@@ -1,0 +1,10 @@
+◇ Suite "Scribe native component journey" started.
+◇ Test realButtonsDriveStartKeepStopFailedSaveRetryAndClose() started.
+✘ Test realButtonsDriveStartKeepStopFailedSaveRetryAndClose() recorded an issue at ScribeComponentJourneyTests.swift:157:6: Caught error: Missing fixture control scribe.start. Own tree: AXGroup:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXStaticText:-:Scribe; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-; AXUnknown:-:-
+✘ Test realButtonsDriveStartKeepStopFailedSaveRetryAndClose() failed after 13.454 seconds with 1 issue.
+◇ Test modelPreferencesReadAndWriteOnlyTheInjectedSuite() started.
+✔ Test modelPreferencesReadAndWriteOnlyTheInjectedSuite() passed after 4.024 seconds.
+◇ Test temporaryMeetingStoreCannotClearAnotherCancellationJournal() started.
+✔ Test temporaryMeetingStoreCannotClearAnotherCancellationJournal() passed after 0.058 seconds.
+✘ Suite "Scribe native component journey" failed after 17.545 seconds with 1 issue.
+✘ Test run with 163 tests in 17 suites failed after 17.565 seconds with 1 issue.

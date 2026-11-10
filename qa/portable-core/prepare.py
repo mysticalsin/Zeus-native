@@ -160,7 +160,13 @@ def write_excerpts(root, group, manifest):
         pieces.append(text)
         manifest["excerpts"].append(evidence)
     if pieces:
-        (root / CORE / "PortableExcerpts.swift").write_text("import Foundation\n\n" + "\n".join(pieces))
+        imports = ["Foundation"]
+        # These exact declarations use CoreGraphics extensions on Apple SDKs.
+        # Linux Foundation provides the geometry values without that module.
+        if group in {"presentation", "recordly-geometry"} and manifest["platform"] == "darwin":
+            imports.append("CoreGraphics")
+        manifest["excerpt_imports"] = imports
+        (root / CORE / "PortableExcerpts.swift").write_text("".join(f"import {name}\n" for name in imports) + "\n" + "\n".join(pieces))
 
 
 def prepare(output, group, *, platform_name=None):

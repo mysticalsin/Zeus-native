@@ -295,6 +295,12 @@ class RequiredGateTests(unittest.TestCase):
         self.update_map(lambda r: r.update(source_snapshot_sha256="d" * 64))
         self.assert_blocked()
 
+    def test_development_receipt_cannot_smuggle_a_native_compiler_barrier(self):
+        self.update_map(lambda r: r.update(native_build={"status": "passed"}))
+        result = self.evaluate()
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("only valid for full macOS" in error for error in result["errors"]), result)
+
     def test_full_run_requires_full_mode_and_completed_obligations(self):
         self.assertEqual(self.evaluate("full")["status"], "failed")
         self.update_map(lambda r: r.update(mode="full"))
@@ -312,6 +318,99 @@ class RequiredGateTests(unittest.TestCase):
         path.unlink()
         self.update_map(lambda r: r["checks"][0]["artifacts"][0].update(path="../outside.log"))
         self.assert_blocked()
+
+
+class NativeBuildGateTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="zeus-native-build-gate-")
+        self.addCleanup(self.temporary.cleanup)
+        self.output = Path(self.temporary.name)
+        self.contracts = gate.policy_modules()[1]
+        folder = self.output / "native-build"
+        folder.mkdir()
+        self.log = folder / "build.log"
+        self.log.write_text("Building for debugging...\nBuild complete! (0.1s)\n")
+        self.result = {"platform": "darwin", "source_snapshot_sha256": "a" * 64,
+                       "native_build": {"status": "passed", "command": ["swift", "build", "--build-tests", "--jobs", "2"],
+                                        "exit_code": 0, "source_snapshot_sha256": "a" * 64, "duration_seconds": 0.1,
+                                        "artifacts": [{"path": "native-build/build.log", "sha256": gate.digest(self.log)}]}}
+        self.definition = {"suite": "SelectedTests", "file": "Tests/ZeusAppTests/SelectedTests.swift"}
+        self.command = ["swift", "test", "--skip-build", "--jobs", "2", "--filter", r"^ZeusAppTests\.SelectedTests/"]
+
+    def validate(self, mode="full"):
+        return gate.validate_native_compilation(self.result, self.output, mode, self.contracts)
+
+    def test_verified_native_build_allows_only_its_exact_fixture_command(self):
+        jobs = self.validate()
+        self.assertEqual(jobs, "2")
+        gate.validate_native_command(self.command, self.definition, jobs)
+        core = {"suite": "SelectedTests", "file": "Tests/ZeusCoreTests/SelectedTests.swift"}
+        gate.validate_native_command([*self.command[:-1], r"^ZeusCoreTests\.SelectedTests/"], core, jobs)
+
+    def test_missing_failed_or_stale_compilation_cannot_authorize_native_reuse(self):
+        original = copy.deepcopy(self.result)
+        changes = [lambda r: r.pop("native_build"), lambda r: r.update(native_build=None),
+                   lambda r: r["native_build"].update(status="failed"),
+                   lambda r: r["native_build"].update(exit_code=1),
+                   lambda r: r["native_build"].update(exit_code=False),
+                   lambda r: r["native_build"].update(source_snapshot_sha256="b" * 64),
+                   lambda r: r["native_build"].update(command=["swift", "build"]),
+                   lambda r: r["native_build"]["command"].append("--skip-build")]
+        for change in changes:
+            with self.subTest(change=change):
+                self.result = copy.deepcopy(original)
+                change(self.result)
+                with self.assertRaises(ValueError):
+                    self.validate()
+
+    def test_missing_or_forged_compiler_log_cannot_authorize_native_reuse(self):
+        for text in ("Build complete! (0.1s)\nerror: native compile failed\n", "Building for debugging...\n",
+                     "Build complete! (0.1s)\nCHECK TIMEOUT after 10 seconds\n"):
+            with self.subTest(text=text):
+                self.log.write_text(text)
+                self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+                with self.assertRaises(ValueError):
+                    self.validate()
+        self.log.unlink()
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_compiler_log_hash_and_containment_are_required(self):
+        self.log.write_text("Build complete! (changed bytes)\n")
+        with self.assertRaises(ValueError):
+            self.validate()
+        self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+        outside = self.output / "outside.log"
+        outside.write_bytes(self.log.read_bytes())
+        self.log.unlink()
+        self.log.symlink_to(outside)
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_barrier_is_for_full_macos_only(self):
+        for mode, platform in (("development", "darwin"), ("development", "linux"), ("full", "linux")):
+            with self.subTest(mode=mode, platform=platform):
+                self.result["platform"] = platform
+                with self.assertRaises(ValueError):
+                    self.validate(mode)
+        self.result.pop("native_build")
+        self.assertIsNone(self.validate("full"))
+        with self.assertRaises(ValueError):
+            gate.validate_native_command(self.command, self.definition, None)
+
+    def test_native_reuse_rejects_changed_jobs_flags_module_or_suite(self):
+        jobs = self.validate()
+        mutations = [lambda c: c.remove("--skip-build"), lambda c: c.__setitem__(4, "3"),
+                     lambda c: c.__setitem__(-1, "SelectedTests"),
+                     lambda c: c.__setitem__(-1, r"^ZeusCoreTests\.SelectedTests/"),
+                     lambda c: c.__setitem__(-1, r"^ZeusAppTests\.UnreviewedTests/"),
+                     lambda c: c.append("--parallel")]
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                command = self.command.copy()
+                mutate(command)
+                with self.assertRaises(ValueError):
+                    gate.validate_native_command(command, self.definition, jobs)
 
 
 class WorkflowContractTests(unittest.TestCase):

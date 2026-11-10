@@ -64,7 +64,7 @@ struct ScribeComponentJourneyTests {
         case injectedFinalWrite
         case missingControl(String, [String])
         case ambiguousControl(String)
-        case unavailableControl(String)
+        case unavailableControl(String, String)
         case rejectedPress(String)
         case traversalLimit
         case transitionTimeout(String)
@@ -73,7 +73,7 @@ struct ScribeComponentJourneyTests {
             case .injectedFinalWrite: return "Synthetic final-write failure"
             case .missingControl(let id, let tree): return "Missing fixture control \(id). Own tree: \(tree.joined(separator: "; "))"
             case .ambiguousControl(let id): return "Multiple fixture controls have \(id)"
-            case .unavailableControl(let id): return "Fixture control is hidden, disabled, or not a button: \(id)"
+            case .unavailableControl(let id, let reason): return "Fixture control is unavailable: \(id) (\(reason))"
             case .rejectedPress(let id): return "Fixture control rejected accessibilityPerformPress: \(id)"
             case .traversalLimit: return "Fixture accessibility tree exceeded its bound"
             case .transitionTimeout(let expected): return "Fixture did not reach \(expected)"
@@ -101,10 +101,11 @@ struct ScribeComponentJourneyTests {
     }
 
     /// Resolve a fresh tree for every action. There is no application-wide tree or controller fallback.
-    private func controls(in window: NSWindow) throws -> [any NSAccessibilityProtocol] {
+    private func controls(in window: NSWindow, diagnostic: inout [String]) throws -> [any NSAccessibilityProtocol] {
         guard let root = window.contentView else { return [] }
         root.layoutSubtreeIfNeeded()
         window.displayIfNeeded()
+        diagnostic.removeAll(keepingCapacity: true)
         var pending: [(Any, Int)] = [(root, 0)]
         var seen = Set<ObjectIdentifier>()
         var result: [any NSAccessibilityProtocol] = []
@@ -112,46 +113,114 @@ struct ScribeComponentJourneyTests {
             guard depth <= 32, seen.count < 1_024 else { throw ScenarioFailure.traversalLimit }
             let object = value as AnyObject
             guard seen.insert(ObjectIdentifier(object)).inserted else { continue }
-            guard let element = object as? any NSAccessibilityProtocol else { continue }
+            // Some hosting wrappers expose physical views alongside their semantic children.
+            // Both remain descendants of this owned content root; never inspect parent/app links.
+            if let view = object as? NSView {
+                pending.append(contentsOf: view.subviews.map { ($0, depth + 1) })
+            }
+            let typeName = String(reflecting: type(of: object))
+            guard let element = object as? any NSAccessibilityProtocol else {
+                if diagnostic.count < 80 { diagnostic.append("\(typeName): does not conform to NSAccessibilityProtocol") }
+                continue
+            }
             result.append(element)
             let children = element.accessibilityChildren() ?? []
+            let navigation = element.accessibilityChildrenInNavigationOrder() ?? []
+            let contents = element.accessibilityContents() ?? []
             pending.append(contentsOf: children.map { ($0, depth + 1) })
-            // Native hosting wrappers can have ignored physical children around their AX children.
-            if children.isEmpty, let view = object as? NSView {
-                pending.append(contentsOf: view.subviews.map { ($0, depth + 1) })
+            pending.append(contentsOf: navigation.map { ($0 as Any, depth + 1) })
+            pending.append(contentsOf: contents.map { ($0, depth + 1) })
+            if diagnostic.count < 80 {
+                diagnostic.append("\(typeName):\(element.accessibilityRole()?.rawValue ?? "?"):" +
+                    "\(element.accessibilityIdentifier() ?? "-"):\(element.accessibilityLabel() ?? "-") " +
+                    "children=\(children.count), navigation=\(navigation.count), contents=\(contents.count)")
             }
         }
         return result
     }
 
     private func press(_ id: String, in window: NSWindow, trace: inout [String]) async throws {
-        guard allowedControls.contains(id), window.isVisible else { throw ScenarioFailure.unavailableControl(id) }
+        guard allowedControls.contains(id) else { throw ScenarioFailure.unavailableControl(id, "not an allowed action") }
+        guard window.isVisible else { throw ScenarioFailure.unavailableControl(id, "owning window is hidden") }
         let deadline = ContinuousClock.now.advanced(by: .seconds(4))
         var diagnostic: [String] = []
+        var lastUnavailableReason: String?
         while ContinuousClock.now < deadline {
-            let tree = try controls(in: window)
-            diagnostic = tree.prefix(80).map {
-                "\($0.accessibilityRole()?.rawValue ?? "?"):\($0.accessibilityIdentifier() ?? "-"):\($0.accessibilityLabel() ?? "-")"
-            }
+            let tree = try controls(in: window, diagnostic: &diagnostic)
             let matches = tree.filter { $0.accessibilityIdentifier() == id }
             if matches.count > 1 { throw ScenarioFailure.ambiguousControl(id) }
             if let button = matches.first {
                 let frame = button.accessibilityFrame()
                 let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
-                guard button.accessibilityRole() == .button, button.isAccessibilityEnabled(),
-                      finite, !frame.isEmpty, frame.intersects(window.frame) else {
-                    throw ScenarioFailure.unavailableControl(id)
+                guard button.accessibilityRole() == .button else {
+                    throw ScenarioFailure.unavailableControl(id, "identified element is not a button")
                 }
-                if let view = button as? NSView, view.isHiddenOrHasHiddenAncestor {
-                    throw ScenarioFailure.unavailableControl(id)
+                guard finite else { throw ScenarioFailure.unavailableControl(id, "nonfinite geometry") }
+                // Model transitions precede SwiftUI's layout/animation and accessibility updates.
+                // Keep the same deadline for missing and not-yet-ready controls, and always resolve
+                // the current object again; never press an unavailable or stale proxy.
+                if !window.isVisible {
+                    lastUnavailableReason = "owning window stayed hidden"
+                } else if !button.isAccessibilityEnabled() {
+                    lastUnavailableReason = "button stayed disabled"
+                } else if frame.isEmpty || !frame.intersects(window.frame) {
+                    lastUnavailableReason = "button stayed empty or outside its window"
+                } else if let view = button as? NSView, view.isHiddenOrHasHiddenAncestor {
+                    lastUnavailableReason = "button stayed hidden"
+                } else {
+                    guard button.accessibilityPerformPress() else { throw ScenarioFailure.rejectedPress(id) }
+                    trace.append("pressed \(id)")
+                    return
                 }
-                guard button.accessibilityPerformPress() else { throw ScenarioFailure.rejectedPress(id) }
-                trace.append("pressed \(id)")
-                return
             }
             try await Task.sleep(for: .milliseconds(10))
         }
+        if let lastUnavailableReason { throw ScenarioFailure.unavailableControl(id, lastUnavailableReason) }
         throw ScenarioFailure.missingControl(id, diagnostic)
+    }
+
+    private final class ButtonTarget: NSObject {
+        private(set) var presses = 0
+        @objc func performAction(_ sender: NSButton) { presses += 1 }
+    }
+
+    @Test func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
+        _ = NSApplication.shared
+        let target = ButtonTarget()
+        let button = NSButton(title: "Synthetic readiness control", target: target,
+                              action: #selector(ButtonTarget.performAction(_:)))
+        button.setAccessibilityIdentifier("scribe.start")
+        button.frame = NSRect(x: 20, y: 20, width: 240, height: 32)
+        button.isEnabled = false
+        let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 300, height: 90),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "Synthetic accessibility readiness fixture"
+        window.isReleasedWhenClosed = false
+        window.contentView?.addSubview(button)
+        defer { window.contentView = nil; window.close() }
+        window.orderFront(nil)
+        var trace: [String] = []
+        let enable = Task { @MainActor in
+            try await Task.sleep(for: .milliseconds(150))
+            #expect(target.presses == 0)
+            button.isEnabled = true
+        }
+        defer { enable.cancel() }
+        try await press("scribe.start", in: window, trace: &trace)
+        try await enable.value
+        #expect(target.presses == 1)
+        #expect(trace == ["pressed scribe.start"])
+
+        button.isEnabled = false
+        do {
+            try await press("scribe.start", in: window, trace: &trace)
+            Issue.record("A permanently disabled owned control was pressed")
+        } catch ScenarioFailure.unavailableControl(let id, let reason) {
+            #expect(id == "scribe.start")
+            #expect(reason == "button stayed disabled")
+        }
+        #expect(target.presses == 1)
+        #expect(trace == ["pressed scribe.start"])
     }
 
     @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {

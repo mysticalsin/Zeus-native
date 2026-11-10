@@ -33,7 +33,7 @@ struct QA20ClockTests {
     @Test func otherQuestionsStayOnTheBrain() {
         #expect(LocalClock.answer(for: "what time is the meeting") == nil)
         #expect(LocalClock.answer(for: "open Spotify") == nil)
-        let answer = PersonaQueries.localAnswer(for: "what time is it")
+        let answer = PersonaQueries.localAnswer(for: "what time is it", personality: .ultron)
         #expect(answer?.contains("AM.") == true || answer?.contains("PM.") == true)
     }
 

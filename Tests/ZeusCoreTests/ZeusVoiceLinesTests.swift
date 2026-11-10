@@ -190,7 +190,7 @@ import Testing
 
     @Test func localQueriesAnswerLoyally() {
         for question in ["are you smarter than me", "how are you today?", "tell me something funny about Mondays"] {
-            let answer = PersonaQueries.localAnswer(for: question) ?? ""
+            let answer = PersonaQueries.localAnswer(for: question, personality: .ultron) ?? ""
             #expect(!answer.isEmpty, "\(question)")
             #expect(!PersonaCompliance.hasOminousHedge(answer))
             #expect(answer.filter { ".!?".contains($0) }.count <= 2, "\(answer)")

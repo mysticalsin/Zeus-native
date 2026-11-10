@@ -14,7 +14,8 @@ import tempfile
 import time
 
 from contracts import (ROOT, Invalid, case_passed, digest, evaluate_features, load,
-                       manifest_matches, require, source_snapshot, swift_summary, validate_map, validate_registry)
+                       manifest_matches, require, source_snapshot, swift_summary, validate_map, validate_registry,
+                       validate_native_build)
 
 
 def portable_module():
@@ -66,7 +67,37 @@ def python_summary(log, code):
     return int(summaries[0]), 1, functions
 
 
-def run_check(definition, args, output, portable):
+def compile_native(args, output, source_hash):
+    folder = output / "native-build"
+    folder.mkdir()
+    log = folder / "build.log"
+    row = {"status": "failed", "command": [], "exit_code": None,
+           "source_snapshot_sha256": source_hash, "artifacts": [], "duration_seconds": 0}
+    try:
+        require(snapshot(output)["sha256"] == source_hash, "Source changed before the native compiler barrier")
+        row["command"] = ["swift", "build", "--build-tests", "--jobs", str(args.jobs)]
+        code, seconds = execute(row["command"], log, args.timeout)
+        row.update(exit_code=code, duration_seconds=seconds, artifacts=[artifact(log, output)])
+        require(code == 0, f"native compiler command exited {code}")
+        require(snapshot(output)["sha256"] == source_hash, "Source changed during the native compiler barrier")
+        row["status"] = "passed"
+        validate_native_build(row, output, source_hash, args.jobs)
+    except (Invalid, OSError, ValueError) as error:
+        row.update(status="failed", reason=str(error))
+        if not log.exists():
+            log.write_text(f"NATIVE BUILD NOT EXECUTED: {error}\n")
+        row["artifacts"] = [artifact(log, output)]
+    return row
+
+
+def run_checks(definitions, args, output, portable, result):
+    for definition in definitions:
+        if definition["kind"] == "native-fixture" and args.mode == "full" and platform.system() == "Darwin" and "native_build" not in result:
+            result["native_build"] = compile_native(args, output, result["source_snapshot_sha256"])
+        result["checks"].append(run_check(definition, args, output, portable, result.get("native_build")))
+
+
+def run_check(definition, args, output, portable, native_build=None):
     ident, kind = definition["id"], definition["kind"]
     row = {"id": ident, "kind": kind, "tier": definition.get("tier", "contract"),
            "scope": definition["scope"], "status": "not-run", "command": [], "exit_code": None,
@@ -80,6 +111,13 @@ def run_check(definition, args, output, portable):
     if kind == "native-fixture" and platform.system() != "Darwin":
         row.update(status="blocked", reason="Actual production native target requires macOS and Apple SDKs.")
         return row
+    if kind == "native-fixture":
+        try:
+            require(native_build is not None, "Native compiler barrier is missing")
+            validate_native_build(native_build, output, snapshot(output)["sha256"], args.jobs)
+        except (Invalid, OSError, ValueError) as error:
+            row.update(status="blocked", blocker="native-build", reason=str(error))
+            return row
     folder = output / ident
     folder.mkdir()
     log = folder / "test.log"
@@ -92,7 +130,7 @@ def run_check(definition, args, output, portable):
             # Selector is a checked bare suite name. No shell, user content, actual
             # capture command or unrestricted app test suite is accepted here.
             module = "ZeusAppTests" if definition["file"].startswith("Tests/ZeusAppTests/") else "ZeusCoreTests"
-            command = ["swift", "test", "--jobs", str(args.jobs), "--filter", "^" + module + r"\." + definition["suite"] + "/"]
+            command = ["swift", "test", "--skip-build", "--jobs", str(args.jobs), "--filter", "^" + module + r"\." + definition["suite"] + "/"]
         elif kind == "release-mocks":
             command = [sys.executable, "qa/release-scripts/test_release_scripts.py"]
         elif kind == "selftests":
@@ -146,12 +184,21 @@ def finish(args, output, result):
                    "command": r["command"], "artifacts": r["artifacts"],
                    "required_action": "Reproduce, repair, and add a real type/lint/test guard to qa/regressions.json; do not mark this candidate as resolved evidence."}
                   for r in result.get("checks", []) if r["status"] == "failed"]
+    if result.get("native_build", {}).get("status") == "failed":
+        build = result["native_build"]
+        candidates.append({"check": "native-build", "status": "failed", "reason": build.get("reason", ""),
+                           "tested_sha": result.get("tested_sha"), "source_snapshot_sha256": build["source_snapshot_sha256"],
+                           "command": build["command"], "artifacts": build["artifacts"],
+                           "required_action": "Repair the shared compiler failure before rerunning native fixtures; blocked fixtures are not passing evidence."})
     save(output / "regression-candidates.json", {"schema_version": 1, "failures": candidates})
     lines = [f"Zeus {args.mode}: {result['status']}", "", f"Tested SHA: {result.get('tested_sha', 'unknown')}",
              f"Source snapshot: {result.get('source_snapshot_sha256', 'unavailable')}",
              f"Fully accepted checklist items: {sum(f['status'] == 'passed' for f in result.get('features', []))}/19",
              f"Release ready: {str(result.get('release_ready', False)).lower()}", "",
              "Development success establishes only its executed guards. Native fixtures are not device proof.", ""]
+    if "native_build" in result:
+        lines.extend([f"Native compiler barrier: {result['native_build']['status']}",
+                      f"Compiler log: native-build/build.log — {result['native_build'].get('reason', 'current-source compilation completed')}", ""])
     for feature in result.get("features", []):
         lines.append(f"- {feature['id']} {feature['title']}: {feature['status']}")
         lines.extend(f"  - {o['id']}: {o['status']} — {o.get('reason') or o['check']}" for o in feature["obligations"])
@@ -193,8 +240,7 @@ def main(argv=None):
         result["map_sha256"] = digest((ROOT / "qa/feature-map.json").read_bytes())
         result["registry_sha256"] = digest((ROOT / "qa/regressions.json").read_bytes())
         selftest = {"id": "closed-loop-selftests", "kind": "selftests", "scope": "Runner/schema/receipt/aggregate rejection regressions."}
-        for definition in [selftest, *definitions.values()]:
-            result["checks"].append(run_check(definition, args, output, portable))
+        run_checks([selftest, *definitions.values()], args, output, portable, result)
         checks = {row["id"]: row for row in result["checks"]}
         result["features"] = evaluate_features(feature_map, checks, output)
         result["regressions"] = evaluate_registry(registry, checks, output)

@@ -44,14 +44,23 @@ public enum ScreenshotDetector {
         isScreenshot(filename: url.lastPathComponent)
     }
 
-    public static func location(defaults: UserDefaults = .standard) -> URL {
-        if let custom = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location") {
-            let expanded = (custom as NSString).expandingTildeInPath
-            if FileManager.default.fileExists(atPath: expanded) {
+    public static func location(defaults: UserDefaults? = UserDefaults(suiteName: "com.apple.screencapture")) -> URL {
+        resolveLocation(configuredPath: defaults?.string(forKey: "location"),
+            desktop: FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+                ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop"),
+            expandPath: { ($0 as NSString).expandingTildeInPath },
+            exists: { FileManager.default.fileExists(atPath: $0) })
+    }
+
+    /// Resolve only the supplied state; tests need no screenshot preferences or private paths.
+    public static func resolveLocation(configuredPath: String?, desktop: URL,
+                                       expandPath: (String) -> String, exists: (String) -> Bool) -> URL {
+        if let configuredPath {
+            let expanded = expandPath(configuredPath)
+            if exists(expanded) {
                 return URL(fileURLWithPath: expanded)
             }
         }
-        return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
+        return desktop
     }
 }

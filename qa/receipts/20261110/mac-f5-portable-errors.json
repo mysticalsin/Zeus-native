@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42734553020",
+  "job_id": 129560455651,
+  "artifact_id": 13725834033,
+  "tested_sha": "46c7059de7bc3dbf62be31ee11a4619abc77f5c4",
+  "head_sha": "f5b7f2be4c0a3f9ad53dc7d63fe9f6ce6ebc7dd6",
+  "status": "failed",
+  "totals": {
+    "tests": 431,
+    "suites": 41
+  },
+  "passed_checks": [
+    {
+      "id": "closed-loop-selftests",
+      "tests": 46,
+      "suites": 1
+    },
+    {
+      "id": "portable-polyglot",
+      "tests": 56,
+      "suites": 7
+    },
+    {
+      "id": "portable-regressions",
+      "tests": 76,
+      "suites": 9
+    },
+    {
+      "id": "portable-scribe",
+      "tests": 151,
+      "suites": 15
+    },
+    {
+      "id": "portable-wiki-relationships",
+      "tests": 26,
+      "suites": 3
+    },
+    {
+      "id": "release-mocks",
+      "tests": 13,
+      "suites": 1
+    },
+    {
+      "id": "portable-buddy",
+      "tests": 20,
+      "suites": 2
+    },
+    {
+      "id": "portable-dictation-insertion",
+      "tests": 17,
+      "suites": 1
+    },
+    {
+      "id": "portable-wiki-export",
+      "tests": 26,
+      "suites": 2
+    }
+  ],
+  "failures": [
+    {
+      "check": "portable-presentation",
+      "status": "failed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/Users/runner/work/_temp/zeus-results/feature-map/portable-presentation/presentation",
+        "--jobs",
+        "4"
+      ],
+      "artifact_sha256": "d5e6ccb27b3c9134d5c0d236f25dce3c88e0468e470f0adf2fc21abb24055b0d",
+      "compiler_errors": [
+        "/Users/runner/work/_temp/zeus-results/feature-map/portable-presentation/presentation/Sources/ZeusCore/PortableExcerpts.swift:109:15: error: type 'AXSnapshotElement' does not conform to protocol 'Equatable'",
+        "/Users/runner/work/_temp/zeus-results/feature-map/portable-presentation/presentation/Sources/ZeusCore/PortableExcerpts.swift:123:57: error: type 'CGRect' has no member 'zero'"
+      ]
+    },
+    {
+      "check": "portable-recordly-geometry",
+      "status": "failed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/Users/runner/work/_temp/zeus-results/feature-map/portable-recordly-geometry/recordly-geometry",
+        "--jobs",
+        "4"
+      ],
+      "artifact_sha256": "e03ee901809d50d41aa70e59021c735b3c4fbbde5fe0924a60b2f3b0f1c0df76",
+      "compiler_errors": [
+        "/Users/runner/work/_temp/zeus-results/feature-map/portable-recordly-geometry/recordly-geometry/Sources/ZeusCore/PortableExcerpts.swift:11:38: error: static property 'zero' cannot be used in a default argument value because 'CoreGraphics' was not imported by this file",
+        "/Users/runner/work/_temp/zeus-results/feature-map/portable-recordly-geometry/recordly-geometry/Sources/ZeusCore/PortableExcerpts.swift:11:65: error: static property 'zero' cannot be used in a default argument value because 'CoreGraphics' was not imported by this file"
+      ]
+    }
+  ],
+  "scope": "Actual Mac portable/core and QA-policy run; not native app integration, hardware capture, UI/device or release-signing acceptance. Extracted framework imports were corrected after this failing run; rerun required."
+}

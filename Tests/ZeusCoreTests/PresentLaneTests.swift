@@ -109,7 +109,8 @@ struct L6PresentTests {
     }
 
     @Test func physicalPointerOffByDefault() {
-        #expect(UserDefaults.standard.object(forKey: PhysicalPointerSettings.defaultsKey) == nil)
-        #expect(!PhysicalPointerSettings.enabled)
+        #expect(!PhysicalPointerSettings.enabled(storedValue: nil))
+        #expect(!PhysicalPointerSettings.enabled(storedValue: false))
+        #expect(PhysicalPointerSettings.enabled(storedValue: true))
     }
 }

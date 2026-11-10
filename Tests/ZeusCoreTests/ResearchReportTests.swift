@@ -121,7 +121,7 @@ import Testing
     @Test func reportsGoToTheVaultsResearchFolderWhenItIsWritable() {
         let vault = URL(fileURLWithPath: "/Users/t/Documents/brain")
         let home = URL(fileURLWithPath: "/Users/t")
-        let url = ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: connection(vault), home: home, exists: { _ in false })
+        let url = ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: connection(vault), chosenFolder: nil, home: home, exists: { _ in false })
         #expect(url.path == "/Users/t/Documents/brain/ZEUS/Research/2026-11-01 Heat pumps.md")
     }
 
@@ -129,15 +129,15 @@ import Testing
         let home = URL(fileURLWithPath: "/Users/t")
         let expected = "/Users/t/Documents/Zeus Research/2026-11-01 Heat pumps.md"
         let vault = URL(fileURLWithPath: "/Users/t/Documents/brain")
-        #expect(ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: nil, home: home, exists: { _ in false }).path == expected)
-        #expect(ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: connection(vault, access: .readOnly), home: home, exists: { _ in false }).path == expected)
-        #expect(ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: connection(vault, kind: .bear), home: home, exists: { _ in false }).path == expected)
+        #expect(ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: nil, chosenFolder: nil, home: home, exists: { _ in false }).path == expected)
+        #expect(ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: connection(vault, access: .readOnly), chosenFolder: nil, home: home, exists: { _ in false }).path == expected)
+        #expect(ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: connection(vault, kind: .bear), chosenFolder: nil, home: home, exists: { _ in false }).path == expected)
     }
 
     @Test func aTakenNameGetsANumberNeverAnOverwrite() {
         let home = URL(fileURLWithPath: "/Users/t")
         let taken: Set<String> = ["/Users/t/Documents/Zeus Research/2026-11-01 Heat pumps.md", "/Users/t/Documents/Zeus Research/2026-11-01 Heat pumps 2.md"]
-        let url = ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: nil, home: home, exists: { taken.contains($0.path) })
+        let url = ResearchReport.destination(fileName: "2026-11-01 Heat pumps.md", connection: nil, chosenFolder: nil, home: home, exists: { taken.contains($0.path) })
         #expect(url.lastPathComponent == "2026-11-01 Heat pumps 3.md")
     }
 

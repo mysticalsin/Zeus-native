@@ -177,6 +177,28 @@ def validate_native(log_path: Path) -> int:
     return count
 
 
+def validate_native_compilation(result: dict, root: Path, mode: str, contracts) -> str | None:
+    """Authorize native reuse only with a current-source, verified macOS test build."""
+    if mode != "full" or result.get("platform") != "darwin":
+        if "native_build" in result:
+            raise ValueError("native compiler barrier is only valid for full macOS checks")
+        return None
+    if "native_build" not in result:
+        raise ValueError("full macOS checks have no native compiler barrier")
+    contracts.validate_native_build(result["native_build"], root, result["source_snapshot_sha256"])
+    return result["native_build"]["command"][4]
+
+
+def validate_native_command(command, definition: dict, native_jobs: str | None) -> None:
+    if native_jobs is None:
+        raise ValueError("native fixture execution has no verified macOS compiler barrier")
+    module = "ZeusAppTests" if definition["file"].startswith("Tests/ZeusAppTests/") else "ZeusCoreTests"
+    expected = ["swift", "test", "--skip-build", "--jobs", native_jobs, "--filter",
+                "^" + module + r"\." + definition["suite"] + "/"]
+    if command != expected:
+        raise ValueError("native fixture command differs from its verified build and exact reviewed suite")
+
+
 def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str) -> int:
     result_path = artifact(root, "result.json")
     # artifact() validates the boundary and rejects links below it. Normalize the
@@ -206,6 +228,7 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
     expected_manifest = contracts.source_snapshot(repo, root)
     if manifest != expected_manifest or result["source_snapshot_sha256"] != manifest.get("sha256"):
         raise ValueError("feature result source differs from current checkout bytes")
+    native_jobs = validate_native_compilation(result, root, mode, contracts)
     if type(result.get("release_ready")) is not bool:
         raise ValueError("feature map release_ready must be a boolean")
     checks = result.get("checks")
@@ -237,6 +260,8 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
             raise ValueError(f"required feature check did not execute and succeed: {ident}")
         if not isinstance(check.get("command"), list) or not check["command"] or not all(isinstance(x, str) and x for x in check["command"]):
             raise ValueError(f"feature check has no command: {ident}")
+        if definition["kind"] == "native-fixture":
+            validate_native_command(check["command"], definition, native_jobs)
         count += tests
         evidence = check.get("artifacts")
         if not isinstance(evidence, list) or not evidence:

@@ -39,6 +39,15 @@ motion parity, MCP delivery or a distributable signed artifact. Future device
 checkers must actually execute a reproducible acceptance protocol with artifacts;
 changing a status string cannot implement one.
 
+Full mode on macOS first compiles the native test target once with
+`swift build --build-tests`. A failed compiler barrier records its exact source
+hash and compiler log; every native fixture is `blocked` by that failure, and no
+native test command runs. After verified current-source compilation, each mapped
+suite executes independently with `swift test --skip-build --filter ...`.
+One suite's runtime failure remains `failed` while later suites still run. A
+missing, changed or unsuccessful compiler receipt cannot authorize `--skip-build`.
+This optimization does not remove any native obligation or change full-mode failure.
+
 ## Evidence and rejection rules
 
 `result.json` records actual git `tested_sha`, separately supplied PR `head_sha`,

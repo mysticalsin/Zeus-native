@@ -770,6 +770,10 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
             }
           ]
         }
@@ -1518,6 +1522,10 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
             }
           ]
         }

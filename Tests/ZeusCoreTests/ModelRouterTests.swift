@@ -99,10 +99,11 @@ struct ModelRouterTests {
     }
 
     @Test func headlessArguments() {
+        let defaults = UserDefaults(suiteName: "zeus.router.\(UUID().uuidString)")!
         // Capped effort (ModelCap): never the account default, which can be "max".
-        #expect(RouterEngine.codex.headlessArguments(prompt: "hi")
+        #expect(RouterEngine.codex.headlessArguments(prompt: "hi", defaults: defaults)
                 == ["exec", "--skip-git-repo-check", "-c", "model_reasoning_effort=\"low\"", "hi"])
-        #expect(RouterEngine.ollama.headlessArguments(prompt: "hi", localModel: "qwen") == ["run", "qwen", "hi"])
+        #expect(RouterEngine.ollama.headlessArguments(prompt: "hi", localModel: "qwen", defaults: defaults) == ["run", "qwen", "hi"])
         #expect(RouterEngine.cursorAgent.binary == "cursor-agent")
     }
 }

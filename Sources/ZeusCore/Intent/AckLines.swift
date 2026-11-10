@@ -71,25 +71,32 @@ public struct AckLines: Sendable {
 
     /// The persona's lines where `ZeusVoiceLines` has a situation, neutral ones elsewhere.
     public static let persona = AckLines { ack in
-        Self.clamp(Self.rawPersona(ack))
+        Self.clamp(Self.rawPersona(ack) { ZeusVoiceLines.line(for: $0, context: $1) })
     }
 
-    private static func rawPersona(_ ack: FastAck) -> String? {
+    /// Explicit inputs avoid consulting host preferences or sharing the live line bank.
+    public static func persona(personality: ZeusPersonality, lines: ZeusVoiceLines = ZeusVoiceLines()) -> AckLines {
+        AckLines { ack in
+            Self.clamp(Self.rawPersona(ack) { lines.line(for: $0, context: $1, personality: personality) })
+        }
+    }
+
+    private static func rawPersona(_ ack: FastAck, line: (ZeusVoiceLines.Situation, [String: String]) -> String) -> String? {
         switch ack {
         case .opening(let app), .switching(let app):
-            ZeusVoiceLines.line(for: .ackOpen, context: ["app": app])
+            line(.ackOpen, ["app": app])
         case .searchingSpotify(let query):
-            ZeusVoiceLines.line(for: .ackPlay, context: ["artist": query])
+            line(.ackPlay, ["artist": query])
         case .resumingSpotify, .media(.play):
-            ZeusVoiceLines.line(for: .ackPlay)
+            line(.ackPlay, [:])
         case .media(.pause), .media(.toggle):
-            ZeusVoiceLines.line(for: .ackDone)
+            line(.ackDone, [:])
         case .media(.next), .media(.previous):
-            ZeusVoiceLines.line(for: .ackDone)
+            line(.ackDone, [:])
         case .added(let items):
-            ZeusVoiceLines.line(for: .ackTodoAdded, context: items.count == 1 ? ["item": items[0]] : [:])
+            line(.ackTodoAdded, items.count == 1 ? ["item": items[0]] : [:])
         case .quitting, .hiding, .openingSite:
-            ZeusVoiceLines.line(for: .ackDone)
+            line(.ackDone, [:])
         default:
             rawNeutral(ack)
         }

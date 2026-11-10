@@ -49,14 +49,14 @@ struct R24LaneTests {
     }
 
     @Test func metaphysicalQuestionsStayLocalAndShort() {
-        let answer = PersonaQueries.localAnswer(for: "Are you conscious?")
+        let answer = PersonaQueries.localAnswer(for: "Are you conscious?", personality: .ultron)
         #expect(answer != nil)
         #expect(answer!.split(separator: " ").count <= 20)
         #expect(!answer!.lowercased().contains("weekly limit"))
     }
 
     @Test func smallTalkIsNotServile() {
-        let answer = PersonaQueries.localAnswer(for: "how are you today") ?? ""
+        let answer = PersonaQueries.localAnswer(for: "how are you today", personality: .ultron) ?? ""
         #expect(!answer.lowercased().contains("at your disposal"))
         #expect(!answer.lowercased().contains("operational"))
     }

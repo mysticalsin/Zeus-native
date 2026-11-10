@@ -165,6 +165,9 @@
           "package": {
             "type": "string",
             "minLength": 1
+          },
+          "blocker": {
+            "const": "native-build"
           }
         },
         "required": [
@@ -179,6 +182,40 @@
           "suites",
           "passed_functions",
           "artifacts"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "blocker"
+              ]
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "blocked"
+                },
+                "command": {
+                  "maxItems": 0
+                },
+                "exit_code": {
+                  "type": "null"
+                },
+                "tests": {
+                  "const": 0
+                },
+                "suites": {
+                  "const": 0
+                },
+                "passed_functions": {
+                  "maxItems": 0
+                },
+                "artifacts": {
+                  "maxItems": 0
+                }
+              }
+            }
+          }
         ]
       }
     },
@@ -312,6 +349,71 @@
         "linux",
         "darwin"
       ]
+    },
+    "native_build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "command",
+        "exit_code",
+        "source_snapshot_sha256",
+        "artifacts",
+        "duration_seconds"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "sha256"
+            ]
+          }
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
     }
   },
   "required": [
@@ -360,6 +462,48 @@
             }
           }
         }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "native_build"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mode": {
+            "const": "full"
+          },
+          "platform": {
+            "const": "darwin"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "full"
+          },
+          "platform": {
+            "const": "darwin"
+          },
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": [
+          "mode",
+          "platform",
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "native_build"
+        ]
       }
     }
   ],

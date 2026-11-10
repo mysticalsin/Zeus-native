@@ -708,7 +708,7 @@ public enum BrowserAgentBrainLaunch {
             return ModelCap.arguments(for: .claude, tier: tier, defaults: defaults)
                 + ["-p", prompt, "--output-format", "text", "--strict-mcp-config", "--no-session-persistence"]
         default:
-            return engine.headlessArguments(prompt: prompt, localModel: localModel, tier: tier)
+            return engine.headlessArguments(prompt: prompt, localModel: localModel, tier: tier, defaults: defaults)
         }
     }
 }

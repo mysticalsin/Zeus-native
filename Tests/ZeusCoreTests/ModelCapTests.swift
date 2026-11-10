@@ -22,9 +22,10 @@ struct ModelCapTests {
     }
 
     @Test func everyEngineThatTakesAModelGetsOneOnEveryLaunch() {
+        let defaults = store()
         for engine in [RouterEngine.claude, .codex, .gemini, .cursorAgent] {
             for tier in [ModelTier.fast, .deep] {
-                let arguments = engine.headlessArguments(prompt: "hi", tier: tier)
+                let arguments = engine.headlessArguments(prompt: "hi", tier: tier, defaults: defaults)
                 #expect(arguments.contains("--model") || arguments.contains("-m") || arguments.contains("-c"),
                         "\(engine) \(tier) launched without a pinned model")
             }

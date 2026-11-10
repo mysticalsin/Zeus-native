@@ -502,6 +502,71 @@
         "file": "qa/closed-loop/tests/test_gate.py",
         "function": "test_trusted_output_ancestor_alias_accepts_valid_packages"
       }
+    },
+    {
+      "id": "REG-042",
+      "failure": "A single native compiler failure repeatedly rebuilt the identical failing target for every fixture suite; the shared barrier must block all native test execution while keeping each obligation unmet.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_failed_common_build_blocks_every_native_suite_without_executing_tests"
+      }
+    },
+    {
+      "id": "REG-043",
+      "failure": "Native --skip-build results could be accepted without a successful compiler barrier for the exact current source snapshot.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_missing_failed_or_stale_compilation_cannot_authorize_native_reuse"
+      }
+    },
+    {
+      "id": "REG-044",
+      "failure": "Portable exact-declaration excerpts omitted the original CoreGraphics import, so native Mac compilation rejected CGRect.zero, default geometry arguments and Equatable synthesis.",
+      "features": [
+        "F08",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_mac_geometry_excerpts_preserve_their_required_framework_import"
+      }
+    },
+    {
+      "id": "REG-045",
+      "failure": "The native Scribe control journey attempted activation before its owned button became enabled; waiting must stay bounded and must not bypass a permanently disabled control.",
+      "features": [
+        "F06",
+        "F13",
+        "S05"
+      ],
+      "check": "native-ScribeComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+      }
+    },
+    {
+      "id": "REG-046",
+      "failure": "Actual Mac component QA could not find the production scribe.start control in the owned accessibility tree; the real button journey must execute successfully rather than treating controller calls or a positive suite total as equivalent.",
+      "features": [
+        "F06",
+        "F13",
+        "S05"
+      ],
+      "check": "native-ScribeComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+      }
     }
   ]
 }

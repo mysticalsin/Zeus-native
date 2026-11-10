@@ -90,6 +90,34 @@ def load(path):
     return json.loads(Path(path).read_text(), object_pairs_hook=pairs)
 
 
+def validate_native_build(build, output, source_hash, jobs=None):
+    """Only fresh, intact compiler success may authorize native --skip-build."""
+    fields(build, {"status", "command", "exit_code", "source_snapshot_sha256", "artifacts", "duration_seconds"}, {"reason"})
+    require(build["status"] == "passed" and type(build["exit_code"]) is int and build["exit_code"] == 0,
+            "native compiler barrier did not pass")
+    command = build["command"]
+    require(type(command) is list and len(command) == 5 and command[:4] == ["swift", "build", "--build-tests", "--jobs"]
+            and type(command[4]) is str and command[4].isdigit() and int(command[4]) > 0,
+            "native compiler barrier command is not allowlisted")
+    require(jobs is None or command[4] == str(jobs), "native compiler barrier job count changed")
+    require(build["source_snapshot_sha256"] == source_hash, "native compiler barrier belongs to other source")
+    require(type(build["duration_seconds"]) in {int, float} and build["duration_seconds"] >= 0,
+            "native compiler barrier duration is invalid")
+    require(type(build["artifacts"]) is list and len(build["artifacts"]) == 1, "native compiler barrier needs its compiler log")
+    evidence = build["artifacts"][0]
+    fields(evidence, {"path", "sha256"})
+    require(evidence["path"] == "native-build/build.log", "native compiler barrier has an unexpected log")
+    root = output.resolve()
+    log = root / evidence["path"]
+    require(not log.is_symlink() and not log.parent.is_symlink() and log.resolve().is_relative_to(root),
+            "native compiler log is redirected")
+    require(log.is_file() and digest(log.read_bytes()) == evidence["sha256"], "native compiler log is missing or changed")
+    text = log.read_text()
+    require(re.search(r"(?m)^Build complete!(?: \([^\n]*\))?\s*$", text), "native compiler log has no completion")
+    require(not re.search(r"(?im)(?:^|\s)(?:error|fatal error):|CHECK TIMEOUT|CHECK COULD NOT START", text),
+            "native compiler log contains failure")
+
+
 def runnable_functions(text, python=False):
     if python:
         return re.findall(r"(?m)^\s*def\s+(test_[A-Za-z_0-9]+)\s*\(", text)
