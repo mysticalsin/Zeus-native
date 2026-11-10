@@ -224,7 +224,9 @@ struct ExplanationRendererTests {
         view.apply(input, reduceMotion: true)
         let node = try #require(view.node(for: sphere.id))
         #expect(node.isHidden && node.opacity == 0)
-        #expect(node.childNodes.first?.geometry?.firstMaterial?.emission.intensity == 0.4)
+        // SceneKit stores intensity as Float, so 0.4 reads back as 0.4000000059604645.
+        let intensity = try #require(node.childNodes.first?.geometry?.firstMaterial?.emission.intensity)
+        #expect(abs(intensity - 0.4) < 1e-6)
         input.objects[sphere.id]?.reveal = 0.5
         view.apply(input, reduceMotion: true)
         #expect(!node.isHidden && node.opacity == 0.5)

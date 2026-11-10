@@ -2552,6 +2552,18 @@
         "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
         "function": "scratchRootIsCanonicalAndHasNoSymlinkComponents"
       }
+    },
+    {
+      "id": "REG-212",
+      "failure": "macOS renderer run at 9d7dcfa failed the group-highlight assertion because SceneKit stores emission intensity as Float, so the production 0.4 read back as 0.4000000059604645 against an exact Double comparison. Production highlight reached the child correctly; the assertion now requires the material and compares within 1e-6.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "nativeSceneReducedMotionNeverRevealsFutureObjectsAndGroupHighlightReachesChildren"
+      }
     }
   ]
 }
