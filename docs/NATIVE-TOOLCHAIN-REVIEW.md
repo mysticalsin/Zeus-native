@@ -279,3 +279,42 @@ or a physical user's permission flow. The separate completion-isolation suite
 retains repeated-completion protection. Native execution of this new component
 journey remains required; Linux parsing and host/map contract tests are not a
 passing Mac journey.
+
+## Semantic controls, event admission and decorative playback
+
+The [5dfeeb8 push artifact](https://github.com/mysticalsin/Zeus-native/actions/runs/42806557428)
+was independently revalidated: 2,320 completed tests across 23 partitions, with
+three failed partitions preserved in the
+[partial receipt](../qa/receipts/20261110/mac-5dfe-ci.json). The exposed native
+button cell has its natural AXButton role while its ignored wrapper reports
+AXUnknown. Synthetic fixtures now annotate that actual cell and put the negative
+role on the same identified semantic element. The production SwiftUI journey
+still exposed no children. A bounded, off-main, read-only own-PID AX snapshot
+now diagnoses that failed lookup without retrying or changing its original
+failure. It requires an exact synthetic window marker and verified membership;
+it cannot request trust, perform actions or inspect another application's tree.
+
+The synchronous event fixture also showed that native mouseDown tracking itself
+can consume a foreign release. The driver now refuses admission when any release
+is already queued, before posting or dispatching a gesture. The guard requires
+no additional action, exact foreign-event preservation and a successful clean
+subsequent click. This protects preexisting input; it does not control new input
+arriving during AppKit tracking.
+
+At `7974d1f`, production compilation passed but the new nested private observable
+fixture failed test compilation: its macro emits a file-scope conformance
+extension. No native tests executed in that run. File-visible fixture scope
+corrects the access; a local Swift macro control reproduces the original failure
+and accepts the correction. Fresh native compilation and execution are required.
+
+Decorative onboarding films now explicitly pause when the owned window is hidden,
+minimized, fully occluded or closing, when the view is hidden, or when motion is
+reduced. Reattachment replaces scoped observers; dismantling pauses playback,
+disables looping, clears queued items and rejects late callbacks. Multi-film
+completion requires the exact owned AVPlayerItem, consumed once, rather than
+only a matching asset URL from any player. Four new native lifecycle guards use
+real muted playback and media-time advancement as a positive control, then
+exercise visibility/disposal and a natural completion. No capture or global
+preference mutation is used. A host with existing OS Reduce Motion cannot satisfy
+the initial normal-playback precondition; that remains an explicit failure, not
+an override. These tests do not measure decoder CPU, energy or physical FPS.

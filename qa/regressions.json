@@ -1429,7 +1429,7 @@
       "check": "native-OwnedWindowEventDriverTests",
       "guard": {
         "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
-        "function": "consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched"
+        "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
       }
     },
     {
@@ -1613,7 +1613,67 @@
       "check": "native-OwnedWindowEventDriverTests",
       "guard": {
         "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
-        "function": "consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched"
+        "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
+      }
+    },
+    {
+      "id": "REG-134",
+      "failure": "AppKit native mouseDown tracking consumed a preexisting foreign release despite the driver never dequeuing it directly. Admission now refuses any preexisting release before posting or dispatching a gesture, preserving exact identity and action count; a clean subsequent click remains required.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
+      }
+    },
+    {
+      "id": "REG-135",
+      "failure": "Onboarding film playback was only gated by window attachment, leaving hide, minimize and occlusion without explicit pause. Real-player lifecycle guards require positive advancement before native visibility transitions and paused media afterward.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow"
+      }
+    },
+    {
+      "id": "REG-136",
+      "failure": "A multi-film preview accepted completion from any AVPlayerItem with the same asset URL, allowing another player to grow its queue. Completion now requires an exact owned item and is consumed once; a foreign same-URL item cannot requeue.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "onlyOwnedNaturalCompletionsCanRequeueBundledFilms"
+      }
+    },
+    {
+      "id": "REG-137",
+      "failure": "A nested private observable fixture failed native test compilation because the observation macro emits a file-scope conformance extension. The fixture uses file-visible scope; the required native compiler barrier and actual onboarding journey remain mandatory.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
+    },
+    {
+      "id": "REG-138",
+      "failure": "A synthetic accessibility fixture annotated the ignored NSButton wrapper and changed its role while the exposed NSButtonCell remained unmarked. The fixture now annotates the actual cell with natural positive role and rejects an explicit wrong role on that same exposed element.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
       }
     }
   ]

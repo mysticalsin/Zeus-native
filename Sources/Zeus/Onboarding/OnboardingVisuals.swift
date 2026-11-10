@@ -50,7 +50,7 @@ struct FilmCard: View {
                 Color.black.overlay(Text("Preview unavailable").font(OB.font(13)).foregroundStyle(.white.opacity(0.7)))
             }
         } else {
-            LoopingFilm(films: films)
+            LoopingFilm(films: films, reduceMotion: reduceMotion)
         }
     }
 
@@ -87,19 +87,51 @@ enum FilmPoster {
 /// Motion it shows the first film's poster frame only.
 struct LoopingFilm: NSViewRepresentable {
     let films: [OnboardingFilm]
+    var reduceMotion = false
 
-    func makeNSView(context: Context) -> FilmView { FilmView(films: films) }
-    func updateNSView(_ view: FilmView, context: Context) {}
+    func makeNSView(context: Context) -> FilmView { FilmView(films: films, reduceMotion: reduceMotion) }
+    func updateNSView(_ view: FilmView, context: Context) { view.setReducedMotion(reduceMotion) }
+    static func dismantleNSView(_ view: FilmView, coordinator: ()) { view.dispose() }
 
+    @MainActor
     final class FilmView: NSView {
         private var looper: AVPlayerLooper?
         private let player = AVQueuePlayer()
         private let playerLayer = AVPlayerLayer()
         private let films: [OnboardingFilm]
-        nonisolated(unsafe) private var endObserver: NSObjectProtocol?
+        private var endObserver: NSObjectProtocol?
+        private var visibilityObservers: [(NotificationCenter, NSObjectProtocol)] = []
+        private weak var observedWindow: NSWindow?
+        private var attachmentRevision: UInt64 = 0
+        private var motionReduction: Bool
+        private var closing = false
+        private var disposed = false
+        private var ownedItems: [ObjectIdentifier: AVPlayerItem] = [:]
 
-        init(films: [OnboardingFilm]) {
+        /// Read-only observations of the real player for native resource-lifecycle verification.
+        struct PlaybackState {
+            let rate: Float
+            let status: AVPlayer.TimeControlStatus
+            let seconds: Double
+            let queuedItems: Int
+            let queuedFilms: [String]
+            let trackedItems: Int
+            let muted: Bool
+            let disposed: Bool
+            let observerCount: Int
+        }
+
+        var playbackState: PlaybackState {
+            .init(rate: player.rate, status: player.timeControlStatus, seconds: player.currentTime().seconds,
+                  queuedItems: player.items().count,
+                  queuedFilms: player.items().compactMap { ($0.asset as? AVURLAsset)?.url.lastPathComponent },
+                  trackedItems: ownedItems.count, muted: player.isMuted,
+                  disposed: disposed, observerCount: visibilityObservers.count + (endObserver == nil ? 0 : 1))
+        }
+
+        init(films: [OnboardingFilm], reduceMotion: Bool = false) {
             self.films = films
+            motionReduction = reduceMotion
             super.init(frame: .zero)
             wantsLayer = true
             playerLayer.player = player
@@ -112,33 +144,128 @@ struct LoopingFilm: NSViewRepresentable {
             if urls.count == 1 {
                 looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: first))
             } else {
-                for url in urls { player.insert(AVPlayerItem(url: url), after: nil) }
+                for url in urls {
+                    let item = AVPlayerItem(url: url)
+                    ownedItems[ObjectIdentifier(item)] = item
+                    player.insert(item, after: nil)
+                }
                 // Each film that finishes goes to the back of the queue.
                 endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] note in
-                    guard let self, let item = note.object as? AVPlayerItem, let asset = item.asset as? AVURLAsset, urls.contains(asset.url) else { return }
                     MainActor.assumeIsolated {
-                        self.player.insert(AVPlayerItem(url: asset.url), after: self.player.items().last)
+                        guard let self, !self.disposed, let item = note.object as? AVPlayerItem,
+                              self.ownedItems[ObjectIdentifier(item)] === item,
+                              let asset = item.asset as? AVURLAsset, urls.contains(asset.url) else { return }
+                        // Consume an owned completion once. A different player of the same URL,
+                        // duplicate completion or callback after disposal cannot grow this queue.
+                        self.ownedItems.removeValue(forKey: ObjectIdentifier(item))
+                        let next = AVPlayerItem(url: asset.url)
+                        self.ownedItems[ObjectIdentifier(next)] = next
+                        self.player.insert(next, after: nil)
+                        self.synchronizePlayback()
                     }
                 }
             }
-            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, let film = films.first {
+            if reducesMotion, let film = films.first {
                 player.seek(to: CMTime(seconds: film.posterTime, preferredTimescale: 600))
             }
         }
 
         required init?(coder: NSCoder) { nil }
 
-        deinit { if let endObserver { NotificationCenter.default.removeObserver(endObserver) } }
+        isolated deinit { dispose() }
 
         override func layout() {
             super.layout()
             playerLayer.frame = bounds
         }
 
-        /// Plays only while on screen, so a hidden guide costs nothing.
+        /// AVPlayer is not a window visibility observer. Pause explicitly when this decorative
+        /// preview is hidden or fully covered; never create a timer to poll an invisible guide.
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if window != nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { player.play() } else { player.pause() }
+            removeVisibilityObservers()
+            closing = false
+            guard !disposed, let window else { player.pause(); return }
+            observedWindow = window
+            let revision = attachmentRevision
+            for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+                         NSWindow.didDeminiaturizeNotification, NSWindow.willCloseNotification] {
+                let token = NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self, weak window] note in
+                    MainActor.assumeIsolated {
+                        guard let self, let window, self.attachmentRevision == revision,
+                              self.window === window, self.observedWindow === window, !self.disposed else { return }
+                        if note.name == NSWindow.willCloseNotification { self.closing = true }
+                        else if window.isVisible && !window.isMiniaturized && window.occlusionState.contains(.visible) {
+                            self.closing = false // The retained guide window can be shown again.
+                        }
+                        self.synchronizePlayback()
+                    }
+                }
+                visibilityObservers.append((.default, token))
+            }
+            for name in [NSApplication.didHideNotification, NSApplication.didUnhideNotification] {
+                observeVisibility(name, center: .default, object: NSApplication.shared, revision: revision)
+            }
+            observeVisibility(NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+                              center: NSWorkspace.shared.notificationCenter, object: NSWorkspace.shared, revision: revision)
+            synchronizePlayback()
+        }
+
+        override func viewDidHide() { super.viewDidHide(); synchronizePlayback() }
+        override func viewDidUnhide() { super.viewDidUnhide(); synchronizePlayback() }
+
+        func setReducedMotion(_ reduced: Bool) {
+            motionReduction = reduced
+            synchronizePlayback()
+        }
+
+        private var reducesMotion: Bool {
+            motionReduction || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        }
+
+        private func synchronizePlayback() {
+            let eligible: Bool
+            if !disposed, !closing, !reducesMotion, !isHiddenOrHasHiddenAncestor, let window {
+                eligible = OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: window.isVisible,
+                    miniaturized: window.isMiniaturized, appHidden: NSApplication.shared.isHidden,
+                    occluded: !window.occlusionState.contains(.visible))
+            } else { eligible = false }
+            if eligible, player.currentItem != nil {
+                if player.rate == 0 || player.timeControlStatus == .paused { player.play() }
+            } else { player.pause() }
+        }
+
+        private func observeVisibility(_ name: Notification.Name, center: NotificationCenter,
+                                       object: Any?, revision: UInt64) {
+            let token = center.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, !self.disposed, self.attachmentRevision == revision,
+                          let window = self.window, self.observedWindow === window else { return }
+                    self.synchronizePlayback()
+                }
+            }
+            visibilityObservers.append((center, token))
+        }
+
+        private func removeVisibilityObservers() {
+            attachmentRevision &+= 1
+            for (center, observer) in visibilityObservers { center.removeObserver(observer) }
+            visibilityObservers.removeAll()
+            observedWindow = nil
+        }
+
+        func dispose() {
+            guard !disposed else { return }
+            disposed = true
+            player.pause()
+            removeVisibilityObservers()
+            if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+            endObserver = nil
+            looper?.disableLooping()
+            looper = nil
+            player.removeAllItems()
+            ownedItems.removeAll()
+            playerLayer.player = nil
         }
     }
 }

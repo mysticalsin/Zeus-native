@@ -516,6 +516,14 @@
       "suite": "OnboardingComponentJourneyTests",
       "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
       "scope": "Actual production Setup card and guide activated by layout-resolved events sent only to owned windows, with in-memory preferences and inert permission/model/connection/sound services. Nine-step deferred setup plus denied-state recovery. No full Settings/AppDelegate route, keyboard, AX, OS consent, capture, physical motion or device acceptance."
+    },
+    {
+      "id": "native-OnboardingFilmLifecycleTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "OnboardingFilmLifecycleTests",
+      "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+      "scope": "Actual muted AVQueuePlayer and bundled local films in owned AppKit windows. Positive playback precedes hide/minimize/occlusion/reduction/detach checks; natural owned completion and foreign same-URL rejection verify bounded queue ownership. No screen/audio capture, OS preference writes, private media, physical FPS or measured CPU/energy acceptance."
     }
   ],
   "features": [
@@ -2313,7 +2321,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
-              "function": "consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched"
+              "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
             }
           ]
         },
@@ -2691,6 +2699,29 @@
             {
               "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
               "function": "deniedRecoveryCallsOnlyInertServiceAndStillAllowsSkip"
+            }
+          ]
+        },
+        {
+          "id": "F13.onboarding-film-lifecycle",
+          "check": "native-OnboardingFilmLifecycleTests",
+          "acceptance": "A real muted decorative player advances only while eligible, pauses on native visibility and reduced-motion changes, ignores stale window/foreign-item notifications, and cannot restart after dismantle. Natural completion keeps the owned queue bounded. Tests require usable native visibility and normal OS motion for the initial positive control; no override or simulated pass is allowed. CPU/energy savings remain a separate device obligation.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+              "function": "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+              "function": "actualOcclusionHiddenViewAndReducedMotionPausePlayback"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+              "function": "reattachmentIgnoresOldWindowAndDisposalCannotRestartPlayback"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+              "function": "onlyOwnedNaturalCompletionsCanRequeueBundledFilms"
             }
           ]
         }

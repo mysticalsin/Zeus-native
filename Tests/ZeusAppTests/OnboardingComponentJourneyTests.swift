@@ -28,7 +28,8 @@ struct OnboardingComponentJourneyTests {
     }
 
     /// No live permission model, polling task, provider, download or sound service is constructed.
-    @MainActor @Observable private final class Services: OnboardingServing {
+    // Observable emits a file-scope conformance extension; a nested private type is inaccessible there.
+    @MainActor @Observable fileprivate final class Services: OnboardingServing {
         var states: [OnboardingCapability: OnboardingAccess] = [:]
         var requests: [OnboardingCapability] = []
         var downloads = 0

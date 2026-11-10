@@ -62,7 +62,8 @@ private enum NativeAppTestHost {
                 "^ZeusAppTests\\.OwnedWindowEventDriverTests/",
                 "^ZeusAppTests\\.ScribeComponentJourneyTests/",
                 "^ZeusAppTests\\.ScribeAccessibilityJourneyTests/",
-                "^ZeusAppTests\\.OnboardingComponentJourneyTests/"
+                "^ZeusAppTests\\.OnboardingComponentJourneyTests/",
+                "^ZeusAppTests\\.OnboardingFilmLifecycleTests/"
             ]
             guard args.count == 9,
                   args[1] == "--test-bundle-path",

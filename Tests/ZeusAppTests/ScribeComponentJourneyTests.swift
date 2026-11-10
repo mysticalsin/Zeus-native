@@ -1,13 +1,167 @@
 import AppKit
+import ApplicationServices
 import Foundation
 import SwiftUI
 import Testing
 import ZeusCore
 @testable import Zeus
 
+/// A failure-only diagnostic, never an action driver. AX handles are created, queried, and
+/// released on one detached task; only bounded text crosses back to the AppKit actor.
+private enum OwnedProcessAXDiagnostic {
+    static let windowMarkerPrefix = "zeus.synthetic.scribe.window."
+
+    private struct Failure: Error { let reason: String }
+
+    static func collect(pid: Int32, windowMarker: String) async -> [String] {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        return await Task.detached(priority: .utility) {
+            snapshot(pid: pid, windowMarker: windowMarker, deadline: deadline)
+        }.value
+    }
+
+    private static func snapshot(pid: Int32, windowMarker: String,
+                                 deadline: ContinuousClock.Instant) -> [String] {
+        guard !Thread.isMainThread, pid == ProcessInfo.processInfo.processIdentifier,
+              windowMarker.hasPrefix(windowMarkerPrefix) else {
+            return ["own-PID AX diagnostic withheld: invalid execution thread, PID, or window marker"]
+        }
+        var rows: [String] = []
+        var visited: [AXUIElement] = []
+        var complete = false
+        var incompleteBranch = false
+        func field(_ value: String) -> String {
+            String(value.prefix(160)).replacingOccurrences(of: "\n", with: "\\n")
+                .replacingOccurrences(of: "\r", with: "\\r")
+        }
+        func append(_ value: String) { if rows.count < 79 { rows.append(value) } }
+        func remainingTimeout() throws -> Float {
+            let remaining = ContinuousClock.now.duration(to: deadline)
+            guard remaining > .zero else { throw Failure(reason: "2-second monotonic budget exhausted") }
+            let parts = remaining.components
+            let seconds = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
+            return Float(min(0.1, seconds))
+        }
+        func prepare(_ element: AXUIElement) throws {
+            let error = AXUIElementSetMessagingTimeout(element, try remainingTimeout())
+            guard error == .success else { throw Failure(reason: "set timeout AXError=\(error.rawValue)") }
+            _ = try remainingTimeout()
+        }
+        func requireOwnPID(_ element: AXUIElement) throws {
+            try prepare(element)
+            var observed: pid_t = 0
+            let error = AXUIElementGetPid(element, &observed)
+            guard error == .success else { throw Failure(reason: "get PID AXError=\(error.rawValue)") }
+            _ = try remainingTimeout()
+            guard observed == pid else { throw Failure(reason: "foreign PID; details withheld") }
+        }
+        func attribute(_ element: AXUIElement, _ name: String) throws -> CFTypeRef? {
+            try prepare(element)
+            var value: CFTypeRef?
+            let error = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+            if error == .noValue || error == .attributeUnsupported {
+                append("optional \(field(name)) AXError=\(error.rawValue)")
+                _ = try remainingTimeout()
+                return nil
+            }
+            guard error == .success else { throw Failure(reason: "read \(field(name)) AXError=\(error.rawValue)") }
+            _ = try remainingTimeout()
+            return value
+        }
+        func elements(_ element: AXUIElement, _ name: String, limit: Int) throws -> [AXUIElement] {
+            try prepare(element)
+            var count: CFIndex = 0
+            let countError = AXUIElementGetAttributeValueCount(element, name as CFString, &count)
+            if countError == .noValue || countError == .attributeUnsupported {
+                append("array \(field(name)) AXError=\(countError.rawValue)")
+                incompleteBranch = true
+                _ = try remainingTimeout()
+                return []
+            }
+            guard countError == .success else {
+                throw Failure(reason: "count \(field(name)) AXError=\(countError.rawValue)")
+            }
+            _ = try remainingTimeout()
+            guard count >= 0, count <= limit else { throw Failure(reason: "\(field(name)) count exceeds cap \(limit)") }
+            guard count > 0 else { return [] }
+            try prepare(element)
+            var raw: CFArray?
+            let error = AXUIElementCopyAttributeValues(element, name as CFString, 0, count, &raw)
+            guard error == .success else { throw Failure(reason: "copy \(field(name)) AXError=\(error.rawValue)") }
+            _ = try remainingTimeout()
+            guard let values = raw as? [AnyObject], values.count == count else {
+                throw Failure(reason: "\(field(name)) changed size or returned malformed array")
+            }
+            return try values.map { value in
+                guard CFGetTypeID(value) == AXUIElementGetTypeID() else {
+                    throw Failure(reason: "\(field(name)) returned a non-AX element")
+                }
+                return value as! AXUIElement // Type ID was checked before the CF bridge cast.
+            }
+        }
+        do {
+            _ = try remainingTimeout()
+            append("trusted=\(AXIsProcessTrusted()), ownPID=true, timeoutMaxMs=100, budgetMs=2000")
+            _ = try remainingTimeout()
+            let application = AXUIElementCreateApplication(pid)
+            try requireOwnPID(application)
+            let windows = try elements(application, kAXWindowsAttribute, limit: 8)
+            var matching: [AXUIElement] = []
+            for window in windows {
+                try requireOwnPID(window)
+                if try attribute(window, kAXIdentifierAttribute) as? String == windowMarker {
+                    matching.append(window)
+                }
+            }
+            guard matching.count == 1, let ownedWindow = matching.first else {
+                throw Failure(reason: "owned window marker matches=\(matching.count); tree withheld")
+            }
+            var pending: [(AXUIElement, Int)] = [(ownedWindow, 0)]
+            var pendingIndex = 0
+            while pendingIndex < pending.count {
+                _ = try remainingTimeout()
+                guard visited.count < 48, rows.count < 78 else { throw Failure(reason: "node or output cap reached") }
+                let (element, depth) = pending[pendingIndex]
+                pendingIndex += 1
+                if visited.contains(where: { CFEqual($0, element) }) { continue }
+                try requireOwnPID(element)
+                if !CFEqual(element, ownedWindow) {
+                    guard let owner = try attribute(element, kAXWindowAttribute),
+                          CFGetTypeID(owner) == AXUIElementGetTypeID(), CFEqual(owner, ownedWindow) else {
+                        append("branch withheld: owned-window membership unverified")
+                        incompleteBranch = true
+                        continue
+                    }
+                }
+                visited.append(element)
+                let role = try attribute(element, kAXRoleAttribute) as? String
+                let identifier = try attribute(element, kAXIdentifierAttribute) as? String
+                let enabled = try attribute(element, kAXEnabledAttribute) as? Bool
+                append("node=\(visited.count), depth=\(depth), role=\(field(role ?? "unreported")), " +
+                       "id=\(field(identifier ?? "unreported")), enabled=\(enabled.map { String($0) } ?? "unreported")")
+                let children = try elements(element, kAXChildrenAttribute, limit: 32)
+                if !children.isEmpty {
+                    guard depth < 8, pending.count + children.count <= 48 else {
+                        throw Failure(reason: "depth or queued-node cap reached")
+                    }
+                    pending.append(contentsOf: children.map { ($0, depth + 1) })
+                }
+            }
+            complete = !incompleteBranch
+        } catch let failure as Failure {
+            append("snapshot stopped: \(field(failure.reason))")
+        } catch {
+            append("snapshot stopped: \(field(String(describing: error)))")
+        }
+        rows.append("diagnosticComplete=\(complete), visited=\(visited.count); original UI failure remains")
+        return rows
+    }
+}
+
 /// Real hosted production controls, inert capture/transcription, synthetic persistence only.
 /// Separate drivers use own accessibility objects or own-window AppKit events; no global AX,
-/// system input injection or screen capture. An AX failure never falls back to pointer events.
+/// system input injection or screen capture. A failed lookup may inspect its marked window
+/// through own-PID read-only AX; it never retries or falls back to pointer events afterward.
 @MainActor
 private struct ScribeComponentFixture {
     private final class Clock { var time: TimeInterval = 100 }
@@ -226,7 +380,7 @@ private struct ScribeComponentFixture {
         var lastUnavailableReason: String?
         while ContinuousClock.now < deadline {
             let tree = try controls(in: window, diagnostic: &diagnostic)
-            let matches = tree.filter { $0.accessibilityIdentifier() == id }
+            let matches = tree.filter { $0.isAccessibilityElement() && $0.accessibilityIdentifier() == id }
             if matches.count > 1 { throw ScenarioFailure.ambiguousControl(id) }
             if let button = matches.first {
                 let frame = button.accessibilityFrame()
@@ -260,7 +414,13 @@ private struct ScribeComponentFixture {
             OwnedWindowFixtureApplication.record("accessibility diagnostics for \(id): \(diagnostic.joined(separator: "; "))")
             throw ScenarioFailure.unavailableControl(id, lastUnavailableReason)
         }
-        throw ScenarioFailure.missingControl(id, diagnostic)
+        let originalFailure = ScenarioFailure.missingControl(id, diagnostic)
+        if let marker = window.accessibilityIdentifier(), marker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) {
+            let snapshot = await OwnedProcessAXDiagnostic.collect(
+                pid: ProcessInfo.processInfo.processIdentifier, windowMarker: marker)
+            OwnedWindowFixtureApplication.record("failure-only own-PID AX: \(snapshot.joined(separator: "; "))")
+        }
+        throw originalFailure
     }
 
     private final class ButtonTarget: NSObject {
@@ -274,7 +434,10 @@ private struct ScribeComponentFixture {
         let target = ButtonTarget()
         let button = NSButton(title: "Synthetic readiness control", target: target,
                               action: #selector(ButtonTarget.performAction(_:)))
-        button.setAccessibilityIdentifier("scribe.start")
+        // AppKit exposes the cell as this standard button's accessibility element. Annotate
+        // that actual element, leaving its natural role and the ignored wrapper unchanged.
+        let cell = try #require(button.cell as? NSButtonCell)
+        cell.setAccessibilityIdentifier("scribe.start")
         button.frame = NSRect(x: 20, y: 20, width: 240, height: 32)
         button.isEnabled = false
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 300, height: 90),
@@ -286,6 +449,9 @@ private struct ScribeComponentFixture {
         content.addSubview(button)
         defer { OwnedWindowFixtureApplication.close(window) }
         window.makeKeyAndOrderFront(nil)
+        #expect(cell.controlView === button)
+        #expect(cell.isAccessibilityElement())
+        #expect(cell.accessibilityRole() == .button)
         var trace: [String] = []
         let enable = Task { @MainActor in
             try await Task.sleep(for: .milliseconds(150))
@@ -316,8 +482,9 @@ private struct ScribeComponentFixture {
         let target = ButtonTarget()
         let button = NSButton(title: "Synthetic mismatched role", target: target,
                               action: #selector(ButtonTarget.performAction(_:)))
-        button.setAccessibilityIdentifier("scribe.start")
-        button.setAccessibilityRole(.staticText)
+        let cell = try #require(button.cell as? NSButtonCell)
+        cell.setAccessibilityIdentifier("scribe.start")
+        cell.setAccessibilityRole(.staticText)
         button.isEnabled = true
         button.frame = NSRect(x: 20, y: 20, width: 240, height: 32)
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 90))
@@ -329,7 +496,9 @@ private struct ScribeComponentFixture {
         window.contentView = content
         defer { OwnedWindowFixtureApplication.close(window) }
         window.makeKeyAndOrderFront(nil)
-        #expect(button.accessibilityRole() != .button)
+        #expect(cell.controlView === button)
+        #expect(cell.isAccessibilityElement())
+        #expect(cell.accessibilityRole() == .staticText)
         var trace: [String] = []
         do {
             try await press("scribe.start", in: window, trace: &trace)
@@ -366,6 +535,7 @@ private struct ScribeComponentFixture {
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 870, height: 400),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Synthetic Scribe component fixture"
+        window.setAccessibilityIdentifier(OwnedProcessAXDiagnostic.windowMarkerPrefix + UUID().uuidString)
         window.contentView = host
         window.isReleasedWhenClosed = false
         defer {

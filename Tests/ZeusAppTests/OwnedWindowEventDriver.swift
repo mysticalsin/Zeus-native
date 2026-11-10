@@ -195,7 +195,7 @@ struct OwnedWindowEventDriverTests {
         }
     }
 
-    @Test func consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched() async throws {
+    @Test func preexistingReleasePreventsDispatchAndRemainsUntouched() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()
             defer { OwnedWindowFixtureApplication.restore(original) }
@@ -228,18 +228,26 @@ struct OwnedWindowEventDriverTests {
                         inMode: .eventTracking, dequeue: true)
                 }
             }
-            try driver.dispatch("fixture.queue-owner", probe: probe, frame: frame, in: window)
-            #expect(target.calls == 2)
+            do {
+                try driver.dispatch("fixture.queue-owner", probe: probe, frame: frame, in: window)
+                Issue.record("A gesture started while a preexisting release was queued")
+            } catch OwnedWindowEventDriver.Failure.eventQueue { }
+            #expect(target.calls == 1)
             let stillQueued = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                 inMode: .eventTracking, dequeue: false))
-            #expect(OwnedWindowEventDriver.sameEvent(stillQueued, queuedForeign), "The driver must leave the unrelated release at the queue head")
-            if OwnedWindowEventDriver.sameEvent(stillQueued, queuedForeign) {
-                _ = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
-                    inMode: .eventTracking, dequeue: true)
-                let remainder = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
-                    inMode: .eventTracking, dequeue: false)
-                #expect(remainder == nil, "The completed click must not leave its synthetic release for a later fixture")
+            try #require(OwnedWindowEventDriver.sameEvent(stillQueued, queuedForeign), "The driver must leave the unrelated release at the queue head")
+            let removed = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                inMode: .eventTracking, dequeue: true))
+            guard OwnedWindowEventDriver.sameEvent(removed, queuedForeign) else {
+                NSApplication.shared.postEvent(removed, atStart: true)
+                throw OwnedWindowEventDriver.Failure.eventQueue
             }
+            #expect(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                inMode: .eventTracking, dequeue: false) == nil, "Rejected dispatch must not have queued a synthetic release")
+            try await driver.click("fixture.queue-owner", in: window)
+            #expect(target.calls == 2)
+            #expect(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                inMode: .eventTracking, dequeue: false) == nil, "The admitted gesture must leave no release queued")
         }
     }
 
@@ -383,6 +391,11 @@ final class OwnedWindowEventDriver {
         let probes = registry.probes(for: id, in: window)
         guard probes.count == 1, probes.first === probe,
               readyFrame(probe, in: window) == frame else { throw Failure.staleGeometry(id) }
+        // Native controls may consume queued input inside mouseDown tracking. Refuse to
+        // start while any preexisting release is present, even from another owned window.
+        // This protects existing input; it cannot prevent new events arriving during tracking.
+        guard NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+            inMode: .eventTracking, dequeue: false) == nil else { throw Failure.eventQueue }
         let point = NSPoint(x: frame.midX, y: frame.midY)
         let number = nextEventNumber
         nextEventNumber += 2
