@@ -74,15 +74,41 @@ jobs:
         id: build
         run: |
           { xcodebuild -version && swift --version && swift build; } 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/build.log"
+          python3 qa/closed-loop/gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/build.log"
       - name: All Core tests and reviewed app fixtures (no consent requests or capture)
         id: test
         # Compiler discovery and qualified event streams must prove every selected case ran.
         # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
           python3 qa/closed-loop/native.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+      - name: Show bounded native failure diagnostics
+        if: failure() && steps.test.outcome == 'failure'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          root = Path(os.environ["RUNNER_TEMP"]) / "zeus-results/app/native-evidence"
+          receipt = root / "result.json"
+          if receipt.is_file() and not receipt.is_symlink():
+              value = json.loads(receipt.read_text())
+              for row in value.get("native_runs", []):
+                  ident = row.get("id", "")
+                  if row.get("status") == "passed" or not re.fullmatch(r"native-[A-Za-z0-9]+", ident):
+                      continue
+                  path = root / ident / "test.log"
+                  if path.is_file() and not path.is_symlink() and not path.parent.is_symlink():
+                      print(f"Native failure: {ident}: {row.get('reason', 'unknown')}")
+                      with path.open("rb") as stream:
+                          stream.seek(max(0, path.stat().st_size - 16384))
+                          print(stream.read(16384).decode("utf-8", errors="replace"))
+          PY
       - name: Bundle local preview (ad-hoc only; no credentials)
         id: bundle
-        run: CONFIG=debug SIGN_IDENTITY=- RELEASE=0 scripts/bundle.sh 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/bundle.log"
+        run: |
+          CONFIG=debug SIGN_IDENTITY=- RELEASE=0 scripts/bundle.sh 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/bundle.log"
+          python3 qa/closed-loop/gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/bundle.log"
       - name: Preserve preview bundle metadata
         id: archive
         run: ditto -c -k --keepParent build/Zeus.app "$RUNNER_TEMP/Zeus-preview.zip" 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/archive.log"

@@ -90,6 +90,23 @@ def load(path):
     return json.loads(Path(path).read_text(), object_pairs_hook=pairs)
 
 
+def validate_compiler_log(text):
+    """Require compiler completion and reject diagnostic headers, not source excerpts."""
+    require(re.search(r"(?m)^Build complete!(?: \([^\n]*\))?\s*$", text),
+            "native compiler log has no completion")
+    for raw in text.splitlines():
+        line = re.sub(r"\x1b\[[0-9;]*m", "", raw).strip()
+        # Swift prints source/caret gutters below warnings. An argument such as
+        # converter.convert(to: output, error: &error) is not a diagnostic.
+        if re.match(r"(?:\d+)?\s*\|", line):
+            continue
+        failure = re.match(
+            r"(?:(?:.*?:\d+(?::\d+)?:|(?:swift(?:c|-frontend)?|clang(?:\+\+)?|ld|ld64|<unknown>):)\s*)?"
+            r"(?:error|fatal error|internal error):", line, re.IGNORECASE)
+        require(not failure and not re.match(r"CHECK (?:TIMEOUT|COULD NOT START)\b", line),
+                "native compiler log contains failure")
+
+
 def validate_native_build(build, output, source_hash, jobs=None):
     """Only fresh, intact compiler success may authorize native --skip-build."""
     fields(build, {"status", "command", "exit_code", "source_snapshot_sha256", "artifacts", "duration_seconds"}, {"reason"})
@@ -112,10 +129,7 @@ def validate_native_build(build, output, source_hash, jobs=None):
     require(not log.is_symlink() and not log.parent.is_symlink() and log.resolve().is_relative_to(root),
             "native compiler log is redirected")
     require(log.is_file() and digest(log.read_bytes()) == evidence["sha256"], "native compiler log is missing or changed")
-    text = log.read_text()
-    require(re.search(r"(?m)^Build complete!(?: \([^\n]*\))?\s*$", text), "native compiler log has no completion")
-    require(not re.search(r"(?im)(?:^|\s)(?:error|fatal error):|CHECK TIMEOUT|CHECK COULD NOT START", text),
-            "native compiler log contains failure")
+    validate_compiler_log(log.read_text())
 
 
 def runnable_functions(text, python=False):

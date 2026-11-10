@@ -419,6 +419,10 @@ def evaluate(needs, inputs: Path, expected_sha: str, head_sha: str, run_id: str,
                 path = artifact(root, relative)
                 if not isinstance(info, dict) or info.get("sha256") != digest(path) or type(info.get("bytes")) is not int or info["bytes"] != path.stat().st_size:
                     raise ValueError(f"artifact changed after its receipt: {relative}")
+            if job == "app":
+                contracts = policy_modules()[1]
+                for relative in ("build.log", "bundle.log"):
+                    contracts.validate_compiler_log(artifact(root, relative).read_text())
             if job == "feature-map":
                 jobs[job]["tests"] = validate_feature_map(root, expected_sha, head_sha, mode)
             else:
@@ -438,6 +442,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="operation", required=True)
     subparsers.add_parser("native-filter")
+    compiler = subparsers.add_parser("compiler-log")
+    compiler.add_argument("--path", type=Path, required=True)
     capture = subparsers.add_parser("record")
     capture.add_argument("--job", choices=REQUIRED, required=True)
     capture.add_argument("--output", type=Path, required=True)
@@ -448,6 +454,13 @@ def main() -> int:
     args = parser.parse_args()
     if args.operation == "native-filter":
         print(native_filter())
+        return 0
+    if args.operation == "compiler-log":
+        try:
+            policy_modules()[1].validate_compiler_log(args.path.read_text())
+        except (OSError, ValueError) as error:
+            print(f"Compiler evidence rejected: {error}", file=sys.stderr)
+            return 1
         return 0
     if args.operation == "record":
         record(args.job, args.output)

@@ -51,6 +51,8 @@ class RequiredGateTests(unittest.TestCase):
                          "release-scripts": "Ran 13 tests in 1.0s\nOK"}
                 (root / "test.log").write_text(lines[job] + "\n")
                 if job == "app":
+                    (root / "build.log").write_text("Build complete! (1.0s)\n")
+                    (root / "bundle.log").write_text("Build complete! (1.0s)\nBuilt build/Zeus.app\n")
                     self.make_native_fixture(root)
                 if job == "extension":
                     policy = gate.load_object(Path(gate.__file__).resolve().parents[2] / "qa/extension-regressions.json")
@@ -175,6 +177,27 @@ class RequiredGateTests(unittest.TestCase):
         result = self.evaluate()
         self.assertEqual(result["status"], "passed", result)
         self.assertGreater(result["jobs"]["feature-map"]["tests"], 0)
+
+    def test_production_compiler_diagnostics_block_despite_successful_steps_and_tests(self):
+        path = self.root("app") / "build.log"
+        for diagnostic in (
+            'Internal Error: dataCorrupted(Swift.DecodingError.Context(debugDescription: "Corrupted JSON"))',
+            "/source/Zeus.swift:375:7: error: unresolved identifier",
+        ):
+            with self.subTest(diagnostic=diagnostic):
+                path.write_text(diagnostic + "\nBuild complete! (1.0s)\n")
+                self.refresh_file("app", "build.log")
+                result = self.evaluate()
+                self.assertEqual(result["status"], "failed", result)
+                self.assertTrue(any("compiler log contains failure" in error for error in result["errors"]), result)
+
+    def test_bundle_compiler_diagnostics_block_despite_successful_packaging(self):
+        path = self.root("app") / "bundle.log"
+        path.write_text('Internal Error: dataCorrupted("Corrupted JSON")\nBuild complete! (1.0s)\nBuilt build/Zeus.app\n')
+        self.refresh_file("app", "bundle.log")
+        result = self.evaluate()
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("compiler log contains failure" in error for error in result["errors"]), result)
 
     def test_extension_requires_named_regressions_despite_positive_summary(self):
         path = self.root("extension") / "test.log"
@@ -551,6 +574,51 @@ class NativeBuildGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.validate()
 
+    def test_warning_source_argument_named_error_is_not_a_compiler_error(self):
+        self.log.write_text(
+            "/source/Zeus.swift:375:7: warning: result of call is unused\n"
+            "373 | // Error handling\n"
+            "375 | converter.convert(to: converted, error: &convertError) { _, _ in input }\n"
+            "    |                                    ^ warning: result is unused\n"
+            "Build complete! (1.0s)\n")
+        self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+        self.assertEqual(self.validate(), "2")
+
+    def test_compiler_diagnostic_headers_remain_blocking_with_source_context_and_color(self):
+        for diagnostic in (
+            "error: build failed",
+            "fatal error: compiler stopped",
+            "Internal Error: dataCorrupted",
+            "/source/File.swift:7: error: missing declaration",
+            "/source/File.swift:7:12: error: missing declaration",
+            "swift-frontend: error: compiler stopped",
+            "clang++: fatal error: header not found",
+            "ld: error: undefined symbol",
+            "<unknown>:0: error: compiler failure",
+            "\x1b[31merror:\x1b[0m build failed",
+            "CHECK TIMEOUT after 10 seconds",
+            "CHECK COULD NOT START compiler",
+        ):
+            with self.subTest(diagnostic=diagnostic):
+                self.log.write_text(
+                    "375 | converter.convert(to: converted, error: &convertError)\n"
+                    + diagnostic + "\nBuild complete! (1.0s)\n")
+                self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+                with self.assertRaisesRegex(ValueError, "compiler log contains failure"):
+                    self.validate()
+
+    def test_compiler_log_command_returns_failure_for_missing_or_failed_evidence(self):
+        for contents, expected in (("Build complete! (1.0s)\n", 0),
+                                   ("Build complete! (1.0s)\nInternal Error: dataCorrupted\n", 1),
+                                   ("Building for debugging...\n", 1), (None, 1)):
+            with self.subTest(contents=contents):
+                if contents is None:
+                    self.log.unlink()
+                else:
+                    self.log.write_text(contents)
+                with patch.object(sys, "argv", ["gate.py", "compiler-log", "--path", str(self.log)]):
+                    self.assertEqual(gate.main(), expected)
+
     def test_compiler_log_hash_and_containment_are_required(self):
         self.log.write_text("Build complete! (changed bytes)\n")
         with self.assertRaises(ValueError):
@@ -615,6 +683,23 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('python3 qa/closed-loop/native.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence"', workflow)
         self.assertIn("native-evidence/result.json", gate.job_artifacts("app"))
         self.assertGreaterEqual(workflow.count("if-no-files-found: error"), len(gate.REQUIRED) + 1)
+
+    def test_every_ci_app_compilation_has_a_diagnostic_barrier_before_upload(self):
+        workflow = (Path(__file__).resolve().parents[3] / ".github/workflows/build.yml").read_text()
+        app = workflow.split("  app:\n", 1)[1].split("\n  extension:", 1)[0]
+        build = app.index('swift build; }')
+        build_check = app.index('gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/build.log"')
+        tests = app.index("python3 qa/closed-loop/native.py")
+        bundle = app.index("scripts/bundle.sh")
+        bundle_check = app.index('gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/bundle.log"')
+        archive = app.index("ditto -c -k")
+        upload = app.index("name: Upload local preview")
+        self.assertLess(build, build_check)
+        self.assertLess(build_check, tests)
+        self.assertLess(tests, bundle)
+        self.assertLess(bundle, bundle_check)
+        self.assertLess(bundle_check, archive)
+        self.assertLess(archive, upload)
 
     def test_native_filter_is_anchored_to_only_reviewed_map_suites(self):
         _, _, _, _, definitions, _ = gate.load_policy()

@@ -1443,6 +1443,42 @@
         "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
         "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
       }
+    },
+    {
+      "id": "REG-120",
+      "failure": "Actual production compilation exited zero after internal compiler errors, but the app build step and aggregate gate accepted the command outcome without inspecting its compiler diagnostics.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_production_compiler_diagnostics_block_despite_successful_steps_and_tests"
+      }
+    },
+    {
+      "id": "REG-121",
+      "failure": "The original compiler matcher classified a Swift warning's source excerpt containing an error: argument as a compiler error.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_warning_source_argument_named_error_is_not_a_compiler_error"
+      }
+    },
+    {
+      "id": "REG-122",
+      "failure": "Independent review reproduced a passing aggregate receipt after inserting an internal compiler error into the final bundle compilation log and refreshing its hash.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_bundle_compiler_diagnostics_block_despite_successful_packaging"
+      }
     }
   ]
 }
