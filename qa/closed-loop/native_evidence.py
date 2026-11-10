@@ -52,7 +52,7 @@ def stream(path):
     return rows
 
 
-def descriptor(payload, repo, recorded_root):
+def descriptor(payload, repo, recorded_root, *, require_cases=True):
     require(payload.get("kind") == "function", "expected compiled function")
     ident, name, location = payload.get("id"), payload.get("name"), payload.get("sourceLocation")
     require(type(ident) is str and type(name) is str and type(location) is dict, "compiled test identity missing")
@@ -87,7 +87,12 @@ def descriptor(payload, repo, recorded_root):
     require(type(cases) is list, "compiled parameter cases missing")
     ids = [case.get("id") if type(case) is dict else None for case in cases]
     require(all(type(value) is str and value for value in ids) and len(ids) == len(set(ids)), "compiled parameter cases invalid or duplicated")
-    require(bool(ids) == parameterized, "parameterized tests need a nonempty discovered case set")
+    # Swift Testing's `list` discovers functions without evaluating parameter
+    # collections. Its execution stream expands them in declarations before
+    # runStarted. Only discovery may omit that expansion; execution must supply
+    # a nonempty plan, and every planned argument must subsequently finish.
+    if require_cases or "_testCases" in payload:
+        require(bool(ids) == parameterized, "parameterized tests need a nonempty declared case plan")
     return {"id": ident, "file": file, "function": function, "line": line, "column": column,
             "parameterized": parameterized, "parameter_cases": sorted(ids)}
 
@@ -108,10 +113,16 @@ def discovery(path, definitions, repo=ROOT, recorded_root=None):
             require(payload.get("kind") == "function", "unknown discovery declaration")
             if selected(ident, definitions):
                 require(ident not in functions, "duplicate compiled test ID")
-                functions[ident] = descriptor(payload, repo, recorded_root)
+                functions[ident] = descriptor(payload, repo, recorded_root, require_cases=False)
     require(functions, "selection has no compiled tests")
     for definition in definitions:
         require(any(selected(ident, [definition]) for ident in functions), "mapped native selection has no compiled tests")
+    # `list` omits implicit structs without @Suite, even though execution emits
+    # their suite lifecycle. Authorize only containers already named by selected
+    # compiler-discovered functions, including enclosing nested containers.
+    for ident in functions:
+        container = ident.split("/", 1)[0].split(".")
+        suites.update(".".join(container[:length]) for length in range(2, len(container) + 1))
     if any(row["kind"] == "native-module" for row in definitions):
         # The current source inventory is a completeness check, never an executed
         # count. Conditional/unsupported declarations fail closed for review.
@@ -137,12 +148,19 @@ def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
     for row in stream(path):
         payload = row["payload"]
         if row["kind"] == "test":
-            require(runs_ended == 0, "declaration after the terminal run event")
+            require(runs_started == 0, "runtime declarations must precede runStarted")
             if payload.get("kind") == "suite":
                 require(payload.get("id") in compiled["suites"], "execution invented a suite")
             else:
                 item = descriptor(payload, repo, recorded_root)
-                require(item["id"] in expected and item == expected[item["id"]], "execution declaration differs from selected compiled identity")
+                require(item["id"] in expected, "execution declaration is not a selected compiled identity")
+                discovered = expected[item["id"]]
+                require({k: v for k, v in item.items() if k != "parameter_cases"}
+                        == {k: v for k, v in discovered.items() if k != "parameter_cases"},
+                        "execution declaration differs from selected compiled identity")
+                if discovered["parameter_cases"]:
+                    require(item["parameter_cases"] == discovered["parameter_cases"],
+                            "runtime argument plan differs from expanded discovery")
                 require(item["id"] not in declared, "duplicate runtime test declaration")
                 declared[item["id"]] = item
             continue
@@ -178,7 +196,7 @@ def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
             started.add(ident)
         elif kind in {"testCaseStarted", "testCaseEnded"}:
             case = payload.get("_testCase")
-            require(type(case) is dict and case.get("id") in expected[ident]["parameter_cases"], "unknown parameter case")
+            require(type(case) is dict and case.get("id") in declared[ident]["parameter_cases"], "unknown parameter case")
             key = (ident, case["id"])
             require(ident in started and ident not in ended, "parameter event outside its test")
             if kind == "testCaseStarted":
@@ -195,10 +213,10 @@ def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
     require(runs_started == runs_ended == 1, "native run is incomplete")
     require(set(declared) == started == ended == set(expected), "compiled selected tests were omitted or did not complete")
     require(suite_started == suite_ended == allowed_suites, "selected native suite was omitted or did not complete")
-    cases = {(ident, case) for ident, row in expected.items() for case in row["parameter_cases"]}
-    require(case_started == case_ended == cases, "parameterized execution omitted a compiled argument case")
+    cases = {(ident, case) for ident, row in declared.items() for case in row["parameter_cases"]}
+    require(case_started == case_ended == cases, "parameterized execution omitted a declared argument case")
     return {"tests": len(expected), "suites": len(suite_ended), "parameter_cases": len(cases),
-            "passed_cases": [expected[ident] for ident in sorted(expected)]}
+            "passed_cases": [declared[ident] for ident in sorted(expected)]}
 
 
 def case_passed(case, passed_cases):

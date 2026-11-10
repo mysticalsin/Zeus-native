@@ -107,6 +107,33 @@ class NativeEventEvidenceTests(unittest.TestCase):
         with self.assertRaises(Invalid):
             self.verify(without_second)
 
+    def test_list_discovery_without_argument_expansion_requires_a_complete_prerun_case_plan(self):
+        self.parameterize()
+        declarations = copy.deepcopy(self.declarations)
+        declarations[1]["payload"].pop("_testCases")
+        compiled = n.discovery(self.write("list.jsonl", declarations), self.definitions, self.repo)
+        def verify(rows):
+            return n.execution(self.write("planned.jsonl", rows), compiled, self.definitions, self.repo)
+        self.assertEqual(verify(self.events())["parameter_cases"], 2)
+        missing_plan = self.events()
+        missing_plan[1]["payload"].pop("_testCases")
+        missing_case = [row for row in self.events() if row["payload"].get("_testCase", {}).get("id") != "argument-two"]
+        late_plan = self.events()
+        declaration = late_plan.pop(1)
+        late_plan.insert(2, declaration)
+        for malformed in (missing_plan, missing_case, late_plan):
+            with self.assertRaises(Invalid):
+                verify(malformed)
+
+    def test_implicit_suite_must_be_the_selected_compiled_function_container(self):
+        compiled = n.discovery(self.write("implicit.jsonl", self.declarations[1:]), self.definitions, self.repo)
+        self.assertEqual(n.execution(self.write("implicit-run.jsonl", self.events()), compiled,
+                                     self.definitions, self.repo)["suites"], 1)
+        invented = self.events()
+        invented[0]["payload"]["id"] = "ZeusCoreTests.ForeignContainer"
+        with self.assertRaises(Invalid):
+            n.execution(self.write("invented-suite.jsonl", invented), compiled, self.definitions, self.repo)
+
     def test_zero_duplicate_or_invented_parameter_cases_fail(self):
         self.parameterize()
         for cases in [[], [{"id": "same"}, {"id": "same"}]]:

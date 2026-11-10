@@ -59,11 +59,17 @@ only a completeness check and is never reported as executed coverage.
 target, saves compiler discovery, then runs that exact native selection. Both
 discovery and execution request Swift Testing **wire version 0**. Each selected
 qualified ID must match its current file, function and `@Test` location, start,
-and finish with a pass. Every discovered parameter-case ID must also start and
-finish. Skips, issues, missing/duplicate events, unknown protocol versions or
+and finish with a pass. Swift Testing lists functions without expanding their
+argument collections and may omit implicit suites. Execution must declare a
+nonempty parameter-case plan before `runStarted`; every planned argument ID must
+then start and finish. Implicit suites are authorized only by the containers of
+selected compiler-discovered functions. Skips, issues, missing/duplicate events, unknown protocol versions or
 unselected suite execution fail even when the human summary reports success.
-The Linux protocol probe is not Apple runtime validation; an unsupported Apple
-variant remains a failed gate until its actual evidence is reviewed.
+Apple Testing 1400 discovery from commit `df3dcc3` was validated against that
+exact source snapshot, including unexpanded parameters and implicit suites.
+The complete argument lifecycle was additionally probed with Linux Swift 6.2.1;
+Apple execution remains pending. An unsupported variant remains a failed gate
+until its actual evidence is reviewed.
 
 The CI app stores `native-evidence/result.json`, a source manifest, compiler log,
 discovery log/events and execution log/events. The aggregate recomputes coverage

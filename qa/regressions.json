@@ -687,6 +687,30 @@
         "file": "qa/closed-loop/tests/test_contracts.py",
         "function": "test_native_artifacts_allow_an_aliased_output_root_but_reject_redirected_children"
       }
+    },
+    {
+      "id": "REG-060",
+      "failure": "Actual Swift Testing list output omits argument expansion, so requiring argument IDs during function discovery blocked all parameterized native execution.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_list_discovery_without_argument_expansion_requires_a_complete_prerun_case_plan"
+      }
+    },
+    {
+      "id": "REG-061",
+      "failure": "Actual Swift Testing list output omits implicit suite declarations that execution emits for compiler-discovered function containers.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_implicit_suite_must_be_the_selected_compiled_function_container"
+      }
     }
   ]
 }

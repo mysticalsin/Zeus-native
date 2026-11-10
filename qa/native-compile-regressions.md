@@ -58,8 +58,11 @@ test failures remained failures.
 | ID | Revision / job | Observed compiler failure | Repair and required guard |
 | --- | --- | --- | --- |
 | TYPE-009 | `1c6bf06`, job `129583572489` | `OnboardingFlow.swift:291`: a Swift switch expression cannot appear directly as a call argument | Bind the result to a local before passing it to the preferences port. Mandatory actual macOS production and test compilation remains the guard; frontend parsing did not catch this type-check restriction. |
-
-The repaired switch expression type-checks under Linux Swift 6.2.1 in isolation.
-The complete repaired view still requires the next macOS build.
-
 | TYPE-010 | `d571d75`, job `129586646795` | Generated `@Observable` extension cannot reference a private nested onboarding test service | Restrict the fixture to file scope with `fileprivate`, which permits the generated extension. Linux Swift 6.2.1 minimal reproduction fails before and type-checks after; actual native test-target compilation remains mandatory. |
+
+Production and test-target compilation both passed at `df3dcc3` in
+[run 42744043519](https://github.com/mysticalsin/Zeus-native/actions/runs/42744043519),
+app job `129591763939`. That clears TYPE-009 and TYPE-010 for that revision.
+Execution then stopped at a separate structured test-discovery validation error:
+Swift Testing's list output omits argument cases for parameterized functions.
+No native tests executed in that run, and preview bundling remained blocked.
