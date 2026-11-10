@@ -15,7 +15,7 @@ let requestTimeout: TimeInterval = 60
 
 final class Relay: @unchecked Sendable {
     private let lock = NSLock()
-    private var pending: [String: UnixSocketServer.Reply] = [:]
+    private let pending = BridgePendingReplies()
     private let output = FileHandle.standardOutput
 
     func toChrome(_ json: Data) -> Bool {
@@ -38,21 +38,20 @@ final class Relay: @unchecked Sendable {
             reply(Self.encode(.success(request.id, .object(["bridge": .bool(true), "version": .string(ZeusCoreVersion.string)]))))
             return
         }
-        lock.withLock { pending[request.id] = reply }
+        guard let token = pending.reserve(id: request.id, reply: reply) else { return }
         guard toChrome(line) else {
-            complete(.failure(request.id, BridgeError(code: "too_large", message: "Request is over Chrome's 1 MB limit")))
+            pending.complete(.failure(request.id, BridgeError(code: "too_large", message: "Request is over Chrome's 1 MB limit")), token: token)
             return
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + requestTimeout) { [weak self] in
-            self?.complete(.failure(request.id, BridgeError(code: "timeout", message: "Chrome did not answer in time")))
+            self?.pending.complete(.failure(request.id, BridgeError(code: "timeout", message: "Chrome did not answer in time")), token: token)
         }
     }
 
     /// A message from the extension: either an answer for the app, or a request for the bridge.
     func fromChrome(_ message: Data) {
         if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message),
-           lock.withLock({ pending[response.id] != nil }) {
-            complete(response)
+           pending.complete(response) {
             return
         }
         guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message) else { return }
@@ -66,11 +65,6 @@ final class Relay: @unchecked Sendable {
         default:
             send(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
         }
-    }
-
-    private func complete(_ response: BridgeResponse) {
-        guard let reply = lock.withLock({ pending.removeValue(forKey: response.id) }) else { return }
-        reply(Self.encode(response))
     }
 
     private static func encode(_ response: BridgeResponse) -> Data? {

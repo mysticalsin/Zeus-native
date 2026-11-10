@@ -282,26 +282,37 @@ private struct AgentsStep: View {
     }
 }
 
-/// Codex / Claude (133 x 24, blue selected segment).
+/// The supported setup choices use the same provider marks as Chat and Settings.
 private struct AgentSegmented: View {
     @Binding var selection: OnboardingFlow.AgentChoice
     @Environment(\.ob) private var ob
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.onboardingReduceMotion) private var motionOverride
+    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     var body: some View {
         HStack(spacing: 0) {
             ForEach(OnboardingFlow.AgentChoice.allCases, id: \.self) { choice in
+                let title = choice == .claude ? AIProvider.claudeCode.title : AIProvider.codex.title
+                let tint = selection == choice ? Color.white : ob.text.opacity(0.9)
                 Button { selection = choice } label: {
-                    Text(choice.rawValue).font(.system(size: 13.5))
-                        .foregroundStyle(selection == choice ? .white : ob.text.opacity(0.9))
-                        .frame(width: 66.5, height: 24)
+                    HStack(spacing: 7) {
+                        EngineBrandLogo(agentLabel: title, size: 15, tint: tint).accessibilityHidden(true)
+                        Text(title).font(OB.font(13.5, .medium))
+                    }
+                        .foregroundStyle(tint)
+                        .frame(width: 130, height: 32)
                         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(selection == choice ? OB.blue : .clear))
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(title)
                 .accessibilityAddTraits(selection == choice ? [.isSelected] : [])
+                .accessibilityIdentifier("onboarding.agent.\(choice == .claude ? "claude" : "codex")")
             }
         }
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(ob.track))
-        .animation(.easeInOut(duration: 0.18), value: selection)
+        .animation(Motion.feedback(reduceMotion: reduceMotion), value: selection)
     }
 }
 

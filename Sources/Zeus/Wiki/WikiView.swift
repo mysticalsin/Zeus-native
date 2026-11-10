@@ -1,8 +1,8 @@
 import SwiftUI
 import ZeusCore
 
-/// The Memory window: pages on the left, one page on the right. No SwiftUI state wrappers are used; every
-/// piece of state is on `WikiController`.
+/// The Memory window: pages on the left, one page on the right. Content state belongs to the
+/// controller; keyboard focus stays with the native view.
 struct WikiView: View {
     let controller: WikiController
 
@@ -136,6 +136,7 @@ private struct WikiBanner: View {
 
 private struct WikiSidebar: View {
     let controller: WikiController
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -144,8 +145,20 @@ private struct WikiSidebar: View {
                 set: { controller.query = $0 }
             ))
             .textFieldStyle(.roundedBorder)
+            .focused($searchFocused)
             .accessibilityLabel("Search Memory")
+            .accessibilityIdentifier("memory.search")
             let pages = controller.visiblePages
+            HStack {
+                Text("\(pages.count) of \(controller.pages.count) pages")
+                    .font(.caption).foregroundStyle(Theme.cloudSecondary)
+                    .accessibilityIdentifier("memory.results")
+                Spacer(minLength: 0)
+                Button("Clear search") { controller.query = ""; searchFocused = true }
+                    .font(.caption)
+                    .disabled(controller.query.isEmpty)
+                    .accessibilityIdentifier("memory.search.clear")
+            }
             if pages.isEmpty {
                 Text(controller.pages.isEmpty
                      ? "Nothing here yet. Decisions and action items from your finished meetings show up as pages."
@@ -207,6 +220,7 @@ private struct WikiRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(page.title), \(summary)\(page.pinned ? ", pinned" : "")")
+        .accessibilityIdentifier("memory.page.\(page.id)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
@@ -269,6 +283,7 @@ private struct WikiPageDetail: View {
             .background(RoundedRectangle(cornerRadius: Theme.bubbleRadius).fill(Color.white.opacity(0.06)))
             .frame(minHeight: 160)
             .accessibilityLabel("Page text, editable")
+            .accessibilityIdentifier("memory.page.editor")
             .accessibilityHint("Changes are saved when you stop typing. Editing a global page makes it personal again.")
             if controller.promotionOpen {
                 WikiPromotionPanel(controller: controller)
@@ -352,6 +367,7 @@ private struct WikiSources: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(Theme.cloudPrimary)
                     .disabled(controller.meetingSourceIssue(id) != nil)
+                    .accessibilityIdentifier("memory.source.\(id.uuidString)")
                     .accessibilityHint("Opens the saved source in Meetings. An active recording or notes session stays running.")
                     if let issue = controller.meetingSourceIssue(id) {
                         Text(issue).font(.system(size: 10)).foregroundStyle(Theme.cloudSecondary)
@@ -384,6 +400,7 @@ private struct WikiRelatedPages: View {
                 Button("Explore connections…") { controller.openGraph() }
                     .font(.system(size: 11))
                     .disabled(controller.settingsUnreadable)
+                    .accessibilityIdentifier("memory.connections.open")
                     .accessibilityHint("Shows a graph and an accessible list of authored links and shared sources.")
             }
             let related = controller.relatedPages
@@ -406,6 +423,7 @@ private struct WikiRelatedPages: View {
                             .buttonStyle(.plain).foregroundStyle(Theme.cloudPrimary)
                             .help(evidence(for: relation))
                             .accessibilityHint(evidence(for: relation))
+                            .accessibilityIdentifier("memory.related.\(relation.pageID)")
                         }
                     }
                 }

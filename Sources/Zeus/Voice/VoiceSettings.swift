@@ -185,8 +185,13 @@ final class VoiceSettings {
     }
 
     func removeOpenAIKey() {
-        Keychain.remove("openai-tts.api-key")
+        guard Keychain.remove("openai-tts.api-key") else {
+            keyMessage = "Couldn't remove the OpenAI TTS key. Check Keychain access and try again."
+            return
+        }
         openAIKeySaved = false
+        openAIKeyDraft = ""
+        keyMessage = nil
         defaults.removeObject(forKey: "voice.provider.pause.openAICompatible")
     }
 
@@ -196,7 +201,8 @@ final class VoiceSettings {
 
     func setElevenVoice(_ id: String) {
         let clean = id.filter { $0.isLetter || $0.isNumber }
-        if clean.isEmpty { Keychain.remove("elevenlabs.voice-id") } else { Keychain.set(clean, for: "elevenlabs.voice-id") }
+        let saved = clean.isEmpty ? Keychain.remove("elevenlabs.voice-id") : Keychain.set(clean, for: "elevenlabs.voice-id")
+        keyMessage = saved ? nil : "Couldn't update the saved voice. Check Keychain access and try again."
     }
 
     func saveElevenKey() {
@@ -215,8 +221,13 @@ final class VoiceSettings {
     }
 
     func removeElevenKey() {
-        Keychain.remove("elevenlabs.api-key")
+        guard Keychain.remove("elevenlabs.api-key") else {
+            keyMessage = "Couldn't remove the ElevenLabs key. Check Keychain access and try again."
+            return
+        }
         elevenKeySaved = false
+        elevenKeyDraft = ""
+        keyMessage = nil
         library = []
         elevenLabsStatusMessage = nil
         elevenLabsPausedUntil = nil

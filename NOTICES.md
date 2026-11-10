@@ -94,17 +94,27 @@ were not present in that folder, so no code was copied.
 Marks identify which AI engine a session uses (nominative use only; each mark belongs to its owner).
 
 ### Simple Icons (CC0 1.0)
-- Package: Simple Icons **16.36.0**, https://github.com/simple-icons/simple-icons, CC0 1.0
-- Fetched 2026-11-03 into `Design/brand-logos-src/`:
-  - Cursor: https://cdn.simpleicons.org/cursor
-  - OpenAI: https://cdn.simpleicons.org/openai (ChatGPT, Codex, `gpt-*`)
-  - Claude: https://cdn.simpleicons.org/claude
-  - Anthropic: https://cdn.simpleicons.org/anthropic
-  - Google Gemini: https://cdn.simpleicons.org/googlegemini
-  - Kimi: https://cdn.simpleicons.org/kimi
-  - Moonshot AI: https://cdn.simpleicons.org/moonshotai
+Simple Icons source files are provided under CC0-1.0. Brand names and trademarks
+remain the property of their owners; this does not imply provider endorsement.
 
-Shipped as template PDFs in `Sources/Zeus/Integrations/Brands/engine-*.pdf`. Mapping lives in
+- Existing OpenAI mark: Simple Icons **15.0.0**,
+  https://cdn.jsdelivr.net/npm/simple-icons@15.0.0/icons/openai.svg.
+  Used as the OpenAI provider identity for ChatGPT, Codex and GPT models.
+  SHA-256: `2b4a04ddc2395b20d168694d3850ce2050a702c4a0cdeb4d8b31b9a970481a8c`.
+- Existing Cursor, Claude, Anthropic, Google Gemini, Kimi and Moonshot AI sources:
+  Simple Icons **16.36.0**, https://github.com/simple-icons/simple-icons.
+  The files originally retrieved on 2026-11-03 were compared byte-for-byte with
+  those pinned package versions on 2026-11-10.
+- Ollama: Simple Icons **16.36.0**, retrieved 2026-11-10,
+  https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/ollama.svg.
+  SHA-256: `9c62bf0159ee96c8b58c86a732f33b002b4b3bb165ec86e8ecca51ad6a82dab6`.
+- LM Studio: Simple Icons **16.36.0**, retrieved 2026-11-10,
+  https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/lmstudio.svg.
+  SHA-256: `16e14708a6ecd687e33700b6e9d47e2e60800407d7f995610871603ddbe3816c`.
+
+Original SVGs and exact provenance are in `Design/brand-logos-src/`. Existing
+marks use template PDFs; the new Ollama and LM Studio marks retain original SVG
+bytes under `Sources/Zeus/Integrations/Brands/`. Mapping is centralized in
 `Sources/ZeusCore/Integrations/EngineBrand.swift`.
 
 ### Grok / xAI (official original SVG; proprietary trademark)
@@ -701,6 +711,39 @@ cloud service, fonts, or model weights.
 MIT License
 
 Copyright (c) 2024 OpenWhispr Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## voice-glow: native assistant beam adaptation
+
+Source: https://github.com/Jakubantalik/Libraries.dev/tree/main/packages/voice-glow
+Package: voice-glow 0.2.1, by Jakub Antalik (MIT).
+
+The native assistant beam adapts the package’s bottom-origin layered glow and
+processing motion. Zeus supplies actual producer state and approved level data;
+the React runtime, microphone helpers and the reference’s simulated speech are
+not part of the native app. The user-supplied Voice Assistant Card timing reference
+is https://transitions.dev/studio.html?id=c85AR0dBjUE.
+
+MIT License
+
+Copyright (c) 2026 Jakub Antalik
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -435,7 +435,7 @@ class NativeAppReceiptIntegrationTests(unittest.TestCase):
     def test_app_gate_rejects_missing_parameter_case_even_with_positive_summary(self):
         self.prepare(parameterized=True)
         self.rewrite_events(lambda row: row["payload"].get("_testCase", {}).get("id") != "argument-two")
-        with self.assertRaisesRegex(ValueError, "omitted a compiled argument case"):
+        with self.assertRaisesRegex(ValueError, "omitted a declared argument case"):
             gate.validate_native(self.app, "a" * 40, "b" * 40)
 
 

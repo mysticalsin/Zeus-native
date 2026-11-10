@@ -29,6 +29,14 @@ def tests(*names):
 
 
 GROUPS = {
+    "socket-safety": (
+        core("UnixSocket.swift"),
+        tests("UnixSocketSafetyTests"),
+    ),
+    "keychain": (
+        core("Keychain/KeychainStore.swift"),
+        tests("KeychainStoreTests"),
+    ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift",
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
@@ -57,14 +65,17 @@ GROUPS = {
         core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift", "Scribe/ScribeCallPrompt.swift",
              "Scribe/ScribeCapture.swift", "Scribe/ScribeMicGate.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribePresentation.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeSpeakerStats.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift"),
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift",
+             "Scribe/ScribeMuteReadScheduler.swift", "Scribe/ScribeIncomingWordLayout.swift"),
         tests("ScribeCoreTests", "ScribePresentationTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
-              "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests"),
+              "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
+              "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests"),
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift"),
-        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests"),
+             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
+             "TopBar/RecordingFeedback.swift"),
+        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
@@ -198,6 +209,7 @@ def prepare(output, group, *, platform_name=None):
                         '    .target(name: "MCPTransportValidation", dependencies: ["ZeusCore"]),\n')
         for source, target in [
             ("Sources/Zeus/BrowserAgent/MCPStdioClient.swift", "Sources/MCPTransportValidation/MCPStdioClient.swift"),
+            ("Sources/Zeus/BrowserAgent/MCPPipeIO.swift", "Sources/MCPTransportValidation/MCPPipeIO.swift"),
             ("Tests/ZeusAppTests/MemoryMCPTransportTests.swift", TESTS + "MemoryMCPTransportTests.swift"),
         ]:
             data = (REPO / source).read_bytes()

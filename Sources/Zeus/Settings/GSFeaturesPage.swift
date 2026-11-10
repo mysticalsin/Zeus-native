@@ -85,7 +85,11 @@ struct FeaturesSettingsPage: View {
             ForEach(Array(RouterEngine.allCases.enumerated()), id: \.element) { index, engine in
                 if index > 0 { GSDivider() }
                 let models = ModelCap.describe(engine)
-                GSRow(symbol: engine.isLocal ? "laptopcomputer" : "cpu", title: engine.title, text: "Quick: \(models.fast). Deep: \(models.deep).")
+                HStack(spacing: 0) {
+                    EngineBrandLogo(agentLabel: engine.title, size: 20, tint: GS.text)
+                        .frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                    GSRow(title: engine.title, text: "Quick: \(models.fast). Deep: \(models.deep).")
+                }
             }
             GSInfo(text: "Zeus acts with Haiku, or Sonnet at most, and the same size on every other engine. Your own coding sessions keep their own models. A provider that renames models can be pinned with a \u{201C}modelCap.<engine>.<fast|deep>\u{201D} default; anything larger than Sonnet is refused.")
         }

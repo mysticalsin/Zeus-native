@@ -7,16 +7,92 @@ struct RecordlyPage: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Tile {
-                if recordly.showsRunning {
-                    RecordlyRunning(recordly: recordly)
-                } else if case .editor = recordly.phase {
-                    RecordlyEditor(recordly: recordly)
-                } else {
-                    RecordlyIdle(recordly: recordly, topBar: topBar)
+            Tile(padding: 0) {
+                ZStack(alignment: .topLeading) {
+                    RecordlyCardBeam(recordly: recordly)
+                    Group {
+                        if recordly.showsRunning {
+                            RecordlyRunning(recordly: recordly)
+                        } else if case .editor = recordly.phase {
+                            RecordlyEditor(recordly: recordly)
+                        } else {
+                            RecordlyIdle(recordly: recordly, topBar: topBar)
+                        }
+                    }
+                    .padding(CardFinish.inset)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
+    }
+}
+
+/// Decorative recording/export activity only. Recordly has no microphone meter, so level stays zero.
+/// Export percentages, controls and success/failure still come exclusively from its controller.
+private struct RecordlyCardBeam: View {
+    let recordly: RecordlyController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var timeline: RecordingFeedback.BeamTimeline?
+    @State private var workSnapshot: RecordingFeedback.Snapshot?
+    @State private var recordingOrigin: Date?
+
+    var body: some View {
+        let feedback = recordly.topBarFeedback()
+        let active = recordly.showsRunning || recordly.isExporting || feedback?.phase == .completed
+        let completionEnd = feedback.flatMap { snapshot in
+            snapshot.phase == .completed
+                ? Date(timeIntervalSinceReferenceDate: snapshot.beganAt + RecordingFeedback.Motion.revealDuration) : nil
+        }
+        DisplaySynchronizedView(paused: !active || reduceMotion || reduceTransparency,
+                                preferredFramesPerSecond: 240, until: completionEnd) { context in
+            if active {
+                let now = context.date.timeIntervalSinceReferenceDate
+                let elapsed = (recordly.startedAt ?? recordingOrigin).map { max(0, context.date.timeIntervalSince($0)) }
+                    ?? timeline?.elapsed(at: now) ?? 0
+                let processing = recordly.isStopping || recordly.isExporting
+                    || (feedback?.phase == .completed && workSnapshot != nil)
+                AssistantBeamView(frame: AssistantBeam.frame(elapsed: elapsed, level: 0,
+                    processing: processing,
+                    processingElapsed: workSnapshot.map { max(0, now - $0.beganAt) } ?? 0,
+                    reduceMotion: reduceMotion || reduceTransparency),
+                    reduceTransparency: reduceTransparency, cornerRadius: CardFinish.radius)
+                    .opacity(beamOpacity(feedback, at: now))
+            }
+        }
+        .onChange(of: feedback, initial: true) { _, snapshot in
+            guard let snapshot, snapshot.phase != .failed else {
+                timeline = nil
+                workSnapshot = nil
+                if snapshot?.phase == .failed { recordingOrigin = nil }
+                return
+            }
+            if timeline == nil { timeline = RecordingFeedback.BeamTimeline(snapshot) }
+            else { timeline?.update(snapshot) }
+            // Completion fades the same processing shape. A new export gets its own gather clock.
+            if snapshot.phase != .completed { workSnapshot = snapshot }
+        }
+        .onChange(of: recordly.startedAt, initial: true) { _, start in
+            // The controller clears startedAt when the saved project replaces the running capture.
+            // Keep this drawing origin through that completion fade, including the new media-path key.
+            if let start { recordingOrigin = start }
+        }
+        .onChange(of: recordly.phase) { _, phase in
+            switch phase {
+            case .idle, .starting, .failed: recordingOrigin = nil
+            default: break
+            }
+        }
+        .onChange(of: recordly.project?.rawMediaPath) { previous, next in
+            // nil → first saved project is the capture above; replacing/removing it starts a new lifetime.
+            if previous != nil && previous != next { recordingOrigin = nil }
+        }
+    }
+
+    private func beamOpacity(_ snapshot: RecordingFeedback.Snapshot?, at now: TimeInterval) -> Double {
+        guard let snapshot, snapshot.phase == .completed else { return 1 }
+        if reduceMotion || reduceTransparency { return 0 }
+        return RecordingFeedback.frame(snapshot, at: now, reduceMotion: false, reduceTransparency: false).beamOpacity / 0.6
     }
 }
 

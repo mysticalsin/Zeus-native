@@ -9,6 +9,8 @@ public enum EngineBrandMark: String, CaseIterable, Sendable, Equatable {
     case gemini
     case kimi
     case grok
+    case ollama
+    case lmStudio
     /// Unknown engines without a verified provider mark.
     case fallback
 
@@ -22,12 +24,18 @@ public enum EngineBrandMark: String, CaseIterable, Sendable, Equatable {
         case .gemini: "engine-gemini"
         case .kimi: "engine-kimi"
         case .grok: "engine-grok"
+        case .ollama: "engine-ollama"
+        case .lmStudio: "engine-lmstudio"
         case .fallback: "engine-fallback"
         }
     }
 
-    /// Grok retains the exact official SVG bytes; the existing marks remain PDFs.
-    public var assetExtension: String { self == .grok ? "svg" : "pdf" }
+    public var assetExtension: String {
+        switch self {
+        case .grok, .ollama, .lmStudio: "svg"
+        default: "pdf"
+        }
+    }
 
     public var title: String {
         switch self {
@@ -38,6 +46,8 @@ public enum EngineBrandMark: String, CaseIterable, Sendable, Equatable {
         case .gemini: "Gemini"
         case .kimi: "Kimi"
         case .grok: "Grok"
+        case .ollama: "Ollama"
+        case .lmStudio: "LM Studio"
         case .fallback: "Unknown engine"
         }
     }
@@ -55,6 +65,7 @@ public enum EngineBrand {
         ("gemini", .gemini), ("Gemini", .gemini), ("googlegemini", .gemini),
         ("kimi", .kimi), ("Kimi", .kimi), ("moonshot", .kimi), ("moonshotai", .kimi),
         ("grok", .grok), ("Grok", .grok), ("Grok Bot", .grok), ("xai", .grok), ("xAI", .grok), ("x.ai", .grok),
+        ("ollama", .ollama), ("Ollama (local)", .ollama), ("LM Studio", .lmStudio), ("lmstudio", .lmStudio),
         ("totally-unknown-engine", .fallback),
     ]
 
@@ -78,8 +89,12 @@ public enum EngineBrand {
             return EngineBrandMark.gemini
         case "kimi", "moonshot", "moonshotai", "moonshot ai":
             return EngineBrandMark.kimi
-        case "grok", "grok bot", "xai", "x.ai":
+        case "grok", "grok bot", "xai", "x ai":
             return EngineBrandMark.grok
+        case "ollama", "ollama local":
+            return EngineBrandMark.ollama
+        case "lm studio", "lmstudio":
+            return EngineBrandMark.lmStudio
         default:
             return EngineBrandMark.fallback
         }
@@ -92,7 +107,9 @@ public enum EngineBrand {
         case .cursor: return EngineBrandMark.cursor
         case .gemini: return EngineBrandMark.gemini
         case .grok: return EngineBrandMark.grok
-        case .ollama, .lmStudio, .anyLLM: return EngineBrandMark.fallback
+        case .ollama: return EngineBrandMark.ollama
+        case .lmStudio: return EngineBrandMark.lmStudio
+        case .anyLLM: return EngineBrandMark.fallback
         }
     }
 
@@ -103,7 +120,7 @@ public enum EngineBrand {
         case .gemini: return EngineBrandMark.gemini
         case .cursorAgent: return EngineBrandMark.cursor
         case .grok: return EngineBrandMark.grok
-        case .ollama: return EngineBrandMark.fallback
+        case .ollama: return EngineBrandMark.ollama
         }
     }
 
@@ -118,7 +135,7 @@ public enum EngineBrand {
 
     /// Labels for silent E2E and snapshot renders: one row per distinct mark plus unknown.
     public static let debugSampleAgents: [String] = [
-        "Cursor Agent", "ChatGPT", "Codex", "Claude Code", "Anthropic", "Gemini", "Kimi", "Grok", "some-unknown-cli",
+        "Cursor Agent", "ChatGPT", "Codex", "Claude Code", "Anthropic", "Gemini", "Kimi", "Grok", "Ollama", "LM Studio", "some-unknown-cli",
     ]
 
     private static func normalize(_ text: String) -> String {

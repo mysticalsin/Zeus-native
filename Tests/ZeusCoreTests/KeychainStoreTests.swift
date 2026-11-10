@@ -51,8 +51,38 @@ import Testing
         let store = KeychainStore(backend: backend, defaults: defaults())
         store.set("k", for: "assistant.key.openAI")
         #expect(store.has("assistant.key.openAI"))
-        store.remove("assistant.key.openAI")
+        #expect(store.remove("assistant.key.openAI"))
         #expect(!store.has("assistant.key.openAI"))
         #expect(backend.items.isEmpty)
+    }
+
+    @Test func deniedRemovalRetainsSavedStateAndSurvivesRelaunchUntilConfirmedRetry() {
+        let account = "assistant.key.openAI"
+        let backend = MemoryKeychain(["com.zeus.app|\(account)": "synthetic-value"])
+        let flags = defaults()
+        let store = KeychainStore(backend: backend, defaults: flags)
+        #expect(store.has(account))
+        backend.locked = ["com.zeus.app|\(account)"]
+        #expect(!store.remove(account))
+        #expect(store.has(account))
+        #expect(backend.items["com.zeus.app|\(account)"] == "synthetic-value")
+
+        backend.locked = []
+        let relaunched = KeychainStore(backend: backend, defaults: flags)
+        #expect(relaunched.has(account))
+        #expect(relaunched.remove(account))
+        #expect(!relaunched.has(account))
+        let nextLaunch = KeychainStore(backend: backend, defaults: flags)
+        #expect(!nextLaunch.has(account))
+    }
+
+    @Test func removalOfAbsentSecretIsIdempotentAndDoesNotTouchOtherAccounts() {
+        let backend = MemoryKeychain(["com.zeus.app|unrelated": "retained"])
+        let flags = defaults()
+        let store = KeychainStore(backend: backend, defaults: flags)
+        #expect(store.remove("absent"))
+        #expect(store.remove("absent"))
+        #expect(store.get("unrelated") == "retained")
+        #expect(backend.items == ["com.zeus.app|unrelated": "retained"])
     }
 }

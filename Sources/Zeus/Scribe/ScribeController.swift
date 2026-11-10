@@ -200,6 +200,7 @@ private struct ScribeWordRevealEntry {
     var text: String
     var alreadyShown: Int
     var since: Date
+    var layout: ScribeIncomingWordLayout
 }
 
 /// Cancelled meetings whose transcript file couldn't be removed. Kept in the app's preferences, outside the
@@ -290,6 +291,8 @@ final class ScribeController {
     /// How loud the meeting audio is, newest last (about 20 values a second, the last 24 kept). Empty when
     /// nothing is recording; decays to zeros when no audio arrives. Drives the meter on the page and the wings.
     private(set) var levelHistory: [Double] = []
+    /// Cached only on real transcript revisions, so a display link can stop once incoming text settles.
+    private(set) var incomingWordsRevealUntil: Date?
     /// The person pressed the trash button and hasn't confirmed throwing the recording away yet.
     private(set) var discardRequested = false
     @ObservationIgnored var meetingTitleHint: String?
@@ -370,7 +373,8 @@ final class ScribeController {
         writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil,
         cancellationDefaults: UserDefaults = .standard,
         endWindow: ScribeEndWindow? = nil,
-        transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine }
+        transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine },
+        motionReduced: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     ) {
         self.provider = provider
         self.generator = generator
@@ -379,6 +383,7 @@ final class ScribeController {
         self.store = store
         self.cancellationDefaults = cancellationDefaults
         self.transcriptionEngine = transcriptionEngine
+        self.motionReduced = motionReduced
         self.writeMeeting = writeMeeting ?? { record in try store?.save(record) }
         self.muteSourceFactory = muteSourceFactory
         self.transcriberFactory = transcriberFactory
@@ -483,14 +488,20 @@ final class ScribeController {
     /// How many words of `segment` to show at `date`: all of them, unless its text just changed while recording,
     /// in which case the new words appear a few at a time (`ScribeWordReveal`).
     func visibleWordCount(for segment: ScribeTranscriptSegment, at date: Date, reduceMotion: Bool) -> Int {
-        let total = ScribeWordText.count(segment.text)
-        guard let entry = wordReveals[segment.id], entry.text == segment.text else { return total }
+        guard let entry = wordReveals[segment.id], entry.text == segment.text else { return ScribeWordText.count(segment.text) }
         return ScribeWordReveal.visibleWords(
-            total: total,
+            total: entry.layout.words.count,
             alreadyShown: entry.alreadyShown,
             since: max(0, date.timeIntervalSince(entry.since)),
             reduceMotion: reduceMotion
         )
+    }
+
+    /// Tokenization and fade origins are cached when real transcript text changes, never per frame.
+    func incomingWordLayout(for segment: ScribeTranscriptSegment) -> ScribeIncomingWordLayout? {
+        guard machine.phase.sessionID == segment.session,
+              let entry = wordReveals[segment.id], entry.text == segment.text else { return nil }
+        return entry.layout
     }
 
     var failureReason: String? {
@@ -543,6 +554,7 @@ final class ScribeController {
         levelHistory = []
         discardRequested = false
         wordReveals = [:]
+        incomingWordsRevealUntil = nil
         notesReadyTask?.cancel()
         notesReadyTask = nil
         let levels = ScribeLevelBox()
@@ -693,6 +705,8 @@ final class ScribeController {
         cancelCaptureInputs()
         transcript = nil
         notes = nil
+        wordReveals = [:]
+        incomingWordsRevealUntil = nil
     }
 
     /// Clears a failure and starts again.
@@ -859,7 +873,7 @@ final class ScribeController {
         guard case .recording = machine.phase else { return }
         let previous = wordReveals[segment.id]
         if previous?.text == segment.text { return }
-        let now = Date()
+        let now = clock()
         var shown = 0
         // The "…" placeholder is not text anyone has read.
         if let previous, previous.text != "…" {
@@ -873,11 +887,19 @@ final class ScribeController {
         wordReveals[segment.id] = ScribeWordRevealEntry(
             text: segment.text,
             alreadyShown: min(shown, ScribeWordText.count(segment.text)),
-            since: now
+            since: now,
+            layout: ScribeIncomingWordLayout(text: segment.text,
+                alreadyShown: min(shown, ScribeWordText.count(segment.text)),
+                since: now.timeIntervalSinceReferenceDate, previous: previous?.layout)
         )
+        let lastEnd = transcript?.segments.suffix(60).reduce(-TimeInterval.infinity) {
+            max($0, wordReveals[$1.id]?.layout.revealEndsAt ?? -.infinity)
+        } ?? -.infinity
+        incomingWordsRevealUntil = lastEnd.isFinite ? Date(timeIntervalSinceReferenceDate: lastEnd) : nil
     }
 
-    private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    @ObservationIgnored private let motionReduced: () -> Bool
+    private var reduceMotion: Bool { motionReduced() }
 
     /// The transcriber has produced its final segments. Notes are generated from the final transcript only.
     func transcriptDidFinish(session id: ScribeSessionID) {
@@ -1462,6 +1484,7 @@ final class ScribeController {
         notesReadyTask?.cancel()
         notesReadyTask = nil
         wordReveals = [:]
+        incomingWordsRevealUntil = nil
         discardRequested = false
         stoppedEarlyReason = nil
         notesIssue = nil

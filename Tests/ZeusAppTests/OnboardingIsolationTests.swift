@@ -152,7 +152,8 @@ struct OnboardingIsolationTests {
     }
 
     @Test func bundledTypographyAndMascotAreRequiredForNativePresentation() throws {
-        let bundle = try #require(ZeusResources.bundle, "The actual app resource bundle must accompany native fixtures")
+        let bundle = try #require(ZeusResources.bundle,
+            "The actual app resource bundle must accompany native fixtures. \(ZeusResources.lookupDescription)")
         let fontURL = try #require(bundle.url(forResource: "PlusJakartaSans", withExtension: "ttf", subdirectory: "Fonts"))
         #expect(FileManager.default.fileExists(atPath: fontURL.path))
         // The production registrar uses CoreText .process; it never installs in Font Book or writes preferences.
@@ -171,6 +172,25 @@ struct OnboardingIsolationTests {
             let url = try #require(film.url)
             #expect(FileManager.default.fileExists(atPath: url.path), "Missing shipped film: \(film.rawValue)")
         }
+    }
+
+    @Test func resourceLookupAddsOnlyExplicitLoadedTestBundleSiblings() {
+        let app = URL(fileURLWithPath: "/synthetic/Applications/Zeus.app")
+        let executable = app.appendingPathComponent("Contents/MacOS/Zeus")
+        let resources = app.appendingPathComponent("Contents/Resources")
+        let production = ZeusResources.candidateURLs(resourceURL: resources, executableURL: executable,
+            mainBundleURL: app, moduleBundleURL: app)
+        #expect(production.first == resources.appendingPathComponent("Zeus_Zeus.bundle"))
+        #expect(!production.contains(app.deletingLastPathComponent().appendingPathComponent("Zeus_Zeus.bundle")))
+        let test = URL(fileURLWithPath: "/synthetic/build/debug/ZeusPackageTests.xctest")
+        let sibling = test.deletingLastPathComponent().appendingPathComponent("Zeus_Zeus.bundle")
+        let hosted = ZeusResources.candidateURLs(resourceURL: nil, executableURL: nil,
+            mainBundleURL: app, moduleBundleURL: test)
+        #expect(hosted.last == sibling)
+        let sameHost = ZeusResources.candidateURLs(resourceURL: nil, executableURL: nil,
+            mainBundleURL: test, moduleBundleURL: test)
+        #expect(sameHost.filter { $0 == sibling }.count == 1)
+        #expect(!hosted.contains(where: { $0.path.contains("Sources") }))
     }
 
     @Test func optionsStayIndependentAndSoundOffPreventsPreviewDispatch() {

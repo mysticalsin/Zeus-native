@@ -92,6 +92,68 @@ struct RecordingFeedbackRenderTests {
         }
     }
 
+    @Test func statusSwapFramesRetargetWithoutShowingDiscardedText() throws {
+        try withArtifacts { directory in
+            for producer in producers {
+                func state(_ text: String) -> RecordingFeedback.Snapshot {
+                    .init(producer: producer, phase: .failed, sessionKey: "status-fixture",
+                          beganAt: epoch.timeIntervalSinceReferenceDate, label: text)
+                }
+                let first = state("Recording needs attention")
+                let discarded = state("Export needs attention")
+                let latest = state("Some exports failed")
+                var transition = RecordingFeedback.StatusTransition(first)
+                var frames: [RenderedFrame] = []
+                for index in 0...13 {
+                    let elapsed = Double(index) / Double(framesPerSecond)
+                    let date = epoch.timeIntervalSinceReferenceDate + elapsed
+                    if index == 2 { transition.update(discarded, at: date, reduceMotion: false) }
+                    if index == 3 { transition.update(latest, at: date, reduceMotion: false) }
+                    let status = transition.frame(at: date, reduceMotion: false)
+                    #expect(status.text != discarded.label, "An interrupted pending status must never appear")
+                    frames.append(try render(transition.target, elapsed: elapsed, status: status))
+                }
+                let settled = frames.filter { $0.elapsed >= 0.45 }
+                #expect(Set(frames.map(\.pixelSHA256)).count > 3, "The supplied status transition was static")
+                #expect(Set(settled.map(\.pixelSHA256)).count == 1, "A finished status transition kept moving")
+                #expect(settled.allSatisfy { $0.displayedStatus == latest.label })
+                try write(frames, snapshot: latest, reduceMotion: false, reduceTransparency: false,
+                          suffix: "interrupted-status", to: directory)
+            }
+        }
+    }
+
+    @Test func reducedMotionStatusSwapShowsLatestTextImmediately() throws {
+        for producer in producers {
+            let first = snapshot(producer, phase: .failed)
+            let next = RecordingFeedback.Snapshot(producer: producer, phase: .failed, sessionKey: first.sessionKey,
+                                                 beganAt: first.beganAt, label: "Save needs attention")
+            var transition = RecordingFeedback.StatusTransition(first)
+            transition.update(next, at: epoch.timeIntervalSinceReferenceDate, reduceMotion: false)
+            let pending = transition.frame(at: epoch.timeIntervalSinceReferenceDate + 0.05, reduceMotion: false)
+            let reduced = try render(next, elapsed: 0.05, reduceMotion: true, status: pending)
+            let settled = try render(next, elapsed: 0.05, reduceMotion: true, status: .settled(next.label))
+            #expect(reduced.pixelSHA256 == settled.pixelSHA256, "Reduced Motion must remove the pending swap in the actual renderer")
+        }
+    }
+
+    @Test func completionDriverStopsFrameRequestsBeforeTheNoticeExpires() async throws {
+        let began = Date.timeIntervalSinceReferenceDate
+        let completed = RecordingFeedback.Snapshot(producer: .recordly, phase: .completed,
+                                                    sessionKey: "completion-clock-fixture", beganAt: began, label: "Recording saved")
+        let driver = RecordingFeedbackStatusDriver(snapshot: completed)
+        defer { driver.stop() }
+        driver.update(completed, reduceMotion: false)
+        #expect(driver.isAnimating, "The completion reveal must receive frames before settling")
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while driver.isAnimating && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!driver.isAnimating, "Completed feedback must release its display-link request after the reveal")
+        #expect(RecordingFeedback.frame(completed, at: began + 1, reduceMotion: false, reduceTransparency: false).visible,
+                "Stopping decorative frames must not dismiss the still-valid completion notice")
+    }
+
     private func snapshot(_ producer: RecordingFeedback.Producer, phase: RecordingFeedback.Phase) -> RecordingFeedback.Snapshot {
         .init(producer: producer, phase: phase, sessionKey: "synthetic-\(producer.rawValue)",
               beganAt: epoch.timeIntervalSinceReferenceDate,
@@ -102,6 +164,7 @@ struct RecordingFeedbackRenderTests {
         let elapsed: TimeInterval
         let image: CGImage
         let pixelSHA256: String
+        let displayedStatus: String?
     }
 
     private func sequence(_ snapshot: RecordingFeedback.Snapshot, count: Int, reduceMotion: Bool = false,
@@ -113,14 +176,15 @@ struct RecordingFeedbackRenderTests {
     }
 
     private func render(_ snapshot: RecordingFeedback.Snapshot?, elapsed: TimeInterval,
-                        reduceMotion: Bool = false, reduceTransparency: Bool = false) throws -> RenderedFrame {
+                        reduceMotion: Bool = false, reduceTransparency: Bool = false,
+                        status: RecordingFeedback.StatusFrame? = nil) throws -> RenderedFrame {
         var openCalls = 0
         let content = ZStack {
             Color.black
             if let snapshot {
                 RecordingFeedbackFrameView(snapshot: snapshot, date: epoch.addingTimeInterval(elapsed),
                                            reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
-                                           open: { openCalls += 1 })
+                                           status: status, open: { openCalls += 1 })
             }
         }
         .frame(width: size.width, height: size.height)
@@ -132,7 +196,8 @@ struct RecordingFeedbackRenderTests {
         let image = try #require(renderer.cgImage, "The production frame could not render")
         #expect(image.width == Int(size.width * scale) && image.height == Int(size.height * scale))
         #expect(openCalls == 0, "Rendering must never invoke the production open action")
-        return RenderedFrame(elapsed: elapsed, image: image, pixelSHA256: Self.digest(try pixels(image)))
+        return RenderedFrame(elapsed: elapsed, image: image, pixelSHA256: Self.digest(try pixels(image)),
+                             displayedStatus: reduceMotion ? snapshot?.label : status?.text ?? snapshot?.label)
     }
 
     /// Canonical RGBA bytes avoid differences in the renderer's chosen provider/row padding.
@@ -152,12 +217,14 @@ struct RecordingFeedbackRenderTests {
         let referenceDateSeconds: Double
         let rgbaSHA256: String
         let decodedGIFRGBASHA256: String
+        let displayedStatus: String?
     }
 
     private struct SequenceMetadata: Encodable {
         let schemaVersion = 1
         let evidenceKind = "synthetic-production-view-frames"
         let scope = "ImageRenderer of RecordingFeedbackFrameView; no screen/device capture or reference-motion parity claim"
+        let samplingPurpose = "20 Hz GIF preview; not a measurement of display refresh rate or delivered frame pacing"
         let producer: String
         let phase: String
         let reduceMotion: Bool
@@ -221,7 +288,8 @@ struct RecordingFeedbackRenderTests {
             frames: frames.enumerated().map {
                 .init(index: $0.offset, elapsedSeconds: $0.element.elapsed,
                       referenceDateSeconds: epoch.timeIntervalSinceReferenceDate + $0.element.elapsed,
-                      rgbaSHA256: $0.element.pixelSHA256, decodedGIFRGBASHA256: decodedHashes[$0.offset])
+                      rgbaSHA256: $0.element.pixelSHA256, decodedGIFRGBASHA256: decodedHashes[$0.offset],
+                      displayedStatus: $0.element.displayedStatus)
             })
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -231,6 +299,7 @@ struct RecordingFeedbackRenderTests {
     private func sourceHashes() throws -> [String: String] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let paths = ["Sources/Zeus/TopBar/RecordingFeedbackView.swift", "Sources/ZeusCore/TopBar/RecordingFeedback.swift",
+                     "Sources/Zeus/Voice/AssistantBeamView.swift", "Sources/ZeusCore/Voice/AssistantBeam.swift",
                      "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift"]
         return try Dictionary(uniqueKeysWithValues: paths.map { ($0, Self.digest(try Data(contentsOf: root.appendingPathComponent($0)))) })
     }

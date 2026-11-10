@@ -49,7 +49,7 @@ One suite's runtime failure remains `failed` while later suites still run. A
 missing, changed or unsuccessful compiler receipt cannot authorize `--skip-build`.
 This optimization does not remove any native obligation or change full-mode failure.
 
-The audited native selection is **all Core tests plus 15 explicitly mapped app suites**.
+The audited native selection is **all Core tests plus 21 explicitly mapped app suites**.
 Three former narrow Core selections are subsumed by the module; their named
 obligations and regression bindings remain mandatory. The compiler's discovery
 stream must include every current Core `@Test` declaration. A source inventory is

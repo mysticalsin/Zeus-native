@@ -41,8 +41,11 @@ struct AIConnectionsPage: View {
             }
             ForEach(Array(shown.enumerated()), id: \.element) { index, provider in
                 if index > 0 { GSDivider() }
-                GSToggleRow(symbol: "plus.bubble", title: "Offer \(provider.title) for new chats",
-                            isOn: Binding(get: { model.offers(provider) }, set: { model.setOffers(provider, $0) }))
+                HStack(spacing: 0) {
+                    BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                    GSToggleRow(title: "Offer \(provider.title) for new chats",
+                                isOn: Binding(get: { model.offers(provider) }, set: { model.setOffers(provider, $0) }))
+                }
             }
         }
         .task { await model.refresh(); await model.checkAllSignIns() }
@@ -53,7 +56,7 @@ struct AIConnectionsPage: View {
         let connected = step == .connected
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
-                BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading)
+                BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
                 GSRow(title: provider.title, text: model.detail(provider, services: services)) {
                     HStack(spacing: 10) {
                         if connected { GSStatus(ok: true, text: "Connected") }
@@ -126,7 +129,7 @@ private struct AnyLLMCard: View {
     var body: some View {
         GSCard("Any LLM") {
             HStack(spacing: 0) {
-                BrandMark(provider: .anyLLM, side: 26).frame(width: 42, alignment: .leading)
+                BrandMark(provider: .anyLLM, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
                 GSRow(title: "OpenAI compatible endpoint", text: "OpenRouter, vLLM, a company gateway or any server that speaks the same API.") {
                     statusView
                 }

@@ -113,6 +113,19 @@ private final class OrderLog: @unchecked Sendable {
     func add(_ entry: String) { lock.withLock { entries.append(entry) } }
 }
 
+/// These deliberately blocking contention workers must not depend on the global dispatch pool,
+/// which the complete parallel test module also uses. Each case starts at most two owned threads;
+/// the existing bounded waits and deferred sink release still detect hangs and ordering failures.
+private func startRouterContentionWorker(group: DispatchGroup, operation: @escaping @Sendable () -> Void) {
+    group.enter()
+    let thread = Thread {
+        defer { group.leave() }
+        operation()
+    }
+    thread.name = "zeus-router-contention-test"
+    thread.start()
+}
+
 /// One-shot arm flag shared by the blocking sinks: only the first delivery blocks.
 private final class BlockOnce: @unchecked Sendable {
     private let lock = NSLock()
@@ -363,13 +376,13 @@ struct ScribeMicGateRouterTests {
         defer { store.releaseAll() }
 
         // This test bounds hangs and checks ordering under contention; it does not prove the lock by itself.
-        DispatchQueue.global().async(group: group) { router.route(frame) }
+        startRouterContentionWorker(group: group) { router.route(frame) }
         // Frame A passed validation and is blocked inside the store sink.
         guard store.entered.wait(timeout: .now() + 2) == .success else {
             Issue.record("frame never reached the store sink")
             return
         }
-        DispatchQueue.global().async(group: group) {
+        startRouterContentionWorker(group: group) {
             log.add("switch-start")
             started.signal()
             router.setActiveSession(next)
@@ -419,13 +432,13 @@ struct ScribeMicGateRouterTests {
         defer { transcriber.releaseAll() }
 
         // This test bounds hangs and checks ordering under contention; it does not prove the lock by itself.
-        DispatchQueue.global().async(group: group) { router.route(frame) }
+        startRouterContentionWorker(group: group) { router.route(frame) }
         // The frame is blocked inside ingest.
         guard transcriber.entered.wait(timeout: .now() + 2) == .success else {
             Issue.record("frame never reached the transcriber sink")
             return
         }
-        DispatchQueue.global().async(group: group) {
+        startRouterContentionWorker(group: group) {
             log.add("finish-start")
             started.signal()
             router.finish()

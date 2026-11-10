@@ -169,7 +169,10 @@ final class AIConnections {
         anyLLMGeneration &+= 1
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            Keychain.remove(AnyLLMConfig.keyAccount)
+            guard Keychain.remove(AnyLLMConfig.keyAccount) else {
+                anyLLMTest = .failed("Couldn't remove the key. Check Keychain access and try again.")
+                return false
+            }
             anyLLMKeySaved = false
         } else {
             guard Keychain.set(trimmed, for: AnyLLMConfig.keyAccount) else {

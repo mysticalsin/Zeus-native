@@ -548,7 +548,7 @@
         "F13",
         "S05"
       ],
-      "check": "native-ScribeComponentJourneyTests",
+      "check": "native-ScribeAccessibilityJourneyTests",
       "guard": {
         "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
         "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
@@ -562,7 +562,7 @@
         "F13",
         "S05"
       ],
-      "check": "native-ScribeComponentJourneyTests",
+      "check": "native-ScribeAccessibilityJourneyTests",
       "guard": {
         "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
         "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
@@ -689,6 +689,42 @@
       }
     },
     {
+      "id": "REG-057",
+      "failure": "Source review found Memory cancellation policy reading host preferences instead of the injected fixture cancellation IDs.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-WikiGraphNavigationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+        "function": "changingInjectedCancellationBlocksSourcesAndPreventsRelearning"
+      }
+    },
+    {
+      "id": "REG-058",
+      "failure": "Source review found Memory source navigation initializing the live Scribe singleton, including its call watcher, instead of using an isolated navigation port.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-WikiGraphNavigationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+        "function": "validSourceFlushesDraftBeforeInjectedNavigationAndClosesGraph"
+      }
+    },
+    {
+      "id": "REG-059",
+      "failure": "Source review of the first native reference adaptation found the beam clock restarting on processing and completion label changes.",
+      "features": [
+        "F07"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+        "function": "beamPhaseClockContinuesAcrossWorkAndCompletionWithoutRestarting"
+      }
+    },
+    {
       "id": "REG-060",
       "failure": "Actual Swift Testing list output omits argument expansion, so requiring argument IDs during function discovery blocked all parameterized native execution.",
       "features": [
@@ -710,6 +746,246 @@
       "guard": {
         "file": "qa/closed-loop/tests/test_native_evidence.py",
         "function": "test_implicit_suite_must_be_the_selected_compiled_function_container"
+      }
+    },
+    {
+      "id": "REG-062",
+      "failure": "Source review found completed feedback could keep requesting high-refresh frames until the five-second notice expiry after its visible transition had finished.",
+      "features": [
+        "F07"
+      ],
+      "check": "native-RecordingFeedbackRenderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+        "function": "completionDriverStopsFrameRequestsBeforeTheNoticeExpires"
+      }
+    },
+    {
+      "id": "REG-063",
+      "failure": "Source review found a paused or Reduce Motion display clock could reuse an old timestamp and hide a later completed state.",
+      "features": [
+        "F05"
+      ],
+      "check": "native-DisplaySynchronizedViewTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DisplaySynchronizedViewTests.swift",
+        "function": "pausedAndReducedClockUsesFreshTimeForNewCompletionWithoutStartingALink"
+      }
+    },
+    {
+      "id": "REG-064",
+      "failure": "Independent source review found fixed wall/media epochs could hide newly completed states after a system wall-clock correction.",
+      "features": [
+        "F05"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+        "function": "wallClockCorrectionsKeepNewCompletionsInTheProducersTimeDomain"
+      }
+    },
+    {
+      "id": "REG-065",
+      "failure": "Source review found a provider asset test could pass using the source-tree file even if the actual app bundle omitted that asset.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-EngineBrandLogoTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+        "function": "vectorAssetsExistInBundle"
+      }
+    },
+    {
+      "id": "REG-066",
+      "failure": "Source review found failed Keychain deletion could clear cached state and let settings report removal even though the backend retained the secret.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "deniedRemovalRetainsSavedStateAndSurvivesRelaunchUntilConfirmedRetry"
+      }
+    },
+    {
+      "id": "REG-067",
+      "failure": "Actual macOS execution and an exact-source resolver fixture found normalized x.ai and Ollama (local) aliases incorrectly falling back instead of using provider marks.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EngineBrandTests.swift",
+        "function": "aliasSamplesResolve"
+      }
+    },
+    {
+      "id": "REG-068",
+      "failure": "A synchronous local-socket reply to a non-reading peer blocked MainActor; the deliberate synchronous-writer regression control exceeded the 250 ms budget.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-socket-safety",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+        "function": "nonReadingPeerDoesNotBlockMainActorAndReplyTimesOut"
+      }
+    },
+    {
+      "id": "REG-069",
+      "failure": "The full macOS test run failed before either router contention sink entered while deliberately blocking workers depended on the shared global dispatch pool.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+        "function": "finishDrainsInFlightDeliveryBeforeTranscriberFinishAndClosesAdmission"
+      }
+    },
+    {
+      "id": "REG-070",
+      "failure": "Independent source review found invisible future transcript text still reserving layout height and scrolling the eligible prefix away.",
+      "features": [
+        "F07"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+        "function": "eligiblePrefixDoesNotReserveUnarrivedTailOrItsWhitespace"
+      }
+    },
+    {
+      "id": "REG-071",
+      "failure": "The original MCP codec trapped with signal 4 when an untrusted response ID was a finite numeric value outside Int range.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+        "function": "responseIDsOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping"
+      }
+    },
+    {
+      "id": "REG-072",
+      "failure": "The original MCP codec trapped with signal 4 when an untrusted error code was a finite numeric value outside Int range.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+        "function": "errorCodesOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping"
+      }
+    },
+    {
+      "id": "REG-073",
+      "failure": "Source review found repeated mute watchdog replacement could accumulate blocked synchronous readers without a global bound.",
+      "features": [
+        "F03"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+        "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
+      }
+    },
+    {
+      "id": "REG-074",
+      "failure": "Source review found partial license credential deletion could lose cleanup state across relaunch and restore activation from retained credentials.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LicenseCredentialCleanupTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+        "function": "partialDeletionKeepsRetryAcrossRelaunchAndDoesNotReactivateRetainedCredentials"
+      }
+    },
+    {
+      "id": "REG-075",
+      "failure": "Actual macOS onboarding fixture could not find packaged app resources when SwiftPM placed the resource bundle beside the loaded XCTest bundle.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingIsolationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+        "function": "bundledTypographyAndMascotAreRequiredForNativePresentation"
+      }
+    },
+    {
+      "id": "REG-076",
+      "failure": "Source review found a blocked child stdin write could monopolize the MCP actor and prevent deadline or cancellation from closing the transport.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-MemoryMCPTransportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "blockedPipeWriteKeepsActorResponsiveAndDeadlineClosesTransport"
+      }
+    },
+    {
+      "id": "REG-077",
+      "failure": "Parallel stdio fixtures exposed inherited pipe descriptors that kept EOF open after the owning child exited.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-MemoryMCPTransportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "partialFinalMessageIsRejectedAndChildIsClosed"
+      }
+    },
+    {
+      "id": "REG-078",
+      "failure": "Independent source review found an in-flight background license activation response could restore credentials after explicit deactivation.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LicenseCredentialCleanupTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+        "function": "delayedBackgroundActivationCannotRestoreCredentialsAfterExplicitDeactivation"
+      }
+    },
+    {
+      "id": "REG-079",
+      "failure": "Source review found malformed complete MCP output could be ignored until request timeout instead of closing the invalid transport.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-MemoryMCPTransportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "malformedCompleteMessagesCloseTheTransportWithoutWaitingForTimeout"
+      }
+    },
+    {
+      "id": "REG-080",
+      "failure": "Source review found a duplicate Chrome bridge request ID could replace the original pending reply instead of rejecting only the duplicate.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete"
+      }
+    },
+    {
+      "id": "REG-081",
+      "failure": "Independent event-driver review found that a native control beneath an alpha-zero ancestor could pass readiness checks and receive a click despite being invisible.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "nativeButtonUsesFreshGeometryAndDisabledControlCannotFire"
       }
     }
   ]

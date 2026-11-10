@@ -5,6 +5,7 @@ import ZeusCore
 /// Loads each verified vector format from the bundled brand directory. Unsupported SVG
 /// decoding returns nil so the views keep their existing safe text/symbol fallback.
 enum EngineBrandImage {
+    @MainActor private static var images: [EngineBrandMark: NSImage] = [:]
     /// This deliberately excludes the source-tree fallback so native tests prove packaging.
     static func bundledURL(for mark: EngineBrandMark) -> URL? {
         Bundle.module.url(forResource: mark.assetName, withExtension: mark.assetExtension, subdirectory: "Brands")
@@ -21,9 +22,11 @@ enum EngineBrandImage {
         return candidates.compactMap { $0 }.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    static func load(_ mark: EngineBrandMark) -> NSImage? {
+    @MainActor static func load(_ mark: EngineBrandMark) -> NSImage? {
+        if let image = images[mark] { return image }
         guard let url = url(for: mark), let image = NSImage(contentsOf: url) else { return nil }
         image.isTemplate = true
+        images[mark] = image
         return image
     }
 }
@@ -32,6 +35,7 @@ enum EngineBrandImage {
 struct EngineBrandLogo: View {
     let agentLabel: String
     var size: CGFloat = 16
+    var tint: Color = Theme.cloudPrimary
 
     private var mark: EngineBrandMark { EngineBrand.resolve(agentLabel) }
 
@@ -48,7 +52,7 @@ struct EngineBrandLogo: View {
                     .font(.system(size: size * 0.78, weight: .medium))
             }
         }
-        .foregroundStyle(Theme.cloudPrimary)
+        .foregroundStyle(tint)
         .frame(width: size, height: size)
         .accessibilityLabel(agentLabel)
         .help(agentLabel)

@@ -6,10 +6,10 @@ import ZeusCore
 @testable import Zeus
 
 /// Real hosted production controls, inert capture/transcription, synthetic persistence only.
-/// Uses the fixture's own accessibility objects; no AXUIElement, input injection or screen capture.
-@MainActor @Suite("Scribe native component journey", .serialized)
-struct ScribeComponentJourneyTests {
-    private static var finishedFixtureApplicationLaunch = false
+/// Separate drivers use own accessibility objects or own-window AppKit events; no global AX,
+/// system input injection or screen capture. An AX failure never falls back to pointer events.
+@MainActor
+private struct ScribeComponentFixture {
     private final class Clock { var time: TimeInterval = 100 }
 
     private final class Capture: ScribeCaptureProvider, @unchecked Sendable {
@@ -69,7 +69,6 @@ struct ScribeComponentJourneyTests {
         case rejectedPress(String)
         case traversalLimit
         case transitionTimeout(String)
-        case fixtureApplication(String)
         var description: String {
             switch self {
             case .injectedFinalWrite: return "Synthetic final-write failure"
@@ -79,7 +78,6 @@ struct ScribeComponentJourneyTests {
             case .rejectedPress(let id): return "Fixture control rejected accessibilityPerformPress: \(id)"
             case .traversalLimit: return "Fixture accessibility tree exceeded its bound"
             case .transitionTimeout(let expected): return "Fixture did not reach \(expected)"
-            case .fixtureApplication(let reason): return "Cannot prepare isolated fixture application: \(reason)"
             }
         }
     }
@@ -98,20 +96,7 @@ struct ScribeComponentJourneyTests {
     /// without constructing ZeusMain/AppDelegate or any production services. Each host restores the
     /// original activation policy after its windows close; application launch is performed only once.
     private func prepareFixtureApplication() throws -> NSApplication.ActivationPolicy {
-        let application = NSApplication.shared
-        guard application.delegate == nil else {
-            throw ScenarioFailure.fixtureApplication("an application delegate is already installed")
-        }
-        let originalPolicy = application.activationPolicy()
-        guard application.setActivationPolicy(.regular) else {
-            throw ScenarioFailure.fixtureApplication("regular activation policy was refused")
-        }
-        if !Self.finishedFixtureApplicationLaunch {
-            application.finishLaunching()
-            Self.finishedFixtureApplicationLaunch = true
-        }
-        application.activate()
-        return originalPolicy
+        try OwnedWindowFixtureApplication.prepare()
     }
 
     private func waitFor(_ name: String, _ condition: () -> Bool) async throws {
@@ -131,7 +116,7 @@ struct ScribeComponentJourneyTests {
         diagnostic.removeAll(keepingCapacity: true)
         diagnostic.append("owned host: visible=\(window.isVisible), key=\(window.isKeyWindow), " +
                           "applicationActive=\(NSApplication.shared.isActive), " +
-                          "launchFinished=\(Self.finishedFixtureApplicationLaunch)")
+                          "launchFinished=\(OwnedWindowFixtureApplication.launchFinished)")
         var pending: [(Any, Int)] = [(root, 0)]
         var seen = Set<ObjectIdentifier>()
         var result: [any NSAccessibilityProtocol] = []
@@ -212,7 +197,7 @@ struct ScribeComponentJourneyTests {
         @objc func performAction(_ sender: NSButton) { presses += 1 }
     }
 
-    @Test func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
+    func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
         let originalPolicy = try prepareFixtureApplication()
         defer { _ = NSApplication.shared.setActivationPolicy(originalPolicy) }
         let target = ButtonTarget()
@@ -254,7 +239,7 @@ struct ScribeComponentJourneyTests {
         #expect(trace == ["pressed scribe.start"])
     }
 
-    @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
+    func runJourney(useWindowEvents: Bool) async throws {
         let originalPolicy = try prepareFixtureApplication()
         defer { _ = NSApplication.shared.setActivationPolicy(originalPolicy) }
         let (suite, defaults) = try preferences()
@@ -263,7 +248,9 @@ struct ScribeComponentJourneyTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = ScribeMeetingStore(directory: root)
         let clock = Clock(), capture = Capture(), writes = Writes()
-        let endWindow = ScribeEndWindow()
+        let registry = useWindowEvents ? OwnedWindowControlRegistry() : nil
+        let eventDriver = registry.map { OwnedWindowEventDriver(registry: $0) }
+        let endWindow = ScribeEndWindow(journeyRegistry: registry)
         let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, store: store,
             transcriberFactory: { _, callbacks in Transcriber(callbacks: callbacks) }, showsEndWindow: true,
             writeMeeting: { try writes.write($0, to: store) }, cancellationDefaults: defaults,
@@ -271,6 +258,7 @@ struct ScribeComponentJourneyTests {
         let topBar = TopBarModel(defaults: defaults)
         let host = NSHostingView(rootView: ScribePage(topBar: topBar, scribe: controller)
             .environment(\.cardFinishOverride, .liquidGlass)
+            .environment(\.ownedWindowControlRegistry, registry)
             .frame(width: 870, height: 400))
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 870, height: 400),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -286,24 +274,34 @@ struct ScribeComponentJourneyTests {
         }
         window.makeKeyAndOrderFront(nil)
         var trace: [String] = []
+        eventDriver?.register(window)
+        func activate(_ id: String, in ownedWindow: NSWindow, trace: inout [String]) async throws {
+            if let eventDriver {
+                try await eventDriver.click(id, in: ownedWindow)
+                trace.append("pressed \(id)")
+            } else {
+                try await press(id, in: ownedWindow, trace: &trace)
+            }
+        }
 
-        try await press("scribe.start", in: window, trace: &trace)
+        try await activate("scribe.start", in: window, trace: &trace)
         try await waitFor("recording") { controller.isRecording }
         let id = try #require(controller.phase.sessionID)
         #expect(capture.startCount == 1)
         #expect(capture.stopCount == 0)
 
-        try await press("scribe.stop", in: window, trace: &trace)
+        try await activate("scribe.stop", in: window, trace: &trace)
         try await waitFor("visible end window") { endWindow.panel?.isVisible == true && controller.endingRemaining == 9 }
         let endPanel = try #require(endWindow.panel)
-        try await press("scribe.endWindow.keep", in: endPanel, trace: &trace)
+        eventDriver?.register(endPanel)
+        try await activate("scribe.endWindow.keep", in: endPanel, trace: &trace)
         try await waitFor("recording after Keep") { controller.phase == .recording(id, since: clock.time) }
         #expect(!endPanel.isVisible)
         #expect(capture.stopCount == 0)
 
-        try await press("scribe.stop", in: window, trace: &trace)
+        try await activate("scribe.stop", in: window, trace: &trace)
         try await waitFor("second end window") { endPanel.isVisible && controller.endingRemaining == 9 }
-        try await press("scribe.endWindow.endNow", in: endPanel, trace: &trace)
+        try await activate("scribe.endWindow.endNow", in: endPanel, trace: &trace)
         try await waitFor("recoverable final-save failure") { controller.completionSaveIssue != nil }
         #expect(controller.phase == .processing(id))
         #expect(capture.stopCount == 1)
@@ -313,14 +311,14 @@ struct ScribeComponentJourneyTests {
         #expect(controller.topBarFeedback()?.phase == .failed)
 
         writes.rejectFinal = false // Change the injected storage dependency, not the UI/controller state.
-        try await press("scribe.endWindow.retrySave", in: endPanel, trace: &trace)
+        try await activate("scribe.endWindow.retrySave", in: endPanel, trace: &trace)
         try await waitFor("durably saved completion") { controller.phase == .complete(id) }
         #expect(writes.savedFinal == 1)
         #expect(controller.completedNoticeID == id)
         #expect(controller.topBarFeedback()?.phase == .completed)
         #expect(store.loadAll().records.first(where: { $0.id == id.rawValue })?.generatedAt != nil)
 
-        try await press("scribe.endWindow.hide", in: endPanel, trace: &trace)
+        try await activate("scribe.endWindow.hide", in: endPanel, trace: &trace)
         #expect(!endPanel.isVisible)
         #expect(controller.phase == .complete(id))
         // Respect either OS accessibility preference; do not press the notes controls while their
@@ -329,7 +327,7 @@ struct ScribeComponentJourneyTests {
             controller.revealElapsed(at: Date()) >= max(ScribeGlow.revealDuration(reduceMotion: false),
                                                        ScribeGlow.revealDuration(reduceMotion: true))
         }
-        try await press("scribe.notes.close", in: window, trace: &trace)
+        try await activate("scribe.notes.close", in: window, trace: &trace)
         try await waitFor("idle after Done") { controller.phase == .idle }
         #expect(controller.completedNoticeID == nil)
         #expect(controller.recaps.contains(where: { $0.id == id }))
@@ -337,10 +335,10 @@ struct ScribeComponentJourneyTests {
         #expect(trace == ["pressed scribe.start", "pressed scribe.stop", "pressed scribe.endWindow.keep",
                           "pressed scribe.stop", "pressed scribe.endWindow.endNow", "pressed scribe.endWindow.retrySave",
                           "pressed scribe.endWindow.hide", "pressed scribe.notes.close"])
-        print("Synthetic Scribe component interaction completed: " + trace.joined(separator: " → "))
+        print("Synthetic Scribe component interaction completed via \(useWindowEvents ? "owned-window events" : "accessibility"): " + trace.joined(separator: " → "))
     }
 
-    @Test func modelPreferencesReadAndWriteOnlyTheInjectedSuite() throws {
+    func modelPreferencesReadAndWriteOnlyTheInjectedSuite() throws {
         let (suite, defaults) = try preferences()
         let (otherSuite, other) = try preferences()
         defer { defaults.removePersistentDomain(forName: suite); other.removePersistentDomain(forName: otherSuite) }
@@ -372,7 +370,7 @@ struct ScribeComponentJourneyTests {
         #expect(other.string(forKey: "topBar.note") == "Independent fixture")
     }
 
-    @Test func temporaryMeetingStoreCannotClearAnotherCancellationJournal() throws {
+    func temporaryMeetingStoreCannotClearAnotherCancellationJournal() throws {
         let (suite, defaults) = try preferences()
         let (otherSuite, other) = try preferences()
         defer { defaults.removePersistentDomain(forName: suite); other.removePersistentDomain(forName: otherSuite) }
@@ -386,5 +384,37 @@ struct ScribeComponentJourneyTests {
         #expect(controller.recaps.isEmpty)
         #expect(ScribeCancelTombstones.ids(in: defaults).isEmpty)
         #expect(ScribeCancelTombstones.ids(in: other) == [otherID])
+    }
+}
+
+
+/// Actual production controls activated with locally targeted AppKit events and current layout.
+@MainActor @Suite("Scribe native component event journey", .serialized)
+struct ScribeComponentJourneyTests {
+    @Test func layoutResolvedEventsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
+        try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: true) }
+    }
+
+    @Test func modelPreferencesReadAndWriteOnlyTheInjectedSuite() throws {
+        try ScribeComponentFixture().modelPreferencesReadAndWriteOnlyTheInjectedSuite()
+    }
+
+    @Test func temporaryMeetingStoreCannotClearAnotherCancellationJournal() throws {
+        try ScribeComponentFixture().temporaryMeetingStoreCannotClearAnotherCancellationJournal()
+    }
+}
+
+/// Kept as separate required proof. Missing native AX roles/children still fails these assertions;
+/// a successful pointer event must never be substituted for a missing accessibility result.
+@MainActor @Suite("Scribe native accessibility journey", .serialized)
+struct ScribeAccessibilityJourneyTests {
+    @Test func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            try await ScribeComponentFixture().waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl()
+        }
+    }
+
+    @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
+        try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false) }
     }
 }

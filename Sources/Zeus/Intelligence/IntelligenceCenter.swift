@@ -202,7 +202,10 @@ final class IntelligenceCenter {
         guard !testMode else { return false }
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            Keychain.remove(JevKey.account)
+            guard Keychain.remove(JevKey.account) else {
+                jevMessage = "Couldn't remove the key. Check Keychain access and try again."
+                return false
+            }
         } else {
             guard Keychain.set(trimmed, for: JevKey.account) else {
                 jevMessage = "Couldn't save the key to your Keychain. It is still in the field."

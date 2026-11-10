@@ -183,8 +183,8 @@
       "id": "missing-F05-device",
       "kind": "unimplemented",
       "tier": "device-proof",
-      "scope": "Native temporal render sequence of start/level/stop/interruption and mini-window transitions, compared to authorized motion reference with frame pacing/reduced-motion thresholds.",
-      "reason": "No temporal reference baseline or automated native motion comparator; still screenshots cannot pass."
+      "scope": "Native temporal reference comparison across recording/mini-window transitions, actual display-synchronized delivery and frame pacing on supported 240 Hz hardware, plus lower-refresh/mixed-display/Reduce Motion/hidden-surface behavior.",
+      "reason": "No current native whole-app, reference-parity or physical high-refresh display receipt; deterministic 240 Hz sampling and offscreen renders cannot satisfy this obligation."
     },
     {
       "id": "missing-F06-native",
@@ -397,7 +397,7 @@
       "id": "native-ScribeComponentJourneyTests",
       "kind": "native-fixture",
       "tier": "native-integration",
-      "scope": "Actual production Scribe controls in an owned NSWindow, activated through its own accessibility objects with injected capture, clock and temporary stores. No global AX, OS permission request, hardware capture or physical-device acceptance.",
+      "scope": "Actual production Scribe controls activated by layout-resolved mouse events sent only to an owned NSWindow, plus isolated model defaults/storage. No global input injection, AX fallback, controller action substitution, capture or device acceptance.",
       "suite": "ScribeComponentJourneyTests",
       "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
     },
@@ -407,6 +407,68 @@
       "tier": "native-integration",
       "module": "ZeusCoreTests",
       "scope": "Every compiled ZeusCoreTests case on macOS, bound to current source and qualified execution events. Synthetic inputs and isolated stores; no hardware capture, personal vault, OS grants or device acceptance."
+    },
+    {
+      "id": "native-DisplaySynchronizedViewTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Public NSView-owned CADisplayLink lifecycle in a hidden owned NSWindow, plus paused timestamp policy. No app activation, input injection, permissions, capture, provider access, physical frame-rate benchmark or displayed-motion proof.",
+      "suite": "DisplaySynchronizedViewTests",
+      "file": "Tests/ZeusAppTests/DisplaySynchronizedViewTests.swift"
+    },
+    {
+      "id": "portable-keychain",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact KeychainStore policy with an in-memory backend and isolated fixture defaults. No macOS Keychain API, secrets, permission prompt or credential UI interaction.",
+      "group": "keychain"
+    },
+    {
+      "id": "portable-socket-safety",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Real bounded AF_UNIX server/client fixtures on disposable local paths. Synthetic messages only; no production service, capture, external network or user data. Darwin native behavior remains separately required.",
+      "group": "socket-safety"
+    },
+    {
+      "id": "native-ScribeIncomingWordTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Memory-only Scribe controller batches and generated actual TextRenderer frames with injected clocks/capture/motion and isolated defaults. No actual capture, app delegate, private store, user input or whole-app interaction proof.",
+      "suite": "ScribeIncomingWordTests",
+      "file": "Tests/ZeusAppTests/ScribeIncomingWordTests.swift"
+    },
+    {
+      "id": "native-LicenseCredentialCleanupTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual license manager cleanup with injected MemoryKeychain, disposable defaults, explicit empty server URL, synthetic device and no launch synchronization. No OS Keychain, hardware ID, server access or credential-settings UI proof.",
+      "suite": "LicenseCredentialCleanupTests",
+      "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift"
+    },
+    {
+      "id": "native-MemoryMCPTransportTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual native app transport and built zeus-cli memory-mcp helper with disposable local vaults and synthetic local pipe peers. No external network, credentials, private vault, capture or general app launch.",
+      "suite": "MemoryMCPTransportTests",
+      "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift"
+    },
+    {
+      "id": "native-ScribeAccessibilityJourneyTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Preserved strict own-window accessibility traversal, readiness and production control activation. This remains mandatory in ordinary CI; an event journey never substitutes for a failing AX result.",
+      "suite": "ScribeAccessibilityJourneyTests",
+      "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
+    },
+    {
+      "id": "native-OwnedWindowEventDriverTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual AppKit and hosted SwiftUI controls in owned test windows using freshly resolved layout geometry and direct owned-window mouse events. No global event posting, controller-action fallback, permission, capture or other app interaction.",
+      "suite": "OwnedWindowEventDriverTests",
+      "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift"
     }
   ],
   "features": [
@@ -572,6 +634,33 @@
           "acceptance": "Automated trace over mute/unmute/unknown transitions and every supported call adapter; zero forbidden payload at each stage. Owner OS consent required for any real capture.",
           "cases": [],
           "id": "F03.3"
+        },
+        {
+          "id": "F03.mute-read-budget",
+          "check": "portable-scribe",
+          "acceptance": "Concurrent watchdog requests admit at most two owned synchronous readers without queueing; stalled readers cannot keep stale mute evidence fresh or let a late unmuted result replace newer mute. This does not prove instantaneous hardware mute.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "oneStalledReaderDoesNotQueueItsReplacementAndReturnedSlotCanRecover"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "simultaneousRefreshRequestsShareTheTwoReaderBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "blockedReadersCannotKeepStaleEvidenceFreshOrLetLateUnmutedReplaceNewerMute"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "invalidOrBackwardsTimingDoesNotLaunchReplacementReaders"
+            }
+          ]
         }
       ]
     },
@@ -638,7 +727,7 @@
         {
           "id": "F05.rendered-feedback",
           "check": "native-RecordingFeedbackRenderTests",
-          "acceptance": "Production shared renderer changes normal frames for both producers, remains steady within reduced-motion phases and expires completion on the bounded deadline; artifacts carry source/timing hashes.",
+          "acceptance": "Production shared renderer emits changing normal frame sequences for both producers, stable Reduce Motion phases, interrupted latest-status swaps and bounded completion expiry. Artifacts bind current source/timing hashes; generated frames do not establish donor parity, whole-app reachability or actual high-refresh presentation.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
@@ -651,6 +740,22 @@
             {
               "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
               "function": "completionFramesExpireAtBoundedDeadline"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "failedFramesRemainVisibleAndStill"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "statusSwapFramesRetargetWithoutShowingDiscardedText"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "reducedMotionStatusSwapShowsLatestTextImmediately"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "completionDriverStopsFrameRequestsBeforeTheNoticeExpires"
             }
           ]
         },
@@ -682,9 +787,106 @@
         },
         {
           "check": "missing-F05-device",
-          "acceptance": "Native temporal render sequence of start/level/stop/interruption and mini-window transitions, compared to authorized motion reference with frame pacing/reduced-motion thresholds.",
+          "acceptance": "Native temporal render sequence of start/level/stop/interruption and mini-window transitions compared to the authorized reference, with measured frame pacing on a supported 240 Hz display. Verify lower-refresh and mixed displays, Reduce Motion and hidden-surface suspension. Deterministic sampling or requested callback rates cannot prove actual hardware presentation.",
           "cases": [],
           "id": "F05.3"
+        },
+        {
+          "id": "F05.assistant-beam-contract",
+          "check": "portable-presentation",
+          "acceptance": "The supplied Voice Assistant beam geometry uses seven lobes and a bounded contour, preserves processing leg timing and phase ownership, scales to the native host, rejects malformed input and holds one static Reduce Motion frame. Pure geometry does not establish rendered parity, physical frame rate or a reachable app journey.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "sevenLobesAndBellContourStayAttachedToTheHostBottom"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "processingUsesReferenceLegDurationCurveAndCentreStart"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "processingGatherIsContinuousAndUsesItsOwnPhaseClock"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "reducedMotionIsOneStaticFrameAcrossAudioAndPhaseChanges"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "compactHostsScaleBeamLengthsWithoutScalingTheirLayout"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "malformedInputNeverProducesNonfiniteDrawingCoordinates"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "emptyOrInvalidHostDoesNotEmitDrawablePrimitives"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "louderInputRaisesTheLightWithoutChangingTheLobeIdentity"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "lateSessionMeterChangesCannotRewriteAccumulatedLobeTravel"
+            }
+          ]
+        },
+        {
+          "id": "F05.display-policy",
+          "check": "portable-presentation",
+          "acceptance": "Requested cadence respects known display capability and a 240 Hz ceiling; hidden, paused, detached and Reduce Motion states prohibit publication. Synthetic timestamp metrics distinguish callback cadence/lateness/work from rendered or displayed frames.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "requestedCadenceUsesTheActualDisplayAndSupports240Hz"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "unknownDisplaysAndInvalidPreferencesNeverInventAFrameRate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "everyHiddenPausedDetachedOrReducedStateBlocksPublication"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "callbackMetricsMeasureSyntheticCadenceWithoutClaimingRenderedFrames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "duplicateBackwardAndInvalidTimestampsCannotCreatePublicationBacklog"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "lateDeliveryAndCallbackWorkRemainSeparateMeasurements"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "wallClockCorrectionsKeepNewCompletionsInTheProducersTimeDomain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+              "function": "finiteAnimationStopsOnceAtItsDeadlineAndRestartsOnlyForNewWork"
+            }
+          ]
+        },
+        {
+          "id": "F05.display-link-lifecycle",
+          "check": "native-DisplaySynchronizedViewTests",
+          "acceptance": "An owned hidden native window exposes its capability and owns a real display link; pause, Reduce Motion, alpha, hide and detach release or suppress that link. Fresh paused timestamps preserve new completion states. This does not measure visible delivery, frame pacing or a physical 240 Hz screen.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/DisplaySynchronizedViewTests.swift",
+              "function": "ownerPauseReducedMotionAndDetachInvalidateTheOwnedDisplayLink"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DisplaySynchronizedViewTests.swift",
+              "function": "pausedAndReducedClockUsesFreshTimeForNewCompletionWithoutStartingALink"
+            }
+          ]
         }
       ]
     },
@@ -755,7 +957,7 @@
         },
         {
           "id": "F06.component-journey",
-          "check": "native-ScribeComponentJourneyTests",
+          "check": "native-ScribeAccessibilityJourneyTests",
           "acceptance": "Real Start, Keep, End now, retry and close controls drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim.",
           "cases": [
             {
@@ -765,6 +967,17 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+            }
+          ]
+        },
+        {
+          "id": "F06.owned-window-event-journey",
+          "check": "native-ScribeComponentJourneyTests",
+          "acceptance": "Layout-derived owned-window mouse events activate actual Start, Keep, Stop, End now, failed-save Retry and Close controls and assert visible states. Injected capture/storage/time remain synthetic; the independent strict accessibility journey must also pass.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "layoutResolvedEventsDriveStartKeepStopFailedSaveRetryAndClose"
             }
           ]
         }
@@ -777,7 +990,7 @@
         {
           "id": "F07.rendered-feedback",
           "check": "native-RecordingFeedbackRenderTests",
-          "acceptance": "Production shared renderer changes normal frames for both producers, remains steady within reduced-motion phases and expires completion on the bounded deadline; artifacts carry source/timing hashes.",
+          "acceptance": "Production shared renderer emits changing normal frame sequences for both producers, stable Reduce Motion phases, interrupted latest-status swaps and bounded completion expiry. Artifacts bind current source/timing hashes; generated frames do not establish donor parity, whole-app reachability or actual high-refresh presentation.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
@@ -790,6 +1003,22 @@
             {
               "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
               "function": "completionFramesExpireAtBoundedDeadline"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "failedFramesRemainVisibleAndStill"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "statusSwapFramesRetargetWithoutShowingDiscardedText"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "reducedMotionStatusSwapShowsLatestTextImmediately"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "completionDriverStopsFrameRequestsBeforeTheNoticeExpires"
             }
           ]
         },
@@ -853,6 +1082,127 @@
           "acceptance": "Temporal frames and event trace for both producers, interruption and reduced motion; readable stable top-bar layout and no completion before persistence.",
           "cases": [],
           "id": "F07.3"
+        },
+        {
+          "id": "F07.reference-status-transitions",
+          "check": "portable-scribe",
+          "acceptance": "Actual status model follows the supplied 150 ms exit/150 ms entrance and 350 ms reveal curves, keeps the latest interrupted status and per-session beam phase, and settles safely under Reduce Motion or invalid clocks. Dense 240 Hz sampling proves model continuity only; actual display delivery and frame pacing remain separate device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "statusSwapUsesReferenceTimingDistanceAndBlur"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "retargetBeforeMidpointShowsOnlyNewestPendingStatus"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "reversingBeforeMidpointCancelsThePendingLabel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "interruptedEntranceStartsFromItsPresentedFrame"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "replacingSessionOrProducerDiscardsEveryPendingLabel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "reducedMotionAndInvalidClocksSettleWithoutReplayingPendingText"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "completionRevealMatchesSuppliedCubicAnd350MillisecondDeadline"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "beamPhaseClockContinuesAcrossWorkAndCompletionWithoutRestarting"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "beamClockResetsForReplacementAndRetryInsteadOfBorrowingOldMotion"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "statusAndRevealRemainContinuousAt240HertzSampling"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "motionUsesElapsedTimeRatherThanRefreshRateOrMissedFrameCount"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "completedMotionStopsAtTheLastVisibleTransitionInsteadOfNoticeExpiry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "staticTerminalFeedbackNeverStartsAnAnimationClockWhenReopenedOrReduced"
+            }
+          ]
+        },
+        {
+          "id": "F07.incoming-word-contract",
+          "check": "portable-scribe",
+          "acceptance": "Actual arriving word ranges preserve exact text, punctuation and whitespace; revisions keep eligible word clocks, replacements discard old ranges, and only the actual eligible prefix participates in layout. Reduce Motion and invalid clocks show readable settled content.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "exactSubstringsPreserveWhitespacePunctuationAndLanguages"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "onlyEligibleRealWordsRevealOver350Milliseconds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "eligiblePrefixDoesNotReserveUnarrivedTailOrItsWhitespace"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "unchangedEligibleWordsDoNotRestartWhenTheBatchGrows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "correctionsReplaceEligibleWordsAndNeverRetainRemovedTokens"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "newSessionsDoNotInheritAnOldWordsFadeOrigin"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "accessibilityPoliciesShowAllWordsOrRemoveBlur"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+              "function": "invalidClocksDoNotHideEligibleTextAndSettledLinesCanBypassRendering"
+            }
+          ]
+        },
+        {
+          "id": "F07.incoming-word-native",
+          "check": "native-ScribeIncomingWordTests",
+          "acceptance": "Injected real Scribe batch revisions and cancellation drive word reveal state; production TextRenderer generates distinct incoming and settled frames without reserving an invisible future tail. Offscreen frames and controller methods do not prove live transcription or control reachability.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeIncomingWordTests.swift",
+              "function": "realBatchRevisionsUseInjectedTimeWithoutRestartingEligibleWords"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeIncomingWordTests.swift",
+              "function": "cancellationClearsRevealStateAndRejectsLateTranscriptBatches"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeIncomingWordTests.swift",
+              "function": "productionTextRendererChangesOnlyIncomingFramesAndReducedMotionIsSettled"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeIncomingWordTests.swift",
+              "function": "longBatchLaysOutOnlyTheActualEligiblePrefix"
+            }
+          ]
         }
       ]
     },
@@ -1017,7 +1367,7 @@
         {
           "id": "F10.graph-controller",
           "check": "native-WikiGraphNavigationTests",
-          "acceptance": "Actual controller persists edited links before navigation, refuses stale deleted IDs and removes forgotten evidence; unreadable settings expose no graph. UI click/keyboard journeys remain separate.",
+          "acceptance": "Actual controller persists drafts before graph/source navigation, preserves selected page and draft when resetting combined filters, refuses stale/cancelled evidence, reports refused navigation, and flushes pending edits during shutdown. Temporary stores and inert injected ports isolate the fixture; real control/keyboard journeys remain separate.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
@@ -1034,6 +1384,30 @@
             {
               "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
               "function": "unreadableMemorySettingsExposeNoGraphEvidence"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "resettingCombinedFiltersRestoresConnectionsWithoutChangingPageOrDraft"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "changingInjectedCancellationBlocksSourcesAndPreventsRelearning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "validSourceFlushesDraftBeforeInjectedNavigationAndClosesGraph"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "refusedSourceNavigationKeepsGraphAndReportsTheExactOutcome"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "staleSourceStatesNeverReachTheInjectedNavigator"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "shutdownFlushesPendingEditsWithoutCreatingAWindow"
             }
           ]
         },
@@ -1092,6 +1466,42 @@
             {
               "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
               "function": "cancelledHandshakeClosesTheChildProcess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "blockedPipeWriteKeepsActorResponsiveAndDeadlineClosesTransport"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "cancellingBlockedWriteStopsTheTransportWithoutWaitingForPipeSpace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "oversizedUnterminatedOutputIsRejectedBeforeThePeerCanGrowTheBuffer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "partialFinalMessageIsRejectedAndChildIsClosed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "malformedCompleteMessagesCloseTheTransportWithoutWaitingForTimeout"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "notificationBurstIsDrainedWithBoundedDiagnosticsAndExactReply"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "writingToAClosedPipeThrowsWithoutRaisingSIGPIPE"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "slowConsumerReceivesOneChunkAndStopCancelsASuspendedReader"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "concurrentHelpersDoNotKeepEachOthersOutputOpen"
             }
           ]
         },
@@ -1134,6 +1544,80 @@
           "acceptance": "Automated meeting/preference/lesson/todo learning through UI, source-linked graph and selected/previewed MCP delivery to disposable Obsidian vault with idempotency, durable retry and exact readback.",
           "cases": [],
           "id": "F10.3"
+        },
+        {
+          "id": "F10.mcp-integer-boundaries",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "MCP response IDs and error codes reject nonfinite, fractional and out-of-range numeric inputs without process traps, while exact boundaries and the default code retain their values. Codec fixtures do not establish server delivery or selected export.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+              "function": "responseIDsOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+              "function": "errorCodesOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+              "function": "exactlyRepresentableIntegerBoundariesAndDefaultErrorCodeKeepTheirValues"
+            }
+          ]
+        },
+        {
+          "id": "F10.native-mcp-transport",
+          "check": "native-MemoryMCPTransportTests",
+          "acceptance": "The actual app transport and built CLI complete selected helper roundtrip and enforce cancellation, bounded line/queue/diagnostic handling, partial-EOF failure, slow-reader backpressure and closed-pipe signal safety. These isolated subprocess fixtures do not prove MCP selection UI or delivery to a private destination.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "bundledHelperCompletesInteractiveMCPRoundTrip"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "handshakeTimeoutClosesTheChildProcess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "cancelledHandshakeClosesTheChildProcess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "blockedPipeWriteKeepsActorResponsiveAndDeadlineClosesTransport"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "cancellingBlockedWriteStopsTheTransportWithoutWaitingForPipeSpace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "oversizedUnterminatedOutputIsRejectedBeforeThePeerCanGrowTheBuffer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "partialFinalMessageIsRejectedAndChildIsClosed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "malformedCompleteMessagesCloseTheTransportWithoutWaitingForTimeout"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "notificationBurstIsDrainedWithBoundedDiagnosticsAndExactReply"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "writingToAClosedPipeThrowsWithoutRaisingSIGPIPE"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "slowConsumerReceivesOneChunkAndStopCancelsASuspendedReader"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "concurrentHelpersDoNotKeepEachOthersOutputOpen"
+            }
+          ]
         }
       ]
     },
@@ -1217,6 +1701,10 @@
             {
               "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
               "function": "unverifiedLegacyPNGsAreAbsentFromBundle"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+              "function": "localProviderMarksUseExactVerifiedSVGsAndDecodeWithoutFallback"
             }
           ],
           "id": "F12.2"
@@ -1226,6 +1714,25 @@
           "acceptance": "Automated light/dark/hover/pressed/focus/disabled/copied and volume/tab/orb interaction traces, keyboard/VoiceOver/small-display contrast; distributable logo provenance.",
           "cases": [],
           "id": "F12.3"
+        },
+        {
+          "id": "F12.provider-identity",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Named supported integrations map to their own provider assets while unknown providers retain an honest generic symbol; source mappings do not prove native rendering or provider connectivity.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/EngineBrandTests.swift",
+              "function": "everyNamedSupportedIntegrationUsesItsOwnProviderMark"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EngineBrandTests.swift",
+              "function": "aliasSamplesResolve"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EngineBrandTests.swift",
+              "function": "officialGrokUsesOriginalSVGAndUnknownProvidersKeepFallback"
+            }
+          ]
         }
       ]
     },
@@ -1319,6 +1826,46 @@
             {
               "file": "Tests/ZeusCoreTests/AckLinesTests.swift",
               "function": "explicitPersonalityDoesNotShareTheLiveLineBank"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "deniedRemovalRetainsSavedStateAndSurvivesRelaunchUntilConfirmedRetry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "removalOfAbsentSecretIsIdempotentAndDoesNotTouchOtherAccounts"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "nonReadingPeerDoesNotBlockMainActorAndReplyTimesOut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "disconnectedPeerCannotSignalTheProcessDuringReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "serverDoesNotRemoveRegularFilesOrSymlinks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "finishDrainsInFlightDeliveryBeforeTranscriberFinishAndClosesAdmission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "setActiveSessionWaitsForInFlightDeliveryAndNoOldFrameReachesSinksAfterward"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LicensePortalVectorTests.swift",
+              "function": "rejectedActivationCannotBeRestoredByAKeyRetainedAfterFailedDeletion"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+              "function": "blockedReadersCannotKeepStaleEvidenceFreshOrLetLateUnmutedReplaceNewerMute"
             }
           ]
         },
@@ -1361,7 +1908,150 @@
             },
             {
               "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "resourceLookupAddsOnlyExplicitLoadedTestBundleSiblings"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
               "function": "optionsStayIndependentAndSoundOffPreventsPreviewDispatch"
+            }
+          ]
+        },
+        {
+          "id": "F13.credential-removal-contract",
+          "check": "portable-keychain",
+          "acceptance": "Denied deletion preserves the saved cache/backend state across synthetic relaunch; confirmed retry removes the intended secret, and absent-item removal is idempotent without touching other accounts. Actual OS Keychain and credential-settings controls remain outside this fixture.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "readsOnceThenServesFromMemory"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "migratesElevenLabsOnceAndStopsTouchingOldItems"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "unreadableLegacyItemIsSkippedNotPrompted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "setAndRemoveKeepCacheInStep"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "deniedRemovalRetainsSavedStateAndSurvivesRelaunchUntilConfirmedRetry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "removalOfAbsentSecretIsIdempotentAndDoesNotTouchOtherAccounts"
+            }
+          ]
+        },
+        {
+          "id": "F13.local-transport",
+          "check": "portable-socket-safety",
+          "acceptance": "Owned local sockets enforce message and connection bounds, handle EOF versus timeout, ignore duplicate/late replies, preserve server/socket ownership, avoid process signals and keep a non-reading peer from blocking MainActor. Actual platform fixtures remain required in native Core execution.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "nonReadingPeerDoesNotBlockMainActorAndReplyTimesOut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "duplicateAndLateRepliesCannotWriteOrCloseTwice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "oversizedIdentifiersAndLinesNeverReachHandler"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "oversizedResponseAndIdentifierAreNotPublished"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "pendingHandlerKeepsItsReplyBeyondTheReadDeadline"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "connectionLimitAndStopCloseEveryWaitingPeer"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "partialTimeoutDoesNotDispatchButCleanEOFDoes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "droppingServerClosesPendingPeerAndRejectsRetainedReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "disconnectedPeerCannotSignalTheProcessDuringReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+              "function": "serverDoesNotRemoveRegularFilesOrSymlinks"
+            }
+          ]
+        },
+        {
+          "id": "F13.credential-cleanup-native",
+          "check": "native-LicenseCredentialCleanupTests",
+          "acceptance": "Partial local credential deletion remains visibly retryable after relaunch and cannot restore activation; confirmed retry removes the retained values. Fixture dependencies explicitly prohibit OS Keychain and server access.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "partialDeletionKeepsRetryAcrossRelaunchAndDoesNotReactivateRetainedCredentials"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "deniedKeyDeletionRemainsInactiveAndRetryableUntilConfirmedRemoval"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "delayedBackgroundActivationCannotRestoreCredentialsAfterExplicitDeactivation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "offlineRetryOfRefusedKeyNeverReportsSuccessfulReactivation"
+            }
+          ]
+        },
+        {
+          "id": "F13.owned-window-event-driver",
+          "check": "native-OwnedWindowEventDriverTests",
+          "acceptance": "Owned-window event dispatch resolves current geometry, activates native and hosted SwiftUI controls, and refuses disabled, duplicate, removed or foreign controls. Strict Scribe AX remains independently required and cannot be replaced by this proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+              "function": "nativeButtonUsesFreshGeometryAndDisabledControlCannotFire"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+              "function": "hostedSwiftUIButtonReceivesRealWindowEvents"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+              "function": "duplicateRemovedAndUnownedControlsCannotDispatch"
+            }
+          ]
+        },
+        {
+          "id": "F13.bridge-reply-ownership",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Synthetic bridge requests preserve the first pending reply, settle duplicate requests independently, reject stale timeout generations and release owned local sockets. No production Chrome session or external service is used.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "anOldTimeoutCannotSettleAReusedRequestID"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "simultaneousDuplicateReservationsHaveOneOwnerAndSettleEveryRejectedReply"
             }
           ]
         }
@@ -1581,7 +2271,7 @@
         },
         {
           "id": "S05.component-journey",
-          "check": "native-ScribeComponentJourneyTests",
+          "check": "native-ScribeAccessibilityJourneyTests",
           "acceptance": "Real Start, Keep, End now, retry and close controls drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim.",
           "cases": [
             {

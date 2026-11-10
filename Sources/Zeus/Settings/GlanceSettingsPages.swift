@@ -851,8 +851,8 @@ private struct LicensePage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Your license") {
             GSRow(symbol: "key", title: status, text: license.isLicensed ? "Your license is kept across updates." : "A one-time purchase. Two Macs.") {
-                // Disables while working; a failed deactivation keeps the license, shows why and offers "Try again".
-                if license.isLicensed {
+                // Partial credential cleanup must keep its explanation and retry visible.
+                if license.isLicensed || license.deactivationError != nil {
                     GSDeactivateLicenseControl()
                 }
             }

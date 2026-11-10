@@ -18,14 +18,13 @@ import ZeusCore
 final class ScribeMuteMonitor: @unchecked Sendable {
     let ingress: ScribeMicrophoneIngress
     private let lock = NSLock()
-    // Concurrent: a read stalled in CoreAudio or the window list must not queue the watchdog's replacement read behind it.
-    private let queue = DispatchQueue(label: "zeus.scribe.mute", qos: .userInitiated, attributes: .concurrent)
+    // One replacement can bypass a stalled scan. Further refreshes wait for an actual free slot.
+    private let reads = ScribeMuteReadScheduler()
     private let refreshInterval: TimeInterval
     private let timeToLive: TimeInterval
     private let refreshWatchdog: TimeInterval
     private var evidence: ScribeMuteEvidence?
     private var timeline: ScribeMuteTimeline
-    private var refreshStartedAt: TimeInterval?
 
     init(
         refreshInterval: TimeInterval = 0.5,
@@ -64,19 +63,9 @@ final class ScribeMuteMonitor: @unchecked Sendable {
     }
 
     private func refreshIfNeeded(now: TimeInterval) {
-        let start = lock.withLock { () -> Bool in
-            let begin = ScribeMuteRefreshPolicy.shouldStart(
-                now: now,
-                evidenceTakenAt: evidence?.takenAt,
-                inFlightSince: refreshStartedAt,
-                interval: refreshInterval,
-                watchdog: refreshWatchdog
-            )
-            if begin { refreshStartedAt = now }
-            return begin
-        }
-        guard start else { return }
-        queue.async { [self] in
+        let takenAt = lock.withLock { evidence?.takenAt }
+        reads.schedule(now: now, evidenceTakenAt: takenAt, interval: refreshInterval,
+                       watchdog: refreshWatchdog) { [self] in
             let reading = Self.read()
             let finished = ScribeHostClock.now()
             ingress.record(state: reading.state, readStart: now, readEnd: finished,
@@ -87,7 +76,6 @@ final class ScribeMuteMonitor: @unchecked Sendable {
                 if (evidence?.takenAt ?? -.infinity) <= now {
                     evidence = ScribeMuteEvidence(state: reading.state, takenAt: now)
                 }
-                if refreshStartedAt == now { refreshStartedAt = nil }
             }
         }
     }

@@ -6,6 +6,7 @@ import ZeusCore
 struct WikiGraphView: View {
     let controller: WikiController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         let snapshot = controller.graphSnapshot
@@ -21,64 +22,99 @@ struct WikiGraphView: View {
                     Text("Graph").tag(false)
                     Text("List").tag(true)
                 }.pickerStyle(.segmented).frame(width: 150)
+                    .accessibilityIdentifier("memory.graph.mode")
             }
             HStack {
                 TextField("Filter connected pages", text: Binding(get: { controller.graphQuery }, set: { controller.graphQuery = $0 }))
                     .textFieldStyle(.roundedBorder).accessibilityLabel("Filter connected pages")
+                    .focused($searchFocused)
+                    .accessibilityIdentifier("memory.graph.query")
                 Picker("Connection type", selection: Binding(get: { controller.graphFilter }, set: { controller.graphFilter = $0 })) {
                     ForEach(WikiGraphFilter.allCases) { filter in Text(filter.title).tag(filter) }
                 }.frame(width: 190)
+                    .accessibilityIdentifier("memory.graph.kind")
             }
-            if controller.settingsUnreadable {
-                Text("Connections are unavailable until Memory's settings are recovered.")
-                    .font(.callout).foregroundStyle(.secondary)
-                Spacer()
-            } else {
-                Group {
-                    if controller.graphShowsList {
-                        connectionList(snapshot)
-                    } else {
-                        WikiGraphCanvas(snapshot: snapshot, selectedRelationID: controller.graphRelationID,
-                            openPage: { controller.selectGraphPage($0) }, inspect: { controller.graphRelationID = $0 })
-                    }
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(snapshot.relationships.count) of \(snapshot.totalRelationshipCount) connections")
+                        .font(.callout.weight(.medium))
+                        .accessibilityIdentifier("memory.graph.results")
+                    Text(controller.graphFilterDescription)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .help(controller.graphFilterDescription)
+                        .accessibilityIdentifier("memory.graph.scope")
                 }
-                .frame(maxWidth: .infinity, minHeight: 270, maxHeight: 270)
-                .transition(reduceMotion ? .identity : .opacity)
-                .animation(Motion.feedback(reduceMotion: reduceMotion), value: controller.graphShowsList)
-
-                if snapshot.relationships.isEmpty {
-                    Text(snapshot.totalRelationshipCount == 0
-                         ? "No authored links or shared sources yet. Connect pages by adding [[Page title]] to an edited page."
-                         : "No connections match these filters. Clear the search or choose All connections.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    HStack {
-                        Text("Solid: authored link · Dashed: shared source").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Reset filters") { controller.resetGraphFilters(); searchFocused = true }
+                    .disabled(!controller.hasGraphFilters)
+                    .accessibilityHint("Shows all connections for the current page and returns to the search field.")
+                    .accessibilityIdentifier("memory.graph.reset")
+            }
+            if let notice = controller.notice {
+                HStack(alignment: .top) {
+                    Text(notice).font(.caption).foregroundStyle(Theme.ember)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("memory.graph.notice")
+                    Spacer(minLength: 8)
+                    Button("Dismiss") { controller.dismissNotice() }
+                        .accessibilityLabel("Dismiss Memory status")
+                        .accessibilityIdentifier("memory.graph.notice.dismiss")
+                }
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if controller.settingsUnreadable {
+                        Text("Connections are unavailable until Memory's settings are recovered.")
+                            .font(.callout).foregroundStyle(.secondary)
                         Spacer()
-                        if !controller.graphShowsList && snapshot.hiddenCount > 0 {
-                            Button("\(snapshot.hiddenCount) more in List") { controller.graphShowsList = true }.font(.caption)
-                        } else {
-                            Text("\(snapshot.relationships.count) connection\(snapshot.relationships.count == 1 ? "" : "s")")
+                    } else {
+                        Group {
+                            if controller.graphShowsList {
+                                connectionList(snapshot)
+                            } else {
+                                WikiGraphCanvas(snapshot: snapshot, selectedRelationID: controller.graphRelationID,
+                                    openPage: { controller.selectGraphPage($0) }, inspect: { controller.graphRelationID = $0 })
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 270, maxHeight: 270)
+                        .transition(reduceMotion ? .identity : .opacity)
+                        .animation(Motion.feedback(reduceMotion: reduceMotion), value: controller.graphShowsList)
+
+                        if snapshot.relationships.isEmpty {
+                            Text(snapshot.totalRelationshipCount == 0
+                                 ? "No authored links or shared sources yet. Connect pages by adding [[Page title]] to an edited page."
+                                 : "No connections match these filters. Reset filters to see this page's connections.")
                                 .font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            HStack {
+                                Text("Solid: authored link · Dashed: shared source").font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                if !controller.graphShowsList && snapshot.hiddenCount > 0 {
+                                    Button("\(snapshot.hiddenCount) more in List") { controller.graphShowsList = true }.font(.caption)
+                                        .accessibilityIdentifier("memory.graph.more")
+                                }
+                            }
+                        }
+                        if let relation = snapshot.relationships.first(where: { $0.pageID == controller.graphRelationID }) {
+                            WikiGraphEvidence(controller: controller, relation: relation)
+                        } else {
+                            Text("Select a page to explore its connections. Select ⓘ to inspect the link or source evidence.")
+                                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 68, alignment: .topLeading)
                         }
                     }
-                }
-                if let relation = snapshot.relationships.first(where: { $0.pageID == controller.graphRelationID }) {
-                    WikiGraphEvidence(controller: controller, relation: relation)
-                } else {
-                    Text("Select a page to explore its connections. Select ⓘ to inspect the link or source evidence.")
-                        .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 68, alignment: .topLeading)
-                }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack {
                 Text("Connections describe links and shared records, not agreement or causation.")
                     .font(.caption2).foregroundStyle(.secondary)
                 Spacer()
                 Button("Done") { controller.graphOpen = false }.keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("memory.graph.done")
             }
         }
-        .padding(20).frame(width: 660, height: 560)
+        .padding(20).frame(width: 660, height: 620)
         .background(Theme.storm).preferredColorScheme(.dark)
+        .onAppear { searchFocused = true }
     }
 
     private func connectionList(_ snapshot: WikiGraphSnapshot) -> some View {
@@ -92,8 +128,10 @@ struct WikiGraphView: View {
                                 Text(WikiGraphLabels.summary(relation)).font(.caption).foregroundStyle(.secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }.buttonStyle(.plain).accessibilityHint("Opens this Memory page and focuses its connections.")
+                            .accessibilityIdentifier("memory.graph.list.\(relation.pageID)")
                         Button { controller.graphRelationID = relation.pageID } label: { Image(systemName: "info.circle") }
                             .accessibilityLabel("Connection details for \(relation.title)")
+                            .accessibilityIdentifier("memory.graph.inspect.\(relation.pageID)")
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
@@ -148,6 +186,7 @@ private struct WikiGraphCanvas: View {
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(node.title)
                                 .accessibilityHint("Opens this Memory page and focuses its connections.")
+                                .accessibilityIdentifier("memory.graph.node.\(node.id)")
                                 .help(node.title)
                         }
                     }.position(x: node.x * width, y: node.y * height)
@@ -163,6 +202,7 @@ private struct WikiGraphCanvas: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Connection details for \(node.title)")
                         .accessibilityHint(WikiGraphLabels.summary(relation))
+                        .accessibilityIdentifier("memory.graph.inspect.\(node.id)")
                         .help(WikiGraphLabels.summary(relation))
                         .position(x: (0.5 + node.x) * width / 2, y: (0.5 + node.y) * height / 2)
                     }
@@ -208,12 +248,12 @@ private struct WikiGraphEvidence: View {
                     switch source {
                     case .meeting(let id):
                         Button {
-                            controller.graphOpen = false
                             controller.openMeetingSource(id)
                         } label: {
                             Label(controller.title(forMeeting: id), systemImage: "arrow.up.forward.square").font(.caption)
                         }
                         .disabled(controller.meetingSourceIssue(id) != nil)
+                        .accessibilityIdentifier("memory.graph.source.\(id.uuidString)")
                         .accessibilityHint("Opens this shared source in Meetings. An active recording stays running.")
                     case .preference(let key):
                         Text("Shared preference: \(key)").font(.caption)

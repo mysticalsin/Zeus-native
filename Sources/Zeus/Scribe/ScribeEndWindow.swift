@@ -8,12 +8,18 @@ import ZeusCore
 final class ScribeEndWindow {
     static let shared = ScribeEndWindow()
     private(set) var panel: NSPanel?
+    private let journeyRegistry: OwnedWindowControlRegistry?
+
+    init(journeyRegistry: OwnedWindowControlRegistry? = nil) {
+        self.journeyRegistry = journeyRegistry
+    }
 
     func present(scribe: ScribeController) {
         if let panel { panel.orderFrontRegardless(); return }
         let panel = EndPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 240),
                              styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        panel.contentView = NSHostingView(rootView: ScribeEndWindowView(scribe: scribe, dismiss: { [weak self] in self?.hide() }))
+        panel.contentView = NSHostingView(rootView: ScribeEndWindowView(scribe: scribe, dismiss: { [weak self] in self?.hide() })
+            .environment(\.ownedWindowControlRegistry, journeyRegistry))
         panel.level = .statusBar
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
@@ -62,7 +68,7 @@ private struct ScribeEndWindowView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Hide meeting window")
                     .accessibilityHint("The current recording or save operation continues.")
-                    .accessibilityIdentifier("scribe.endWindow.hide")
+                    .ownedJourneyControl("scribe.endWindow.hide")
             }
             content
             Spacer(minLength: 0)
@@ -87,9 +93,9 @@ private struct ScribeEndWindowView: View {
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             HStack {
                 Button("End meeting now") { scribe.confirmEnd() }.buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("scribe.endWindow.endNow")
+                    .ownedJourneyControl("scribe.endWindow.endNow")
                 Button("Keep recording") { scribe.keepRecording() }.buttonStyle(.bordered)
-                    .accessibilityIdentifier("scribe.endWindow.keep")
+                    .ownedJourneyControl("scribe.endWindow.keep")
             }
             .disabled(scribe.endStopRequested)
         case .processing:
@@ -98,7 +104,7 @@ private struct ScribeEndWindowView: View {
                     .font(.system(size: 17, weight: .semibold)).accessibilityAddTraits(.isHeader)
                 Text(issue).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(4)
                 Button("Retry save") { scribe.retrySave(id) }.buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("scribe.endWindow.retrySave")
+                    .ownedJourneyControl("scribe.endWindow.retrySave")
             } else {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
