@@ -1820,6 +1820,90 @@
         "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
         "function": "fixturePythonRejectsMissingNonexecutableAndDirectoryWithoutFallback"
       }
+    },
+    {
+      "id": "REG-151",
+      "failure": "The outer cleanup-test supervisor raised PermissionError during its back-to-back TERM/KILL teardown on macOS after the runner behavior assertions. The fixture now sends one SIGKILL to its unreaped owned group before a bounded reap; no production runner assertion is relaxed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_outer_supervisor_signals_once_before_reaping_and_closes_handles"
+      }
+    },
+    {
+      "id": "REG-152",
+      "failure": "A cleanup fixture must not hide unexpected signal denial or reap failure while closing its pipe handles. These errors remain test failures rather than becoming successful cleanup.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_outer_supervisor_signal_or_reap_error_stays_visible_after_handle_cleanup"
+      }
+    },
+    {
+      "id": "REG-153",
+      "failure": "Native host artifacts identified the host but omitted the dynamically loaded test-bundle bytes. A prelaunch input sidecar now records that digest so crash evidence can reject changed or redirected compiled input.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_app_host.py",
+        "function": "test_provenance_rejects_outside_build_bundle_and_tracks_compiled_bytes"
+      }
+    },
+    {
+      "id": "REG-154",
+      "failure": "A crash from another process, another launch or an ambiguous crashed thread must not be used to diagnose the original native failure. Only exact owned-host identity and bounded sanitized frames can be emitted.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_pid_path_launch_time_bundle_and_thread_identity_are_mandatory"
+      }
+    },
+    {
+      "id": "REG-155",
+      "failure": "A collector refusal with a pre-existing output directory could overwrite its result during finalization. Existing output and original failed test evidence must never be overwritten.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_existing_output_and_original_failure_are_never_overwritten"
+      }
+    },
+    {
+      "id": "REG-156",
+      "failure": "Malformed or nonfinite crash JSON, including exponent overflow, must not enter a diagnostic or weaken its identity bounds. Unsupported report content remains unavailable evidence.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_unknown_duplicate_nonfinite_and_trailing_report_formats_are_rejected"
+      }
+    },
+    {
+      "id": "REG-157",
+      "failure": "ISO-only parsing rejected the documented Apple IPS date form with a space before the numeric UTC offset. Exact Apple report timestamps and ISO host telemetry now match with explicit timezones; timezone-less input stays invalid.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_apple_ips_times_and_iso_host_telemetry_match_with_explicit_timezones"
+      }
     }
   ]
 }

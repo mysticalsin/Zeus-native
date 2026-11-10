@@ -58,6 +58,23 @@ private enum NativeAppTestHost {
     static func main() {
         do {
             let args = CommandLine.arguments
+            // Authenticated later by the original test.log hash. This identifies
+            // this synthetic host's crash report without launching another host.
+            let timestamp = ISO8601DateFormatter()
+            timestamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path else {
+                throw HostFailure("could not identify the synthetic host executable")
+            }
+            let identity: [String: Any] = [
+                "pid": ProcessInfo.processInfo.processIdentifier,
+                "started": timestamp.string(from: Date()),
+                "executable": executable
+            ]
+            let identityData = try JSONSerialization.data(withJSONObject: identity, options: [.sortedKeys])
+            var identityRecord = Data("Owned-window test host identity: ".utf8)
+            identityRecord.append(identityData)
+            identityRecord.append(Data("\n".utf8))
+            FileHandle.standardError.write(identityRecord)
             let filters: Set<String> = [
                 "^ZeusAppTests\\.OwnedWindowEventDriverTests/",
                 "^ZeusAppTests\\.ScribeComponentJourneyTests/",

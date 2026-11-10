@@ -99,6 +99,23 @@ sys.stdin.readline()  # Retain this leader's PID until the outer supervisor kill
 
 
 class ExecutionCleanupTests(unittest.TestCase):
+    @staticmethod
+    def stop_supervisor(process):
+        # This fixture leader has never been polled/reaped and reserves its separate
+        # group. One final signal avoids TERM making the group zombie-only before
+        # another killpg call; Darwin can reject that second signal with EPERM.
+        try:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        finally:
+            try:
+                process.wait(timeout=2)
+            finally:
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    stream.close()
+
     def isolated_case(self, mode):
         with tempfile.TemporaryDirectory(prefix="zeus-owned-command-") as directory:
             process = subprocess.Popen([sys.executable, "-c", SUPERVISOR, directory, mode, str(RUNNER_FILE)],
@@ -126,16 +143,37 @@ class ExecutionCleanupTests(unittest.TestCase):
                 self.assertNotIn("CLEANUP UNCONFIRMED", result["log"])
                 return result
             finally:
-                # This supervisor has not been polled/reaped: its PID still reserves
-                # exactly this test's separate process group, even after an assertion.
-                for signum in (signal.SIGTERM, signal.SIGKILL):
-                    try:
-                        os.killpg(process.pid, signum)
-                    except ProcessLookupError:
-                        pass
-                process.wait(timeout=2)
+                self.stop_supervisor(process)
+
+    def test_outer_supervisor_signals_once_before_reaping_and_closes_handles(self):
+        process = Mock(pid=123)
+        observed = []
+        process.wait.side_effect = lambda **kwargs: observed.append("wait")
+        with patch.object(os, "killpg", side_effect=lambda *args: observed.append("kill")) as kill:
+            self.stop_supervisor(process)
+        kill.assert_called_once_with(123, signal.SIGKILL)
+        process.wait.assert_called_once_with(timeout=2)
+        process.poll.assert_not_called()
+        self.assertEqual(observed, ["kill", "wait"])
+        for stream in (process.stdin, process.stdout, process.stderr):
+            stream.close.assert_called_once_with()
+
+    def test_outer_supervisor_signal_or_reap_error_stays_visible_after_handle_cleanup(self):
+        for point in ("signal", "reap"):
+            with self.subTest(point=point):
+                process = Mock(pid=123)
+                error = PermissionError(1, "synthetic signal denial") if point == "signal" else subprocess.TimeoutExpired("synthetic supervisor", 2)
+                if point == "reap":
+                    process.wait.side_effect = error
+                with patch.object(os, "killpg", side_effect=error if point == "signal" else None) as kill:
+                    with self.assertRaises(type(error)) as caught:
+                        self.stop_supervisor(process)
+                self.assertIs(caught.exception, error)
+                kill.assert_called_once_with(123, signal.SIGKILL)
+                process.wait.assert_called_once_with(timeout=2)
+                process.poll.assert_not_called()
                 for stream in (process.stdin, process.stdout, process.stderr):
-                    stream.close()
+                    stream.close.assert_called_once_with()
 
     def test_timeout_stops_owned_grandchild_and_preserves_other_process_group(self):
         result = self.isolated_case("timeout")

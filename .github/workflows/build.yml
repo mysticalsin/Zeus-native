@@ -118,6 +118,13 @@ jobs:
               print(f"command={command!r} exit={code} truncated={len(data) > 8192}")
               print(text)
           PY
+      - name: Read the original owned-host crash report
+        if: failure() && steps.test.outcome == 'failure'
+        timeout-minutes: 1
+        # Read-only: no debugger, relaunch, permission prompt or extra UI action.
+        # Missing/unsupported evidence cannot clear the original native failure.
+        run: |
+          python3 qa/closed-loop/ax_crash_report.py --evidence "$RUNNER_TEMP/zeus-results/app/native-evidence" --output "$RUNNER_TEMP/zeus-results/app/ax-crash-report"
       - name: Show bounded native failure diagnostics
         if: failure() && steps.test.outcome == 'failure'
         run: |

@@ -55,8 +55,31 @@ class NativeAppHostTests(unittest.TestCase):
             self.assertEqual(copied.read_bytes(), binary.read_bytes())
             self.assertEqual(plistlib.loads((copied.parent.parent / "Info.plist").read_bytes()), host.INFO)
             self.assertIn(str(platform / "Developer/Library/PrivateFrameworks"), environment["DYLD_FRAMEWORK_PATH"])
+            inputs = json.loads(host.inputs_path(output, "native-case").read_text())
+            self.assertEqual(inputs, {"schema_version": 1, "test_bundle": {
+                "path": str(tests), "resolved_path": str(tests.resolve()), "sha256": digest(tests.read_bytes())},
+                "selected_platform": str(platform)})
+            self.assertNotIn("environment", inputs)
             with self.assertRaises(FileExistsError):
                 host.prepare(output, "native-case", repo)
+
+    def test_provenance_rejects_outside_build_bundle_and_tracks_compiled_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tests = host.bundle_binary(root)
+            tests.parent.mkdir(parents=True)
+            foreign = root / "foreign"
+            foreign.write_bytes(b"foreign binary")
+            foreign.chmod(0o700)
+            tests.symlink_to(foreign)
+            with self.assertRaisesRegex(Invalid, "redirected"):
+                host.input_provenance(root, {"platform": "/selected/platform"})
+            tests.unlink()
+            tests.write_bytes(b"first synthetic bundle")
+            tests.chmod(0o700)
+            before = host.input_provenance(root, {"platform": "/selected/platform"})
+            tests.write_bytes(b"changed synthetic bundle")
+            self.assertNotEqual(before, host.input_provenance(root, {"platform": "/selected/platform"}))
 
     def test_host_receipt_cannot_replace_complete_qualified_execution(self):
         fixture = fixtures.NativeEventEvidenceTests()

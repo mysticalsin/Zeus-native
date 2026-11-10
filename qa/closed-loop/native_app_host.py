@@ -1,11 +1,12 @@
 """Package the compiled, test-only AppKit host without installing or launching Zeus."""
 import os
+import json
 from pathlib import Path
 import plistlib
 import shutil
 import subprocess
 
-from contracts import ROOT, require
+from contracts import ROOT, digest, require
 
 SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests",
           "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests"}
@@ -34,6 +35,35 @@ def bundle_binary(repo):
     return Path(repo) / ".build/debug/ZeusPackageTests.xctest/Contents/MacOS/ZeusPackageTests"
 
 
+def inputs_path(output_directory, ident):
+    return Path(output_directory) / ident / "native-artifacts/test-host/inputs.json"
+
+
+def runtime_configuration():
+    """Record the actual selected platform and loader paths used by this host."""
+    result = subprocess.run(["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-platform-path"],
+                            capture_output=True, text=True, check=True, timeout=10)
+    platform = Path(result.stdout.strip())
+    require(platform.is_absolute() and platform.is_dir(), "selected Xcode platform is unavailable")
+    frameworks = [platform / "Developer/Library/Frameworks", platform / "Developer/Library/PrivateFrameworks"]
+    libraries = [platform / "Developer/usr/lib"]
+    require(all(path.is_dir() for path in frameworks + libraries), "selected Xcode test runtime is incomplete")
+    environment = {key: ":".join([*(str(path) for path in paths), *([os.environ[key]] if os.environ.get(key) else [])])
+                   for key, paths in (("DYLD_FRAMEWORK_PATH", frameworks), ("DYLD_LIBRARY_PATH", libraries))}
+    return {"platform": str(platform), "environment": environment}
+
+
+def input_provenance(repo, runtime):
+    tests = bundle_binary(repo)
+    require(tests.is_file() and os.access(tests, os.X_OK)
+            and tests.resolve().is_relative_to((Path(repo) / ".build").resolve()),
+            "compiled native test bundle is missing or redirected")
+    return {"schema_version": 1,
+            "test_bundle": {"path": str(tests), "resolved_path": str(tests.resolve()),
+                            "sha256": digest(tests.read_bytes())},
+            "selected_platform": runtime["platform"]}
+
+
 def prepare(output_directory, ident, repo=ROOT):
     repo = Path(repo)
     built = repo / ".build/debug/zeus-native-test-host"
@@ -48,15 +78,9 @@ def prepare(output_directory, ident, repo=ROOT):
     (target.parent.parent / "Info.plist").write_bytes(plistlib.dumps(INFO))
     # Prefer the selected macOS platform runtime paths to ambient overrides.
     # The host imports no Testing library; the test bundle loads its own.
-    result = subprocess.run(["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-platform-path"],
-                            capture_output=True, text=True, check=True, timeout=10)
-    platform = Path(result.stdout.strip())
-    require(platform.is_absolute() and platform.is_dir(), "selected Xcode platform is unavailable")
-    frameworks = [platform / "Developer/Library/Frameworks", platform / "Developer/Library/PrivateFrameworks"]
-    libraries = [platform / "Developer/usr/lib"]
-    require(all(path.is_dir() for path in frameworks + libraries), "selected Xcode test runtime is incomplete")
-    return {key: ":".join([*(str(path) for path in paths), *([os.environ[key]] if os.environ.get(key) else [])])
-            for key, paths in (("DYLD_FRAMEWORK_PATH", frameworks), ("DYLD_LIBRARY_PATH", libraries))}
+    runtime = runtime_configuration()
+    inputs_path(output_directory, ident).write_text(json.dumps(input_provenance(repo, runtime), indent=2) + "\n")
+    return runtime["environment"]
 
 
 def validate_artifacts(files, ident):

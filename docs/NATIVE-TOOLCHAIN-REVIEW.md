@@ -472,3 +472,54 @@ and three-second request deadlines are unchanged. The production worker script,
 managed-venv routing, installed packages and model behavior are unchanged.
 Fresh native execution of every worker guard is still required; the launcher
 experiment alone does not establish product startup or latency.
+
+At `c1e34a1`, [independent native validation](../qa/receipts/20261110/mac-c1-ci.json)
+confirms 2,334 tests across 27 complete passing partitions. All four real film
+lifecycle guards now pass. The accessibility partition still exits with SIGTRAP,
+and the pre-interpreter-selection Kokoro partition retains five issues. The
+original Reduce Motion setting was verified restored. This accepts the tested
+film lifecycle behavior, not reference motion parity, device FPS or full onboarding.
+
+At `2edc3c1`, [independent native validation](../qa/receipts/20261110/mac-2ed-ci.json)
+confirms 2,360 tests across 28 complete passing partitions. All 26 voice-worker
+cases pass with the explicit fixture interpreter and unchanged deadlines; all
+four film lifecycle cases still pass. The accessibility partition alone remains
+failed, including both the rejected action acknowledgement and subsequent
+SIGTRAP. The separate development job failed one of 130 verification selftests
+in its outer supervisor cleanup; that failure is distinct from the passing
+native voice suite and remains a failed check.
+
+## Outer verification-supervisor teardown
+
+The [2edc3 development failure](../qa/receipts/20261110/mac-2ed-feature-failure.json)
+records one PermissionError in the outer isolated supervisor's consecutive
+TERM/KILL teardown, after the behavior assertions. Public XNU source supports
+an all-zombie-group race as one explanation; the artifact does not prove which
+signal failed or establish the exact kernel cause. The fixture now sends one
+SIGKILL to its still-unreaped, separately owned group, then performs a bounded
+wait and closes its handles. Unexpected signal or reap errors remain failures.
+Production `run.py` and the original ten behavior guards are unchanged.
+All 12 focused guards passed, and two negative controls caught the old signal
+sequence and an attempted permission-error suppression. Fresh Mac confirmation
+remains required.
+
+## Read-only diagnosis of the original accessibility crash
+
+The native host now emits its own PID, start timestamp and actual executable
+path once. Before that original launch, a small input sidecar records the loaded
+test-bundle digest. After a failed AX run, the collector checks the original
+source, compiler/discovery receipts, command and artifact hashes, then reads
+only fresh matching host `.ips` reports from the disposable runner's standard
+report directory. Exact PID/path, launch/capture time, bundle and crashed-thread
+identity checks reject unrelated or ambiguous reports. File reads, candidate
+counts, polling and emitted frames are bounded. Raw reports, locals, memory,
+environment and arbitrary paths are not exported; only sanitized crashed-thread
+symbols/image basenames and fixed diagnostic phases are retained.
+
+The collector never launches a debugger or another test host, sends another UI
+action, changes OS settings or repairs an acceptance receipt. Existing output
+is never overwritten, original evidence is rechecked afterward, and unsupported
+or missing reports remain unavailable. Twenty-one focused collector/host tests
+and Swift syntax parsing passed. Real macOS report availability and compatibility
+still require the next native run. The existing action-acknowledgement failure
+remains separate from the later SIGTRAP regardless of the diagnostic outcome.
