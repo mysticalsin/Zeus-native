@@ -288,7 +288,8 @@ struct OnboardingRoot: View {
     }
 
     private func cycleTheme() {
-        options.set("general.windowTheme", switch theme { case "System": "Light"; case "Light": "Dark"; default: "System" })
+        let next = switch theme { case "System": "Light"; case "Light": "Dark"; default: "System" }
+        options.set("general.windowTheme", next)
     }
 
     private var footer: some View {

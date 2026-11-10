@@ -48,3 +48,16 @@ Do not lower the language/SDK requirements, skip these files, turn errors into
 ignored output or treat a new native fixture count as proof of physical user
 interaction. These repairs clear compilation only; the feature-map integration,
 window journey, device and signing obligations remain separate.
+
+## Later native checkpoints
+
+Production and test compilation passed at `ca6d1ca` in app job `129569661281`.
+That clears the initial compiler rows for that revision; its two real-control
+test failures remained failures.
+
+| ID | Revision / job | Observed compiler failure | Repair and required guard |
+| --- | --- | --- | --- |
+| TYPE-009 | `1c6bf06`, job `129583572489` | `OnboardingFlow.swift:291`: a Swift switch expression cannot appear directly as a call argument | Bind the result to a local before passing it to the preferences port. Mandatory actual macOS production and test compilation remains the guard; frontend parsing did not catch this type-check restriction. |
+
+The repaired switch expression type-checks under Linux Swift 6.2.1 in isolation.
+The complete repaired view still requires the next macOS build.
