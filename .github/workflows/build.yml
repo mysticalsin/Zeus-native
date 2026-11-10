@@ -77,6 +77,9 @@ jobs:
           python3 qa/closed-loop/gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/build.log"
       - name: All Core tests and reviewed app fixtures (no consent requests or capture)
         id: test
+        env:
+          # One owned fixture child only; sanitized diagnostics are not latency evidence.
+          ZEUS_NATIVE_PYTHON_STARTUP_DIAGNOSTIC: "1"
         # Compiler discovery and qualified event streams must prove every selected case ran.
         # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |

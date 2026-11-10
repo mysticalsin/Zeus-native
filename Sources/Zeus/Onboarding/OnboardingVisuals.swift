@@ -151,9 +151,10 @@ struct LoopingFilm: NSViewRepresentable {
                 }
                 // Each film that finishes goes to the back of the queue.
                 endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] note in
+                    guard let item = note.object as? AVPlayerItem else { return }
+                    let identity = ObjectIdentifier(item)
                     MainActor.assumeIsolated {
-                        guard let self, !self.disposed, let item = note.object as? AVPlayerItem,
-                              self.ownedItems[ObjectIdentifier(item)] === item,
+                        guard let self, !self.disposed, let item = self.ownedItems[identity],
                               let asset = item.asset as? AVURLAsset, urls.contains(asset.url) else { return }
                         // Consume an owned completion once. A different player of the same URL,
                         // duplicate completion or callback after disposal cannot grow this queue.
@@ -191,10 +192,11 @@ struct LoopingFilm: NSViewRepresentable {
             for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
                          NSWindow.didDeminiaturizeNotification, NSWindow.willCloseNotification] {
                 let token = NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self, weak window] note in
+                    let isClosing = note.name == NSWindow.willCloseNotification
                     MainActor.assumeIsolated {
                         guard let self, let window, self.attachmentRevision == revision,
                               self.window === window, self.observedWindow === window, !self.disposed else { return }
-                        if note.name == NSWindow.willCloseNotification { self.closing = true }
+                        if isClosing { self.closing = true }
                         else if window.isVisible && !window.isMiniaturized && window.occlusionState.contains(.visible) {
                             self.closing = false // The retained guide window can be shown again.
                         }

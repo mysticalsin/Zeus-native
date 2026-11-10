@@ -1675,6 +1675,18 @@
         "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
         "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
       }
+    },
+    {
+      "id": "REG-139",
+      "failure": "Mac Swift concurrency checking rejected Notification values captured across MainActor.assumeIsolated in decorative-player callbacks. Observers now extract only Sendable item identity and notification-kind values, while owned player access stays on MainActor; the native compiler barrier and real lifecycle guard remain required.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow"
+      }
     }
   ]
 }

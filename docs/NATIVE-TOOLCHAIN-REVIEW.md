@@ -318,3 +318,25 @@ exercise visibility/disposal and a natural completion. No capture or global
 preference mutation is used. A host with existing OS Reduce Motion cannot satisfy
 the initial normal-playback precondition; that remains an explicit failure, not
 an override. These tests do not measure decoder CPU, energy or physical FPS.
+
+The `318b5c8` Mac build caught two Swift concurrency errors: Notification values
+were captured across MainActor.assumeIsolated in the film observers. Those
+callbacks now extract a Sendable item identity or notification-kind Boolean
+before entering the MainActor handler. The owned item dictionary retains exact
+identity and consume-once behavior. Native test execution did not begin in that
+run; the production compile failure remains a failure. The Linux Foundation
+control does not reproduce Apple's diagnostic, so only a fresh Mac compile can
+validate this correction.
+
+One existing Python publication fixture now has an explicit macOS CI diagnostic
+flag. After 350 ms it may sample its still-running owned child if the bounded
+phase log has no interpreter-entry marker. The original binary, request deadlines
+and concurrency remain unchanged. Sampler stdout is held only in bounded memory;
+matching child/parent headers are required before at most 64 bounded call-tree
+tuples are emitted. Raw arguments, headers, paths and errors are discarded.
+Denial or timeout is unavailable evidence, with no elevation or consent retry.
+Auxiliary diagnostics are joined after launch/render cleanup before deleting the
+fixture directory. Two sanitizer guards pass in the portable harness. Sampling
+can perturb the child and is not latency evidence; its two-second helper budget
+is not a hard wall-clock cap around a stalled OS launch and allows bounded stop
+observation afterward. The macOS sampling branch still requires native execution.

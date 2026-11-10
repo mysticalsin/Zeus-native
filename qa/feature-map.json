@@ -1850,6 +1850,14 @@
             {
               "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
               "function": "cancellationDuringArtifactCopyRemovesTheUnpublishedTarget"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "startupSampleSanitizerRejectsHeadersArgumentsPathsAndWrongOwner"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "startupSampleSanitizerBoundsInputAndFrameCount"
             }
           ]
         },

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZeusCore
 #if canImport(Darwin)
 import Darwin
 #else
@@ -13,6 +14,63 @@ import Glibc
 
 @Suite("Bounded local voice worker")
 struct KokoroWorkerSessionTests {
+    private struct StartupDiagnostic: Encodable, Sendable {
+        enum Status: String, Encodable, Sendable { case captured, unavailable, alreadyEntered, childExited }
+        struct Frame: Encodable, Equatable, Sendable {
+            let sampleCount: Int
+            let symbol: String
+            let image: String
+        }
+        let pid: Int32
+        let status: Status
+        let frames: [Frame]
+
+        // A sample report can contain command arguments and private paths. Admit only bounded
+        // call-tree symbols/image basenames after verifying both the target and its parent.
+        static func sanitized(_ output: String, exitStatus: Int32, pid: Int32, parentPID: Int32) -> Self {
+            let unavailable = Self(pid: pid, status: .unavailable, frames: [])
+            guard exitStatus == 0, pid > 0, parentPID > 0,
+                  let pattern = try? NSRegularExpression(pattern:
+                    #"^[ \t+|!:]*([0-9]{1,7})[ \t]+([A-Za-z_$][A-Za-z0-9_$.:<>~+\-]{0,95}|\?\?\?)[ \t]+\(in ([A-Za-z0-9_][A-Za-z0-9_.+\-]{0,63})\)(?:[ \t]+\+[ \t]+[0-9]+)?(?:[ \t]+\[0x[0-9A-Fa-f]+\])?[ \t]*$"#)
+            else { return unavailable }
+            let bounded = String(decoding: output.utf8.prefix(131_072), as: UTF8.self)
+            var targetMatches = false, parentMatches = false, inGraph = false
+            var frames: [Frame] = []
+            func headerPID(_ line: Substring) -> Int32? {
+                guard line.last == "]", let opening = line.lastIndex(of: "[") else { return nil }
+                return Int32(line[line.index(after: opening)..<line.index(before: line.endIndex)])
+            }
+            for line in bounded.split(separator: "\n", omittingEmptySubsequences: false) {
+                if !inGraph {
+                    if line.hasPrefix("Process:") { targetMatches = headerPID(line) == pid }
+                    if line.hasPrefix("Parent Process:") { parentMatches = headerPID(line) == parentPID }
+                    if line == "Call graph:" {
+                        guard targetMatches, parentMatches else { return unavailable }
+                        inGraph = true
+                    }
+                    continue
+                }
+                if let first = line.first, !first.isWhitespace { break }
+                guard line.utf8.count <= 512 else { continue }
+                let text = String(line)
+                guard let match = pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                      let countRange = Range(match.range(at: 1), in: text),
+                      let symbolRange = Range(match.range(at: 2), in: text),
+                      let imageRange = Range(match.range(at: 3), in: text),
+                      let count = Int(text[countRange]), count > 0, count <= 1_000_000 else { continue }
+                frames.append(Frame(sampleCount: count, symbol: String(text[symbolRange]), image: String(text[imageRange])))
+                if frames.count == 64 { break }
+            }
+            return frames.isEmpty ? unavailable : Self(pid: pid, status: .captured, frames: frames)
+        }
+
+        func emit() {
+            if let data = try? JSONEncoder().encode(self), let text = String(data: data, encoding: .utf8) {
+                print("Kokoro Python startup diagnostic: \(text)")
+            }
+        }
+    }
+
     // Fixture diagnostics contain fixed phase names, labeled clocks and PIDs only.
     // They never read production stderr or record the submitted text.
     private final class Trace: @unchecked Sendable {
@@ -145,6 +203,49 @@ struct KokoroWorkerSessionTests {
             return task
         }
 
+        func diagnoseColdStartup(of process: Process) {
+            #if os(macOS)
+            guard ProcessInfo.processInfo.environment["ZEUS_NATIVE_PYTHON_STARTUP_DIAGNOSTIC"] == "1" else { return }
+            let pid = process.processIdentifier, parentPID = ProcessInfo.processInfo.processIdentifier
+            guard pid > 0 else { return }
+            ownTask {
+                do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+                let diagnostic = await Task.detached { [self] in
+                    guard process.processIdentifier == pid, process.isRunning else {
+                        return StartupDiagnostic(pid: pid, status: .childExited, frames: [])
+                    }
+                    let path = directory.appendingPathComponent("phases.log")
+                    if FileManager.default.fileExists(atPath: path.path) {
+                        guard let handle = try? FileHandle(forReadingFrom: path) else {
+                            return StartupDiagnostic(pid: pid, status: .unavailable, frames: [])
+                        }
+                        defer { try? handle.close() }
+                        guard let data = try? handle.read(upToCount: 4096) else {
+                            return StartupDiagnostic(pid: pid, status: .unavailable, frames: [])
+                        }
+                        if String(decoding: data, as: UTF8.self).split(separator: "\n").contains(where: {
+                            let fields = $0.split(separator: " ")
+                            return fields.count == 4 && Int32(fields[2]) == pid && fields[3] == "python-entered"
+                        }) {
+                            return StartupDiagnostic(pid: pid, status: .alreadyEntered, frames: [])
+                        }
+                    }
+                    guard process.processIdentifier == pid, process.isRunning else {
+                        return StartupDiagnostic(pid: pid, status: .childExited, frames: [])
+                    }
+                    // The sampler observes only this owned fixture child. Denial/timeout stays
+                    // unavailable: no privilege retry, consent request or raw report is emitted.
+                    let result = BoundedSubprocess.run("/usr/bin/sample",
+                        [String(pid), "1", "10", "-mayDie", "-file", "/dev/stdout"],
+                        timeout: 2, maxOutputBytes: 131_072)
+                    return StartupDiagnostic.sanitized(result.output, exitStatus: result.status,
+                                                       pid: pid, parentPID: parentPID)
+                }.value
+                diagnostic.emit()
+            }
+            #endif
+        }
+
         func report(test: String) {
             var entries = trace.snapshot
             // Read a bounded prefix and admit only the known fixture event grammar.
@@ -168,10 +269,12 @@ struct KokoroWorkerSessionTests {
         }
 
         func close() async {
-            let (tasks, sessions, auxiliaryTasks) = lock.withLock { (self.tasks, self.sessions, self.auxiliaryTasks) }
+            let (tasks, sessions) = lock.withLock { (self.tasks, self.sessions) }
             tasks.forEach { $0.cancel() }
             for session in sessions { await session.close() }
             for task in tasks { _ = await task.value }
+            // A late Process.run handoff can register its diagnostic while close joins the launch.
+            let auxiliaryTasks = lock.withLock { self.auxiliaryTasks }
             for task in auxiliaryTasks { await task.value }
         }
 
@@ -201,7 +304,10 @@ struct KokoroWorkerSessionTests {
 
     @Test func productionWorkerPublishesOnlyACompleteAcknowledgedWAV() async throws {
         try await withFixture { fixture in
-            let session = fixture.session()
+            let session = fixture.session(launchProcess: { process in
+                try process.run()
+                fixture.diagnoseColdStartup(of: process)
+            })
             let task = fixture.render(session, "partial")
             try await wait {
                 let items = (try? FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)) ?? []
@@ -216,6 +322,54 @@ struct KokoroWorkerSessionTests {
             #expect(!(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)).contains { $0.hasPrefix("zeus-kokoro-work-") })
             await session.close()
         }
+    }
+
+    @Test func startupSampleSanitizerRejectsHeadersArgumentsPathsAndWrongOwner() throws {
+        let report = """
+        Process: python3 [123]
+        Parent Process: synthetic-tests [99]
+        Command args: --token PRIVATE_TOKEN
+        Path: /private/person/vault
+        PROVIDER_KEY=PRIVATE_TOKEN
+        Call graph:
+            + 30 __psynch_mutexwait (in libsystem_kernel.dylib) + 8 [0x123abc]
+            + 20 xcselect_invoke_xcrun (in libxcselect.dylib) + 42 [0xdef456]
+            + 1 private/path (in libxcselect.dylib)
+            + 1 function (in /private/person/library)
+            + 1 function (in libxcselect.dylib) PRIVATE_TOKEN
+        Binary Images:
+            99 should_not_survive (in library)
+        """
+        let result = StartupDiagnostic.sanitized(report, exitStatus: 0, pid: 123, parentPID: 99)
+        #expect(result.status == .captured)
+        #expect(result.frames == [
+            .init(sampleCount: 30, symbol: "__psynch_mutexwait", image: "libsystem_kernel.dylib"),
+            .init(sampleCount: 20, symbol: "xcselect_invoke_xcrun", image: "libxcselect.dylib")
+        ])
+        let encoded = String(decoding: try JSONEncoder().encode(result), as: UTF8.self)
+        for forbidden in ["PRIVATE_TOKEN", "PROVIDER_KEY", "/private", "Command args", "0x123abc", "should_not_survive"] {
+            #expect(!encoded.contains(forbidden))
+        }
+        let invalidCases: [(Int32, Int32, Int32)] = [(124, 99, 0), (123, 98, 0), (123, 99, 124)]
+        for (pid, parent, status) in invalidCases {
+            let rejected = StartupDiagnostic.sanitized(report, exitStatus: status, pid: pid, parentPID: parent)
+            #expect(rejected.status == .unavailable && rejected.frames.isEmpty)
+        }
+    }
+
+    @Test func startupSampleSanitizerBoundsInputAndFrameCount() throws {
+        let header = "Process: python3 [123]\nParent Process: synthetic-tests [99]\nCall graph:\n"
+        let frame = "    + 100 _dispatch_semaphore_wait_slow (in libdispatch.dylib) + 8 [0xabc]\n"
+        let result = StartupDiagnostic.sanitized(header + String(repeating: frame, count: 100),
+                                                exitStatus: 0, pid: 123, parentPID: 99)
+        #expect(result.frames.count == 64)
+        #expect(try JSONEncoder().encode(result).count < 16_384)
+        let oversized = String(repeating: "X", count: 131_072) + "\n" + header + frame
+        let rejected = StartupDiagnostic.sanitized(oversized, exitStatus: 0, pid: 123, parentPID: 99)
+        #expect(rejected.status == .unavailable && rejected.frames.isEmpty)
+        let oversizedSymbol = "    + 1 " + String(repeating: "a", count: 97) + " (in dyld)\n"
+        #expect(StartupDiagnostic.sanitized(header + oversizedSymbol, exitStatus: 0,
+                                            pid: 123, parentPID: 99).frames.isEmpty)
     }
 
     @Test func cancellingSynthesisReturnsNoArtifactAndStopsItsWorker() async throws {
