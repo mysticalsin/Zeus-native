@@ -25,8 +25,13 @@ enum OwnedWindowFixtureApplication {
             throw OwnedWindowEventDriver.Failure.unavailable("fixture application already has a delegate")
         }
         let original = application.activationPolicy()
-        guard application.setActivationPolicy(.regular) else {
-            throw OwnedWindowEventDriver.Failure.unavailable("regular fixture activation policy was refused")
+        if original != .regular {
+            guard application.setActivationPolicy(.regular) else {
+                throw OwnedWindowEventDriver.Failure.unavailable("regular fixture activation policy was refused; original=\(original.rawValue), current=\(application.activationPolicy().rawValue)")
+            }
+        }
+        guard application.activationPolicy() == .regular else {
+            throw OwnedWindowEventDriver.Failure.unavailable("fixture did not retain regular activation policy")
         }
         if !launchFinished {
             if !application.isRunning {
@@ -43,8 +48,8 @@ enum OwnedWindowFixtureApplication {
 
     static func restore(_ policy: NSApplication.ActivationPolicy) {
         record("restore policy begin; target=\(policy.rawValue)")
-        let restored = NSApplication.shared.setActivationPolicy(policy)
-        record("restore policy returned; accepted=\(restored)")
+        let restored = NSApplication.shared.activationPolicy() == policy || NSApplication.shared.setActivationPolicy(policy)
+        record("restore policy returned; accepted=\(restored), effective=\(NSApplication.shared.activationPolicy().rawValue)")
     }
 
     static func close(_ window: NSWindow) {

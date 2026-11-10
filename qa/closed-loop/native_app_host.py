@@ -45,8 +45,8 @@ def prepare(output_directory, ident, repo=ROOT):
     target.parent.mkdir(parents=True, exist_ok=False)
     shutil.copy2(built, target)
     (target.parent.parent / "Info.plist").write_bytes(plistlib.dumps(INFO))
-    # Match SwiftPM's selected macOS platform runtime search paths. The copied
-    # host imports no Testing library; the existing test bundle loads its own.
+    # Prefer the selected macOS platform runtime paths to ambient overrides.
+    # The host imports no Testing library; the test bundle loads its own.
     result = subprocess.run(["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-platform-path"],
                             capture_output=True, text=True, check=True, timeout=10)
     platform = Path(result.stdout.strip())

@@ -16,7 +16,11 @@ actor KokoroWorkerSession {
     static let maximumTextBytes = 16_384
     static let maximumReplyBytes = 16_384
     static let maximumWAVBytes = 64 * 1024 * 1024
-    private static let launchLock = NSLock()
+    enum LaunchPhase: String, Sendable { case queued, began, returned, failed, skipped }
+    private static let defaultLaunchQueue = DispatchQueue(label: "zeus.kokoro.launch", qos: .utility)
+    private let launchQueue: DispatchQueue
+    private let launchProcess: @Sendable (Process) throws -> Void
+    private let launchObserver: @Sendable (LaunchPhase) -> Void
     private let configuration: @Sendable () -> Launch?
     private let requestTimeout: TimeInterval
     private let idleTimeout: TimeInterval
@@ -28,6 +32,7 @@ actor KokoroWorkerSession {
     private var generation = UUID()
     private var pending: Pending?
     private var startup: Task<Void, Never>?
+    private var launching: Task<Void, Never>?
     private var closing: Task<Bool, Never>?
     private var idle: Task<Void, Never>?
     private var closed = false
@@ -61,15 +66,22 @@ actor KokoroWorkerSession {
         guard KokoroWorker.kokoroOnnxImportWorks(python: python) else { return nil }
         return Launch(executable: python, arguments: KokoroWorker.argv(python: python, modelDir: KokoroWorker.modelDir()))
     }, requestTimeout: TimeInterval = 120, idleTimeout: TimeInterval = 120,
-         temporaryDirectory: URL = FileManager.default.temporaryDirectory) {
+         temporaryDirectory: URL = FileManager.default.temporaryDirectory,
+         launchQueue: DispatchQueue? = nil,
+         launchProcess: @escaping @Sendable (Process) throws -> Void = { try $0.run() },
+         launchObserver: @escaping @Sendable (LaunchPhase) -> Void = { _ in }) {
         self.configuration = configuration
         self.requestTimeout = requestTimeout
         self.idleTimeout = idleTimeout
         self.temporaryDirectory = temporaryDirectory
+        self.launchQueue = launchQueue ?? Self.defaultLaunchQueue
+        self.launchProcess = launchProcess
+        self.launchObserver = launchObserver
     }
 
     deinit {
         startup?.cancel(); idle?.cancel()
+        pending?.cancellation.cancel()
         input?.stop(); output?.stop()
         pending?.timer.cancel()
         pending?.continuation.resume(returning: nil)
@@ -88,7 +100,7 @@ actor KokoroWorkerSession {
     }
 
     func render(_ text: String, voice: String, speed: Double) async -> URL? {
-        guard !closed, !Task.isCancelled, pending == nil, closing == nil,
+        guard !closed, !Task.isCancelled, pending == nil, closing == nil, launching == nil,
               !text.isEmpty, text.utf8.count <= Self.maximumTextBytes,
               !voice.isEmpty, voice.utf8.count <= 128,
               speed.isFinite, speed >= 0.25, speed <= 4,
@@ -138,43 +150,143 @@ actor KokoroWorkerSession {
 
     func close() async {
         closed = true
+        pending?.cancellation.cancel()
         failPending()
         stopWorker()
+        // Process.run is not interruptible. Join its handoff and any late child cleanup.
+        if let launching { await launching.value }
         if let closing { await closing.value }
+    }
+
+    /// A launch result has one owner until its descriptors are duplicated or closed.
+    private final class Spawned: @unchecked Sendable {
+        let process = Process()
+        let stdin = Pipe()
+        let stdout = Pipe()
+
+        init() {
+            // A failed bounded cleanup must not discard a still-running Process.
+            // Break this deliberate retention only after Foundation observes termination.
+            process.terminationHandler = { [process] _ in process.terminationHandler = nil }
+        }
+
+        func closeChildEnds() {
+            try? stdin.fileHandleForReading.close()
+            try? stdout.fileHandleForWriting.close()
+        }
+
+        func closeParentEnds() {
+            try? stdin.fileHandleForWriting.close()
+            try? stdout.fileHandleForReading.close()
+        }
+
+        deinit { closeChildEnds(); closeParentEnds() }
+    }
+
+    private enum LaunchOutcome: Sendable {
+        case skipped
+        case finished(Spawned, succeeded: Bool)
+    }
+
+    private static func spawn(_ launch: Launch, queue: DispatchQueue,
+                              run: @escaping @Sendable (Process) throws -> Void,
+                              observe: @escaping @Sendable (LaunchPhase) -> Void,
+                              cancellation: Cancellation, deadline: TimeInterval) async -> LaunchOutcome {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                guard !cancellation.isCancelled, ProcessInfo.processInfo.systemUptime < deadline else {
+                    observe(.skipped)
+                    continuation.resume(returning: .skipped)
+                    return
+                }
+                let spawned = Spawned()
+                var succeeded = false
+                do {
+                    spawned.process.executableURL = URL(fileURLWithPath: launch.executable)
+                    spawned.process.arguments = launch.arguments
+                    for handle in [spawned.stdin.fileHandleForReading, spawned.stdin.fileHandleForWriting,
+                                   spawned.stdout.fileHandleForReading, spawned.stdout.fileHandleForWriting] {
+                        guard fcntl(handle.fileDescriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+                            throw CocoaError(.fileWriteUnknown)
+                        }
+                    }
+                    spawned.process.standardInput = spawned.stdin
+                    spawned.process.standardOutput = spawned.stdout
+                    spawned.process.standardError = FileHandle.nullDevice
+                    guard !cancellation.isCancelled, ProcessInfo.processInfo.systemUptime < deadline else {
+                        spawned.process.terminationHandler = nil
+                        observe(.skipped)
+                        continuation.resume(returning: .skipped)
+                        return
+                    }
+                    observe(.began)
+                    try run(spawned.process)
+                    succeeded = true
+                    observe(.returned)
+                } catch {
+                    observe(.failed)
+                }
+                if !spawned.process.isRunning { spawned.process.terminationHandler = nil }
+                spawned.closeChildEnds()
+                continuation.resume(returning: .finished(spawned, succeeded: succeeded))
+            }
+        }
     }
 
     private func start(_ launch: Launch?) async {
         startup = nil
-        guard !closed, pending != nil, closing == nil else { return }
+        guard !closed, let request = pending, closing == nil, launching == nil else { return }
         guard let launch else { failPending(); return }
-        do {
-            let (process, stdin, stdout) = try Self.launchLock.withLock {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: launch.executable)
-                process.arguments = launch.arguments
-                let stdin = Pipe(), stdout = Pipe()
-                for handle in [stdin.fileHandleForReading, stdin.fileHandleForWriting,
-                               stdout.fileHandleForReading, stdout.fileHandleForWriting] {
-                    guard fcntl(handle.fileDescriptor, F_SETFD, FD_CLOEXEC) == 0 else { throw CocoaError(.fileWriteUnknown) }
-                }
-                process.standardInput = stdin
-                process.standardOutput = stdout
-                process.standardError = FileHandle.nullDevice
-                try process.run()
-                try? stdin.fileHandleForReading.close()
-                try? stdout.fileHandleForWriting.close()
-                return (process, stdin, stdout)
+        guard !request.cancellation.isCancelled, ProcessInfo.processInfo.systemUptime < request.deadline else {
+            cancel(request.id); return
+        }
+        let id = request.id, cancellation = request.cancellation, deadline = request.deadline
+        launchObserver(.queued)
+        // The config probe can be reused during setup; a process launch cannot.
+        launching = Task { [weak self, launchQueue, launchProcess, launchObserver] in
+            let outcome = await Self.spawn(launch, queue: launchQueue, run: launchProcess,
+                                          observe: launchObserver, cancellation: cancellation, deadline: deadline)
+            if let self {
+                await self.finishLaunch(outcome, id: id, cancellation: cancellation, deadline: deadline)
+            } else if case .finished(let spawned, _) = outcome {
+                spawned.closeParentEnds()
+                _ = await Self.finishChild(spawned.process)
             }
-            child = process
-            defer { try? stdin.fileHandleForWriting.close(); try? stdout.fileHandleForReading.close() }
-            input = try MCPPipeIO(handle: stdin.fileHandleForWriting, name: "kokoro-input")
-            output = try MCPPipeIO(handle: stdout.fileHandleForReading, name: "kokoro-output")
+        }
+    }
+
+    private func finishLaunch(_ outcome: LaunchOutcome, id: UUID,
+                              cancellation: Cancellation, deadline: TimeInterval) async {
+        defer { launching = nil }
+        guard case .finished(let spawned, let succeeded) = outcome else {
+            if pending?.id == id { cancel(id) }
+            return
+        }
+        child = spawned.process
+        defer { spawned.closeParentEnds() }
+        guard succeeded, !closed, pending?.id == id, !cancellation.isCancelled,
+              ProcessInfo.processInfo.systemUptime < deadline else {
+            if pending?.id == id { failPending() }
+            spawned.closeParentEnds()
+            stopWorker()
+            if let closing { await closing.value }
+            return
+        }
+        do {
+            input = try MCPPipeIO(handle: spawned.stdin.fileHandleForWriting, name: "kokoro-input")
+            output = try MCPPipeIO(handle: spawned.stdout.fileHandleForReading, name: "kokoro-output")
             generation = UUID()
             let current = generation
             output?.read(consume: { [weak self] data in await self?.consume(data, generation: current) ?? false },
                          ended: { [weak self] in await self?.ended(current) })
-            if let id = pending?.id { await send(id) }
-        } catch { failPending(); stopWorker() }
+            // Clear launch ownership before request I/O can publish a fast reply.
+            Task { await self.send(id) }
+        } catch {
+            if pending?.id == id { failPending() }
+            spawned.closeParentEnds()
+            stopWorker()
+            if let closing { await closing.value }
+        }
     }
 
     private func send(_ id: UUID) async {
@@ -275,11 +387,22 @@ actor KokoroWorkerSession {
     }
 
     private static func finishChild(_ process: Process) async -> Bool {
-        guard process.isRunning else { return true }
+        guard process.isRunning else {
+            // Once exit is observed this cannot wait for a running child; on
+            // corelibs Foundation it also releases the retained run-loop source.
+            if process.processIdentifier > 0 { process.waitUntilExit() }
+            process.terminationHandler = nil
+            return true
+        }
         process.terminate()
         for _ in 0..<25 where process.isRunning { try? await Task.sleep(for: .milliseconds(10)) }
         if process.isRunning { _ = kill(process.processIdentifier, SIGKILL) }
         for _ in 0..<100 where process.isRunning { try? await Task.sleep(for: .milliseconds(10)) }
-        return !process.isRunning
+        let exited = !process.isRunning
+        if exited {
+            process.waitUntilExit()
+            process.terminationHandler = nil
+        }
+        return exited
     }
 }

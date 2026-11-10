@@ -160,11 +160,17 @@ The push development job passed 638 checks; the PR development job caught a
 successful write in a supposedly closed-pipe fixture. A remaining reader is
 required for that result. The fixture's unprotected Foundation Pipe could be
 inherited by another child, although the specific child was not identified.
-It now uses a private FIFO opened atomically with CLOEXEC, unlinks it, proves a
-positive byte transfer, and requires kernel evidence of reader closure before
-requiring the exact unavailable-stream error. Darwin's HUP and Linux's ERR are
-both recognized. All 35 focused export/transport tests pass on Linux; native
-validation of this revision is still required.
+It uses a private FIFO opened atomically with CLOEXEC, proves a positive byte
+transfer, and requires kernel evidence of reader closure before requiring the
+exact unavailable-stream error. All 35 focused export/transport tests passed on
+Linux. The next Mac run (`3afa6de`) caught an incorrect FIFO poll assumption:
+Darwin reports available buffer space without guaranteeing ERR/HUP when the
+reader closes. XNU's
+[FIFO open path](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/miscfs/fifofs/fifo_vnops.c#L268)
+instead guarantees ENXIO for a nonblocking writer-open with no readers. The
+fixture now uses that bounded, write-free readiness probe, then unlinks the
+private FIFO and invokes the tested write once. Native validation of this
+revision remains required.
 
 The three owned-window suites now have a test-only synchronous AppKit host.
 It loads the existing compiled test bundle through Swift Testing's documented
@@ -177,3 +183,45 @@ positive test counts, complete events and accessibility assertions remain
 required. Source review and Linux gate tests do not establish AppKit execution;
 the new host requires its own Mac build and run. No installed app or OS privacy
 permission is changed by this synthetic host.
+
+At `3afa6de`, the new host compiled on macOS, and all 113 verification selftests
+passed. The app job reported 2,305 complete native passes in 21 partitions.
+The three hosted suites stopped before executing tests because the combined
+delegate/policy initialization guard failed; Memory transport failed the FIFO
+readiness premise described above, and the worker startup waits still failed.
+No UI pass is inferred from successful host compilation. Initialization now
+reports an unexpected delegate separately, attempts a policy transition only
+when necessary, and checks the effective regular policy. A refused transition
+remains fatal. The prior combined error does not establish which condition
+failed; that requires the next Mac run.
+
+## Responsive local voice launch and process finalization
+
+Process launch previously ran synchronously while holding the voice session
+actor. The new handoff runs that transaction on a serial dispatch queue, keeps
+one owned launch until adoption or cleanup, checks request identity/cancellation
+and absolute deadline before and after spawning, and rejects replacement requests
+while launch remains unresolved. Cancellation and deadlines can now resolve the
+request during a stalled launch. Closing the session still joins a late launch
+and cleans up its child; Foundation's noninterruptible `Process.run()` means that
+join cannot have a hard wall-clock bound if the OS call never returns.
+
+The successful launch releases its ownership before sending request bytes, so a
+fast reply cannot leave the next sequential render incorrectly rejected. A
+retained process is finalized only after exit is observed. Linux controls and
+the pinned
+[Foundation implementation](https://github.com/swiftlang/swift-corelibs-foundation/blob/swift-6.2.1-RELEASE/Sources/Foundation/Process.swift#L1168)
+show that `waitUntilExit()` also releases its retained run-loop source. This call
+is made only after `isRunning` is false, and only for a started process. It does
+not claim to join a termination callback. Failed bounded child cleanup still
+prevents replacement.
+
+All 24 focused Foundation/subprocess tests pass on Linux, including finite-gate
+launch deadline, cancellation, close/join, queued-expiry, before/after-spawn
+failure, process lifetime and immediate worker reuse guards. Mutations that
+block the session actor during launch or remove replacement-admission protection
+fail the relevant guards. The normal suite remains concurrent and existing
+request deadlines are unchanged. Diagnostics add fixed launch phase names and
+labeled epoch/monotonic clocks; they do not read production stderr or record
+submitted text. These results establish the focused Linux behavior, not Mac
+startup latency, audio quality or native acceptance.

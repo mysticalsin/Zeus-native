@@ -13,7 +13,7 @@ import Glibc
 
 @Suite("Bounded local voice worker")
 struct KokoroWorkerSessionTests {
-    // Fixture diagnostics contain fixed phase names, monotonic times and PIDs only.
+    // Fixture diagnostics contain fixed phase names, labeled clocks and PIDs only.
     // They never read production stderr or record the submitted text.
     private final class Trace: @unchecked Sendable {
         private let lock = NSLock()
@@ -21,7 +21,7 @@ struct KokoroWorkerSessionTests {
         func record(_ phase: String) {
             lock.withLock {
                 guard entries.count < 32 else { return }
-                entries.append("\(ProcessInfo.processInfo.systemUptime) \(ProcessInfo.processInfo.processIdentifier) \(phase)")
+                entries.append("uptime=\(ProcessInfo.processInfo.systemUptime) epoch=\(Date().timeIntervalSince1970) \(ProcessInfo.processInfo.processIdentifier) \(phase)")
             }
         }
         var snapshot: [String] { lock.withLock { entries } }
@@ -35,6 +35,7 @@ struct KokoroWorkerSessionTests {
         private let lock = NSLock()
         private var sessions: [KokoroWorkerSession] = []
         private var tasks: [Task<URL?, Never>] = []
+        private var auxiliaryTasks: [Task<Void, Never>] = []
 
         private static let wrapper = """
         import sys
@@ -58,7 +59,7 @@ struct KokoroWorkerSessionTests {
                 global _count
                 if _count>=32: return
                 _count+=1
-                line=f'{time.monotonic():.6f} {os.getpid()} {name}\\n'
+                line=f'monotonic={time.monotonic():.6f} epoch={time.time():.6f} {os.getpid()} {name}\\n'
                 if os.path.exists(_path) and os.path.getsize(_path)+len(line)>4096: return
                 with open(_path,'a') as output: output.write(line)
             """.write(to: directory.appendingPathComponent("fixture_trace.py"), atomically: true, encoding: .utf8)
@@ -103,7 +104,10 @@ struct KokoroWorkerSessionTests {
         }
 
         func session(timeout: TimeInterval = 3, idle: TimeInterval = 120,
-                     configuration: (@Sendable () -> KokoroWorkerSession.Launch?)? = nil) -> KokoroWorkerSession {
+                     configuration: (@Sendable () -> KokoroWorkerSession.Launch?)? = nil,
+                     launchQueue: DispatchQueue? = nil,
+                     launchProcess: @escaping @Sendable (Process) throws -> Void = { try $0.run() },
+                     launchObserver: @escaping @Sendable (KokoroWorkerSession.LaunchPhase) -> Void = { _ in }) -> KokoroWorkerSession {
             let launch = launch, trace = trace
             let session = KokoroWorkerSession(configuration: {
                 trace.record("configuration-entered")
@@ -111,7 +115,11 @@ struct KokoroWorkerSessionTests {
                 if let configuration { result = configuration() } else { result = launch }
                 trace.record(result == nil ? "configuration-unavailable" : "configuration-returned")
                 return result
-            }, requestTimeout: timeout, idleTimeout: idle, temporaryDirectory: directory)
+            }, requestTimeout: timeout, idleTimeout: idle, temporaryDirectory: directory,
+               launchQueue: launchQueue, launchProcess: launchProcess, launchObserver: { phase in
+                   trace.record("launch-" + phase.rawValue)
+                   launchObserver(phase)
+               })
             lock.withLock { sessions.append(session) }
             return session
         }
@@ -130,6 +138,12 @@ struct KokoroWorkerSessionTests {
             return task
         }
 
+        func ownTask(_ operation: @escaping @Sendable () async -> Void) -> Task<Void, Never> {
+            let task = Task(operation: operation)
+            lock.withLock { auxiliaryTasks.append(task) }
+            return task
+        }
+
         func report(test: String) {
             var entries = trace.snapshot
             // Read a bounded prefix and admit only the known fixture event grammar.
@@ -141,8 +155,10 @@ struct KokoroWorkerSessionTests {
                 if let data = try? handle.read(upToCount: 4096) {
                     for line in String(decoding: data, as: UTF8.self).split(separator: "\n").prefix(32) {
                         let fields = line.split(separator: " ")
-                        guard fields.count == 3, let time = Double(fields[0]), time.isFinite,
-                              let pid = Int32(fields[1]), pid > 0, allowed.contains(String(fields[2])) else { continue }
+                        guard fields.count == 4, fields[0].hasPrefix("monotonic="), fields[1].hasPrefix("epoch="),
+                              let time = Double(fields[0].dropFirst(10)), time.isFinite,
+                              let epoch = Double(fields[1].dropFirst(6)), epoch.isFinite,
+                              let pid = Int32(fields[2]), pid > 0, allowed.contains(String(fields[3])) else { continue }
                         entries.append(String(line))
                     }
                 }
@@ -151,10 +167,11 @@ struct KokoroWorkerSessionTests {
         }
 
         func close() async {
-            let (tasks, sessions) = lock.withLock { (self.tasks, self.sessions) }
+            let (tasks, sessions, auxiliaryTasks) = lock.withLock { (self.tasks, self.sessions, self.auxiliaryTasks) }
             tasks.forEach { $0.cancel() }
             for session in sessions { await session.close() }
             for task in tasks { _ = await task.value }
+            for task in auxiliaryTasks { await task.value }
         }
 
         func remove() { try? FileManager.default.removeItem(at: directory) }
@@ -356,6 +373,229 @@ struct KokoroWorkerSessionTests {
             await session.close()
             let remaining = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)
             #expect(!remaining.contains { $0.hasPrefix("zeus-kokoro-") })
+        }
+    }
+
+    private final class LaunchProbe: @unchecked Sendable {
+        enum Failure: Error { case afterSpawn }
+        private let lock = NSLock()
+        private let gate = DispatchSemaphore(value: 0)
+        private var didEnter = false
+        private var didLeave = false
+        private var runCalls = 0
+        private var launchedPID: Int32?
+        private weak var observedProcess: Process?
+        private var closeResult: Bool?
+        private var events: [KokoroWorkerSession.LaunchPhase] = []
+
+        var entered: Bool { lock.withLock { didEnter } }
+        var leftGate: Bool { lock.withLock { didLeave } }
+        var calls: Int { lock.withLock { runCalls } }
+        var pid: Int32? { lock.withLock { launchedPID } }
+        var processReleased: Bool { lock.withLock { observedProcess == nil } }
+        var closedAfterRun: Bool? { lock.withLock { closeResult } }
+        var skipped: Bool { lock.withLock { events.contains(.skipped) } }
+
+        func hold() {
+            lock.withLock { didEnter = true }
+            _ = gate.wait(timeout: .now() + 1)
+            lock.withLock { didLeave = true }
+        }
+        func release() { gate.signal() }
+        func observe(_ event: KokoroWorkerSession.LaunchPhase) {
+            lock.withLock { if events.count < 16 { events.append(event) } }
+        }
+        func didClose() { lock.withLock { closeResult = didLeave && launchedPID != nil } }
+        func run(_ process: Process, held: Bool = false, failAfterSpawn: Bool = false) throws {
+            lock.withLock { runCalls += 1; observedProcess = process }
+            if held { hold() }
+            try process.run()
+            lock.withLock { launchedPID = process.processIdentifier }
+            if failAfterSpawn { throw Failure.afterSpawn }
+        }
+    }
+
+    private func launchReader(_ fixture: Fixture) -> KokoroWorkerSession.Launch {
+        let marker = fixture.directory.appendingPathComponent("launch-request-received")
+        return .init(executable: "/bin/sh", arguments: ["-c",
+            "while IFS= read -r line; do printf received > \"$1\"; done", "fixture", marker.path])
+    }
+
+    private func requireLateChildReaped(_ probe: LaunchProbe, fixture: Fixture) throws {
+        let pid = try #require(probe.pid)
+        #expect(kill(pid, 0) == -1 && errno == ESRCH)
+        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launch-request-received").path))
+    }
+
+    @Test func deadlineDuringLaunchReturnsBeforeRunnerAndReapsLateChild() async throws {
+        try await withFixture { fixture in
+            let probe = LaunchProbe()
+            defer { probe.release() }
+            let queue = DispatchQueue(label: "zeus.test.launch-deadline")
+            let launch = launchReader(fixture)
+            let session = fixture.session(timeout: 0.1, configuration: { launch }, launchQueue: queue,
+                                          launchProcess: { try probe.run($0, held: true) })
+            let began = ContinuousClock.now
+            let request = fixture.render(session, "deadline")
+            try await wait { probe.entered }
+            #expect(await request.value == nil)
+            #expect(began.duration(to: .now) < .milliseconds(500))
+            #expect(!probe.leftGate)
+            let replacementBegan = ContinuousClock.now
+            #expect(await session.render("replacement", voice: "synthetic", speed: 1) == nil)
+            #expect(replacementBegan.duration(to: .now) < .milliseconds(500))
+            #expect(await session.pendingRequestCount == 0)
+            #expect(probe.calls == 1)
+            probe.release()
+            await session.close()
+            try requireLateChildReaped(probe, fixture: fixture)
+            try await wait { probe.processReleased }
+            #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
+        }
+    }
+
+    @Test func cancellationDuringLaunchReturnsBeforeRunnerAndReapsLateChild() async throws {
+        try await withFixture { fixture in
+            let probe = LaunchProbe()
+            defer { probe.release() }
+            let queue = DispatchQueue(label: "zeus.test.launch-cancellation")
+            let launch = launchReader(fixture)
+            let session = fixture.session(configuration: { launch }, launchQueue: queue,
+                                          launchProcess: { try probe.run($0, held: true) })
+            let request = fixture.render(session, "cancel")
+            try await wait { probe.entered }
+            let began = ContinuousClock.now
+            request.cancel()
+            #expect(await request.value == nil)
+            #expect(began.duration(to: .now) < .milliseconds(500))
+            #expect(!probe.leftGate)
+            let replacementBegan = ContinuousClock.now
+            #expect(await session.render("replacement", voice: "synthetic", speed: 1) == nil)
+            #expect(replacementBegan.duration(to: .now) < .milliseconds(500))
+            #expect(await session.pendingRequestCount == 0)
+            #expect(probe.calls == 1)
+            probe.release()
+            await session.close()
+            try requireLateChildReaped(probe, fixture: fixture)
+            try await wait { probe.processReleased }
+        }
+    }
+
+    @Test func closeDuringLaunchResolvesRequestThenJoinsLateChild() async throws {
+        try await withFixture { fixture in
+            let probe = LaunchProbe()
+            defer { probe.release() }
+            let queue = DispatchQueue(label: "zeus.test.launch-close")
+            let launch = launchReader(fixture)
+            let session = fixture.session(configuration: { launch }, launchQueue: queue,
+                                          launchProcess: { try probe.run($0, held: true) })
+            let request = fixture.render(session, "close")
+            try await wait { probe.entered }
+            let began = ContinuousClock.now
+            let closing = fixture.ownTask {
+                await session.close()
+                probe.didClose()
+            }
+            #expect(await request.value == nil)
+            #expect(began.duration(to: .now) < .milliseconds(500))
+            #expect(!probe.leftGate)
+            #expect(probe.closedAfterRun == nil)
+            probe.release()
+            await closing.value
+            #expect(probe.closedAfterRun == true)
+            try requireLateChildReaped(probe, fixture: fixture)
+            try await wait { probe.processReleased }
+            #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
+        }
+    }
+
+    @Test func expiredQueuedLaunchNeverInvokesTheProcessRunner() async throws {
+        try await withFixture { fixture in
+            let blocker = LaunchProbe(), probe = LaunchProbe()
+            defer { blocker.release() }
+            let queue = DispatchQueue(label: "zeus.test.launch-queued")
+            let blockedWork = fixture.ownTask {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    queue.async {
+                        blocker.hold()
+                        continuation.resume()
+                    }
+                }
+            }
+            try await wait { blocker.entered }
+            let launch = launchReader(fixture)
+            let session = fixture.session(timeout: 0.1, configuration: { launch }, launchQueue: queue,
+                                          launchProcess: { try probe.run($0) }, launchObserver: { probe.observe($0) })
+            let began = ContinuousClock.now
+            let request = fixture.render(session, "queued")
+            #expect(await request.value == nil)
+            #expect(began.duration(to: .now) < .milliseconds(500))
+            #expect(!blocker.leftGate)
+            #expect(probe.calls == 0)
+            let replacementBegan = ContinuousClock.now
+            #expect(await session.render("replacement", voice: "synthetic", speed: 1) == nil)
+            #expect(replacementBegan.duration(to: .now) < .milliseconds(500))
+            #expect(await session.pendingRequestCount == 0)
+            blocker.release()
+            await session.close()
+            await blockedWork.value
+            #expect(probe.skipped)
+            #expect(probe.calls == 0)
+            #expect(probe.pid == nil)
+            #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launch-request-received").path))
+        }
+    }
+
+    @Test func runnerFailureBeforeAndAfterSpawnReleasesItsOwnedProcess() async throws {
+        for afterSpawn in [false, true] {
+            try await withFixture { fixture in
+                let probe = LaunchProbe()
+                let queue = DispatchQueue(label: "zeus.test.launch-failure")
+                let launch = afterSpawn ? launchReader(fixture) : KokoroWorkerSession.Launch(
+                    executable: fixture.directory.appendingPathComponent("missing-executable").path, arguments: [])
+                let session = fixture.session(configuration: { launch }, launchQueue: queue,
+                                              launchProcess: { try probe.run($0, failAfterSpawn: afterSpawn) })
+                #expect(await session.render("failure", voice: "synthetic", speed: 1) == nil)
+                await session.close()
+                #expect(probe.calls == 1)
+                if afterSpawn {
+                    try requireLateChildReaped(probe, fixture: fixture)
+                } else {
+                    #expect(probe.pid == nil)
+                }
+                // A never-started Process has no termination callback; a started
+                // one must release its deliberate retention after observed exit.
+                try await wait { probe.processReleased }
+            }
+        }
+    }
+
+    @Test func terminatedWorkerReleasesItsProcessAfterClose() async throws {
+        try await withFixture { fixture in
+            let probe = LaunchProbe()
+            let session = fixture.session(configuration: {
+                .init(executable: "/bin/sh", arguments: ["-c", "exit 0"])
+            }, launchProcess: { try probe.run($0) })
+            #expect(await session.render("terminated", voice: "synthetic", speed: 1) == nil)
+            await session.close()
+            try requireLateChildReaped(probe, fixture: fixture)
+            try await wait { probe.processReleased }
+        }
+    }
+
+    @Test func completedRequestCanImmediatelyReuseTheSameWorker() async throws {
+        try await withFixture { fixture in
+            let session = fixture.session()
+            var firstPID: Int32?
+            for index in 0..<4 {
+                let text = "sequence-\(index)"
+                let result = try #require(await session.render(text, voice: "synthetic", speed: 1))
+                #expect(try Data(contentsOf: result).count == 48)
+                let marker = fixture.directory.appendingPathComponent("started-" + text)
+                let pid = try #require(Int32(try String(contentsOf: marker, encoding: .utf8)))
+                if let firstPID { #expect(pid == firstPID) } else { firstPID = pid }
+            }
+            await session.close()
         }
     }
 

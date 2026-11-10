@@ -219,7 +219,6 @@ struct MemoryMCPTransportTests {
         try #require(writeFD >= 0)
         let handle = FileHandle(fileDescriptor: writeFD, closeOnDealloc: true)
         defer { try? handle.close() }
-        try #require(unlink(path) == 0) // No subsequent opener can introduce a reader.
         let writer = try MCPPipeIO(handle: handle, name: "closed-pipe-fixture")
         defer { writer.stop() }
         let control = Data("fixture".utf8)
@@ -228,19 +227,25 @@ struct MemoryMCPTransportTests {
         try #require(received == control, "The same writer must transfer bytes before its reader closes")
         try reader.close()
         // A concurrent spawn may briefly hold CLOEXEC descriptors before exec.
-        // Establish that all readers are gone without retrying a failed write.
+        // Nonblocking writer-open returns ENXIO only when no readers remain.
+        // Darwin FIFO poll reports buffer space, not reliable reader closure.
+        // This probe adds no reader and never retries the actual tested write.
         let readyDeadline = ProcessInfo.processInfo.systemUptime + 0.2
         var noReaders = false
         repeat {
-            var descriptor = pollfd(fd: writeFD, events: Int16(POLLOUT), revents: 0)
-            let ready = poll(&descriptor, 1, 0)
-            if ready < 0, errno == EINTR { continue }
-            try #require(ready >= 0 && descriptor.revents & Int16(POLLNVAL) == 0)
-            noReaders = descriptor.revents & Int16(POLLERR | POLLHUP) != 0
+            let probe = open(path, O_WRONLY | O_NONBLOCK | O_CLOEXEC)
+            if probe >= 0 { try #require(close(probe) == 0) }
+            else {
+                let failure = errno
+                if failure == EINTR { continue }
+                try #require(failure == ENXIO, "The private FIFO must remain accessible")
+                noReaders = true
+            }
             if noReaders { break }
             try await Task.sleep(for: .milliseconds(1))
         } while ProcessInfo.processInfo.systemUptime < readyDeadline
         try #require(noReaders, "The kernel must confirm this pipe has no readers")
+        try #require(unlink(path) == 0) // No subsequent opener can introduce a reader.
         try handle.close()
         do {
             try await writer.write(control, deadline: ProcessInfo.processInfo.systemUptime + 0.2)

@@ -1542,7 +1542,7 @@
     },
     {
       "id": "REG-128",
-      "failure": "The closed-pipe fixture accepted a write after local read closure during concurrent Mac process tests. Its bare Pipe could be inherited by another child. The guard now opens a private FIFO with atomic CLOEXEC, proves positive byte transfer first, and requires unavailable rather than any timeout or cancellation error.",
+      "failure": "The closed-pipe fixture accepted a write after local read closure during concurrent Mac process tests. Its bare Pipe could be inherited by another child; a later FIFO poll readiness check was invalid on Darwin. The guard opens a private FIFO with atomic CLOEXEC, proves positive byte transfer, requires ENXIO from a nonblocking writer-open to establish no readers, unlinks it, and requires the exact unavailable error from one tested write.",
       "features": [
         "F10",
         "F13"
@@ -1563,6 +1563,45 @@
       "guard": {
         "file": "qa/closed-loop/tests/test_native_app_host.py",
         "function": "test_host_receipt_cannot_replace_complete_qualified_execution"
+      }
+    },
+    {
+      "id": "REG-130",
+      "failure": "Synchronous Process.run held the voice session actor, delaying cancellation and request deadlines during launch. The guard stalls a real launch, requires prompt cancellation and immediate replacement rejection, then proves late-child cleanup.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "cancellationDuringLaunchReturnsBeforeRunnerAndReapsLateChild"
+      }
+    },
+    {
+      "id": "REG-131",
+      "failure": "An expired request could still spawn after waiting for the launch executor. The guard keeps launch queued until the request expires and requires that the process runner is never invoked.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "expiredQueuedLaunchNeverInvokesTheProcessRunner"
+      }
+    },
+    {
+      "id": "REG-132",
+      "failure": "Polling Process.isRunning after termination did not finalize Foundation run-loop ownership; controlled Linux processes remained retained until post-exit waitUntilExit. The guard requires owned process release after confirmed child exit.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "terminatedWorkerReleasesItsProcessAfterClose"
       }
     }
   ]

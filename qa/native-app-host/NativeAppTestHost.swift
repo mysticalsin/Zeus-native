@@ -85,10 +85,19 @@ private enum NativeAppTestHost {
             let getter = unsafeBitCast(symbol, to: GetEntryPoint.self)
             let entryPoint = unsafeBitCast(getter(), to: TestEntryPoint.self)
             let application = NSApplication.shared
-            guard application.delegate == nil,
-                  application.setActivationPolicy(.regular) else {
-                throw HostFailure("could not initialize the owned AppKit application")
+            if let delegate = application.delegate {
+                throw HostFailure("unexpected application delegate: \(String(describing: type(of: delegate)))")
             }
+            let originalPolicy = application.activationPolicy()
+            if originalPolicy != .regular {
+                guard application.setActivationPolicy(.regular) else {
+                    throw HostFailure("regular activation policy was refused; original=\(originalPolicy.rawValue), current=\(application.activationPolicy().rawValue)")
+                }
+            }
+            guard application.activationPolicy() == .regular else {
+                throw HostFailure("owned application did not retain regular activation policy")
+            }
+            report("application initialized; originalPolicy=\(originalPolicy.rawValue), effectivePolicy=\(application.activationPolicy().rawValue)")
             guard let wakeEvent = NSEvent.otherEvent(with: .applicationDefined,
                 location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                 windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0) else {
