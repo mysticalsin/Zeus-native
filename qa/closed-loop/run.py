@@ -158,14 +158,17 @@ def run_native_check(definition, args, output, native_build, discovery_receipt, 
     folder.mkdir()
     log, events = folder / "test.log", folder / "events.jsonl"
     try:
-        row["command"] = native.run_command(selection, args.jobs, str(output), definition["id"])
-        code, seconds = execute(row["command"], log, args.timeout, {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")})
+        row["command"] = native.run_command(selection, args.jobs, str(output), definition["id"], ROOT)
+        environment = {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")}
+        if native.native_app_host.selected(selection):
+            environment.update(native.native_app_host.prepare(output, definition["id"]))
+        code, seconds = execute(row["command"], log, args.timeout, environment)
         row.update(exit_code=code, duration_seconds=seconds)
         count, suites, _ = swift_summary(log.read_text(), code)
         metrics = native.execution(events, compiled, selection)
         require((count, suites) == (metrics["tests"], metrics["suites"]), "native text summary differs from qualified execution")
         row.update(metrics, passed_functions=sorted({case["function"] for case in metrics["passed_cases"]}), status="passed")
-    except (Invalid, OSError, ValueError) as error:
+    except (Invalid, OSError, ValueError, subprocess.SubprocessError) as error:
         row.update(status="failed", reason=str(error))
     for file in [log, events, *sorted((folder / "native-artifacts").rglob("*"))]:
         if file.is_file():

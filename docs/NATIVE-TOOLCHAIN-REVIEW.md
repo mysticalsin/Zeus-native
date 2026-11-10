@@ -130,3 +130,50 @@ early directory removal fails the cleanup guard. Production worker source,
 concurrent execution and existing timing limits are unchanged. Mac startup
 latency and the actor-owned synchronous Process.run path still require
 diagnosis; these fixture repairs do not establish a production latency fix.
+
+## Native fixture checkpoint at c803a96
+
+The intervening `f024d1a` run caught the outdated spelling of AppKit's
+`acceptsFirstMouse(for:)` override in the new test view. Its production build and
+638 development checks passed, but test compilation failed and no native test
+partition ran. The spelling was corrected in `c803a96`.
+
+Both `c803a96` Mac runs completed production and test compilation and still
+reported the same four failed native partitions. Independent validation of the
+[push artifact](https://github.com/mysticalsin/Zeus-native/actions/runs/42794257141)
+confirms 2,317 complete passes in 22 partitions; the
+[partial receipt](../qa/receipts/20261110/mac-c803-ci.json) binds the exact source,
+compiler/discovery evidence and event streams. Canonical event capture no longer
+rejects the first dispatched release, but the event host still exits before its
+suite completes. This is not acceptance of the queued-release regression.
+
+The worker traces separate configuration from Python entry. The three early
+marker waits still failed at roughly two seconds without a Python-entry marker.
+The push run's idle test passed around 2.7 seconds; its PR counterpart failed at
+three seconds. The valid-WAV control and wrong-ID/path tests completed on both
+runs, as did the throwing-fixture cleanup guard. Swift system uptime and this
+Python runtime's monotonic timestamps have different origins and must not be
+subtracted across processes. The precise cold-start delay remains unresolved;
+neither deadlines nor concurrency have been relaxed.
+
+The push development job passed 638 checks; the PR development job caught a
+successful write in a supposedly closed-pipe fixture. A remaining reader is
+required for that result. The fixture's unprotected Foundation Pipe could be
+inherited by another child, although the specific child was not identified.
+It now uses a private FIFO opened atomically with CLOEXEC, unlinks it, proves a
+positive byte transfer, and requires kernel evidence of reader closure before
+requiring the exact unavailable-stream error. Darwin's HUP and Linux's ERR are
+both recognized. All 35 focused export/transport tests pass on Linux; native
+validation of this revision is still required.
+
+The three owned-window suites now have a test-only synchronous AppKit host.
+It loads the existing compiled test bundle through Swift Testing's documented
+[ABI](https://github.com/swiftlang/swift-testing/blob/swift-6.2.4-RELEASE/Sources/Testing/ABI/EntryPoints/ABIEntryPoint.swift),
+without calling its async main. Swift Testing still writes the original
+version-zero event stream and terminal summary. The runner binds the exact
+host, bundle and filter command and retains the host binary and metadata as
+hashed artifacts. The normal compiler barrier, compiled test discovery,
+positive test counts, complete events and accessibility assertions remain
+required. Source review and Linux gate tests do not establish AppKit execution;
+the new host requires its own Mac build and run. No installed app or OS privacy
+permission is changed by this synthetic host.

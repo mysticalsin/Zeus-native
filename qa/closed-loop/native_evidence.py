@@ -3,6 +3,7 @@ from collections import Counter
 import json
 from pathlib import Path
 import re
+import native_app_host
 
 from contracts import (ROOT, Invalid, digest, fields, require, runnable_functions, swift_summary,
                        load, source_snapshot, validate_native_build)
@@ -258,7 +259,13 @@ def discovery_command(output_directory):
             str(Path(output_directory) / "native-discovery/events.jsonl"), "--event-stream-version", "0", "list"]
 
 
-def run_command(definitions, jobs, output_directory, ident):
+def run_command(definitions, jobs, output_directory, ident, recorded_repo=ROOT):
+    if native_app_host.selected(definitions):
+        return [str(native_app_host.executable(output_directory, ident)),
+                "--test-bundle-path", str(native_app_host.bundle_binary(recorded_repo)),
+                "--filter", selector(definitions),
+                "--event-stream-output-path", str(Path(output_directory) / ident / "events.jsonl"),
+                "--event-stream-version", "0"]
     return ["swift", "test", "--skip-build", "--jobs", str(jobs), "--filter", selector(definitions),
             "--event-stream-output-path", str(Path(output_directory) / ident / "events.jsonl"),
             "--event-stream-version", "0"]
@@ -282,13 +289,15 @@ def validate_run_receipt(row, root, compiled, definitions, jobs, recorded_repo, 
     require(row.get("status") == "passed" and type(row.get("exit_code")) is int and row["exit_code"] == 0,
             "native execution did not succeed")
     ident = row["id"]
-    require(row.get("command") == run_command(definitions, jobs, recorded_output, ident), "native execution selector, build jobs or event command changed")
+    require(row.get("command") == run_command(definitions, jobs, recorded_output, ident, recorded_repo), "native execution selector, build jobs or event command changed")
     require(type(row.get("artifacts")) is list, "native run artifacts missing")
     files = {item.get("path"): artifact(root, item) for item in row["artifacts"]}
     require(len(files) == len(row["artifacts"]), "duplicate native artifact")
     require(ident + "/test.log" in files and ident + "/events.jsonl" in files, "native run needs its log and qualified events")
     require(all(name in {ident + "/test.log", ident + "/events.jsonl"} or name.startswith(ident + "/native-artifacts/") for name in files),
             "native artifact is outside its checker")
+    if native_app_host.selected(definitions):
+        native_app_host.validate_artifacts(files, ident)
     metrics = execution(files[ident + "/events.jsonl"], compiled, definitions, repo, recorded_repo)
     count, suites, _ = swift_summary(files[ident + "/test.log"].read_text(), 0)
     require((count, suites) == (metrics["tests"], metrics["suites"]), "native summary differs from qualified execution")

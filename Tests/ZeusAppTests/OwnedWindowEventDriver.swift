@@ -29,10 +29,12 @@ enum OwnedWindowFixtureApplication {
             throw OwnedWindowEventDriver.Failure.unavailable("regular fixture activation policy was refused")
         }
         if !launchFinished {
-            record("finishLaunching begin")
-            application.finishLaunching()
+            if !application.isRunning {
+                record("finishLaunching begin")
+                application.finishLaunching()
+                record("finishLaunching returned")
+            }
             launchFinished = true
-            record("finishLaunching returned")
         }
         application.activate()
         record("prepare returned; active=\(application.isActive)")

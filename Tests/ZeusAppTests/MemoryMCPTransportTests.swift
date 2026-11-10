@@ -1,6 +1,11 @@
 import Foundation
 import Testing
 import ZeusCore
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 #if ZEUS_PORTABLE_MCP
 @testable import MCPTransportValidation
 #else
@@ -197,13 +202,52 @@ struct MemoryMCPTransportTests {
     }
 
     @Test func writingToAClosedPipeThrowsWithoutRaisingSIGPIPE() async throws {
-        let pipe = Pipe()
-        let writer = try MCPPipeIO(handle: pipe.fileHandleForWriting, name: "closed-pipe-fixture")
-        try pipe.fileHandleForWriting.close()
-        try pipe.fileHandleForReading.close()
+        // Open both pipe ends with atomic CLOEXEC. A bare Foundation Pipe can
+        // leave a reader in a concurrently launched child, invalidating the
+        // closed-reader premise even after this process closes its copy.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-closed-pipe-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("stream").path
+        try #require(mkfifo(path, 0o600) == 0)
+        let readFD = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)
+        try #require(readFD >= 0)
+        let reader = FileHandle(fileDescriptor: readFD, closeOnDealloc: true)
+        defer { try? reader.close() }
+        let writeFD = open(path, O_WRONLY | O_NONBLOCK | O_CLOEXEC)
+        try #require(writeFD >= 0)
+        let handle = FileHandle(fileDescriptor: writeFD, closeOnDealloc: true)
+        defer { try? handle.close() }
+        try #require(unlink(path) == 0) // No subsequent opener can introduce a reader.
+        let writer = try MCPPipeIO(handle: handle, name: "closed-pipe-fixture")
         defer { writer.stop() }
-        await #expect(throws: (any Error).self) {
-            try await writer.write(Data("fixture".utf8), deadline: ProcessInfo.processInfo.systemUptime + 0.2)
+        let control = Data("fixture".utf8)
+        try await writer.write(control, deadline: ProcessInfo.processInfo.systemUptime + 0.2)
+        let received = try reader.read(upToCount: control.count)
+        try #require(received == control, "The same writer must transfer bytes before its reader closes")
+        try reader.close()
+        // A concurrent spawn may briefly hold CLOEXEC descriptors before exec.
+        // Establish that all readers are gone without retrying a failed write.
+        let readyDeadline = ProcessInfo.processInfo.systemUptime + 0.2
+        var noReaders = false
+        repeat {
+            var descriptor = pollfd(fd: writeFD, events: Int16(POLLOUT), revents: 0)
+            let ready = poll(&descriptor, 1, 0)
+            if ready < 0, errno == EINTR { continue }
+            try #require(ready >= 0 && descriptor.revents & Int16(POLLNVAL) == 0)
+            noReaders = descriptor.revents & Int16(POLLERR | POLLHUP) != 0
+            if noReaders { break }
+            try await Task.sleep(for: .milliseconds(1))
+        } while ProcessInfo.processInfo.systemUptime < readyDeadline
+        try #require(noReaders, "The kernel must confirm this pipe has no readers")
+        try handle.close()
+        do {
+            try await writer.write(control, deadline: ProcessInfo.processInfo.systemUptime + 0.2)
+            Issue.record("A write succeeded after the only reader closed")
+        } catch MCPPipeIO.Failure.unavailable {
+            // Keep the actual unavailable-stream result: timeout/stopped errors
+            // must not make this closed-pipe regression pass.
         }
     }
 

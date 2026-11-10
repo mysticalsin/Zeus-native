@@ -242,10 +242,11 @@ def validate_native_compilation(result: dict, root: Path, mode: str, contracts) 
     return result["native_build"]["command"][4]
 
 
-def validate_native_command(command, definition: dict, native_jobs: str | None, recorded_output: str, ident: str) -> None:
+def validate_native_command(command, definition: dict, native_jobs: str | None, recorded_output: str, ident: str, recorded_repo=None) -> None:
     if native_jobs is None:
         raise ValueError("native fixture execution has no verified macOS compiler barrier")
-    expected = native_evidence_module().run_command([definition], native_jobs, recorded_output, ident)
+    native = native_evidence_module()
+    expected = native.run_command([definition], native_jobs, recorded_output, ident, recorded_repo or native.ROOT)
     if command != expected:
         raise ValueError("native fixture command differs from its verified build, events and exact reviewed selection")
 
@@ -320,7 +321,7 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
         if not isinstance(check.get("command"), list) or not check["command"] or not all(isinstance(x, str) and x for x in check["command"]):
             raise ValueError(f"feature check has no command: {ident}")
         if definition["kind"] in native.NATIVE_KINDS:
-            validate_native_command(check["command"], definition, native_jobs, result["output_directory"], ident)
+            validate_native_command(check["command"], definition, native_jobs, result["output_directory"], ident, result["repository"])
             metrics = native.validate_run_receipt(check, root, compiled, [definition], native_jobs,
                                                   result["repository"], result["output_directory"], repo=repo)
             count += metrics["tests"]

@@ -1539,6 +1539,31 @@
         "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
         "function": "thrownFixtureFailureJoinsRenderAndClosesWorkerBeforeRemoval"
       }
+    },
+    {
+      "id": "REG-128",
+      "failure": "The closed-pipe fixture accepted a write after local read closure during concurrent Mac process tests. Its bare Pipe could be inherited by another child. The guard now opens a private FIFO with atomic CLOEXEC, proves positive byte transfer first, and requires unavailable rather than any timeout or cancellation error.",
+      "features": [
+        "F10",
+        "F13"
+      ],
+      "check": "portable-wiki-export",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "writingToAClosedPipeThrowsWithoutRaisingSIGPIPE"
+      }
+    },
+    {
+      "id": "REG-129",
+      "failure": "The SwiftPM async-main drain exited during owned AppKit event dispatch with exit zero and no terminal Swift Testing event. A synchronous AppKit host now owns the three UI processes; the gate still requires their complete qualified execution and exact host/bundle command.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_app_host.py",
+        "function": "test_host_receipt_cannot_replace_complete_qualified_execution"
+      }
     }
   ]
 }
