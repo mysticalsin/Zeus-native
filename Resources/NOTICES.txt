@@ -40,13 +40,23 @@ Individual marks fetched 2026-11-03 from the Simple Icons CDN (same paths as in 
 Design sources kept at `Design/brand-logos-src/`. Shipped as single-colour template PDFs under
 `Sources/Zeus/Integrations/Brands/engine-*.pdf`.
 
-The five copied PNG files `chatgpt.png`, `claude.png`, `cursor.png`, `gemini.png`, and `grok.png`
-are separate image assets from the documented Simple Icons template PDFs. Their individual source,
-creator, license, and rights or clearance status are unknown from the inspected project evidence.
-Their presence does not establish permission to use the associated names or marks. In particular,
-`grok.png` is present; the evidence does not establish that it is an xAI-provided brand kit or grant
-rights to it. No trademark, service-mark, endorsement, or commercial-use permission is granted or
-claimed by this notice.
+### Grok / xAI (official original SVG; proprietary trademark)
+Source: https://x.ai/legal/brand-guidelines, corroborated by https://x.ai/grok.
+Retrieved 2026-11-10 from the official footer's “Built with Grok” link. Identical original SVG
+bytes occur on both pages. Source: Design/brand-logos-src/grok.svg; bundled: Brands/engine-grok.svg.
+SHA-256: 8157a9b2e3ff94a690000ee9327156eb28539efe176fcb06cadcc7688fb4df90.
+The original 34x32 dimensions, paths and currentColor attributes are retained byte-for-byte.
+Native rendering preserves proportions and uses the label color for the original template mark.
+
+Published guidance permits accurate references to the provider/services and prohibits implying
+endorsement, approval or sponsorship. The logo section also requires artwork exactly as supplied
+at its download link, without alteration or adjustment. That ZIP link returned HTTP 403 during
+review; this is the independently verified official inline SVG, not a claimed copy of that pack.
+This proprietary trademark is not CC0. Use here is solely nominative provider identification;
+no endorsement or broader trademark permission is claimed.
+
+The five unused, unverified PNGs formerly named chatgpt.png, claude.png, cursor.png, gemini.png
+and grok.png were removed from the source/resource directory and are not distributed.
 
 Marks for Ollama, LM Studio and unknown engines use the same fallback until a vector mark is added.
 

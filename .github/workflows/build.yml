@@ -74,15 +74,12 @@ jobs:
         id: build
         run: |
           { xcodebuild -version && swift --version && swift build; } 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/build.log"
-      - name: Native integration fixtures (no OS consent requests or capture)
+      - name: All Core tests and reviewed app fixtures (no consent requests or capture)
         id: test
-        env:
-          ZEUS_QA_ARTIFACT_DIR: ${{ runner.temp }}/zeus-results/app/recording-feedback
-        # This reviewed allowlist is deliberate. Full mode reports the unimplemented device obligations.
-        # Every selected test uses injected ports, generated buffers, offscreen rendering or temporary files.
+        # Compiler discovery and qualified event streams must prove every selected case ran.
+        # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
-          native_filter="$(python3 qa/closed-loop/gate.py native-filter)"
-          scripts/test.sh --filter "$native_filter" 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+          python3 qa/closed-loop/native.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
       - name: Bundle local preview (ad-hoc only; no credentials)
         id: bundle
         run: CONFIG=debug SIGN_IDENTITY=- RELEASE=0 scripts/bundle.sh 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/bundle.log"

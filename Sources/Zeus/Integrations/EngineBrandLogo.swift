@@ -2,11 +2,18 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
-/// Loads a vector engine mark from `Integrations/Brands/<asset>.pdf`.
+/// Loads each verified vector format from the bundled brand directory. Unsupported SVG
+/// decoding returns nil so the views keep their existing safe text/symbol fallback.
 enum EngineBrandImage {
+    /// This deliberately excludes the source-tree fallback so native tests prove packaging.
+    static func bundledURL(for mark: EngineBrandMark) -> URL? {
+        Bundle.module.url(forResource: mark.assetName, withExtension: mark.assetExtension, subdirectory: "Brands")
+    }
+
     static func url(for mark: EngineBrandMark) -> URL? {
-        let name = "\(mark.assetName).pdf"
+        let name = "\(mark.assetName).\(mark.assetExtension)"
         let candidates = [
+            bundledURL(for: mark),
             ZeusResources.bundle?.resourceURL?.appendingPathComponent("Brands/\(name)"),
             Bundle.main.resourceURL?.appendingPathComponent("Brands/\(name)"),
             URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Brands/\(name)"),

@@ -567,6 +567,114 @@
         "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
         "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
       }
+    },
+    {
+      "id": "REG-047",
+      "failure": "ScreenshotDetector ignored its injected defaults and read host preferences instead.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenshotDetectorTests.swift",
+        "function": "configuredScreenshotLocationUsesTheExpandedExistingPath"
+      }
+    },
+    {
+      "id": "REG-048",
+      "failure": "BrowserAgentBrainLaunch discarded injected model preferences for non-Claude engines.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserAgentLoopTests.swift",
+        "function": "brainLaunchUsesOnlyInjectedModelPreferences"
+      }
+    },
+    {
+      "id": "REG-049",
+      "failure": "Successful console totals could mask a missing, stale or changed app-native receipt.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_native_receipt_missing_stale_or_changed_cannot_use_console_totals"
+      }
+    },
+    {
+      "id": "REG-050",
+      "failure": "Swift Testing human summaries can report a passing positive total even when disabled or empty-argument tests were skipped.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_positive_summary_cannot_hide_skipped_or_issue_events"
+      }
+    },
+    {
+      "id": "REG-051",
+      "failure": "A parameterized function-level pass could hide an omitted compiled argument identity.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_parameterized_execution_requires_every_discovered_argument_identity"
+      }
+    },
+    {
+      "id": "REG-052",
+      "failure": "Compiled discovery could omit current Core declarations while a smaller selected test set still produced a positive total.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_compiled_core_discovery_must_include_every_current_declaration"
+      }
+    },
+    {
+      "id": "REG-053",
+      "failure": "An unselected app suite could execute without selected child tests while every required function still passed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_unselected_suite_execution_cannot_hide_behind_complete_selected_tests"
+      }
+    },
+    {
+      "id": "REG-054",
+      "failure": "A passing native function stream could omit selected suite lifecycles or include declarations after the terminal run event.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_terminal_run_rejects_late_declarations_and_missing_suite_lifecycle"
+      }
+    },
+    {
+      "id": "REG-055",
+      "failure": "An injected onboarding animation preference could negate the system Reduce Motion setting.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingIsolationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+        "function": "explicitMotionPolicyNeverOverridesSystemReduction"
+      }
     }
   ]
 }

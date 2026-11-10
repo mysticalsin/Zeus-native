@@ -4,21 +4,15 @@ import AVFoundation
 import Observation
 import SwiftUI
 
-/// Transient motion values for the guide (an @Observable singleton: the @State macro plugin is not
-/// available with the Command Line Tools).
-@MainActor @Observable
-final class OnboardingMotion {
-    static let shared = OnboardingMotion()
-    var wave = 0.0
-    var haloDrawn = 1.0
-}
-
 // MARK: Films
 
 /// A looping, muted film card, Glance's learn-* preview (260 pt wide, radius 20; the intro is wider).
 /// More than one film plays as a loop of the list.
 struct FilmCard: View {
     let films: [OnboardingFilm]
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.onboardingReduceMotion) private var motionOverride
+    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     var body: some View {
         let size = films.first.map { film in
             let width: CGFloat = film == .intro ? 420 : 260
@@ -48,8 +42,13 @@ struct FilmCard: View {
         if let film = films.first, film == .intro {
             IntroScene(t: film.posterTime)
                 .scaleEffect(filmCardScale(for: film))
-        } else if TopBarStyle.isSnapshot, let film = films.first, let image = FilmPoster.image(for: film) {
-            Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+        } else if TopBarStyle.isSnapshot || reduceMotion {
+            if let film = films.first, let image = FilmPoster.image(for: film) {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                // A missing poster must not silently turn animation back on.
+                Color.black.overlay(Text("Preview unavailable").font(OB.font(13)).foregroundStyle(.white.opacity(0.7)))
+            }
         } else {
             LoopingFilm(films: films)
         }
@@ -350,6 +349,7 @@ struct ThemePreview: View {
 
 /// Right-column art for the sounds onboarding step (matches halo/day preview sizing).
 struct SoundsPreviewTile: View {
+    var options: OnboardingOptions = .live
     /// Spans the step's rows (feedback switch plus the four cues).
     var height: CGFloat = 160
     @Environment(\.ob) private var ob
@@ -365,13 +365,13 @@ struct SoundsPreviewTile: View {
                         .frame(width: 5, height: CGFloat(18 + (index * 7) % 28))
                 }
             }
-            .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.4)
+            .opacity(options.bool("sound.on") ? 1 : 0.4)
             .offset(y: height * 0.3)
         }
         .frame(width: 260, height: height)
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.08), lineWidth: 1))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ExtraPreferences.shared.soundsOn ? "Sound on" : "Sound off")
+        .accessibilityLabel(options.bool("sound.on") ? "Sound on" : "Sound off")
     }
 }
 
@@ -380,11 +380,14 @@ struct SoundsPreviewTile: View {
 /// A small screen with the closed notch and its halo (260 pt wide, as tall as the step's rows), and the
 /// style's name underneath.
 struct HaloPreviewCard: View {
+    var options: OnboardingOptions = .live
     var height: CGFloat = 81
-    private var drawn: Double { OnboardingMotion.shared.haloDrawn }
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.onboardingReduceMotion) private var motionOverride
+    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
+    private var drawn: Double { options.haloDrawn }
     @Environment(\.ob) private var ob
-    private var store: SettingsStore { SettingsStore.shared }
-    private var style: HaloStyle { HaloStyle.resolve(SettingsStore.binding("halo.style").wrappedValue) }
+    private var style: HaloStyle { HaloStyle.resolve(options.string("halo.style")) }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -393,8 +396,8 @@ struct HaloPreviewCard: View {
                     .init(color: .black, location: 0.0), .init(color: .black, location: 0.2),
                     .init(color: Color(rgb: 12, 20, 48), location: 0.55), .init(color: Color(rgb: 28, 56, 128), location: 1),
                 ], startPoint: .top, endPoint: .bottom))
-            HaloOutline(style: style, arm: SettingsStore.binding("halo.armWidth").wrappedValue,
-                        thickness: max(100, store.double("halo.thickness")) / 100, drawn: drawn, animated: true)
+            HaloOutline(style: style, arm: options.string("halo.armWidth"),
+                        thickness: max(100, options.double("halo.thickness")) / 100, drawn: drawn, animated: !reduceMotion)
                 .frame(width: 260, height: 81)
             Text(style.title).font(OB.font(13, .medium)).foregroundStyle(.white.opacity(0.7))
                 .frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 22)
@@ -405,13 +408,13 @@ struct HaloPreviewCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Halo preview, \(style.title)")
         .onChange(of: style) { replay() }
-        .onChange(of: SettingsStore.binding("halo.entrance").wrappedValue) { replay() }
+        .onChange(of: options.string("halo.entrance")) { replay() }
     }
 
     private func replay() {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        OnboardingMotion.shared.haloDrawn = 0
-        withAnimation(.easeOut(duration: 0.6)) { OnboardingMotion.shared.haloDrawn = 1 }
+        guard !reduceMotion else { return }
+        options.haloDrawn = 0
+        withAnimation(.easeOut(duration: 0.6)) { options.haloDrawn = 1 }
     }
 }
 

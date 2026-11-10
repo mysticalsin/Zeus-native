@@ -1,5 +1,7 @@
 import AppKit
 import CoreLocation
+import AVFoundation
+import EventKit
 import Observation
 import UserNotifications
 import ZeusCore
@@ -8,8 +10,50 @@ import ZeusCore
 /// (never all at launch), as in Glance's flow.
 @MainActor
 @Observable
-final class OnboardingServices {
+final class OnboardingServices: OnboardingServing {
     let permissions: PermissionsModel
+    func access(_ capability: OnboardingCapability) -> OnboardingAccess {
+        guard !Self.fresh else { return .notGranted }
+        // Register the observed permission snapshot even for statuses read from an OS enum below.
+        _ = permissions.granted
+        switch capability {
+        case .microphone:
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized: return .allowed
+            case .denied, .restricted: return .denied
+            default: return .notGranted
+            }
+        case .calendar, .reminders:
+            let status = EKEventStore.authorizationStatus(for: capability == .calendar ? .event : .reminder)
+            if status == .denied || status == .restricted { return .denied }
+            return granted(capability == .calendar ? .calendar : .reminders) ? .allowed : .notGranted
+        case .location:
+            if location.authorizationStatus == .denied || location.authorizationStatus == .restricted { return .denied }
+            return locationAllowed ? .allowed : .notGranted
+        case .accessibility: return granted(.accessibility) ? .allowed : .notGranted
+        case .automation: return granted(.automation) ? .allowed : .notGranted
+        case .notifications: return notificationsAllowed ? .allowed : .notGranted
+        case .fullDiskAccess: return fullDiskAccess ? .allowed : .notGranted
+        }
+    }
+
+    func request(_ capability: OnboardingCapability) {
+        switch capability {
+        case .microphone:
+            if access(.microphone) == .denied { permissions.open(.microphone) }
+            else { permissions.request(.microphone) }
+        case .accessibility: permissions.request(.accessibility)
+        case .calendar: permissions.request(.calendar)
+        case .reminders: permissions.request(.reminders)
+        case .automation: requestAutomation()
+        case .notifications: allowNotifications()
+        case .fullDiskAccess: allowFullDiskAccess()
+        case .location: allowLocation()
+        }
+    }
+
+    func downloadModel() { prepareDictationModel() }
+
     /// Downloads and loads the on-device dictation model (DictationController.prepareModel).
     @ObservationIgnored var prepareDictationModel: () -> Void = {}
 

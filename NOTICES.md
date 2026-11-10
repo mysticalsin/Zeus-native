@@ -107,13 +107,30 @@ Marks identify which AI engine a session uses (nominative use only; each mark be
 Shipped as template PDFs in `Sources/Zeus/Integrations/Brands/engine-*.pdf`. Mapping lives in
 `Sources/ZeusCore/Integrations/EngineBrand.swift`.
 
-The five copied PNG files `chatgpt.png`, `claude.png`, `cursor.png`, `gemini.png`, and `grok.png`
-are separate image assets from the documented Simple Icons template PDFs. Their individual source,
-creator, license, and rights or clearance status are unknown from the inspected project evidence.
-Their presence does not establish permission to use the associated names or marks. In particular,
-`grok.png` is present; the evidence does not establish that it is an xAI-provided brand kit or grant
-rights to it. No trademark, service-mark, endorsement, or commercial-use permission is granted or
-claimed by this notice.
+### Grok / xAI (official original SVG; proprietary trademark)
+
+- Source: https://x.ai/legal/brand-guidelines, corroborated by https://x.ai/grok.
+- Retrieved 2026-11-10. The identical inline Grok SVG appears in the official footer's
+  “Built with Grok” link on both pages. It was copied byte-for-byte, without redrawing or editing.
+- Original and bundled source: `Design/brand-logos-src/grok.svg` and
+  `Sources/Zeus/Integrations/Brands/engine-grok.svg`.
+- SHA-256: `8157a9b2e3ff94a690000ee9327156eb28539efe176fcb06cadcc7688fb4df90`.
+- The original 34×32 dimensions, paths and `currentColor` attributes are retained. The native
+  view preserves proportions and uses the label color for the original mark's template rendering.
+  Exact retrieval and page hashes are recorded in `Design/brand-logos-src/grok.provenance.json`.
+
+The published guidelines allow accurate references to the provider or services and prohibit
+misrepresenting a relationship or implying endorsement, approval or sponsorship. The logo section
+also requires logos exactly as supplied at its download link, without alteration or adjustment.
+That ZIP link returned HTTP 403 during review; this asset is the verified official inline SVG,
+not a claimed copy of the inaccessible ZIP. No correspondence to that pack is asserted.
+
+This proprietary mark is not covered by Simple Icons' CC0 license. Zeus uses it solely to identify
+Grok / xAI as the selected provider; no endorsement or broader trademark permission is claimed.
+
+The five unused PNG files formerly named `chatgpt.png`, `claude.png`, `cursor.png`, `gemini.png`
+and `grok.png` had unknown individual provenance and have been removed from this source/resource
+directory. They are not distributed with the native app.
 
 **Trademark:** All third-party marks remain the property of their owners. Zeus uses them only to
 identify the corresponding engine or product.

@@ -8,10 +8,11 @@ public enum EngineBrandMark: String, CaseIterable, Sendable, Equatable {
     case anthropic
     case gemini
     case kimi
-    /// Unknown engines and Grok / xAI (no CC0 mark in Simple Icons; no official xAI vector shipped here).
+    case grok
+    /// Unknown engines without a verified provider mark.
     case fallback
 
-    /// PDF base name under `Integrations/Brands/` (no extension).
+    /// Vector asset base name under `Integrations/Brands/` (no extension).
     public var assetName: String {
         switch self {
         case .cursor: "engine-cursor"
@@ -20,9 +21,13 @@ public enum EngineBrandMark: String, CaseIterable, Sendable, Equatable {
         case .anthropic: "engine-anthropic"
         case .gemini: "engine-gemini"
         case .kimi: "engine-kimi"
+        case .grok: "engine-grok"
         case .fallback: "engine-fallback"
         }
     }
+
+    /// Grok retains the exact official SVG bytes; the existing marks remain PDFs.
+    public var assetExtension: String { self == .grok ? "svg" : "pdf" }
 
     public var title: String {
         switch self {
@@ -32,6 +37,7 @@ public enum EngineBrandMark: String, CaseIterable, Sendable, Equatable {
         case .anthropic: "Anthropic"
         case .gemini: "Gemini"
         case .kimi: "Kimi"
+        case .grok: "Grok"
         case .fallback: "Unknown engine"
         }
     }
@@ -48,7 +54,7 @@ public enum EngineBrand {
         ("anthropic", .anthropic), ("Anthropic", .anthropic),
         ("gemini", .gemini), ("Gemini", .gemini), ("googlegemini", .gemini),
         ("kimi", .kimi), ("Kimi", .kimi), ("moonshot", .kimi), ("moonshotai", .kimi),
-        ("grok", .fallback), ("Grok", .fallback), ("Grok Bot", .fallback), ("xai", .fallback), ("xAI", .fallback),
+        ("grok", .grok), ("Grok", .grok), ("Grok Bot", .grok), ("xai", .grok), ("xAI", .grok), ("x.ai", .grok),
         ("totally-unknown-engine", .fallback),
     ]
 
@@ -72,8 +78,8 @@ public enum EngineBrand {
             return EngineBrandMark.gemini
         case "kimi", "moonshot", "moonshotai", "moonshot ai":
             return EngineBrandMark.kimi
-        case "grok", "grok bot", "xai":
-            return EngineBrandMark.fallback
+        case "grok", "grok bot", "xai", "x.ai":
+            return EngineBrandMark.grok
         default:
             return EngineBrandMark.fallback
         }
@@ -85,7 +91,7 @@ public enum EngineBrand {
         case .codex, .chatgpt: return EngineBrandMark.openai
         case .cursor: return EngineBrandMark.cursor
         case .gemini: return EngineBrandMark.gemini
-        case .grok: return EngineBrandMark.fallback
+        case .grok: return EngineBrandMark.grok
         case .ollama, .lmStudio, .anyLLM: return EngineBrandMark.fallback
         }
     }
@@ -96,7 +102,7 @@ public enum EngineBrand {
         case .codex: return EngineBrandMark.openai
         case .gemini: return EngineBrandMark.gemini
         case .cursorAgent: return EngineBrandMark.cursor
-        case .grok: return EngineBrandMark.fallback
+        case .grok: return EngineBrandMark.grok
         case .ollama: return EngineBrandMark.fallback
         }
     }

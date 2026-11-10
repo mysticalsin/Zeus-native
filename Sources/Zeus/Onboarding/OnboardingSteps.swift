@@ -6,13 +6,14 @@ import SwiftUI
 struct OnboardingStepView: View {
     let step: OnboardingStep
     let flow: OnboardingFlow
-    let services: OnboardingServices
+    let services: any OnboardingServing
+    var options: OnboardingOptions = .live
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             switch step {
             case .theme:
-                ThemeStep()
+                ThemeStep(options: options)
                     .frame(maxWidth: .infinity)
                     .offset(y: OB.contentMidY + nudge - OB.size.height / 2)
             default:
@@ -30,15 +31,15 @@ struct OnboardingStepView: View {
         case .welcome:
             welcomeVisual
         case .murmure, .agents, .control, .reach:
-            FilmCard(films: step.films).position(x: OB.visualCenterX, y: OB.contentMidY)
+            FilmCard(films: step.films).environment(\.onboardingReduceMotion, flow.reducesMotion).position(x: OB.visualCenterX, y: OB.contentMidY)
         case .day:
             DayIcons(pitch: DayStep.pitch, count: 3)
                 .position(x: OB.visualCenterX, y: OnboardingChromeLayout.rowsMidY(count: 3, pitch: DayStep.pitch))
         case .halo:
-            HaloPreviewCard(height: OnboardingChromeLayout.rowsBlock(count: 4, pitch: HaloStep.pitch).height)
+            HaloPreviewCard(options: options, height: OnboardingChromeLayout.rowsBlock(count: 4, pitch: HaloStep.pitch).height)
                 .position(x: OB.visualCenterX, y: OnboardingChromeLayout.rowsMidY(count: 4, pitch: HaloStep.pitch))
         case .sounds:
-            SoundsPreviewTile(height: OnboardingChromeLayout.rowsBlock(count: SoundsStep.rowCount, pitch: SoundsStep.pitch).height)
+            SoundsPreviewTile(options: options, height: OnboardingChromeLayout.rowsBlock(count: SoundsStep.rowCount, pitch: SoundsStep.pitch).height)
                 .position(x: OB.visualCenterX, y: OnboardingChromeLayout.rowsMidY(count: SoundsStep.rowCount, pitch: SoundsStep.pitch))
         case .theme:
             EmptyView()
@@ -62,11 +63,11 @@ struct OnboardingStepView: View {
         case .welcome: WelcomeStep()
         case .murmure: MurmureStep(services: services)
         case .agents: AgentsStep(flow: flow, services: services)
-        case .control: ControlStep()
-        case .reach: ReachStep()
+        case .control: ControlStep(options: options)
+        case .reach: ReachStep(options: options)
         case .day: DayStep(services: services)
-        case .halo: HaloStep()
-        case .sounds: SoundsStep(flow: flow, services: services)
+        case .halo: HaloStep(options: options)
+        case .sounds: SoundsStep(options: options)
         case .theme: EmptyView()
         }
     }
@@ -74,10 +75,10 @@ struct OnboardingStepView: View {
     @ViewBuilder private var visual: some View {
         switch step {
         case .welcome: WelcomeHero()
-        case .murmure, .agents, .control, .reach: FilmCard(films: step.films)
+        case .murmure, .agents, .control, .reach: FilmCard(films: step.films).environment(\.onboardingReduceMotion, flow.reducesMotion)
         case .day: DayIcons(pitch: DayStep.pitch, count: 3)
-        case .halo: HaloPreviewCard(height: OnboardingChromeLayout.rowsBlock(count: 4, pitch: HaloStep.pitch).height)
-        case .sounds: SoundsPreviewTile(height: OnboardingChromeLayout.rowsBlock(count: SoundsStep.rowCount, pitch: SoundsStep.pitch).height)
+        case .halo: HaloPreviewCard(options: options, height: OnboardingChromeLayout.rowsBlock(count: 4, pitch: HaloStep.pitch).height)
+        case .sounds: SoundsPreviewTile(options: options, height: OnboardingChromeLayout.rowsBlock(count: SoundsStep.rowCount, pitch: SoundsStep.pitch).height)
         case .theme: EmptyView()
         }
     }
@@ -105,12 +106,6 @@ struct StepHeading: View {
 }
 
 // MARK: 1 Welcome
-
-/// The bindings as they are right now (both are recordable in Settings), so no step names a key by hand.
-private enum OnboardingKeys {
-    @MainActor static var talk: String { Preferences.shared.pushToTalk.title }
-    @MainActor static var dictation: String { DictationSettings.shared.key?.title ?? "your dictation key" }
-}
 
 private struct WelcomeStep: View {
     @Environment(\.ob) private var ob
@@ -168,28 +163,20 @@ struct WelcomeHero: View {
 // MARK: 2 Murmure
 
 private struct MurmureStep: View {
-    let services: OnboardingServices
+    let services: any OnboardingServing
     @Environment(\.ob) private var ob
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StepHeading(title: "Murmure", subtitle: "")
                 .frame(width: 520, alignment: .leading)
             VStack(spacing: 0) {
-                OBRow(symbol: "mic", title: "Microphone", text: "") {
-                    OBAllowButton(granted: services.granted(.microphone), name: "Microphone") {
-                        services.permissions.request(.microphone)
-                    }
-                }
+                OBPermissionRow(symbol: "mic", title: "Microphone", reason: "For dictation and voice commands.", capability: .microphone, services: services)
                 .frame(height: 62)
                 OBDivider()
-                OBRow(symbol: "accessibility", title: "Accessibility", text: "") {
-                    OBAllowButton(granted: services.granted(.accessibility), name: "Accessibility") {
-                        services.permissions.request(.accessibility)
-                    }
-                }
+                OBPermissionRow(symbol: "accessibility", title: "Accessibility", reason: "Use shortcuts and insert dictated text.", capability: .accessibility, services: services)
                 .frame(height: 62)
                 OBDivider()
-                OBRow(symbol: "arrow.down.circle", title: "Murmure model", text: "", textWidth: 230) {
+                OBRow(symbol: "arrow.down.circle", title: "Murmure model", text: "On-device dictation. Download when ready.", textWidth: 230) {
                     modelControl
                 }
                 .padding(.top, 14)
@@ -216,7 +203,8 @@ private struct MurmureStep: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Downloading the Murmure model, \(Int(progress * 100)) percent")
         } else {
-            Button("Download") { services.prepareDictationModel() }
+            Button("Download") { services.downloadModel() }
+                .accessibilityIdentifier("onboarding.model.download")
                 .buttonStyle(OBOutlineButtonStyle())
                 .accessibilityHint("Downloads the on-device dictation model.")
         }
@@ -227,7 +215,7 @@ private struct MurmureStep: View {
 
 private struct AgentsStep: View {
     let flow: OnboardingFlow
-    let services: OnboardingServices
+    let services: any OnboardingServing
     @Environment(\.ob) private var ob
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -244,11 +232,14 @@ private struct AgentsStep: View {
                     }
                     .foregroundStyle(OB.allowed)
                     Button("Check again") { services.refresh() }
+                        .accessibilityIdentifier("onboarding.agent.refresh")
                         .buttonStyle(OBOutlineButtonStyle(height: 35, filled: false))
                 } else {
                     Button("Connect") { services.connect(flow.agent) }
+                        .accessibilityIdentifier("onboarding.agent.connect")
                         .buttonStyle(OBBlueButtonStyle())
                     Button("Check again") { services.refresh() }
+                        .accessibilityIdentifier("onboarding.agent.refresh")
                         .buttonStyle(OBOutlineButtonStyle(height: 35, filled: false))
                 }
             }
@@ -266,17 +257,17 @@ private struct AgentsStep: View {
             }
             VStack(spacing: 0) {
                 OBRow(symbol: "bell", title: "Zeus alerts", text: "") {
-                    OBAllowButton(granted: services.notificationsAllowed, name: "Zeus alerts") { services.allowNotifications() }
+                    OBAllowButton(granted: services.access(.notifications) == .allowed, name: "Zeus alerts") { services.request(.notifications) }
                 }
                 .frame(height: 62)
                 OBDivider()
                 OBRow(symbol: "externaldrive", title: "Full Disk Access", text: "") {
-                    OBAllowButton(granted: services.fullDiskAccess, name: "Full Disk Access") { services.allowFullDiskAccess() }
+                    OBAllowButton(granted: services.access(.fullDiskAccess) == .allowed, name: "Full Disk Access") { services.request(.fullDiskAccess) }
                 }
                 .frame(height: 62)
                 OBDivider()
                 OBRow(symbol: "music.note", title: "Music and Spotify", text: "") {
-                    OBAllowButton(granted: services.granted(.automation), name: "Music and Spotify") { services.requestAutomation() }
+                    OBAllowButton(granted: services.access(.automation) == .allowed, name: "Music and Spotify") { services.request(.automation) }
                 }
                 .frame(height: 62)
                 if let message = services.automationMessage {
@@ -317,15 +308,16 @@ private struct AgentSegmented: View {
 // MARK: 4 Stay in control
 
 private struct ControlStep: View {
+    let options: OnboardingOptions
     static let pitch: CGFloat = 84
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StepHeading(title: "Stay in control.", subtitle: "")
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
-                toggleRow("hand.raised", "Permission requests", Binding(get: { ExtraPreferences.shared.peekApprovals }, set: { ExtraPreferences.shared.peekApprovals = $0 }))
-                toggleRow("checkmark.circle", "Finished tasks", Binding(get: { ExtraPreferences.shared.peekAgentDone }, set: { ExtraPreferences.shared.peekAgentDone = $0 }))
-                toggleRow("exclamationmark.triangle", "Errors and stuck agents", SettingsStore.shared.boolBinding("notify.errors"))
+                toggleRow("hand.raised", "Permission requests", options.boolBinding("notify.approvals"))
+                toggleRow("checkmark.circle", "Finished tasks", options.boolBinding("notify.agentDone"))
+                toggleRow("exclamationmark.triangle", "Errors and stuck agents", options.boolBinding("notify.errors"))
             }
             .frame(width: 420)
             .padding(.top, OnboardingChromeLayout.headingToRows)
@@ -342,6 +334,7 @@ private struct ControlStep: View {
 // MARK: 5 Keys and displays
 
 private struct ReachStep: View {
+    let options: OnboardingOptions
     static let pitch: CGFloat = 66
     @Environment(\.ob) private var ob
     var body: some View {
@@ -349,14 +342,14 @@ private struct ReachStep: View {
             StepHeading(title: "Keys and displays.", subtitle: "")
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
-                OBRow(symbol: "mic", title: "Hold to talk, double-tap to latch", text: "") { keys(OnboardingKeys.talk) }
+                OBRow(symbol: "mic", title: "Hold to talk, double-tap to latch", text: "") { keys(options.talkKey) }
                 OBRow(symbol: "keyboard", title: "Answer from the keyboard", text: "") { keys("\u{2303}\u{2325}Y  \u{2303}\u{2325}N  \u{2303}\u{2325}O") }
                 OBRow(symbol: "display.2", title: "Every display", text: "") {
-                    OBPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue))
+                    OBPopup(selection: options.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue))
                         .accessibilityLabel("Show the notch on")
                 }
                 OBRow(symbol: "moon.zzz", title: "Insomnia", text: "") {
-                    Toggle("Insomnia", isOn: SettingsStore.shared.boolBinding("insomnia.lidClosed"))
+                    Toggle("Insomnia", isOn: options.boolBinding("insomnia.lidClosed"))
                         .toggleStyle(OBToggleStyle()).accessibilityLabel("Insomnia")
                 }
             }
@@ -373,7 +366,7 @@ private struct ReachStep: View {
 // MARK: 6 Your day
 
 private struct DayStep: View {
-    let services: OnboardingServices
+    let services: any OnboardingServing
     /// Tall rows: each of the three app icons on the right sits level with its own row.
     static let pitch: CGFloat = 88
     var body: some View {
@@ -381,19 +374,9 @@ private struct DayStep: View {
             StepHeading(title: "Your day", subtitle: "")
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
-                OBRow(symbol: "cloud.sun", title: "Local weather", text: "") {
-                    OBAllowButton(granted: services.locationAllowed, name: "Local weather") { services.allowLocation() }
-                }
-                OBRow(symbol: "calendar", title: "Calendar", text: "") {
-                    OBAllowButton(granted: services.granted(.calendar), name: "Calendar") {
-                        services.permissions.request(.calendar)
-                    }
-                }
-                OBRow(symbol: "list.bullet.circle", title: "Reminders", text: "") {
-                    OBAllowButton(granted: services.granted(.reminders), name: "Reminders") {
-                        services.permissions.request(.reminders)
-                    }
-                }
+                OBPermissionRow(symbol: "cloud.sun", title: "Local weather", reason: "Show the weather near you.", capability: .location, services: services)
+                OBPermissionRow(symbol: "calendar", title: "Calendar", reason: "See upcoming events in your day.", capability: .calendar, services: services)
+                OBPermissionRow(symbol: "list.bullet.circle", title: "Reminders", reason: "Keep your reminders close at hand.", capability: .reminders, services: services)
             }
             .frame(width: 420)
             .padding(.top, OnboardingChromeLayout.headingToRows)
@@ -404,7 +387,8 @@ private struct DayStep: View {
 // MARK: 7 Theme
 
 private struct ThemeStep: View {
-    private var style: String { SettingsStore.shared.string("appearance.cardStyle") }
+    let options: OnboardingOptions
+    private var style: String { options.string("appearance.cardStyle") }
     @Environment(\.ob) private var ob
     static let choices = ["Glass", "Liquid Glass", "Physical"]
 
@@ -417,7 +401,7 @@ private struct ThemeStep: View {
                 .accessibilityLabel("Home and Music preview, \(style)")
             HStack(spacing: 12) {
                 ForEach(Self.choices, id: \.self) { choice in
-                    Button { withAnimation(.easeInOut(duration: 0.2)) { SettingsStore.shared.set("appearance.cardStyle", choice) } } label: {
+                    Button { withAnimation(.easeInOut(duration: 0.2)) { options.set("appearance.cardStyle", choice) } } label: {
                         HStack(spacing: 10) {
                             Image(systemName: style == choice ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 13))
@@ -444,6 +428,7 @@ private struct ThemeStep: View {
 // MARK: 8 Halo
 
 private struct HaloStep: View {
+    let options: OnboardingOptions
     static let pitch: CGFloat = 66
     @Environment(\.ob) private var ob
 
@@ -452,9 +437,9 @@ private struct HaloStep: View {
             StepHeading(title: "Your signature of light", subtitle: "")
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
-                OBRow(symbol: "sparkles", title: "Light", text: "") { popup("Light", HaloChoices.styleTitle, HaloChoices.styles) }
-                OBRow(symbol: "arrow.left.and.right", title: "Halo arm width", text: "") { popup("Halo arm width", SettingsStore.binding("halo.armWidth"), HaloChoices.armWidths) }
-                OBRow(symbol: "play.circle", title: "Halo entrance", text: "") { popup("Halo entrance", HaloChoices.entranceTitle, HaloChoices.entrances) }
+                OBRow(symbol: "sparkles", title: "Light", text: "") { popup("Light", options.haloStyleTitle, HaloChoices.styles) }
+                OBRow(symbol: "arrow.left.and.right", title: "Halo arm width", text: "") { popup("Halo arm width", options.binding("halo.armWidth"), HaloChoices.armWidths) }
+                OBRow(symbol: "play.circle", title: "Halo entrance", text: "") { popup("Halo entrance", options.haloEntranceTitle, HaloChoices.entrances) }
                 OBRow(symbol: "slider.horizontal.3", title: "Light thickness", text: "") { thickness }
             }
             .frame(width: 420)
@@ -468,10 +453,10 @@ private struct HaloStep: View {
 
     private var thickness: some View {
         HStack(spacing: 8) {
-            OBTickSlider(value: Binding(get: { SettingsStore.shared.double("halo.thickness") }, set: { SettingsStore.shared.set("halo.thickness", String(Int($0))) }), range: 100...200, step: 5)
+            OBTickSlider(value: Binding(get: { options.double("halo.thickness") }, set: { options.set("halo.thickness", String(Int($0))) }), range: 100...200, step: 5)
                 .frame(width: 130)
                 .accessibilityLabel("Light thickness")
-            Text("\(Int(SettingsStore.shared.double("halo.thickness"))) %")
+            Text("\(Int(options.double("halo.thickness"))) %")
                 .font(OB.font(13.5, .semibold)).foregroundStyle(ob.text).monospacedDigit()
                 .frame(width: 48, alignment: .trailing)
         }
@@ -500,9 +485,8 @@ enum HaloChoices {
 // MARK: 9 Sounds
 
 private struct SoundsStep: View {
-    let flow: OnboardingFlow
-    let services: OnboardingServices
-    private var soundsOn: Bool { ExtraPreferences.shared.soundsOn }
+    let options: OnboardingOptions
+    private var soundsOn: Bool { options.bool("sound.on") }
     @Environment(\.ob) private var ob
     /// The feedback switch and the four cues; the preview tile on the right spans exactly these rows.
     static let rowCount = 5
@@ -514,13 +498,14 @@ private struct SoundsStep: View {
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
                 OBRow(symbol: "speaker.wave.2", title: "Sound feedback", text: "") {
-                    Toggle("Sound feedback", isOn: Binding(get: { ExtraPreferences.shared.soundsOn }, set: { ExtraPreferences.shared.soundsOn = $0 }))
+                    Toggle("Sound feedback", isOn: options.boolBinding("sound.on"))
                         .toggleStyle(OBToggleStyle(size: .large)).accessibilityLabel("Sound feedback")
+                        .accessibilityIdentifier("onboarding.sound.enabled")
                 }
-                soundRow("Run start", "play.circle", SettingsStore.binding("sound.startStyle"), SoundStyles.runStart, .start)
-                soundRow("Requests", "hand.raised", SettingsStore.binding("sound.approvalStyle"), SoundStyles.requests, .approval)
-                soundRow("Your answer", "checkmark.bubble", SettingsStore.binding("sound.answerStyle"), SoundStyles.answer, .answer)
-                soundRow("Completion", "checkmark.circle", SettingsStore.binding("sound.doneStyle"), SoundStyles.done, .done)
+                soundRow("Run start", "play.circle", options.binding("sound.startStyle"), SoundStyles.runStart, .start)
+                soundRow("Requests", "hand.raised", options.binding("sound.approvalStyle"), SoundStyles.requests, .approval)
+                soundRow("Your answer", "checkmark.bubble", options.binding("sound.answerStyle"), SoundStyles.answer, .answer)
+                soundRow("Completion", "checkmark.circle", options.binding("sound.doneStyle"), SoundStyles.done, .done)
             }
             .frame(width: 420)
             .padding(.top, OnboardingChromeLayout.headingToRows)
@@ -539,13 +524,14 @@ private struct SoundsStep: View {
     }
 
     private func previewButton(_ event: ZeusSound.Event, _ title: String) -> some View {
-        Button { SoundStyles.preview(event) } label: {
+        Button { options.preview(event) } label: {
             Image(systemName: "speaker.wave.2").font(.system(size: 12, weight: .medium)).foregroundStyle(OB.blueText)
                 .frame(width: 28, height: 28)
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(ob.tile))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play the \(title.lowercased()) sound")
+        .accessibilityIdentifier("onboarding.sound.preview.\(title.lowercased().replacingOccurrences(of: " ", with: "-"))")
     }
 }
 

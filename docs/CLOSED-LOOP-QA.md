@@ -25,10 +25,10 @@ Every event/ref/revision has a separate concurrency group and `cancel-in-progres
 
 ## What each check proves
 
-- `app`: Xcode 26.1.1 native build, a reviewed allowlist of synthetic native integration tests, and an ad-hoc preview bundle. Tests use injected permission ports, generated buffers, temporary files, and offscreen rendering. This job does not launch Zeus, request permission, capture any device, install an app, or access signing credentials. The preview is not a notarized distribution build.
+- `app`: Xcode 26.1.1 native build, the complete audited `ZeusCoreTests` module plus the explicit app-suite allowlist in the feature map, and an ad-hoc preview bundle. Tests use injected permission ports, generated buffers, temporary files, and offscreen rendering. This job does not launch Zeus, request permission, capture any device, install an app, or access signing credentials. The preview is not a notarized distribution build.
 - `extension`: locked dependency install, TypeScript checking, browser-target/consent regression tests, and production extension build.
 - `release-scripts`: failure-path tests using mock packaging, signing, notarization, Gatekeeper, and installation tools. These verify script decisions and rollback behavior; they do not establish an actual release signature or notarization.
-- `feature-map`: the machine-readable [19-item acceptance map](../qa/feature-map.json), regression registry, runner self-tests, and source-bound portable tests. Full mode also attempts safe native integration fixtures and requires every acceptance obligation, including device proof and release proof.
+- `feature-map`: the machine-readable [19-item acceptance map](../qa/feature-map.json), regression registry, runner self-tests, and source-bound portable tests. Full mode also builds the native test target once, discovers compiled tests, executes the complete Core module and reviewed app fixtures with qualified event evidence, and requires every acceptance obligation, including device proof and release proof.
 
 Development mode can pass while native/device obligations remain explicitly incomplete. **Full mode currently fails deliberately on unimplemented or unproved obligations.** Neither a passing subset nor a `release_ready` field can override a missing feature, missing test case, changed source package, or unimplemented checker. Completion requires an executable, reviewed verifier and its fresh passing evidence, not a manually edited green receipt or a manual click-through checklist.
 
@@ -37,6 +37,8 @@ The scheduled/main/merge-queue jobs therefore expose remaining work rather than 
 ## Evidence and reproduction
 
 Every job uploads diagnostics even after failure. Artifacts are named `zeus-check-app`, `zeus-check-extension`, `zeus-check-release-scripts`, `zeus-check-feature-map`, and `zeus-required-checks`. Check artifacts retain logs and JSON for 30 days; the separate ad-hoc app preview is retained for 14 days. Source packages retain the exact compiled copies/excerpts and their manifests, excluding build caches. Offscreen recording feedback renders, when produced by native tests, are synthetic visual regression artifacts, not recordings of the user's screen.
+
+The app's nested `native-evidence/result.json` binds its source manifest, compiler receipt, compiled discovery and execution event streams. The gate independently checks every selected qualified test identity and every discovered parameter case; a source inventory or positive console total cannot replace execution. Skips, issues, missing terminal events, changed hashes and unsupported wire formats fail closed. Linux protocol fixtures validate the parser; current macOS compiler output and actual Mac execution are still required as native proof.
 
 `tested_sha` identifies the checkout actually tested; `head_sha` identifies the PR source commit when applicable. Pull-request checks therefore report both the merge candidate and the authored head. The gate hashes logs and result files, validates exact job/check sets, checks positive test counts, rejects duplicate JSON keys and non-finite values, and re-evaluates feature obligations against the checked-in map and regression registry. Source manifests and reproducible portable packages bind results to current source bytes.
 

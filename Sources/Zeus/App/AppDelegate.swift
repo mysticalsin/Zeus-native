@@ -563,10 +563,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 
     /// The welcome guide (Sources/Zeus/Onboarding), Glance's seven steps.
-    private lazy var guide: OnboardingWindowController = {
+    private lazy var guideServices: OnboardingServices = {
         let services = OnboardingServices(permissions: permissions)
         services.prepareDictationModel = { [weak self] in self?.dictation.prepareModel() }
-        let guide = OnboardingWindowController(services: services)
+        return services
+    }()
+
+    private lazy var guide: OnboardingWindowController = {
+        let guide = OnboardingWindowController(services: guideServices)
         guide.onFinish = { [weak self] in self?.permissions.refresh() }
         return guide
     }()
@@ -581,7 +585,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Settings (Sources/Zeus/Settings), Glance's window and sections.
     private lazy var glanceSettings: GlanceSettingsWindowController = {
-        let context = GSContext(services: guide.services)
+        let context = GSContext(services: guideServices)
         context.restartConnection = { [weak self] in
             self?.agentServer.stop()
             self?.agentServer.start()

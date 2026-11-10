@@ -102,7 +102,7 @@ final class OnboardingFlow {
     static let completedKey = "zeus.onboarding.completed"
 
     var step: OnboardingStep {
-        didSet { if !TopBarStyle.isSnapshot { UserDefaults.standard.set(step.rawValue, forKey: Self.stepKey) } }
+        didSet { persistence.writeStep(step.rawValue) }
     }
     /// +1 going forward, -1 going back; set just before the step changes so the outgoing view slides the right way.
     private(set) var direction = 1
@@ -115,14 +115,45 @@ final class OnboardingFlow {
     var detailsOpen = false
     var featuresOpen = false
     /// Plays a cue (tests replace it).
-    @ObservationIgnored var playSound: (OnboardingSound) -> Void = { $0.play() }
+    @ObservationIgnored var playSound: (OnboardingSound) -> Void
+    @ObservationIgnored private let persistence: OnboardingPersistence
+    @ObservationIgnored private let feedback: OnboardingFeedback
+    @ObservationIgnored private var transitionTask: Task<Void, Never>?
+    private(set) var completedThisPresentation = false
+
+    var completed: Bool { persistence.readCompleted() }
+    var reducesMotion: Bool { feedback.reduceMotion() }
 
     enum AgentChoice: String, CaseIterable { case codex = "Codex", claude = "Claude" }
 
-    init() {
-        let start = OnboardingStep(rawValue: UserDefaults.standard.integer(forKey: Self.stepKey)) ?? .welcome
+    init(persistence: OnboardingPersistence = .live, feedback: OnboardingFeedback = .live) {
+        self.persistence = persistence
+        self.feedback = feedback
+        playSound = feedback.playSound
+        let start = OnboardingStep(rawValue: persistence.readStep()) ?? .welcome
         step = start
-        wake = start == .welcome && !OnboardingTransition.reduceMotion && !TopBarStyle.isSnapshot ? .asleep : .awake
+        wake = start == .welcome && !feedback.reduceMotion() && !feedback.isSnapshot() ? .asleep : .awake
+    }
+
+    func beginPresentation() { completedThisPresentation = false }
+
+    func restart() {
+        cancelPendingTransition()
+        completedThisPresentation = false
+        step = .welcome
+    }
+
+    func cancelPendingTransition() { transitionTask?.cancel(); transitionTask = nil }
+
+    /// Only the actual final step completes setup; repeated activation cannot finish twice.
+    @discardableResult func complete() -> Bool {
+        guard step == .sounds, !completedThisPresentation else { return false }
+        cancelPendingTransition()
+        completedThisPresentation = true
+        persistence.markCompleted()
+        finish()
+        step = .welcome
+        return true
     }
 
     static var isCompleted: Bool {
@@ -143,15 +174,17 @@ final class OnboardingFlow {
 
     func go(_ target: OnboardingStep) {
         guard target != step else { return }
-        let reduce = OnboardingTransition.reduceMotion
+        let reduce = feedback.reduceMotion()
         direction = target.rawValue > step.rawValue ? 1 : -1
         if direction > 0 { playSound(.advance) }
         sweep = 0
         // One tick later, so the outgoing step has already seen the new direction.
-        Task { @MainActor in
-            withAnimation(OnboardingTransition.animation(reduceMotion: reduce)) { step = target }
+        transitionTask?.cancel()
+        transitionTask = Task { @MainActor [weak self] in
+            guard let self, !Task.isCancelled else { return }
+            withAnimation(OnboardingTransition.animation(reduceMotion: reduce)) { self.step = target }
             if let sweepAnimation = OnboardingTransition.sweepAnimation(reduceMotion: reduce) {
-                withAnimation(sweepAnimation) { sweep = 1 }
+                withAnimation(sweepAnimation) { self.sweep = 1 }
             }
         }
     }
@@ -161,10 +194,10 @@ final class OnboardingFlow {
 
     /// Asleep, then waking, then waving: the mascot's first appearance. Reduce Motion shows it awake.
     func playWake() async {
-        guard step == .welcome, !OnboardingTransition.reduceMotion, !TopBarStyle.isSnapshot else { wake = .awake; return }
+        guard step == .welcome, !feedback.reduceMotion(), !feedback.isSnapshot() else { wake = .awake; return }
         wake = .asleep
         do { try await Task.sleep(for: .milliseconds(1100)) } catch { return }
-        guard step == .welcome, !OnboardingTransition.reduceMotion else { wake = .awake; return }
+        guard step == .welcome, !feedback.reduceMotion() else { wake = .awake; return }
         wake = .waking
         do { try await Task.sleep(for: .milliseconds(1900)) } catch { return }
         guard step == .welcome else { return }
@@ -175,9 +208,10 @@ final class OnboardingFlow {
 /// Root of the 960 x 760 window: watermark, brand, dashes, the step, and the footer.
 struct OnboardingRoot: View {
     let flow: OnboardingFlow
-    let services: OnboardingServices
+    let services: any OnboardingServing
     let finish: () -> Void
-    @AppStorage("opt.general.windowTheme") private var theme = "System"
+    var options: OnboardingOptions = .live
+    private var theme: String { options.string("general.windowTheme") }
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -190,7 +224,7 @@ struct OnboardingRoot: View {
     }
 
     var body: some View {
-        let reduce = reduceMotion
+        let reduce = reduceMotion || flow.reducesMotion
         ZStack(alignment: .topLeading) {
             palette.canvas
             OnboardingWatermark(shift: OnboardingTransition.watermarkShift(step: flow.step.rawValue, reduceMotion: reduce))
@@ -203,6 +237,7 @@ struct OnboardingRoot: View {
                 .buttonStyle(.plain)
                 .offset(x: 903.5, y: 68)
                 .accessibilityLabel("Window appearance")
+                .accessibilityIdentifier("onboarding.appearance")
                 .accessibilityValue(theme)
                 .accessibilityHint("Switches between System, Light and Dark.")
             }
@@ -212,7 +247,7 @@ struct OnboardingRoot: View {
             ZStack {
                 ForEach(OnboardingStep.allCases, id: \.self) { step in
                     if step == flow.step {
-                        OnboardingStepView(step: step, flow: flow, services: services)
+                        OnboardingStepView(step: step, flow: flow, services: services, options: options)
                             .transition(OnboardingTransition.content(direction: flow.direction, reduceMotion: reduce))
                     }
                 }
@@ -232,6 +267,10 @@ struct OnboardingRoot: View {
         .ignoresSafeArea()
         .environment(\.ob, palette)
         .preferredColorScheme(palette.canvas == OB.light.canvas ? .light : .dark)
+        .environment(\.onboardingReduceMotion, reduce)
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            options.refreshExternalPreferences()
+        }
         .task(id: flow.step) { await flow.playWake() }
     }
 
@@ -240,7 +279,7 @@ struct OnboardingRoot: View {
     private var mascot: some View {
         let slot = OnboardingLayout.mascotSlot(for: flow.step)
         return ZStack(alignment: .topLeading) {
-            MascotTile(pose: flow.mascotPose, side: slot.side)
+            MascotTile(pose: flow.mascotPose, side: slot.side, animated: !(reduceMotion || flow.reducesMotion))
                 .frame(width: slot.side, height: slot.side)
                 .offset(x: slot.center.x - slot.side / 2, y: slot.center.y - slot.side / 2)
         }
@@ -249,7 +288,7 @@ struct OnboardingRoot: View {
     }
 
     private func cycleTheme() {
-        theme = switch theme { case "System": "Light"; case "Light": "Dark"; default: "System" }
+        options.set("general.windowTheme", switch theme { case "System": "Light"; case "Light": "Dark"; default: "System" })
     }
 
     private var footer: some View {
@@ -264,23 +303,28 @@ struct OnboardingRoot: View {
                 .buttonStyle(OBTextButtonStyle())
                 .keyboardShortcut(.leftArrow, modifiers: [.command])
                 .accessibilityLabel("Back")
+                .accessibilityIdentifier("onboarding.back")
             }
             Spacer()
             switch flow.step {
             case .welcome:
                 Button("Start") { flow.next() }
+                    .accessibilityIdentifier("onboarding.start")
                     .buttonStyle(OBPrimaryButtonStyle(width: 87))
                     .keyboardShortcut(.defaultAction)
             case .sounds:
-                Button("Finish") { flow.finish(); finish() }
+                Button("Finish", action: finish)
+                    .accessibilityIdentifier("onboarding.finish")
                     .buttonStyle(OBPrimaryButtonStyle(width: 93.5))
                     .keyboardShortcut(.defaultAction)
             default:
                 Button("Set up later") { flow.next() }
+                    .accessibilityIdentifier("onboarding.skip")
                     .buttonStyle(OBTextButtonStyle())
                     .padding(.trailing, 18.5)
                     .accessibilityHint("Skips this step. You can finish it later in Settings.")
                 Button("Continue") { flow.next() }
+                    .accessibilityIdentifier("onboarding.next")
                     .buttonStyle(OBPrimaryButtonStyle(width: 117.5))
                     .keyboardShortcut(.defaultAction)
             }
@@ -296,12 +340,15 @@ struct OnboardingRoot: View {
 @MainActor
 final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
-    let flow = OnboardingFlow()
-    let services: OnboardingServices
+    let flow: OnboardingFlow
+    let options: OnboardingOptions
+    let services: any OnboardingServing
     var onFinish: (() -> Void)?
 
-    init(services: OnboardingServices) {
+    init(services: any OnboardingServing, flow: OnboardingFlow = OnboardingFlow(), options: OnboardingOptions = .live) {
         self.services = services
+        self.flow = flow
+        self.options = options
     }
 
     var isVisible: Bool { window?.isVisible == true }
@@ -309,7 +356,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     var debugWindow: NSWindow? { window }
 
     func show(restart: Bool = false) {
-        if restart { flow.step = .welcome }
+        if !isVisible { flow.beginPresentation() }
+        if restart { flow.restart() }
         if window == nil {
             let window = NSWindow(
                 contentRect: NSRect(origin: .zero, size: OB.size),
@@ -321,7 +369,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             window.isReleasedWhenClosed = false
             window.title = "Welcome to Zeus"
             window.delegate = self
-            let hosting = NSHostingView(rootView: OnboardingRoot(flow: flow, services: services) { [weak self] in self?.finish() })
+            let hosting = NSHostingView(rootView: OnboardingRoot(flow: flow, services: services, finish: { [weak self] in self?.finish() }, options: options))
             hosting.sizingOptions = []
             window.contentView = hosting
             // Glance's frame is 960 x 760 including the title bar (full-size content).
@@ -334,14 +382,15 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         services.startPolling()
     }
 
-    func windowWillClose(_ notification: Notification) { services.stopPolling() }
+    func windowWillClose(_ notification: Notification) {
+        flow.cancelPendingTransition()
+        services.stopPolling()
+    }
 
     func close() { window?.close() }
 
     private func finish() {
-        UserDefaults.standard.set(true, forKey: OnboardingFlow.completedKey)
-        UserDefaults.standard.set(true, forKey: "didOnboard")
-        flow.step = .welcome
+        guard flow.complete() else { return }
         window?.close()
         onFinish?()
     }

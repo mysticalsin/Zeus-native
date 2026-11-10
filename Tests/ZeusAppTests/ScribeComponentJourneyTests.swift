@@ -9,6 +9,7 @@ import ZeusCore
 /// Uses the fixture's own accessibility objects; no AXUIElement, input injection or screen capture.
 @MainActor @Suite("Scribe native component journey", .serialized)
 struct ScribeComponentJourneyTests {
+    private static var finishedFixtureApplicationLaunch = false
     private final class Clock { var time: TimeInterval = 100 }
 
     private final class Capture: ScribeCaptureProvider, @unchecked Sendable {
@@ -68,6 +69,7 @@ struct ScribeComponentJourneyTests {
         case rejectedPress(String)
         case traversalLimit
         case transitionTimeout(String)
+        case fixtureApplication(String)
         var description: String {
             switch self {
             case .injectedFinalWrite: return "Synthetic final-write failure"
@@ -77,6 +79,7 @@ struct ScribeComponentJourneyTests {
             case .rejectedPress(let id): return "Fixture control rejected accessibilityPerformPress: \(id)"
             case .traversalLimit: return "Fixture accessibility tree exceeded its bound"
             case .transitionTimeout(let expected): return "Fixture did not reach \(expected)"
+            case .fixtureApplication(let reason): return "Cannot prepare isolated fixture application: \(reason)"
             }
         }
     }
@@ -89,6 +92,26 @@ struct ScribeComponentJourneyTests {
     private func preferences() throws -> (String, UserDefaults) {
         let suite = "scribe-component-\(UUID().uuidString)"
         return (suite, try #require(UserDefaults(suiteName: suite)))
+    }
+
+    /// A Swift Testing process does not enter NSApplication.run(). Complete the public AppKit setup
+    /// without constructing ZeusMain/AppDelegate or any production services. Each host restores the
+    /// original activation policy after its windows close; application launch is performed only once.
+    private func prepareFixtureApplication() throws -> NSApplication.ActivationPolicy {
+        let application = NSApplication.shared
+        guard application.delegate == nil else {
+            throw ScenarioFailure.fixtureApplication("an application delegate is already installed")
+        }
+        let originalPolicy = application.activationPolicy()
+        guard application.setActivationPolicy(.regular) else {
+            throw ScenarioFailure.fixtureApplication("regular activation policy was refused")
+        }
+        if !Self.finishedFixtureApplicationLaunch {
+            application.finishLaunching()
+            Self.finishedFixtureApplicationLaunch = true
+        }
+        application.activate()
+        return originalPolicy
     }
 
     private func waitFor(_ name: String, _ condition: () -> Bool) async throws {
@@ -106,6 +129,9 @@ struct ScribeComponentJourneyTests {
         root.layoutSubtreeIfNeeded()
         window.displayIfNeeded()
         diagnostic.removeAll(keepingCapacity: true)
+        diagnostic.append("owned host: visible=\(window.isVisible), key=\(window.isKeyWindow), " +
+                          "applicationActive=\(NSApplication.shared.isActive), " +
+                          "launchFinished=\(Self.finishedFixtureApplicationLaunch)")
         var pending: [(Any, Int)] = [(root, 0)]
         var seen = Set<ObjectIdentifier>()
         var result: [any NSAccessibilityProtocol] = []
@@ -153,7 +179,9 @@ struct ScribeComponentJourneyTests {
                 let frame = button.accessibilityFrame()
                 let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
                 guard button.accessibilityRole() == .button else {
-                    throw ScenarioFailure.unavailableControl(id, "identified element is not a button")
+                    throw ScenarioFailure.unavailableControl(id,
+                        "identified \(String(reflecting: type(of: button))) has role " +
+                        "\(button.accessibilityRole()?.rawValue ?? "nil"), enabled=\(button.isAccessibilityEnabled())")
                 }
                 guard finite else { throw ScenarioFailure.unavailableControl(id, "nonfinite geometry") }
                 // Model transitions precede SwiftUI's layout/animation and accessibility updates.
@@ -185,7 +213,8 @@ struct ScribeComponentJourneyTests {
     }
 
     @Test func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
-        _ = NSApplication.shared
+        let originalPolicy = try prepareFixtureApplication()
+        defer { _ = NSApplication.shared.setActivationPolicy(originalPolicy) }
         let target = ButtonTarget()
         let button = NSButton(title: "Synthetic readiness control", target: target,
                               action: #selector(ButtonTarget.performAction(_:)))
@@ -196,9 +225,11 @@ struct ScribeComponentJourneyTests {
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Synthetic accessibility readiness fixture"
         window.isReleasedWhenClosed = false
-        window.contentView?.addSubview(button)
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 90))
+        window.contentView = content
+        content.addSubview(button)
         defer { window.contentView = nil; window.close() }
-        window.orderFront(nil)
+        window.makeKeyAndOrderFront(nil)
         var trace: [String] = []
         let enable = Task { @MainActor in
             try await Task.sleep(for: .milliseconds(150))
@@ -224,7 +255,8 @@ struct ScribeComponentJourneyTests {
     }
 
     @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
-        _ = NSApplication.shared // Own test-process application; ZeusMain/AppDelegate are never launched.
+        let originalPolicy = try prepareFixtureApplication()
+        defer { _ = NSApplication.shared.setActivationPolicy(originalPolicy) }
         let (suite, defaults) = try preferences()
         defer { defaults.removePersistentDomain(forName: suite) }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-component-\(UUID().uuidString)")
@@ -252,7 +284,7 @@ struct ScribeComponentJourneyTests {
             window.contentView = nil
             window.close()
         }
-        window.orderFront(nil)
+        window.makeKeyAndOrderFront(nil)
         var trace: [String] = []
 
         try await press("scribe.start", in: window, trace: &trace)

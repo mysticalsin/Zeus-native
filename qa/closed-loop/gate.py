@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.util
 import json
 import os
@@ -107,13 +108,21 @@ def positive_test_count(job: str, path: Path) -> int:
     return maximum
 
 
+def job_artifacts(job: str) -> set[str]:
+    if job == "feature-map":
+        return {"result.json"}
+    files = {f"{check}.log" for check in REQUIRED[job]}
+    if job == "app":
+        files.add("native-evidence/result.json")
+    return files
+
+
 def record(job: str, output: Path) -> None:
     output.mkdir(parents=True, exist_ok=True)
     actual_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     checks = load_json(os.environ.get("ZEUS_STEP_RESULTS", "null"))
     files = {}
-    for check in REQUIRED[job]:
-        relative = "result.json" if job == "feature-map" else f"{check}.log"
+    for relative in sorted(job_artifacts(job)):
         path = output / relative
         if path.is_file() and not path.is_symlink():
             files[relative] = {"sha256": digest(path), "bytes": path.stat().st_size}
@@ -152,29 +161,39 @@ def load_policy():
     return repo, contracts, portable, feature_map, definitions, registry
 
 
+def native_evidence_module():
+    sibling = Path(__file__).resolve().parent
+    if str(sibling) not in sys.path:
+        sys.path.insert(0, str(sibling))
+    module = importlib.import_module("native_evidence")
+    if Path(module.__file__).resolve() != sibling / "native_evidence.py" or module.ROOT.resolve() != sibling.parents[1]:
+        raise ValueError("native evidence validator is not from the current checkout")
+    return module
+
+
 def native_filter() -> str:
     _, _, _, _, definitions, _ = load_policy()
-    return "|".join("^" + ("ZeusAppTests" if row["file"].startswith("Tests/ZeusAppTests/") else "ZeusCoreTests")
-                    + r"\." + row["suite"] + "/" for row in definitions.values() if row["kind"] == "native-fixture")
+    native = native_evidence_module()
+    return native.selector([row for row in definitions.values() if row["kind"] in native.NATIVE_KINDS])
 
 
-def validate_native(log_path: Path) -> int:
-    repo, contracts, _, feature_map, definitions, registry = load_policy()
-    count, _, functions = contracts.swift_summary(log_path.read_text(), 0)
-    if count < len(functions):
-        raise ValueError("native total is smaller than passed case identities")
-    selected = [row for row in definitions.values() if row["kind"] == "native-fixture"]
-    selected_functions = [name for row in selected for name in contracts.runnable_functions((repo / row["file"]).read_text())]
+def validate_native(root: Path, expected_sha: str, head_sha: str) -> int:
+    repo, _, _, feature_map, definitions, registry = load_policy()
+    native = native_evidence_module()
+    selected = [row for row in definitions.values() if row["kind"] in native.NATIVE_KINDS]
+    # Canonicalize the trusted parent, then validate the nested receipt boundary.
+    evidence = artifact(root, "native-evidence/result.json").parent
+    metrics = native.validate_receipt(evidence, expected_sha, head_sha, selected, repo=repo)
+    if type(metrics.get("tests")) is not int or metrics["tests"] <= 0:
+        raise ValueError("native execution has no verified positive case count")
     cases = [case for feature in feature_map["features"] for obligation in feature["obligations"]
-             if definitions[obligation["check"]]["kind"] == "native-fixture" for case in obligation["cases"]]
-    cases += [row["guard"] for row in registry if row["check"] in definitions and definitions[row["check"]]["kind"] == "native-fixture"]
+             if definitions[obligation["check"]]["kind"] in native.NATIVE_KINDS for case in obligation["cases"]]
+    cases += [row["guard"] for row in registry if row["check"] in definitions and definitions[row["check"]]["kind"] in native.NATIVE_KINDS]
     if not cases:
         raise ValueError("native acceptance cases are missing")
     for case in cases:
-        if selected_functions.count(case["function"]) != 1:
-            raise ValueError(f"native case identity is ambiguous: {case['function']}")
-        contracts.case_passed(case, {"status": "passed", "passed_functions": functions}, log_path.parent)
-    return count
+        native.case_passed(case, metrics["passed_cases"])
+    return metrics["tests"]
 
 
 def validate_native_compilation(result: dict, root: Path, mode: str, contracts) -> str | None:
@@ -189,14 +208,12 @@ def validate_native_compilation(result: dict, root: Path, mode: str, contracts) 
     return result["native_build"]["command"][4]
 
 
-def validate_native_command(command, definition: dict, native_jobs: str | None) -> None:
+def validate_native_command(command, definition: dict, native_jobs: str | None, recorded_output: str, ident: str) -> None:
     if native_jobs is None:
         raise ValueError("native fixture execution has no verified macOS compiler barrier")
-    module = "ZeusAppTests" if definition["file"].startswith("Tests/ZeusAppTests/") else "ZeusCoreTests"
-    expected = ["swift", "test", "--skip-build", "--jobs", native_jobs, "--filter",
-                "^" + module + r"\." + definition["suite"] + "/"]
+    expected = native_evidence_module().run_command([definition], native_jobs, recorded_output, ident)
     if command != expected:
-        raise ValueError("native fixture command differs from its verified build and exact reviewed suite")
+        raise ValueError("native fixture command differs from its verified build, events and exact reviewed selection")
 
 
 def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str) -> int:
@@ -229,6 +246,14 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
     if manifest != expected_manifest or result["source_snapshot_sha256"] != manifest.get("sha256"):
         raise ValueError("feature result source differs from current checkout bytes")
     native_jobs = validate_native_compilation(result, root, mode, contracts)
+    native = native_evidence_module()
+    native_definitions = [row for row in definitions.values() if row["kind"] in native.NATIVE_KINDS]
+    compiled = None
+    if native_jobs is not None:
+        compiled = native.validate_discovery_receipt(result.get("native_discovery"), root, result["source_snapshot_sha256"],
+                                                     native_definitions, result.get("repository"), result.get("output_directory"), repo=repo)
+    elif "native_discovery" in result:
+        raise ValueError("native discovery is only valid with a verified full macOS build")
     if type(result.get("release_ready")) is not bool:
         raise ValueError("feature map release_ready must be a boolean")
     checks = result.get("checks")
@@ -260,8 +285,12 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
             raise ValueError(f"required feature check did not execute and succeed: {ident}")
         if not isinstance(check.get("command"), list) or not check["command"] or not all(isinstance(x, str) and x for x in check["command"]):
             raise ValueError(f"feature check has no command: {ident}")
-        if definition["kind"] == "native-fixture":
-            validate_native_command(check["command"], definition, native_jobs)
+        if definition["kind"] in native.NATIVE_KINDS:
+            validate_native_command(check["command"], definition, native_jobs, result["output_directory"], ident)
+            metrics = native.validate_run_receipt(check, root, compiled, [definition], native_jobs,
+                                                  result["repository"], result["output_directory"], repo=repo)
+            count += metrics["tests"]
+            continue
         count += tests
         evidence = check.get("artifacts")
         if not isinstance(evidence, list) or not evidence:
@@ -349,7 +378,7 @@ def evaluate(needs, inputs: Path, expected_sha: str, head_sha: str, run_id: str,
             if any(value != "success" for value in checks.values()):
                 raise ValueError(f"one or more required checks did not pass: {checks}")
             files = receipt.get("files")
-            expected_files = {"result.json"} if job == "feature-map" else {f"{check}.log" for check in required_checks}
+            expected_files = job_artifacts(job)
             if not isinstance(files, dict) or set(files) != expected_files:
                 raise ValueError("check logs/results are missing or unexpected")
             for relative, info in files.items():
@@ -359,7 +388,7 @@ def evaluate(needs, inputs: Path, expected_sha: str, head_sha: str, run_id: str,
             if job == "feature-map":
                 jobs[job]["tests"] = validate_feature_map(root, expected_sha, head_sha, mode)
             else:
-                count = validate_native(artifact(root, "test.log")) if job == "app" else positive_test_count(job, artifact(root, "test.log"))
+                count = validate_native(root, expected_sha, head_sha) if job == "app" else positive_test_count(job, artifact(root, "test.log"))
                 if count <= 0:
                     raise ValueError("test command produced no positive passing test count")
                 jobs[job]["tests"] = count

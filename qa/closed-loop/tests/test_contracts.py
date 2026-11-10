@@ -262,15 +262,21 @@ class NativeBuildBarrierTests(unittest.TestCase):
             if command[1] == "build":
                 log.write_text("error: synthetic compiler failure\n" if build_code else "Build complete! (0.1s)\n")
                 return build_code, 0.1
-            if failed_suite and failed_suite in command[-1]:
+            if failed_suite and any(failed_suite in argument for argument in command):
                 log.write_text("✘ Test syntheticCase() recorded an issue: expected value\n")
                 return 1, 0.1
             log.write_text("✔ Test syntheticCase() passed after 0.1 seconds.\n✔ Test run with 1 test in 1 suite passed after 0.1 seconds.\n")
+            if "--event-stream-output-path" in command:
+                Path(command[command.index("--event-stream-output-path") + 1]).write_text("{}\n")
             return 0, 0.1
         result = {"checks": [], "source_snapshot_sha256": "a" * 64}
         with patch.object(runner.platform, "system", return_value="Darwin"), \
              patch.object(runner, "snapshot", return_value={"sha256": "a" * 64}), \
-             patch.object(runner, "execute", side_effect=execute), patch("builtins.print"):
+             patch.object(runner, "execute", side_effect=execute), patch("builtins.print"), \
+             patch.object(runner, "discover_native", return_value={"status": "passed"}), \
+             patch.object(runner.native, "validate_discovery_receipt", return_value={}), \
+             patch.object(runner.native, "execution", return_value={"tests": 1, "suites": 1, "parameter_cases": 0,
+                          "passed_cases": [{"file": "synthetic", "function": "syntheticCase"}]}):
             runner.run_checks(self.definitions(), SimpleNamespace(mode="full", jobs=2, timeout=10), output, None, result)
         return result, commands
 

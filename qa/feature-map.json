@@ -107,36 +107,20 @@
       "file": "Tests/ZeusAppTests/OnboardingTests.swift"
     },
     {
+      "id": "native-OnboardingIsolationTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual onboarding flow, injected in-memory options/services and bundled font/mascot availability. No control activation, permission request, provider connection, capture or whole-app/device acceptance.",
+      "suite": "OnboardingIsolationTests",
+      "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift"
+    },
+    {
       "id": "native-PermissionsCaptureTests",
       "kind": "native-fixture",
       "tier": "native-integration",
       "scope": "Injected permission ports; no real camera/screen request or capture.",
       "suite": "PermissionsCaptureTests",
       "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift"
-    },
-    {
-      "id": "native-RecordlyExportValidationTests",
-      "kind": "native-fixture",
-      "tier": "native-integration",
-      "scope": "AVFoundation rejects missing/invalid synthetic media; does not prove successful export.",
-      "suite": "RecordlyExportValidationTests",
-      "file": "Tests/ZeusCoreTests/RecordlyExportValidationTests.swift"
-    },
-    {
-      "id": "native-RecordlyCheckpointStoreTests",
-      "kind": "native-fixture",
-      "tier": "native-integration",
-      "scope": "Actual Darwin filesystem confinement and large sparse checkpoint fixtures under temporary roots.",
-      "suite": "RecordlyCheckpointStoreTests",
-      "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift"
-    },
-    {
-      "id": "native-RecordlyExportFilesTests",
-      "kind": "native-fixture",
-      "tier": "native-integration",
-      "scope": "Actual Darwin exclusive export publication in temporary roots.",
-      "suite": "RecordlyExportFilesTests",
-      "file": "Tests/ZeusCoreTests/RecordlyExportFilesTests.swift"
     },
     {
       "id": "native-RecordlyDebugWiringTests",
@@ -416,6 +400,13 @@
       "scope": "Actual production Scribe controls in an owned NSWindow, activated through its own accessibility objects with injected capture, clock and temporary stores. No global AX, OS permission request, hardware capture or physical-device acceptance.",
       "suite": "ScribeComponentJourneyTests",
       "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
+    },
+    {
+      "id": "native-ZeusCoreTests",
+      "kind": "native-module",
+      "tier": "native-integration",
+      "module": "ZeusCoreTests",
+      "scope": "Every compiled ZeusCoreTests case on macOS, bound to current source and qualified execution events. Synthetic inputs and isolated stores; no hardware capture, personal vault, OS grants or device acceptance."
     }
   ],
   "features": [
@@ -900,7 +891,7 @@
           "id": "F08.2"
         },
         {
-          "check": "native-RecordlyExportValidationTests",
+          "check": "native-ZeusCoreTests",
           "acceptance": "Bytes alone never certify playable media.",
           "cases": [
             {
@@ -911,7 +902,7 @@
           "id": "F08.3"
         },
         {
-          "check": "native-RecordlyExportFilesTests",
+          "check": "native-ZeusCoreTests",
           "acceptance": "Publication tests run actual confined/exclusive file operations.",
           "cases": [
             {
@@ -922,7 +913,7 @@
           "id": "F08.4"
         },
         {
-          "check": "native-RecordlyCheckpointStoreTests",
+          "check": "native-ZeusCoreTests",
           "acceptance": "Large sparse files and checkpoint failure paths use real native filesystem operations.",
           "cases": [
             {
@@ -1218,6 +1209,14 @@
             {
               "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
               "function": "rowRendersEverySampleMark"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+              "function": "officialGrokSVGIsExactAndDecodesAtOriginalAspectRatio"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+              "function": "unverifiedLegacyPNGsAreAbsentFromBundle"
             }
           ],
           "id": "F12.2"
@@ -1297,6 +1296,72 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "temporaryMeetingStoreCannotClearAnotherCancellationJournal"
+            }
+          ]
+        },
+        {
+          "id": "F13.complete-core-module",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "All current Core test declarations must be discovered in the compiled target and each selected function/parameter case must start and finish successfully, with no skipped tests or issues; named injected-input guards remain mandatory. This is not whole-app or hardware QA.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScreenshotDetectorTests.swift",
+              "function": "configuredScreenshotLocationUsesTheExpandedExistingPath"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrowserAgentLoopTests.swift",
+              "function": "brainLaunchUsesOnlyInjectedModelPreferences"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PersonaQueriesTests.swift",
+              "function": "explicitPersonalityUsesAnIndependentLineBank"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AckLinesTests.swift",
+              "function": "explicitPersonalityDoesNotShareTheLiveLineBank"
+            }
+          ]
+        },
+        {
+          "id": "F13.onboarding-isolation",
+          "check": "native-OnboardingIsolationTests",
+          "acceptance": "All nine onboarding steps preserve injected progress, cancellation and explicit completion; deferred and denied capability presentation uses fixture services, preview preferences stay isolated, and actual bundled typography/mascot assets resolve. These are policy and resource assertions, not a user-control journey or OS-consent proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "nineStepsPersistAndCompletionIsExplicitAndExactlyOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "backDeferredSetupAndRelaunchPreserveProgressWithoutCompleting"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "closingBeforeQueuedNavigationCannotAdvanceOrFinishLater"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "invalidResumeStepFallsBackAndReducedMotionStartsAwake"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "deniedAccessOffersRecoveryAndAuthorizedAccessOffersNoRequest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "reopeningCompletedPresentationAllowsAnotherExplicitFinish"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "explicitMotionPolicyNeverOverridesSystemReduction"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "bundledTypographyAndMascotAreRequiredForNativePresentation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "optionsStayIndependentAndSoundOffPreventsPreviewDispatch"
             }
           ]
         }
@@ -1443,7 +1508,7 @@
           "id": "S04.3"
         },
         {
-          "check": "native-RecordlyExportValidationTests",
+          "check": "native-ZeusCoreTests",
           "acceptance": "Missing recording is never a successful export.",
           "cases": [
             {

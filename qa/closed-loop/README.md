@@ -24,9 +24,10 @@ capture the desktop. No manual clickthrough can change a gate result.
 `development` runs the gate's own rejection tests, **every default portable
 group**, and the mocked release-script tests. It can pass while all 19 complete
 features remain incomplete. This standalone command defers native fixtures;
-GitHub's separate `app` job and aggregate still require every mapped native
-fixture/guard to execute, even for a development PR. `full` runs those plus the individually named native
-fixture suites on macOS and evaluates **every obligation**. On Linux the native
+GitHub's separate `app` job and aggregate still require every Core test and every
+mapped app fixture/guard to execute, even for a development PR. `full` runs the
+complete `ZeusCoreTests` module plus the individually named app fixture suites on
+macOS and evaluates **every obligation**. On Linux the native
 checks are `blocked`. An unavailable device/signing/temporal acceptance runner is
 `unimplemented`, never a passing placeholder. **Full mode currently must fail**:
 the feature map records substantial acceptance work still missing. There is no
@@ -47,6 +48,28 @@ suite executes independently with `swift test --skip-build --filter ...`.
 One suite's runtime failure remains `failed` while later suites still run. A
 missing, changed or unsuccessful compiler receipt cannot authorize `--skip-build`.
 This optimization does not remove any native obligation or change full-mode failure.
+
+The audited native selection is **all Core tests plus 15 explicitly mapped app suites**.
+Three former narrow Core selections are subsumed by the module; their named
+obligations and regression bindings remain mandatory. The compiler's discovery
+stream must include every current Core `@Test` declaration. A source inventory is
+only a completeness check and is never reported as executed coverage.
+
+`native.py --output NEW --jobs 4` is the CI app entrypoint. It builds the test
+target, saves compiler discovery, then runs that exact native selection. Both
+discovery and execution request Swift Testing **wire version 0**. Each selected
+qualified ID must match its current file, function and `@Test` location, start,
+and finish with a pass. Every discovered parameter-case ID must also start and
+finish. Skips, issues, missing/duplicate events, unknown protocol versions or
+unselected suite execution fail even when the human summary reports success.
+The Linux protocol probe is not Apple runtime validation; an unsupported Apple
+variant remains a failed gate until its actual evidence is reviewed.
+
+The CI app stores `native-evidence/result.json`, a source manifest, compiler log,
+discovery log/events and execution log/events. The aggregate recomputes coverage
+from those hashed artifacts with `native_evidence.py`; console totals cannot
+substitute for this evidence. Native case bindings use qualified file/function
+identities rather than borrowing a same-named pass from another file.
 
 ## Evidence and rejection rules
 
