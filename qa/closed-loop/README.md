@@ -40,6 +40,15 @@ motion parity, MCP delivery or a distributable signed artifact. Future device
 checkers must actually execute a reproducible acceptance protocol with artifacts;
 changing a status string cannot implement one.
 
+The `trusted-native-fixture` check kind (tier `device-proof`, same fields as
+`native-fixture`) names an app suite that only a trusted Mac can execute, for
+example SwiftUI controls reached through the accessibility tree, which SwiftUI
+does not expose inside its own process. The CI app job never selects it. In
+`development` it must be `not-run` with no evidence. Full mode fails closed with
+"trusted Mac evidence is required" because no trusted runner or evidence format
+exists yet. Its obligations stay open, and a pointer-event journey never
+substitutes for it.
+
 Both full mode on macOS and the CI app entrypoint first compile the native test
 target once with `swift build --build-tests`, then save compiled discovery once.
 A failed compiler barrier records its exact source hash and compiler log; every

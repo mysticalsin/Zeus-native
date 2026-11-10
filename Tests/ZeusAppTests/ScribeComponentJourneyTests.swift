@@ -768,8 +768,10 @@ struct ScribeComponentJourneyTests {
     }
 }
 
-/// Kept as separate required proof. Missing native AX roles/children still fails these assertions;
-/// a successful pointer event must never be substituted for a missing accessibility result.
+/// Kept as separate required proof of the AppKit readiness and wrong-role guards. Missing native AX
+/// roles/children still fails these assertions; a successful pointer event must never be substituted
+/// for a missing accessibility result. The SwiftUI button journey lives in
+/// `ScribeTrustedAccessibilityJourneyTests` because it cannot run in CI.
 @MainActor @Suite("Scribe native accessibility journey", .serialized)
 struct ScribeAccessibilityJourneyTests {
     @Test func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
@@ -778,13 +780,20 @@ struct ScribeAccessibilityJourneyTests {
         }
     }
 
-    @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
-        try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false) }
-    }
-
     @Test func persistentWrongAccessibilityRoleNeverReceivesAPress() async throws {
         try await OwnedWindowJourneyLease.perform {
             try await ScribeComponentFixture().persistentWrongAccessibilityRoleNeverReceivesAPress()
         }
+    }
+}
+
+/// The SwiftUI button journey through accessibility. SwiftUI's NSHostingView exposes no accessibility
+/// children inside its own process, so this cannot pass in required CI. It is a device-proof obligation
+/// (`trusted-native-fixture`) that stays open until it runs with a trusted assistive client on a Mac.
+/// The pointer journey in `ScribeComponentJourneyTests` must never be substituted for it.
+@MainActor @Suite("Scribe trusted accessibility journey", .serialized)
+struct ScribeTrustedAccessibilityJourneyTests {
+    @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
+        try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false) }
     }
 }

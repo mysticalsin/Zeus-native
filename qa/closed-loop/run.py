@@ -287,6 +287,13 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
     if kind == "unimplemented":
         row.update(status="unimplemented", reason=definition["reason"])
         return row
+    if kind == "trusted-native-fixture":
+        # Never executed here; the CI app job does not select it and no trusted-Mac runner exists yet.
+        row["reason"] = ("Trusted Mac evidence is required (SwiftUI exposes no in-process accessibility tree); "
+                         "no trusted runner exists yet.")
+        if args.mode == "full":
+            row["status"] = "blocked"
+        return row
     folder = output / ident
     folder.mkdir()
     log = folder / "test.log"

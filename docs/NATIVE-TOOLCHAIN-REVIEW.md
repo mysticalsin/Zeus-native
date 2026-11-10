@@ -47,7 +47,12 @@ Four partitions remain failed: ScribeComponentJourneyTests,
 ScribeAccessibilityJourneyTests, OwnedWindowEventDriverTests and
 KokoroWorkerSessionTests. The two event-dispatch suites lack a terminal Swift
 Testing summary; the accessibility and resident-worker processes exited 1.
-Their exact causes require their detailed artifacts. The CI job and required
+Their exact causes require their detailed artifacts. For the accessibility
+suite, one cause is that SwiftUI's hosting view exposes no in-process
+accessibility children; that single SwiftUI journey test now lives in
+ScribeTrustedAccessibilityJourneyTests, a trusted-Mac device-proof obligation
+that CI does not select and that stays open. The AppKit readiness and wrong-role
+guards stay in the required ScribeAccessibilityJourneyTests partition. The CI job and required
 aggregate remain failed, and preview packaging was skipped. The separate
 development feature map reported 631 passing checks. Artifact validation and
 physical-device acceptance are separate obligations; these log summaries do

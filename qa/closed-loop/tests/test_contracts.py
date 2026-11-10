@@ -90,6 +90,67 @@ class MatrixContractTests(unittest.TestCase):
         self.assertTrue(any(o["status"] == "not-run" for row in results for o in row["obligations"]))
 
 
+class TrustedNativeFixtureTests(unittest.TestCase):
+    ID = "device-ScribeTrustedAccessibilityJourneyTests"
+
+    def setUp(self):
+        self.data = c.load(c.ROOT / "qa/feature-map.json")
+        self.portable = runner.portable_module()
+
+    def trusted(self, data=None):
+        return next(row for row in (data or self.data)["checks"] if row["id"] == self.ID)
+
+    def test_ax_journey_is_bound_to_the_trusted_kind_and_regressions_stay_executable(self):
+        checks = c.validate_map(self.data, self.portable)
+        self.assertEqual((checks[self.ID]["kind"], checks[self.ID]["tier"]), ("trusted-native-fixture", "device-proof"))
+        ledger = c.validate_registry(c.load(c.ROOT / "qa/regressions.json"), checks)
+        self.assertEqual({row["id"] for row in ledger if row["check"] == self.ID}, {"REG-046", "REG-140"})
+
+    def test_trusted_kind_is_never_selected_by_the_ci_app_job(self):
+        import gate
+        import native_evidence as native
+        checks = c.validate_map(self.data, self.portable)
+        self.assertNotIn("trusted-native-fixture", native.NATIVE_KINDS)
+        self.assertNotIn("ScribeTrustedAccessibilityJourneyTests", gate.native_filter())
+        selection = [row for row in checks.values() if row["kind"] in native.NATIVE_KINDS]
+        self.assertFalse(any(native.selected("ZeusAppTests.ScribeTrustedAccessibilityJourneyTests/x()/F.swift:1:1", [row])
+                             for row in selection))
+        with self.assertRaises(c.Invalid):
+            native.partitions(selection + [checks[self.ID]])
+
+    def test_trusted_kind_keeps_native_fixture_field_and_tier_rules(self):
+        for change in (lambda row: row.update(tier="native-integration"), lambda row: row.update(extra="x"),
+                       lambda row: row.update(suite="InventedTests"), lambda row: row.pop("file"),
+                       lambda row: row.update(file="Tests/ZeusCoreTests/ScribeTests.swift")):
+            data = copy.deepcopy(self.data)
+            change(self.trusted(data))
+            with self.subTest(change=change), self.assertRaises(c.Invalid):
+                c.validate_map(data, self.portable)
+
+    def test_trusted_obligation_cases_and_guards_must_live_in_its_file(self):
+        data = copy.deepcopy(self.data)
+        obligation = next(o for f in data["features"] for o in f["obligations"] if o["check"] == self.ID)
+        obligation["cases"][0]["file"] = "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift" \
+            if obligation["cases"][0]["file"] != "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift" else "Tests/ZeusAppTests/OwnedWindowEventDriver.swift"
+        with self.assertRaises(c.Invalid):
+            c.validate_map(data, self.portable)
+        checks = c.validate_map(self.data, self.portable)
+        ledger = c.load(c.ROOT / "qa/regressions.json")
+        row = next(r for r in ledger["regressions"] if r["check"] == self.ID)
+        row["guard"]["file"] = "qa/closed-loop/tests/test_gate.py"
+        row["guard"]["function"] = "test_complete_current_revision_evidence_passes"
+        with self.assertRaises(c.Invalid):
+            c.validate_registry(ledger, checks)
+
+    def test_runner_reports_not_run_in_development_and_blocked_in_full_without_executing(self):
+        definition = self.trusted()
+        for mode, status in (("development", "not-run"), ("full", "blocked")):
+            with self.subTest(mode=mode), patch.object(runner, "execute", side_effect=AssertionError("must not execute")):
+                row = runner.run_check(definition, SimpleNamespace(mode=mode, jobs=1, timeout=1), Path("/nonexistent"), None)
+                self.assertEqual((row["status"], row["command"], row["exit_code"], row["artifacts"]), (status, [], None, []))
+                self.assertTrue(row["reason"])
+
+
 class EvidenceContractTests(unittest.TestCase):
     def test_swift_nonzero_empty_missing_or_ambiguous_summary_is_failure(self):
         passed = "✔ Test actualCase() passed after 0.1 seconds.\n✔ Test run with 1 test in 1 suite passed after 0.1 seconds.\n"

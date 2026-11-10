@@ -178,6 +178,16 @@ def validate_map(data, portable, root=ROOT):
             nonempty(check["suite"])
             require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
             require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing native suite")
+        elif check["kind"] == "trusted-native-fixture":
+            # Same shape as a native fixture, but only a trusted Mac can execute it: SwiftUI exposes no
+            # in-process accessibility tree, so the CI app job never selects it.
+            require(set(check) == {"id", "kind", "tier", "scope", "suite", "file"}, "invalid trusted native fields")
+            require(check["tier"] == "device-proof", "trusted native fixtures are device proof only")
+            file = relative_file(check["file"], root)
+            require(check["file"].startswith("Tests/ZeusAppTests/"), "trusted native fixture must be an app test")
+            nonempty(check["suite"])
+            require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
+            require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing trusted native suite")
         elif check["kind"] == "native-module":
             require(set(check) == {"id", "kind", "tier", "scope", "module"}, "invalid native module fields")
             require(check["tier"] == "native-integration" and check["module"] == "ZeusCoreTests",
@@ -214,7 +224,7 @@ def validate_map(data, portable, root=ROOT):
             require(bool(obligation["cases"]) == (check["kind"] != "unimplemented"), "implemented obligations need actual cases; unimplemented cannot claim them")
             for case in obligation["cases"]:
                 validate_case(case, root)
-                if check["kind"] == "native-fixture":
+                if check["kind"] in {"native-fixture", "trusted-native-fixture"}:
                     require(case["file"] == check["file"], "case not in native fixture")
                 elif check["kind"] == "native-module":
                     require(case["file"].startswith("Tests/ZeusCoreTests/"), "case not in the complete Core module")
@@ -245,7 +255,7 @@ def validate_registry(data, checks, root=ROOT):
         validate_case(row["guard"], root)
         if row["check"] == "closed-loop-selftests":
             require(row["guard"]["file"].startswith("qa/closed-loop/tests/"), "selftest guard not in runner test suite")
-        elif checks[row["check"]]["kind"] == "native-fixture":
+        elif checks[row["check"]]["kind"] in {"native-fixture", "trusted-native-fixture"}:
             require(row["guard"]["file"] == checks[row["check"]]["file"], "guard not in selected native suite")
         elif checks[row["check"]]["kind"] == "native-module":
             require(row["guard"]["file"].startswith("Tests/ZeusCoreTests/"), "guard not in complete Core module")

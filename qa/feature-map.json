@@ -458,8 +458,16 @@
       "id": "native-ScribeAccessibilityJourneyTests",
       "kind": "native-fixture",
       "tier": "native-integration",
-      "scope": "Preserved strict own-window accessibility traversal, readiness and production control activation. This remains mandatory in ordinary CI; an event journey never substitutes for a failing AX result.",
+      "scope": "Own-window AppKit accessibility readiness and wrong-role guards: bounded wait for an owned button to become enabled, and a persistently wrong accessibility role never receives a press. This remains mandatory in ordinary CI; an event journey never substitutes for a failing AX result. The SwiftUI button journey is not in this partition (see device-ScribeTrustedAccessibilityJourneyTests).",
       "suite": "ScribeAccessibilityJourneyTests",
+      "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
+    },
+    {
+      "id": "device-ScribeTrustedAccessibilityJourneyTests",
+      "kind": "trusted-native-fixture",
+      "tier": "device-proof",
+      "scope": "SwiftUI button journey through accessibility. SwiftUI's NSHostingView exposes no in-process accessibility tree, so CI never selects this suite. It needs a run with a trusted assistive client on a Mac; no runner or evidence format exists yet, so it stays open.",
+      "suite": "ScribeTrustedAccessibilityJourneyTests",
       "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
     },
     {
@@ -1192,12 +1200,8 @@
         {
           "id": "F06.component-journey",
           "check": "native-ScribeAccessibilityJourneyTests",
-          "acceptance": "Real Start, Keep, End now, retry and close controls drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim.",
+          "acceptance": "Own-window AppKit readiness wait is bounded and never bypasses a permanently disabled control, and a persistently wrong accessibility role never receives a press. The SwiftUI button journey is the separate trusted-ax-journey obligation.",
           "cases": [
-            {
-              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
-              "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
-            },
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
@@ -1205,6 +1209,17 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
+            }
+          ]
+        },
+        {
+          "id": "F06.trusted-ax-journey",
+          "check": "device-ScribeTrustedAccessibilityJourneyTests",
+          "acceptance": "Real Start, Keep, End now, retry and close controls found through the accessibility tree drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim. Open until run on a trusted Mac; the pointer journey is not a substitute.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
             }
           ]
         },
@@ -3907,12 +3922,8 @@
         {
           "id": "S05.component-journey",
           "check": "native-ScribeAccessibilityJourneyTests",
-          "acceptance": "Real Start, Keep, End now, retry and close controls drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim.",
+          "acceptance": "Own-window AppKit readiness wait is bounded and never bypasses a permanently disabled control, and a persistently wrong accessibility role never receives a press. The SwiftUI button journey is the separate trusted-ax-journey obligation.",
           "cases": [
-            {
-              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
-              "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
-            },
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
@@ -3920,6 +3931,17 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
+            }
+          ]
+        },
+        {
+          "id": "S05.trusted-ax-journey",
+          "check": "device-ScribeTrustedAccessibilityJourneyTests",
+          "acceptance": "Real Start, Keep, End now, retry and close controls found through the accessibility tree drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim. Open until run on a trusted Mac; the pointer journey is not a substitute.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
             }
           ]
         }

@@ -114,7 +114,7 @@ class RequiredGateTests(unittest.TestCase):
                    "tests": 0, "suites": 0, "passed_functions": [], "artifacts": []}
             if kind == "unimplemented":
                 row.update(status="unimplemented", reason=definition["reason"])
-            elif kind not in self.native_validator.NATIVE_KINDS:
+            elif kind not in self.native_validator.NATIVE_KINDS and kind != "trusted-native-fixture":
                 folder = root / ident
                 folder.mkdir()
                 names = sorted(functions[ident])
@@ -180,6 +180,31 @@ class RequiredGateTests(unittest.TestCase):
         result = self.evaluate()
         self.assertEqual(result["status"], "passed", result)
         self.assertGreater(result["jobs"]["feature-map"]["tests"], 0)
+
+    def trusted_check(self):
+        result = json.loads((self.root("feature-map") / "result.json").read_text())
+        row = next(row for row in result["checks"] if row["kind"] == "trusted-native-fixture")
+        self.assertEqual(row["status"], "not-run")
+        return row["id"]
+
+    def test_trusted_check_is_not_run_in_development_and_cannot_claim_evidence(self):
+        ident = self.trusted_check()
+        self.assertEqual(self.evaluate()["status"], "passed")
+        claims = (dict(status="passed"), dict(exit_code=0), dict(tests=1), dict(command=["swift", "test"]),
+                  dict(artifacts=[{"path": "test.log", "sha256": "0" * 64}]))
+        for claim in claims:
+            with self.subTest(claim=claim):
+                self.update_map(lambda value: next(row for row in value["checks"] if row["id"] == ident).update(claim))
+                self.assert_blocked()
+                self.update_map(lambda value: next(row for row in value["checks"] if row["id"] == ident).update(
+                    status="not-run", exit_code=None, tests=0, command=[], artifacts=[]))
+
+    def test_trusted_check_fails_closed_in_full_mode_without_a_trusted_runner(self):
+        self.trusted_check()
+        self.update_map(lambda value: value.update(mode="full"))
+        result = self.evaluate("full")
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("trusted Mac evidence is required" in error for error in result["errors"]), result)
 
     def test_production_compiler_diagnostics_block_despite_successful_steps_and_tests(self):
         path = self.root("app") / "build.log"

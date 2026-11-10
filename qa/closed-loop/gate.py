@@ -262,6 +262,10 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
         raise ValueError("feature map schema is unsupported")
     if result.get("status") != "passed" or result.get("mode") != mode:
         raise ValueError(f"feature map did not pass {mode} mode")
+    trusted = sorted(ident for ident, definition in definitions.items() if definition["kind"] == "trusted-native-fixture")
+    if mode == "full" and trusted:
+        # No trusted-Mac runner or evidence format exists yet, so full mode cannot be satisfied by CI.
+        raise ValueError(f"trusted Mac evidence is required and no runner exists yet: {', '.join(trusted)}")
     if result.get("tested_sha") != expected_sha or result.get("head_sha") != head_sha:
         raise ValueError("feature map belongs to another source/head SHA")
     if result.get("map_sha256") != digest(repo / "qa/feature-map.json") or result.get("registry_sha256") != digest(repo / "qa/regressions.json"):
