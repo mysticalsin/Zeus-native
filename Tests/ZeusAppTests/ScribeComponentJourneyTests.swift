@@ -486,6 +486,9 @@ private struct ScribeComponentFixture {
             throw ScenarioFailure.unavailableControl(id, lastUnavailableReason)
         }
         let originalFailure = ScenarioFailure.missingControl(id, diagnostic)
+        // Flush the original failure first: the own-PID AX snapshot below has crashed the host
+        // (SIGTRAP after its breadcrumb cap), which previously erased which control was missing.
+        OwnedWindowFixtureApplication.record("original failure before own-PID AX: \(originalFailure)")
         let marker = window.accessibilityIdentifier()
         if marker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) {
             let snapshot = await OwnedProcessAXDiagnostic.collect(
