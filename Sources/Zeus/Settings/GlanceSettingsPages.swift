@@ -106,13 +106,7 @@ private struct GeneralPage: View {
             GSDivider()
             GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", isOn: bool("general.welcomeBack"))
         }
-        GSCard("Setup") {
-            GSRow(symbol: "sparkles", title: "Set up Zeus again", text: "Revisit the guide, connected agents and permissions.") {
-                Button("Open guide", action: openGuide)
-                    .buttonStyle(GSButtonStyle())
-                    .accessibilityIdentifier("settings.general.openGuide")
-            }
-        }
+        GSSetupCard(openGuide: openGuide)
         GSCard("Keep awake") {
             GSRow(symbol: "timer", title: "Session length", text: "How long the cup on Home keeps the Mac awake.") {
                 GSPopup(selection: Binding(
@@ -165,6 +159,21 @@ private struct GeneralPage: View {
         .buttonStyle(.plain)
         .accessibilityLabel(name)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+}
+
+/// The production Setup card is independent of Settings' live stores and services.
+struct GSSetupCard: View {
+    let openGuide: () -> Void
+
+    var body: some View {
+        GSCard("Setup") {
+            GSRow(symbol: "sparkles", title: "Set up Zeus again", text: "Revisit the guide, connected agents and permissions.") {
+                Button("Open guide", action: openGuide)
+                    .buttonStyle(GSButtonStyle())
+                    .ownedJourneyControl("settings.general.openGuide")
+            }
+        }
     }
 }
 

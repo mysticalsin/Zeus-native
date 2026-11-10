@@ -304,29 +304,29 @@ struct OnboardingRoot: View {
                 .buttonStyle(OBTextButtonStyle())
                 .keyboardShortcut(.leftArrow, modifiers: [.command])
                 .accessibilityLabel("Back")
-                .accessibilityIdentifier("onboarding.back")
+                .ownedJourneyControl("onboarding.back")
             }
             Spacer()
             switch flow.step {
             case .welcome:
                 Button("Start") { flow.next() }
-                    .accessibilityIdentifier("onboarding.start")
                     .buttonStyle(OBPrimaryButtonStyle(width: 87))
+                    .ownedJourneyControl("onboarding.start")
                     .keyboardShortcut(.defaultAction)
             case .sounds:
                 Button("Finish", action: finish)
-                    .accessibilityIdentifier("onboarding.finish")
                     .buttonStyle(OBPrimaryButtonStyle(width: 93.5))
+                    .ownedJourneyControl("onboarding.finish")
                     .keyboardShortcut(.defaultAction)
             default:
                 Button("Set up later") { flow.next() }
-                    .accessibilityIdentifier("onboarding.skip")
                     .buttonStyle(OBTextButtonStyle())
+                    .ownedJourneyControl("onboarding.skip")
                     .padding(.trailing, 18.5)
                     .accessibilityHint("Skips this step. You can finish it later in Settings.")
                 Button("Continue") { flow.next() }
-                    .accessibilityIdentifier("onboarding.next")
                     .buttonStyle(OBPrimaryButtonStyle(width: 117.5))
+                    .ownedJourneyControl("onboarding.next")
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -371,15 +371,18 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var presented = false
     private let pollingLifecycle: OnboardingPollingLifecycle
+    private let journeyRegistry: OwnedWindowControlRegistry?
     let flow: OnboardingFlow
     let options: OnboardingOptions
     let services: any OnboardingServing
     var onFinish: (() -> Void)?
 
-    init(services: any OnboardingServing, flow: OnboardingFlow = OnboardingFlow(), options: OnboardingOptions = .live) {
+    init(services: any OnboardingServing, flow: OnboardingFlow = OnboardingFlow(), options: OnboardingOptions = .live,
+         journeyRegistry: OwnedWindowControlRegistry? = nil) {
         self.services = services
         self.flow = flow
         self.options = options
+        self.journeyRegistry = journeyRegistry
         pollingLifecycle = OnboardingPollingLifecycle(services: services)
         super.init()
         for name in [NSApplication.didHideNotification, NSApplication.didUnhideNotification] {
@@ -412,7 +415,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             window.isReleasedWhenClosed = false
             window.title = "Welcome to Zeus"
             window.delegate = self
-            let hosting = NSHostingView(rootView: OnboardingRoot(flow: flow, services: services, finish: { [weak self] in self?.finish() }, options: options))
+            let hosting = NSHostingView(rootView: OnboardingRoot(flow: flow, services: services, finish: { [weak self] in self?.finish() }, options: options)
+                .environment(\.ownedWindowControlRegistry, journeyRegistry))
             hosting.sizingOptions = []
             window.contentView = hosting
             // Glance's frame is 960 x 760 including the title bar (full-size content).

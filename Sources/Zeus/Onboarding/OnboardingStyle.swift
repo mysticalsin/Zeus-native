@@ -399,7 +399,7 @@ struct OBAllowButton: View {
                 .buttonStyle(OBOutlineButtonStyle())
                 .frame(width: recovery ? 112 : 68)
                 .accessibilityLabel(recovery ? "Open Settings for \(name)" : "Allow \(name)")
-                .accessibilityIdentifier(identifier ?? "onboarding.allow.\(name)")
+                .ownedJourneyControl(identifier ?? "onboarding.allow.\(name)")
         }
     }
 }

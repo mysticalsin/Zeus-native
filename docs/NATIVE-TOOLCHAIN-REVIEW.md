@@ -259,3 +259,23 @@ and request deadlines are unchanged. The isolation correction does not certify
 a cold-start improvement. A bounded after-test diagnostic records the exact Apple
 launcher linkage and selected interpreter without warming the cold fixtures first.
 Those metadata cannot establish where the observed startup delay occurs.
+
+## Production onboarding component journey
+
+A fourth AppKit-hosted suite now starts from the real General Setup card, opens
+the real guide controller and activates Start, Set up later, Back, Continue and
+Finish through owned-window events. Persistence, permission requests, connection
+checks, model downloads and sound feedback use explicit inert dependencies. The
+complete deferred route runs under requested normal and reduced-motion policies;
+an OS reduction preference remains authoritative. A separate denied-microphone
+case requires exactly one inert recovery call and verifies that skipping remains
+possible. Neither fixture constructs the live permission model or grants consent.
+
+The tests assert step persistence, current footer reachability, closure and one
+completion for that activation, plus no unsolicited service calls. They do not
+prove each page's rendered text, keyboard or accessibility navigation, temporal
+quality, active polling on an occluded host, the full Settings/AppDelegate route,
+or a physical user's permission flow. The separate completion-isolation suite
+retains repeated-completion protection. Native execution of this new component
+journey remains required; Linux parsing and host/map contract tests are not a
+passing Mac journey.

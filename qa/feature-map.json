@@ -508,6 +508,14 @@
       "scope": "Injected scheduler time, warm callbacks and action ports with synthetic provider selections. No scheduler start, live settings, model loads, provider requests, voice rendering, capture or playback.",
       "suite": "BrainWarmSchedulerTests",
       "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift"
+    },
+    {
+      "id": "native-OnboardingComponentJourneyTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "OnboardingComponentJourneyTests",
+      "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+      "scope": "Actual production Setup card and guide activated by layout-resolved events sent only to owned windows, with in-memory preferences and inert permission/model/connection/sound services. Nine-step deferred setup plus denied-state recovery. No full Settings/AppDelegate route, keyboard, AX, OS consent, capture, physical motion or device acceptance."
     }
   ],
   "features": [
@@ -2668,6 +2676,21 @@
             {
               "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
               "function": "pollingFollowsOwnWindowMiniaturizeRestoreAndCloseWithoutActions"
+            }
+          ]
+        },
+        {
+          "id": "F13.onboarding-component-journey",
+          "check": "native-OnboardingComponentJourneyTests",
+          "acceptance": "Native production Setup-card Open guide routes into the real injected guide. Start, defer, Back, Continue and Finish preserve step persistence and complete exactly once; denied recovery calls only the inert service and remains skippable. Normal/requested-reduction flow policies are exercised without overriding an OS reduction preference. Real permissions, keyboard, accessibility, temporal motion and the full Settings/AppDelegate route remain separate obligations.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+              "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+              "function": "deniedRecoveryCallsOnlyInertServiceAndStillAllowsSkip"
             }
           ]
         }

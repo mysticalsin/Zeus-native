@@ -61,7 +61,8 @@ private enum NativeAppTestHost {
             let filters: Set<String> = [
                 "^ZeusAppTests\\.OwnedWindowEventDriverTests/",
                 "^ZeusAppTests\\.ScribeComponentJourneyTests/",
-                "^ZeusAppTests\\.ScribeAccessibilityJourneyTests/"
+                "^ZeusAppTests\\.ScribeAccessibilityJourneyTests/",
+                "^ZeusAppTests\\.OnboardingComponentJourneyTests/"
             ]
             guard args.count == 9,
                   args[1] == "--test-bundle-path",

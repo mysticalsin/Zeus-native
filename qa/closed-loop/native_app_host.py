@@ -7,7 +7,8 @@ import subprocess
 
 from contracts import ROOT, require
 
-SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests"}
+SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests",
+          "OnboardingComponentJourneyTests"}
 INFO = {
     "CFBundleExecutable": "zeus-native-test-host",
     "CFBundleIdentifier": "org.zeus.native-test-host",
