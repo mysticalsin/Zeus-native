@@ -1747,6 +1747,54 @@
         "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
         "function": "test_failed_restore_never_turns_native_success_into_job_success"
       }
+    },
+    {
+      "id": "REG-145",
+      "failure": "A real onboarding film could be ready, visible and eligible yet remain paused at its first presentation after attachment. FilmView now resynchronizes through the existing playback policy at the AppKit drawing boundary, retaining all visibility, Reduce Motion and disposal gates. The original real-playing guard remains mandatory.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "reattachmentIgnoresOldWindowAndDisposalCannotRestartPlayback"
+      }
+    },
+    {
+      "id": "REG-146",
+      "failure": "A timed-out verification command was killed only at its direct driver, leaving an inherited process group able to keep working or retain output. The executor now owns a fresh group, signals it without reaping the identity between TERM and KILL, and bounds direct-child cleanup; an unrelated control group must remain alive.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_timeout_stops_owned_grandchild_and_preserves_other_process_group"
+      }
+    },
+    {
+      "id": "REG-147",
+      "failure": "Interrupted polling or external child reaping can make a process-group identity unsafe to signal and can lose the real exit status. The verifier refuses nondefault SIGCHLD before launching and does not signal a reaped or uncertain child group.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_nondefault_child_reaping_policy_cannot_launch_or_forge_success"
+      }
+    },
+    {
+      "id": "REG-148",
+      "failure": "Accepting an exit result without checking the monotonic clock after poll can classify completion beyond the deadline as a passing check. Late observed completion now remains timeout124 and cannot trigger a signal to a reaped group.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_exit_observed_after_deadline_cannot_pass_or_signal_a_reaped_group"
+      }
     }
   ]
 }

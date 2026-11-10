@@ -414,3 +414,39 @@ The separate `e295aaf` PR development job later timed out in
 and 113 passing verification selftests, but the timed-out partition has no
 terminal completion and stays failed. Its counterpart push's 641 passes cannot
 replace that result. The timeout cause remains under investigation.
+
+## First drawing and bounded check cleanup
+
+The `a847dbd` run verified the managed profile through NSWorkspace and restored
+its original `true` setting. Three film cases reached real playback and passed,
+but the reattachment case failed before its operation began: player and item
+were ready, all eligibility gates were true, and media time/rate stayed zero.
+FilmView now resynchronizes its existing policy in the supported AppKit
+`viewWillDraw` boundary. It adds no timer or policy override and does not relax
+the four-second actual-playing guard. Fresh native execution remains required.
+
+Separately, the verification command executor previously used a direct-child
+timeout, which could leave an inherited grandchild running. Each command now
+starts a fresh process group. Timeout or interruption checks direct-child
+ownership before TERM, a finite grace period and KILL; no poll/reap occurs
+between those signals. Reaping is bounded, uncertain ownership is reported
+instead of signaled, and nondefault SIGCHLD is refused before launch because it
+can lose the true exit status. Python 3.11 public APIs remain supported. The
+request timeout retains its earlier scope after process creation; a blocked OS
+spawn is not claimed bounded, and descendants that create another group are
+outside this cleanup boundary. Ten focused guards passed; the exact original
+executor failed the owned-grandchild negative control. This repairs a cleanup
+gap, not an established cause of the earlier bridge hang.
+
+A separate diagnostic workflow compares one first explicit launch of Apple's
+Python shim and the selected Xcode interpreter on fresh hosted runners. Its
+independent Homebrew driver enforces the original three-second observation
+deadline and separately reports the two-second marker result. Target metadata
+and source hashes are collected afterward. Nine driver guards, including a
+mutation control for late polling, pass locally. This experiment does not replace
+the failed Kokoro fixtures or certify managed-venv/model performance.
+
+The [a847dbd receipt](../qa/receipts/20261110/mac-a847-ci.json) independently
+binds the native result and motion-profile restoration to that exact source.
+The [e295aaf development failure](../qa/receipts/20261110/mac-e295-feature-failure.json)
+retains the timed-out bridge partition separately from its passing companion run.

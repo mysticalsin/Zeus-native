@@ -200,6 +200,13 @@ struct LoopingFilm: NSViewRepresentable {
             playerLayer.frame = bounds
         }
 
+        override func viewWillDraw() {
+            super.viewWillDraw()
+            // Attachment can precede the window's first visible presentation. Recheck the
+            // same visibility and motion policy when AppKit actually prepares this view to draw.
+            synchronizePlayback()
+        }
+
         /// AVPlayer is not a window visibility observer. Pause explicitly when this decorative
         /// preview is hidden or fully covered; never create a timer to poll an invisible guide.
         override func viewDidMoveToWindow() {

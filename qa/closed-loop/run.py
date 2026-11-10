@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -46,19 +47,118 @@ def artifact(path, output):
     return {"path": str(path.relative_to(output)), "sha256": digest(path.read_bytes())}
 
 
+def cleanup_owned_command(process, stream):
+    """Stop only an unreaped child in the fresh group created by execute.
+
+    Python 3.11 on macOS has no waitid(WNOWAIT). A nonblocking waitpid probe
+    therefore admits signaling only while the exact direct child is still
+    running. If it was already reaped (including an interrupted poll), group
+    identity is no longer reserved: report incomplete cleanup rather than risk
+    signaling a reused PID. Descendants that create another group are outside
+    this deliberately narrow ownership boundary.
+    """
+    def unconfirmed(reason):
+        stream.write("\nCHECK CLEANUP UNCONFIRMED: " + reason + "\n")
+        return False
+
+    # Defer a second cancellation only for this finite cleanup interval. Restore
+    # the caller's exact mask after the last signal and bounded direct-child reap.
+    old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM})
+    try:
+        if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
+            return unconfirmed("child reaping policy is not exclusive; no group signal sent")
+        if process.returncode is not None:
+            return unconfirmed("direct child already reaped; no group signal sent")
+        try:
+            child, status = os.waitpid(process.pid, os.WNOHANG)
+        except ChildProcessError:
+            return unconfirmed("direct child ownership unavailable; no group signal sent")
+        except OSError as error:
+            return unconfirmed(f"child ownership probe failed (errno {error.errno}); no group signal sent")
+        if child == process.pid:
+            process.returncode = os.waitstatus_to_exitcode(status)
+            return unconfirmed("direct child exited before cleanup; no group signal sent")
+        if child != 0 or process.pid <= 0 or process.pid == os.getpgrp():
+            return unconfirmed("fresh child group could not be established; no group signal sent")
+        try:
+            if os.getpgid(process.pid) != process.pid:
+                return unconfirmed("child left its owned group; no group signal sent")
+        except OSError as error:
+            return unconfirmed(f"child group probe failed (errno {error.errno}); no group signal sent")
+
+        signal_failed = False
+
+        def send(signum):
+            nonlocal signal_failed
+            try:
+                os.killpg(process.pid, signum)
+            except ProcessLookupError:
+                pass
+            except OSError as error:
+                signal_failed = True
+                stream.write(f"\nCHECK CLEANUP SIGNAL FAILED: {signum.name} (errno {error.errno})\n")
+
+        reaped = False
+        try:
+            send(signal.SIGTERM)
+            # No poll/wait/reap here: the unreaped leader reserves the group
+            # identity even if TERM exits it while a grandchild ignores TERM.
+            time.sleep(0.25)
+        finally:
+            try:
+                send(signal.SIGKILL)
+            finally:
+                try:
+                    process.wait(timeout=1)
+                    reaped = True
+                except subprocess.TimeoutExpired:
+                    unconfirmed("direct child did not exit within the cleanup deadline")
+                except OSError as error:
+                    unconfirmed(f"direct child reap failed (errno {error.errno})")
+        if signal_failed:
+            return unconfirmed("one or more owned group signals failed")
+        return reaped
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+
+
 def execute(command, log, timeout, environment=None):
     started = time.monotonic()
     with log.open("w") as stream:
+        process = None
         try:
-            process = subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT,
-                                     timeout=timeout, check=False, env={**os.environ, "NO_COLOR": "1", "PYTHONDONTWRITEBYTECODE": "1", **(environment or {})})
-            code = process.returncode
+            # Auto-reaping or a custom SIGCHLD handler can lose the actual exit
+            # status before Popen polls it. Do not launch under that ambiguity.
+            if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
+                raise OSError("Default SIGCHLD ownership is required for check execution")
+            process = subprocess.Popen(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT,
+                                       start_new_session=True,
+                                       env={**os.environ, "NO_COLOR": "1", "PYTHONDONTWRITEBYTECODE": "1", **(environment or {})})
+            # Preserve subprocess.run's timeout contract: process creation itself
+            # is outside the deadline. A blocked OS spawn is not a bounded claim.
+            deadline = time.monotonic() + timeout
+            while True:
+                code = process.poll()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                if code is not None:
+                    break
+                time.sleep(min(0.01, remaining))
         except subprocess.TimeoutExpired:
+            if process is not None:
+                cleanup_owned_command(process, stream)
             stream.write(f"\nCHECK TIMEOUT after {timeout} seconds\n")
             code = 124
         except OSError as error:
+            if process is not None:
+                cleanup_owned_command(process, stream)
             stream.write(f"\nCHECK COULD NOT START: {error}\n")
             code = 127
+        except BaseException:
+            if process is not None:
+                cleanup_owned_command(process, stream)
+            raise
     return code, round(time.monotonic() - started, 3)
 
 
