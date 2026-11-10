@@ -24,7 +24,7 @@ struct OnboardingIsolationTests {
         }
     }
 
-    @MainActor @Observable private final class Services: OnboardingServing {
+    @MainActor @Observable fileprivate final class Services: OnboardingServing {
         var states: [OnboardingCapability: OnboardingAccess] = [:]
         var requests: [OnboardingCapability] = []
         var polls = 0

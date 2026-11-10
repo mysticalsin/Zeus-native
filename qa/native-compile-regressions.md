@@ -61,3 +61,5 @@ test failures remained failures.
 
 The repaired switch expression type-checks under Linux Swift 6.2.1 in isolation.
 The complete repaired view still requires the next macOS build.
+
+| TYPE-010 | `d571d75`, job `129586646795` | Generated `@Observable` extension cannot reference a private nested onboarding test service | Restrict the fixture to file scope with `fileprivate`, which permits the generated extension. Linux Swift 6.2.1 minimal reproduction fails before and type-checks after; actual native test-target compilation remains mandatory. |
