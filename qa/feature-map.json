@@ -524,6 +524,14 @@
       "suite": "OnboardingFilmLifecycleTests",
       "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
       "scope": "Actual muted AVQueuePlayer and bundled local films in owned AppKit windows. Positive playback precedes hide/minimize/occlusion/reduction/detach checks; natural owned completion and foreign same-URL rejection verify bounded queue ownership. No screen/audio capture, OS preference writes, private media, physical FPS or measured CPU/energy acceptance."
+    },
+    {
+      "id": "native-AudioSamplesConversionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual AVAudioConverter and generated PCM buffers only: consume-once ownership, nonblocking overlap rejection and streaming/final conversion. No engine, capture, recognizer, playback or speech accuracy/device performance claim.",
+      "suite": "AudioSamplesConversionTests",
+      "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift"
     }
   ],
   "features": [
@@ -614,6 +622,25 @@
             {
               "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
               "function": "emptyEncodedAudioRemainsValidAndDeclaredContainerCannotHideTruncation"
+            }
+          ]
+        },
+        {
+          "id": "F01.pcm-conversion-ownership",
+          "check": "native-AudioSamplesConversionTests",
+          "acceptance": "Generated PCM is supplied once with explicit live/final statuses; stateful converter rejects overlap without blocking and recovers afterward. Sequential conversion with reused input storage matches complete final output. This does not establish recognition, capture privacy or physical latency.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+              "function": "inputOwnerSuppliesExactlyOnceAcrossConcurrentRequests"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+              "function": "sequentialBuffersPreserveWholeStreamAndFinalTail"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+              "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
             }
           ]
         }

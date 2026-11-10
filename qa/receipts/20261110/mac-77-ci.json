@@ -1,0 +1,42 @@
+{
+  "evidence_kind": "native-compilation-failure-revalidation",
+  "head": "77c3d6ccfa864a2beb419a553c0a579dc78ba0d4",
+  "tested": "d7862be5f53ab5d6f24008823b0697c6b1390a6c",
+  "source_snapshot_sha256": "881062dfffb887b3c19cefd9758f28754146f48893f5af48afeb3d15b8efb0ce",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42813474734",
+  "app_job": 129820513185,
+  "artifact_id": 13763828015,
+  "artifact_zip_sha256": "b3ae632e8e4e23a43618e24f989727a1d3aaefce044617120ca37a6be20940ca",
+  "production_build": "passed",
+  "native_test_build": "failed",
+  "native_test_build_exit_code": 1,
+  "native_discovery": "not-run",
+  "verified_tests": 0,
+  "verified_partition_count": 0,
+  "blocked_partition_count": 28,
+  "complete_native_acceptance": false,
+  "compiler_failure": {
+    "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+    "line": 418,
+    "column": 12,
+    "message": "initializer for conditional binding must have Optional type, not 'String'",
+    "repeated_diagnostic_headers": 14
+  },
+  "validation_scope": {
+    "source_manifest": "exact head tree",
+    "feature_map_checks": 71,
+    "regressions": 139,
+    "compiler_barrier_rejection": "native compiler barrier did not pass",
+    "compiler_log_rejection": "native compiler log has no completion",
+    "archive_members_verified": 7
+  },
+  "revalidated_artifacts": {
+    "build.log": "8d5ec6c1e2077d74348094d1bf6cf1893c1bb1c49925215be38326721c37bd74",
+    "job.json": "c68acf61edd2e6023d549328886f7ffe6a95fc500b04e69e89642650465304a8",
+    "native-evidence/native-build/build.log": "0ca3fe04d9a90e553a5e95c80e8942ddcc2e15ba57d3e62e0c478d7ea160cb6f",
+    "native-evidence/result.json": "30842cd00ea3780d23f4a03de8b0e753211066da25824b09ea988ea897bd9e1d",
+    "native-evidence/source-manifest.json": "e0ab854daf4e6a90d50ba793861b94e53c5c8cd0e943ed763dca57729892803f",
+    "python-launcher.log": "e8e1c1496b4b29b71454c1f66638237c596d7d135f9b98f506e07629ff92e3d4",
+    "test.log": "b6091e510a53c9d0e94fd10075cb57bd9430ae89f9e3bd2e6721111e74c6233d"
+  }
+}

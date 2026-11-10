@@ -349,3 +349,32 @@ The failure-only AX diagnostic now binds that declared value directly and keeps
 the synthetic-window prefix check. No native tests ran on this revision, and
 no sampler or new onboarding/film journey result is established. Fresh native
 compilation and execution remain required.
+
+## PCM conversion ownership
+
+The two native conversion callbacks previously captured an unprotected mutable
+`fed` flag and a borrowed non-Sendable PCM buffer. Each synchronous conversion
+now owns a retained read-only input reference and lock-protected consume-once
+state. The caller must leave the sample bytes unchanged until conversion returns;
+this is not a general transfer wrapper for mutable audio buffers. A separate
+nonblocking resampler guard protects the stateful converter from overlap. The
+live path retains its drop-on-error behavior; checked file conversion throws.
+Neither path waits for a competing conversion.
+
+Three new native guards use generated PCM only: concurrent input requests,
+streaming/final conversion with reused input storage, and contested conversion
+followed by recovery. They do not open an engine, request permission, play sound,
+recognize speech or measure physical-device performance. Linux parsing and source
+review cannot validate AVAudioConverter behavior; fresh Mac execution is required.
+The preceding compiler failure is preserved in the
+[77c3d6c receipt](../qa/receipts/20261110/mac-77-ci.json).
+
+At `e295aaf`, both production and test compilation passed. Independent validation
+of the [PR artifact](../qa/receipts/20261110/mac-e295-ci.json) confirms 2,327
+completed native tests in 25 of 28 partitions. All owned-event tests and the
+production Setup-card/guide journeys now pass with inert services. The semantic
+button fixture still rejects its press and the following SwiftUI journey exits
+with a trap; actual film tests cannot reach their initial playing/advancing
+condition; the cold Python fixtures retain five issues and sampling is unavailable.
+These three failures remain failures. None of the film pause/requeue assertions
+is accepted merely because the earlier compile errors were repaired.

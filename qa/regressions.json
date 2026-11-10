@@ -1699,6 +1699,30 @@
         "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
         "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
       }
+    },
+    {
+      "id": "REG-141",
+      "failure": "Native Sendable conversion callbacks captured a mutable fed flag and a borrowed non-Sendable PCM buffer without an explicit owner. A per-conversion read-only buffer owner now serializes consume-once state and distinguishes live input starvation from final end-of-stream.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-AudioSamplesConversionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+        "function": "inputOwnerSuppliesExactlyOnceAcrossConcurrentRequests"
+      }
+    },
+    {
+      "id": "REG-142",
+      "failure": "The Sendable resampler held a mutable AVAudioConverter without a conversion ownership boundary. A nonblocking guard now rejects overlap: live conversion drops that failed chunk and checked file conversion throws, while a later uncontested conversion still succeeds.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-AudioSamplesConversionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+        "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
+      }
     }
   ]
 }

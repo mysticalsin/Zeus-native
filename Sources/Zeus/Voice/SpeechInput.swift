@@ -370,13 +370,10 @@ final class SpeechInput: @unchecked Sendable {
         let ratio = targetFormat.sampleRate / file.processingFormat.sampleRate
         let capacity = AVAudioFrameCount(Double(source.frameLength) * ratio) + 64
         guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { throw InputError.recognizerUnavailable }
-        var fed = false
+        let conversionInput = PCMConversionInput(buffer: source, final: true)
         var convertError: NSError?
         converter.convert(to: converted, error: &convertError) { _, status in
-            if fed { status.pointee = .endOfStream; return nil }
-            fed = true
-            status.pointee = .haveData
-            return source
+            conversionInput.take(status: status)
         }
         VoiceLog.log("inject", "convert error \(String(describing: convertError)) convertedFrames \(converted.frameLength)")
         guard convertError == nil, converted.frameLength > 0 else { throw InputError.recognizerUnavailable }
