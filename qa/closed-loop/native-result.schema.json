@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "description": "App CI native evidence. native_evidence.validate_receipt recomputes current source, exact policy, compiled discovery and qualified lifecycle events. No device-proof claim.",
+  "description": "App CI native evidence. Version 2 records one Core module process followed by each mapped App suite process. native_evidence.validate_receipt recomputes current source, exact ordered policy, compiled discovery and every process qualified lifecycle; all partitions must pass. No device-proof claim.",
   "properties": {
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "status": {
       "enum": [
@@ -202,48 +202,185 @@
         "minLength": 1
       }
     },
-    "native_run": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "kind": {
-          "type": "string",
-          "minLength": 1
-        },
-        "tier": {
-          "type": "string",
-          "minLength": 1
-        },
-        "scope": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "passed",
-            "failed",
-            "blocked",
-            "not-run",
-            "unimplemented"
-          ]
-        },
-        "command": {
-          "type": "array",
-          "items": {
+    "native_runs": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Exact ordered mapped check rows: Core module first, then one App suite per sequential process. IDs, commands, artifacts and process completion are independently verified.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
             "type": "string",
             "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "native-module",
+              "native-fixture"
+            ]
+          },
+          "tier": {
+            "const": "native-integration"
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "blocked",
+              "not-run",
+              "unimplemented"
+            ]
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "tests": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "suites": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "passed_functions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "path",
+                "sha256"
+              ]
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blocker": {
+            "enum": [
+              "native-build",
+              "native-discovery"
+            ]
+          },
+          "passed_cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/passedCase"
+            }
+          },
+          "parameter_cases": {
+            "type": "integer",
+            "minimum": 0
           }
         },
-        "exit_code": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
+        "required": [
+          "id",
+          "kind",
+          "tier",
+          "scope",
+          "status",
+          "command",
+          "exit_code",
+          "tests",
+          "suites",
+          "passed_functions",
+          "artifacts",
+          "passed_cases",
+          "parameter_cases"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "blocker"
+              ]
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "blocked"
+                },
+                "command": {
+                  "maxItems": 0
+                },
+                "exit_code": {
+                  "type": "null"
+                },
+                "tests": {
+                  "const": 0
+                },
+                "suites": {
+                  "const": 0
+                },
+                "passed_functions": {
+                  "maxItems": 0
+                },
+                "artifacts": {
+                  "maxItems": 0
+                },
+                "passed_cases": {
+                  "maxItems": 0
+                },
+                "parameter_cases": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "native_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Recomputed totals and qualified case union from every required passing process; cannot substitute for per-process evidence.",
+      "required": [
+        "tests",
+        "suites",
+        "parameter_cases",
+        "passed_cases"
+      ],
+      "properties": {
         "tests": {
           "type": "integer",
           "minimum": 0
@@ -252,177 +389,17 @@
           "type": "integer",
           "minimum": 0
         },
-        "passed_functions": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "artifacts": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "path": {
-                "type": "string",
-                "minLength": 1
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              }
-            },
-            "required": [
-              "path",
-              "sha256"
-            ]
-          }
-        },
-        "reason": {
-          "type": "string"
-        },
-        "duration_seconds": {
-          "type": "number",
+        "parameter_cases": {
+          "type": "integer",
           "minimum": 0
-        },
-        "package": {
-          "type": "string",
-          "minLength": 1
-        },
-        "blocker": {
-          "enum": [
-            "native-build",
-            "native-discovery"
-          ]
         },
         "passed_cases": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "file",
-              "function",
-              "line",
-              "column",
-              "parameterized",
-              "parameter_cases"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "file": {
-                "type": "string",
-                "pattern": "^Tests/Zeus(Core|App)Tests/"
-              },
-              "function": {
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"
-              },
-              "line": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "column": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "parameterized": {
-                "type": "boolean"
-              },
-              "parameter_cases": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true
-              }
-            }
-          }
-        },
-        "parameter_cases": {
-          "type": "integer",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "id",
-        "kind",
-        "tier",
-        "scope",
-        "status",
-        "command",
-        "exit_code",
-        "tests",
-        "suites",
-        "passed_functions",
-        "artifacts"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "blocker"
-            ]
-          },
-          "then": {
-            "properties": {
-              "status": {
-                "const": "blocked"
-              },
-              "command": {
-                "maxItems": 0
-              },
-              "exit_code": {
-                "type": "null"
-              },
-              "tests": {
-                "const": 0
-              },
-              "suites": {
-                "const": 0
-              },
-              "passed_functions": {
-                "maxItems": 0
-              },
-              "artifacts": {
-                "maxItems": 0
-              },
-              "passed_cases": {
-                "maxItems": 0
-              },
-              "parameter_cases": {
-                "const": 0
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "enum": [
-                  "native-fixture",
-                  "native-module",
-                  "native-combined"
-                ]
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "passed_cases",
-              "parameter_cases"
-            ]
+            "$ref": "#/$defs/passedCase"
           }
         }
-      ]
+      }
     }
   },
   "required": [
@@ -452,7 +429,8 @@
           "registry_sha256",
           "native_build",
           "native_discovery",
-          "native_run"
+          "native_runs",
+          "native_summary"
         ],
         "properties": {
           "platform": {
@@ -464,5 +442,53 @@
         }
       }
     }
-  ]
+  ],
+  "$defs": {
+    "passedCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "file",
+        "function",
+        "line",
+        "column",
+        "parameterized",
+        "parameter_cases"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^Tests/Zeus(Core|App)Tests/"
+        },
+        "function": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parameterized": {
+          "type": "boolean"
+        },
+        "parameter_cases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
 }

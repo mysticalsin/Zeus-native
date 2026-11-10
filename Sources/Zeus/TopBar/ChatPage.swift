@@ -270,14 +270,15 @@ private struct NewChatForm: View {
                     .menuStyle(.button).buttonStyle(.plain).fixedSize()
                 }
                 HStack(spacing: 8) {
-                    NotchTextField(text: $hub.newInstruction, placeholder: "What should \(hub.newTool.title) do?", onSubmit: start)
+                    NotchTextField(text: $hub.newInstruction, placeholder: hub.offeredTools.isEmpty ? "Choose an agent in Settings first" : "What should \(hub.newTool.title) do?", onSubmit: start)
                         .padding(.horizontal, 10).frame(height: 32)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     CardButton(title: hub.launching ? "Starting…" : "Start", tint: Theme.accent, filled: true, action: start)
-                        .opacity(hub.request.isValid ? 1 : 0.4)
-                        .disabled(!hub.request.isValid || hub.launching)
+                        .opacity(hub.canLaunch ? 1 : 0.4)
+                        .disabled(!hub.canLaunch)
                 }
-                Text(hub.launchMessage ?? "Opens \(hub.newTool.title) in your terminal. It shows up here and in the notch once it starts.")
+                Text(hub.offeredTools.isEmpty ? "Choose an agent in Settings → Integrations to start a new chat."
+                     : hub.launchMessage ?? "Opens \(hub.newTool.title) in your terminal. It shows up here and in the notch once it starts.")
                     .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
             }
         }

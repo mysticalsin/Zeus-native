@@ -83,4 +83,51 @@ struct BridgePendingRepliesTests {
         #expect(decoded.filter { $0.error?.code == "duplicate_request" }.count == 31)
         #expect(pending.count == 0)
     }
+
+    @Test func terminalFailureDrainsAllRepliesOnceOutsideTheLockAndCancelsTheirTimers() async throws {
+        let pending = BridgePendingReplies()
+        let replies = Box<[Data?]>([])
+        for id in ["first", "second"] {
+            let token = try #require(pending.reserve(id: id) { data in
+                #expect(pending.count == 0, "Terminal callbacks must run after the registry lock is released")
+                replies.change { $0.append(data) }
+            })
+            #expect(pending.armTimeout(id: id, token: token, after: 10))
+        }
+        pending.failAll(BridgeError(code: "not_connected"))
+        pending.failAll(BridgeError(code: "again"))
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(replies.read().count == 2 && pending.count == 0)
+        let responses = try replies.read().map { try JSONDecoder().decode(BridgeResponse.self, from: #require($0)) }
+        #expect(responses.allSatisfy { $0.error?.code == "not_connected" })
+        #expect(!pending.complete(.success("first")))
+    }
+
+    @Test func completedRequestTimerCanBeRearmedOnlyForTheCurrentReservation() async throws {
+        let pending = BridgePendingReplies()
+        let replies = Box<[Data?]>([])
+        let first = try #require(pending.reserve(id: "reuse") { data in replies.change { $0.append(data) } })
+        #expect(pending.armTimeout(id: "reuse", token: first, after: 10))
+        #expect(pending.complete(.success("reuse"), token: first))
+        let second = try #require(pending.reserve(id: "reuse") { data in replies.change { $0.append(data) } })
+        #expect(pending.armTimeout(id: "reuse", token: second, after: 10))
+        #expect(!pending.armTimeout(id: "reuse", token: first, after: 0.01))
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(replies.read().count == 1 && pending.count == 1)
+        #expect(pending.complete(.success("reuse"), token: second))
+        #expect(replies.read().count == 2 && pending.count == 0)
+    }
+
+    @Test func aLiveReservationDeadlineProducesOneTimeoutReply() async throws {
+        let pending = BridgePendingReplies()
+        let replies = Box<[Data?]>([])
+        let token = try #require(pending.reserve(id: "deadline") { data in replies.change { $0.append(data) } })
+        #expect(pending.armTimeout(id: "deadline", token: token, after: 0.03))
+        try await eventually { replies.read().count == 1 }
+        let item = try #require(replies.read().first)
+        let response = try JSONDecoder().decode(BridgeResponse.self, from: #require(item))
+        #expect(response.error?.code == "timeout" && pending.count == 0)
+        #expect(!pending.complete(.success("deadline"), token: token))
+    }
+
 }

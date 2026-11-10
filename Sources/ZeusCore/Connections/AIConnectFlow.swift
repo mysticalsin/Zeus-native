@@ -232,10 +232,17 @@ public enum AIConnectFlow {
         return nil
     }
 
+    public static func hookConnectionMessage(_ provider: AIProvider, signedIn: Bool?) -> String {
+        switch signedIn {
+        case true: "Hooks installed. \(provider.title) is signed in."
+        case false: "Hooks installed, but \(provider.title) isn't signed in. Click Sign in."
+        case nil: "Hooks installed. Sign-in status could not be verified; check the provider's app or CLI."
+        }
+    }
+
     /// One-click presets for the endpoint card. The model is a small one; Tony can change it.
     public static let endpointPresets: [AIEndpointPreset] = [
         AIEndpointPreset(title: "OpenAI", baseURL: "https://api.openai.com/v1", model: "gpt-5-mini"),
-        AIEndpointPreset(title: "Anthropic", baseURL: "https://api.anthropic.com/v1", model: "claude-haiku-4-5"),
     ]
 
     static func jsonObject(in text: String) -> [String: Any]? {

@@ -34,9 +34,7 @@ struct AIConnectionsPage: View {
         AnyLLMCard(services: services)
         GSCard("Available apps") {
             let shown = AIProvider.allCases.filter { provider in
-                // Any LLM is offered only once its endpoint passed a test.
-                if provider == .anyLLM, case .connected = model.status(provider, services: services) { return true }
-                if provider == .anyLLM { return false }
+                guard provider.supportsNewChats else { return false }
                 return model.installed(provider) || model.status(provider, services: services) != .notInstalled
             }
             ForEach(Array(shown.enumerated()), id: \.element) { index, provider in
@@ -59,7 +57,7 @@ struct AIConnectionsPage: View {
                 BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
                 GSRow(title: provider.title, text: model.detail(provider, services: services)) {
                     HStack(spacing: 10) {
-                        if connected { GSStatus(ok: true, text: "Connected") }
+                        if connected { GSStatus(ok: true, text: provider.kind == .app ? "Available" : "Connected") }
                         else if step == .install { GSStatus(ok: false, text: "Not found") }
                         if model.busy.contains(provider) {
                             ProgressView().controlSize(.small)
@@ -68,6 +66,10 @@ struct AIConnectionsPage: View {
                             Button(step.buttonTitle) { model.primary(provider, services: services) }
                                 .buttonStyle(GSButtonStyle(prominent: true))
                                 .accessibilityLabel("\(step.buttonTitle) \(provider.title)")
+                        } else if provider.kind == .app {
+                            Button("Open") { model.openApp(provider, services: services) }
+                                .buttonStyle(GSButtonStyle())
+                                .accessibilityLabel("Open \(provider.title)")
                         } else if provider.kind == .hooked {
                             Button("Repair") { Task { await model.connectAndCheck(provider, services: services) } }
                                 .buttonStyle(GSButtonStyle())
@@ -145,9 +147,9 @@ private struct AnyLLMCard: View {
                 }
             }
             GSDivider()
-            field("Base URL", "https://api.example.com/v1", Binding(get: { model.anyLLM.baseURL }, set: { model.anyLLM.baseURL = $0; model.endpointEdited() }))
+            field("Base URL", "https://api.example.com/v1", Binding(get: { model.anyLLM.baseURL }, set: { model.anyLLM.baseURL = $0 }))
             GSDivider()
-            field("Model", "model name", Binding(get: { model.anyLLM.model }, set: { model.anyLLM.model = $0; model.endpointEdited() }))
+            field("Model", "model name", Binding(get: { model.anyLLM.model }, set: { model.anyLLM.model = $0 }))
             GSDivider()
             GSRow(title: "API key", text: model.anyLLMKeySaved ? "Saved in your Keychain. Zeus reads it once." : "Kept in your Keychain. Leave empty for a local server.") {
                 HStack(spacing: 10) {

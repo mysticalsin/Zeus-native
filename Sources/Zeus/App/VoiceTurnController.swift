@@ -135,7 +135,7 @@ final class VoiceTurnController {
         do {
             try speech.start()
         } catch {
-            VoiceLog.log("error", "can't start listening: \(error.localizedDescription) (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech))")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
                 VoicePermissions.notifyDenied(cue, pane)
@@ -451,7 +451,6 @@ final class VoiceTurnController {
         let problem = await plan.run { [weak self] in
             let elapsed = FastPath.ms(ContinuousClock.now - finalAt)
             fast.signposter.emitEvent("action started", "\(elapsed, format: .fixed(precision: 1), privacy: .public) ms")
-            NSLog("[ZEUS] fast: %@ via %@ started %.1fms after the transcript", plan.summary, engine, elapsed)
             VoiceLog.log("route", "fast via \(engine): \(plan.intent.intentLabel)")
             VoiceLog.log("action", "\(VoiceLog.described(plan.summary)) started \(String(format: "%.0f", elapsed)) ms after the transcript")
             IntelligenceCenter.shared.announce(engine: engine, summary: plan.summary)
@@ -468,10 +467,9 @@ final class VoiceTurnController {
         // said, which is nothing.
         var result = TurnResult(spoken: plan.ack ?? "", actions: ["fast \(plan.intent.intentLabel) via \(engine): \(plan.summary)"])
         if let problem {
-            NSLog("[ZEUS] fast: %@ problem: %@", plan.summary, problem)
             result.problems.append(problem)
             AvatarStatus.shared.flash(.error, for: 2)
-            VoiceLog.log("error", "action problem: \(problem)")
+            VoiceLog.logContent("error", problem, prefix: "action problem: ")
             ZeusSound.play(.voiceError)
             let spoken = SpokenFailure.line(problem)
             if speak { say(spoken) } else { buddy.showCaption(spoken); buddy.hideCaption() }
@@ -498,7 +496,6 @@ final class VoiceTurnController {
 
     /// Not sure which one you meant: ask instead of guessing.
     private func askBack(_ question: String, engine: String, transcript: String, speak: Bool) -> TurnResult {
-        NSLog("[ZEUS] fast: asking (%@): %@", engine, question)
         VoiceLog.logContent("route", question, prefix: "fast via \(engine) asks: ")
         buddy.idle()
         if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
@@ -566,13 +563,13 @@ final class VoiceTurnController {
             }
             if changed {
                 do { try persistence.save(store) } catch {
-                    VoiceLog.log("error", "memory save: \(error.localizedDescription)")
+                    VoiceLog.logContent("error", error.localizedDescription, prefix: "memory save: ")
                     reply = "I couldn't save that, so nothing changed."
                     logOutcome = "save failed"
                 }
             }
         } catch {
-            VoiceLog.log("error", "memory load: \(error.localizedDescription)")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "memory load: ")
             reply = "I can't read my memory file, so I left it alone."
             logOutcome = "load failed"
         }
@@ -838,7 +835,7 @@ final class VoiceTurnController {
                         }
                         lastErrors.append(text)
                         for racer in slice { BrainLatencyBook.shared.recordFailure(racer.id) }
-                        VoiceLog.log("route", "\(opened.engine()) failed (\(text.prefix(80)))")
+                        VoiceLog.logContent("route", text, prefix: "\(opened.engine()) failed; detail ")
                         cursor += slice.count
                         deepNow = true
                         if cursor >= candidates.count {
@@ -872,7 +869,7 @@ final class VoiceTurnController {
             guard !Task.isCancelled else { return TurnResult(cancelled: true) }
             buddy.idle()
             let message = Self.spokenError(error)
-            VoiceLog.log("error", "brain: \(error.localizedDescription)")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "brain: ")
             ZeusSound.play(.voiceError)
             AvatarStatus.shared.flash(.error, for: 3)
             result.error = message

@@ -16,6 +16,18 @@ Native control, consented hardware, signing and distribution proof remain requir
   their existing journal/readback rules rather than automatically replaying.
 - Untrusted JSON-RPC numeric IDs and error codes cannot trap integer conversion.
   Bridge pending replies retain the original request when a duplicate ID arrives.
+- Native-host framing validates the four-byte header before retaining its body.
+  Output admission is bounded to 32 frames / 8 MiB with absolute write deadlines.
+  A broken stream closes the host; clean EOF drains accepted responses first.
+- Local Python helper execution now bounds stdin writes, stdout/stderr retention
+  and termination cleanup. A helper that ignores SIGTERM cannot turn a timeout
+  into a reported success. This does not establish task cancellation or kill an
+  arbitrary descendant process tree.
+- Custom OpenAI-compatible endpoints require HTTPS outside exact loopback hosts.
+  Both request construction and dispatch enforce this; redirects are not followed
+  with prompts or credentials. Changing the address, model or key invalidates the
+  previous connection check. Unknown sign-in status remains unknown, and app-only
+  launchers do not advertise unsupported prompt delivery.
 - Microphone-status reads have a bounded number of in-flight workers. Hung OS
   reads cannot accumulate replacement workers; stale evidence remains unknown.
 - Credential deletion succeeds only when the backend confirms removal or absence.
@@ -24,6 +36,11 @@ Native control, consented hardware, signing and distribution proof remain requir
   cannot restore credentials after an explicit deactivation.
 - Provider logos identify supported integrations. Their source versions and
   hashes are recorded; images use a bounded cache instead of repeated file decode.
+- Voice diagnostic sinks share one redacted record. Wake transcripts, conversation
+  text and provider errors use metadata unless content logging was explicitly
+  enabled; that option never bypasses credential redaction. Oversized diagnostics,
+  including one grapheme with many combining marks, are omitted before expensive
+  pattern matching rather than publishing truncated credential fragments.
 - Recording effects use display-synchronized clocks, pause when hidden or reduced,
   and stop after finite reveals. Meetings separates decorative drawing from
   static content. Incoming-word layout is cached until actual text admission.
@@ -51,3 +68,14 @@ Strict accessibility assertions remain mandatory and separate from the new
 owned-window event journeys. A failure or an unavailable GUI is not a passing
 user journey. Signing, notarization, Gatekeeper, rollback and clean-machine
 installation also require evidence from the exact final artifact.
+
+At 82e310c, production and test-target compilation passed, but the combined
+native test process ended without its terminal summary. It is not a passing
+native run. The next runner isolates each selected app suite from other suites'
+snapshot flags and application lifecycle, retaining the same strict assertions
+and complete compiler-derived test selection.
+
+The resident Kokoro voice worker still needs a separate cancellation and output
+publication repair: synthetic process reproduction showed a cancelled render
+waiting and a WAV path returned while its file was still being written. The
+bounded one-shot helper repair above does not fix this resident-worker path.

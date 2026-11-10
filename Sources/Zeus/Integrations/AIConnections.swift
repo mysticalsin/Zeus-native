@@ -15,15 +15,21 @@ final class AIConnections {
         case connected(String)
     }
 
-    enum TestState: Equatable { case idle, testing, passed(String), failed(String) }
+    typealias TestState = AnyLLMEndpointValidation.State
 
     private(set) var detections: [AIProvider: AIProviderDetection] = [:]
     private(set) var serverModels: [AIProvider: Int] = [:]
     private(set) var checking = false
     var messages: [AIProvider: String] = [:]
-    var anyLLM: AnyLLMConfig { didSet { Self.save(anyLLM) } }
+    var anyLLM: AnyLLMConfig {
+        didSet {
+            Self.save(anyLLM)
+            if oldValue != anyLLM { endpointEdited() }
+        }
+    }
     private(set) var anyLLMKeySaved = false
-    var anyLLMTest: TestState = .idle
+    private var endpointValidation = AnyLLMEndpointValidation()
+    var anyLLMTest: TestState { endpointValidation.state }
     /// The key being typed; cleared once saved (this toolchain has no SwiftUI `@State` macro).
     var keyDraft = ""
     /// Last auth-status answer per CLI (Sign in / Connect), from a free status check.
@@ -32,8 +38,7 @@ final class AIConnections {
     var installShown: AIProvider?
     /// Rows with a primary action in flight.
     var busy: Set<AIProvider> = []
-    /// Bumped by every edit, key change and disconnect so an older endpoint test cannot report for the new setup.
-    @ObservationIgnored private var anyLLMGeneration = 0
+    private var offerRevision = 0
     @ObservationIgnored var signInWatch: [AIProvider: Task<Void, Never>] = [:]
     @ObservationIgnored private let defaults = UserDefaults.standard
 
@@ -42,10 +47,12 @@ final class AIConnections {
             .flatMap { try? JSONDecoder().decode(AnyLLMConfig.self, from: $0) } ?? AnyLLMConfig()
         anyLLMKeySaved = Keychain.get(AnyLLMConfig.keyAccount) != nil
         detections = AIProviderDetector.detectAll()
+        // Remove credential-bearing URL values saved by earlier builds without using them.
+        Self.save(anyLLM)
     }
 
     private static func save(_ config: AnyLLMConfig) {
-        if let data = try? JSONEncoder().encode(config) { UserDefaults.standard.set(data, forKey: AnyLLMConfig.defaultsKey) }
+        if let data = try? JSONEncoder().encode(config.configurationForPreferences) { UserDefaults.standard.set(data, forKey: AnyLLMConfig.defaultsKey) }
     }
 
     // MARK: Status
@@ -62,7 +69,7 @@ final class AIConnections {
             return installed(provider) || AgentHookInstaller.isAvailable(agent) ? .ready : .notInstalled
         case .grok, .chatgpt:
             guard installed(provider) else { return .notInstalled }
-            return defaults.bool(forKey: enabledKey(provider)) ? .connected("The app opens with your question.") : .ready
+            return defaults.bool(forKey: enabledKey(provider)) ? .connected("Opens the app. Prompt handoff is not supported.") : .ready
         case .ollama, .lmStudio:
             if let count = serverModels[provider] { return .connected(count == 1 ? "Running, 1 model." : "Running, \(count) models.") }
             return installed(provider) ? .ready : .notInstalled
@@ -71,7 +78,7 @@ final class AIConnections {
             if case .passed(let text) = anyLLMTest { return .connected(text) }
             // A refused or unreachable endpoint is never "saved and connected".
             if case .failed = anyLLMTest { return .ready }
-            return defaults.bool(forKey: enabledKey(.anyLLM)) ? .connected("Endpoint saved.") : .ready
+            return .ready
         }
     }
 
@@ -88,7 +95,7 @@ final class AIConnections {
         case .ready:
             switch provider.kind {
             case .hooked: return "Found on this Mac. Connect to follow it from the notch."
-            case .app: return "Found on this Mac. Open it to hand questions to it."
+            case .app: return "Found on this Mac. Open the app here; prompt handoff is not supported."
             case .localServer: return provider == .ollama ? "Found on this Mac. Start runs Ollama." : "Found on this Mac. Start runs the LM Studio server."
             case .endpoint: return "Test the endpoint to connect it."
             }
@@ -114,7 +121,6 @@ final class AIConnections {
             defaults.set(true, forKey: enabledKey(provider))
             Task { await refresh(only: provider) }
         case .anyLLM:
-            defaults.set(true, forKey: enabledKey(.anyLLM))
             Task { await testAnyLLM() }
         }
         services.refresh()
@@ -128,7 +134,7 @@ final class AIConnections {
             if let agent = provider.hookAgent { try? AgentHookInstaller.uninstall(agent) }
         default:
             defaults.set(false, forKey: enabledKey(provider))
-            if provider == .anyLLM { anyLLMGeneration &+= 1; anyLLMTest = .idle }
+            if provider == .anyLLM { endpointEdited() }
         }
         serverModels[provider] = nil
         services.refresh()
@@ -166,66 +172,71 @@ final class AIConnections {
     /// (Return in the field) check for empty first. False when the Keychain refused: the caller keeps the draft.
     @discardableResult
     func saveAnyLLMKey(_ key: String) -> Bool {
-        anyLLMGeneration &+= 1
+        endpointEdited()
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             guard Keychain.remove(AnyLLMConfig.keyAccount) else {
-                anyLLMTest = .failed("Couldn't remove the key. Check Keychain access and try again.")
+                endpointRejected("Couldn't remove the key. Check Keychain access and try again.")
                 return false
             }
             anyLLMKeySaved = false
         } else {
             guard Keychain.set(trimmed, for: AnyLLMConfig.keyAccount) else {
-                anyLLMTest = .failed("Couldn't save the key to your Keychain. It is still in the field.")
+                endpointRejected("Couldn't save the key to your Keychain. It is still in the field.")
                 return false
             }
             anyLLMKeySaved = true
         }
-        anyLLMTest = .idle
         return true
     }
 
     /// The address or model changed: the earlier test and the "connected" flag no longer apply.
     func endpointEdited() {
-        anyLLMGeneration &+= 1
-        anyLLMTest = .idle
+        endpointValidation.invalidate()
         messages[.anyLLM] = nil
+        defaults.set(false, forKey: enabledKey(.anyLLM))
+    }
+
+    func endpointRejected(_ reason: String) {
+        endpointValidation.invalidate(reason: reason)
         defaults.set(false, forKey: enabledKey(.anyLLM))
     }
 
     /// Lists the endpoint's models. No tokens are spent; a 401 means the address is right and the key is wrong.
     func testAnyLLM() async {
-        guard let url = anyLLM.modelsURL else { anyLLMTest = .failed("Add a base URL first."); return }
-        if anyLLM.isInsecureRemote { anyLLMTest = .failed("Plain http is only allowed for this Mac. Use https."); return }
+        guard let url = anyLLM.modelsURL else { endpointRejected("Add a base URL first."); return }
+        guard AnyLLMEndpointPolicy.permits(url) else {
+            endpointRejected("Use https for remote servers and keep credentials in the API key field.")
+            return
+        }
         // One test at a time; a second press while one is running changes nothing.
-        if case .testing = anyLLMTest { return }
-        anyLLMTest = .testing
-        let generation = anyLLMGeneration
+        guard let generation = endpointValidation.begin() else { return }
+        defaults.set(false, forKey: enabledKey(.anyLLM))
         var request = URLRequest(url: url, timeoutInterval: 10)
         if let key = Keychain.get(AnyLLMConfig.keyAccount) { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         let result: TestState
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await AnyLLMHTTPTransport.data(for: request)
             switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
             case 200..<300: result = .passed("Connected to \(url.host ?? "the endpoint").")
             case 401, 403: result = .failed("The endpoint refused the key.")
-            case 404: result = .passed("Reached \(url.host ?? "the endpoint"). It does not list models.")
+            case 300..<400: result = .failed("The endpoint redirected. Save its final address, then test again.")
+            case 404: result = .failed("The endpoint did not expose a models list. Check its API base URL.")
             case let code: result = .failed("The endpoint answered \(code).")
             }
         } catch {
             result = .failed("Could not reach \(url.host ?? "the endpoint").")
         }
         // An edit, a key change or a disconnect while the request ran made this answer about another setup.
-        guard generation == anyLLMGeneration else { return }
-        anyLLMTest = result
-        // The flag is set before a test starts (Connect, Test); a failed test takes it back.
-        if case .failed = result { defaults.set(false, forKey: enabledKey(.anyLLM)) }
+        guard endpointValidation.complete(result, generation: generation) else { return }
+        defaults.set(endpointValidation.isApproved, forKey: enabledKey(.anyLLM))
     }
 
     /// One answer from the endpoint, for routing a question to it.
     func askAnyLLM(_ prompt: String) async -> String? {
         guard let request = anyLLM.request(prompt: prompt, key: Keychain.get(AnyLLMConfig.keyAccount)),
-              let (data, _) = try? await URLSession.shared.data(for: request) else { return nil }
+              let (data, response) = try? await AnyLLMHTTPTransport.data(for: request),
+              let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { return nil }
         return AnyLLMConfig.answer(from: data)
     }
 
@@ -235,18 +246,22 @@ final class AIConnections {
 
     /// "Offer for new chats". Claude Code and Codex keep the toggles Settings already had.
     func offers(_ provider: AIProvider) -> Bool {
-        switch provider {
+        _ = offerRevision
+        return switch provider {
         case .claudeCode: SettingsStore.shared.bool("integrations.offerClaude")
         case .codex: SettingsStore.shared.bool("integrations.offerCodex")
-        default: defaults.object(forKey: provider.offerKey) as? Bool ?? false
+        case .cursor, .gemini: defaults.object(forKey: provider.offerKey) as? Bool ?? true
+        default: false
         }
     }
 
     func setOffers(_ provider: AIProvider, _ on: Bool) {
+        guard provider.supportsNewChats else { return }
         switch provider {
         case .claudeCode: SettingsStore.shared.set("integrations.offerClaude", on ? "true" : "false")
         case .codex: SettingsStore.shared.set("integrations.offerCodex", on ? "true" : "false")
         default: defaults.set(on, forKey: provider.offerKey)
         }
+        offerRevision &+= 1
     }
 }

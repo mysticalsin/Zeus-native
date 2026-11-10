@@ -10,6 +10,23 @@ from contracts import (ROOT, Invalid, digest, fields, require, runnable_function
 NATIVE_KINDS = {"native-fixture", "native-module"}
 
 
+def partitions(definitions):
+    """One Core process, then each explicitly selected app suite in map order."""
+    require(type(definitions) is list and definitions, "native partitions missing")
+    require(all(row.get("kind") in NATIVE_KINDS for row in definitions), "unknown native partition")
+    ids = [row.get("id") for row in definitions]
+    require(all(type(ident) is str and ident for ident in ids) and len(set(ids)) == len(ids),
+            "native partition IDs are missing or duplicated")
+    core = [row for row in definitions if row["kind"] == "native-module"]
+    app = [row for row in definitions if row["kind"] == "native-fixture"]
+    require(len(core) == 1 and core[0].get("module") == "ZeusCoreTests", "exactly one complete Core partition is required")
+    require(all(row.get("file", "").startswith("Tests/ZeusAppTests/") for row in app),
+            "only app suites may follow the complete Core partition")
+    # selector also rejects duplicate suite selectors, even under distinct IDs.
+    selector(definitions)
+    return core + app
+
+
 def module_for(definition):
     return definition["module"] if definition["kind"] == "native-module" else definition["file"].split("/")[1]
 
@@ -283,6 +300,26 @@ def validate_run_receipt(row, root, compiled, definitions, jobs, recorded_repo, 
     return metrics
 
 
+def validate_partition_receipts(rows, root, compiled, definitions, jobs, recorded_repo, recorded_output, repo=ROOT):
+    ordered = partitions(definitions)
+    require(type(rows) is list and len(rows) == len(ordered), "native partition receipts are missing or duplicated")
+    require([row.get("id") if type(row) is dict else None for row in rows] == [row["id"] for row in ordered],
+            "native partition order or selection changed")
+    passed = {}
+    totals = {"tests": 0, "suites": 0, "parameter_cases": 0}
+    for row, definition in zip(rows, ordered):
+        require(row.get("kind") == definition["kind"], "native partition kind changed")
+        metrics = validate_run_receipt(row, root, compiled, [definition], jobs, recorded_repo, recorded_output, repo)
+        for case in metrics["passed_cases"]:
+            require(case["id"] not in passed, "native partitions executed a test more than once")
+            passed[case["id"]] = case
+        for key in totals:
+            totals[key] += metrics[key]
+    require(set(passed) == set(compiled["functions"]), "native partition union omitted or invented a compiled function")
+    require(totals["tests"] == len(passed), "native partition counts disagree with their exact union")
+    return {**totals, "passed_cases": [passed[ident] for ident in sorted(passed)]}
+
+
 def validate_receipt(root, expected_sha, head_sha, definitions, repo=ROOT):
     """Recompute the CI app's complete Core + explicit app selection from raw events."""
     require(not root.is_symlink(), "native evidence root is redirected")
@@ -293,8 +330,8 @@ def validate_receipt(root, expected_sha, head_sha, definitions, repo=ROOT):
     result = load(result_path)
     fields(result, {"schema_version", "status", "tested_sha", "head_sha", "repository", "output_directory", "platform",
                     "source_snapshot_sha256", "source_manifest", "map_sha256", "registry_sha256", "native_build",
-                    "native_discovery", "native_run", "errors"})
-    require(type(result["schema_version"]) is int and result["schema_version"] == 1, "unsupported native receipt")
+                    "native_discovery", "native_runs", "native_summary", "errors"})
+    require(type(result["schema_version"]) is int and result["schema_version"] == 2, "unsupported native receipt")
     require(result["status"] == "passed" and result["errors"] == [] and result["platform"] == "darwin", "native run did not pass on macOS")
     require(result["tested_sha"] == expected_sha and result["head_sha"] == head_sha, "native receipt belongs to other source revision")
     require(result["map_sha256"] == digest((repo / "qa/feature-map.json").read_bytes())
@@ -305,9 +342,11 @@ def validate_receipt(root, expected_sha, head_sha, definitions, repo=ROOT):
     validate_native_build(result["native_build"], root, result["source_snapshot_sha256"])
     compiled = validate_discovery_receipt(result["native_discovery"], root, result["source_snapshot_sha256"],
                                            definitions, result["repository"], result["output_directory"], repo)
-    require(result["native_run"]["id"] == "native-all" and result["native_run"]["kind"] == "native-combined", "native app selection changed")
-    metrics = validate_run_receipt(result["native_run"], root, compiled, definitions,
-                                   result["native_build"]["command"][4], result["repository"], result["output_directory"], repo)
+    metrics = validate_partition_receipts(result["native_runs"], root, compiled, definitions,
+                                          result["native_build"]["command"][4], result["repository"], result["output_directory"], repo)
+    fields(result["native_summary"], {"tests", "suites", "parameter_cases", "passed_cases"})
+    require(all(type(result["native_summary"][key]) is int for key in ("tests", "suites", "parameter_cases"))
+            and result["native_summary"] == metrics, "native summary differs from the verified partition union")
     native_ids = {definition["id"] for definition in definitions}
     for feature in load(repo / "qa/feature-map.json")["features"]:
         for obligation in feature["obligations"]:

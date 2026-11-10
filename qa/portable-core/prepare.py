@@ -33,6 +33,11 @@ GROUPS = {
         core("UnixSocket.swift"),
         tests("UnixSocketSafetyTests"),
     ),
+    "bridge-transport": (
+        core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
+             "JSONValue.swift", "ZeusPaths.swift", "Version.swift") + ["Sources/zeus-bridge/main.swift"],
+        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
+    ),
     "keychain": (
         core("Keychain/KeychainStore.swift"),
         tests("KeychainStoreTests"),
@@ -198,10 +203,14 @@ def prepare(output, group, *, platform_name=None):
     write_excerpts(root, group, manifest)
     compatibility = group in ("recordly-geometry", "buddy") and platform_name == "linux"
     extra_target = ''
+    products = ''
     core_dependencies = '[]'
     test_dependencies = '["ZeusCore"]'
     test_settings = ''
-    if group == "wiki-export":
+    if group == "bridge-transport":
+        products = 'products: [.executable(name: "zeus-bridge", targets: ["zeus-bridge"])], '
+        extra_target = '    .executableTarget(name: "zeus-bridge", dependencies: ["ZeusCore"]),\n'
+    elif group == "wiki-export":
         wrapper = root / "Sources/zeus-memory-helper/main.swift"
         wrapper.parent.mkdir(parents=True)
         wrapper.write_text('import Foundation\nimport ZeusCore\nexit(WikiExportMCPCommand.run(Array(CommandLine.arguments.dropFirst())))\n')
@@ -231,7 +240,8 @@ def prepare(output, group, *, platform_name=None):
         core_dependencies = '["CoreGraphics"]'
     (root / "Package.swift").write_text(
         '// swift-tools-version: 6.0\nimport PackageDescription\n'
-        'let package = Package(name: "ZeusPortableValidation", platforms: [.macOS("14.2")], targets: [\n'
+        'let package = Package(name: "ZeusPortableValidation", platforms: [.macOS("14.2")], '
+        + products + 'targets: [\n'
         + extra_target + f'    .target(name: "ZeusCore", dependencies: {core_dependencies}),\n'
         +
         f'    .testTarget(name: "ZeusCoreTests", dependencies: {test_dependencies}{test_settings})\n])\n')

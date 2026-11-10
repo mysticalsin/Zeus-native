@@ -469,6 +469,13 @@
       "scope": "Actual AppKit and hosted SwiftUI controls in owned test windows using freshly resolved layout geometry and direct owned-window mouse events. No global event posting, controller-action fallback, permission, capture or other app interaction.",
       "suite": "OwnedWindowEventDriverTests",
       "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift"
+    },
+    {
+      "id": "portable-bridge-transport",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "bridge-transport",
+      "scope": "Exact bridge framing/pipe/ownership source and real zeus-bridge executable with disposable owned pipes/sockets/support directory. No Chrome session, user settings, provider, capture or external network."
     }
   ],
   "features": [
@@ -1733,6 +1740,41 @@
               "function": "officialGrokUsesOriginalSVGAndUnknownProvidersKeepFallback"
             }
           ]
+        },
+        {
+          "id": "F12.provider-connection-truth",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Injected provider policy respects each implemented launcher toggle, keeps all-disabled choices empty, distinguishes unverified authentication from signed-in state, and describes unsupported handoff and endpoint capabilities honestly. No installed-provider authentication or actual chat launch is proved.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+              "function": "installedCursorAndGeminiRespectTheirOwnOfferSwitches"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+              "function": "disablingEveryOfferDoesNotSilentlyRestoreClaude"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+              "function": "onlyImplementedChatLaunchersExposeOfferSettings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+              "function": "unknownAuthNeverClaimsTheProviderIsSignedIn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+              "function": "appOpenDescriptionsDoNotPromiseUnsupportedPromptHandoff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+              "function": "anthropicMessagesAPIIsNotOfferedAsAnOpenAICompatiblePreset"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AgentHubTests.swift",
+              "function": "offeredAgentsFollowTheIntegrationToggles"
+            }
+          ]
         }
       ]
     },
@@ -2039,8 +2081,76 @@
         {
           "id": "F13.bridge-reply-ownership",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Synthetic bridge requests preserve the first pending reply, settle duplicate requests independently, reject stale timeout generations and release owned local sockets. No production Chrome session or external service is used.",
+          "acceptance": "Actual platform Core fixtures exercise bounded bridge framing and pipe lifecycle, clean EOF delivery and token-bound pending replies; duplicate IDs retain the original owner. Only disposable local peers and the built bridge helper are used, never a production Chrome session.",
           "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "oversizedHeaderIsRejectedBeforeAnyDeclaredBodyIsBuffered"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "zeroLengthFramesFailClosedInBothDirections"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "everyFragmentBoundaryPreservesConcatenatedUnicodeMessagesExactly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "maximumInboundFrameStreamsWithoutExceedingItsBodyBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "truncatedEOFRejectsHeaderAndBodyAndReleasesRetainedBytes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "receiverFailureStopsTheSameChunkBeforeItsNextFrame"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "batchedConvenienceRejectsOversizedHeadersAndRetainsOnlyIncompleteTail"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "bufferedConvenienceHasABatchLimitEvenForOtherwiseValidFrames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "slowReaderReceivesOrderedCompleteFramesAcrossPartialWrites"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "nonReadingPeerCannotBlockCallerOrExceedFrameBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "byteBudgetRejectsWorkBeforeTheFrameCountBudgetIsReached"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "nonReadingPeerHitsAnAbsoluteWriteDeadlineAndClosesTheStream"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "stopSettlesQueuedWritesWithoutWaitingForTheirLongDeadline"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "disconnectedReaderDoesNotRaiseSIGPIPEOrLeaveAcceptedWorkPending"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "finalBytesAndEOFArrivingTogetherFinishWithoutAnotherReadinessEvent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "immediateStopAndStopBeforeStartAlwaysSettleTheAcceptedStartOnce"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "droppingAnIdleInputOwnerCancelsItsDescriptorAndEndsTheRead"
+            },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
               "function": "duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete"
@@ -2052,6 +2162,246 @@
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
               "function": "simultaneousDuplicateReservationsHaveOneOwnerAndSettleEveryRejectedReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "terminalFailureDrainsAllRepliesOnceOutsideTheLockAndCancelsTheirTimers"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "completedRequestTimerCanBeRearmedOnlyForTheCurrentReservation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "aLiveReservationDeadlineProducesOneTimeoutReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "nonReadingChromeCannotStrandPendingRequestsOrKeepOpenStdinAlive"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "cleanEOFFlushesAnAlreadyAcceptedCompleteResponseBeforeExit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
+            }
+          ]
+        },
+        {
+          "id": "F13.bridge-wire-contract",
+          "check": "portable-bridge-transport",
+          "acceptance": "Bounded native-message framing, serialized output/backpressure, cancellation, duplicate IDs and clean EOF are exercised with owned local peers and the actual bridge executable. This is not browser integration or device acceptance.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "oversizedHeaderIsRejectedBeforeAnyDeclaredBodyIsBuffered"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "zeroLengthFramesFailClosedInBothDirections"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "everyFragmentBoundaryPreservesConcatenatedUnicodeMessagesExactly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "maximumInboundFrameStreamsWithoutExceedingItsBodyBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "truncatedEOFRejectsHeaderAndBodyAndReleasesRetainedBytes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "receiverFailureStopsTheSameChunkBeforeItsNextFrame"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "batchedConvenienceRejectsOversizedHeadersAndRetainsOnlyIncompleteTail"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
+              "function": "bufferedConvenienceHasABatchLimitEvenForOtherwiseValidFrames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "slowReaderReceivesOrderedCompleteFramesAcrossPartialWrites"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "nonReadingPeerCannotBlockCallerOrExceedFrameBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "byteBudgetRejectsWorkBeforeTheFrameCountBudgetIsReached"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "nonReadingPeerHitsAnAbsoluteWriteDeadlineAndClosesTheStream"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "stopSettlesQueuedWritesWithoutWaitingForTheirLongDeadline"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "disconnectedReaderDoesNotRaiseSIGPIPEOrLeaveAcceptedWorkPending"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "finalBytesAndEOFArrivingTogetherFinishWithoutAnotherReadinessEvent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "immediateStopAndStopBeforeStartAlwaysSettleTheAcceptedStartOnce"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "droppingAnIdleInputOwnerCancelsItsDescriptorAndEndsTheRead"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "anOldTimeoutCannotSettleAReusedRequestID"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "simultaneousDuplicateReservationsHaveOneOwnerAndSettleEveryRejectedReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "terminalFailureDrainsAllRepliesOnceOutsideTheLockAndCancelsTheirTimers"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "completedRequestTimerCanBeRearmedOnlyForTheCurrentReservation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "aLiveReservationDeadlineProducesOneTimeoutReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "nonReadingChromeCannotStrandPendingRequestsOrKeepOpenStdinAlive"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "cleanEOFFlushesAnAlreadyAcceptedCompleteResponseBeforeExit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
+            }
+          ]
+        },
+        {
+          "id": "F13.bounded-helper-process",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Owned local subprocess fixtures bound stdin, stdout/stderr, termination, inherited descriptors and output size; deadlines include blocked input and never report a timed-out helper as success. These fixtures do not execute installed providers or capture devices.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "pipesDrainConcurrentlyAndPreserveTheRealExitStatus"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "timeoutIncludesAChildThatNeverReadsStdin"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "ignoresTermIsKilledAndNeverReportedAsSuccess"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "outputBudgetStopsANoisyChildWithoutRetainingTheExcess"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "earlyInputCloseCannotSignalTheParentOrClaimACompletedRequest"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "inheritedOutputDescriptorCannotKeepCallerWaitingForEOF"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "emptyInputDeliversEOFAndConcurrentHelpersDoNotRetainEachOthersPipes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+              "function": "invalidLimitsAndMissingExecutableFailBeforeAnySuccess"
+            }
+          ]
+        },
+        {
+          "id": "F13.voice-diagnostic-privacy",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Synthetic voice diagnostic records default to content metadata, redact generated credentials and home paths before sink formatting, prevent line spoofing and bound stored bytes even for a single oversized grapheme. Record-format policy fixtures do not prove physical capture, every runtime caller or user log contents.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+              "function": "conversationIsMetadataUnlessContentWasExplicitlyEnabled"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+              "function": "providerErrorsAreRedactedBeforeAnySinkCanReadThem"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+              "function": "debugContentStillRedactsCredentialsAndCannotForgeAnotherLine"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+              "function": "longUntrustedDiagnosticsHaveBoundedStoredFields"
+            }
+          ]
+        },
+        {
+          "id": "F13.endpoint-transport-safety",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Synthetic endpoint requests reject remote cleartext and embedded credentials, exclude credential-bearing drafts from preferences, require current approval generations and refuse redirect delivery using an owned loopback HTTP fixture. External provider calls, real credentials and installed-app control flows are not exercised.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "credentialBearingURLDraftsAreNeverSerializedToPreferences"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "remoteCleartextAndEmbeddedCredentialsNeverProduceRequests"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "secureRemoteAndExactLoopbackRequestsRemainAvailable"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "transportRejectsUnsafeDirectRequestsBeforeDispatch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "editsKeysDisconnectAndRejectedValidationRevokeApproval"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "staleResultsCannotCompleteOrDisableTheReplacementCheck"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "actualHTTPRedirectNeverReceivesPromptOrKeyAtItsDestination"
             }
           ]
         }

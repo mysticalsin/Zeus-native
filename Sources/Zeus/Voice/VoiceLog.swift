@@ -24,14 +24,11 @@ enum VoiceLog {
 
     /// What a log line may say about a piece of conversation text.
     static func described(_ text: String, content: Bool = contentLoggingEnabled) -> String {
-        content ? text : "(\(text.count) chars)"
+        VoiceLogRecord.contentDescription(text, includeContent: content)
     }
 
     static func format(_ date: Date, _ stage: String, _ detail: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let text = detail.replacingOccurrences(of: "\n", with: " ")
-        return "\(formatter.string(from: date)) \(stage.padding(toLength: 10, withPad: " ", startingAt: 0)) \(text)"
+        VoiceLogRecord(stage: stage, detail: detail).line(at: date)
     }
 
     /// Logs conversation text (a transcript, a spoken answer): metadata unless content logging is on.
@@ -40,9 +37,10 @@ enum VoiceLog {
     }
 
     static func log(_ stage: String, _ detail: String = "") {
-        let line = format(Date(), stage, detail)
-        FlightRecorder.shared.record(stage == "error" ? "error" : "voice", stage, detail)
-        NSLog("[ZEUS] voice: %@ %@", stage, detail)
+        let record = VoiceLogRecord(stage: stage, detail: detail)
+        let line = record.line(at: Date())
+        FlightRecorder.shared.record(record.stage == "error" ? "error" : "voice", record.stage, record.detail)
+        NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail)
         if echo { print(line) }
         queue.async {
             let fm = FileManager.default

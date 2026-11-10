@@ -416,10 +416,12 @@ class NativeAppReceiptIntegrationTests(unittest.TestCase):
         self.addCleanup(policy.stop)
 
     def rewrite_events(self, keep):
-        path = self.output / "native-all/events.jsonl"
+        run = self.result["native_runs"][0]
+        relative = run["id"] + "/events.jsonl"
+        path = self.output / relative
         rows = [json.loads(line) for line in path.read_text().splitlines()]
         path.write_text("".join(json.dumps(row) + "\n" for row in rows if keep(row)))
-        next(item for item in self.result["native_run"]["artifacts"] if item["path"] == "native-all/events.jsonl")["sha256"] = gate.digest(path)
+        next(item for item in run["artifacts"] if item["path"] == relative)["sha256"] = gate.digest(path)
         (self.output / "result.json").write_text(json.dumps(self.result))
 
     def test_app_gate_recomputes_file_backed_qualified_receipt(self):
@@ -436,6 +438,26 @@ class NativeAppReceiptIntegrationTests(unittest.TestCase):
         self.prepare(parameterized=True)
         self.rewrite_events(lambda row: row["payload"].get("_testCase", {}).get("id") != "argument-two")
         with self.assertRaisesRegex(ValueError, "omitted a declared argument case"):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_legacy_native_schema_version(self):
+        self.prepare()
+        self.result["schema_version"] = 1
+        (self.output / "result.json").write_text(json.dumps(self.result))
+        with self.assertRaisesRegex(ValueError, "unsupported native receipt"):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_missing_process_terminal_event_even_with_positive_summary(self):
+        self.prepare()
+        self.rewrite_events(lambda row: row["payload"].get("kind") != "runEnded")
+        with self.assertRaises(ValueError):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_nonzero_process_exit_even_with_passing_summary(self):
+        self.prepare()
+        self.result["native_runs"][0]["exit_code"] = 1
+        (self.output / "result.json").write_text(json.dumps(self.result))
+        with self.assertRaisesRegex(ValueError, "native execution did not succeed"):
             gate.validate_native(self.app, "a" * 40, "b" * 40)
 
 

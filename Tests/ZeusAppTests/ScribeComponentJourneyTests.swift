@@ -199,7 +199,7 @@ private struct ScribeComponentFixture {
 
     func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
         let originalPolicy = try prepareFixtureApplication()
-        defer { _ = NSApplication.shared.setActivationPolicy(originalPolicy) }
+        defer { OwnedWindowFixtureApplication.restore(originalPolicy) }
         let target = ButtonTarget()
         let button = NSButton(title: "Synthetic readiness control", target: target,
                               action: #selector(ButtonTarget.performAction(_:)))
@@ -213,7 +213,7 @@ private struct ScribeComponentFixture {
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 90))
         window.contentView = content
         content.addSubview(button)
-        defer { window.contentView = nil; window.close() }
+        defer { OwnedWindowFixtureApplication.close(window) }
         window.makeKeyAndOrderFront(nil)
         var trace: [String] = []
         let enable = Task { @MainActor in
@@ -241,7 +241,7 @@ private struct ScribeComponentFixture {
 
     func runJourney(useWindowEvents: Bool) async throws {
         let originalPolicy = try prepareFixtureApplication()
-        defer { _ = NSApplication.shared.setActivationPolicy(originalPolicy) }
+        defer { OwnedWindowFixtureApplication.restore(originalPolicy) }
         let (suite, defaults) = try preferences()
         defer { defaults.removePersistentDomain(forName: suite) }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-component-\(UUID().uuidString)")
@@ -267,10 +267,11 @@ private struct ScribeComponentFixture {
         window.isReleasedWhenClosed = false
         defer {
             // Teardown is not an asserted user action. Release the actual hosted controller/window cycle.
+            OwnedWindowFixtureApplication.record("Scribe teardown begin")
             controller.cancel()
             endWindow.close()
-            window.contentView = nil
-            window.close()
+            OwnedWindowFixtureApplication.record("Scribe controller/end-window teardown returned")
+            OwnedWindowFixtureApplication.close(window)
         }
         window.makeKeyAndOrderFront(nil)
         var trace: [String] = []

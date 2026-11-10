@@ -40,14 +40,19 @@ motion parity, MCP delivery or a distributable signed artifact. Future device
 checkers must actually execute a reproducible acceptance protocol with artifacts;
 changing a status string cannot implement one.
 
-Full mode on macOS first compiles the native test target once with
-`swift build --build-tests`. A failed compiler barrier records its exact source
-hash and compiler log; every native fixture is `blocked` by that failure, and no
-native test command runs. After verified current-source compilation, each mapped
-suite executes independently with `swift test --skip-build --filter ...`.
-One suite's runtime failure remains `failed` while later suites still run. A
-missing, changed or unsuccessful compiler receipt cannot authorize `--skip-build`.
-This optimization does not remove any native obligation or change full-mode failure.
+Both full mode on macOS and the CI app entrypoint first compile the native test
+target once with `swift build --build-tests`, then save compiled discovery once.
+A failed compiler barrier records its exact source hash and compiler log; every
+native fixture is `blocked` by that failure, and no native test command runs.
+After verified current-source compilation and discovery, each mapped native check
+executes in its own process using `swift test --skip-build --filter ...`. The CI
+app entrypoint runs the complete Core module first, followed sequentially by one
+process for each explicitly mapped App suite in map order.
+This keeps process-global UI fixture state isolated between App suites. One
+process's runtime failure remains `failed` while later suites still run; any
+failed or incomplete required process fails the app result. A missing, changed or
+unsuccessful compiler/discovery receipt cannot authorize `--skip-build`. Every
+mapped obligation remains required, including both AX and event journey suites.
 
 The audited native selection is **all Core tests plus 21 explicitly mapped app suites**.
 Three former narrow Core selections are subsumed by the module; their named
@@ -56,15 +61,19 @@ stream must include every current Core `@Test` declaration. A source inventory i
 only a completeness check and is never reported as executed coverage.
 
 `native.py --output NEW --jobs 4` is the CI app entrypoint. It builds the test
-target, saves compiler discovery, then runs that exact native selection. Both
+target, saves compiler discovery, then runs that exact native selection in the
+separate sequential processes described above. `--jobs` controls Swift build
+jobs, not concurrent fixture processes. Both
 discovery and execution request Swift Testing **wire version 0**. Each selected
 qualified ID must match its current file, function and `@Test` location, start,
 and finish with a pass. Swift Testing lists functions without expanding their
 argument collections and may omit implicit suites. Execution must declare a
 nonempty parameter-case plan before `runStarted`; every planned argument ID must
 then start and finish. Implicit suites are authorized only by the containers of
-selected compiler-discovered functions. Skips, issues, missing/duplicate events, unknown protocol versions or
-unselected suite execution fail even when the human summary reports success.
+selected compiler-discovered functions. Every process must exit zero and contain
+its own complete terminal `runEnded` event. Skips, issues, missing/duplicate events,
+unknown protocol versions or unselected suite execution fail even when the human
+summary reports success.
 Apple Testing 1400 discovery from commit `df3dcc3` was validated against that
 exact source snapshot, including unexpanded parameters and implicit suites.
 The complete argument lifecycle was additionally probed with Linux Swift 6.2.1;
@@ -72,10 +81,16 @@ Apple execution remains pending. An unsupported variant remains a failed gate
 until its actual evidence is reviewed.
 
 The CI app stores `native-evidence/result.json`, a source manifest, compiler log,
-discovery log/events and execution log/events. The aggregate recomputes coverage
-from those hashed artifacts with `native_evidence.py`; console totals cannot
-substitute for this evidence. Native case bindings use qualified file/function
-identities rather than borrowing a same-named pass from another file.
+discovery log/events and per-process execution log/events. Its version 2 receipt
+contains ordered `native_runs` rows under their mapped check IDs and a
+`native_summary` with recomputed `tests`, `suites`, `parameter_cases` and
+`passed_cases`. The aggregate verifies the exact required partition set and
+order, every process's hashed evidence, and the disjoint qualified case union
+with `native_evidence.py`; neither console totals nor the summary alone can
+substitute for execution. Legacy version 1 combined-run receipts are rejected.
+Native case bindings use qualified file/function identities rather than
+borrowing a same-named pass from another file. `native-result.schema.json`
+documents this app receipt; the feature-map receipt remains version 1.
 
 ## Evidence and rejection rules
 

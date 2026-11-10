@@ -10,6 +10,7 @@ enum OwnedWindowFixtureApplication {
 
     static func prepare() throws -> NSApplication.ActivationPolicy {
         let application = NSApplication.shared
+        record("prepare begin; launched=\(launchFinished), policy=\(application.activationPolicy().rawValue), active=\(application.isActive)")
         guard application.delegate == nil else {
             throw OwnedWindowEventDriver.Failure.unavailable("fixture application already has a delegate")
         }
@@ -17,9 +18,33 @@ enum OwnedWindowFixtureApplication {
         guard application.setActivationPolicy(.regular) else {
             throw OwnedWindowEventDriver.Failure.unavailable("regular fixture activation policy was refused")
         }
-        if !launchFinished { application.finishLaunching(); launchFinished = true }
+        if !launchFinished {
+            record("finishLaunching begin")
+            application.finishLaunching()
+            launchFinished = true
+            record("finishLaunching returned")
+        }
         application.activate()
+        record("prepare returned; active=\(application.isActive)")
         return original
+    }
+
+    static func restore(_ policy: NSApplication.ActivationPolicy) {
+        record("restore policy begin; target=\(policy.rawValue)")
+        let restored = NSApplication.shared.setActivationPolicy(policy)
+        record("restore policy returned; accepted=\(restored)")
+    }
+
+    static func close(_ window: NSWindow) {
+        record("close begin; window=\(window.windowNumber), releasedWhenClosed=\(window.isReleasedWhenClosed)")
+        window.contentView = nil
+        window.close()
+        record("close returned")
+    }
+
+    static func record(_ message: String) {
+        // Flush these bounded fixture-only lifecycle markers even if AppKit exits the host early.
+        FileHandle.standardError.write(Data("Owned-window fixture: \(message)\n".utf8))
     }
 }
 
@@ -71,13 +96,13 @@ struct OwnedWindowEventDriverTests {
     @Test func nativeButtonUsesFreshGeometryAndDisabledControlCannotFire() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()
-            defer { _ = NSApplication.shared.setActivationPolicy(original) }
+            defer { OwnedWindowFixtureApplication.restore(original) }
             let registry = OwnedWindowControlRegistry(), target = Target()
             let content = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 120))
             let action = button(target, registry: registry, id: "fixture.action")
             content.addSubview(action)
             let window = host(content)
-            defer { window.contentView = nil; window.close() }
+            defer { OwnedWindowFixtureApplication.close(window) }
             let driver = OwnedWindowEventDriver(registry: registry)
             driver.register(window)
             try await driver.click("fixture.action", in: window)
@@ -105,7 +130,7 @@ struct OwnedWindowEventDriverTests {
     @Test func hostedSwiftUIButtonReceivesRealWindowEvents() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()
-            defer { _ = NSApplication.shared.setActivationPolicy(original) }
+            defer { OwnedWindowFixtureApplication.restore(original) }
             let registry = OwnedWindowControlRegistry(), target = Target()
             let root = Button("Synthetic SwiftUI action") { target.calls += 1 }
                 .buttonStyle(.borderedProminent)
@@ -113,7 +138,7 @@ struct OwnedWindowEventDriverTests {
                 .frame(width: 320, height: 120)
                 .environment(\.ownedWindowControlRegistry, registry)
             let window = host(NSHostingView(rootView: root))
-            defer { window.contentView = nil; window.close() }
+            defer { OwnedWindowFixtureApplication.close(window) }
             let driver = OwnedWindowEventDriver(registry: registry)
             driver.register(window)
             try await driver.click("fixture.swiftui", in: window)
@@ -124,7 +149,7 @@ struct OwnedWindowEventDriverTests {
     @Test func duplicateRemovedAndUnownedControlsCannotDispatch() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()
-            defer { _ = NSApplication.shared.setActivationPolicy(original) }
+            defer { OwnedWindowFixtureApplication.restore(original) }
             let registry = OwnedWindowControlRegistry(), target = Target()
             let content = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 120))
             let first = button(target, registry: registry, id: "fixture.duplicate")
@@ -132,7 +157,7 @@ struct OwnedWindowEventDriverTests {
             content.addSubview(first)
             content.addSubview(second)
             let window = host(content)
-            defer { window.contentView = nil; window.close() }
+            defer { OwnedWindowFixtureApplication.close(window) }
             let driver = OwnedWindowEventDriver(registry: registry)
             do {
                 try await driver.click("fixture.duplicate", in: window)
@@ -186,12 +211,19 @@ final class OwnedWindowEventDriver {
         guard windows[ObjectIdentifier(window)]?.value === window else { throw Failure.unownedWindow }
         let deadline = ContinuousClock.now.advanced(by: .seconds(4))
         var previous: (ObjectIdentifier, NSRect)?
+        var samples = 0
+        var diagnostic = "No layout sample completed"
         while ContinuousClock.now < deadline {
             try Task.checkCancellation()
+            samples += 1
             window.contentView?.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
             let probes = registry.probes(for: id, in: window)
             if probes.count > 1 { throw Failure.ambiguous(id) }
+            diagnostic = "samples=\(samples), probes=\(probes.count), visible=\(window.isVisible), "
+                + "key=\(window.isKeyWindow), active=\(NSApplication.shared.isActive), "
+                + "windowAlpha=\(window.alphaValue), miniaturized=\(window.isMiniaturized)"
+            if let probe = probes.first { diagnostic += "; " + describe(probe, in: window) }
             if let probe = probes.first, let frame = readyFrame(probe, in: window) {
                 let identity = ObjectIdentifier(probe)
                 if let previous, previous.0 == identity, previous.1 == frame {
@@ -202,7 +234,22 @@ final class OwnedWindowEventDriver {
             } else { previous = nil }
             try await Task.sleep(for: .milliseconds(10))
         }
-        throw Failure.unavailable(id)
+        throw Failure.unavailable("\(id); \(diagnostic)")
+    }
+
+    private func describe(_ probe: OwnedWindowControlProbeView, in window: NSWindow) -> String {
+        var ancestors: [String] = []
+        var parent: NSView? = probe
+        while let view = parent, ancestors.count < 24 {
+            let enabled = (view as? NSControl).map { ",enabled=\($0.isEnabled)" } ?? ""
+            ancestors.append("\(String(reflecting: type(of: view)))(alpha=\(view.alphaValue),hidden=\(view.isHidden)\(enabled))")
+            if view === window.contentView { break }
+            parent = view.superview
+        }
+        return "probeEnabled=\(probe.controlEnabled), frame=\(probe.convert(probe.bounds, to: nil)), "
+            + "visibleRect=\(probe.convert(probe.visibleRect, to: nil)), "
+            + "root=\(String(describing: window.contentView.map { $0.convert($0.bounds, to: nil) })), "
+            + "ancestors=\(ancestors.joined(separator: " > "))"
     }
 
     private func readyFrame(_ probe: OwnedWindowControlProbeView, in window: NSWindow) -> NSRect? {

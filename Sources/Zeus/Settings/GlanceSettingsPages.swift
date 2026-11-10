@@ -40,7 +40,7 @@ struct GSPageView: View {
         VStack(alignment: .leading, spacing: GS.cardGap) {
             SettingsUpdateBadgeRow()
             switch section {
-            case .general: GeneralPage(navigation: navigation)
+            case .general: GeneralPage(navigation: navigation, openGuide: context.openGuide)
             case .appearance: AppearancePage(context: context)
             case .sounds: SoundsPage()
             case .notifications: GSNotificationsPage()
@@ -78,6 +78,7 @@ private extension View {
 
 private struct GeneralPage: View {
     let navigation: GSNavigation
+    let openGuide: () -> Void
     var body: some View {
         GSPageHeading(section: .general, subtitle: "")
             .padding(.bottom, -GS.cardGap)
@@ -89,8 +90,8 @@ private struct GeneralPage: View {
             GSDivider()
             GSRow(symbol: "bubble.left.and.bubble.right", title: "Default agent", text: "For new conversations opened from the notch.")
             HStack(spacing: 12) {
-                agentChoice("Codex", symbol: "chevron.left.forwardslash.chevron.right")
-                agentChoice("Claude Code", symbol: "asterisk")
+                agentChoice("Codex")
+                agentChoice("Claude Code")
             }
             .padding(.bottom, 8)
         }
@@ -104,6 +105,13 @@ private struct GeneralPage: View {
             GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus windows out of screen shares and recordings.", isOn: bool("general.showInScreenSharing"))
             GSDivider()
             GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", isOn: bool("general.welcomeBack"))
+        }
+        GSCard("Setup") {
+            GSRow(symbol: "sparkles", title: "Set up Zeus again", text: "Revisit the guide, connected agents and permissions.") {
+                Button("Open guide", action: openGuide)
+                    .buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.general.openGuide")
+            }
         }
         GSCard("Keep awake") {
             GSRow(symbol: "timer", title: "Session length", text: "How long the cup on Home keeps the Mac awake.") {
@@ -136,11 +144,12 @@ private struct GeneralPage: View {
 
     private var keepAwake: KeepAwakeSession { .shared }
 
-    private func agentChoice(_ name: String, symbol: String) -> some View {
+    private func agentChoice(_ name: String) -> some View {
         let selected = SettingsStore.binding("general.defaultAgent").wrappedValue == name || (name == "Codex" && store.string("general.defaultAgent").isEmpty)
         return Button { store.set("general.defaultAgent", name) } label: {
             HStack(spacing: 14) {
-                Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+                EngineBrandLogo(agentLabel: name, size: 18, tint: .white)
+                    .accessibilityHidden(true)
                     .frame(width: 30, height: 30)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(name == "Codex" ? Color(rgb: 60, 62, 70) : Color(rgb: 217, 119, 87)))
                 Text(name).font(OB.font(14.5, .semibold)).foregroundStyle(GS.text)

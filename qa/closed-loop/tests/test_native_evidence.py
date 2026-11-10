@@ -189,13 +189,13 @@ class NativeEventEvidenceTests(unittest.TestCase):
         (self.repo / "qa/feature-map.json").write_text('{"features": []}')
         (self.repo / "qa/regressions.json").write_text('{"regressions": []}')
         output = self.repo / "evidence"
-        for folder in ["native-build", "native-discovery", "native-all"]:
+        for folder in ["native-build", "native-discovery", "native-ZeusCoreTests"]:
             (output / folder).mkdir(parents=True)
         (output / "native-build/build.log").write_text("Build complete! (0.1s)\n")
         (output / "native-discovery/test.log").write_text(self.ident + "\n")
         (output / "native-discovery/events.jsonl").write_text("".join(json.dumps(x) + "\n" for x in self.declarations))
-        (output / "native-all/events.jsonl").write_text("".join(json.dumps(x) + "\n" for x in self.events()))
-        (output / "native-all/test.log").write_text("✔ Test example() passed after 0.1 seconds.\n✔ Test run with 1 test in 1 suite passed after 0.1 seconds.\n")
+        (output / "native-ZeusCoreTests/events.jsonl").write_text("".join(json.dumps(x) + "\n" for x in self.events()))
+        (output / "native-ZeusCoreTests/test.log").write_text("✔ Test example() passed after 0.1 seconds.\n✔ Test run with 1 test in 1 suite passed after 0.1 seconds.\n")
         manifest = source_snapshot(self.repo, output)
         (output / "source-manifest.json").write_text(json.dumps(manifest))
         def evidence(path):
@@ -205,7 +205,7 @@ class NativeEventEvidenceTests(unittest.TestCase):
         # current-source manifest to include those real fixture inputs as well.
         manifest = source_snapshot(self.repo, output)
         (output / "source-manifest.json").write_text(json.dumps(manifest))
-        result = {"schema_version": 1, "status": "passed", "tested_sha": "a" * 40, "head_sha": "b" * 40,
+        result = {"schema_version": 2, "status": "passed", "tested_sha": "a" * 40, "head_sha": "b" * 40,
                   "repository": str(self.repo), "output_directory": str(output), "platform": "darwin", "errors": [],
                   "source_snapshot_sha256": manifest["sha256"], "source_manifest": evidence("source-manifest.json"),
                   "map_sha256": digest((self.repo / "qa/feature-map.json").read_bytes()),
@@ -216,10 +216,12 @@ class NativeEventEvidenceTests(unittest.TestCase):
                   "native_discovery": {"status": "passed", "command": n.discovery_command(output), "exit_code": 0,
                                        "source_snapshot_sha256": manifest["sha256"], "duration_seconds": 0.1,
                                        "artifacts": [evidence("native-discovery/test.log"), evidence("native-discovery/events.jsonl")]},
-                  "native_run": {"id": "native-all", "kind": "native-combined", "status": "passed", "exit_code": 0,
-                                 "command": n.run_command(self.definitions, 2, output, "native-all"), **metrics,
+                  "native_summary": metrics,
+                  "native_runs": [{"id": "native-ZeusCoreTests", "kind": "native-module", "status": "passed", "exit_code": 0,
+                                   "tier": "native-integration", "scope": "Synthetic receipt fixture only.",
+                                 "command": n.run_command(self.definitions, 2, output, "native-ZeusCoreTests"), **metrics,
                                  "passed_functions": ["example"],
-                                 "artifacts": [evidence("native-all/test.log"), evidence("native-all/events.jsonl")]}}
+                                 "artifacts": [evidence("native-ZeusCoreTests/test.log"), evidence("native-ZeusCoreTests/events.jsonl")]}]}
         (output / "result.json").write_text(json.dumps(result))
         return output, result
 
@@ -237,7 +239,7 @@ class NativeEventEvidenceTests(unittest.TestCase):
         definitions = [{**self.definitions[0], "id": "native-ZeusCoreTests"}]
         with self.assertRaises(Invalid):
             n.validate_receipt(output, "c" * 40, "b" * 40, definitions, self.repo)
-        (output / "native-all/events.jsonl").write_text("{}\n")
+        (output / "native-ZeusCoreTests/events.jsonl").write_text("{}\n")
         with self.assertRaises(Invalid):
             n.validate_receipt(output, "a" * 40, "b" * 40, definitions, self.repo)
 

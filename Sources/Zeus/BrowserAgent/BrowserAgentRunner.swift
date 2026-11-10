@@ -302,7 +302,7 @@ final class BrowserAgentRunner {
                 guard let request = config.request(prompt: prompt.user, key: key, system: prompt.system) else {
                     throw BridgeError(code: "failed", message: "The Any LLM endpoint isn't set up.")
                 }
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await AnyLLMHTTPTransport.data(for: request)
                 guard (response as? HTTPURLResponse)?.statusCode ?? 0 < 300, let answer = AnyLLMConfig.answer(from: data) else {
                     throw BridgeError(code: "failed", message: "The Any LLM endpoint didn't answer.")
                 }

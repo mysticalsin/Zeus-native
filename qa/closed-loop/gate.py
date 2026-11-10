@@ -178,6 +178,7 @@ def native_filter() -> str:
 
 
 def validate_native(root: Path, expected_sha: str, head_sha: str) -> int:
+    """Require every mapped process receipt before using the verified case union."""
     repo, _, _, feature_map, definitions, registry = load_policy()
     native = native_evidence_module()
     selected = [row for row in definitions.values() if row["kind"] in native.NATIVE_KINDS]

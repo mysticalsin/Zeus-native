@@ -90,7 +90,7 @@ import Testing
         let json = try JSONEncoder().encode(request)
         var buffer = try NativeMessagingFrame.encode(json) + NativeMessagingFrame.encode(json)
         buffer.append(contentsOf: [0x05, 0x00]) // start of a third, incomplete frame
-        let messages = NativeMessagingFrame.decode(&buffer)
+        let messages = try NativeMessagingFrame.decode(&buffer)
         #expect(messages.count == 2)
         #expect(try JSONDecoder().decode(BridgeRequest.self, from: messages[0]) == request)
         #expect(buffer.count == 2)

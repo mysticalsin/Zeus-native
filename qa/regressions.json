@@ -987,6 +987,234 @@
         "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
         "function": "nativeButtonUsesFreshGeometryAndDisabledControlCannotFire"
       }
+    },
+    {
+      "id": "REG-082",
+      "failure": "Combined app test execution shared process-global snapshot/window state across unrelated suites; actual macOS fixtures observed stalled readiness while another suite changed global presentation policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_processes.py",
+        "function": "test_every_native_selector_gets_its_own_sequential_process_core_first"
+      }
+    },
+    {
+      "id": "REG-083",
+      "failure": "The actual combined native process exited zero without a Swift Testing summary or runEnded, leaving selected cases incomplete after unrelated suites had passed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_processes.py",
+        "function": "test_exit_zero_with_incomplete_partition_events_fails_despite_other_success"
+      }
+    },
+    {
+      "id": "REG-084",
+      "failure": "Exact-source local-helper probes reproduced stdin writes blocking before the timeout watchdog could run.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+        "function": "timeoutIncludesAChildThatNeverReadsStdin"
+      }
+    },
+    {
+      "id": "REG-085",
+      "failure": "Exact-source local-helper probes reproduced a SIGTERM-ignoring child exceeding its deadline and still returning a successful status.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+        "function": "ignoresTermIsKilledAndNeverReportedAsSuccess"
+      }
+    },
+    {
+      "id": "REG-086",
+      "failure": "Source review found wake and research diagnostics could record conversation text without explicit content logging being enabled.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+        "function": "conversationIsMetadataUnlessContentWasExplicitlyEnabled"
+      }
+    },
+    {
+      "id": "REG-087",
+      "failure": "Source review found provider errors could reach voice diagnostic sinks before a single shared credential and home-path redaction step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+        "function": "providerErrorsAreRedactedBeforeAnySinkCanReadThem"
+      }
+    },
+    {
+      "id": "REG-088",
+      "failure": "Independent diagnostic review found character-based truncation could retain unbounded bytes in one grapheme and could split a credential before redaction.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+        "function": "longUntrustedDiagnosticsHaveBoundedStoredFields"
+      }
+    },
+    {
+      "id": "REG-089",
+      "failure": "The original native bridge executable accepted an oversized UInt32 frame length and waited for the declared body instead of promptly settling the pending local request.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled"
+      }
+    },
+    {
+      "id": "REG-090",
+      "failure": "The original native bridge executable blocked writing stdout before registering its request timeout, stranding pending local sockets while stdin remained open.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "nonReadingChromeCannotStrandPendingRequestsOrKeepOpenStdinAlive"
+      }
+    },
+    {
+      "id": "REG-091",
+      "failure": "A deliberate clean-EOF probe caught the first asynchronous bridge repair cancelling an already accepted response instead of flushing it before exit.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "cleanEOFFlushesAnAlreadyAcceptedCompleteResponseBeforeExit"
+      }
+    },
+    {
+      "id": "REG-092",
+      "failure": "Independent source review found stopping native input before dispatch-source setup could omit its terminal callback or notify before closing the owned descriptor.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "immediateStopAndStopBeforeStartAlwaysSettleTheAcceptedStartOnce"
+      }
+    },
+    {
+      "id": "REG-093",
+      "failure": "Source review found a rejected or untested remote cleartext endpoint could remain enabled and send the prompt and key; restoring unguarded request construction reproduces the leak in synthetic fixtures.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "remoteCleartextAndEmbeddedCredentialsNeverProduceRequests"
+      }
+    },
+    {
+      "id": "REG-094",
+      "failure": "A deliberate redirect-following mutation delivered a synthetic prompt and key to the redirect destination instead of preserving the original endpoint boundary.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "actualHTTPRedirectNeverReceivesPromptOrKeyAtItsDestination"
+      }
+    },
+    {
+      "id": "REG-095",
+      "failure": "Source review found edits and preset changes could retain approval from a previous endpoint and stale validation results could restore that approval.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "staleResultsCannotCompleteOrDisableTheReplacementCheck"
+      }
+    },
+    {
+      "id": "REG-096",
+      "failure": "Source review found an unknown provider authentication result was displayed as signed in.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "unknownAuthNeverClaimsTheProviderIsSignedIn"
+      }
+    },
+    {
+      "id": "REG-097",
+      "failure": "Source review found disabling every offered agent silently restored Claude as a fallback.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "disablingEveryOfferDoesNotSilentlyRestoreClaude"
+      }
+    },
+    {
+      "id": "REG-098",
+      "failure": "Source review found installed Cursor and Gemini offers did not consistently follow their individual integration switches.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "installedCursorAndGeminiRespectTheirOwnOfferSwitches"
+      }
+    },
+    {
+      "id": "REG-099",
+      "failure": "Source review found opening a chat provider app was described as handing off the prompt even though that handoff was unsupported.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "appOpenDescriptionsDoNotPromiseUnsupportedPromptHandoff"
+      }
+    },
+    {
+      "id": "REG-100",
+      "failure": "Source review found the Anthropic Messages API listed as an OpenAI-compatible endpoint preset.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "anthropicMessagesAPIIsNotOfferedAsAnOpenAICompatiblePreset"
+      }
     }
   ]
 }

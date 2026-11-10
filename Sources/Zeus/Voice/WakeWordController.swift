@@ -167,7 +167,7 @@ final class WakeWordController {
             VoiceLog.log("wake", "listening on this Mac (recogniser locale \(listener.localeIdentifier))")
         } catch {
             setStatus("Paused: the microphone didn't start")
-            VoiceLog.log("error", "wake mic start failed: \(error.localizedDescription)")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "wake mic start failed: ")
             retryStartAt = Date().addingTimeInterval(10)
         }
     }

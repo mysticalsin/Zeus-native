@@ -49,7 +49,7 @@ extension AIConnections {
         case .startServer:
             Task { await startServer(provider) }
         case .configure:
-            messages[provider] = "Add a base URL and a model below, or pick OpenAI or Anthropic, then paste a key."
+            messages[provider] = "Add an OpenAI-compatible base URL and model below, or pick OpenAI, then paste a key."
         case .test:
             Task { await testEndpoint() }
         case .connected:
@@ -135,12 +135,9 @@ extension AIConnections {
         RouterSettings.shared.refresh()
         let hooked: Bool = { if case .connected = status(provider, services: services) { return true } else { return false } }()
         let brain = provider.routerEngine.map { " \($0.title) is also a brain choice in Intelligence." } ?? ""
-        switch (hooked, signed) {
-        case (true, false?):
-            messages[provider] = "Hooks installed, but \(provider.title) isn't signed in. Click Sign in."
-        case (true, _):
-            messages[provider] = "Connected. Hooks installed and \(provider.title) is signed in." + brain
-        case (false, _):
+        if hooked {
+            messages[provider] = AIConnectFlow.hookConnectionMessage(provider, signedIn: signed) + (signed == true ? brain : "")
+        } else {
             messages[provider] = installMessage ?? "Couldn't install the hooks. Click Check again."
         }
     }
@@ -155,7 +152,7 @@ extension AIConnections {
         NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration()) { _, error in
             Task { @MainActor in
                 AIConnections.shared.messages[provider] = error.map { "Couldn't open \(provider.title): \($0.localizedDescription)" }
-                    ?? "Connected. \(provider.title) is open and gets your questions from the notch."
+                    ?? "\(provider.title) is open. Prompt handoff is not supported."
             }
         }
         connect(provider, services: services)
@@ -206,11 +203,10 @@ extension AIConnections {
     /// Haiku / mini size.
     func testEndpoint() async {
         if let problem = AIConnectFlow.endpointModelProblem(anyLLM.model) {
-            anyLLMTest = .failed(problem)
+            endpointRejected(problem)
             messages[.anyLLM] = problem
             return
         }
-        UserDefaults.standard.set(true, forKey: enabledKey(.anyLLM))
         await testAnyLLM()
         switch anyLLMTest {
         case .passed(let text), .failed(let text): messages[.anyLLM] = text
@@ -219,9 +215,8 @@ extension AIConnections {
     }
 
     func applyPreset(baseURL: String, model: String) {
-        anyLLM.baseURL = baseURL
-        anyLLM.model = model
-        anyLLMTest = .idle
+        anyLLM = AnyLLMConfig(baseURL: baseURL, model: model)
+        endpointEdited()
         messages[.anyLLM] = "Filled in. Paste your key, then Test."
     }
 
