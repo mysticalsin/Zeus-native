@@ -39,6 +39,10 @@ def save(path, data):
 
 
 def artifact(path, output):
+    # The owned root may be an OS alias (/var -> /private/var on macOS).
+    # Resolve only that root; child file/directory redirects still fail closed.
+    require(not path.is_symlink() and path.resolve() == output.resolve() / path.relative_to(output),
+            "artifact escaped output or redirects a child")
     return {"path": str(path.relative_to(output)), "sha256": digest(path.read_bytes())}
 
 
@@ -165,7 +169,6 @@ def run_native_check(definition, args, output, native_build, discovery_receipt, 
         row.update(status="failed", reason=str(error))
     for file in [log, events, *sorted((folder / "native-artifacts").rglob("*"))]:
         if file.is_file():
-            require(not file.is_symlink() and file.resolve().is_relative_to(output), "native artifact escaped output")
             row["artifacts"].append(artifact(file, output))
     print(f"{row['id']}: {row['status']} ({row['tests']} fully identified tests)", flush=True)
     return row
@@ -215,7 +218,6 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         row["artifacts"].append(artifact(log, output))
     for file in sorted((folder / "native-artifacts").rglob("*")):
         if file.is_file():
-            require(not file.is_symlink() and file.resolve().is_relative_to(output), "native artifact escaped output")
             row["artifacts"].append(artifact(file, output))
     print(f"{ident}: {row['status']} ({row['tests']} tests)", flush=True)
     return row

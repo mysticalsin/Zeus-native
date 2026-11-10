@@ -675,6 +675,18 @@
         "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
         "function": "explicitMotionPolicyNeverOverridesSystemReduction"
       }
+    },
+    {
+      "id": "REG-056",
+      "failure": "Native artifact collection rejected macOS temporary output roots entered through /var when resolved children lived under /private/var.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_native_artifacts_allow_an_aliased_output_root_but_reject_redirected_children"
+      }
     }
   ]
 }

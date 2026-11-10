@@ -300,6 +300,22 @@ class NativeBuildBarrierTests(unittest.TestCase):
             self.assertEqual(["--skip-build" in command for command in commands], [False, True, True, True])
             self.assertNotIn("blocker", result["checks"][1])
 
+    def test_native_artifacts_allow_an_aliased_output_root_but_reject_redirected_children(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve()
+            actual, alias = parent / "actual", parent / "alias"
+            actual.mkdir()
+            alias.symlink_to(actual, target_is_directory=True)
+            result, _ = self.run_matrix(alias)
+            self.assertEqual([row["status"] for row in result["checks"]], ["passed"] * 3)
+            self.assertTrue(all(row["artifacts"] for row in result["checks"]))
+            (actual / "redirected").symlink_to(actual / "native-FirstTests", target_is_directory=True)
+            with self.assertRaises(c.Invalid):
+                runner.artifact(alias / "redirected/test.log", alias)
+            (actual / "linked.log").symlink_to(actual / "native-FirstTests/test.log")
+            with self.assertRaises(c.Invalid):
+                runner.artifact(alias / "linked.log", alias)
+
     def test_changed_source_after_compilation_cannot_execute_skip_build(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
