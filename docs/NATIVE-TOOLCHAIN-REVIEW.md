@@ -500,8 +500,11 @@ SIGKILL to its still-unreaped, separately owned group, then performs a bounded
 wait and closes its handles. Unexpected signal or reap errors remain failures.
 Production `run.py` and the original ten behavior guards are unchanged.
 All 12 focused guards passed, and two negative controls caught the old signal
-sequence and an attempted permission-error suppression. Fresh Mac confirmation
-remains required.
+sequence and an attempted permission-error suppression. The
+[6e863bd development receipt](../qa/receipts/20261110/mac-6e-feature.json) now
+independently validates 678 tests across 14 checks on macOS, including all 150
+verification selftests. This confirms the tested supervisor repair, not full
+native or release acceptance.
 
 ## Read-only diagnosis of the original accessibility crash
 
@@ -520,6 +523,17 @@ The collector never launches a debugger or another test host, sends another UI
 action, changes OS settings or repairs an acceptance receipt. Existing output
 is never overwritten, original evidence is rechecked afterward, and unsupported
 or missing reports remain unavailable. Twenty-one focused collector/host tests
-and Swift syntax parsing passed. Real macOS report availability and compatibility
-still require the next native run. The existing action-acknowledgement failure
-remains separate from the later SIGTRAP regardless of the diagnostic outcome.
+and Swift syntax parsing passed.
+
+The [6e863bd native receipt](../qa/receipts/20261110/mac-6e-ci.json) independently
+validates production/test compilation, discovery and 2,360 tests across 28
+complete passing partitions. The accessibility partition still failed its
+`scribe.start` action acknowledgement: AppKit returned false even though the
+owned readiness fixture recorded one target invocation. A separate real-control
+lookup then lacked its accessibility tree, and the diagnostic path exited with SIGTRAP.
+The collector returned `unavailable`, `matching_report_unavailable`, at `scan`;
+its nonzero exit deliberately preserves missing diagnostic evidence. Its source,
+original native receipt and input-provenance hashes match the retained artifact,
+and it reports the original evidence unchanged. No matching stack was available,
+so the crash cause remains unresolved. The app job and required aggregate remain
+failed, preview packaging was skipped, and no physical-device acceptance is claimed.
