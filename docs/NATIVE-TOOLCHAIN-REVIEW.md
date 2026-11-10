@@ -340,3 +340,12 @@ fixture directory. Two sanitizer guards pass in the portable harness. Sampling
 can perturb the child and is not latency evidence; its two-second helper budget
 is not a hard wall-clock cap around a stalled OS launch and allows bounded stop
 observation afterward. The macOS sampling branch still requires native execution.
+
+The `77c3d6c` [Mac PR run](https://github.com/mysticalsin/Zeus-native/actions/runs/42813474734)
+passed production compilation, confirming the film observer isolation correction.
+Test-target compilation then rejected optional binding of
+`NSWindow.accessibilityIdentifier()`, whose AppKit declaration returns `String`.
+The failure-only AX diagnostic now binds that declared value directly and keeps
+the synthetic-window prefix check. No native tests ran on this revision, and
+no sampler or new onboarding/film journey result is established. Fresh native
+compilation and execution remain required.

@@ -1687,6 +1687,18 @@
         "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
         "function": "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow"
       }
+    },
+    {
+      "id": "REG-140",
+      "failure": "A failure-only native accessibility diagnostic treated NSWindow.accessibilityIdentifier() as Optional although its AppKit declaration returns String, preventing the test target from compiling. It now uses the declared type and retains the exact synthetic-window prefix check; the native compiler barrier and accessibility journey stay mandatory.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+      }
     }
   ]
 }

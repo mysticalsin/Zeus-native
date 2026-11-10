@@ -415,7 +415,8 @@ private struct ScribeComponentFixture {
             throw ScenarioFailure.unavailableControl(id, lastUnavailableReason)
         }
         let originalFailure = ScenarioFailure.missingControl(id, diagnostic)
-        if let marker = window.accessibilityIdentifier(), marker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) {
+        let marker = window.accessibilityIdentifier()
+        if marker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) {
             let snapshot = await OwnedProcessAXDiagnostic.collect(
                 pid: ProcessInfo.processInfo.processIdentifier, windowMarker: marker)
             OwnedWindowFixtureApplication.record("failure-only own-PID AX: \(snapshot.joined(separator: "; "))")
