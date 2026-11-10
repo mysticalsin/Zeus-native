@@ -225,3 +225,37 @@ request deadlines are unchanged. Diagnostics add fixed launch phase names and
 labeled epoch/monotonic clocks; they do not read production stderr or record
 submitted text. These results establish the focused Linux behavior, not Mac
 startup latency, audio quality or native acceptance.
+
+## Native lifecycle checkpoint at 139eb55
+
+Independent validation of the [PR artifact](https://github.com/mysticalsin/Zeus-native/actions/runs/42801415962)
+confirms 2,320 complete test passes across 23 partitions. The
+[partial receipt](../qa/receipts/20261110/mac-139-ci.json) binds compiler output,
+exact source, discovery, qualified execution and artifact hashes. All three
+Scribe component journeys now finish under the synchronous AppKit host, and the
+Memory transport suite passes with the Darwin-compatible ENXIO reader check.
+The separate development job passes 641 checks. Three native partitions still
+fail; preview packaging and the aggregate remain blocked.
+
+The foreign-event guard failed because it queued a release before an async
+readiness wait. A real AppKit loop may consume queued input during that yield.
+The fixture now settles through the public click path, then synchronously tests
+the same dispatcher while the foreign event is owned by the fixture. Exact
+identity, geometry and action-count assertions remain required. This corrected
+fixture still needs its next Mac execution.
+
+Accessibility failures still show an AXUnknown button wrapper and no semantic
+children for the SwiftUI hosting view. An ignored AppKit wrapper is not the
+semantic control; this evidence alone cannot attribute failure to CI. Additional
+owned-window diagnostics compare ignored views/cells with Apple's public
+unignored-element APIs. Action eligibility and assertions remain unchanged.
+
+The Python traces place the early delay after Process.run returns and before
+Python enters the fixture wrapper. They do not establish its cause. CPython's
+`-I` excludes environment and user-site injection but still performs system site
+initialization; these disposable stub-module fixtures now also use `-S`. The
+product worker retains its installed environment. Binary selection, concurrency
+and request deadlines are unchanged. The isolation correction does not certify
+a cold-start improvement. A bounded after-test diagnostic records the exact Apple
+launcher linkage and selected interpreter without warming the cold fixtures first.
+Those metadata cannot establish where the observed startup delay occurs.

@@ -81,6 +81,37 @@ jobs:
         # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
           python3 qa/closed-loop/native.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+      - name: Record Python launcher metadata after cold fixtures
+        if: always() && steps.test.outcome != 'skipped'
+        timeout-minutes: 1
+        # Run after tests: resolving the launcher before fixtures could warm its cache.
+        # This diagnostic cannot replace or change the native test result.
+        run: |
+          python3 - <<'PY' | tee "$RUNNER_TEMP/zeus-results/app/python-launcher.log"
+          import subprocess
+          import tempfile
+          commands = [
+              ["/usr/bin/otool", "-L", "/usr/bin/python3"],
+              ["/usr/bin/nm", "-u", "/usr/bin/python3"],
+              ["/usr/bin/xcrun", "--find", "python3"],
+          ]
+          for command in commands:
+              with tempfile.TemporaryFile() as output:
+                  try:
+                      code = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT,
+                                            timeout=5, check=False).returncode
+                  except subprocess.TimeoutExpired:
+                      code = "timeout"
+                  except OSError as error:
+                      code = type(error).__name__
+                  output.seek(0)
+                  data = output.read(8193)
+              text = data[:8192].decode("utf-8", errors="replace")
+              if command[0] == "/usr/bin/nm":
+                  text = "\n".join(line for line in text.splitlines() if "xcselect" in line.lower())
+              print(f"command={command!r} exit={code} truncated={len(data) > 8192}")
+              print(text)
+          PY
       - name: Show bounded native failure diagnostics
         if: failure() && steps.test.outcome == 'failure'
         run: |

@@ -108,6 +108,69 @@ private struct ScribeComponentFixture {
         throw ScenarioFailure.transitionTimeout(name)
     }
 
+    private func diagnosticField(_ value: String) -> String {
+        String(value.prefix(160)).replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
+
+    /// These observations never become press candidates. AppKit can expose an NSControl's
+    /// cell instead of its ignored view; compare the public semantic helpers without assigning
+    /// roles, changing accessibility state, walking parent links, or requesting system AX access.
+    private func appendSemanticDiagnostics(for source: NSView, in window: NSWindow,
+                                           diagnostic: inout [String]) {
+        guard source.window === window, diagnostic.count < 64 else { return }
+        func append(_ label: String, _ value: Any?) {
+            guard diagnostic.count < 80 else { return }
+            guard let value else { diagnostic.append("semantic probe \(label): nil"); return }
+            let object = value as AnyObject
+            // Only inspect objects returned from this owned view's descendant APIs. For actual
+            // views/cells, verify their concrete owner too; never follow a foreign window.
+            if let view = object as? NSView, view.window !== window {
+                diagnostic.append("semantic probe \(label): non-owned view; details withheld")
+                return
+            }
+            if let cell = object as? NSCell, cell.controlView?.window !== window {
+                diagnostic.append("semantic probe \(label): non-owned cell; details withheld")
+                return
+            }
+            let typeName = diagnosticField(String(reflecting: type(of: object)))
+            guard let element = object as? any NSAccessibilityProtocol else {
+                diagnostic.append("semantic probe \(label): \(typeName); no NSAccessibilityProtocol conformance")
+                return
+            }
+            let reportedWindow = element.accessibilityWindow()
+            if let reportedWindow, (reportedWindow as AnyObject) !== window {
+                diagnostic.append("semantic probe \(label): \(typeName); different window object; details withheld")
+                return
+            }
+            let frame = element.accessibilityFrame()
+            let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+            diagnostic.append("semantic probe \(label): \(typeName), sameAsSource=\(object === source), " +
+                "element=\(element.isAccessibilityElement()), role=\(diagnosticField(element.accessibilityRole()?.rawValue ?? "nil")), " +
+                "id=\(diagnosticField(element.accessibilityIdentifier() ?? "-")), " +
+                "enabled=\(element.isAccessibilityEnabled()), " +
+                "window=\(reportedWindow == nil ? "unreported" : "owned"), " +
+                "finiteFrame=\(finite), emptyFrame=\(frame.isEmpty), intersectsWindow=\(frame.intersects(window.frame))")
+        }
+        append("raw view", source)
+        if let control = source as? NSButton {
+            append("raw button cell", control.cell)
+            // A plain, single-cell NSButton has the one-to-one hierarchy required by this API.
+            // Do not apply it to a SwiftUI hosting root, which can have multiple semantic children.
+            if type(of: control) == NSButton.self, control.subviews.isEmpty,
+               let cell = control.cell, type(of: cell) == NSButtonCell.self {
+                append("unignored button descendant", NSAccessibility.unignoredDescendant(of: control))
+            }
+        }
+        let unignored = NSAccessibility.unignoredChildrenForOnlyChild(from: source)
+        if diagnostic.count < 80 {
+            diagnostic.append("semantic probe unignored-only-child results=\(unignored.count), reportingFirst=\(min(unignored.count, 8))")
+        }
+        for (index, element) in unignored.prefix(8).enumerated() {
+            append("unignored-only-child[\(index)]", element)
+        }
+    }
+
     /// Resolve a fresh tree for every action. There is no application-wide tree or controller fallback.
     private func controls(in window: NSWindow, diagnostic: inout [String]) throws -> [any NSAccessibilityProtocol] {
         guard let root = window.contentView else { return [] }
@@ -117,6 +180,7 @@ private struct ScribeComponentFixture {
         diagnostic.append("owned host: visible=\(window.isVisible), key=\(window.isKeyWindow), " +
                           "applicationActive=\(NSApplication.shared.isActive), " +
                           "launchFinished=\(OwnedWindowFixtureApplication.launchFinished)")
+        appendSemanticDiagnostics(for: root, in: window, diagnostic: &diagnostic)
         var pending: [(Any, Int)] = [(root, 0)]
         var seen = Set<ObjectIdentifier>()
         var result: [any NSAccessibilityProtocol] = []
@@ -128,8 +192,11 @@ private struct ScribeComponentFixture {
             // Both remain descendants of this owned content root; never inspect parent/app links.
             if let view = object as? NSView {
                 pending.append(contentsOf: view.subviews.map { ($0, depth + 1) })
+                if view is NSButton {
+                    appendSemanticDiagnostics(for: view, in: window, diagnostic: &diagnostic)
+                }
             }
-            let typeName = String(reflecting: type(of: object))
+            let typeName = diagnosticField(String(reflecting: type(of: object)))
             guard let element = object as? any NSAccessibilityProtocol else {
                 if diagnostic.count < 80 { diagnostic.append("\(typeName): does not conform to NSAccessibilityProtocol") }
                 continue
@@ -142,8 +209,9 @@ private struct ScribeComponentFixture {
             pending.append(contentsOf: navigation.map { ($0 as Any, depth + 1) })
             pending.append(contentsOf: contents.map { ($0, depth + 1) })
             if diagnostic.count < 80 {
-                diagnostic.append("\(typeName):\(element.accessibilityRole()?.rawValue ?? "?"):" +
-                    "\(element.accessibilityIdentifier() ?? "-"):\(element.accessibilityLabel() ?? "-") " +
+                diagnostic.append("\(typeName):\(diagnosticField(element.accessibilityRole()?.rawValue ?? "?")):" +
+                    "\(diagnosticField(element.accessibilityIdentifier() ?? "-")):\(diagnosticField(element.accessibilityLabel() ?? "-")) " +
+                    "element=\(element.isAccessibilityElement()), " +
                     "children=\(children.count), navigation=\(navigation.count), contents=\(contents.count)")
             }
         }
@@ -186,7 +254,12 @@ private struct ScribeComponentFixture {
             }
             try await Task.sleep(for: .milliseconds(10))
         }
-        if let lastUnavailableReason { throw ScenarioFailure.unavailableControl(id, lastUnavailableReason) }
+        if let lastUnavailableReason {
+            // Preserve exact failure reasons (including negative-control assertions) while making
+            // wrapper/cell evidence available when a raw object has an identifier but no button role.
+            OwnedWindowFixtureApplication.record("accessibility diagnostics for \(id): \(diagnostic.joined(separator: "; "))")
+            throw ScenarioFailure.unavailableControl(id, lastUnavailableReason)
+        }
         throw ScenarioFailure.missingControl(id, diagnostic)
     }
 

@@ -92,15 +92,16 @@ struct KokoroWorkerSessionTests {
                 phase('audio-written')
             """.write(to: directory.appendingPathComponent("soundfile.py"), atomically: true, encoding: .utf8)
             // Run the unmodified production worker script with disposable model modules.
-            // -I prevents loading installed/user Python packages; only this fixture directory is added.
+            // -I ignores Python environment settings and user-site packages; -S skips site initialization.
+            // These fixtures need only the standard library and the explicitly added stub directory.
             let files = KokoroWorker.modelFiles(in: directory)
-            launch = .init(executable: "/usr/bin/python3", arguments: ["-I", "-c", Self.wrapper, directory.path,
+            launch = .init(executable: "/usr/bin/python3", arguments: ["-I", "-S", "-c", Self.wrapper, directory.path,
                 KokoroWorker.workerScript(modelDir: directory), files.onnx.path, files.voices.path])
             trace.record("fixture-ready")
         }
 
         func pythonLaunch(script: String, arguments: [String]) -> KokoroWorkerSession.Launch {
-            .init(executable: "/usr/bin/python3", arguments: ["-I", "-c", Self.wrapper, directory.path, script] + arguments)
+            .init(executable: "/usr/bin/python3", arguments: ["-I", "-S", "-c", Self.wrapper, directory.path, script] + arguments)
         }
 
         func session(timeout: TimeInterval = 3, idle: TimeInterval = 120,

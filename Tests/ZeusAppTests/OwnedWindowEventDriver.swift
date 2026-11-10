@@ -206,6 +206,15 @@ struct OwnedWindowEventDriverTests {
             defer { OwnedWindowFixtureApplication.close(window) }
             let driver = OwnedWindowEventDriver(registry: registry)
             driver.register(window)
+            // Let the normal AppKit loop settle layout before inserting the
+            // foreign event. It may legitimately consume queued input while an
+            // async readiness wait yields; this test isolates synchronous dispatch.
+            try await driver.click("fixture.queue-owner", in: window)
+            #expect(target.calls == 1)
+            let probes = registry.probes(for: "fixture.queue-owner", in: window)
+            try #require(probes.count == 1)
+            let probe = try #require(probes.first)
+            let frame = probe.convert(probe.bounds, to: nil)
             // This event belongs to this regression fixture, not to the driver's gesture.
             // It has no target action; only this test may remove it during cleanup.
             let foreign = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: NSPoint(x: 110, y: 47),
@@ -219,8 +228,8 @@ struct OwnedWindowEventDriverTests {
                         inMode: .eventTracking, dequeue: true)
                 }
             }
-            try await driver.click("fixture.queue-owner", in: window)
-            #expect(target.calls == 1)
+            try driver.dispatch("fixture.queue-owner", probe: probe, frame: frame, in: window)
+            #expect(target.calls == 2)
             let stillQueued = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                 inMode: .eventTracking, dequeue: false))
             #expect(OwnedWindowEventDriver.sameEvent(stillQueued, queuedForeign), "The driver must leave the unrelated release at the queue head")
@@ -251,6 +260,13 @@ struct OwnedWindowEventDriverTests {
                 try await driver.click("fixture.duplicate", in: window)
                 Issue.record("An unregistered native window received input")
             } catch OwnedWindowEventDriver.Failure.unownedWindow { }
+            let rawProbe = try #require(first.subviews.compactMap { $0 as? OwnedWindowControlProbeView }.first)
+            do {
+                try driver.dispatch("fixture.duplicate", probe: rawProbe,
+                    frame: rawProbe.convert(rawProbe.bounds, to: nil), in: window)
+                Issue.record("Synchronous dispatch sent input to an unregistered window")
+            } catch OwnedWindowEventDriver.Failure.unownedWindow { }
+            #expect(target.calls == 0)
             driver.register(window)
             do {
                 try await driver.click("fixture.duplicate", in: window)
@@ -362,8 +378,10 @@ final class OwnedWindowEventDriver {
         return frame
     }
 
-    private func dispatch(_ id: String, probe: OwnedWindowControlProbeView, frame: NSRect, in window: NSWindow) throws {
-        guard registry.probes(for: id, in: window).count == 1,
+    fileprivate func dispatch(_ id: String, probe: OwnedWindowControlProbeView, frame: NSRect, in window: NSWindow) throws {
+        guard windows[ObjectIdentifier(window)]?.value === window else { throw Failure.unownedWindow }
+        let probes = registry.probes(for: id, in: window)
+        guard probes.count == 1, probes.first === probe,
               readyFrame(probe, in: window) == frame else { throw Failure.staleGeometry(id) }
         let point = NSPoint(x: frame.midX, y: frame.midY)
         let number = nextEventNumber

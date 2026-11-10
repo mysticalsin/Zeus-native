@@ -1603,6 +1603,18 @@
         "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
         "function": "terminatedWorkerReleasesItsProcessAfterClose"
       }
+    },
+    {
+      "id": "REG-133",
+      "failure": "The foreign-event ownership fixture queued its release before an async layout wait; the normal AppKit loop legitimately consumed it during that yield. The guard now settles through the public click path, then inserts the foreign event and invokes the same synchronous dispatcher without yielding, requiring the exact foreign release to remain queued.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched"
+      }
     }
   ]
 }
