@@ -1,0 +1,103 @@
+Building for debugging...
+[0/15] Write swift-version-457096A79D733C59.txt
+[1/15] Write sources
+[5/16] Emitting module ZeusCore
+[6/26] Compiling ZeusCore ExplanationCompletionStream.swift
+[7/26] Compiling ZeusCore ExplanationCoordinates.swift
+[8/26] Compiling ZeusCore ExplanationDiagnostics.swift
+[9/26] Compiling ZeusCore ExplanationHistory.swift
+[10/26] Compiling ZeusCore ExplanationPlayback.swift
+[11/26] Compiling ZeusCore ExplanationProtocol.swift
+[12/26] Compiling ZeusCore ExplanationReducer.swift
+[13/26] Compiling ZeusCore ExplanationStream.swift
+[14/26] Compiling ZeusCore ScreenShot.swift
+[15/26] Compiling ZeusCore TranscriptionEngine.swift
+[17/28] Emitting module Zeus
+[18/35] Compiling Zeus ExplanationAudioContracts.swift
+[19/35] Compiling Zeus ExplanationController.swift
+[20/35] Compiling Zeus ExplanationMicrophone.swift
+[21/35] Compiling Zeus ExplanationProviderContracts.swift
+[22/35] Compiling Zeus ExplanationScreenContext.swift
+[23/35] Compiling Zeus InertNativeAdapters.swift
+[24/35] Compiling Zeus InertScreenAdapter.swift
+[25/36] Wrapping AST for ZeusCore for debugging
+[27/37] Emitting module ZeusTests
+[28/38] Compiling ZeusTests ExplanationControllerTests.swift
+[29/39] Wrapping AST for Zeus for debugging
+[30/39] Wrapping AST for ZeusTests for debugging
+[31/39] /workspace/zeus-validation/visual-controller-3/.build/x86_64-unknown-linux-gnu/debug/VisualControllerPackageDiscoveredTests.derived/all-discovered-tests.swift
+[32/39] Write sources
+[34/40] Emitting module VisualControllerPackageDiscoveredTests
+[35/42] Compiling VisualControllerPackageDiscoveredTests ZeusTests.swift
+[36/42] Compiling VisualControllerPackageDiscoveredTests all-discovered-tests.swift
+[37/43] /workspace/zeus-validation/visual-controller-3/.build/x86_64-unknown-linux-gnu/debug/VisualControllerPackageTests.derived/runner.swift
+[38/43] Wrapping AST for VisualControllerPackageDiscoveredTests for debugging
+[39/43] Write sources
+[41/44] Emitting module VisualControllerPackageTests
+[42/45] Compiling VisualControllerPackageTests runner.swift
+[43/46] Wrapping AST for VisualControllerPackageTests for debugging
+[44/46] Write Objects.LinkFileList
+[45/46] Linking VisualControllerPackageTests.xctest
+Build complete! (83.93s)
+Test Suite 'All tests' started at 2026-11-10 16:22:48.695
+Test Suite 'debug.xctest' started at 2026-11-10 16:22:48.701
+Test Suite 'debug.xctest' passed at 2026-11-10 16:22:48.701
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 16:22:48.701
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Explanation controller with synthetic services" started.
+◇ Test captionsCommitOnlyOnExplicitAdvanceWithoutAudioOrCapture() started.
+✔ Test captionsCommitOnlyOnExplicitAdvanceWithoutAudioOrCapture() passed after 0.012 seconds.
+◇ Test captionDiagnosticsNeverClaimAudibleOutputOrCountReplayAsNewGeneration() started.
+✔ Test captionDiagnosticsNeverClaimAudibleOutputOrCountReplayAsNewGeneration() passed after 0.008 seconds.
+◇ Test failedNarrationDiagnosticsPreserveNumericFailureAndBoundedCleanupOnly() started.
+✔ Test failedNarrationDiagnosticsPreserveNumericFailureAndBoundedCleanupOnly() passed after 0.002 seconds.
+◇ Test stopDropsUnpresentedBeatsFromCanonicalHistoryAndReplay() started.
+✔ Test stopDropsUnpresentedBeatsFromCanonicalHistoryAndReplay() passed after 0.002 seconds.
+◇ Test stoppedCaptionReplayContainsOnlyCompletedPrefixAndStaysReadOnly() started.
+✔ Test stoppedCaptionReplayContainsOnlyCompletedPrefixAndStaysReadOnly() passed after 0.006 seconds.
+◇ Test lateProviderDeliveryCannotRewriteReplacementTurn() started.
+✔ Test lateProviderDeliveryCannotRewriteReplacementTurn() passed after 0.007 seconds.
+◇ Test invalidFutureSceneDoesNotCommitEarlierQueuedCue() started.
+✔ Test invalidFutureSceneDoesNotCommitEarlierQueuedCue() passed after 0.002 seconds.
+◇ Test replayDoesNotMutateCanonicalHistoryAndManualEditSupportsUndoRedo() started.
+✔ Test replayDoesNotMutateCanonicalHistoryAndManualEditSupportsUndoRedo() passed after 0.012 seconds.
+◇ Test narrationFailureReleasesLeaseWithoutFallbackOrCapture() started.
+✔ Test narrationFailureReleasesLeaseWithoutFallbackOrCapture() passed after 0.003 seconds.
+◇ Test deniedMicrophoneRetainsTypedCaptionPath() started.
+✔ Test deniedMicrophoneRetainsTypedCaptionPath() passed after 0.006 seconds.
+◇ Test sameRunLoopPressReleaseCannotStartCaptureOrAskPermissionAfterRelease() started.
+✔ Test sameRunLoopPressReleaseCannotStartCaptureOrAskPermissionAfterRelease() passed after 0.001 seconds.
+◇ Test admittedHistorySavesAndChatDeletionCannotBeUndoneByLateWrite() started.
+✔ Test admittedHistorySavesAndChatDeletionCannotBeUndoneByLateWrite() passed after 0.273 seconds.
+◇ Test failedSaveSurvivesConversationSwitchAndRetriesItsOwnedRecord() started.
+✔ Test failedSaveSurvivesConversationSwitchAndRetriesItsOwnedRecord() passed after 0.776 seconds.
+◇ Test retryCannotRequeueFailedCheckpointBehindNewerInflightSave() started.
+✔ Test retryCannotRequeueFailedCheckpointBehindNewerInflightSave() passed after 0.520 seconds.
+◇ Test anotherRecordSavingCannotClearTheRemainingFailureNotice() started.
+✔ Test anotherRecordSavingCannotClearTheRemainingFailureNotice() passed after 1.044 seconds.
+◇ Test switchingAwaitsPendingSaveAndDoesNotWriteBlankConversation() started.
+✔ Test switchingAwaitsPendingSaveAndDoesNotWriteBlankConversation() passed after 0.264 seconds.
+◇ Test memoryOnlyHistoryRefusesSwitchUntilExplicitStorageRecovery() started.
+✔ Test memoryOnlyHistoryRefusesSwitchUntilExplicitStorageRecovery() passed after 0.266 seconds.
+◇ Test failedOpenCanRetryTheSameConversationAfterStorageReturns() started.
+✔ Test failedOpenCanRetryTheSameConversationAfterStorageReturns() passed after 0.004 seconds.
+◇ Test closingRejectsNewWorkAndStaleDeliveryUntilQuitIsCancelled() started.
+✔ Test closingRejectsNewWorkAndStaleDeliveryUntilQuitIsCancelled() passed after 0.004 seconds.
+◇ Test fullFailedSaveCapacityStillAllowsRecoveringAnOwnedConversation() started.
+✔ Test fullFailedSaveCapacityStillAllowsRecoveringAnOwnedConversation() passed after 13.686 seconds.
+◇ Test knownCorruptRecordDeletionIsSafeAndRetryIsIdempotent() started.
+✔ Test knownCorruptRecordDeletionIsSafeAndRetryIsIdempotent() passed after 0.013 seconds.
+◇ Test deletionWithoutOwnedIdentityCannotClaimUnreadableRecordWasRemoved() started.
+✔ Test deletionWithoutOwnedIdentityCannotClaimUnreadableRecordWasRemoved() passed after 0.005 seconds.
+◇ Test firstMeaningfulMemoryOnlySceneLinksExactlyOnceWithoutCapture() started.
+✔ Test firstMeaningfulMemoryOnlySceneLinksExactlyOnceWithoutCapture() passed after 0.002 seconds.
+◇ Test deletingReopenedHistoryCannotRecreateItsChatLinkDuringStop() started.
+✔ Test deletingReopenedHistoryCannotRecreateItsChatLinkDuringStop() passed after 0.006 seconds.
+◇ Test retentionEvictionInvalidatesCheckpointBeforeEditingTheStillOpenRecord() started.
+✔ Test retentionEvictionInvalidatesCheckpointBeforeEditingTheStillOpenRecord() passed after 1.308 seconds.
+✔ Suite "Explanation controller with synthetic services" passed after 18.251 seconds.
+✔ Test run with 25 tests in 1 suite passed after 18.252 seconds.

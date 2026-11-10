@@ -532,6 +532,84 @@
       "scope": "Actual AVAudioConverter and generated PCM buffers only: consume-once ownership, nonblocking overlap rejection and streaming/final conversion. No engine, capture, recognizer, playback or speech accuracy/device performance claim.",
       "suite": "AudioSamplesConversionTests",
       "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift"
+    },
+    {
+      "id": "portable-explanation",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "explanation",
+      "scope": "Exact Foundation scene protocol, bounded NDJSON/SSE, reducer, actual-clock consumer, coordinates, local history and bounded numeric diagnostics with synthetic data. No native rendering, sound, capture, provider requests, measured hardware performance or physical-device acceptance."
+    },
+    {
+      "id": "native-ExplanationAudioTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationAudioTests",
+      "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+      "scope": "Synthetic PCM, fake writer/player and owned temporary files: selected-voice snapshot and missing-voice rejection, cancellation, duration, resource limits and media-clock identity. No sound output, models, network or capture."
+    },
+    {
+      "id": "native-ExplanationMicrophoneTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationMicrophoneTests",
+      "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+      "scope": "Injected permission/capture/ASR services and unprepared WhisperKit refusal: cancellation, on-device policy and cache-only boundaries. No OS prompt, model preparation or microphone access."
+    },
+    {
+      "id": "native-ExplanationControllerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationControllerTests",
+      "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+      "scope": "Production explanation controller with synthetic providers and disposable stores: caption admissions, late callbacks, invalid responses, replay/history, numeric lifecycle diagnostics, failure and deletion. No user-control journey, real providers, sound or capture."
+    },
+    {
+      "id": "native-ExplanationProviderTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationProviderTests",
+      "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+      "scope": "Production request builder and no-redirect policy with synthetic content: endpoint, model, credential, image opt-in and request bounds. No credentials read or HTTP request sent."
+    },
+    {
+      "id": "native-ExplanationRendererTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationRendererTests",
+      "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+      "scope": "Production Canvas/SceneKit rendering in an owned inert AppKit host: generated scene pixels, geometry, accessibility, reveal and disposal. No physical display cadence or provider acceptance."
+    },
+    {
+      "id": "native-ExplanationTalkButtonTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationTalkButtonTests",
+      "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+      "scope": "Owned native push-to-talk control with UUID-scoped synthetic callbacks: keyboard/hold/release/cancel. No microphone permission or capture."
+    },
+    {
+      "id": "native-ExplanationScreenContextTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationScreenContextTests",
+      "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+      "scope": "Injected selected-display capture services and owned drawing panels: denial, stale completion, context expiry, mapping and pass-through lifecycle. No live screen capture or TCC changes."
+    },
+    {
+      "id": "missing-explanation-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "New voice-driven visual explanation end-to-end acceptance on a consented Mac.",
+      "reason": "Native compilation/execution of this isolated local feature, real ASR/TTS/model exchanges, full Chat control journeys, screenshot references, multi-display annotations and CPU/GPU/memory/frame-time traces remain unverified. No physical Mac executor is connected."
+    },
+    {
+      "id": "native-ExplanationChatLifecycleTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ExplanationChatLifecycleTests",
+      "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+      "scope": "Production ChatModel with disposable stores and owned ChatPanel controls: durable visual links, immutable conversation identity, per-record failed-save retry, deletion and synchronous hide/close/minimize/Escape stop. No capture, providers or installed-app navigation."
     }
   ],
   "features": [
@@ -1517,6 +1595,854 @@
           "acceptance": "Automated native multi-display/scale/Spaces/removal traces, velocity continuity, speech-to-drawing motion and exact targets; optional physical actions remain disabled by default.",
           "cases": [],
           "id": "F09.4"
+        },
+        {
+          "id": "F09.explanation-contracts",
+          "check": "portable-explanation",
+          "acceptance": "Versioned typed events reject untrusted operations, incorrect identities, revision conflicts and resource exhaustion. Only real playback observations or explicit caption advance admit cues; interruption/replay, history/undo and coordinate transforms retain their stated boundaries. Bounded numeric diagnostics reject stale/invalid samples, exclude content and identity, and do not infer physical sound, photons or process metrics.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+              "function": "validBytewiseStreamRequiresStopDoneAndEOF"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+              "function": "eofWithoutDoneFailsEvenAfterFinalScene"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+              "function": "outputLimitAndToolsAreVisibleFailures"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+              "function": "malformedJSONAndOversizedLineFailClosed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+              "function": "doneBeforeStopAndTruncatedFramingFail"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+              "function": "cancellationRejectsLateData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+              "function": "croppedResizedImageMapsThroughItsOriginalOriginAndRoundTrips"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+              "function": "backingScaleDoesNotReplaceDeliveredScreenshotPixelDimensions"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+              "function": "changedContentDisplayFrameScaleOrCaptureIdentityCannotAuthorizeOverlay"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+              "function": "aspectFitLetterboxAndZoomPanHaveAnExactClippedInverse"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+              "function": "mixedCanvasCaptureProjectionUsesSameScaleForGeometryAndManualEdits"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+              "function": "malformedMetadataAndNonfiniteHitsAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "actualCuesShareReservedRevisionAndCancellationNeverCommitsFutureScene"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "spokenOnlyBeatReservesRevisionAtActualStartWithoutAnUndoEntry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "repeatedOrOutOfOrderCueAndWrongTokenCannotModifyCanonicalScene"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "userEditInvalidatesQueuedModelAndNewEditAfterUndoClearsRedo"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "newTurnInvalidatesStartedPlaybackAndReplayIsReadOnly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "restartKeepsOnlyAppliedSnapshotsAndNeverRevivesAdmission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "interruptedAnimationUndoReturnsPreBeatSceneInsteadOfNeverShownFutureTarget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "retentionCountersExposeDroppedConversationCheckpointsAndUndo"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "malformedVersionsIdentityDatesAndCheckpointOrderAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "decodedCueOrderAndRevisionGapsCannotForgeAppliedHistory"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "revisionAndSizeLimitsRejectWithoutMutatingHistory"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "missingRegistryFailsRestoreWhileCaptureIDsRemainInertMetadata"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "storeRoundTripsAndStaleSaveCannotReplaceNewerCheckpoint"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "everyPrecommitFaultPreservesOldRecordAndRemovesTemporaryFile"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "directorySyncFailureReturnsSavedWarningAndCommittedData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "retentionRemovesOldRecordsAndDeleteFailureIsVisibleAfterSuccessfulSave"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "expiredRecordsAreRemovedButCorruptAndUnknownFilesAreReportedOrPreserved"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "ancestorAndLeafSymlinksNeverRedirectHistoryOperations"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "hardLinksAndFIFOAreRefusedWithoutBlockingOrDeletingTargets"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "diskBudgetAndOversizeReadAreRejectedBeforeReplacement"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "synthesisReadinessDoesNotReserveRevisionOrRevealBeforeRealPlayback"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "outOfOrderSynthesisCannotOvertakeAnEarlierBeat"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "wordCuesUseActualAlignmentAndBeatDoesNotCompleteAtReadingEstimate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "absentOrPartialAlignmentUsesBeatBoundaryWithoutInventingWordTimes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "pausedAndOldTicketsCannotAdvanceResumeOrSeek"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "cancelledTurnIsTerminalAndCannotBeRevivedByAudioOrModelEvents"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "mutedBeatsAdvanceOnlyExplicitlyIncludingSpokenOnlyReservations"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "captionCompletionPreservesActualPartiallyPlayedTimeAndLateSynthesisCannotRewriteIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "manualCaptionReplayUsesActualChunkEndForEndCuesWithoutCanonicalAdmission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "invalidIdentityGapDuplicateAndMediaPositionLeaveStateUnchanged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "replayRetainsSpokenOnlyRevisionsAndNeverEmitsCanonicalAdmissions"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "unchangedReplayPrefixEmitsOnlyLightweightFramesUntilActualCueBoundary"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "seekingExactMediaEndNeverRequestsZeroLengthPlaybackOrCanonicalCompletion"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "currentBeatPreviewCompletesWithoutWaitingForAcceptedFutureAudioAndReplayResetsLimit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "animationOverlapBeginsAtSampledPoseAndInterruptionCanFreezeIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "zeroDurationAndReducedMotionSnapToFiniteFinalPose"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "actualShortAudioBoundsLongAnimationWithoutFabricatingCompletionTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "reducedMotionAndManualCaptionsPreserveStaticRevealWhileSnappingAdmittedMotion"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "validAnimationEndpointsCannotExposeUnsafeComposedMidpoint"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "atomicCueForwardReferencesRenderAndInvalidCueLeavesPresentationUntouched"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "replayCacheExtendsCuePrefixThenRebuildsAfterBackwardSeek"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "replayCachePreservesZeroCueRevisionsAndRejectsMalformedUpdateAtomically"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+              "function": "replayCacheChangedPayloadRebuildsInsteadOfRetainingPriorObjects"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "safeWireRoundTripsAndSeparatesAppAudioMetadata"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "rejectsUnknownFieldsAtEveryNestedBoundary"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "rejectsDuplicateEscapedKeysUnsupportedCommandsAndTrailingData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "finiteGeometryTextAndTransitionLimitsApplyToDirectConstruction"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "rejectsModelAudioMetadataNonfiniteNumbersAndNestingBombs"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "validatesSemanticAnchorsAndActualAlignmentWithoutEstimatingSpeech"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "everyClosedOperationRoundTripsWithoutExecutablePayloads"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+              "function": "allRequiredEnvelopeFieldsAndVersionAreEnforced"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "invalidTransactionsAreAtomicAndCannotConcealInvalidObjects"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "stableIDsReferencesAndParentCyclesAreValidated"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "manualRevisionAndSessionIdentityRejectLateModelEdits"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "cueSubsetsAndSpokenOnlyBeatsHaveExplicitRevisionAdmission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "assetRegistryAndCaptureIdentityAreNeverInferredFromModelObjects"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "safe3DLabelsMeshesAndGeometryBudgetsRejectDangerousShapes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "malformedPatchCannotBeHiddenByLaterClearAndAnimationsHaveFiniteEndpoints"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "projectedEventsValidateEveryVisibleCueBoundary"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+              "function": "individuallyFiniteNestedTransformsCannotOverflowNativeMatrices"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "arbitraryByteChunksIncludingSplitUTF8EmitOnlyCompleteEvents"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "orderedBatchesAndEquivalentDuplicatesAreIdempotent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "conflictingDuplicatesSequenceGapsAndWrongBaseRevisionReject"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "staleSessionSceneAndTurnAreRejectedBeforeDeduplication"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "malformedBatchEmitsNothingAndFailsPermanently"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "finishRequiresFinalEventAndFinalNewlineAndCancellationDropsPending"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+              "function": "frameTurnAndIdentityBudgetsBoundRetryAndMemory"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "firstActualEventsUseMonotonicLatencyAndNeverInferAudioOrPhotons"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "freshNonceRejectsOldCallbacksEvenWhenCallerReusesItsIdentity"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "invalidAndBackwardClockReadingsCannotMutateOrReplaceTheActiveTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "cueLatenessIsMediaTimeNotPlaybackRateOrElapsedWallTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "cancellationMeasuresOnlyBracketedSynchronousCleanupAndClosesEventAdmission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "failedCleanupClockStillAllowsExplicitRetirementWithoutInventedTiming"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "fixedFailureCategoriesCountWithoutAcceptingErrorText"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "processSamplesAreOptionalCumulativeAndAtomicOnInvalidInputs"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "countersSaturateWithoutGrowingArraysOrWrapping"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "turnAndFirstEventAggregatesRemainBoundedAcrossReplacements"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "encodedReportContainsOnlyFixedNumericLeavesAndNoIdentityOrAbsoluteTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+              "function": "physicalFootprintBytesExportNamesTheProvidedMetric"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationAudioTests",
+          "check": "native-ExplanationAudioTests",
+          "acceptance": "Synthetic PCM, fake writer/player and owned temporary files: selected-voice snapshot and missing-voice rejection, cancellation, duration, resource limits and media-clock identity. No sound output, models, network or capture.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "syntheticPCMHasMeasuredDurationAndPrivateOwnedLifetime"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "cancellationDropsLateBuffersAndReleasesFileBeforeNextRender"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "synchronousCompletionThenWriterErrorDoesNotResumeTwice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "twoBeatQueueRejectsThirdAndCancellationReleasesBothSlots"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "PCMFormatChangesAndDurationBudgetFailClosed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "cancellingQueuedBeatReturnsWithoutWaitingForActiveSynthesis"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "playerUsesMediaClockAndRejectsStaleCompletionAfterSeek"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "registryRejectsForgedMetadataAndMoreThanTwoArtifacts"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "nonfinitePCMIsRejectedBeforeNativePlaybackForPlanarAndInterleavedBuffers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "missingDisplayTicksUseActualMediaClockAfterFiftyMillisecondWatchdog"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "shortClipCompletionCannotOvertakePlayingAndClockSamplesStayBounded"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "replacementPurgesQueuedOldObservationsAndControlOverflowFailsVisibly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "selectedInstalledVoiceIsSnapshottedAndChangesApplyToNextRender"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+              "function": "missingSelectedVoiceFailsWithoutDefaultSubstitutionOrRetainedPCM"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationMicrophoneTests",
+          "check": "native-ExplanationMicrophoneTests",
+          "acceptance": "Injected permission/capture/ASR services and unprepared WhisperKit refusal: cancellation, on-device policy and cache-only boundaries. No OS prompt, model preparation or microphone access.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "localRecognitionRequestsOnlyMicAndNeverPreparesOrFallsBack"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "appleRecognitionRequiresBothPermissionsBeforeCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "releaseDuringPermissionDialogCannotStartAfterLateApproval"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "stalePartialsAndDeviceChangesCannotMutateReplacementTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "unsafeOrCloudEngineIsRejectedBeforePermissionsAndCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "realWhisperKitCacheOnlyEntryRefusesUnloadedInstanceWithoutPreparation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "actualCapturePolicyRejectsInvalidFormatsAndEnforcesNinetySeconds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+              "function": "cancelledLocalInferenceKeepsItsSlotAndRejectsLateTranscript"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationControllerTests",
+          "check": "native-ExplanationControllerTests",
+          "acceptance": "Production explanation controller with synthetic providers and disposable stores: caption admissions, late callbacks, invalid responses, replay/history, numeric lifecycle diagnostics, failure and deletion. No user-control journey, real providers, sound or capture.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "captionsCommitOnlyOnExplicitAdvanceWithoutAudioOrCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "stopDropsUnpresentedBeatsFromCanonicalHistoryAndReplay"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "stoppedCaptionReplayContainsOnlyCompletedPrefixAndStaysReadOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "lateProviderDeliveryCannotRewriteReplacementTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "invalidFutureSceneDoesNotCommitEarlierQueuedCue"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "replayDoesNotMutateCanonicalHistoryAndManualEditSupportsUndoRedo"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "narrationFailureReleasesLeaseWithoutFallbackOrCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "deniedMicrophoneRetainsTypedCaptionPath"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "sameRunLoopPressReleaseCannotStartCaptureOrAskPermissionAfterRelease"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "admittedHistorySavesAndChatDeletionCannotBeUndoneByLateWrite"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "failedSaveSurvivesConversationSwitchAndRetriesItsOwnedRecord"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "retryCannotRequeueFailedCheckpointBehindNewerInflightSave"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "anotherRecordSavingCannotClearTheRemainingFailureNotice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "switchingAwaitsPendingSaveAndDoesNotWriteBlankConversation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "memoryOnlyHistoryRefusesSwitchUntilExplicitStorageRecovery"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "failedOpenCanRetryTheSameConversationAfterStorageReturns"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "closingRejectsNewWorkAndStaleDeliveryUntilQuitIsCancelled"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "fullFailedSaveCapacityStillAllowsRecoveringAnOwnedConversation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "knownCorruptRecordDeletionIsSafeAndRetryIsIdempotent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "deletionWithoutOwnedIdentityCannotClaimUnreadableRecordWasRemoved"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "firstMeaningfulMemoryOnlySceneLinksExactlyOnceWithoutCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "deletingReopenedHistoryCannotRecreateItsChatLinkDuringStop"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "retentionEvictionInvalidatesCheckpointBeforeEditingTheStillOpenRecord"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "currentBeatSeekEndsPreviewWithoutPlayingOrSynthesizingQueuedFuture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "captionDiagnosticsNeverClaimAudibleOutputOrCountReplayAsNewGeneration"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+              "function": "failedNarrationDiagnosticsPreserveNumericFailureAndBoundedCleanupOnly"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationProviderTests",
+          "check": "native-ExplanationProviderTests",
+          "acceptance": "Production request builder and no-redirect policy with synthetic content: endpoint, model, credential, image opt-in and request bounds. No credentials read or HTTP request sent.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "selectedEndpointGetsOnlyBoundedChatBodyAndExplicitKeyHeader"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "unsafeSchemesRemotePlaintextAndURLCredentialsNeverConstructARequest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "plainHTTPIsPermittedOnlyForExplicitLoopbackEndpoints"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "localOnlyRejectsRemoteHTTPSWithoutSubstitutingAnotherEndpoint"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "configuredModelsRemainInsideTheExistingCap"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "headerInjectionAndOversizedKeysAreRejectedWithoutChangingTheBody"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "promptLimitUsesUTF8BytesAndRejectsEmptyRequests"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "conversationCannotBecomeSystemMessagesToolsOrOtherApplicationContext"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "historyCountAndEncodedBytesHaveIndependentBounds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "invalidSceneCannotBeSerializedIntoAProviderRequest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "exhaustedRevisionCannotRequestAnImpossibleNextBeat"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "historicalCaptureIdentityDoesNotImplicitlyAttachPixels"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "onlyExplicitMatchingSnapshotBytesAreAttachedAsAnInMemoryImage"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "mismatchedUnboundOrOversizedSnapshotNeverConstructsARequest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "transportUsesEphemeralStorageAndFiniteRequestAndResourceDeadlines"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+              "function": "redirectDelegateNeverForwardsPromptOrAuthorizationEvenToTheSameOrigin"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationRendererTests",
+          "check": "native-ExplanationRendererTests",
+          "acceptance": "Production Canvas/SceneKit rendering in an owned inert AppKit host: generated scene pixels, geometry, accessibility, reveal and disposal. No physical display cadence or provider acceptance.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "cumulativeRevealUsesDistanceAndHandlesZeroDuplicateAndInvalidProgress"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "connectorsFollowSubjectEdgesAndSelectionUsesTheRevealedPath"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "nestedTransformsAndKeyboardNudgesShareOneInverseMapping"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "groupVisibilityAndConnectorBoundsFollowTheSameTransformedDescendants"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "captureProjectionClipsLetterboxingRejectsStaleContextAndInvertsEdits"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "measuredLabelsStayClippedAndDoNotOverlapSubjectsOrEachOther"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "invalidSceneCannotRenderAndReducedMotionPreservesSuppliedPresentation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "productionCanvasPixelsChangeOnlyWithSuppliedPresentationAndRespectReducedMotion"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "worldGeometryIsBoundedAndContainsRealMeshNormalsAndCappedTubes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "nativeScenePreservesStableNodesReparentsLiveChildrenAndDisposesResources"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "nativeSceneReducedMotionNeverRevealsFutureObjectsAndGroupHighlightReachesChildren"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+              "function": "nativeSceneRejectsMalformedGeometryAndReadOnlyModeNeverEmitsKeyboardEdits"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationTalkButtonTests",
+          "check": "native-ExplanationTalkButtonTests",
+          "acceptance": "Owned native push-to-talk control with UUID-scoped synthetic callbacks: keyboard/hold/release/cancel. No microphone permission or capture.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+              "function": "mouseAndKeyboardHoldEmitOneBeginAndOneFinishWithoutRepeatStarts"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+              "function": "accessibilityToggleAndExternalListeningNeverDuplicateAStart"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+              "function": "escapeDisableWindowLossAndRemovalCancelAndIgnoreLateRelease"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+              "function": "failedStartingAttemptThenReplacementIgnoresOldMouseAndKeyboardReleases"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+              "function": "holdKeepsItsCallbacksAndRejectedStartNeverCreatesAReleaseAction"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+              "function": "externalStartupCancelsOnWindowLossAndDisableButCompletedCaptureDoesNot"
+            }
+          ]
+        },
+        {
+          "id": "F09.ExplanationScreenContextTests",
+          "check": "native-ExplanationScreenContextTests",
+          "acceptance": "Injected selected-display capture services and owned drawing panels: denial, stale completion, context expiry, mapping and pass-through lifecycle. No live screen capture or TCC changes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "constructionAndDeniedCaptureNeverReadOrCaptureTheDisplay"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "selectedOnlyCaptureKeepsNativePixelsScaleAndNegativeDisplayOriginDistinct"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "cancellationSuppressesLateCaptureAndKeepsTheSingleOSAdmissionUntilReturn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "changedDuringCaptureCannotPublishEvenIfMetadataReturnsToItsOriginalValue"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "unavailableObservationKeepsOnlyTheFrozenSnapshot"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "slowCaptureCannotRestartTheAnnotationExpiryClock"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "aMissingSelectedDisplayNeverFallsBackToAnotherCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "expiryAndUnknownMetadataStopObservationButDoNotEraseTheFrozenReference"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "oversizedImageNeverBecomesAContext"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "ownerReleaseInvalidatesSubscribersAndStopsBothPassiveObservers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "retiredObserverCannotInvalidateReplacementAndRenderTicksDoNotPollTheOS"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "croppedNonuniformPixelsProjectToPanelPointsAndInvertThroughGlobalAppKit"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "ownedOverlayIsClickThroughReusesItsPanelAndDisappearsWhenContextExpires"
+            }
+          ]
+        },
+        {
+          "id": "F09.explanation-device",
+          "check": "missing-explanation-device",
+          "acceptance": "The integrated Chat flow works through typed and consented spoken requests, measured real narration, interruption, follow-ups, save/reopen/delete and contextual annotations; it remains responsive and resource-bounded on the selected Mac with Reduce Motion and denied/revoked permissions.",
+          "cases": []
+        },
+        {
+          "id": "F09.ExplanationChatLifecycleTests",
+          "check": "native-ExplanationChatLifecycleTests",
+          "acceptance": "Production ChatModel with disposable stores and owned ChatPanel controls: durable visual links, immutable conversation identity, per-record failed-save retry, deletion and synchronous hide/close/minimize/Escape stop. No capture, providers or installed-app navigation.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+              "function": "ordinaryChatDeletionDoesNotAdmitExplanationStorageWork"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+              "function": "linksRemainBoundToTheirConversationWithoutChangingSelectionOrInventingMessages"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+              "function": "aSuccessfulOtherLinkCannotHideAFailedLinkAndRetryUsesCurrentConversation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+              "function": "deletingAFailedLinkRemovesItsRetryAdmission"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+              "function": "ownedPanelHideCloseMiniaturizeAndEscapeSynchronouslyNotifyStop"
+            }
+          ]
+        },
+        {
+          "id": "F09.durable-visual-chat-link",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Visual-only conversations retain a genuine history link across ChatStore reload without fabricated messages; legacy Chat records and unsaved empty ordinary drafts retain their behavior.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ChatTests.swift",
+              "function": "visualOnlyLinkSurvivesStoreReloadWithoutInventingChatMessages"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChatTests.swift",
+              "function": "legacyConversationWithoutVisualLinkStillDecodesAndUnlinkedEmptyStaysUnsaved"
+            }
+          ]
         }
       ]
     },

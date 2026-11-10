@@ -8,6 +8,8 @@ import ZeusCore
 final class ChatWindowController {
     private var window: NSPanel?
     private let chat: ChatModel
+    var makeExplanation: () -> ExplanationController? = { nil }
+    var stopExplanation: () -> Void = {}
 
     init(chat: ChatModel = .shared) {
         self.chat = chat
@@ -29,10 +31,11 @@ final class ChatWindowController {
         panel.level = .floating
         panel.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
         panel.isReleasedWhenClosed = false
+        panel.onHide = { [weak self] in self?.stopExplanation() }
         panel.hidesOnDeactivate = false
         panel.backgroundColor = NSColor(Theme.storm)
         panel.minSize = CGSize(width: 480, height: 360)
-        panel.contentView = NSHostingView(rootView: ChatWindowView(chat: chat))
+        panel.contentView = NSHostingView(rootView: ChatWindowView(chat: chat, makeExplanation: makeExplanation))
         if !panel.setFrameUsingName("ZeusChat") { panel.center() }
         panel.setFrameAutosaveName("ZeusChat")
         panel.makeKeyAndOrderFront(nil)
@@ -45,15 +48,25 @@ final class ChatWindowController {
     }
 }
 
-private final class ChatPanel: NSPanel {
+final class ChatPanel: NSPanel {
+    /// Explicit AppKit lifecycle: a retained hosting view is not guaranteed to
+    /// receive SwiftUI onDisappear when its window is hidden or miniaturized.
+    var onHide: () -> Void = {}
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+    override func orderOut(_ sender: Any?) { onHide(); super.orderOut(sender) }
+    override func close() { onHide(); super.close() }
+    override func miniaturize(_ sender: Any?) { onHide(); super.miniaturize(sender) }
 }
 
 struct ChatWindowView: View {
     let chat: ChatModel
+    var makeExplanation: () -> ExplanationController? = { nil }
+    @AppStorage("opt.explanation.enabled") private var visualEnabled = "false"
+    @State private var showingVisual = false
+    @State private var explanation: ExplanationController?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -61,14 +74,36 @@ struct ChatWindowView: View {
                 .frame(width: 210)
             Rectangle().fill(TopBarStyle.tileStroke).frame(width: 1)
             VStack(spacing: 0) {
-                ChatTranscriptView(chat: chat, compact: false)
-                ChatComposer(chat: chat, compact: false)
-                    .padding(12)
+                if visualEnabled == "true" {
+                    HStack {
+                        Button("Conversation") { showingVisual = false; explanation?.stop() }
+                            .buttonStyle(.borderless)
+                        Button { if explanation == nil { explanation = makeExplanation() }; showingVisual = true } label: {
+                            Label("Visual explanation", systemImage: "square.on.circle")
+                        }.buttonStyle(.borderless)
+                        Spacer()
+                    }.font(TopBarStyle.label(11, .semibold)).padding(.horizontal, 14).padding(.vertical, 8)
+                    Divider()
+                }
+                if let error = chat.visualStoreError {
+                    Text(error).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 14).padding(.vertical, 8)
+                        .accessibilityIdentifier("explanation.sidebar-save-error")
+                }
+                if showingVisual, visualEnabled == "true", let explanation {
+                    ExplanationPane(controller: explanation, conversationID: chat.current.id) {
+                        explanation.submit()
+                    }
+                } else {
+                    ChatTranscriptView(chat: chat, compact: false)
+                    ChatComposer(chat: chat, compact: false).padding(12)
+                }
             }
         }
         .padding(.top, 28)
         .background(Theme.storm)
         .preferredColorScheme(.dark)
+        .onChange(of: visualEnabled) { if visualEnabled != "true" { explanation?.stop(); showingVisual = false } }
     }
 }
 

@@ -29,6 +29,15 @@ def tests(*names):
 
 
 GROUPS = {
+    "explanation": (
+        core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
+             "Explanation/ExplanationPlayback.swift", "Explanation/ExplanationCoordinates.swift",
+             "Explanation/ExplanationHistory.swift", "Explanation/ExplanationDiagnostics.swift"),
+        tests("ExplanationProtocolTests", "ExplanationReducerTests", "ExplanationStreamTests",
+              "ExplanationCompletionStreamTests", "ExplanationPlaybackTests", "ExplanationCoordinatesTests",
+              "ExplanationHistoryTests", "ExplanationDiagnosticsTests"),
+    ),
     "socket-safety": (
         core("UnixSocket.swift"),
         tests("UnixSocketSafetyTests"),

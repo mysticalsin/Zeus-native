@@ -9,7 +9,9 @@ import subprocess
 from contracts import ROOT, digest, require
 
 SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests",
-          "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests"}
+          "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests",
+          "ExplanationRendererTests", "ExplanationTalkButtonTests", "ExplanationScreenContextTests",
+          "ExplanationChatLifecycleTests"}
 INFO = {
     "CFBundleExecutable": "zeus-native-test-host",
     "CFBundleIdentifier": "org.zeus.native-test-host",

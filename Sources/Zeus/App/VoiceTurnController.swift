@@ -119,6 +119,7 @@ final class VoiceTurnController {
 
     @discardableResult
     func press() -> Bool {
+        ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
         BrainWarmScheduler.shared.noteActivity()
         turnTask?.cancel()

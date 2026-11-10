@@ -1,0 +1,245 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/18] Compiling ZeusCore ExplanationCompletionStream.swift
+[5/18] Compiling ZeusCore ExplanationCoordinates.swift
+[6/18] Compiling ZeusCore ExplanationDiagnostics.swift
+[7/18] Compiling ZeusCore ExplanationHistory.swift
+[8/18] Emitting module ZeusCore
+[9/22] Compiling ZeusCore ExplanationPlayback.swift
+[10/22] Compiling ZeusCore ExplanationProtocol.swift
+[11/22] Compiling ZeusCore ExplanationReducer.swift
+[12/22] Compiling ZeusCore ExplanationStream.swift
+[13/23] Wrapping AST for ZeusCore for debugging
+[15/28] Emitting module ZeusCoreTests
+[16/28] Compiling ZeusCoreTests ExplanationCompletionStreamTests.swift
+[17/28] Compiling ZeusCoreTests ExplanationCoordinatesTests.swift
+[18/28] Compiling ZeusCoreTests ExplanationDiagnosticsTests.swift
+[19/28] Compiling ZeusCoreTests ExplanationHistoryTests.swift
+[20/32] Compiling ZeusCoreTests ExplanationPlaybackTests.swift
+[21/32] Compiling ZeusCoreTests ExplanationProtocolTests.swift
+[22/32] Compiling ZeusCoreTests ExplanationReducerTests.swift
+[23/32] Compiling ZeusCoreTests ExplanationStreamTests.swift
+[24/33] /workspace/zeus-validation/visual-canonical-explanation-3/explanation/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[25/33] Write sources
+[26/33] Wrapping AST for ZeusCoreTests for debugging
+[28/35] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[29/35] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[30/36] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[31/37] /workspace/zeus-validation/visual-canonical-explanation-3/explanation/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[32/37] Write sources
+[33/37] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[35/39] Emitting module ZeusPortableValidationPackageTests
+[36/39] Compiling ZeusPortableValidationPackageTests runner.swift
+[37/40] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[38/40] Write Objects.LinkFileList
+[39/40] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (55.47s)
+Test Suite 'All tests' started at 2026-11-10 16:25:03.747
+Test Suite 'debug.xctest' started at 2026-11-10 16:25:03.748
+Test Suite 'debug.xctest' passed at 2026-11-10 16:25:03.748
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 16:25:03.748
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite ExplanationProtocolTests started.
+◇ Suite "Explanation real-media playback and presentation" started.
+◇ Suite "Explanation coordinate identities and transforms" started.
+◇ Suite "Private-content-free explanation diagnostics" started.
+◇ Suite ExplanationReducerTests started.
+◇ Suite ExplanationHistoryTests started.
+◇ Suite ExplanationCompletionStreamTests started.
+◇ Suite ExplanationStreamTests started.
+◇ Test everyClosedOperationRoundTripsWithoutExecutablePayloads() started.
+◇ Test finiteGeometryTextAndTransitionLimitsApplyToDirectConstruction() started.
+◇ Test allRequiredEnvelopeFieldsAndVersionAreEnforced() started.
+◇ Test validatesSemanticAnchorsAndActualAlignmentWithoutEstimatingSpeech() started.
+◇ Test rejectsModelAudioMetadataNonfiniteNumbersAndNestingBombs() started.
+◇ Test safeWireRoundTripsAndSeparatesAppAudioMetadata() started.
+◇ Test rejectsUnknownFieldsAtEveryNestedBoundary() started.
+◇ Test physicalFootprintBytesExportNamesTheProvidedMetric() started.
+◇ Test atomicCueForwardReferencesRenderAndInvalidCueLeavesPresentationUntouched() started.
+◇ Test outOfOrderSynthesisCannotOvertakeAnEarlierBeat() started.
+◇ Test actualShortAudioBoundsLongAnimationWithoutFabricatingCompletionTime() started.
+◇ Test reducedMotionAndManualCaptionsPreserveStaticRevealWhileSnappingAdmittedMotion() started.
+◇ Test cueLatenessIsMediaTimeNotPlaybackRateOrElapsedWallTime() started.
+◇ Test rejectsDuplicateEscapedKeysUnsupportedCommandsAndTrailingData() started.
+◇ Test wordCuesUseActualAlignmentAndBeatDoesNotCompleteAtReadingEstimate() started.
+◇ Test encodedReportContainsOnlyFixedNumericLeavesAndNoIdentityOrAbsoluteTime() started.
+◇ Test mutedBeatsAdvanceOnlyExplicitlyIncludingSpokenOnlyReservations() started.
+◇ Test invalidIdentityGapDuplicateAndMediaPositionLeaveStateUnchanged() started.
+◇ Test unchangedReplayPrefixEmitsOnlyLightweightFramesUntilActualCueBoundary() started.
+◇ Test invalidAndBackwardClockReadingsCannotMutateOrReplaceTheActiveTurn() started.
+◇ Test malformedMetadataAndNonfiniteHitsAreRejected() started.
+◇ Test turnAndFirstEventAggregatesRemainBoundedAcrossReplacements() started.
+◇ Test freshNonceRejectsOldCallbacksEvenWhenCallerReusesItsIdentity() started.
+◇ Test croppedResizedImageMapsThroughItsOriginalOriginAndRoundTrips() started.
+◇ Test absentOrPartialAlignmentUsesBeatBoundaryWithoutInventingWordTimes() started.
+◇ Test cancellationMeasuresOnlyBracketedSynchronousCleanupAndClosesEventAdmission() started.
+◇ Test fixedFailureCategoriesCountWithoutAcceptingErrorText() started.
+◇ Test animationOverlapBeginsAtSampledPoseAndInterruptionCanFreezeIt() started.
+◇ Test firstActualEventsUseMonotonicLatencyAndNeverInferAudioOrPhotons() started.
+◇ Test aspectFitLetterboxAndZoomPanHaveAnExactClippedInverse() started.
+◇ Test mixedCanvasCaptureProjectionUsesSameScaleForGeometryAndManualEdits() started.
+◇ Test backingScaleDoesNotReplaceDeliveredScreenshotPixelDimensions() started.
+◇ Test changedContentDisplayFrameScaleOrCaptureIdentityCannotAuthorizeOverlay() started.
+◇ Test countersSaturateWithoutGrowingArraysOrWrapping() started.
+◇ Test pausedAndOldTicketsCannotAdvanceResumeOrSeek() started.
+◇ Test replayCachePreservesZeroCueRevisionsAndRejectsMalformedUpdateAtomically() started.
+◇ Test failedCleanupClockStillAllowsExplicitRetirementWithoutInventedTiming() started.
+◇ Test processSamplesAreOptionalCumulativeAndAtomicOnInvalidInputs() started.
+◇ Test validAnimationEndpointsCannotExposeUnsafeComposedMidpoint() started.
+◇ Test replayRetainsSpokenOnlyRevisionsAndNeverEmitsCanonicalAdmissions() started.
+◇ Test individuallyFiniteNestedTransformsCannotOverflowNativeMatrices() started.
+◇ Test projectedEventsValidateEveryVisibleCueBoundary() started.
+◇ Test assetRegistryAndCaptureIdentityAreNeverInferredFromModelObjects() started.
+◇ Test seekingExactMediaEndNeverRequestsZeroLengthPlaybackOrCanonicalCompletion() started.
+◇ Test cancelledTurnIsTerminalAndCannotBeRevivedByAudioOrModelEvents() started.
+◇ Test stableIDsReferencesAndParentCyclesAreValidated() started.
+◇ Test manualCaptionReplayUsesActualChunkEndForEndCuesWithoutCanonicalAdmission() started.
+◇ Test cueSubsetsAndSpokenOnlyBeatsHaveExplicitRevisionAdmission() started.
+◇ Test zeroDurationAndReducedMotionSnapToFiniteFinalPose() started.
+◇ Test manualRevisionAndSessionIdentityRejectLateModelEdits() started.
+◇ Test synthesisReadinessDoesNotReserveRevisionOrRevealBeforeRealPlayback() started.
+◇ Test replayCacheExtendsCuePrefixThenRebuildsAfterBackwardSeek() started.
+◇ Test captionCompletionPreservesActualPartiallyPlayedTimeAndLateSynthesisCannotRewriteIt() started.
+◇ Test malformedPatchCannotBeHiddenByLaterClearAndAnimationsHaveFiniteEndpoints() started.
+◇ Test invalidTransactionsAreAtomicAndCannotConcealInvalidObjects() started.
+◇ Test currentBeatPreviewCompletesWithoutWaitingForAcceptedFutureAudioAndReplayResetsLimit() started.
+◇ Test repeatedOrOutOfOrderCueAndWrongTokenCannotModifyCanonicalScene() started.
+◇ Test replayCacheChangedPayloadRebuildsInsteadOfRetainingPriorObjects() started.
+◇ Test safe3DLabelsMeshesAndGeometryBudgetsRejectDangerousShapes() started.
+◇ Test ancestorAndLeafSymlinksNeverRedirectHistoryOperations() started.
+◇ Test newTurnInvalidatesStartedPlaybackAndReplayIsReadOnly() started.
+◇ Test decodedCueOrderAndRevisionGapsCannotForgeAppliedHistory() started.
+◇ Test retentionRemovesOldRecordsAndDeleteFailureIsVisibleAfterSuccessfulSave() started.
+◇ Test missingRegistryFailsRestoreWhileCaptureIDsRemainInertMetadata() started.
+◇ Test storeRoundTripsAndStaleSaveCannotReplaceNewerCheckpoint() started.
+◇ Test malformedVersionsIdentityDatesAndCheckpointOrderAreRejected() started.
+◇ Test actualCuesShareReservedRevisionAndCancellationNeverCommitsFutureScene() started.
+◇ Test spokenOnlyBeatReservesRevisionAtActualStartWithoutAnUndoEntry() started.
+◇ Test retentionCountersExposeDroppedConversationCheckpointsAndUndo() started.
+◇ Test diskBudgetAndOversizeReadAreRejectedBeforeReplacement() started.
+◇ Test everyPrecommitFaultPreservesOldRecordAndRemovesTemporaryFile() started.
+◇ Test interruptedAnimationUndoReturnsPreBeatSceneInsteadOfNeverShownFutureTarget() started.
+◇ Test hardLinksAndFIFOAreRefusedWithoutBlockingOrDeletingTargets() started.
+◇ Test userEditInvalidatesQueuedModelAndNewEditAfterUndoClearsRedo() started.
+◇ Test expiredRecordsAreRemovedButCorruptAndUnknownFilesAreReportedOrPreserved() started.
+◇ Test restartKeepsOnlyAppliedSnapshotsAndNeverRevivesAdmission() started.
+◇ Test revisionAndSizeLimitsRejectWithoutMutatingHistory() started.
+◇ Test directorySyncFailureReturnsSavedWarningAndCommittedData() started.
+◇ Test cancellationRejectsLateData() started.
+◇ Test validBytewiseStreamRequiresStopDoneAndEOF() started.
+◇ Test doneBeforeStopAndTruncatedFramingFail() started.
+◇ Test outputLimitAndToolsAreVisibleFailures() started.
+◇ Test malformedJSONAndOversizedLineFailClosed() started.
+◇ Test eofWithoutDoneFailsEvenAfterFinalScene() started.
+◇ Test frameTurnAndIdentityBudgetsBoundRetryAndMemory() started.
+◇ Test arbitraryByteChunksIncludingSplitUTF8EmitOnlyCompleteEvents() started.
+◇ Test orderedBatchesAndEquivalentDuplicatesAreIdempotent() started.
+◇ Test conflictingDuplicatesSequenceGapsAndWrongBaseRevisionReject() started.
+◇ Test finishRequiresFinalEventAndFinalNewlineAndCancellationDropsPending() started.
+◇ Test staleSessionSceneAndTurnAreRejectedBeforeDeduplication() started.
+◇ Test malformedBatchEmitsNothingAndFailsPermanently() started.
+✔ Test validatesSemanticAnchorsAndActualAlignmentWithoutEstimatingSpeech() passed after 0.090 seconds.
+✔ Test finiteGeometryTextAndTransitionLimitsApplyToDirectConstruction() passed after 0.093 seconds.
+✔ Test rejectsModelAudioMetadataNonfiniteNumbersAndNestingBombs() passed after 0.094 seconds.
+✔ Test safeWireRoundTripsAndSeparatesAppAudioMetadata() passed after 0.094 seconds.
+✔ Test physicalFootprintBytesExportNamesTheProvidedMetric() passed after 0.094 seconds.
+✔ Test outOfOrderSynthesisCannotOvertakeAnEarlierBeat() passed after 0.094 seconds.
+✔ Test atomicCueForwardReferencesRenderAndInvalidCueLeavesPresentationUntouched() passed after 0.094 seconds.
+✔ Test actualShortAudioBoundsLongAnimationWithoutFabricatingCompletionTime() passed after 0.094 seconds.
+✔ Test reducedMotionAndManualCaptionsPreserveStaticRevealWhileSnappingAdmittedMotion() passed after 0.094 seconds.
+✔ Test wordCuesUseActualAlignmentAndBeatDoesNotCompleteAtReadingEstimate() passed after 0.094 seconds.
+✔ Test encodedReportContainsOnlyFixedNumericLeavesAndNoIdentityOrAbsoluteTime() passed after 0.094 seconds.
+✔ Test mutedBeatsAdvanceOnlyExplicitlyIncludingSpokenOnlyReservations() passed after 0.094 seconds.
+✔ Test invalidIdentityGapDuplicateAndMediaPositionLeaveStateUnchanged() passed after 0.094 seconds.
+✔ Test unchangedReplayPrefixEmitsOnlyLightweightFramesUntilActualCueBoundary() passed after 0.094 seconds.
+✔ Test rejectsDuplicateEscapedKeysUnsupportedCommandsAndTrailingData() passed after 0.095 seconds.
+✔ Test invalidAndBackwardClockReadingsCannotMutateOrReplaceTheActiveTurn() passed after 0.094 seconds.
+✔ Test cueLatenessIsMediaTimeNotPlaybackRateOrElapsedWallTime() passed after 0.104 seconds.
+✔ Test malformedMetadataAndNonfiniteHitsAreRejected() passed after 0.106 seconds.
+✔ Test freshNonceRejectsOldCallbacksEvenWhenCallerReusesItsIdentity() passed after 0.107 seconds.
+✔ Test croppedResizedImageMapsThroughItsOriginalOriginAndRoundTrips() passed after 0.107 seconds.
+✔ Test everyClosedOperationRoundTripsWithoutExecutablePayloads() passed after 0.108 seconds.
+✔ Test cancellationMeasuresOnlyBracketedSynchronousCleanupAndClosesEventAdmission() passed after 0.108 seconds.
+✔ Test absentOrPartialAlignmentUsesBeatBoundaryWithoutInventingWordTimes() passed after 0.108 seconds.
+✔ Test fixedFailureCategoriesCountWithoutAcceptingErrorText() passed after 0.108 seconds.
+✔ Test firstActualEventsUseMonotonicLatencyAndNeverInferAudioOrPhotons() passed after 0.107 seconds.
+✔ Test mixedCanvasCaptureProjectionUsesSameScaleForGeometryAndManualEdits() passed after 0.108 seconds.
+✔ Test aspectFitLetterboxAndZoomPanHaveAnExactClippedInverse() passed after 0.108 seconds.
+✔ Test backingScaleDoesNotReplaceDeliveredScreenshotPixelDimensions() passed after 0.108 seconds.
+✔ Test changedContentDisplayFrameScaleOrCaptureIdentityCannotAuthorizeOverlay() passed after 0.108 seconds.
+✔ Test animationOverlapBeginsAtSampledPoseAndInterruptionCanFreezeIt() passed after 0.108 seconds.
+✔ Test pausedAndOldTicketsCannotAdvanceResumeOrSeek() passed after 0.108 seconds.
+✔ Test replayCachePreservesZeroCueRevisionsAndRejectsMalformedUpdateAtomically() passed after 0.108 seconds.
+✔ Test failedCleanupClockStillAllowsExplicitRetirementWithoutInventedTiming() passed after 0.108 seconds.
+✔ Test processSamplesAreOptionalCumulativeAndAtomicOnInvalidInputs() passed after 0.108 seconds.
+✔ Test validAnimationEndpointsCannotExposeUnsafeComposedMidpoint() passed after 0.108 seconds.
+✔ Test rejectsUnknownFieldsAtEveryNestedBoundary() passed after 0.109 seconds.
+✔ Test replayRetainsSpokenOnlyRevisionsAndNeverEmitsCanonicalAdmissions() passed after 0.108 seconds.
+✔ Test individuallyFiniteNestedTransformsCannotOverflowNativeMatrices() passed after 0.108 seconds.
+✔ Test assetRegistryAndCaptureIdentityAreNeverInferredFromModelObjects() passed after 0.108 seconds.
+✔ Test allRequiredEnvelopeFieldsAndVersionAreEnforced() passed after 0.109 seconds.
+✔ Test cancelledTurnIsTerminalAndCannotBeRevivedByAudioOrModelEvents() passed after 0.108 seconds.
+✔ Test seekingExactMediaEndNeverRequestsZeroLengthPlaybackOrCanonicalCompletion() passed after 0.108 seconds.
+✔ Test projectedEventsValidateEveryVisibleCueBoundary() passed after 0.108 seconds.
+✔ Test manualCaptionReplayUsesActualChunkEndForEndCuesWithoutCanonicalAdmission() passed after 0.108 seconds.
+✔ Test cueSubsetsAndSpokenOnlyBeatsHaveExplicitRevisionAdmission() passed after 0.108 seconds.
+✔ Test stableIDsReferencesAndParentCyclesAreValidated() passed after 0.108 seconds.
+✔ Test synthesisReadinessDoesNotReserveRevisionOrRevealBeforeRealPlayback() passed after 0.108 seconds.
+✔ Test zeroDurationAndReducedMotionSnapToFiniteFinalPose() passed after 0.108 seconds.
+✔ Test manualRevisionAndSessionIdentityRejectLateModelEdits() passed after 0.108 seconds.
+✔ Test captionCompletionPreservesActualPartiallyPlayedTimeAndLateSynthesisCannotRewriteIt() passed after 0.108 seconds.
+✔ Test invalidTransactionsAreAtomicAndCannotConcealInvalidObjects() passed after 0.108 seconds.
+✔ Test malformedPatchCannotBeHiddenByLaterClearAndAnimationsHaveFiniteEndpoints() passed after 0.108 seconds.
+✔ Test replayCacheExtendsCuePrefixThenRebuildsAfterBackwardSeek() passed after 0.108 seconds.
+✔ Test replayCacheChangedPayloadRebuildsInsteadOfRetainingPriorObjects() passed after 0.108 seconds.
+✔ Test currentBeatPreviewCompletesWithoutWaitingForAcceptedFutureAudioAndReplayResetsLimit() passed after 0.108 seconds.
+✔ Test repeatedOrOutOfOrderCueAndWrongTokenCannotModifyCanonicalScene() passed after 0.108 seconds.
+✔ Test newTurnInvalidatesStartedPlaybackAndReplayIsReadOnly() passed after 0.108 seconds.
+✔ Test ancestorAndLeafSymlinksNeverRedirectHistoryOperations() passed after 0.108 seconds.
+✔ Test decodedCueOrderAndRevisionGapsCannotForgeAppliedHistory() passed after 0.108 seconds.
+✔ Test missingRegistryFailsRestoreWhileCaptureIDsRemainInertMetadata() passed after 0.108 seconds.
+✔ Test countersSaturateWithoutGrowingArraysOrWrapping() passed after 0.109 seconds.
+✔ Test safe3DLabelsMeshesAndGeometryBudgetsRejectDangerousShapes() passed after 0.108 seconds.
+✔ Test malformedVersionsIdentityDatesAndCheckpointOrderAreRejected() passed after 0.108 seconds.
+✔ Test spokenOnlyBeatReservesRevisionAtActualStartWithoutAnUndoEntry() passed after 0.107 seconds.
+✔ Test actualCuesShareReservedRevisionAndCancellationNeverCommitsFutureScene() passed after 0.108 seconds.
+✔ Test storeRoundTripsAndStaleSaveCannotReplaceNewerCheckpoint() passed after 0.108 seconds.
+✔ Test retentionRemovesOldRecordsAndDeleteFailureIsVisibleAfterSuccessfulSave() passed after 0.108 seconds.
+✔ Test interruptedAnimationUndoReturnsPreBeatSceneInsteadOfNeverShownFutureTarget() passed after 0.107 seconds.
+✔ Test userEditInvalidatesQueuedModelAndNewEditAfterUndoClearsRedo() passed after 0.107 seconds.
+✔ Test diskBudgetAndOversizeReadAreRejectedBeforeReplacement() passed after 0.107 seconds.
+✔ Test hardLinksAndFIFOAreRefusedWithoutBlockingOrDeletingTargets() passed after 0.107 seconds.
+✔ Test turnAndFirstEventAggregatesRemainBoundedAcrossReplacements() passed after 0.110 seconds.
+✔ Test restartKeepsOnlyAppliedSnapshotsAndNeverRevivesAdmission() passed after 0.107 seconds.
+✔ Test cancellationRejectsLateData() passed after 0.107 seconds.
+✔ Test everyPrecommitFaultPreservesOldRecordAndRemovesTemporaryFile() passed after 0.108 seconds.
+✔ Test revisionAndSizeLimitsRejectWithoutMutatingHistory() passed after 0.107 seconds.
+✔ Test validBytewiseStreamRequiresStopDoneAndEOF() passed after 0.105 seconds.
+✔ Test outputLimitAndToolsAreVisibleFailures() passed after 0.105 seconds.
+✔ Test doneBeforeStopAndTruncatedFramingFail() passed after 0.105 seconds.
+✔ Test expiredRecordsAreRemovedButCorruptAndUnknownFilesAreReportedOrPreserved() passed after 0.108 seconds.
+✔ Test eofWithoutDoneFailsEvenAfterFinalScene() passed after 0.105 seconds.
+✔ Test directorySyncFailureReturnsSavedWarningAndCommittedData() passed after 0.107 seconds.
+✔ Test arbitraryByteChunksIncludingSplitUTF8EmitOnlyCompleteEvents() passed after 0.095 seconds.
+✔ Test finishRequiresFinalEventAndFinalNewlineAndCancellationDropsPending() passed after 0.095 seconds.
+✔ Test orderedBatchesAndEquivalentDuplicatesAreIdempotent() passed after 0.095 seconds.
+✔ Test conflictingDuplicatesSequenceGapsAndWrongBaseRevisionReject() passed after 0.095 seconds.
+✔ Test malformedBatchEmitsNothingAndFailsPermanently() passed after 0.095 seconds.
+✔ Test frameTurnAndIdentityBudgetsBoundRetryAndMemory() passed after 0.096 seconds.
+✔ Test staleSessionSceneAndTurnAreRejectedBeforeDeduplication() passed after 0.095 seconds.
+✔ Suite ExplanationProtocolTests passed after 0.112 seconds.
+✔ Suite "Private-content-free explanation diagnostics" passed after 0.112 seconds.
+✔ Suite "Explanation real-media playback and presentation" passed after 0.112 seconds.
+✔ Suite ExplanationReducerTests passed after 0.112 seconds.
+✔ Suite ExplanationStreamTests passed after 0.112 seconds.
+✔ Suite "Explanation coordinate identities and transforms" passed after 0.112 seconds.
+✔ Test malformedJSONAndOversizedLineFailClosed() passed after 0.111 seconds.
+✔ Suite ExplanationCompletionStreamTests passed after 0.117 seconds.
+✔ Test retentionCountersExposeDroppedConversationCheckpointsAndUndo() passed after 0.433 seconds.
+✔ Suite ExplanationHistoryTests passed after 0.437 seconds.
+✔ Test run with 91 tests in 8 suites passed after 0.438 seconds.

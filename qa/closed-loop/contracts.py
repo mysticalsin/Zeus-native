@@ -148,7 +148,8 @@ def validate_case(case, root=ROOT):
         "qa/release-scripts/test_release_scripts.py", "qa/closed-loop/tests/test_gate.py", "qa/closed-loop/tests/test_contracts.py",
         "qa/closed-loop/tests/test_native_evidence.py", "qa/closed-loop/tests/test_native_processes.py",
         "qa/closed-loop/tests/test_native_app_host.py", "qa/closed-loop/tests/test_ci_motion_profile.py",
-        "qa/closed-loop/tests/test_execution_cleanup.py", "qa/closed-loop/tests/test_ax_crash_report.py"}, "case must be a repository test")
+        "qa/closed-loop/tests/test_execution_cleanup.py", "qa/closed-loop/tests/test_ax_crash_report.py",
+        "qa/closed-loop/tests/test_settings_catalog.py"}, "case must be a repository test")
     require(type(case["function"]) is str and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", case["function"]), "invalid test function")
     require(runnable_functions(file.read_text(), file.suffix == ".py").count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
 

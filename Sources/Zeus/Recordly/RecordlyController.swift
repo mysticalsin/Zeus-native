@@ -302,6 +302,7 @@ final class RecordlyController {
 
     func start(topBar: TopBarModel?) async {
         guard canStart, let selectionIntent = sourcePicker.selectionIntent else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         guard RecordlyPermissionGate.screenRecordingReady() else {
             let reason = RecordlyCaptureError.permissionDenied.localizedDescription
             sourcePicker.markDenied(reason: reason)

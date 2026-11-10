@@ -38,8 +38,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var teleprompter: TeleprompterController!
     private let keepAwake = KeepAwake()
     private let chatWindow: ChatWindowController?
+    private var explanation: ExplanationController?
+    private var explanationQuitToken: UUID?
+    private var explanationDeletionTasks: [UUID: Task<Void, Never>] = [:]
+    /// History UUID -> conversation UUID. Retained until exact deletion succeeds.
+    private var failedExplanationDeletions: [UUID: UUID] = [:]
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let chat = on(.chatWindow) ? ChatModel.shared : nil
+        chat?.retryVisualConversationLinks()
+        for (historyID, id) in failedExplanationDeletions where explanationDeletionTasks[historyID] == nil {
+            deleteExplanationHistory(id, historyID: historyID)
+        }
+        explanation?.beginClosing()
+        let pending = {
+            self.explanation?.hasUnsavedHistory == true || chat?.hasUnsavedVisualLinks == true
+                || !self.failedExplanationDeletions.isEmpty || !self.explanationDeletionTasks.isEmpty
+        }
+        guard pending() else { return .terminateNow }
+        guard explanationQuitToken == nil else { return .terminateLater }
+        let token = UUID(); explanationQuitToken = token
+        Task { @MainActor [weak self] in
+            await self?.explanation?.flushPendingSaves()
+            guard let self, self.explanationQuitToken == token else { return }
+            for deletion in Array(self.explanationDeletionTasks.values) { await deletion.value }
+            guard self.explanationQuitToken == token else { return }
+            chat?.retryVisualConversationLinks()
+            self.explanationQuitToken = nil
+            if pending() {
+                self.explanation?.resumeAfterCancelledQuit()
+                self.topBar.show(.hint("Zeus is waiting for explanation saves or deletions. Resolve the storage error before quitting."))
+            }
+            sender.reply(toApplicationShouldTerminate: !pending())
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, self.explanationQuitToken == token else { return }
+            self.explanationQuitToken = nil
+            self.explanation?.resumeAfterCancelledQuit()
+            self.topBar.show(.hint("Saving the explanation is taking longer than expected. Zeus stayed open to preserve it."))
+            sender.reply(toApplicationShouldTerminate: false)
+        }
+        return .terminateLater
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
+        explanation?.stop()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
         if on(.layaShutdown) { LayaHelper.shared.shutdown() }
@@ -124,7 +168,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         topBar.openPermissions = { [weak self] in self?.showPermissions() }
         // Typed chat: one store behind the notch Chat tab and the floating window.
         if on(.chatBrain) { ChatModel.shared.brain = ClaudeCLIProvider() }
-        if on(.chatWindow) { ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() } }
+        if on(.chatWindow) {
+            ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() }
+            chatWindow?.makeExplanation = { [weak self] in self?.visualExplanation() }
+            chatWindow?.stopExplanation = { [weak self] in self?.explanation?.stop() }
+            ChatModel.shared.onDeleteConversation = { [weak self] id, historyID in
+                self?.deleteExplanationHistory(id, historyID: historyID)
+            }
+        }
         if on(.chatHotkey) { ChatHotkeyMonitor.shared.start { [weak self] in self?.chatWindow?.toggle() } }
         // Usage and limits from the agents' local logs; a cue when a limit gets close.
         if on(.usage) {
@@ -486,6 +537,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func talkKeyPressed() {
         guard on(.talkHotkey), voice != nil else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
         buddy.call()
@@ -501,6 +553,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         voice?.press()
+    }
+
+    private func visualExplanation() -> ExplanationController? {
+        guard on(.chatWindow), FeatureSettings.bool("explanation.enabled", default: false) else { return nil }
+        if let explanation { return explanation }
+        let acquire: () throws -> Void = { [weak self] in
+            guard let self, !self.topBar.isDictating, self.voice?.isListening != true,
+                  !ScribeController.shared.phase.isActive,
+                  ![RecordlyController.Phase.starting, .recording, .stopping].contains(RecordlyController.shared.phase) else {
+                throw ExplanationMicrophoneError.busy
+            }
+            self.voice?.stopSpeaking()
+            WakeWordController.shared.talkKeyHeld = true
+            ExplanationAudioArbitration.onTakeover = { [weak self] in self?.explanation?.stop() }
+        }
+        let release = {
+            ExplanationAudioArbitration.onTakeover = nil
+            WakeWordController.shared.talkKeyHeld = false
+        }
+        let provider = ExplanationHTTPProvider(configuration: {
+            (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount))
+        }, localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) })
+        let storeFactory: () throws -> ExplanationHistoryStore = {
+            guard let root = ExplanationHistoryStore.productionRootURL() else { throw CocoaError(.fileNoSuchFile) }
+            return try ExplanationHistoryStore(root: root)
+        }
+        let store = try? storeFactory()
+        let microphone = ExplanationMicrophone(acquire: acquire, release: release)
+        let controller = ExplanationController(provider: provider, speechProvider: SystemExplanationSpeechOutput(),
+            microphone: microphone, store: store, storeFactory: storeFactory, acquireAudio: acquire, releaseAudio: release)
+        controller.localInput = dictation?.whisperKit
+        controller.onSubmission = { [weak controller] text in
+            guard let history = controller?.history else { return }
+            ChatModel.shared.retainVisualConversation(title: text, explanationID: history.id,
+                                                     conversationID: history.canonicalScene.sessionID)
+        }
+        explanation = controller
+        return controller
+    }
+
+    private func deleteExplanationHistory(_ id: UUID, historyID: UUID) {
+        guard explanationDeletionTasks[historyID] == nil else { return }
+        // Admission is synchronous: delete→quit in the same run loop cannot
+        // outrun the asynchronous deletion task and silently retain the record.
+        failedExplanationDeletions[historyID] = id
+        explanationDeletionTasks[historyID] = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let removed: Bool
+            if let explanation = self.explanation { removed = await explanation.deleteConversation(id, expectedHistoryID: historyID) }
+            else if let root = ExplanationHistoryStore.productionRootURL(), let store = try? ExplanationHistoryStore(root: root) {
+                do {
+                    do { try await store.delete(id: historyID) }
+                    catch ExplanationHistoryStore.StoreError.notFound { /* Exact target is already absent. */ }
+                    let list: ExplanationHistoryStore.Listing?
+                    do { list = try await store.list() }
+                    catch ExplanationHistoryStore.StoreError.notFound { list = nil }
+                    for record in list?.records ?? [] where record.sessionID == id {
+                        do { try await store.delete(id: record.id) }
+                        catch ExplanationHistoryStore.StoreError.notFound { /* Already removed. */ }
+                    }
+                    removed = true
+                } catch { removed = false }
+            } else { removed = false }
+            if removed { self.failedExplanationDeletions[historyID] = nil }
+            else { self.topBar.show(.hint("Linked explanation history could not be deleted. Zeus will retry before quitting.")) }
+            self.explanationDeletionTasks[historyID] = nil
+        }
     }
 
     private func playDemo() {
@@ -538,7 +657,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Teleprompter Window", action: #selector(openPrompterFromMenu), keyEquivalent: "").target = self
         let stop = menu.addItem(withTitle: "Stop Speaking", action: #selector(stopSpeakingFromMenu), keyEquivalent: "")
         stop.target = self
-        stop.isEnabled = voice?.isSpeaking ?? false
+        stop.isEnabled = voice?.isSpeaking == true || explanation?.isBusy == true
         menu.autoenablesItems = false
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: "").target = self
@@ -558,7 +677,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard on(.teleprompter) else { return }
         PrompterHub.shared.toggle()
     }
-    @objc private func stopSpeakingFromMenu() { voice?.stopSpeaking() }
+    @objc private func stopSpeakingFromMenu() { explanation?.stop(); voice?.stopSpeaking() }
     @objc private func openSettingsFromMenu() { showSettings() }
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 

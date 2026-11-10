@@ -527,6 +527,7 @@ final class ScribeController {
 
     func start() {
         guard !machine.phase.isActive else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         clearCompletedNotice()
         hideEndWindow()
         cancelTranscriber()

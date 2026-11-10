@@ -1904,6 +1904,606 @@
         "file": "qa/closed-loop/tests/test_ax_crash_report.py",
         "function": "test_apple_ips_times_and_iso_host_telemetry_match_with_explicit_timezones"
       }
+    },
+    {
+      "id": "REG-158",
+      "failure": "Valid SSE completion finalized the inner scene stream twice and rejected every complete response.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+        "function": "validBytewiseStreamRequiresStopDoneAndEOF"
+      }
+    },
+    {
+      "id": "REG-159",
+      "failure": "A projected later cue could repair an invalid earlier visible checkpoint before validation.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+        "function": "projectedEventsValidateEveryVisibleCueBoundary"
+      }
+    },
+    {
+      "id": "REG-160",
+      "failure": "Applying individual operations instead of the whole cue rejected valid forward references and violated cue atomicity.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "atomicCueForwardReferencesRenderAndInvalidCueLeavesPresentationUntouched"
+      }
+    },
+    {
+      "id": "REG-161",
+      "failure": "Replay omitted spoken-only revision reservations, causing later valid scene cues to fail or skip revisions.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "replayRetainsSpokenOnlyRevisionsAndNeverEmitsCanonicalAdmissions"
+      }
+    },
+    {
+      "id": "REG-162",
+      "failure": "Freezing an interrupted animation as an ordinary edit pushed a never-displayed future target into undo history.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+        "function": "interruptedAnimationUndoReturnsPreBeatSceneInsteadOfNeverShownFutureTarget"
+      }
+    },
+    {
+      "id": "REG-163",
+      "failure": "Switching partial audible playback to manual captions could rewind elapsed media time.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "captionCompletionPreservesActualPartiallyPlayedTimeAndLateSynthesisCannotRewriteIt"
+      }
+    },
+    {
+      "id": "REG-164",
+      "failure": "Manual caption replay included end cues with an earlier media position.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "manualCaptionReplayUsesActualChunkEndForEndCuesWithoutCanonicalAdmission"
+      }
+    },
+    {
+      "id": "REG-165",
+      "failure": "Individually finite nested group scales could overflow native rendering transforms.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+        "function": "individuallyFiniteNestedTransformsCannotOverflowNativeMatrices"
+      }
+    },
+    {
+      "id": "REG-166",
+      "failure": "Safe animation endpoints could interpolate an unsafe composed parent/child transform.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "validAnimationEndpointsCannotExposeUnsafeComposedMidpoint"
+      }
+    },
+    {
+      "id": "REG-167",
+      "failure": "An admitted animation longer than its actual audio beat could stop at a partial pose while history held its unseen target.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "actualShortAudioBoundsLongAnimationWithoutFabricatingCompletionTime"
+      }
+    },
+    {
+      "id": "REG-168",
+      "failure": "Reduced Motion exposed intentionally hidden static objects before their later reveal cue.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "reducedMotionAndManualCaptionsPreserveStaticRevealWhileSnappingAdmittedMotion"
+      }
+    },
+    {
+      "id": "REG-169",
+      "failure": "Settings generation drifted from the checked-in production catalog, removing existing options and changing behavior.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_catalog_and_inventory_match_the_generator"
+      }
+    },
+    {
+      "id": "REG-170",
+      "failure": "Stale settings generation re-enabled voice capture opt-ins by default.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_capture_and_input_default_regressions_fail_before_any_output"
+      }
+    },
+    {
+      "id": "REG-171",
+      "failure": "Settings generation could expose or drop the intentionally hidden debug microphone-conflict bypass.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_debug_mic_bypass_cannot_be_exposed_or_silently_removed"
+      }
+    },
+    {
+      "id": "REG-172",
+      "failure": "A duplicate settings row could conceal an earlier unsafe capture default.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_later_duplicate_cannot_conceal_the_emitted_unsafe_default"
+      }
+    },
+    {
+      "id": "REG-173",
+      "failure": "Renderer group visibility and connector bounds ignored transformed descendant state.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "groupVisibilityAndConnectorBoundsFollowTheSameTransformedDescendants"
+      }
+    },
+    {
+      "id": "REG-174",
+      "failure": "Renderer Reduced Motion forced static reveal to one, exposing objects before admitted cues.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "invalidSceneCannotRenderAndReducedMotionPreservesSuppliedPresentation"
+      }
+    },
+    {
+      "id": "REG-175",
+      "failure": "An old push-to-talk release could finish a replacement capture without an attempt identity.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationTalkButtonTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+        "function": "failedStartingAttemptThenReplacementIgnoresOldMouseAndKeyboardReleases"
+      }
+    },
+    {
+      "id": "REG-176",
+      "failure": "A shortcut-started pending microphone attempt could survive control disable or window loss.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationTalkButtonTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+        "function": "externalStartupCancelsOnWindowLossAndDisableButCompletedCaptureDoesNot"
+      }
+    },
+    {
+      "id": "REG-177",
+      "failure": "Immediate press/release before the asynchronous start task ran could start microphone capture after release.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "sameRunLoopPressReleaseCannotStartCaptureOrAskPermissionAfterRelease"
+      }
+    },
+    {
+      "id": "REG-178",
+      "failure": "An occluded window could pause its display link while narration continued, leaving visual cues stalled until completion.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "missingDisplayTicksUseActualMediaClockAfterFiftyMillisecondWatchdog"
+      }
+    },
+    {
+      "id": "REG-179",
+      "failure": "Synthesized PCM could carry nonfinite sample values to native playback.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "nonfinitePCMIsRejectedBeforeNativePlaybackForPlanarAndInterleavedBuffers"
+      }
+    },
+    {
+      "id": "REG-180",
+      "failure": "Independent callback tasks did not formally preserve start-before-finish for short clips and could accumulate unbounded clock samples.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "shortClipCompletionCannotOvertakePlayingAndClockSamplesStayBounded"
+      }
+    },
+    {
+      "id": "REG-181",
+      "failure": "Queued old playback observations needed epoch invalidation and bounded control-message overflow behavior.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "replacementPurgesQueuedOldObservationsAndControlOverflowFailsVisibly"
+      }
+    },
+    {
+      "id": "REG-182",
+      "failure": "WhisperKit download:false could still fetch tokenizer resources; installed-file readiness was not a no-download capability.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationMicrophoneTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+        "function": "realWhisperKitCacheOnlyEntryRefusesUnloadedInstanceWithoutPreparation"
+      }
+    },
+    {
+      "id": "REG-183",
+      "failure": "A whitespace/newline-only model passed the existing completeness predicate before being trimmed to an empty request model.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationProviderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+        "function": "configuredModelsRemainInsideTheExistingCap"
+      }
+    },
+    {
+      "id": "REG-184",
+      "failure": "Credential header construction needed bounded keys and rejection of all C0/DEL controls.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationProviderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+        "function": "headerInjectionAndOversizedKeysAreRejectedWithoutChangingTheBody"
+      }
+    },
+    {
+      "id": "REG-185",
+      "failure": "Request construction needed independent snapshot identity, nonempty-byte and delivered-dimension bounds.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationProviderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+        "function": "mismatchedUnboundOrOversizedSnapshotNeverConstructsARequest"
+      }
+    },
+    {
+      "id": "REG-186",
+      "failure": "A global sidebar-save error could be cleared by another conversation while the failed link remained unsaved.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationChatLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+        "function": "aSuccessfulOtherLinkCannotHideAFailedLinkAndRetryUsesCurrentConversation"
+      }
+    },
+    {
+      "id": "REG-187",
+      "failure": "Retained AppKit panels could hide without SwiftUI onDisappear, so narration needed an explicit owned-window stop hook.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationChatLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+        "function": "ownedPanelHideCloseMiniaturizeAndEscapeSynchronouslyNotifyStop"
+      }
+    },
+    {
+      "id": "REG-188",
+      "failure": "ChatStore skipped visual-only conversations because they had no messages, orphaning scene history after restart.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ChatTests.swift",
+        "function": "visualOnlyLinkSurvivesStoreReloadWithoutInventingChatMessages"
+      }
+    },
+    {
+      "id": "REG-189",
+      "failure": "Replay could include accepted future beats that were never presented before interruption.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "stoppedCaptionReplayContainsOnlyCompletedPrefixAndStaysReadOnly"
+      }
+    },
+    {
+      "id": "REG-190",
+      "failure": "A failed explanation write could lose its only retained snapshot when switching conversations or reopening while disk remained unreadable.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "failedSaveSurvivesConversationSwitchAndRetriesItsOwnedRecord"
+      }
+    },
+    {
+      "id": "REG-191",
+      "failure": "Retry could enqueue an older failed checkpoint behind a newer in-flight save, producing a persistent stale replacement conflict.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "retryCannotRequeueFailedCheckpointBehindNewerInflightSave"
+      }
+    },
+    {
+      "id": "REG-192",
+      "failure": "A different record saving successfully could hide an unresolved save failure.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "anotherRecordSavingCannotClearTheRemainingFailureNotice"
+      }
+    },
+    {
+      "id": "REG-193",
+      "failure": "Switching back before a debounced save completed could create a second history record for one Chat; blank opens must remain unsaved.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "switchingAwaitsPendingSaveAndDoesNotWriteBlankConversation"
+      }
+    },
+    {
+      "id": "REG-194",
+      "failure": "A rejected Chat switch could leave another conversation\u2019s private history active for submission under the newly selected Chat.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "memoryOnlyHistoryRefusesSwitchUntilExplicitStorageRecovery"
+      }
+    },
+    {
+      "id": "REG-195",
+      "failure": "A failed initial load left its conversation ID selected and prevented retrying the same conversation after recovery.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "failedOpenCanRetryTheSameConversationAfterStorageReturns"
+      }
+    },
+    {
+      "id": "REG-196",
+      "failure": "New explanation work could be admitted during asynchronous quit saving and be lost after the quit decision.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "closingRejectsNewWorkAndStaleDeliveryUntilQuitIsCancelled"
+      }
+    },
+    {
+      "id": "REG-197",
+      "failure": "The unsaved-record cap blocked recovery of already-owned failures as well as new record creation.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "fullFailedSaveCapacityStillAllowsRecoveringAnOwnedConversation"
+      }
+    },
+    {
+      "id": "REG-198",
+      "failure": "Listing only decodable histories could falsely report that a corrupt linked record was deleted; exact typed absence must be idempotent.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "knownCorruptRecordDeletionIsSafeAndRetryIsIdempotent"
+      }
+    },
+    {
+      "id": "REG-199",
+      "failure": "Unreadable records with unknown ownership cannot be declared deleted or removed indiscriminately.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "deletionWithoutOwnedIdentityCannotClaimUnreadableRecordWasRemoved"
+      }
+    },
+    {
+      "id": "REG-200",
+      "failure": "A first meaningful visual edit while storage was unavailable could remain unlinked and be orphaned when the scratch Chat changed.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "firstMeaningfulMemoryOnlySceneLinksExactlyOnceWithoutCapture"
+      }
+    },
+    {
+      "id": "REG-201",
+      "failure": "Stopping a reopened explanation during deletion could attempt to recreate the just-deleted Chat link.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "deletingReopenedHistoryCannotRecreateItsChatLinkDuringStop"
+      }
+    },
+    {
+      "id": "REG-202",
+      "failure": "Seeking could cancel future synthesis but leave a queued future beat buffering indefinitely; current-beat previews must stop at their bound.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "currentBeatSeekEndsPreviewWithoutPlayingOrSynthesizingQueuedFuture"
+      }
+    },
+    {
+      "id": "REG-203",
+      "failure": "Deleting an ordinary Chat must not initiate explanation storage work or block quit for an unrelated storage root.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationChatLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+        "function": "ordinaryChatDeletionDoesNotAdmitExplanationStorageWork"
+      }
+    },
+    {
+      "id": "REG-204",
+      "failure": "Retention could evict a still-open history while the controller retained its persisted checkpoint, causing the next edit to use stale save preconditions instead of safely recreating the owned record.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "retentionEvictionInvalidatesCheckpointBeforeEditingTheStillOpenRecord"
+      }
+    },
+    {
+      "id": "REG-205",
+      "failure": "An owned NSButtonCell invoked its retained synthetic target exactly once but returned false from accessibilityPerformPress, causing the readiness fixture to reject an action it had observed. Only that fixture may acknowledge the exact single action without retry; disabled controls and the production AX driver remain strict.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+      }
+    },
+    {
+      "id": "REG-206",
+      "failure": "Numeric explanation diagnostics must not report caption-only presentation as audible output or count read-only replay as a new generation; exported counters must retain their actual lifecycle and media boundaries.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "captionDiagnosticsNeverClaimAudibleOutputOrCountReplayAsNewGeneration"
+      }
+    },
+    {
+      "id": "REG-207",
+      "failure": "The diagnostics collector labeled task_vm_info.phys_footprint as resident bytes, misrepresenting the provided process-memory metric. Numeric reports must name physical footprint explicitly and must not export the old resident-byte keys.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+        "function": "physicalFootprintBytesExportNamesTheProvidedMetric"
+      }
     }
   ]
 }

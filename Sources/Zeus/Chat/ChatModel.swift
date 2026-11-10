@@ -20,6 +20,17 @@ final class ChatModel {
     var brain: BrainProvider?
     /// Opens (or brings forward) the floating window with the composer focused.
     var openWindow: () -> Void = {}
+    /// The visual explanation store removes its linked local record with Chat.
+    var onDeleteConversation: (UUID, UUID) -> Void = { _, _ in }
+    private var failedVisualLinkIDs = Set<UUID>()
+    private var visualLinkProblem: String?
+    var hasUnsavedVisualLinks: Bool { !failedVisualLinkIDs.isEmpty }
+    var visualStoreError: String? {
+        if hasUnsavedVisualLinks {
+            return "Some explanation sidebar links could not be saved. Keep Zeus open and check local storage before quitting."
+        }
+        return visualLinkProblem
+    }
 
     private let store: ChatStore
     private var turn: UUID?
@@ -66,10 +77,57 @@ final class ChatModel {
     }
 
     func delete(_ id: UUID) {
+        let visualLink = conversations.first(where: { $0.id == id })?.visualExplanationID
         if id == sendingID { stop() }
+        failedVisualLinkIDs.remove(id)
         store.delete(id)
         conversations.removeAll { $0.id == id }
         if id == currentID { currentID = conversations.first?.id }
+        if let visualLink { onDeleteConversation(id, visualLink) }
+    }
+
+    /// Retains a visual conversation in the existing sidebar without routing its
+    /// request through the action-capable ordinary Chat send path.
+    @discardableResult
+    func retainVisualConversation(title: String, explanationID: UUID, conversationID: UUID) -> Bool {
+        let isCurrent = current.id == conversationID
+        guard var conversation = isCurrent ? current : conversations.first(where: { $0.id == conversationID }) else {
+            visualLinkProblem = "The explanation's conversation is no longer available. Its sidebar link was not recreated."
+            return false
+        }
+        if conversation.title.isEmpty {
+            conversation.title = String(title.prefix(80))
+        }
+        conversation.visualExplanationID = explanationID
+        conversation.updatedAt = Date()
+        if let index = conversations.firstIndex(where: { $0.id == conversationID }) {
+            conversations[index] = conversation
+        } else {
+            conversations.insert(conversation, at: 0)
+        }
+        if isCurrent { currentID = conversationID }
+        do {
+            try store.save(conversation)
+            failedVisualLinkIDs.remove(conversationID)
+            visualLinkProblem = nil
+            return true
+        } catch {
+            failedVisualLinkIDs.insert(conversationID)
+            return false
+        }
+    }
+
+    /// One explicit retry per pending link, using the current conversation rather
+    /// than an old snapshot. Deleting a conversation removes its retry admission.
+    func retryVisualConversationLinks() {
+        for id in Array(failedVisualLinkIDs) {
+            guard let conversation = conversations.first(where: { $0.id == id }), conversation.visualExplanationID != nil else {
+                failedVisualLinkIDs.remove(id)
+                continue
+            }
+            do { try store.save(conversation); failedVisualLinkIDs.remove(id) }
+            catch { /* Keep this exact unsaved link visible and eligible for a later retry. */ }
+        }
     }
 
     func togglePin(_ id: UUID) {

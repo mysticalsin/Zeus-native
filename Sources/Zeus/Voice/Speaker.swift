@@ -76,6 +76,7 @@ final class Speaker {
     }
 
     func speak(_ text: String) {
+        ExplanationAudioArbitration.yieldToNewCapture()
         queue.append(text)
         guard pump == nil else { return }
         let token = UUID()

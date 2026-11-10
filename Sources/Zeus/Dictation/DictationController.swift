@@ -459,6 +459,7 @@ final class DictationController {
 
     func begin() {
         guard !topBar.isDictating else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         fallbackNote = nil
         let speechAllowed = SFSpeechRecognizer.authorizationStatus() == .authorized
         let languageAvailable = speech.configure(localeIdentifier: settings.language.localeIdentifier)
