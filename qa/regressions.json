@@ -1503,6 +1503,42 @@
         "file": "qa/closed-loop/tests/test_gate.py",
         "function": "test_compiler_cli_test_retains_complete_python_execution_receipt"
       }
+    },
+    {
+      "id": "REG-125",
+      "failure": "Actual AppKit queue insertion narrowed a synthetic event number and rounded its timestamp, so the native journey driver rejected its own queued release as unrelated.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "nonTrackingResponderReceivesItsCanonicalQueuedRelease"
+      }
+    },
+    {
+      "id": "REG-126",
+      "failure": "The wrong-ID and wrong-path worker fixtures also used invalid WAV data, allowing unrelated WAV rejection or startup failure to stand in for the intended protocol guard.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "wrongIdentityWrongPathAndSymlinkCannotPublish"
+      }
+    },
+    {
+      "id": "REG-127",
+      "failure": "A throwing worker fixture removed its directory before cancelling and joining the render task and closing its worker; failed assertions could discard diagnostics while work was still using them.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "thrownFixtureFailureJoinsRenderAndClosesWorkerBeforeRemoval"
+      }
     }
   ]
 }

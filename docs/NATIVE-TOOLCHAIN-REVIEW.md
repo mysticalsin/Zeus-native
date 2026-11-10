@@ -86,9 +86,10 @@ The development run passed its other 528 checks but failed the selftest
 partition. Source review identified expected CLI rejection diagnostics
 interleaving unittest's result line; the fixture now captures and asserts
 stderr. A subprocess regression feeds that case's actual transcript through
-the unchanged strict Python summary parser. The original detailed selftest
-artifact has not yet been unpacked, so additional original failures are not
-ruled out by this diagnosis.
+the unchanged strict Python summary parser. After the executor recovered, the original artifact confirmed all 109
+unit tests exited successfully but the strict runner rejected the interrupted
+CLI result line with `Python cases missing/duplicated/skipped`. This confirms
+the transcript defect; the parser was not relaxed.
 
 The exposed native logs establish two separate event-fixture findings:
 AppKit changed event number 1,000,001 to 16,961 and rounded the timestamp,
@@ -99,3 +100,33 @@ The accessibility host remained inactive and its controls lacked the required
 AX roles/tree. Four resident-worker assertions failed during concurrent
 startup; the cause remains under investigation. None of these failures is
 waived or reclassified as device proof.
+
+At `1ffadd3`, all 110 verification selftests passed on Linux. Its macOS
+development CI also passed all 638 checks. The native app job remains failed;
+these verification repairs do not waive the native journey failures. The
+interrupted local patch was preserved in a git stash and external diff before
+fast-forwarding to the GitHub commits. The restored executor is still Linux.
+
+The `1e88f06` native artifact has now been independently revalidated against a
+detached exact-source checkout: source manifest, compiler/discovery evidence,
+hashes and complete event streams establish 2,317 passes in 22 partitions.
+The four failed partitions remain failed. See the machine-derived
+[partial receipt](../qa/receipts/20261110/mac-1e88-ci.json).
+
+The queued-release repair captures the canonical queue representation immediately
+after insertion, before dispatch, and keeps subsequent identity checks exact.
+A nontracking responder regression covers release delivery; the foreign release
+regression now shares the same window and point and preserves its own canonical
+identity. Linux parsing succeeds, but native execution is still required; this
+repair does not claim to resolve premature test-host exit or AX exposure.
+
+The worker fixtures now retain bounded synthetic phase traces, join rendering
+and close sessions before deleting fixture files, and require a valid-WAV
+control plus a per-mode acknowledgement for rejection tests. The original
+wrong-ID/path fixtures also supplied invalid WAV data, which could mask missing
+protocol checks. All 17 focused Foundation/subprocess tests pass on Linux.
+Separate mutations removing the ID and path guards each fail their test;
+early directory removal fails the cleanup guard. Production worker source,
+concurrent execution and existing timing limits are unchanged. Mac startup
+latency and the actor-owned synchronous Process.run path still require
+diagnosis; these fixture repairs do not establish a production latency fix.

@@ -13,42 +13,166 @@ import Glibc
 
 @Suite("Bounded local voice worker")
 struct KokoroWorkerSessionTests {
-    private struct Fixture {
+    // Fixture diagnostics contain fixed phase names, monotonic times and PIDs only.
+    // They never read production stderr or record the submitted text.
+    private final class Trace: @unchecked Sendable {
+        private let lock = NSLock()
+        private var entries: [String] = []
+        func record(_ phase: String) {
+            lock.withLock {
+                guard entries.count < 32 else { return }
+                entries.append("\(ProcessInfo.processInfo.systemUptime) \(ProcessInfo.processInfo.processIdentifier) \(phase)")
+            }
+        }
+        var snapshot: [String] { lock.withLock { entries } }
+    }
+
+    private final class Fixture: @unchecked Sendable {
+        let identifier = UUID()
         let directory: URL
         let launch: KokoroWorkerSession.Launch
+        private let trace = Trace()
+        private let lock = NSLock()
+        private var sessions: [KokoroWorkerSession] = []
+        private var tasks: [Task<URL?, Never>] = []
+
+        private static let wrapper = """
+        import sys
+        sys.path.insert(0,sys.argv.pop(1))
+        from fixture_trace import phase
+        phase('python-entered')
+        try: exec(sys.argv.pop(1))
+        except BaseException:
+            phase('worker-error')
+            raise
+        """
+
         init() throws {
-            directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-voice-fixture-\(UUID().uuidString)-\"quoted", isDirectory: true)
+            directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-voice-fixture-\(identifier.uuidString)-\"quoted", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             try """
+            import os,time
+            _path=os.path.join(os.path.dirname(__file__),'phases.log')
+            _count=0
+            def phase(name):
+                global _count
+                if _count>=32: return
+                _count+=1
+                line=f'{time.monotonic():.6f} {os.getpid()} {name}\\n'
+                if os.path.exists(_path) and os.path.getsize(_path)+len(line)>4096: return
+                with open(_path,'a') as output: output.write(line)
+            """.write(to: directory.appendingPathComponent("fixture_trace.py"), atomically: true, encoding: .utf8)
+            try """
             import os,time,pathlib
+            from fixture_trace import phase
+            phase('kokoro-imported')
             class Kokoro:
-                def __init__(self,model,voices): self.root=pathlib.Path(model).parent; print("library diagnostic")
+                def __init__(self,model,voices):
+                    self.root=pathlib.Path(model).parent
+                    phase('engine-ready')
+                    print("library diagnostic")
                 def create(self,text,**kwargs):
+                    phase('create-entered')
                     (self.root/('started-'+text)).write_text(str(os.getpid()))
                     if text=='hang': time.sleep(30)
                     return text,16000
             """.write(to: directory.appendingPathComponent("kokoro_onnx.py"), atomically: true, encoding: .utf8)
             try """
             import struct,time
+            from fixture_trace import phase
+            phase('soundfile-imported')
             def write(path,audio,sr,format):
                 data=b'RIFF'+struct.pack('<I',40)+b'WAVEfmt '+struct.pack('<IHHIIHH',16,1,1,16000,32000,2,16)+b'data'+struct.pack('<I',4)+b'\\x00'*4
                 with open(path,'wb') as f:
                     f.write(data[:16]); f.flush()
+                    phase('partial-written')
                     if audio=='partial': time.sleep(0.3)
                     f.write(data[16:])
+                phase('audio-written')
             """.write(to: directory.appendingPathComponent("soundfile.py"), atomically: true, encoding: .utf8)
             // Run the unmodified production worker script with disposable model modules.
             // -I prevents loading installed/user Python packages; only this fixture directory is added.
-            let wrapper = "import sys; sys.path.insert(0,sys.argv.pop(1)); exec(sys.argv.pop(1))"
             let files = KokoroWorker.modelFiles(in: directory)
-            launch = .init(executable: "/usr/bin/python3", arguments: ["-I", "-c", wrapper, directory.path,
+            launch = .init(executable: "/usr/bin/python3", arguments: ["-I", "-c", Self.wrapper, directory.path,
                 KokoroWorker.workerScript(modelDir: directory), files.onnx.path, files.voices.path])
+            trace.record("fixture-ready")
         }
-        func session(timeout: TimeInterval = 3, idle: TimeInterval = 120) -> KokoroWorkerSession {
-            let launch = launch
-            return KokoroWorkerSession(configuration: { launch }, requestTimeout: timeout, idleTimeout: idle, temporaryDirectory: directory)
+
+        func pythonLaunch(script: String, arguments: [String]) -> KokoroWorkerSession.Launch {
+            .init(executable: "/usr/bin/python3", arguments: ["-I", "-c", Self.wrapper, directory.path, script] + arguments)
         }
+
+        func session(timeout: TimeInterval = 3, idle: TimeInterval = 120,
+                     configuration: (@Sendable () -> KokoroWorkerSession.Launch?)? = nil) -> KokoroWorkerSession {
+            let launch = launch, trace = trace
+            let session = KokoroWorkerSession(configuration: {
+                trace.record("configuration-entered")
+                let result: KokoroWorkerSession.Launch?
+                if let configuration { result = configuration() } else { result = launch }
+                trace.record(result == nil ? "configuration-unavailable" : "configuration-returned")
+                return result
+            }, requestTimeout: timeout, idleTimeout: idle, temporaryDirectory: directory)
+            lock.withLock { sessions.append(session) }
+            return session
+        }
+
+        func render(_ session: KokoroWorkerSession, _ text: String,
+                    didReturn: @escaping @Sendable () -> Void = {}) -> Task<URL?, Never> {
+            let trace = trace
+            trace.record("render-submitted")
+            let task = Task {
+                let result = await session.render(text, voice: "synthetic", speed: 1)
+                didReturn()
+                trace.record(result == nil ? "render-rejected" : "render-published")
+                return result
+            }
+            lock.withLock { tasks.append(task) }
+            return task
+        }
+
+        func report(test: String) {
+            var entries = trace.snapshot
+            // Read a bounded prefix and admit only the known fixture event grammar.
+            let allowed = Set(["python-entered", "worker-error", "kokoro-imported", "engine-ready",
+                               "create-entered", "soundfile-imported", "partial-written", "audio-written",
+                               "request-read", "reply-ready"])
+            if let handle = try? FileHandle(forReadingFrom: directory.appendingPathComponent("phases.log")) {
+                defer { try? handle.close() }
+                if let data = try? handle.read(upToCount: 4096) {
+                    for line in String(decoding: data, as: UTF8.self).split(separator: "\n").prefix(32) {
+                        let fields = line.split(separator: " ")
+                        guard fields.count == 3, let time = Double(fields[0]), time.isFinite,
+                              let pid = Int32(fields[1]), pid > 0, allowed.contains(String(fields[2])) else { continue }
+                        entries.append(String(line))
+                    }
+                }
+            }
+            print("Kokoro fixture \(test) \(identifier.uuidString): \(entries.joined(separator: "; "))")
+        }
+
+        func close() async {
+            let (tasks, sessions) = lock.withLock { (self.tasks, self.sessions) }
+            tasks.forEach { $0.cancel() }
+            for session in sessions { await session.close() }
+            for task in tasks { _ = await task.value }
+        }
+
         func remove() { try? FileManager.default.removeItem(at: directory) }
+    }
+
+    private func withFixture(_ test: String = #function, _ body: (Fixture) async throws -> Void) async throws {
+        let fixture = try Fixture()
+        do {
+            try await body(fixture)
+        } catch {
+            fixture.report(test: test)
+            await fixture.close()
+            fixture.remove()
+            throw error
+        }
+        fixture.report(test: test)
+        await fixture.close()
+        fixture.remove()
     }
 
     private func wait(_ condition: () async -> Bool) async throws {
@@ -58,109 +182,136 @@ struct KokoroWorkerSessionTests {
     }
 
     @Test func productionWorkerPublishesOnlyACompleteAcknowledgedWAV() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = fixture.session()
-        let task = Task { await session.render("partial", voice: "synthetic", speed: 1) }
-        try await wait {
-            let items = (try? FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)) ?? []
-            return items.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent("audio.wav.partial").path) }
+        try await withFixture { fixture in
+            let session = fixture.session()
+            let task = fixture.render(session, "partial")
+            try await wait {
+                let items = (try? FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)) ?? []
+                return items.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent("audio.wav.partial").path) }
+            }
+            #expect(await session.pendingRequestCount == 1)
+            let items = try FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)
+            #expect(!items.contains { $0.pathExtension == "wav" })
+            let result = try #require(await task.value)
+            #expect(try Data(contentsOf: result).count == 48)
+            #expect(try FileManager.default.attributesOfItem(atPath: result.path)[.posixPermissions] as? Int == 0o600)
+            #expect(!(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)).contains { $0.hasPrefix("zeus-kokoro-work-") })
+            await session.close()
         }
-        #expect(await session.pendingRequestCount == 1)
-        let items = try FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)
-        #expect(!items.contains { $0.pathExtension == "wav" })
-        let result = try #require(await task.value)
-        #expect(try Data(contentsOf: result).count == 48)
-        #expect(try FileManager.default.attributesOfItem(atPath: result.path)[.posixPermissions] as? Int == 0o600)
-        #expect(!(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)).contains { $0.hasPrefix("zeus-kokoro-work-") })
-        await session.close()
     }
 
     @Test func cancellingSynthesisReturnsNoArtifactAndStopsItsWorker() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = fixture.session()
-        let task = Task { await session.render("hang", voice: "synthetic", speed: 1) }
-        let marker = fixture.directory.appendingPathComponent("started-hang")
-        try await wait { FileManager.default.fileExists(atPath: marker.path) }
-        let pid = try #require(Int32(try String(contentsOf: marker, encoding: .utf8)))
-        let began = ContinuousClock.now
-        task.cancel()
-        #expect(await task.value == nil)
-        #expect(began.duration(to: .now) < .milliseconds(500))
-        await session.close()
-        #expect(kill(pid, 0) == -1 && errno == ESRCH)
-        #expect(!(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)).contains { $0.hasPrefix("zeus-kokoro-") })
+        try await withFixture { fixture in
+            let session = fixture.session()
+            let task = fixture.render(session, "hang")
+            let marker = fixture.directory.appendingPathComponent("started-hang")
+            try await wait { FileManager.default.fileExists(atPath: marker.path) }
+            let pid = try #require(Int32(try String(contentsOf: marker, encoding: .utf8)))
+            let began = ContinuousClock.now
+            task.cancel()
+            #expect(await task.value == nil)
+            #expect(began.duration(to: .now) < .milliseconds(500))
+            await session.close()
+            #expect(kill(pid, 0) == -1 && errno == ESRCH)
+            let remaining = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)
+            #expect(!remaining.contains { $0.hasPrefix("zeus-kokoro-") })
+        }
     }
 
     @Test func pendingAdmissionIsBoundedAndNeverReplaysARejectedRequest() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = fixture.session()
-        let first = Task { await session.render("hang", voice: "synthetic", speed: 1) }
-        try await wait { await session.pendingRequestCount == 1 }
-        #expect(await session.render("second", voice: "synthetic", speed: 1) == nil)
-        #expect(await session.pendingRequestCount == 1)
-        first.cancel(); #expect(await first.value == nil)
-        await session.close()
-        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("started-second").path))
+        try await withFixture { fixture in
+            let session = fixture.session()
+            let first = fixture.render(session, "hang")
+            try await wait { await session.pendingRequestCount == 1 }
+            #expect(await session.render("second", voice: "synthetic", speed: 1) == nil)
+            #expect(await session.pendingRequestCount == 1)
+            first.cancel(); #expect(await first.value == nil)
+            await session.close()
+            #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("started-second").path))
+        }
     }
 
     @Test func deadlineIncludesStartupAndANonReadingWorker() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = KokoroWorkerSession(configuration: { .init(executable: "/bin/sleep", arguments: ["30"]) },
-                                          requestTimeout: 0.1, temporaryDirectory: fixture.directory)
-        let began = ContinuousClock.now
-        #expect(await session.render(String(repeating: "x", count: KokoroWorkerSession.maximumTextBytes), voice: "synthetic", speed: 1) == nil)
-        #expect(began.duration(to: .now) < .milliseconds(500))
-        await session.close()
-        #expect(!(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)).contains { $0.hasPrefix("zeus-kokoro-") })
+        try await withFixture { fixture in
+            let session = fixture.session(timeout: 0.1, configuration: { .init(executable: "/bin/sleep", arguments: ["30"]) })
+            let began = ContinuousClock.now
+            #expect(await session.render(String(repeating: "x", count: KokoroWorkerSession.maximumTextBytes), voice: "synthetic", speed: 1) == nil)
+            #expect(began.duration(to: .now) < .milliseconds(500))
+            await session.close()
+            let remaining = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)
+            #expect(!remaining.contains { $0.hasPrefix("zeus-kokoro-") })
+        }
     }
 
     @Test func malformedAndOversizedRepliesEndTheWorker() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        for script in ["printf 'not-json\\n'", "printf '{\"id\":'", "exec /bin/dd if=/dev/zero bs=32768 count=2"] {
-            let session = KokoroWorkerSession(configuration: { .init(executable: "/bin/sh", arguments: ["-c", script]) }, temporaryDirectory: fixture.directory)
-            #expect(await session.render("test", voice: "synthetic", speed: 1) == nil)
-            await session.close()
-            #expect(await session.pendingRequestCount == 0)
+        try await withFixture { fixture in
+            for script in ["printf 'not-json\\n'", "printf '{\"id\":'", "exec /bin/dd if=/dev/zero bs=32768 count=2"] {
+                let session = fixture.session(timeout: 120, configuration: { .init(executable: "/bin/sh", arguments: ["-c", script]) })
+                #expect(await session.render("test", voice: "synthetic", speed: 1) == nil)
+                await session.close()
+                #expect(await session.pendingRequestCount == 0)
+            }
         }
     }
 
     @Test func wrongIdentityWrongPathAndSymlinkCannotPublish() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        for mode in ["id", "path", "symlink", "partial", "invalid-pcm"] {
-            let script = """
-            import sys,json,os,struct
-            req=json.loads(sys.stdin.readline())
-            data=b'RIFF'+struct.pack('<I',40)+b'WAVE'+b'0'*36
-            if sys.argv[1]=='symlink':
-                outside=req['out']+'.target';open(outside,'wb').write(data);os.symlink(outside,req['out'])
-            else: open(req['out'],'wb').write(data[:44] if sys.argv[1]=='partial' else data)
-            print(json.dumps({'id': 'wrong' if sys.argv[1]=='id' else req['id'], 'out': 'wrong' if sys.argv[1]=='path' else req['out'],'ok':True}),flush=True)
-            """
-            let session = KokoroWorkerSession(configuration: { .init(executable: "/usr/bin/python3", arguments: ["-I", "-c", script, mode]) }, temporaryDirectory: fixture.directory)
-            #expect(await session.render("test", voice: "synthetic", speed: 1) == nil)
-            await session.close()
+        try await withFixture { fixture in
+            // The control proves this same interpreter/transport can publish the otherwise valid WAV.
+            for mode in ["valid", "id", "path", "symlink", "partial", "invalid-pcm"] {
+                let script = """
+                import sys,json,os,struct
+                from fixture_trace import phase
+                req=json.loads(sys.stdin.readline())
+                phase('request-read')
+                mode=sys.argv[1]
+                data=b'RIFF'+struct.pack('<I',40)+b'WAVEfmt '+struct.pack('<IHHIIHH',16,1,1,16000,32000,2,16)+b'data'+struct.pack('<I',4)+b'\\x00'*4
+                if mode=='invalid-pcm': data=data[:20]+b'\\x03\\x00'+data[22:]
+                if mode=='symlink':
+                    outside=req['out']+'.target';open(outside,'wb').write(data);os.symlink(outside,req['out'])
+                else: open(req['out'],'wb').write(data[:44] if mode=='partial' else data)
+                reply={'id': 'wrong' if mode=='id' else req['id'], 'out': 'wrong' if mode=='path' else req['out'],'ok':True}
+                with open(sys.argv[2],'w') as marker: marker.write(mode)
+                phase('reply-ready')
+                print(json.dumps(reply),flush=True)
+                """
+                let marker = fixture.directory.appendingPathComponent("reply-ready-\(mode)")
+                let launch = fixture.pythonLaunch(script: script, arguments: [mode, marker.path])
+                let session = fixture.session(timeout: 120, configuration: { launch })
+                let result = await session.render("test", voice: "synthetic", speed: 1)
+                // A startup failure, EOF or deadline cannot stand in for exercising the requested mode.
+                try #require((try? String(contentsOf: marker, encoding: .utf8)) == mode)
+                if mode == "valid" {
+                    let published = try #require(result)
+                    #expect(try Data(contentsOf: published).count == 48)
+                } else {
+                    #expect(result == nil)
+                }
+                await session.close()
+            }
         }
     }
 
     @Test func idleWorkerReleasesItsProcessAndClosedSessionCannotRestart() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = fixture.session(idle: 0.05)
-        let first = try #require(await session.render("first", voice: "synthetic", speed: 1))
-        #expect(try Data(contentsOf: first).count == 48)
-        try await wait { !(await session.isRunning) }
-        // Explicitly close after observing idle shutdown; it also joins the bounded cleanup.
-        await session.close()
-        #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
+        try await withFixture { fixture in
+            let session = fixture.session(idle: 0.05)
+            let first = try #require(await session.render("first", voice: "synthetic", speed: 1))
+            #expect(try Data(contentsOf: first).count == 48)
+            try await wait { !(await session.isRunning) }
+            // Explicitly close after observing idle shutdown; it also joins the bounded cleanup.
+            await session.close()
+            #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
+        }
     }
 
     @Test func invalidTextAndSpeedNeverStartAWorker() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = fixture.session()
-        #expect(await session.render("", voice: "synthetic", speed: 1) == nil)
-        #expect(await session.render(String(repeating: "x", count: KokoroWorkerSession.maximumTextBytes + 1), voice: "synthetic", speed: 1) == nil)
-        #expect(await session.render("test", voice: "synthetic", speed: .nan) == nil)
-        #expect(await session.isRunning == false)
-        await session.close()
+        try await withFixture { fixture in
+            let session = fixture.session()
+            #expect(await session.render("", voice: "synthetic", speed: 1) == nil)
+            #expect(await session.render(String(repeating: "x", count: KokoroWorkerSession.maximumTextBytes + 1), voice: "synthetic", speed: 1) == nil)
+            #expect(await session.render("test", voice: "synthetic", speed: .nan) == nil)
+            #expect(await session.isRunning == false)
+            await session.close()
+        }
     }
     private final class StartupProbe: @unchecked Sendable {
         let lock = NSLock()
@@ -175,34 +326,85 @@ struct KokoroWorkerSessionTests {
     }
 
     @Test func cancellationDuringSetupDoesNotCreateAnotherProbeOrReplayTheOldText() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let probe = StartupProbe(), launch = fixture.launch
-        let session = KokoroWorkerSession(configuration: { probe.run(launch) }, temporaryDirectory: fixture.directory)
-        let first = Task { await session.render("first", voice: "synthetic", speed: 1) }
-        try await wait { probe.count == 1 }
-        first.cancel(); #expect(await first.value == nil)
-        let second = Task { await session.render("second", voice: "synthetic", speed: 1) }
-        try await wait { await session.pendingRequestCount == 1 }
-        #expect(probe.count == 1)
-        probe.gate.signal()
-        let result = try #require(await second.value)
-        #expect(try Data(contentsOf: result).count == 48)
-        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("started-first").path))
-        #expect(FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("started-second").path))
-        await session.close()
+        try await withFixture { fixture in
+            let probe = StartupProbe(), launch = fixture.launch
+            let session = fixture.session(timeout: 120, configuration: { probe.run(launch) })
+            let first = fixture.render(session, "first")
+            try await wait { probe.count == 1 }
+            first.cancel(); #expect(await first.value == nil)
+            let second = fixture.render(session, "second")
+            try await wait { await session.pendingRequestCount == 1 }
+            #expect(probe.count == 1)
+            probe.gate.signal()
+            let result = try #require(await second.value)
+            #expect(try Data(contentsOf: result).count == 48)
+            #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("started-first").path))
+            #expect(FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("started-second").path))
+            await session.close()
+        }
     }
 
     @Test func cancelledPartialWriteCannotLeaveAnAudioArtifact() async throws {
-        let fixture = try Fixture(); defer { fixture.remove() }
-        let session = fixture.session()
-        let task = Task { await session.render("partial", voice: "synthetic", speed: 1) }
-        try await wait {
-            let items = (try? FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)) ?? []
-            return items.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent("audio.wav.partial").path) }
+        try await withFixture { fixture in
+            let session = fixture.session()
+            let task = fixture.render(session, "partial")
+            try await wait {
+                let items = (try? FileManager.default.contentsOfDirectory(at: fixture.directory, includingPropertiesForKeys: nil)) ?? []
+                return items.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent("audio.wav.partial").path) }
+            }
+            task.cancel(); #expect(await task.value == nil)
+            await session.close()
+            let remaining = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)
+            #expect(!remaining.contains { $0.hasPrefix("zeus-kokoro-") })
         }
-        task.cancel(); #expect(await task.value == nil)
-        await session.close()
-        #expect(!(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)).contains { $0.hasPrefix("zeus-kokoro-") })
+    }
+
+    private enum FixtureFailure: Error { case expected }
+
+    @Test func thrownFixtureFailureJoinsRenderAndClosesWorkerBeforeRemoval() async throws {
+        let proof = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-cleanup-proof-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: proof) }
+        let completed = Trace()
+        var captured: (Fixture, KokoroWorkerSession, Task<URL?, Never>, Int32)?
+        var caught = false
+        do {
+            try await withFixture { fixture in
+                // Shell builtins only: this guard owns one process, with no descendant-cleanup claim.
+                let script = """
+                trap 'if [ -d "$1" ]; then printf present > "$2"; else printf removed > "$2"; fi' EXIT
+                trap 'exit 0' TERM
+                printf '%s' "$$" > "$1/cleanup-started"
+                printf ready > "$1/cleanup-ready"
+                while IFS= read -r line; do :; done
+                """
+                let directory = fixture.directory
+                let session = fixture.session(configuration: {
+                    .init(executable: "/bin/sh", arguments: ["-c", script, "fixture", directory.path, proof.path])
+                })
+                let task = fixture.render(session, "test", didReturn: {
+                    completed.record(FileManager.default.fileExists(atPath: directory.path) ? "directory-present" : "directory-missing")
+                })
+                let marker = directory.appendingPathComponent("cleanup-started")
+                let ready = directory.appendingPathComponent("cleanup-ready")
+                // The acknowledgement follows the completed PID write; mere file existence
+                // can race with the shell opening an empty output file.
+                try await wait { (try? String(contentsOf: ready, encoding: .utf8)) == "ready" }
+                let pid = try #require(Int32(try String(contentsOf: marker, encoding: .utf8)))
+                captured = (fixture, session, task, pid)
+                throw FixtureFailure.expected
+            }
+        } catch FixtureFailure.expected { caught = true }
+        try #require(caught)
+        let (fixture, session, task, pid) = try #require(captured)
+        // The task callback and child EXIT trap both observed the directory before deletion.
+        #expect(completed.snapshot.contains { $0.hasSuffix(" directory-present") })
+        #expect(try String(contentsOf: proof, encoding: .utf8) == "present")
+        #expect(await task.value == nil)
+        #expect(await session.isRunning == false)
+        #expect(await session.pendingRequestCount == 0)
+        #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
+        #expect(kill(pid, 0) == -1 && errno == ESRCH)
+        #expect(!FileManager.default.fileExists(atPath: fixture.directory.path))
     }
 
     private func wav(_ samples: [UInt8] = [0, 0, 0, 0]) -> Data {

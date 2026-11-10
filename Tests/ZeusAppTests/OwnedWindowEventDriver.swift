@@ -83,6 +83,14 @@ struct OwnedWindowEventDriverTests {
         @objc func pressed(_ sender: Any?) { calls += 1 }
     }
 
+    private final class NonTrackingView: NSView {
+        private(set) var downs = 0
+        private(set) var releases: [NSEvent] = []
+        override func acceptsFirstMouse(_ event: NSEvent?) -> Bool { true }
+        override func mouseDown(with event: NSEvent) { downs += 1 }
+        override func mouseUp(with event: NSEvent) { releases.append(event) }
+    }
+
     private func host(_ content: NSView) -> NSWindow {
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 320, height: 120),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -156,6 +164,30 @@ struct OwnedWindowEventDriverTests {
         }
     }
 
+    @Test func nonTrackingResponderReceivesItsCanonicalQueuedRelease() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let registry = OwnedWindowControlRegistry()
+            let content = NonTrackingView(frame: NSRect(x: 0, y: 0, width: 320, height: 120))
+            let probe = OwnedWindowControlProbeView(registry: registry, id: "fixture.nontracking", enabled: true)
+            probe.frame = NSRect(x: 20, y: 30, width: 180, height: 34)
+            content.addSubview(probe)
+            let window = host(content)
+            defer { OwnedWindowFixtureApplication.close(window) }
+            let driver = OwnedWindowEventDriver(registry: registry)
+            driver.register(window)
+            // This responder does not track mouseDown. The driver must deliver the queued
+            // release even when AppKit canonicalizes its event number and timestamp.
+            try await driver.click("fixture.nontracking", in: window)
+            #expect(content.downs == 1)
+            #expect(content.releases.count == 1)
+            let release = try #require(content.releases.first)
+            #expect(release.window === window)
+            #expect(release.locationInWindow == NSPoint(x: 110, y: 47))
+        }
+    }
+
     @Test func consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()
@@ -169,13 +201,13 @@ struct OwnedWindowEventDriverTests {
             driver.register(window)
             // This event belongs to this regression fixture, not to the driver's gesture.
             // It has no target action; only this test may remove it during cleanup.
-            let foreign = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero,
+            let foreign = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: NSPoint(x: 110, y: 47),
                 modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
                 context: nil, eventNumber: 2_000_000, clickCount: 1, pressure: 0))
-            NSApplication.shared.postEvent(foreign, atStart: true)
+            let queuedForeign = try OwnedWindowEventDriver.postAndCaptureRelease(foreign, in: window)
             defer {
                 if let pending = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
-                    inMode: .eventTracking, dequeue: false), OwnedWindowEventDriver.sameEvent(pending, foreign) {
+                    inMode: .eventTracking, dequeue: false), OwnedWindowEventDriver.sameEvent(pending, queuedForeign) {
                     _ = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                         inMode: .eventTracking, dequeue: true)
                 }
@@ -184,8 +216,8 @@ struct OwnedWindowEventDriverTests {
             #expect(target.calls == 1)
             let stillQueued = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                 inMode: .eventTracking, dequeue: false))
-            #expect(OwnedWindowEventDriver.sameEvent(stillQueued, foreign), "The driver must leave the unrelated release at the queue head")
-            if OwnedWindowEventDriver.sameEvent(stillQueued, foreign) {
+            #expect(OwnedWindowEventDriver.sameEvent(stillQueued, queuedForeign), "The driver must leave the unrelated release at the queue head")
+            if OwnedWindowEventDriver.sameEvent(stillQueued, queuedForeign) {
                 _ = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                     inMode: .eventTracking, dequeue: true)
                 let remainder = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
@@ -340,7 +372,8 @@ final class OwnedWindowEventDriver {
         OwnedWindowFixtureApplication.record("dispatch \(id) begin; requested=\(number)/\(number + 1); down=\(Self.describe(down)); up=\(Self.describe(up))")
         // An AppKit mouseDown can track synchronously. Its same-window release must already be
         // queued. postEvent stays inside this test process; it never posts system/HID input.
-        NSApplication.shared.postEvent(up, atStart: true)
+        let queuedUp = try Self.postAndCaptureRelease(up, in: window)
+        OwnedWindowFixtureApplication.record("dispatch \(id) queued release=\(Self.describe(queuedUp))")
         window.sendEvent(down)
         OwnedWindowFixtureApplication.record("dispatch \(id) down returned")
         // Tracking controls may have consumed our release already. An unrelated queue head does
@@ -348,11 +381,11 @@ final class OwnedWindowEventDriver {
         // SwiftUI responders leave our exact release queued, which we deliver to the same window.
         if let pending = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                                                         inMode: .eventTracking, dequeue: false) {
-            OwnedWindowFixtureApplication.record("dispatch \(id) release peek=\(Self.describe(pending)); owned=\(Self.sameEvent(pending, up))")
-            if Self.sameEvent(pending, up) {
+            OwnedWindowFixtureApplication.record("dispatch \(id) release peek=\(Self.describe(pending)); owned=\(Self.sameEvent(pending, queuedUp))")
+            if Self.sameEvent(pending, queuedUp) {
                 let release = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
                     inMode: .eventTracking, dequeue: true))
-                guard Self.sameEvent(release, up) else {
+                guard Self.sameEvent(release, queuedUp) else {
                     NSApplication.shared.postEvent(release, atStart: true)
                     throw Failure.eventQueue
                 }
@@ -366,10 +399,30 @@ final class OwnedWindowEventDriver {
         print("Owned-window event: \(id), window=\(window.windowNumber), frame=\(frame), point=\(point), events=\(number)/\(number + 1)")
     }
 
+    /// AppKit may canonicalize eventNumber and timestamp when inserting an event. Capture the
+    /// immutable queued representation immediately after our front insertion, with no await or
+    /// event dispatch between them. A later unrelated head must never become our identity.
+    static func postAndCaptureRelease(_ release: NSEvent, in window: NSWindow) throws -> NSEvent {
+        guard release.type == .leftMouseUp, release.window === window,
+              release.windowNumber == window.windowNumber else { throw Failure.eventQueue }
+        NSApplication.shared.postEvent(release, atStart: true)
+        guard let queued = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+            inMode: .eventTracking, dequeue: false),
+              queued.type == release.type, queued.window === window,
+              queued.windowNumber == window.windowNumber,
+              queued.locationInWindow == release.locationInWindow,
+              queued.modifierFlags == release.modifierFlags,
+              queued.buttonNumber == release.buttonNumber,
+              queued.clickCount == release.clickCount else { throw Failure.eventQueue }
+        return queued
+    }
+
     static func sameEvent(_ candidate: NSEvent, _ expected: NSEvent) -> Bool {
         candidate.type == expected.type && candidate.windowNumber == expected.windowNumber
             && candidate.eventNumber == expected.eventNumber && candidate.timestamp == expected.timestamp
             && candidate.locationInWindow == expected.locationInWindow
+            && candidate.modifierFlags == expected.modifierFlags
+            && candidate.buttonNumber == expected.buttonNumber && candidate.clickCount == expected.clickCount
     }
 
     private static func describe(_ event: NSEvent) -> String {

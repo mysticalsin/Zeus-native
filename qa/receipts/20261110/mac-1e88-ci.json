@@ -1,0 +1,155 @@
+{
+  "head": "1e88f0639836b8898396c639deb609419b5f2fa2",
+  "tested": "269a00d42552387a25b0c5e1d1856b4f2667e5a7",
+  "source_snapshot_sha256": "640fb682962d0efd7c14fd307b4b01df312a2423a844836230d7b01158fdfbe1",
+  "verified_partition_count": 22,
+  "verified_tests": 2317,
+  "verified_partitions": [
+    {
+      "id": "native-ZeusCoreTests",
+      "tests": 2146,
+      "suites": 290
+    },
+    {
+      "id": "native-DictationOwnershipIntegrationTests",
+      "tests": 49,
+      "suites": 1
+    },
+    {
+      "id": "native-PolyglotPinTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-RecorderPillTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainCaptureModelTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-UltronVoiceEffectTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-EngineBrandLogoTests",
+      "tests": 6,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingTests",
+      "tests": 18,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingIsolationTests",
+      "tests": 14,
+      "suites": 1
+    },
+    {
+      "id": "native-PermissionsCaptureTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordlyDebugWiringTests",
+      "tests": 5,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeLifecycleScenarioTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordingFeedbackRenderTests",
+      "tests": 7,
+      "suites": 1
+    },
+    {
+      "id": "native-WikiGraphNavigationTests",
+      "tests": 10,
+      "suites": 1
+    },
+    {
+      "id": "native-HaloRendererTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-DisplaySynchronizedViewTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeIncomingWordTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-LicenseCredentialCleanupTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-MemoryMCPTransportTests",
+      "tests": 12,
+      "suites": 1
+    },
+    {
+      "id": "native-KokoroWorkerTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-TickingTests",
+      "tests": 9,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainWarmSchedulerTests",
+      "tests": 8,
+      "suites": 1
+    }
+  ],
+  "failures": [
+    {
+      "id": "native-ScribeComponentJourneyTests",
+      "reason": "missing or ambiguous Swift Testing summary",
+      "exit_code": 0
+    },
+    {
+      "id": "native-ScribeAccessibilityJourneyTests",
+      "reason": "command exited 1",
+      "exit_code": 1
+    },
+    {
+      "id": "native-OwnedWindowEventDriverTests",
+      "reason": "missing or ambiguous Swift Testing summary",
+      "exit_code": 0
+    },
+    {
+      "id": "native-KokoroWorkerSessionTests",
+      "reason": "command exited 1",
+      "exit_code": 1
+    }
+  ],
+  "complete_native_acceptance": false,
+  "evidence_kind": "partial-native-revalidation",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42787029328",
+  "app_job": 129730744089,
+  "artifact_id": 13750495945,
+  "artifact_zip_sha256": "5642d22849c5b3fea16bfc8f268a2d9f7f5bef1ae2826730588e199737dacf8f",
+  "revalidated_artifacts": {
+    "job.json": "2773d722f58efd0ebf79c799ea8c35b042065debb449b1aeee3ed0f2c686bc6c",
+    "build.log": "8a7190682403ace5f1824dde50bf6acc32a4bff842a6cde2bb2a64a2ab7e8b40",
+    "native-evidence/result.json": "8b1d0d1e3ffa538289d33800af7da941c2ecbf9d1cf71c11a78dba0fd0d3da05",
+    "native-evidence/source-manifest.json": "4e2c6f83e12f6462bd41690e58739866dfc3a6843516bc9201c5cb0b499da824",
+    "native-evidence/native-build/build.log": "811490c056cbee204c7d7563fe001e2cc3b587ff5f25c30fae78577448aa9c64",
+    "native-evidence/native-discovery/events.jsonl": "e910fc41b4967e5a0864f095cf07864e614669fa3ceff4848278544de52c72d5"
+  }
+}
