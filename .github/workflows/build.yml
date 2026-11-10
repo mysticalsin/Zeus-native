@@ -194,6 +194,26 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/zeus-results/feature-map"
           if [ -f "$RUNNER_TEMP/zeus-feature-map.log" ]; then cp "$RUNNER_TEMP/zeus-feature-map.log" "$RUNNER_TEMP/zeus-results/feature-map/runner.log"; fi
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          root = Path(os.environ["RUNNER_TEMP"]) / "zeus-results/feature-map"
+          receipt = root / "result.json"
+          if receipt.is_file() and not receipt.is_symlink():
+              value = json.loads(receipt.read_text())
+              for row in value.get("checks", []):
+                  ident = row.get("id", "")
+                  if row.get("status") != "failed" or not re.fullmatch(r"[A-Za-z0-9_-]+", ident):
+                      continue
+                  path = root / ident / "test.log"
+                  print(f"Development failure: {ident}: {row.get('reason', 'unknown')}")
+                  if path.is_file() and not path.is_symlink() and not path.parent.is_symlink():
+                      with path.open("rb") as stream:
+                          stream.seek(max(0, path.stat().st_size - 32768))
+                          print(stream.read(32768).decode("utf-8", errors="replace"))
+          PY
       - name: Record exact revision and step outcomes
         if: always()
         env:

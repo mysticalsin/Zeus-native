@@ -72,3 +72,30 @@ preliminary local patch had 11 focused tests passing and an independent review
 that identified the bundle gap. The extended patch was reconstructed from
 the exact published head through the GitHub connector; it requires its own CI
 validation. Prior local results must not be attributed to the extended patch.
+
+Independent review of the extended parser also found that LLVM errors and
+absolute compiler-tool paths could evade its initial prefix list. The parser
+now retains rejection of those headers, including root-level and space-containing
+paths, with explicit regression cases. This was established by source review;
+no corresponding zero-exit LLVM failure was observed in Zeus CI.
+
+At `1e88f0639836b8898396c639deb609419b5f2fa2`, the
+[PR run](https://github.com/mysticalsin/Zeus-native/actions/runs/42787029328)
+again reported 2,317 native passes and the same four failed partitions.
+The development run passed its other 528 checks but failed the selftest
+partition. Source review identified expected CLI rejection diagnostics
+interleaving unittest's result line; the fixture now captures and asserts
+stderr. A subprocess regression feeds that case's actual transcript through
+the unchanged strict Python summary parser. The original detailed selftest
+artifact has not yet been unpacked, so additional original failures are not
+ruled out by this diagnosis.
+
+The exposed native logs establish two separate event-fixture findings:
+AppKit changed event number 1,000,001 to 16,961 and rounded the timestamp,
+causing the driver's exact identity comparison to reject its queued release;
+both event suites also exited from Swift's async-main drain path without
+terminal test evidence. These observations do not establish a shared cause.
+The accessibility host remained inactive and its controls lacked the required
+AX roles/tree. Four resident-worker assertions failed during concurrent
+startup; the cause remains under investigation. None of these failures is
+waived or reclassified as device proof.

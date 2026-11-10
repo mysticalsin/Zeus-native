@@ -101,8 +101,9 @@ def validate_compiler_log(text):
         if re.match(r"(?:\d+)?\s*\|", line):
             continue
         failure = re.match(
-            r"(?:(?:.*?:\d+(?::\d+)?:|(?:swift(?:c|-frontend)?|clang(?:\+\+)?|ld|ld64|<unknown>):)\s*)?"
-            r"(?:error|fatal error|internal error):", line, re.IGNORECASE)
+            r"(?:(?:.*?:\d+(?::\d+)?:|(?:[^\r\n:]*[/\\])?"
+            r"(?:swift(?:c|-frontend|-driver)?|clang(?:\+\+)?|ld|ld64|lld|lld-link|<unknown>):)\s*)?"
+            r"(?:error|fatal error|internal error|llvm error):", line, re.IGNORECASE)
         require(not failure and not re.match(r"CHECK (?:TIMEOUT|COULD NOT START)\b", line),
                 "native compiler log contains failure")
 

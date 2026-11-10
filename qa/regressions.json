@@ -1479,6 +1479,30 @@
         "file": "qa/closed-loop/tests/test_gate.py",
         "function": "test_bundle_compiler_diagnostics_block_despite_successful_packaging"
       }
+    },
+    {
+      "id": "REG-123",
+      "failure": "Independent static review found the diagnostic header parser no longer rejected LLVM ERROR and absolute compiler-path headers that the previous matcher blocked.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_compiler_diagnostic_headers_remain_blocking_with_source_context_and_color"
+      }
+    },
+    {
+      "id": "REG-124",
+      "failure": "The new CLI regression printed expected error diagnostics into unittest's result line, preventing the strict runner from identifying every reported test. Capture and assert those diagnostics inside the fixture.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_compiler_cli_test_retains_complete_python_execution_receipt"
+      }
     }
   ]
 }

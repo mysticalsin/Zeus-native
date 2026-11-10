@@ -1,7 +1,10 @@
 import copy
+import contextlib
+import io
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 import tempfile
@@ -592,6 +595,12 @@ class NativeBuildGateTests(unittest.TestCase):
             "/source/File.swift:7: error: missing declaration",
             "/source/File.swift:7:12: error: missing declaration",
             "swift-frontend: error: compiler stopped",
+            "LLVM ERROR: broken module found",
+            "/swift-frontend: error: compiler stopped",
+            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend: error: compiler stopped",
+            "/path with spaces/clang++: fatal error: header not found",
+            "swift-driver: error: compiler stopped",
+            "lld-link: error: undefined symbol",
             "clang++: fatal error: header not found",
             "ld: error: undefined symbol",
             "<unknown>:0: error: compiler failure",
@@ -616,8 +625,25 @@ class NativeBuildGateTests(unittest.TestCase):
                     self.log.unlink()
                 else:
                     self.log.write_text(contents)
-                with patch.object(sys, "argv", ["gate.py", "compiler-log", "--path", str(self.log)]):
+                captured = io.StringIO()
+                with patch.object(sys, "argv", ["gate.py", "compiler-log", "--path", str(self.log)]), contextlib.redirect_stderr(captured):
                     self.assertEqual(gate.main(), expected)
+                if expected:
+                    self.assertIn("Compiler evidence rejected:", captured.getvalue())
+                else:
+                    self.assertEqual(captured.getvalue(), "")
+
+    def test_compiler_cli_test_retains_complete_python_execution_receipt(self):
+        # This test intentionally invokes only the CLI case, never itself.
+        result = subprocess.run(
+            [sys.executable, "-m", "unittest", "-v",
+             "test_gate.NativeBuildGateTests.test_compiler_log_command_returns_failure_for_missing_or_failed_evidence"],
+            cwd=Path(__file__).resolve().parent, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, timeout=30)
+        runner = importlib.import_module("run")
+        count, suites, functions = runner.python_summary(result.stdout, result.returncode)
+        self.assertEqual((count, suites), (1, 1))
+        self.assertEqual(functions, ["test_compiler_log_command_returns_failure_for_missing_or_failed_evidence"])
 
     def test_compiler_log_hash_and_containment_are_required(self):
         self.log.write_text("Build complete! (changed bytes)\n")
