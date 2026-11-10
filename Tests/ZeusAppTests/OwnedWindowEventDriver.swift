@@ -86,7 +86,7 @@ struct OwnedWindowEventDriverTests {
     private final class NonTrackingView: NSView {
         private(set) var downs = 0
         private(set) var releases: [NSEvent] = []
-        override func acceptsFirstMouse(_ event: NSEvent?) -> Bool { true }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func mouseDown(with event: NSEvent) { downs += 1 }
         override func mouseUp(with event: NSEvent) { releases.append(event) }
     }
