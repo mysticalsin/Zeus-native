@@ -163,7 +163,7 @@ struct ExplanationPane: View {
             }.buttonStyle(.borderless).font(.caption)
             if controller.currentDuration > 0, !controller.muted {
                 Slider(value: Binding(get: { min(controller.position, max(0, controller.currentDuration - 0.01)) },
-                                      set: controller.seek), in: 0...max(0.01, controller.currentDuration - 0.01))
+                                      set: { controller.seek($0) }), in: 0...max(0.01, controller.currentDuration - 0.01))
                     .accessibilityLabel("Preview current narration beat")
             }
         }
@@ -211,7 +211,7 @@ struct ExplanationPane: View {
             Toggle("Local-only model requests", isOn: Binding(get: { localOnly == "true" }, set: { controller.stop(); localOnly = $0 ? "true" : "false" }))
             Text("Local-only mode refuses remote endpoints. It never substitutes another provider.")
                 .font(.caption2).foregroundStyle(.secondary)
-            Toggle("Caption mode", isOn: Binding(get: { controller.muted }, set: controller.setMuted))
+            Toggle("Caption mode", isOn: Binding(get: { controller.muted }, set: { controller.setMuted($0) }))
             Text("Caption mode never synthesizes audio. Advance each beat yourself.").font(.caption2).foregroundStyle(.secondary)
             Picker("Narration voice", selection: Binding(get: { voiceIdentifier }, set: {
                 controller.stop()
