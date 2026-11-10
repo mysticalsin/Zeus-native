@@ -450,3 +450,25 @@ The [a847dbd receipt](../qa/receipts/20261110/mac-a847-ci.json) independently
 binds the native result and motion-profile restoration to that exact source.
 The [e295aaf development failure](../qa/receipts/20261110/mac-e295-feature-failure.json)
 retains the timed-out bridge partition separately from its passing companion run.
+
+## Explicit interpreter for synthetic voice fixtures
+
+The [fresh-runner observations](../qa/receipts/20261110/python-c1-first-entry.json)
+retain all four failed diagnostic jobs. On both push and PR runners, Apple's
+`/usr/bin/python3` launcher emitted no Python-entry marker before the original
+three-second deadline. The selected Xcode interpreter emitted its marker and
+exited in approximately 0.13–0.15 seconds. Its later `xcrun --find python3`
+metadata command still timed out, so the direct-path jobs are not complete
+passes. File hashes and `xcode-select --print-path` identify the literal target;
+the unavailable xcrun result remains unavailable.
+
+CI now explicitly sets `ZEUS_TEST_PYTHON_EXECUTABLE` to the selected Xcode 26.3
+interpreter for synthetic voice fixtures, including the full feature-map path.
+The fixture validates one absolute executable file before creating its temporary
+directory and reuses that choice at both launch sites. An invalid explicit value
+fails instead of falling back; an unset value retains the previous local default.
+No Python warmup or resolving subprocess is introduced, and the two-second marker
+and three-second request deadlines are unchanged. The production worker script,
+managed-venv routing, installed packages and model behavior are unchanged.
+Fresh native execution of every worker guard is still required; the launcher
+experiment alone does not establish product startup or latency.

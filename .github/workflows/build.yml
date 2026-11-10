@@ -80,9 +80,12 @@ jobs:
         env:
           # One owned fixture child only; sanitized diagnostics are not latency evidence.
           ZEUS_NATIVE_PYTHON_STARTUP_DIAGNOSTIC: "1"
+          # Synthetic worker fixtures bypass Apple's developer-tool launcher only.
+          ZEUS_TEST_PYTHON_EXECUTABLE: /Applications/Xcode_26.3.app/Contents/Developer/usr/bin/python3
         # Compiler discovery and qualified event streams must prove every selected case ran.
         # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
+          printf 'Synthetic voice fixture interpreter: %s\n' "$ZEUS_TEST_PYTHON_EXECUTABLE" | tee "$RUNNER_TEMP/zeus-results/app/fixture-python.log"
           python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
       - name: Record Python launcher metadata after cold fixtures
         if: always() && steps.test.outcome != 'skipped'
@@ -221,13 +224,18 @@ jobs:
         run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
       - name: Run current-source feature map
         id: map
+        env:
+          # Full mode uses the same explicit synthetic-fixture interpreter.
+          ZEUS_TEST_PYTHON_EXECUTABLE: /Applications/Xcode_26.3.app/Contents/Developer/usr/bin/python3
         run: |
+          printf 'Synthetic voice fixture interpreter: %s\n' "$ZEUS_TEST_PYTHON_EXECUTABLE" | tee "$RUNNER_TEMP/zeus-fixture-python.log"
           python3 qa/closed-loop/run.py --mode "$ZEUS_FEATURE_MODE" --output "$RUNNER_TEMP/zeus-results/feature-map" 2>&1 | tee "$RUNNER_TEMP/zeus-feature-map.log"
       - name: Preserve runner diagnostics
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/zeus-results/feature-map"
           if [ -f "$RUNNER_TEMP/zeus-feature-map.log" ]; then cp "$RUNNER_TEMP/zeus-feature-map.log" "$RUNNER_TEMP/zeus-results/feature-map/runner.log"; fi
+          if [ -f "$RUNNER_TEMP/zeus-fixture-python.log" ]; then cp "$RUNNER_TEMP/zeus-fixture-python.log" "$RUNNER_TEMP/zeus-results/feature-map/fixture-python.log"; fi
           python3 - <<'PY'
           import json
           import os

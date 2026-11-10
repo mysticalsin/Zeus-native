@@ -14,6 +14,25 @@ import Glibc
 
 @Suite("Bounded local voice worker")
 struct KokoroWorkerSessionTests {
+    private enum FixturePython {
+        enum SelectionFailure: Error, Equatable { case absolutePathRequired, executableFileRequired }
+
+        // Only these synthetic fixtures use this override. No interpreter is launched to
+        // select it, and an invalid explicit choice must never fall back to the system shim.
+        static func select(_ configured: String?) throws -> String {
+            let path = configured ?? "/usr/bin/python3"
+            guard path.hasPrefix("/"), !path.utf8.contains(0) else {
+                throw SelectionFailure.absolutePathRequired
+            }
+            var directory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &directory),
+                  !directory.boolValue, FileManager.default.isExecutableFile(atPath: path) else {
+                throw SelectionFailure.executableFileRequired
+            }
+            return path
+        }
+    }
+
     private struct StartupDiagnostic: Encodable, Sendable {
         enum Status: String, Encodable, Sendable { case captured, unavailable, alreadyEntered, childExited }
         struct Frame: Encodable, Equatable, Sendable {
@@ -89,6 +108,7 @@ struct KokoroWorkerSessionTests {
         let identifier = UUID()
         let directory: URL
         let launch: KokoroWorkerSession.Launch
+        private let pythonExecutable: String
         private let trace = Trace()
         private let lock = NSLock()
         private var sessions: [KokoroWorkerSession] = []
@@ -106,7 +126,8 @@ struct KokoroWorkerSessionTests {
             raise
         """
 
-        init() throws {
+        init(pythonExecutable configured: String? = ProcessInfo.processInfo.environment["ZEUS_TEST_PYTHON_EXECUTABLE"]) throws {
+            pythonExecutable = try FixturePython.select(configured)
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-voice-fixture-\(identifier.uuidString)-\"quoted", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             try """
@@ -153,13 +174,13 @@ struct KokoroWorkerSessionTests {
             // -I ignores Python environment settings and user-site packages; -S skips site initialization.
             // These fixtures need only the standard library and the explicitly added stub directory.
             let files = KokoroWorker.modelFiles(in: directory)
-            launch = .init(executable: "/usr/bin/python3", arguments: ["-I", "-S", "-c", Self.wrapper, directory.path,
+            launch = .init(executable: pythonExecutable, arguments: ["-I", "-S", "-c", Self.wrapper, directory.path,
                 KokoroWorker.workerScript(modelDir: directory), files.onnx.path, files.voices.path])
             trace.record("fixture-ready")
         }
 
         func pythonLaunch(script: String, arguments: [String]) -> KokoroWorkerSession.Launch {
-            .init(executable: "/usr/bin/python3", arguments: ["-I", "-S", "-c", Self.wrapper, directory.path, script] + arguments)
+            .init(executable: pythonExecutable, arguments: ["-I", "-S", "-c", Self.wrapper, directory.path, script] + arguments)
         }
 
         func session(timeout: TimeInterval = 3, idle: TimeInterval = 120,
@@ -300,6 +321,46 @@ struct KokoroWorkerSessionTests {
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
         while !(await condition()), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
         try #require(await condition())
+    }
+
+    @Test func fixturePythonDefaultsOnlyWhenConfigurationIsUnset() throws {
+        #expect(try FixturePython.select(nil) == "/usr/bin/python3")
+        for path in ["", "python3", "./python3", "~/python3", "/usr/bin/python3\0ignored"] {
+            #expect(throws: FixturePython.SelectionFailure.absolutePathRequired) {
+                try FixturePython.select(path)
+            }
+        }
+    }
+
+    @Test func fixturePythonExplicitSelectionReachesBothLaunchSites() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-python-selection-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("synthetic interpreter \"quoted")
+        try Data("synthetic fixture; never executed".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let fixture = try Fixture(pythonExecutable: executable.path)
+        defer { fixture.remove() }
+        #expect(fixture.launch.executable == executable.path)
+        let second = fixture.pythonLaunch(script: "fixed-script", arguments: ["fixed-argument"])
+        #expect(second.executable == executable.path)
+        #expect(Array(fixture.launch.arguments.prefix(3)) == ["-I", "-S", "-c"])
+        #expect(Array(second.arguments.prefix(3)) == ["-I", "-S", "-c"])
+    }
+
+    @Test func fixturePythonRejectsMissingNonexecutableAndDirectoryWithoutFallback() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-python-rejection-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let nonexecutable = root.appendingPathComponent("not-executable")
+        try Data("synthetic fixture".utf8).write(to: nonexecutable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: nonexecutable.path)
+        for path in [root.appendingPathComponent("missing").path, nonexecutable.path, root.path] {
+            #expect(throws: FixturePython.SelectionFailure.executableFileRequired) {
+                let fixture = try Fixture(pythonExecutable: path)
+                fixture.remove() // Clean up even if a regression incorrectly accepts this path.
+            }
+        }
     }
 
     @Test func productionWorkerPublishesOnlyACompleteAcknowledgedWAV() async throws {

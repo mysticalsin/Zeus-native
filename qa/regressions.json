@@ -1795,6 +1795,31 @@
         "file": "qa/closed-loop/tests/test_execution_cleanup.py",
         "function": "test_exit_observed_after_deadline_cannot_pass_or_signal_a_reaped_group"
       }
+    },
+    {
+      "id": "REG-149",
+      "failure": "Synthetic Kokoro fixtures hardcoded the Apple developer-tool Python launcher, which did not enter Python before the original deadline on either fresh runner. CI now selects the exact Xcode interpreter for synthetic fixtures only. The real production worker script must still publish only a complete acknowledged WAV within the unchanged fixture deadlines.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "productionWorkerPublishesOnlyACompleteAcknowledgedWAV"
+      }
+    },
+    {
+      "id": "REG-150",
+      "failure": "An invalid explicitly configured test interpreter must not silently fall back to another executable or create a fixture. Selection now rejects missing, nonexecutable, directory, relative, empty and NUL paths; the validated choice is shared by both fixture launch sites.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "fixturePythonRejectsMissingNonexecutableAndDirectoryWithoutFallback"
+      }
     }
   ]
 }
