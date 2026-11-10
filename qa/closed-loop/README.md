@@ -49,6 +49,21 @@ does not expose inside its own process. The CI app job never selects it. In
 exists yet. Its obligations stay open, and a pointer-event journey never
 substitutes for it.
 
+### Running the trusted accessibility journey locally
+
+`scripts/trusted-ax-journey.sh` runs `ScribeTrustedAccessibilityJourneyTests` on a Mac. Run it from a
+terminal that already has Accessibility trust; it never asks for permissions. It builds with
+`swift build --build-tests --scratch-path "$HOME/AI-Brain-build/zeus-native-build"`, packages the same
+bundled test host that CI uses, and runs only that suite. The test reads its own process through the
+accessibility client API on a background thread, selects its own window by marker identifier, and presses
+each real SwiftUI button with `AXPress`. It fails, never skips, when `AXIsProcessTrusted()` is false.
+
+The runner prints pass or fail by validating the Swift Testing event stream: every started test needs a
+terminal event and the run must end with zero issues. A zero exit status alone is not a pass. A receipt
+goes to `$HOME/AI-Brain-build/zeus-trusted-ax/run-<time>-<sha>/receipt.json` with the sha, timestamp, result
+and test ids. It refuses to run off macOS or when `GITHUB_ACTIONS` is set. Full gate mode still fails closed
+for this check; consuming the receipt there is a follow-up.
+
 Both full mode on macOS and the CI app entrypoint first compile the native test
 target once with `swift build --build-tests`, then save compiled discovery once.
 A failed compiler barrier records its exact source hash and compiler log; every

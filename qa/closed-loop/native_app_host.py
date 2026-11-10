@@ -11,7 +11,9 @@ from contracts import ROOT, digest, require
 SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests",
           "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests",
           "ExplanationRendererTests", "ExplanationTalkButtonTests", "ExplanationScreenContextTests",
-          "ExplanationChatLifecycleTests"}
+          "ExplanationChatLifecycleTests", "ScribeTrustedAccessibilityJourneyTests"}
+# Launchable by the host, but only by the local trusted runner. `selected` never picks these for CI.
+TRUSTED_SUITES = {"ScribeTrustedAccessibilityJourneyTests"}
 INFO = {
     "CFBundleExecutable": "zeus-native-test-host",
     "CFBundleIdentifier": "org.zeus.native-test-host",
@@ -24,7 +26,7 @@ INFO = {
 
 
 def selected(definitions):
-    hosted = [row for row in definitions if row.get("kind") == "native-fixture" and row.get("suite") in SUITES]
+    hosted = [row for row in definitions if row.get("kind") == "native-fixture" and row.get("suite") in SUITES - TRUSTED_SUITES]
     require(not hosted or len(definitions) == 1, "AppKit journeys require their own host process")
     return bool(hosted)
 

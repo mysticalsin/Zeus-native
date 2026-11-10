@@ -3,6 +3,7 @@ import copy
 import json
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import native_app_host as host
 import native_evidence as evidence
+import trusted_ax
 from contracts import Invalid, digest
 import test_native_evidence as fixtures
 
@@ -22,7 +24,7 @@ class NativeAppHostTests(unittest.TestCase):
         return {"kind": "native-fixture", "suite": suite, "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift"}
 
     def test_only_owned_journeys_use_exact_host_and_recorded_bundle(self):
-        for suite in sorted(host.SUITES):
+        for suite in sorted(host.SUITES - host.TRUSTED_SUITES):
             definition = self.definition(suite)
             command = evidence.run_command([definition], 4, "/evidence", "native-case", "/compiled/source")
             self.assertEqual(command, [str(host.executable("/evidence", "native-case")),
@@ -133,6 +135,69 @@ class NativeAppHostTests(unittest.TestCase):
         row["artifacts"] = row["artifacts"][:-1]
         with self.assertRaisesRegex(Invalid, "host artifacts"):
             validate()
+
+
+class TrustedAXRunnerTests(unittest.TestCase):
+    SUITE = "ScribeTrustedAccessibilityJourneyTests"
+    TEST = "ZeusAppTests." + SUITE + "/" + trusted_ax.REQUIRED_FUNCTION + "()/ScribeComponentJourneyTests.swift:1:1"
+
+    def definition(self, kind):
+        return {"kind": kind, "suite": self.SUITE, "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"}
+
+    def events(self, rows):
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, folder, True)
+        path = folder / "events.jsonl"
+        path.write_text("".join(json.dumps({"version": 0, **row}) + "\n" for row in rows))
+        return path
+
+    def clean(self, ident=None, end="pass", run_end="pass"):
+        ident = ident or self.TEST
+        mark = lambda symbol: {"messages": [{"symbol": symbol}]}
+        return [{"kind": "test", "payload": {"kind": "function", "id": ident}},
+                {"kind": "event", "payload": {"kind": "runStarted"}},
+                {"kind": "event", "payload": {"kind": "testStarted", "testID": ident}},
+                {"kind": "event", "payload": {"kind": "testEnded", "testID": ident, **mark(end)}},
+                {"kind": "event", "payload": {"kind": "runEnded", **mark(run_end)}}]
+
+    def test_ci_never_selects_the_trusted_suite_even_though_the_host_can_launch_it(self):
+        self.assertIn(self.SUITE, host.SUITES)
+        self.assertFalse(host.selected([self.definition("trusted-native-fixture")]))
+        self.assertFalse(host.selected([self.definition("native-fixture")]))
+        self.assertNotIn("trusted-native-fixture", evidence.NATIVE_KINDS)
+        swift = (Path(__file__).resolve().parents[3] / "qa/native-app-host/NativeAppTestHost.swift").read_text()
+        self.assertIn(trusted_ax.FILTER.replace("\\", "\\\\"), swift)
+
+    def test_command_uses_exact_filter_and_absolute_event_stream(self):
+        argv = trusted_ax.command(Path("/h"), Path("/t"), Path("/e/events.jsonl"))
+        self.assertEqual(argv, ["/h", "--test-bundle-path", "/t", "--filter", "^ZeusAppTests\\." + self.SUITE + "/",
+                                "--event-stream-output-path", "/e/events.jsonl", "--event-stream-version", "0"])
+
+    def test_clean_stream_passes_and_missing_stream_never_does(self):
+        problems, ids = trusted_ax.validate_events(self.events(self.clean()))
+        self.assertEqual((problems, ids), ([], [self.TEST]))
+        problems, ids = trusted_ax.validate_events(Path(tempfile.gettempdir()) / "absent-events.jsonl")
+        self.assertTrue(problems and not ids)
+
+    def test_stream_defects_never_pass(self):
+        base = self.clean()
+        cases = {"no run end": base[:-1], "no test end": base[:3] + base[4:],
+                 "failed end": self.clean(end="fail"), "failed run": self.clean(run_end="fail"),
+                 "wrong suite": self.clean(ident="ZeusAppTests.OtherTests/x()/F.swift:1:1"),
+                 "issue": base[:3] + [{"kind": "event", "payload": {"kind": "issueRecorded", "testID": self.TEST}}] + base[3:]}
+        for name, rows in cases.items():
+            with self.subTest(name):
+                problems, _ = trusted_ax.validate_events(self.events(rows))
+                self.assertTrue(problems, name)
+
+    def test_runner_refuses_ci_and_non_macos(self):
+        with patch.dict(trusted_ax.os.environ, {"GITHUB_ACTIONS": "true"}), \
+                patch.object(trusted_ax.platform, "system", return_value="Darwin"):
+            with self.assertRaisesRegex(Invalid, "never runs in CI"):
+                trusted_ax.require_local_mac()
+        with patch.object(trusted_ax.platform, "system", return_value="Linux"):
+            with self.assertRaisesRegex(Invalid, "requires macOS"):
+                trusted_ax.require_local_mac()
 
 
 if __name__ == "__main__":

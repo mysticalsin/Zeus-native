@@ -205,6 +205,128 @@ private enum OwnedProcessAXDiagnostic {
     }
 }
 
+/// The trusted-client press path for the SwiftUI button journey. SwiftUI's NSHostingView exposes no
+/// in-process accessibility children, but inside a bundled app that is running NSApp.run() a trusted
+/// process can read its own tree through the AX client API. Every AX call runs on the main actor: AppKit
+/// serves own-process AX requests on the calling thread, so a background caller makes SwiftUI build its
+/// accessibility tree off the main thread and trap (Swift 6 executor check, SIGTRAP). Between attempts the
+/// main actor suspends so SwiftUI can update. AX elements are created, used and dropped inside one
+/// synchronous attempt and never reused after a retry. Own PID only, own marked window only.
+@MainActor
+private enum TrustedAXClient {
+    enum Attempt: Sendable {
+        case pressed
+        case notReady(String)
+        case missing([String])
+        case ambiguous
+        case rejected(Int32)
+        case invalid(String)
+    }
+
+    static func press(_ id: String, pid: pid_t, windowMarker: String,
+                      deadline: ContinuousClock.Instant) async -> Attempt {
+        var last: Attempt = .notReady("no attempt ran before the deadline")
+        while ContinuousClock.now < deadline {
+            // Re-resolve from the application element on every attempt; never keep a stale element.
+            let result = attempt(id, pid: pid, windowMarker: windowMarker, deadline: deadline)
+            switch result {
+            case .notReady, .missing: last = result
+            default: return result
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return last
+    }
+
+    private static func attempt(_ id: String, pid: pid_t, windowMarker: String,
+                                deadline: ContinuousClock.Instant) -> Attempt {
+        guard Thread.isMainThread, pid == ProcessInfo.processInfo.processIdentifier,
+              windowMarker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) else {
+            return .invalid("invalid execution thread, PID, or window marker")
+        }
+        let maxDepth = 16, maxNodes = 600, maxChildren = 64
+        let timeout: Float = 0.5
+        let axTypeID = AXUIElementGetTypeID()
+        func read(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
+            AXUIElementSetMessagingTimeout(element, timeout)
+            var value: CFTypeRef?
+            return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil
+        }
+        func elements(_ element: AXUIElement, _ name: String) -> [AXUIElement] {
+            guard let raw = read(element, name) as? [AnyObject] else { return [] }
+            return raw.prefix(maxChildren).compactMap { CFGetTypeID($0) == axTypeID ? ($0 as! AXUIElement) : nil }
+        }
+        func frame(_ element: AXUIElement) -> CGRect? {
+            guard let position = read(element, kAXPositionAttribute), let size = read(element, kAXSizeAttribute),
+                  CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() else { return nil }
+            var point = CGPoint.zero, extent = CGSize.zero
+            guard AXValueGetValue(position as! AXValue, .cgPoint, &point),
+                  AXValueGetValue(size as! AXValue, .cgSize, &extent) else { return nil }
+            return CGRect(origin: point, size: extent)
+        }
+        func usable(_ rect: CGRect) -> Bool {
+            [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite) && !rect.isEmpty
+        }
+
+        let application = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(application, timeout)
+        var owner: pid_t = 0
+        guard AXUIElementGetPid(application, &owner) == .success, owner == pid else {
+            return .invalid("application element is not this process")
+        }
+        var candidates = elements(application, kAXWindowsAttribute)
+        for child in elements(application, kAXChildrenAttribute)
+        where !candidates.contains(where: { CFEqual($0, child) }) { candidates.append(child) }
+        let marked = candidates.filter { read($0, kAXIdentifierAttribute) as? String == windowMarker }
+        guard marked.count <= 1 else { return .invalid("owned window marker matches \(marked.count) windows") }
+        guard let window = marked.first else {
+            let seen = candidates.prefix(8).map { candidate -> String in
+                let role = read(candidate, kAXRoleAttribute) as? String ?? "-"
+                let identifier = read(candidate, kAXIdentifierAttribute) as? String ?? "-"
+                let title = read(candidate, kAXTitleAttribute) as? String ?? "-"
+                return "\(role) id=\(identifier.prefix(80)) title=\(title.prefix(60))"
+            }
+            return .missing(["own-PID AX windows=\(candidates.count), marker matches=0, expected=\(windowMarker.prefix(80))"] + seen)
+        }
+        guard let windowFrame = frame(window), usable(windowFrame) else {
+            return .notReady("owned AX window has no finite, non-empty frame")
+        }
+
+        var queue: [(AXUIElement, Int)] = [(window, 0)]
+        var index = 0
+        var matches: [AXUIElement] = []
+        var identifiers: [String] = []
+        while index < queue.count {
+            if ContinuousClock.now >= deadline { return .notReady("deadline reached while walking the owned window") }
+            guard index < maxNodes else { return .invalid("owned window tree exceeded \(maxNodes) nodes") }
+            let (element, depth) = queue[index]
+            index += 1
+            if let identifier = read(element, kAXIdentifierAttribute) as? String {
+                if identifiers.count < 40 { identifiers.append(String(identifier.prefix(80))) }
+                if identifier == id { matches.append(element) }
+            }
+            if depth < maxDepth {
+                queue.append(contentsOf: elements(element, kAXChildrenAttribute).map { ($0, depth + 1) })
+            }
+        }
+        guard matches.count <= 1 else { return .ambiguous }
+        guard let button = matches.first else {
+            return .missing(["own-PID AX windows=\(candidates.count), marker matches=1, nodes=\(index)",
+                             "identifiers=\(identifiers.joined(separator: ","))"])
+        }
+        let role = read(button, kAXRoleAttribute) as? String
+        guard role == kAXButtonRole else { return .notReady("identified AX element has role \(role ?? "nil"), not AXButton") }
+        guard read(button, kAXEnabledAttribute) as? Bool == true else { return .notReady("button stayed disabled") }
+        guard let buttonFrame = frame(button), usable(buttonFrame) else {
+            return .notReady("button has no finite, non-empty frame")
+        }
+        guard buttonFrame.intersects(windowFrame) else { return .notReady("button stayed outside its window") }
+        AXUIElementSetMessagingTimeout(button, 1.0)
+        let error = AXUIElementPerformAction(button, kAXPressAction as CFString)
+        return error == .success ? .pressed : .rejected(error.rawValue)
+    }
+}
+
 /// Real hosted production controls, inert capture/transcription, synthetic persistence only.
 /// Separate drivers use own accessibility objects or own-window AppKit events; no global AX,
 /// system input injection or screen capture. A failed lookup may inspect its marked window
@@ -268,6 +390,7 @@ private struct ScribeComponentFixture {
         case ambiguousControl(String)
         case unavailableControl(String, String)
         case rejectedPress(String)
+        case rejectedAXPress(String, Int32)
         case traversalLimit
         case transitionTimeout(String)
         var description: String {
@@ -277,6 +400,7 @@ private struct ScribeComponentFixture {
             case .ambiguousControl(let id): return "Multiple fixture controls have \(id)"
             case .unavailableControl(let id, let reason): return "Fixture control is unavailable: \(id) (\(reason))"
             case .rejectedPress(let id): return "Fixture control rejected accessibilityPerformPress: \(id)"
+            case .rejectedAXPress(let id, let code): return "Trusted AX client press was not accepted for \(id): AXError=\(code)"
             case .traversalLimit: return "Fixture accessibility tree exceeded its bound"
             case .transitionTimeout(let expected): return "Fixture did not reach \(expected)"
             }
@@ -498,6 +622,42 @@ private struct ScribeComponentFixture {
         throw originalFailure
     }
 
+    /// Trusted-client path: see TrustedAXClient. Fails, never skips, when this process is not trusted.
+    private func trustedPress(_ id: String, in window: NSWindow, trace: inout [String]) async throws {
+        guard allowedControls.contains(id) else { throw ScenarioFailure.unavailableControl(id, "not an allowed action") }
+        guard AXIsProcessTrusted() else {
+            throw ScenarioFailure.unavailableControl(id, "this process is not trusted for accessibility " +
+                "(AXIsProcessTrusted is false); run scripts/trusted-ax-journey.sh from a trusted terminal")
+        }
+        guard window.isVisible else { throw ScenarioFailure.unavailableControl(id, "owning window is hidden") }
+        let marker = window.accessibilityIdentifier()
+        guard marker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) else {
+            throw ScenarioFailure.unavailableControl(id, "owning window has no marker identifier")
+        }
+        // AppKit lists an inactive app's windows to AX clients only after activation (proven with the
+        // bundled probe), and cooperative activate() is refused while the launching terminal is frontmost.
+        // Activate only this own test process, and only on the local trusted path.
+        if !NSApplication.shared.isActive || !window.isKeyWindow {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            let activationDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while !NSApplication.shared.isActive, ContinuousClock.now < activationDeadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(4))
+        let outcome = await TrustedAXClient.press(id, pid: ProcessInfo.processInfo.processIdentifier,
+                                                  windowMarker: marker, deadline: deadline)
+        switch outcome {
+        case .pressed: trace.append("pressed \(id)")
+        case .notReady(let reason): throw ScenarioFailure.unavailableControl(id, reason)
+        case .missing(let rows): throw ScenarioFailure.missingControl(id, rows)
+        case .ambiguous: throw ScenarioFailure.ambiguousControl(id)
+        case .rejected(let code): throw ScenarioFailure.rejectedAXPress(id, code)
+        case .invalid(let reason): throw ScenarioFailure.unavailableControl(id, reason)
+        }
+    }
+
     private final class ButtonTarget: NSObject {
         private(set) var presses = 0
         @objc func performAction(_ sender: NSButton) { presses += 1 }
@@ -601,7 +761,9 @@ private struct ScribeComponentFixture {
         #expect(trace.isEmpty)
     }
 
-    func runJourney(useWindowEvents: Bool) async throws {
+    func runJourney(useWindowEvents: Bool, trustedAXClient: Bool = false) async throws {
+        // Pointer events never substitute for the accessibility journey.
+        try #require(!(useWindowEvents && trustedAXClient), "trusted AX client and window events are exclusive")
         let originalPolicy = try prepareFixtureApplication()
         defer { OwnedWindowFixtureApplication.restore(originalPolicy) }
         let (suite, defaults) = try preferences()
@@ -643,6 +805,8 @@ private struct ScribeComponentFixture {
             if let eventDriver {
                 try await eventDriver.click(id, in: ownedWindow)
                 trace.append("pressed \(id)")
+            } else if trustedAXClient {
+                try await trustedPress(id, in: ownedWindow, trace: &trace)
             } else {
                 try await press(id, in: ownedWindow, trace: &trace)
             }
@@ -658,6 +822,10 @@ private struct ScribeComponentFixture {
         try await waitFor("visible end window") { endWindow.panel?.isVisible == true && controller.endingRemaining == 9 }
         let endPanel = try #require(endWindow.panel)
         eventDriver?.register(endPanel)
+        if trustedAXClient {
+            // The trusted client selects an owned window by marker; the panel is a separate window.
+            endPanel.setAccessibilityIdentifier(OwnedProcessAXDiagnostic.windowMarkerPrefix + UUID().uuidString)
+        }
         try await activate("scribe.endWindow.keep", in: endPanel, trace: &trace)
         try await waitFor("recording after Keep") { controller.phase == .recording(id, since: clock.time) }
         #expect(!endPanel.isVisible)
@@ -699,7 +867,7 @@ private struct ScribeComponentFixture {
         #expect(trace == ["pressed scribe.start", "pressed scribe.stop", "pressed scribe.endWindow.keep",
                           "pressed scribe.stop", "pressed scribe.endWindow.endNow", "pressed scribe.endWindow.retrySave",
                           "pressed scribe.endWindow.hide", "pressed scribe.notes.close"])
-        print("Synthetic Scribe component interaction completed via \(useWindowEvents ? "owned-window events" : "accessibility"): " + trace.joined(separator: " → "))
+        print("Synthetic Scribe component interaction completed via \(useWindowEvents ? "owned-window events" : trustedAXClient ? "trusted AX client" : "accessibility"): " + trace.joined(separator: " → "))
     }
 
     func modelPreferencesReadAndWriteOnlyTheInjectedSuite() throws {
@@ -789,11 +957,12 @@ struct ScribeAccessibilityJourneyTests {
 
 /// The SwiftUI button journey through accessibility. SwiftUI's NSHostingView exposes no accessibility
 /// children inside its own process, so this cannot pass in required CI. It is a device-proof obligation
-/// (`trusted-native-fixture`) that stays open until it runs with a trusted assistive client on a Mac.
+/// (`trusted-native-fixture`) that stays open until it runs with a trusted assistive client on a Mac
+/// (`scripts/trusted-ax-journey.sh`: bundled host, own-PID AX client API on a background thread).
 /// The pointer journey in `ScribeComponentJourneyTests` must never be substituted for it.
 @MainActor @Suite("Scribe trusted accessibility journey", .serialized)
 struct ScribeTrustedAccessibilityJourneyTests {
     @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
-        try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false) }
+        try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false, trustedAXClient: true) }
     }
 }
