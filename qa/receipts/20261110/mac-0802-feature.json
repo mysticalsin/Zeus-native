@@ -1,0 +1,265 @@
+{
+  "run_id": 42854927189,
+  "job_id": 129965245898,
+  "artifact_id": 13782158936,
+  "repository": "mysticalsin/Zeus-native",
+  "tested_sha": "0802bf0ca4041d0eaee51500ab38e73096ccbab0",
+  "head_sha": "0802bf0ca4041d0eaee51500ab38e73096ccbab0",
+  "dirty": false,
+  "platform": "darwin",
+  "host": "macOS-15.8.2-arm64-arm-64bit-Mach-O",
+  "mode": "development",
+  "status": "failed",
+  "release_ready": false,
+  "zip_sha256": "213f6fe04a24fdf8e8758c89d5244bd3758ac3b2387dca1d0d1021d11c3f0fce",
+  "zip_matches_github_digest": true,
+  "extracted_files": 201,
+  "check_status_counts": {
+    "passed": 14,
+    "not-run": 37,
+    "unimplemented": 31,
+    "failed": 1
+  },
+  "credited_tests": 682,
+  "successful_checks": [
+    {
+      "id": "closed-loop-selftests",
+      "tests": 154
+    },
+    {
+      "id": "portable-polyglot",
+      "tests": 56
+    },
+    {
+      "id": "portable-regressions",
+      "tests": 76
+    },
+    {
+      "id": "portable-scribe",
+      "tests": 177
+    },
+    {
+      "id": "portable-presentation",
+      "tests": 33
+    },
+    {
+      "id": "portable-recordly-geometry",
+      "tests": 31
+    },
+    {
+      "id": "portable-wiki-relationships",
+      "tests": 26
+    },
+    {
+      "id": "release-mocks",
+      "tests": 13
+    },
+    {
+      "id": "portable-buddy",
+      "tests": 20
+    },
+    {
+      "id": "portable-dictation-insertion",
+      "tests": 17
+    },
+    {
+      "id": "portable-wiki-export",
+      "tests": 35
+    },
+    {
+      "id": "portable-keychain",
+      "tests": 6
+    },
+    {
+      "id": "portable-socket-safety",
+      "tests": 10
+    },
+    {
+      "id": "portable-bridge-transport",
+      "tests": 28
+    }
+  ],
+  "explanation": {
+    "build_completed": true,
+    "build_seconds": 13.16,
+    "tests_executed": 91,
+    "individual_passes": 83,
+    "issues": 8,
+    "suites": 8,
+    "credited_tests": 0,
+    "failures": [
+      {
+        "test": "everyPrecommitFaultPreservesOldRecordAndRemovesTemporaryFile",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 303,
+        "error": "unsafePath",
+        "log_line": 133
+      },
+      {
+        "test": "storeRoundTripsAndStaleSaveCannotReplaceNewerCheckpoint",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 282,
+        "error": "unsafePath",
+        "log_line": 134
+      },
+      {
+        "test": "retentionRemovesOldRecordsAndDeleteFailureIsVisibleAfterSuccessfulSave",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 328,
+        "error": "unsafePath",
+        "log_line": 135
+      },
+      {
+        "test": "diskBudgetAndOversizeReadAreRejectedBeforeReplacement",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 396,
+        "error": "unsafePath",
+        "log_line": 136
+      },
+      {
+        "test": "directorySyncFailureReturnsSavedWarningAndCommittedData",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 319,
+        "error": "unsafePath",
+        "log_line": 137
+      },
+      {
+        "test": "expiredRecordsAreRemovedButCorruptAndUnknownFilesAreReportedOrPreserved",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 345,
+        "error": "unsafePath",
+        "log_line": 138
+      },
+      {
+        "test": "hardLinksAndFIFOAreRefusedWithoutBlockingOrDeletingTargets",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 382,
+        "error": "unsafePath",
+        "log_line": 139
+      },
+      {
+        "test": "ancestorAndLeafSymlinksNeverRedirectHistoryOperations",
+        "source": "ExplanationHistoryTests.swift",
+        "source_line": 363,
+        "error": "unsafePath",
+        "log_line": 140
+      }
+    ],
+    "source_verification": [
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationProtocol.swift",
+        "sha256": "f2333d36b7220c65aa6ca6a7543940088c8ec56e2fc7f529461982493dc7caae",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationReducer.swift",
+        "sha256": "771344da89e09d585c29e194a619c0dc36bec401a5abe63880909332ad76a1d7",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationStream.swift",
+        "sha256": "172d06ec37f64c6b24d213fe44ad18c792927dc8a327c06a19e265144bd7a071",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationCompletionStream.swift",
+        "sha256": "7a97f83d6e4253a5f0e44e7c786305cc04659855cc59fce03ace0bceca48426e",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationPlayback.swift",
+        "sha256": "50f67bf3668c3e9d788971c146c7e7af34d46dc894aaffe4a0a8d16ba60edb06",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationCoordinates.swift",
+        "sha256": "da597f3cbd9e4b011ad87f974378c9508213d20b0d14147ee8d12924e722eb66",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationHistory.swift",
+        "sha256": "9a2d1ef34ead7957a2baf5e5621d9a229700c8425dd6b219da1955982491f43f",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Sources/ZeusCore/Explanation/ExplanationDiagnostics.swift",
+        "sha256": "e343841619390623bc96136d0bb6b2df04198630d73fca93eeae5296a57cc8de",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+        "sha256": "1b30d196c69a9532252c637983bc0319137b510cee5c12f6120faa21d8c45dba",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+        "sha256": "a54edbc9978f8f4d7337e392815bb457b8460a88ce54be060705c4d9784cf796",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+        "sha256": "e9817e4342bbf3c510fdfdc33b00fb5b5c0d049cd1deb5978cc73c44c73285eb",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+        "sha256": "f1cde5947922937e11192fd37e19cae6a2d02e3c0225cdc77e5cf22c4a9a6f2b",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "sha256": "8549aa7f24407099f67e54cac1b16a19d8e2df8a36759b2cd94e35b07a3e4c68",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+        "sha256": "5799ddc0d885260f5799a95b738a4c307f81bdc939d5667dacc88077c47c5c72",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+        "sha256": "5e4d483f0ccad6ac2c58b15fe54fce06f7e9da9d3b7cf10c5723b65235dd4f46",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      },
+      {
+        "source": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+        "sha256": "87b6c0756c54f031b93923b7e583e1e99358c1fe612ebf42a72bdb0848f7bb7c",
+        "matches_validation_manifest": true,
+        "matches_source_manifest": true,
+        "matches_git_commit": true
+      }
+    ]
+  },
+  "scope": "Original failed macOS development feature-map receipt; neither native app build nor physical/device/release acceptance. No tests rerun for this diagnosis.",
+  "cause_status": "All failures are unsafePath during strict no-follow folder traversal. Exact offending component was not logged. Existing repository Recordly fixtures document Darwin Foundation resolvingSymlinksInPath stripping /private. POSIX realpath at the trusted test scratch boundary is the proposed fixture repair; macOS rerun still required."
+}

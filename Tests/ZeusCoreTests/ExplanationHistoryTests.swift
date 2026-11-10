@@ -265,9 +265,18 @@ import Glibc
         let base: URL
         var root: URL { base.appendingPathComponent("history", isDirectory: true) }
         init() throws {
-            base = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            let created = FileManager.default.temporaryDirectory
                 .appendingPathComponent("zeus-explanation-test-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: base, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            try FileManager.default.createDirectory(at: created, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            // Resolve only this newly created, owned fixture. On Darwin, Foundation's
+            // resolvingSymlinksInPath can retain the /var alias that the store correctly refuses.
+            guard let resolved = realpath(created.path, nil) else {
+                let failure = NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+                try? FileManager.default.removeItem(at: created)
+                throw failure
+            }
+            defer { free(resolved) }
+            base = URL(fileURLWithPath: String(cString: resolved), isDirectory: true)
         }
         func remove() { try? FileManager.default.removeItem(at: base) }
         func file(_ history: ExplanationHistory) -> URL { root.appendingPathComponent(ExplanationHistoryStore.fileName(history.id)) }
@@ -278,6 +287,31 @@ import Glibc
         func names() throws -> [String] { try FileManager.default.contentsOfDirectory(atPath: root.path).sorted() }
     }
     private struct InjectedFailure: Error, Equatable {}
+
+    @Test func scratchRootIsCanonicalAndHasNoSymlinkComponents() async throws {
+        let scratch = try Scratch(); defer { scratch.remove() }
+        let store = try scratch.store()
+        let history = try fresh()
+        _ = try await store.save(history, now: date)
+        #expect(try await store.load(id: history.id) == history)
+        let resolved = try #require(realpath(scratch.root.path, nil))
+        defer { free(resolved) }
+        #expect(scratch.root.path == String(cString: resolved))
+
+        var folder = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        try #require(folder >= 0)
+        defer { _ = close(folder) }
+        for component in scratch.root.path.split(separator: "/") {
+            let next = openat(folder, String(component), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+            try #require(next >= 0, "Owned scratch component \(component) failed no-follow traversal with errno \(errno)")
+            _ = close(folder)
+            folder = next
+        }
+        var info = stat()
+        try #require(fstat(folder, &info) == 0)
+        #expect(info.st_uid == getuid())
+        #expect((info.st_mode & 0o077) == 0)
+    }
 
     @Test func storeRoundTripsAndStaleSaveCannotReplaceNewerCheckpoint() async throws {
         let scratch = try Scratch(); defer { scratch.remove() }

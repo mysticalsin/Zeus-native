@@ -485,21 +485,22 @@ enum ExplanationCanvasPainter {
         let color = ExplanationRenderPalette.color(item.object.style.fill)
         var ctx = context
         ctx.concatenate(item.transform)
-        ctx.clip(to: Path(CGRect(x: 0, y: 0, width: local.width * item.reveal, height: local.height)))
+        ctx.clip(to: Path(CGRect(x: 0, y: 0, width: local.width * CGFloat(item.reveal), height: local.height)))
         if item.object.geometry.kind == .chart {
             let low = min(0, values.min() ?? 0), high = max(0, values.max() ?? 0)
-            let span = max(high - low, 0.000001), baseline = plot.maxY + low / span * plot.height
+            let span = max(high - low, 0.000001)
+            let baseline = plot.maxY + CGFloat(low / span) * plot.height
             ctx.stroke(ExplanationCanvasLayout.polyline([.init(x: plot.minX, y: baseline), .init(x: plot.maxX, y: baseline)]),
                        with: .color(.secondary.opacity(0.5)), lineWidth: 1)
-            let step = plot.width / Double(values.count)
+            let step = plot.width / CGFloat(values.count)
             for index in values.indices {
-                let y = baseline - values[index] / span * plot.height
-                let rect = CGRect(x: plot.minX + Double(index) * step + 2, y: min(y, baseline),
+                let y = baseline - CGFloat(values[index] / span) * plot.height
+                let rect = CGRect(x: plot.minX + CGFloat(index) * step + 2, y: min(y, baseline),
                                   width: max(1, step - 4), height: max(1, abs(y - baseline)))
                 ctx.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(color.opacity(0.8)))
                 if step >= 30 {
                     ctx.draw(Text(labels[index]).font(.system(size: 11)),
-                        in: CGRect(x: plot.minX + Double(index) * step, y: plot.maxY + 4, width: step, height: 18))
+                        in: CGRect(x: plot.minX + CGFloat(index) * step, y: plot.maxY + 4, width: step, height: 18))
                 }
             }
         } else {
@@ -508,9 +509,9 @@ enum ExplanationCanvasPainter {
                        with: .color(color), lineWidth: 2)
             for index in values.indices {
                 let fraction = span > 0 ? (values[index] - low) / span : 0.5
-                let x = plot.minX + plot.width * fraction
+                let x = plot.minX + plot.width * CGFloat(fraction)
                 ctx.fill(Path(ellipseIn: .init(x: x - 4, y: plot.midY - 4, width: 8, height: 8)), with: .color(color))
-                if plot.width / Double(values.count) >= 50 {
+                if plot.width / CGFloat(values.count) >= 50 {
                     ctx.draw(Text(labels[index]).font(.system(size: 11)),
                              in: CGRect(x: max(plot.minX, min(x - 35, plot.maxX - 70)), y: plot.midY + 10, width: 70, height: 30))
                 }

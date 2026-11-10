@@ -522,7 +522,10 @@ private final class ExplanationSynthesisCancellation: @unchecked Sendable {
         if shouldCancel { timer.cancel() }
     }
     func cancel() {
-        let (sink, timer) = lock.withLock { cancelled = true; return (sink, timer) }
+        let (sink, timer): (ExplanationPCMSink?, Task<Void, Never>?) = lock.withLock {
+            self.cancelled = true
+            return (self.sink, self.timer)
+        }
         timer?.cancel(); sink?.abort(CancellationError())
     }
     deinit { timer?.cancel() }

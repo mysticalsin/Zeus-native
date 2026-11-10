@@ -127,7 +127,7 @@ final class ExplanationSCNHostView: SCNView {
     func node(for id: String) -> SCNNode? { entries[id]?.node }
 
     init() {
-        super.init(frame: .zero, options: [.preferredRenderingAPI: SCNRenderingAPI.metal.rawValue])
+        super.init(frame: .zero, options: [SCNView.Option.preferredRenderingAPI.rawValue: SCNRenderingAPI.metal.rawValue])
         let owned = SCNScene()
         owned.isPaused = true
         owned.rootNode.addChildNode(world)

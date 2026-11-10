@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 #if canImport(AVFoundation)
 import AVFoundation
 #endif
@@ -11,6 +16,17 @@ import ZeusCore
 @MainActor
 @Suite("Explanation controller with synthetic services", .serialized)
 struct ExplanationControllerTests {
+    /// Resolve only the trusted, existing OS scratch base. Foundation's path
+    /// resolver can restore Darwin's /var alias, which the real store rejects.
+    /// Production storage paths still pass through their unchanged no-follow checks.
+    private func canonicalFixtureBase() throws -> URL {
+        guard let resolved = realpath(FileManager.default.temporaryDirectory.path, nil) else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        defer { free(resolved) }
+        return URL(fileURLWithPath: String(cString: resolved), isDirectory: true)
+    }
+
     @MainActor private final class Calls {
         var speech = 0, media = 0, captures = 0, screens = 0, permissions = 0
         var acquired = 0, released = 0
@@ -328,7 +344,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func admittedHistorySavesAndChatDeletionCannotBeUndoneByLateWrite() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-history-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-history-" + UUID().uuidString)
         let store = try ExplanationHistoryStore(root: root)
         let fixture = Fixture(store: store), controller = fixture.controller, conversationID = UUID()
         await fixture.open(id: conversationID); fixture.submit()
@@ -347,7 +363,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func failedSaveSurvivesConversationSwitchAndRetriesItsOwnedRecord() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-failed-save-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-failed-save-" + UUID().uuidString)
         let fault = CommitFault()
         let store = try ExplanationHistoryStore(root: root, faultHook: { try fault.check($0) })
         let fixture = Fixture(store: store), controller = fixture.controller, first = UUID(), second = UUID()
@@ -379,7 +395,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func retryCannotRequeueFailedCheckpointBehindNewerInflightSave() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-inflight-save-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-inflight-save-" + UUID().uuidString)
         let fault = CommitFault()
         let store = try ExplanationHistoryStore(root: root, faultHook: { try fault.check($0) })
         let fixture = Fixture(store: store), controller = fixture.controller
@@ -407,7 +423,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func anotherRecordSavingCannotClearTheRemainingFailureNotice() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-cross-record-save-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-cross-record-save-" + UUID().uuidString)
         let fault = CommitFault()
         let store = try ExplanationHistoryStore(root: root, faultHook: { try fault.check($0) })
         let fixture = Fixture(store: store), controller = fixture.controller
@@ -435,7 +451,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func switchingAwaitsPendingSaveAndDoesNotWriteBlankConversation() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-pending-save-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-pending-save-" + UUID().uuidString)
         let store = try ExplanationHistoryStore(root: root)
         let fixture = Fixture(store: store), controller = fixture.controller, first = UUID(), second = UUID()
         try await withOwnedHistoryFixture(fixture, root: root) {
@@ -455,7 +471,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func memoryOnlyHistoryRefusesSwitchUntilExplicitStorageRecovery() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-recover-store-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-recover-store-" + UUID().uuidString)
         let store = try ExplanationHistoryStore(root: root)
         var available = false
         let fixture = Fixture(storeFactory: {
@@ -486,7 +502,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func failedOpenCanRetryTheSameConversationAfterStorageReturns() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        let root = try canonicalFixtureBase()
             .appendingPathComponent("zeus-controller-retry-open-" + UUID().uuidString)
         try Data("synthetic unavailable folder".utf8).write(to: root)
         let store = try ExplanationHistoryStore(root: root)
@@ -527,7 +543,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func fullFailedSaveCapacityStillAllowsRecoveringAnOwnedConversation() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        let root = try canonicalFixtureBase()
             .appendingPathComponent("zeus-controller-retained-capacity-" + UUID().uuidString)
         let fault = CommitFault()
         let store = try ExplanationHistoryStore(root: root, faultHook: { try fault.check($0) })
@@ -554,7 +570,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func knownCorruptRecordDeletionIsSafeAndRetryIsIdempotent() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        let root = try canonicalFixtureBase()
             .appendingPathComponent("zeus-controller-corrupt-delete-" + UUID().uuidString)
         let store = try ExplanationHistoryStore(root: root)
         let id = UUID()
@@ -575,7 +591,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func deletionWithoutOwnedIdentityCannotClaimUnreadableRecordWasRemoved() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        let root = try canonicalFixtureBase()
             .appendingPathComponent("zeus-controller-unknown-delete-" + UUID().uuidString)
         let store = try ExplanationHistoryStore(root: root)
         let record = try ExplanationHistory(scene: .init(sessionID: UUID(), sceneID: UUID()), title: "Owned fixture", at: Date())
@@ -608,7 +624,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func deletingReopenedHistoryCannotRecreateItsChatLinkDuringStop() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        let root = try canonicalFixtureBase()
             .appendingPathComponent("zeus-controller-delete-link-" + UUID().uuidString)
         let store = try ExplanationHistoryStore(root: root)
         let id = UUID()
@@ -628,7 +644,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func retentionEvictionInvalidatesCheckpointBeforeEditingTheStillOpenRecord() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        let root = try canonicalFixtureBase()
             .appendingPathComponent("zeus-controller-retention-edit-" + UUID().uuidString)
         let fault = CommitFault(); fault.allowWrites()
         let store = try ExplanationHistoryStore(root: root, policy: .init(maxRecords: 1),
@@ -688,7 +704,7 @@ struct ExplanationControllerTests {
     }
 
     @Test func currentBeatSeekEndsPreviewWithoutPlayingOrSynthesizingQueuedFuture() async throws {
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("zeus-controller-seek-" + UUID().uuidString)
+        let root = try canonicalFixtureBase().appendingPathComponent("zeus-controller-seek-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let writer = SilentWriter()
         let output = SystemExplanationSpeechOutput(writer: writer, temporaryRoot: root)

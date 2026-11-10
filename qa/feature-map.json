@@ -1964,6 +1964,10 @@
             {
               "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
               "function": "physicalFootprintBytesExportNamesTheProvidedMetric"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+              "function": "scratchRootIsCanonicalAndHasNoSymlinkComponents"
             }
           ]
         },

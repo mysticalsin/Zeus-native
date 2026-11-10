@@ -2504,6 +2504,54 @@
         "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
         "function": "physicalFootprintBytesExportNamesTheProvidedMetric"
       }
+    },
+    {
+      "id": "REG-208",
+      "failure": "The first native build found ambiguous inference in the locked synthesis-cancellation tuple. Explicit optional tuple types and self-qualified members now enforce the cancellation snapshot at compile time; the existing cancellation fixture exercises its owned PCM cleanup after compilation.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "cancellationDropsLateBuffersAndReleasesFileBeforeNextRender"
+      }
+    },
+    {
+      "id": "REG-209",
+      "failure": "The first native build found mixed CGFloat and Double arithmetic in chart layout. Explicit CGFloat conversion at the drawing boundary now makes chart/timeline coordinate expressions type-check; the production Canvas fixture remains bound to the compiled renderer.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "productionCanvasPixelsChangeOnlyWithSuppliedPresentationAndRespectReducedMotion"
+      }
+    },
+    {
+      "id": "REG-210",
+      "failure": "The first native build inferred a String-keyed SceneKit options dictionary, making the shorthand rendering-API key invalid. The explicit SCNView.Option rawValue now enforces the SDK key type; the owned native SceneKit fixture exercises construction after compilation.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "nativeScenePreservesStableNodesReparentsLiveChildrenAndDisposesResources"
+      }
+    },
+    {
+      "id": "REG-211",
+      "failure": "macOS history fixtures threw unsafePath under Foundation-normalized temporary roots; the original log did not identify the rejected component. Disposable fixtures now use throwing POSIX realpath, following the existing Darwin system-alias test pattern, and verify every directory component without following symlinks. Production path rejection remains strict.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+        "function": "scratchRootIsCanonicalAndHasNoSymlinkComponents"
+      }
     }
   ]
 }

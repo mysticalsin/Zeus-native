@@ -69,7 +69,7 @@ struct ExplanationPane: View {
                             Task { await controller.flushPendingSaves(); await controller.open(conversationID: conversationID) }
                         }.buttonStyle(.borderless)
                     }
-                    if let snapshot = controller.screenContext.snapshot {
+                    if controller.screenContext.snapshot != nil {
                         if let image = snapshotImage {
                             Image(nsImage: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 8))
                                 .accessibilityLabel("Selected display snapshot")
@@ -231,11 +231,15 @@ struct ExplanationPane: View {
             }
             Text("Installed voices only. Changing voice stops this explanation and applies to the next narration.")
                 .font(.caption2).foregroundStyle(.secondary)
-            Picker("Microphone", selection: Binding(get: { controller.deviceUID ?? "" }, set: { controller.deviceUID = $0.isEmpty ? nil : $0 })) {
+            Picker("Microphone", selection: Binding(get: { controller.deviceUID ?? "" }, set: {
+                controller.stop(); controller.deviceUID = $0.isEmpty ? nil : $0
+            })) {
                 Text("System default").tag("")
                 ForEach(Microphones.all(), id: \.uid) { device in Text(device.name).tag(device.uid) }
             }
-            Toggle("Use already-loaded WhisperKit", isOn: $controller.useInstalledWhisper)
+            Toggle("Use already-loaded WhisperKit", isOn: Binding(get: { controller.useInstalledWhisper }, set: {
+                controller.stop(); controller.useInstalledWhisper = $0
+            }))
             Text("Requires a verified model already loaded by Zeus. Otherwise use Apple on-device recognition; no model downloads start here.")
                 .font(.caption2).foregroundStyle(.secondary)
             Picker("In-app shortcut", selection: $shortcut) {
