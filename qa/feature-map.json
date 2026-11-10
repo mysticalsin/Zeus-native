@@ -408,6 +408,14 @@
       "suite": "HaloRendererTests",
       "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
       "scope": "Actual SwiftUI Path flattening and offscreen HaloOutline geometry/style rendering. No desktop capture, settings mutation or donor/motion parity proof."
+    },
+    {
+      "id": "native-ScribeComponentJourneyTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual production Scribe controls in an owned NSWindow, activated through its own accessibility objects with injected capture, clock and temporary stores. No global AX, OS permission request, hardware capture or physical-device acceptance.",
+      "suite": "ScribeComponentJourneyTests",
+      "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
     }
   ],
   "features": [
@@ -753,6 +761,17 @@
           "acceptance": "Actual countdown and completed note window traces for session replacement, resumed call, write failure and retry; no idle-mic heuristic as call end.",
           "cases": [],
           "id": "F06.3"
+        },
+        {
+          "id": "F06.component-journey",
+          "check": "native-ScribeComponentJourneyTests",
+          "acceptance": "Real Start, Keep, End now, retry and close controls drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+            }
+          ]
         }
       ]
     },
@@ -1261,6 +1280,21 @@
           "acceptance": "Automated disposable-account onboarding, denied/revoked permissions, every tab/settings route, daily workflow, crash/relaunch, offline/provider/storage failure and accessibility acceptance on exact binary.",
           "cases": [],
           "id": "F13.4"
+        },
+        {
+          "id": "F13.component-isolation",
+          "check": "native-ScribeComponentJourneyTests",
+          "acceptance": "The actual model uses only the injected preferences suite and temporary meeting-store cancellation journal, preserving another synthetic store.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "modelPreferencesReadAndWriteOnlyTheInjectedSuite"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "temporaryMeetingStoreCannotClearAnotherCancellationJournal"
+            }
+          ]
         }
       ]
     },
@@ -1475,6 +1509,17 @@
           "acceptance": "Automated actual countdown/completion window and source-linked recap sequence, including resumed call and storage failure; compare authorized reference timing.",
           "cases": [],
           "id": "S05.4"
+        },
+        {
+          "id": "S05.component-journey",
+          "check": "native-ScribeComponentJourneyTests",
+          "acceptance": "Real Start, Keep, End now, retry and close controls drive the production component through failed final save and completion using inert providers and a temporary store; no external input injection or reference/device parity claim.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+            }
+          ]
         }
       ]
     },

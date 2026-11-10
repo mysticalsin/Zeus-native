@@ -193,6 +193,30 @@ class EvidenceContractTests(unittest.TestCase):
             source.write_text("let value = 2\n")
             self.assertNotEqual(c.source_snapshot(root, output), before)
 
+    def test_output_root_alias_does_not_make_receipt_an_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "actual"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "Sources").mkdir()
+            (root / "Sources/fixture.swift").write_text("let value = 1\n")
+            (root / "output").mkdir()
+            alias = base / "alias"
+            alias.symlink_to(root, target_is_directory=True)
+            before = c.source_snapshot(alias, alias / "output")
+            (root / "output/result.json").write_text("{}")
+            self.assertEqual(c.source_snapshot(alias, alias / "output"), before)
+            self.assertEqual(c.source_snapshot(root, root / "output"), before)
+
+    def test_portable_package_uses_the_production_macos_floor(self):
+        portable = runner.portable_module()
+        production = (c.ROOT / "Package.swift").read_text()
+        self.assertIn('platforms: [.macOS("14.2")]', production)
+        with tempfile.TemporaryDirectory() as directory:
+            package = portable.prepare(Path(directory), "polyglot", platform_name="darwin")
+            self.assertIn('platforms: [.macOS("14.2")]', (package / "Package.swift").read_text())
+
     def test_duplicate_json_keys_cannot_overwrite_failure_with_success(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "receipt.json"

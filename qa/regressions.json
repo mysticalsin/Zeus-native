@@ -466,6 +466,42 @@
         "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
         "function": "reducedMotionFramesStayStableWithinPhase"
       }
+    },
+    {
+      "id": "REG-039",
+      "failure": "Generated portable packages omitted the production macOS deployment floor, so real Mac CI rejected otherwise available concurrency and Foundation APIs.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_portable_package_uses_the_production_macos_floor"
+      }
+    },
+    {
+      "id": "REG-040",
+      "failure": "macOS /var temporary-path aliases caused the input snapshot to include its own output receipt and falsely report changed source.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_output_root_alias_does_not_make_receipt_an_input"
+      }
+    },
+    {
+      "id": "REG-041",
+      "failure": "The aggregate gate rejected a valid generated source package when the trusted output ancestor used the macOS /var to /private/var alias.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_trusted_output_ancestor_alias_accepts_valid_packages"
+      }
     }
   ]
 }

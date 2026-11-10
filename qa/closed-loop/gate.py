@@ -178,7 +178,11 @@ def validate_native(log_path: Path) -> int:
 
 
 def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str) -> int:
-    result = load_object(artifact(root, "result.json"))
+    result_path = artifact(root, "result.json")
+    # artifact() validates the boundary and rejects links below it. Normalize the
+    # trusted ancestry once (macOS /var aliases /private/var) before package checks.
+    root = result_path.parent
+    result = load_object(result_path)
     repo, contracts, portable, feature_map, definitions, registry = load_policy()
     if type(result.get("schema_version")) is not int or result["schema_version"] != 1:
         raise ValueError("feature map schema is unsupported")

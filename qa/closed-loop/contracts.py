@@ -56,6 +56,9 @@ def digest(data):
 
 
 def source_snapshot(root, output):
+    # macOS temporary paths may enter through /var and resolve under /private/var.
+    # Normalize the owned output root, not arbitrary child symlinks in inputs.
+    output = output.resolve()
     paths = subprocess.check_output(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root).decode().split("\0")
     files = []
     for name in sorted(set(paths) - {""}):

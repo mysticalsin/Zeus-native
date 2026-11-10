@@ -213,7 +213,7 @@ def prepare(output, group, *, platform_name=None):
         core_dependencies = '["CoreGraphics"]'
     (root / "Package.swift").write_text(
         '// swift-tools-version: 6.0\nimport PackageDescription\n'
-        'let package = Package(name: "ZeusPortableValidation", targets: [\n'
+        'let package = Package(name: "ZeusPortableValidation", platforms: [.macOS("14.2")], targets: [\n'
         + extra_target + f'    .target(name: "ZeusCore", dependencies: {core_dependencies}),\n'
         +
         f'    .testTarget(name: "ZeusCoreTests", dependencies: {test_dependencies}{test_settings})\n])\n')

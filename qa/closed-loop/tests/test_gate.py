@@ -141,6 +141,38 @@ class RequiredGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "passed", result)
         self.assertGreater(result["jobs"]["feature-map"]["tests"], 0)
 
+    def use_ancestor_alias(self):
+        alias_directory = tempfile.TemporaryDirectory(prefix="zeus-gate-ancestor-")
+        self.addCleanup(alias_directory.cleanup)
+        alias = Path(alias_directory.name) / "var"
+        alias.symlink_to(self.inputs.parent.resolve(), target_is_directory=True)
+        self.inputs = alias / self.inputs.name
+        self.assertNotEqual(self.inputs.absolute(), self.inputs.resolve())
+
+    def test_trusted_output_ancestor_alias_accepts_valid_packages(self):
+        # Models macOS /var -> /private/var without editing the host filesystem.
+        self.use_ancestor_alias()
+        result = self.evaluate()
+        self.assertEqual(result["status"], "passed", result)
+
+    def test_ancestor_alias_does_not_allow_child_package_symlinks_or_escape(self):
+        self.use_ancestor_alias()
+        result = json.loads((self.root("feature-map") / "result.json").read_text())
+        package = next(row["package"] for row in result["checks"] if row["kind"] == "portable")
+        source = self.root("feature-map") / package / "Package.swift"
+        outside = self.inputs.parent / (self.inputs.name + "-redirected.swift")
+        outside.write_bytes(source.read_bytes())
+        self.addCleanup(outside.unlink)
+        source.unlink()
+        source.symlink_to(outside)
+        blocked = self.evaluate()
+        self.assertEqual(blocked["status"], "failed", blocked)
+        self.assertTrue(any("source package is redirected" in error for error in blocked["errors"]), blocked)
+        source.unlink()
+        source.write_bytes(outside.read_bytes())
+        self.update_map(lambda value: next(row for row in value["checks"] if row["kind"] == "portable").update(package="../outside"))
+        self.assert_blocked()
+
     def test_any_non_success_prerequisite_blocks(self):
         for job in gate.REQUIRED:
             for result in ("failure", "cancelled", "skipped", "timed_out", "neutral", "", "SUCCESS", "true", True, False, None, {"result": "success"}):
