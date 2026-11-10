@@ -1,0 +1,28 @@
+[0/1] Planning build
+Building for debugging...
+[0/8] Write sources
+[2/15] Write swift-version-457096A79D733C59.txt
+[4/16] Emitting module Zeus
+[5/16] Compiling Zeus HarnessDependencies.swift
+[6/16] Compiling Zeus BrainCaptureModel.swift
+[7/17] Wrapping AST for Zeus for debugging
+[9/19] Compiling ZeusAppTests BrainCaptureModelTests.swift
+[10/19] Emitting module ZeusAppTests
+[11/20] /workspace/zeus-validation/brain/.build/x86_64-unknown-linux-gnu/debug/BrainValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[12/20] Write sources
+[13/20] Wrapping AST for ZeusAppTests for debugging
+[15/24] Compiling BrainValidationPackageDiscoveredTests all-discovered-tests.swift
+[16/24] Emitting module BrainValidationPackageDiscoveredTests
+[17/24] Compiling BrainValidationPackageDiscoveredTests ZeusCoreTests.swift
+[18/24] Compiling BrainValidationPackageDiscoveredTests ZeusAppTests.swift
+[19/25] /workspace/zeus-validation/brain/.build/x86_64-unknown-linux-gnu/debug/BrainValidationPackageTests.derived/runner.swift
+[20/25] Write sources
+[21/27] Wrapping AST for BrainValidationPackageDiscoveredTests for debugging
+[23/27] Emitting module BrainValidationPackageTests
+[24/27] Compiling BrainValidationPackageTests runner.swift
+[25/27] Write Objects.LinkFileList
+error: link command failed with exit code 1 (use -v to see invocation)
+/usr/bin/ld: /workspace/toolchains/swift-6.2.1-RELEASE-ubuntu24.04/usr/lib/swift/linux/libswiftObservation.so: undefined reference to `swift::threading::fatal(char const*, ...)'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+[26/27] Linking BrainValidationPackageTests.xctest
+error: fatalError

@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mysticalsin/Zeus/qa/closed-loop/result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "mode": {
+      "enum": [
+        "development",
+        "full"
+      ]
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "release_ready": {
+      "type": "boolean"
+    },
+    "tested_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "dirty": {
+      "type": "boolean"
+    },
+    "source_snapshot_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ]
+    },
+    "map_sha256": {
+      "type": "string",
+      "minLength": 1
+    },
+    "registry_sha256": {
+      "type": "string",
+      "minLength": 1
+    },
+    "started_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finished_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tier": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "blocked",
+              "not-run",
+              "unimplemented"
+            ]
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "tests": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "suites": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "passed_functions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "path",
+                "sha256"
+              ]
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "tier",
+          "scope",
+          "status",
+          "command",
+          "exit_code",
+          "tests",
+          "suites",
+          "passed_functions",
+          "artifacts"
+        ]
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "incomplete"
+            ]
+          },
+          "obligations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "check": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "enum": [
+                    "passed",
+                    "failed",
+                    "blocked",
+                    "not-run",
+                    "unimplemented"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "check",
+                "status",
+                "reason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "obligations"
+        ]
+      }
+    },
+    "regressions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "check": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "blocked",
+              "not-run",
+              "unimplemented"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "check",
+          "status",
+          "reason"
+        ]
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suites": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tests",
+        "suites"
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "platform": {
+      "enum": [
+        "linux",
+        "darwin"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "mode",
+    "status",
+    "release_ready",
+    "started_at",
+    "finished_at",
+    "host",
+    "checks",
+    "features",
+    "regressions",
+    "totals",
+    "errors",
+    "platform"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "passed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "tested_sha",
+          "head_sha",
+          "dirty",
+          "source_snapshot_sha256",
+          "source_manifest",
+          "map_sha256",
+          "registry_sha256"
+        ],
+        "properties": {
+          "errors": {
+            "maxItems": 0
+          },
+          "totals": {
+            "properties": {
+              "tests": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "description": "gate.py additionally derives required check IDs and feature obligations from current map, verifies tested/head SHA/run identity and artifact digests, and rejects missing, failed, skipped or unsupported evidence. This schema is not an attestation."
+}

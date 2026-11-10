@@ -1,0 +1,18 @@
+test_ad_hoc_bundle_remains_available_for_local_validation (__main__.ReleaseScripts.test_ad_hoc_bundle_remains_available_for_local_validation) ... ok
+test_developer_id_bundle_uses_secure_timestamps (__main__.ReleaseScripts.test_developer_id_bundle_uses_secure_timestamps) ... ok
+test_failed_backup_does_not_replace_installed_copy (__main__.ReleaseScripts.test_failed_backup_does_not_replace_installed_copy) ... ok
+test_failed_image_keeps_previous_dmg (__main__.ReleaseScripts.test_failed_image_keeps_previous_dmg) ... ok
+test_failed_install_restores_previous_copy (__main__.ReleaseScripts.test_failed_install_restores_previous_copy) ... ok
+test_installer_keeps_verified_rollback (__main__.ReleaseScripts.test_installer_keeps_verified_rollback) ... ok
+test_preview_is_explicitly_not_a_release (__main__.ReleaseScripts.test_preview_is_explicitly_not_a_release) ... ok
+test_rejected_notarization_never_staples_or_publishes (__main__.ReleaseScripts.test_rejected_notarization_never_staples_or_publishes) ... ok
+test_release_assesses_app_and_dmg_before_publication (__main__.ReleaseScripts.test_release_assesses_app_and_dmg_before_publication) ... ok
+test_release_requires_identity_and_profile_before_build (__main__.ReleaseScripts.test_release_requires_identity_and_profile_before_build) ... ok
+test_running_app_is_not_replaced (__main__.ReleaseScripts.test_running_app_is_not_replaced) ... ok
+test_signature_checks_fail_closed (__main__.ReleaseScripts.test_signature_checks_fail_closed) ... ok
+test_test_defaults_cleanup_reaches_matching_domains_only (__main__.ReleaseScripts.test_test_defaults_cleanup_reaches_matching_domains_only) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 4.465s
+
+OK

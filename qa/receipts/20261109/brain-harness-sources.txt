@@ -1,0 +1,26 @@
+Production source files (symlinked):
+AboutYou.swift
+BrainCapture.swift
+SecondBrain/VaultPathBoundary.swift
+SecondBrain/SecondBrain.swift
+SecondBrain/BrainRecall.swift
+SecondBrain/BrainToday.swift
+SecondBrain/TodayBrief.swift
+SecondBrain/Todo.swift
+SecondBrain/TodoVoice.swift
+Intent/Utterance.swift
+PersonaReplyClamp.swift
+Persona/PersonaCompliance.swift
+Persona/ZeusVoiceLines.swift
+Tests (symlinked):
+BrainCaptureTests.swift
+AboutYouTests.swift
+SecondBrainTests.swift
+TodayTests.swift
+VaultBoundaryTests.swift
+HarnessDependencies.swift stubs only ResearchReport.vaultFolder; no research behavior is covered.
+BrainCaptureModelTests require macOS and are not run in this harness.
+
+Additional production source: Intent/WakePhrase.swift
+BrainCaptureModel class extracted byte-for-byte from app file, plus imports Foundation, Observation, ZeusCore. Only native TodoController/AboutYouModel are stubbed; tests inject connection and use temp filesystem. Native UI, bookmarks and OS access are NOT tested.
+Tests/ZeusAppTests/BrainCaptureModelTests.swift (symlinked)

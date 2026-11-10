@@ -1,0 +1,26 @@
+[
+  {
+    "source": "Sources/ZeusCore/BuddyVisibility.swift",
+    "sha256": "190f0711ca3d79569166959a63b89690f6f7efb8f058e4bb86486da52330cf7f"
+  },
+  {
+    "source": "Sources/ZeusCore/Present/CoordinateMapper.swift",
+    "sha256": "5985236e93904f9093adfdac297648d7e1bffe3d9be1a6578a118afe664a6832"
+  },
+  {
+    "source": "Sources/ZeusCore/Present/CompanionMotion.swift",
+    "sha256": "7dc37f94147d4a726313e3ad179788c6cbe46e35dd495a4fc01659bbd959fe4c"
+  },
+  {
+    "source": "Sources/ZeusCore/Present/CompanionPointing.swift",
+    "sha256": "d984d40a4f406615c6fdaa84c6fa992050ed89464cb1c1a29f503b212aedfbf3"
+  },
+  {
+    "source": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+    "sha256": "2f031e07238641a1917045195c7d34cb6c405d76c354d41a631144416cb7293c"
+  },
+  {
+    "source": "Tests/ZeusCoreTests/CompanionMotionTests.swift",
+    "sha256": "5b73804804933d18393b9efda3b89bd6540b47a82b0796ab7e924969d900944c"
+  }
+]

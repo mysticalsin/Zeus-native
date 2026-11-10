@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ZEUS</title>
+<style>
+  :root { --storm:#0E1116; --card:rgba(255,255,255,.05); --text:#E9EDF2; --muted:#A3ADB8; --quiet:#6B7480;
+          --bolt:#FFC83D; --leaf:#3CCB7F; --ember:#FF8A3D; }
+  * { box-sizing: border-box; }
+  body { margin:0; width:300px; background:var(--storm); color:var(--text);
+         font:13px/1.4 ui-rounded, -apple-system, system-ui, sans-serif; }
+  main { padding:16px; display:grid; gap:12px; }
+  header { display:flex; align-items:center; gap:10px; }
+  header img { width:32px; height:32px; }
+  h1 { font-size:15px; margin:0; letter-spacing:.08em; }
+  .version { margin-left:auto; color:var(--quiet); font-size:11px; }
+  .card { background:var(--card); border-radius:12px; padding:12px; display:grid; gap:6px; }
+  .row { display:flex; align-items:center; gap:8px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--ember); flex:none; }
+  .ok .dot { background:var(--leaf); box-shadow:0 0 8px var(--leaf); }
+  .detail { color:var(--muted); font-size:12px; }
+  ul { margin:0; padding-left:18px; color:var(--muted); font-size:12px; }
+  kbd { font:11px ui-monospace, monospace; background:rgba(255,255,255,.08); border-radius:4px; padding:1px 5px; color:var(--text); }
+  button { justify-self:start; background:none; border:0; color:var(--bolt); font:600 13px ui-rounded, system-ui; cursor:pointer; padding:0; }
+  button:focus-visible { outline:2px solid var(--bolt); outline-offset:3px; border-radius:4px; }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="icons/icon-128.png" alt=""><h1>ZEUS</h1><span class="version" id="version"></span></header>
+  <section class="card" id="status" aria-live="polite">
+    <div class="row"><span class="dot"></span><strong id="headline">Checking…</strong></div>
+    <div class="detail" id="detail"></div>
+    <button id="reconnect" type="button">Reconnect</button>
+  </section>
+  <section class="card">
+    <div>Hold your ZEUS talk key on your Mac and say:</div>
+    <ul>
+      <li>"What's this page about?"</li>
+      <li>"Open GitHub"</li>
+      <li>"Ask ChatGPT to plan my week"</li>
+      <li>"Click Sign in" (you confirm in the notch)</li>
+    </ul>
+  </section>
+</main>
+<script type="module" src="dist/popup.js"></script>
+</body>
+</html>

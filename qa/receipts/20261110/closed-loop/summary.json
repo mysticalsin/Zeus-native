@@ -1,0 +1,105 @@
+{
+  "receipt_kind": "Compact audit record, not a reusable gate input: full compiled-source packages are not duplicated here. Original fresh packages remain under /workspace/zeus-validation and CI artifacts preserve them.",
+  "tested_sha": "f0e36ab4b8e78c908ed3dedc0a251458563ffe74",
+  "dirty": true,
+  "source_snapshot_sha256": "9171858561d1660267d7b3b5169a30b737cb64ec5ab32a1086ff62edfb9b7bca",
+  "commands": [
+    "python3 qa/closed-loop/run.py --mode development --jobs 2 --output /workspace/zeus-validation/closed-loop-development-frozen",
+    "python3 qa/closed-loop/run.py --mode full --jobs 2 --output /workspace/zeus-validation/closed-loop-full-frozen"
+  ],
+  "modes": {
+    "development": {
+      "status": "passed",
+      "release_ready": false,
+      "totals": {
+        "tests": 462,
+        "suites": 45
+      },
+      "check_statuses": {
+        "passed": 11,
+        "not-run": 14,
+        "unimplemented": 30
+      },
+      "accepted_features": 0,
+      "feature_total": 19
+    },
+    "full": {
+      "status": "failed",
+      "release_ready": false,
+      "totals": {
+        "tests": 462,
+        "suites": 45
+      },
+      "check_statuses": {
+        "passed": 11,
+        "blocked": 14,
+        "unimplemented": 30
+      },
+      "accepted_features": 0,
+      "feature_total": 19
+    }
+  },
+  "portable_groups": [
+    {
+      "id": "portable-polyglot",
+      "tests": 56,
+      "suites": 7,
+      "status": "passed"
+    },
+    {
+      "id": "portable-regressions",
+      "tests": 76,
+      "suites": 9,
+      "status": "passed"
+    },
+    {
+      "id": "portable-scribe",
+      "tests": 151,
+      "suites": 15,
+      "status": "passed"
+    },
+    {
+      "id": "portable-presentation",
+      "tests": 16,
+      "suites": 3,
+      "status": "passed"
+    },
+    {
+      "id": "portable-recordly-geometry",
+      "tests": 31,
+      "suites": 2,
+      "status": "passed"
+    },
+    {
+      "id": "portable-wiki-relationships",
+      "tests": 14,
+      "suites": 2,
+      "status": "passed"
+    },
+    {
+      "id": "portable-buddy",
+      "tests": 20,
+      "suites": 2,
+      "status": "passed"
+    },
+    {
+      "id": "portable-dictation-insertion",
+      "tests": 17,
+      "suites": 1,
+      "status": "passed"
+    },
+    {
+      "id": "portable-wiki-export",
+      "tests": 26,
+      "suites": 2,
+      "status": "passed"
+    }
+  ],
+  "limitations": [
+    "No native app build or native fixture execution on this Linux host.",
+    "No microphone, screen or audio capture, personal vault, OS consent, installation, signing or release action.",
+    "No donor/reference motion parity, full onboarding/daily-use/device acceptance, notarization or Gatekeeper proof.",
+    "Full mode fails 14 blocked native fixture checks and 30 unimplemented obligations/checkers; unit counts do not discharge them."
+  ],
+  "source_change_negative": "All 462 tests passed, but an intentional feature-map guard refinement during the preliminary run caused source-snapshot rejection; no passing result was reused."
+}

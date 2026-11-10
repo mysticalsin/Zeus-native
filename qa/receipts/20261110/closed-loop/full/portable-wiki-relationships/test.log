@@ -1,0 +1,118 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/20] Emitting module ZeusCore
+[5/20] Compiling ZeusCore MeetingCopilot.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[6/20] Compiling ZeusCore PortableExcerpts.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[7/20] Compiling ZeusCore ScribeCapture.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[8/20] Compiling ZeusCore ScribeNotes.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[9/20] Compiling ZeusCore ScribeRecapNavigation.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[10/20] Compiling ZeusCore ScribeSession.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[11/25] Compiling ZeusCore ScribeTranscript.swift
+[12/25] Compiling ZeusCore SensitiveInfoScanner.swift
+[13/25] Compiling ZeusCore WikiCompiler.swift
+[14/25] Compiling ZeusCore WikiPage.swift
+[15/25] Compiling ZeusCore WikiRelationships.swift
+[16/26] Wrapping AST for ZeusCore for debugging
+[18/28] Emitting module ZeusCoreTests
+[19/29] Compiling ZeusCoreTests ScribeRecapNavigationTests.swift
+[20/29] Compiling ZeusCoreTests WikiRelationshipsTests.swift
+[21/30] /workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[22/30] Write sources
+[23/30] Wrapping AST for ZeusCoreTests for debugging
+[25/32] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[26/32] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[27/33] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[28/34] /workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-relationships/wiki-relationships/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[29/34] Write sources
+[30/34] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[32/36] Emitting module ZeusPortableValidationPackageTests
+[33/36] Compiling ZeusPortableValidationPackageTests runner.swift
+[34/37] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[35/37] Write Objects.LinkFileList
+[36/37] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (26.55s)
+Test Suite 'All tests' started at 2026-11-10 00:43:43.364
+Test Suite 'debug.xctest' started at 2026-11-10 00:43:43.368
+Test Suite 'debug.xctest' passed at 2026-11-10 00:43:43.368
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:43:43.368
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Scribe saved-source navigation" started.
+◇ Suite "Wiki relationships" started.
+◇ Test everyActivePhaseRefusesSavedSourceNavigation() started.
+◇ Test missingOrCancelledSourcesNeverCloseTheCurrentNotes() started.
+◇ Test existingSourcesLeaveOnlyTerminalStagesBeforeOpening() started.
+◇ Test generatedMeetingTextAndUnreviewedForgottenTextCannotCreateLinks() started.
+◇ Test compiledPagesBecomeConnectedByAnExplicitEditedLink() started.
+◇ Test ambiguousMissingSelfAndUnsupportedLinksAreNotConnections() started.
+◇ Test duplicateSourcesAndPagesDoNotInflateConnections() started.
+◇ Test missingAndForgottenEvidenceNeverResurrectsEditedSources() started.
+◇ Test exactIDsDisambiguateTitlesAndReciprocalLinksKeepTheirDirection() started.
+◇ Test forgettingRemovesEdgesAndPreservesReviewRequirements() started.
+◇ Test deletingAnExplicitTargetRemovesBothDirectionsWithoutChangingTheDraft() started.
+◇ Test aSourceOfAnotherKindIsNotTheSameEvidence() started.
+◇ Test sharedCurrentSourceIDsAreTheOnlyEvidence() started.
+✔ Test everyActivePhaseRefusesSavedSourceNavigation() passed after 0.001 seconds.
+◇ Test relationshipsHaveStableEvidenceAndPageOrdering() started.
+✔ Test missingOrCancelledSourcesNeverCloseTheCurrentNotes() passed after 0.001 seconds.
+✔ Test existingSourcesLeaveOnlyTerminalStagesBeforeOpening() passed after 0.002 seconds.
+✔ Test generatedMeetingTextAndUnreviewedForgottenTextCannotCreateLinks() passed after 0.002 seconds.
+✔ Test duplicateSourcesAndPagesDoNotInflateConnections() passed after 0.002 seconds.
+✔ Test forgettingRemovesEdgesAndPreservesReviewRequirements() passed after 0.002 seconds.
+✔ Test deletingAnExplicitTargetRemovesBothDirectionsWithoutChangingTheDraft() passed after 0.002 seconds.
+✔ Test aSourceOfAnotherKindIsNotTheSameEvidence() passed after 0.002 seconds.
+✔ Test exactIDsDisambiguateTitlesAndReciprocalLinksKeepTheirDirection() passed after 0.002 seconds.
+✔ Suite "Scribe saved-source navigation" passed after 0.003 seconds.
+✔ Test missingAndForgottenEvidenceNeverResurrectsEditedSources() passed after 0.002 seconds.
+✔ Test sharedCurrentSourceIDsAreTheOnlyEvidence() passed after 0.002 seconds.
+✔ Test relationshipsHaveStableEvidenceAndPageOrdering() passed after 0.003 seconds.
+✔ Test ambiguousMissingSelfAndUnsupportedLinksAreNotConnections() passed after 0.003 seconds.
+✔ Test compiledPagesBecomeConnectedByAnExplicitEditedLink() passed after 0.004 seconds.
+✔ Suite "Wiki relationships" passed after 0.004 seconds.
+✔ Test run with 14 tests in 2 suites passed after 0.005 seconds.

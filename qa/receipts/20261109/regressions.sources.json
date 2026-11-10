@@ -1,0 +1,68 @@
+{
+  "group": "regressions",
+  "repository": "/workspace/Zeus",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/Dictation/DictationCore.swift",
+      "sha256": "e9775aead9f627c39ecf0cdbd78cac2b44b31030262cb75ff228f157cbfe18c6"
+    },
+    {
+      "source": "Sources/ZeusCore/Dictation/SpeechEngineCatalog.swift",
+      "sha256": "019c189847b2bb62445642f7322c3f71c660459bcb25569793395a724b5827e8"
+    },
+    {
+      "source": "Sources/ZeusCore/Dictation/SpokenDictationMarkup.swift",
+      "sha256": "e1f82642537775f8e9449c2f6854aefdab56b554a8e1e1ad8d6ec7fa6e4f6442"
+    },
+    {
+      "source": "Sources/ZeusCore/Dictation/TranscriptionEngine.swift",
+      "sha256": "e471cbd77794ed1a3c5f89a482fbad0210777143e4a2019766e8b9a82cb7a65a"
+    },
+    {
+      "source": "Sources/ZeusCore/Dictation/WhisperPromptRecovery.swift",
+      "sha256": "38a67facae91d9916416a0cfd0d39ff483d7745852152aa5e4e5f4845248ae8e"
+    },
+    {
+      "source": "Sources/ZeusCore/Voice/UltronVoiceSignal.swift",
+      "sha256": "f799b04022e63cb955f73be6b317335039437cab87b60bfd7e8322131dd16961"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyCaptureTimeline.swift",
+      "sha256": "debf3213054602645bee4ee4f13d0631db8b70b8519510a7701a4f8e69129873"
+    },
+    {
+      "source": "Sources/ZeusCore/Mac/DriveTypingFlow.swift",
+      "sha256": "cb684d1a6018a2d63482b457758f2b1ed44367fab4cf8f652d6ab07e33006e86"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/DictationExplicitCorrectionTests.swift",
+      "sha256": "17d901dd4bc4fd402d4f374fe155a12475a3691f453f4dbfd3c034ba4de23de2"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/DictationQAFixTests.swift",
+      "sha256": "662c8796243213d842deb379300680e5c75e1d7a6e4f04e743e45f804b320560"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/SpeechEngineCatalogTests.swift",
+      "sha256": "67940c9f9e82657b7dd78ce31166d5744fe5deaa45ea01fff8504444fc488eef"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+      "sha256": "ae6f269013e946b71889cb56925bba9da9d76d5419a65be4e8c5cf0794338c50"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+      "sha256": "7444007b6ab48c684a280820d4e2dfd1c2d4aa3c376c9005233bdc178c1d8f5f"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+      "sha256": "32b9aeafb795993f03435b2741e3b3303a933899de7794898ac5bd12c307241b"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/WhisperPromptRecoveryTests.swift",
+      "sha256": "e5778ceedab4dfbb44ed264fb66d15d4c4b59c843cdd92d41f1ad677a922cce0"
+    }
+  ],
+  "excerpts": []
+}

@@ -1,0 +1,267 @@
+# Glance 0.3.1 settings inventory
+
+Source: Glance 0.3.1 (build 26) from app-71mb.dmg, studied on the box: the fr and es `Localizable.strings` (1,644 keys; the en table is intentionally empty because the English copy lives in code), `Info.plist` usage strings, `strings` on the binary (defaults keys such as `notchpilot.lyrics.enabled`, `notchpilot.notifications.replaceSystem`, `notchpilot.notifications.mutedApps`, `haloStyle`, `cardStyle`, `avatarStyle`, `haloThickness`, `armWidthSetting`, `rainAlertEnabledKey`, `focusMinutes`, `keepAwake`, `inMeeting`) and the 14 `settings-glass-*` sidebar icon names. No code or assets were copied; Zeus draws its own UI and uses macOS system sounds.
+
+Sidebar (Glance order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
+
+**Coverage:** 146 of 146 Glance options are in Zeus Settings with a matching control (100% of all, 100% of the 146 in scope). 133 are wired to real behaviour (91%). 13 are labelled stubs with a TODO. 0 are excluded.
+
+**Before this round:** has 18, partial 27, missing 96.
+
+Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
+
+
+## General
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Your defaults | Language | menu | System language | Pins the app language instead of following macOS. | missing | stub | `general.language` | ZEUS copy is English only today. TODO: localize, then honour the pin. |
+| Your defaults | Window appearance (System, Light, Dark) | segmented | System | Theme for Settings and the welcome guide. | missing | stub | `general.windowTheme` | Glass is drawn dark only. TODO: light glass palette. |
+| Your defaults | Default agent for new chats | menu | Claude Code | Agent used when you start a new chat from the notch. | missing | live | `general.defaultAgent` | Pre-selects the agent in Chat > New chat; falls back to the first offered agent. |
+| Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. Screens without a notch get a slim pill. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
+| Day to day | Launch at login | toggle | on | Starts the app when you log in. | missing | live | `general.launchAtLogin` | SMAppService, bundled app only. |
+| Day to day | Keep the Mac awake while agents work | toggle | off | Blocks idle sleep while an agent runs; the screen can still lock. | missing | live | `general.keepAwake` | Power assertion held only while a session is working. |
+| Day to day | Meeting mode (discreet during calls and screen sharing) | toggle | on | When another app uses the mic or camera, or the display is mirrored: leave captures, mute sounds, hide details. | partial | live | `general.meetingMode` | Detects the mic in use by another app and mirrored displays. Camera detection TODO. |
+| Guided setup | Run setup again | button | - | Replays the first-run guide. | has | custom | `general.runSetup` |  |
+| Updates | Check for updates automatically | toggle | on | Sparkle checks the feed and installs with consent. | missing | stub | `about.autoUpdate` | No update server (no remote, no deploys). TODO when a release channel exists. |
+| Updates | Check for updates | button | - | Checks now. | missing | stub | `about.checkNow` | Same as above. |
+
+## Appearance
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Find your look | Card style (Classic, Glass, Physical, Liquid Glass, Dashboard, Dashboard B) | picture cards | Glass | Look of the permission, running and finished cards. | partial | live | `appearance.cardStyle` |  |
+| Find your look | Home style (Device, Borderless, Borderless colour) | picture cards | Device | Frame of the Home band. | missing | live | `appearance.homeStyle` |  |
+| Find your look | Customize Physical (Home and card finishes) | menus | - | Separate finishes for Home and cards in the Physical theme. | missing | live | `appearance.physicalFinish` |  |
+| Home | Home slot 1 | menu | - | The widget in the first Home card. | missing | live | `home.widget.1` | Click a card in Customize Home, or pick here. Defaults are today's Music, Focus, Weather and Calendar. |
+| Home | Home slot 2 | menu | - | The widget in the second Home card. | missing | live | `home.widget.2` | Click a card in Customize Home, or pick here. Defaults are today's Music, Focus, Weather and Calendar. |
+| Home | Home slot 3 | menu | - | The widget in the third Home card. | missing | live | `home.widget.3` | Click a card in Customize Home, or pick here. Defaults are today's Music, Focus, Weather and Calendar. |
+| Home | Home slot 4 | menu | - | The widget in the fourth Home card. | missing | live | `home.widget.4` | Click a card in Customize Home, or pick here. Defaults are today's Music, Focus, Weather and Calendar. |
+| Home | Clock style | menu | - | Analog, digital, elastic or blue halo. | missing | live | `home.variant.clock` | Home Clock widget. |
+| Home | Music style | menu | - | Art, disc, cassette or wave. | missing | live | `home.variant.music` | Home Music widget. |
+| Home | Weather style | menu | - | Summary, hourly curve, days, feels like or wind. | missing | live | `home.variant.weather` | Home Weather widget. |
+| Home | Calendar style | menu | - | Next event, month, week or agenda. | missing | live | `home.variant.calendar` | Home Calendar widget. |
+| Home | Home backdrop | picture cards | - | A quiet drawing behind the Home cards. Moves only while Home is open, and holds still with Reduce Motion. | missing | live | `home.backdrop` | Twelve procedural backdrops drawn in SwiftUI. |
+| Home | World clock cities | text | - | Time zone names, separated by commas. | missing | live | `home.worldClock.zones` | Home World clock widget. |
+| Home | Countdown title | text | - | What the Countdown widget counts down to. | missing | live | `home.countdown.title` | Home Countdown widget. |
+| Home | Countdown date | text | - | A day as 2026-12-25. | missing | live | `home.countdown.date` | Home Countdown widget. |
+| Agent cards | Running card (Wave, Essentials) | segmented | Wave | Layout of the running-agent preview. | missing | live | `appearance.runningCard` | Wave shows activity bars; Essentials keeps the compact status row. |
+| Agents | Agent status icon (Glyphs, Lumi, Lumi Pixel, Creatures) | picture cards | Glyphs | Symbol or a character for each agent state. | partial | custom | `avatar.alwaysInNotch` | ZEUS answer: the Mini ZEUS mascot (13 states) on General. |
+| Notch behavior | Hide the notch automatically | toggle | on | Closes when the pointer leaves. | partial | live | `notch.autoHide` | Off: it stays open until the shortcut or a click elsewhere. |
+| Notch behavior | Delay before closing | menu | Short | How long it waits after the pointer leaves. | missing | live | `notch.closeDelay` | Glance closes about 0.53 s after the pointer leaves (glance-clone-proof/parity/N8-glance.mp4). |
+| Notch behavior | Show the notch (hover dwell) | menu | On hover | How quickly hovering opens it. | partial | live | `notch.openDelay` | 0.1 s, 0.25 s or 0.6 s. |
+| Halo | Halo style | menu | Classic halo | The closed-notch glow while an agent works or needs you. One setting: the notch, Settings and the welcome guide all read it. | partial | custom | `halo.style` | Stable ids; titles come from ZeusCore.HaloStyle. Replaces the old topBar.halo key (migrated at launch). |
+| Halo | Halo entrance | menu | Sweep | Animation as the halo lights up. | partial | custom | `halo.entrance` | Stable ids; titles come from ZeusCore.HaloEntrance. Each has its own choreography. |
+| Halo | Entrance intensity | slider | 100 % | Strength of the entrance. | missing | live | `halo.intensity` | Controls the halo entrance effects and live preview. |
+| Halo | Entrance speed | slider | 100 % | Speed of the entrance. | missing | live | `halo.speed` | Scales the closed-notch entrance duration from 50 to 200 %. |
+| Halo | Match the halo colour to the wallpaper | toggle | on | Blends with white on light wallpapers. | partial | live | `halo.wallpaper` | Samples the wallpaper under the notch and blends the halo toward white as it gets lighter. |
+| Halo | Halo arm width (Narrow, Medium, Wide, Extra wide) | segmented | Medium | 76, 130, 220 or 440 pt each side. | missing | live | `halo.armWidth` | Controls the closed-notch halo reach and live preview. |
+| Halo | Light thickness | slider | 100 % | 100 to 200 %. | missing | live | `halo.thickness` | Controls the closed-notch halo and live preview. |
+| Halo | Light wave to the screen edges | toggle | on | A wave of light crosses the screen on agent events. | partial | live | `halo.edgeWave` | A click-through overlay on every Space, left out of captures; fronts run round the screen edge. |
+| Everyday lights | Light wave while music plays | toggle | on | Artwork-tinted wave on the closed notch. | has | custom | `topBar.musicWings` |  |
+| Everyday lights | Progress outline on the music preview | toggle | on | Outline empties as the track plays. | missing | live | `lights.musicProgress` | Tracks media progress around the music wings. |
+| Everyday lights | React to real sound (live spectrum) | toggle | off | The music light follows the sound your Mac is playing. | missing | live | `lights.liveSpectrum` | CoreAudio process tap of system output, listen only. Asks for System Audio Recording once, when this is turned on or the Waves tab opens. Runs only while music plays. |
+| Everyday lights | Waves style (Bars, Wave, Mirror) | segmented | Bars | How the Waves tab draws the spectrum. | missing | live | `waves.style` | Zeus addition. The Waves tab is off by default; add it in Settings > Top Bar. |
+| Everyday lights | Waves sensitivity | slider | 100 % | How strongly the bars react to quiet sound. | missing | live | `waves.sensitivity` | Zeus addition. A gain on the live band levels. |
+| Everyday lights | Light sweep on copy | toggle | on | Confirms a copy was caught. | partial | live | `lights.copy` | Gates the copy cue. |
+| Everyday lights | Intake light when files land | toggle | on | Glow when files land on the shelf. | partial | live | `lights.shelf` | Gates the shelf cue. |
+| Everyday lights | Case-key lights (Caps Lock and Shift) | toggle | on | Caps Lock flashes the outline. | partial | live | `lights.capsLock` | Caps Lock flash and the Shift-held-alone crest, both live (Shift needs Accessibility access). |
+| Everyday lights | Shortcut peeks (cut, undo, save, print...) | toggle | on | Shows cards for command shortcuts. Requires Accessibility access. | missing | live | `lights.shortcutPeeks` | Key monitoring waits until Accessibility access is granted in Settings > Permissions. |
+| Everyday lights | Green gauge when plugged in | toggle | on | Charge level outline on power changes. | partial | live | `lights.battery` | Gates charging and low-battery cues. |
+| Everyday lights | Volume HUD in the notch | toggle | on | Level glow and wings when output volume changes. | live | live | `lights.hud.volume` | CoreAudio listener; no permission needed. |
+| Everyday lights | Brightness HUD in the notch | toggle | on | Level glow when built-in brightness changes. | live | live | `lights.hud.brightness` | DisplayServices polling; keys accelerate when Accessibility is on. |
+| Everyday lights | Keyboard backlight HUD | toggle | on | Level glow when keyboard illumination changes. | live | live | `lights.hud.keyboard` | Skipped on Macs without a backlight. |
+| Everyday lights | Mute pulse in the notch | toggle | on | Dim slash pulse when output is muted. | live | live | `lights.hud.mute` |  |
+| Everyday lights | Replace macOS volume and brightness HUD | toggle | on | Needs Accessibility in Settings > Permissions. Without it, both HUDs can show. | live | live | `lights.hud.replaceSystem` | CGEventTap consumes media keys when trusted. |
+| Everyday lights | Incoming rain alert | toggle | on | "Rain in X min" pill before a shower. | partial | live | `lights.rain` | Uses hourly forecast timing; suppresses repeat alerts for three hours after a shower starts. |
+| Everyday lights | Timer light gauge | toggle | on | Outline counts down a focus session. | partial | live | `lights.timer` | Gates the closed focus wings. |
+| Everyday lights | Purple glow while the mic listens | toggle | on | Glows with your voice during a spoken answer. | partial | live | `lights.micGlow` | Gates the mic-listening glow while Zeus speaks. |
+| Everyday lights | Glow when a reminder is added | toggle | on | Blue crests after you add a reminder. | missing | live | `lights.reminderGlow` | Fires when ZEUS saves a reminder. |
+| Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |
+
+## Notifications
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Agent notifications | Permission requests | toggle | on | Alert when an agent asks. | has | custom | `notify.approvals` |  |
+| Agent notifications | Finished tasks | toggle | on | Alert when an agent finishes. | has | custom | `notify.agentDone` |  |
+| Agent notifications | Errors and stuck agents | toggle | on | Alert when an agent fails or stalls. | missing | live | `notify.errors` | Failed (Claude Code StopFailure, Codex error) and stalled agents get a red or amber halo and card; with this on they also send a macOS notification (when macOS allows ZEUS notifications) and a notch cue. |
+| Agent notifications | Call an agent stalled after | menu | 5 min | A working agent with no events for this long turns amber. | missing | live | `notify.stallMinutes` | Checked every 20 seconds. |
+| System alerts | Show system notifications (app alerts in macOS) | toggle | on | ZEUS sends focused macOS banners while the notch is closed. | missing | live | `notify.system` | Permission is requested only when you turn this on. |
+| Other apps | Show notifications from other apps in the notch | toggle | off | Reads the local Notification Center store (Full Disk Access). | missing | custom | `notify.mirror` | Open question Q4, labelled Coming. |
+| Other apps | Replace system banners | toggle | off | Dismisses the macOS banner once shown in the notch. | missing | stub | `notify.replaceBanners` | Dismissing another app's banner needs private API or fragile Accessibility scripting, so the row stays hidden. |
+| Other apps | Muted apps (Unmute) | list | empty | Apps whose notifications are hidden. | missing | custom | `notify.mutedApps` | Bundle ids, comma separated; the Settings card lists apps seen in Notification Center with Mute and Unmute. |
+| Other apps | Peek new notifications under the notch | toggle | on | A slim line for about four seconds; click opens the app. | missing | live | `notify.peek` | Needs the mirror above. |
+| Other apps | Show details in the peek | toggle | on | Off shows only the app name. Meeting mode hides details regardless. | missing | live | `notify.peekDetails` |  |
+
+## Sounds
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Sound feedback | Sound feedback | toggle | on | Master switch for every cue. | has | custom | `sound.on` |  |
+| Sound categories | Run start sound (style + preview) | menu + play | Classic | When an agent starts. | missing | live | `sound.startStyle` | Zeus synthesized sounds (tools/sounds/make_sounds.py). |
+| Sound categories | Requests sound (style + preview) | menu + play | Classic | When an agent needs you. | partial | live | `sound.approvalStyle` |  |
+| Sound categories | Your answer sound (style + preview) | menu + play | Futuristic 1 | When you approve or deny. | missing | live | `sound.answerStyle` |  |
+| Sound categories | Completion chime (style + preview) | menu + play | Success | When a task completes. | partial | live | `sound.doneStyle` |  |
+| Sound categories | Dictation sounds | toggle | on | Cue when recording starts and ends. | has | custom | `dictation.sounds` |  |
+| Sound categories | Timer alarms | toggle | on | Sound when a focus round ends. | missing | live | `sound.timer` |  |
+
+## Voice
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Voice answer | Enable voice answers | toggle | off | Say a keyword to answer a permission card; mic only while the card shows. | partial | live | `voice.answers` | ZEUS also answers out loud (Answers card). |
+| Your keywords | Approve keywords | text | ok, yes | Comma separated; the last word counts. | missing | live | `voice.approveWords` |  |
+| Your keywords | Deny keywords | text | no | Comma separated. | missing | live | `voice.denyWords` |  |
+| Your keywords | Open the app keywords | text | open | Comma separated. | missing | live | `voice.openWords` |  |
+| Your keywords | Reset the default words | button | - | Restores the keywords. | missing | live | `voice.resetWords` |  |
+
+## Dictation
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Local dictation | Enable local dictation | toggle | off | Dictate into any text field. | has | custom | `dictation.enabled` |  |
+| Local dictation | On-device model (download, repair, status) | status + button | Not installed | 630 MB model for private transcription. | partial | live | `dictation.model` | ZEUS uses Apple on-device speech: no download. |
+| Your shortcut | Dictation shortcut (Fn, modifier, pair) | recorder | Fn | Key to hold or press. | has | custom | `dictation.key` |  |
+| Your shortcut | Shortcut behavior (Hold to speak, Press to start and stop) | segmented | Hold to speak | How the key works. | partial | live | `dictation.behavior` | Press toggles recording when dictation has a dedicated key; the shared talk key keeps hold/double-tap behavior. |
+| Language and feedback | Dictation language (Automatic + list) | menu | Automatic | Language to transcribe. | partial | live | `dictation.language` | Selected locale is passed to Apple Speech and Whisper; Parakeet uses a script hint where supported. |
+| Language and feedback | Play dictation sounds | toggle | on | Start and stop cues. | has | custom | `dictation.sounds` | Same switch as Sounds. |
+| History | Dictation history (search, clear) | list | on | Saved only on this Mac. | has | custom | `dictation.keepDays` |  |
+| History | Copy last dictation | button | - | Copies the last result. | missing | live | `dictation.copyLast` |  |
+| History | Third-party licenses | button | - | Model licences. | missing | live | `dictation.licenses` | Apple speech: no third-party model. Opens About. |
+
+## Shortcut
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Global shortcut | Open the agent picker (Control Option Space) | toggle | on | Arrows pick a session, Return opens, Esc closes. | partial | custom | `shortcut.openNotch` | ZEUS: a preset menu for opening the notch. |
+| Answer from the keyboard | Answer permissions from the keyboard (Control Option Y, N, O) | toggle | on | Approve, deny or open, live only while a request waits. | missing | live | `shortcut.answerKeys` | Registered only while a card is waiting. |
+
+## Integrations
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Available apps | Offer Claude Code for new chats | toggle | on | Shows it in New chat. | missing | live | `integrations.offerClaude` | Chat > New chat lists Claude Code only when on. |
+| Available apps | Offer Codex for new chats | toggle | on | Shows it in New chat. | missing | live | `integrations.offerCodex` | Chat > New chat lists Codex only when on. |
+| Connections | Claude Code connection (connect, repair, check again) | status + buttons | auto | Hooks for activity and approvals. | has | custom | `integrations.claude` |  |
+| Connections | Codex connection (connect, validate, repair) | status + buttons | - | Activity follows local logs; the hook adds immediate approvals. | missing | live | `integrations.codex` | Hook installation is managed under General > Other agents. |
+| Connections | Antigravity (event-driven plugin) | status | auto | Native plugin, no polling. | missing | live | `integrations.antigravity` | Detects the app. TODO: plugin. |
+
+## Permissions
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Access status | Accessibility | status + button | - | Shortcuts, keys and agent actions. | has | custom | `perm.accessibility` |  |
+| Access status | Location | status + button | - | Local weather and rain alerts. | missing | live | `perm.location` | ZEUS uses a typed city, so this stays optional. |
+| Access status | Calendar | status + button | - | Events and video calls. | partial | live | `perm.calendar` |  |
+| Access status | Reminders | status + button | - | Read, create and complete tasks. | partial | live | `perm.reminders` |  |
+| Access status | Notifications (app alerts) | status + button | - | Agent banners. | missing | live | `perm.notifications` |  |
+| Access status | Full Disk Access | status + button | - | Notifications from other apps. | missing | live | `perm.fullDisk` | Only needed for the mirror (Q4). |
+| Access status | Mic and speech recognition | status + button | - | Voice answers and interview. | has | custom | `perm.mic` |  |
+| Access status | Screen and system audio | status + button | - | Interview transcription. | has | custom | `perm.screen` |  |
+| Access status | Media control (automation per app) | status | asked when needed | Music, Spotify and browsers ask on first use. | missing | live | `perm.automation` |  |
+| Trusted chats | Trusted chats (stop trusting, clear all) | list + buttons | none | Chats auto-approved except sensitive commands, cleared on quit. | missing | custom | `perm.trustedChats` | Allow this whole chat on an approval card; high-risk commands still ask. Memory only. |
+
+## Privacy
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Notification details | Show project and command details | toggle | on | Off hides commands and project names outside the notch. | missing | live | `privacy.details` | Off, or Meeting mode active: approval cards hide the command. |
+| Usage data | Help improve (anonymous usage counts) | toggle | on | Daily anonymous counts. | has | live | `privacy.analytics` | ZEUS sends nothing; shown as a fact, not a switch. |
+| Music metadata | Synced lyrics (LRCLIB) | toggle | off | Sends title and artist to lrclib.net. | missing | stub | `privacy.lyrics` | Lyrics view TODO (parity row). Off by default as it sends data. |
+| Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
+
+## Interview
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| AI provider | Provider and model | menus | - | Which AI writes the suggestions. | missing | stub | `interview.provider` | Copilot is Q3. No keys stored by ZEUS. |
+| AI provider | API key (save, delete, test the connection) | field + buttons | - | Key in the keychain. | missing | stub | `interview.key` | ZEUS needs no key: it uses the CLIs on this Mac. |
+| Candidate context | Candidate context | text | empty | CV, role, strengths for tailored answers. | missing | stub | `interview.context` | Stored locally for Q3. |
+| Candidate context | Offer a suggestion automatically | toggle | off | Suggests without asking. | missing | stub | `interview.autoSuggest` | Q3. |
+| Interviewer's voice | Capture and transcribe system audio (Deepgram) | toggle + key | off | Cloud transcription of the other person. | missing | stub | `interview.systemAudio` | Q3. Would be on-device in ZEUS. |
+| Screen sharing | Hide from screen sharing | toggle | auto in meetings | Leaves shares and recordings. | has | custom | `interview.hide` |  |
+
+## iPhone
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Pairing | Connect an iPhone (pairing code, new code, disconnect) | QR + buttons | - | End-to-end encrypted pairing. | missing | custom | `iphone.pair` | Stub with design note: needs the iPhone app (Q6). |
+| While agents work | Keep the Mac from sleeping | toggle | off | Same as General. | missing | custom | `general.keepAwake` | Shares the General switch. |
+| Local connection | Restart the local connection | button | - | Restarts the relay. | missing | stub | `iphone.restart` | Q6. |
+
+## Diagnostics
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Status | Connection status (Connected, Offline) | status | - | Daemon reachable. | has | custom | `diag.socket` |  |
+| Status | Tracked agents | list | - | Agents that sent events. | missing | live | `diag.agents` |  |
+| Recovery | Restart the daemon | button | - | Running tasks stay in their apps. | missing | live | `diag.restart` | Restarts the agent socket. |
+
+## License
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| License | Activate a license, key, buy, trial status | field + buttons | trial | Paid licence. | missing | custom | `license` | Trial countdown, offline Ed25519 key check, Keychain, deactivate to move Macs. No payment provider; gating off (Entitlements). |
+
+## Assistant
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Account | ChatGPT account, model, reasoning effort, speed | sign-in + menus | - | Assistant on your ChatGPT plan. | missing | custom | `assistant.provider` | Bring your own key (OpenAI, Anthropic, ElevenLabs) in the Keychain, model picker. ChatGPT sign-in is Coming: needs an OAuth backend. |
+| Model | Model | menu | - | Selected chat model for the chosen provider. | missing | custom | `assistant.model` | Provider-specific model picker on the Assistant settings page. |
+| Behaviour | Double Command replies, Right Command hold to speak | toggles | - | Drafts a reply from the conversation. | partial | stub | `assistant.doubleCommand` | Hold-to-speak is the ZEUS talk key. Reply drafting TODO with the chat on devon/claude. |
+
+## Integrations
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Beamer | Beamer: start when Zeus starts | toggle | - | Opens Beamer hidden in the menu bar when Zeus starts. | missing | live | `beamer.autoStart` | Zeus addition. Beamer's own start-at-login switch is inside Beamer. |
+| Beamer | Beamer: light the notch when control crosses | toggle | - | A Zeus cue when your keyboard and mouse move to another machine. | missing | live | `beamer.cue` | Zeus addition. Reads Beamer's menu bar status (Accessibility). |
+
+## Voice
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Fast path | Fast path (instant commands) | toggle | - | Simple commands run the moment you finish speaking; off sends everything to the AI. | missing | live | `fastPath.enabled` | Zeus addition. Laya or Jev is on the Engine page. |
+| Hey Zeus | Listen for "Hey Zeus" | toggle | - | Say it, then your request. | missing | custom | `voice.heyZeus` | Zeus addition. Hand-built card on Voice. |
+| Talk to Zeus | Talk shortcut | recorder | - | Hold to talk, let go to send. | missing | custom | `voice.talkKey` | Zeus addition. Recorder on Voice. |
+| Voice | Personality (Ultron or Plain) and Design voice | menu | - | How Zeus sounds and what it calls itself. | missing | custom | `voice.personality` | Zeus addition. Voice page. |
+| Dictation | Murmure speech engines | menu | - | Which speech recognition writes your words. | missing | custom | `dictation.engine` | Zeus addition. Murmure page. |
+
+## Keep awake
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Insomnia | Insomnia (lid-closed mode) | toggle | - | Keep agents working with the lid closed. | missing | custom | `insomnia.lidClosed` | Zeus addition. Insomnia page. |
+
+## Prompter
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Teleprompter | Follow my presentation | toggle | - | Opens the prompter when a slideshow starts. | missing | custom | `prompter.followPresentation` | Zeus addition. Features page; stored under the prompter key. |
+| Teleprompter | Advance slides when I finish their notes | toggle | - | Voice-follow moves to the next slide. | missing | custom | `prompter.followAdvances` | Zeus addition. Features page. |
+| Teleprompter | Hide the prompter from screen sharing | toggle | - | You see it; shares do not. | missing | custom | `prompterWindow.private` | Zeus addition. Features page. |
+
+## Agents
+
+| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Browser agent | Let Zeus work in Chrome | toggle | - | Web tasks, step by step, with a card you can stop. | missing | live | `browserAgent.enabled` | Zeus addition. |
+| Browser agent | Most steps per task | menu | - | Where a web task stops and tells you. | missing | live | `browserAgent.maxSteps` | Zeus addition. |
+| Browser agent | Always ask before | text | - | Extra words that always show an approval card. | missing | live | `browserAgent.alwaysAsk` | Zeus addition. Added to the built-in list (buy, send, delete, post...). |
+| Coding | Default coding agent | menu | - | Claude Code, Codex, Gemini or Cursor Agent. | missing | custom | `code.tool` | Zeus addition. Stored under the code.tool key. |
+| Coding | Terminal app | menu | - | Automatic, Ghostty, iTerm, Warp or Terminal. | missing | custom | `code.terminal` | Zeus addition. Stored under the code.terminal key. |
+| Research | Research depth | menu | - | Quick or Deep when you do not say deep research. | missing | live | `research.depth` | Zeus addition. |
+| Research | Save reports in | text | - | A folder for research reports. | missing | live | `research.folder` | Zeus addition. Empty keeps the second brain, else Documents/Zeus Research. |
+| Models | Models Zeus uses (read-only) | status | - | Which model each engine uses, never above Haiku or Sonnet. | missing | custom | `models.caps` | Zeus addition. Read-only display of ModelCap. |
+| Drive | When Zeus may drive your Mac | menu | - | How much Zeus may do on its own on your Mac. | missing | custom | `privacy.driveAutonomy` | Zeus addition. Privacy page; stored under drive.autonomy. |
+
+## Zeus additions beyond Glance
+
+- Search box in the Settings sidebar (every option, section titles and notes; Return opens the first hit).
+- Live preview card on Appearance (halo style, arm width, thickness and cues drawn as you change them).
+- Reset this section to defaults (header button on every page).
+- Export and import all settings as JSON (General).
+- Keyboard navigation: Up and Down move between sections, Command F focuses search, Escape clears it.
+- Sections Glance does not have: Top Bar (tab order, weather city and units), the To-do quick-add shortcut, second-brain rows.

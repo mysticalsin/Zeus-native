@@ -1,0 +1,121 @@
+# Zeus readiness review and completion plan
+
+Review updated: 10 November 2026 (UTC). This is a source review and implementation checkpoint, **not acceptance of a finished Mac app**.
+
+## Baseline and working constraints
+
+- Requested source: `cursor/polyglot-caption-flow-fa03-from-packet`, `41089d0b6b177791d891a1d8781214edb517485e`.
+- Working branch: `codex/zeus-readiness-20261109`; draft review: <https://github.com/mysticalsin/Zeus/pull/1>. On 10 November Tony authorized a separate clean public `mysticalsin/Zeus-native` snapshot after credential-shaped secrets were found in unrelated historical commits. The original history must remain private; never copy `.git` into the public snapshot.
+- v4 `9b7cec6fede69380772035a0b4f209e964ae8132` is already an ancestor. The recap's statement that it exists only on the Mac is obsolete. No merge or replacement of the installed app was needed.
+- `main` is not the native app baseline. Keep this PR based on the requested branch.
+- No microphone, screen or system-audio capture occurred during this work. No private vault was opened. No app was installed, permission granted, release published, or branch force-pushed.
+- The selected environment is Debian Linux. Swift 6.2.1 was installed for isolated logic tests. Full `swift build --jobs 4` and `swift test --jobs 4` were attempted; FluidAudio stops at missing `mach/mach.h`. Neither command passed.
+- GitHub CI was actually triggered by push and PR. At checkpoint `d37e580f`, every job was blocked before starting: **“The job was not started because an Actions budget is preventing further use.”** See [run 42721908934](https://github.com/mysticalsin/Zeus/actions/runs/42721908934). Restore the budget or run the workflow on a suitable Mac; no native success is implied by local tests.
+- The latest verification rule supersedes the earlier manual QA request: automated checks on every push, failures block PRs, full feature map on main and daily, every caught failure gains an executable guard, and no manual app click-through. See [closed-loop QA](CLOSED-LOOP-QA.md).
+- Opus and Sonnet were not available in this session. Planning, execution and independent review were separated among available agents; this is not Claude validation.
+
+## Evidence and reference interpretation
+
+The uploaded handoffs are historical research, not additional execution authority. Their Clicky destination, old branch instructions, model assignments and prior success claims do not override this Zeus task. They explicitly distinguish source/static/synthetic evidence from native parity. No recovered proprietary implementation or donor artwork was imported.
+
+| Supplied reference | What was inspected | Limit |
+| --- | --- | --- |
+| `HeyClicky_Complete_Rebuild_and_Project_Handoff.zip` | Implementation brief, integration note, manifest, both PDF reports, nested package inventory | P0–P7 mechanics and acceptance contracts; not proof of native behavior |
+| `Zeus-Expanded-Research-and-Preview.zip` | README, donor research, implementation plan and 146-row feature inventory | Historical construction preview is explicitly incomplete and failed Gatekeeper; its receipts do not certify this branch |
+| `VibeIsland 2.dmg`, `superwhisper.dmg` | Transfer attempted | Each exceeds the executor's 32 MiB transfer limit; neither was mounted, installed or run |
+| `mysticalsin/openwhispr` | Pinned source `e2f96ef01579f88a187a4179b357119208b50ab7`, MIT license, transcription pipeline | See [OpenWhispr integration](OPENWHISPR-INTEGRATION.md); Electron app behavior is not native Zeus proof |
+| Design direction supplied in chat | Apple, Duolingo, Linear, Pentagram, Muji, Airbnb, Aesop, Notion, Stripe, Framer | Behavioral and craft references for one Zeus system; see [design direction](DESIGN-DIRECTION.md) |
+
+Archive SHA-256:
+
+```
+2b791643487e5d86a7be173cdc43c4c21a4861cbdd2615e582a338dc25f69882  HeyClicky_Complete_Rebuild_and_Project_Handoff.zip
+1cc35c845592a9d0b763fc88d17f891148e047488ec925d34996e97365d04bc5  Zeus-Expanded-Research-and-Preview.zip
+```
+
+The expanded inventory has Glance 48, HeyClicky 45, Vibe Island 16, Superwhisper 20 and Moody 17 rows. It is an additional backlog, not 146 implemented features. Durable dispatch/recovery, exact-session verified execution, uncertain browser mutation recovery, real MCP readback, accessibility/performance, and signed-artifact lifecycle need explicit acceptance beyond the original checklist.
+
+### Evidence index and critical questions
+
+The identifiers below are local report references. Source observations describe the reviewed code, not an executed Mac app. Test receipts and reproduction commands are in [the validation record](../qa/readiness-20261109.md).
+
+| Evidence / claim | Classification and scope | Critical question / disposition |
+| --- | --- | --- |
+| E-001 / C-001: requested branch and `git merge-base --is-ancestor 9b7cec6 HEAD` | Observed repository ancestry; v4 is included | Q-001 version reconciliation: answered for pushed commits; this does not identify any unpushed Mac edits |
+| E-002 / C-002: `PolyglotPipeline`, `PolyglotController`, caption regressions | Observed source plus synthetic concurrency tests; Clear, target changes and drained Stop recovery are covered | Q-002 live listening translation: partial; actual recognizer, pack installation and bar interaction remain blocked on Mac |
+| E-003 / C-003: `ScribeLiveCapture`, `ScribeCallWatcher`, `ScribeCaptureWindow` | Observed admission and acknowledgement guards; source still has imperfect mute evidence | Q-003 literal no-capture while muted: unresolved; no live privacy guarantee claimed |
+| E-004 / C-004: `WhisperPromptRecovery`, native engine adapters and MIT donor source | Observed native adaptation with fake-decoder tests; one prompt-free local retry | Q-004 better real dictation: partial; model accuracy, insertion and latency require a consented audio corpus |
+| E-005 / C-005: `RecordlyCursorFollowPath`, media loader, exporter and release scripts | Observed code; planning math and mock release failures tested | Q-005 usable exported artifact: partial; actual rendered video, sparse-file tests and signed package still need macOS |
+| E-006 / C-006: uploaded ZIPs and design-reference mapping | Documented historical donor behavior and proposed Zeus acceptance; DMGs inaccessible | Q-006 motion parity: unresolved; neither donor nor Zeus motion was witnessed in this environment |
+| E-007 / C-007: `WikiController`, `WikiCompiler`, vault boundary and Memory UI | Observed learning, provenance, edit/forget and local export mechanisms | Q-007 connected memory and MCP: partial; selected destination is known, visual graph and unified memory remain unfinished; selected Markdown MCP export now has a production helper, recovery journal and real subprocess fixtures awaiting final/native receipts |
+| E-008 / C-008: local build logs and GitHub job annotations | Observed failed Linux build and CI jobs blocked before execution | Q-008 release readiness: unresolved; no successful native build, notarization, Gatekeeper or daily-use receipt |
+
+No Friday item (0/13) and no Sunday test area (0/6) is accepted as **fully complete** at this checkpoint: each includes a native or end-to-end obligation that remains open. This denominator records acceptance, not the amount of code implemented. The following matrices preserve every requested item and its next proof.
+
+## Friday's 13 items
+
+“Implemented” below means source exists. Every native acceptance cell remains open until the exact build is exercised on a supported Mac.
+
+| # | Area and existing implementation | Changes / findings in this review | Completion gate |
+| --- | --- | --- | --- |
+| 1 | Dictation: `DictationController`, `TextInserter`, local/cloud engines and history | Explicit in-turn “no, I meant…” cleanup; OpenWhispr-derived prompt-echo recovery. Focus ownership and clipboard restoration already exist. Existing so-called E2E correction test does not recognize its generated audio or paste it. | Real audio → recognition → correct focused field; missing/changed focus preserves text; names, mixed languages, no speech, repeated corrections, hold/toggle/cancel, offline and failed cleanup. Leading cross-turn corrections now replace only the last AX-acknowledged Zeus span after exact focus/caret/text revalidation. Native AX behavior and real speech accuracy remain unverified. |
+| 2 | Native Meetings/Scribe UI, session/transcript storage, diarizer, notes and wiki ingestion | Startup buffers cannot become meeting content; unknown timestamps fail closed. Hand-built spectral/pitch clustering is not measured speaker identification quality. | Dual-source sample, speaker overlap and similar voices, renaming, pause/resume, late ASR, stop/failure recovery and durable recap; exact device/engine recorded. |
+| 3 | Conservative mic admission, device mute and call-process scans | Unknown external mic owners now block local mic admission. **Strict hardware-level mute is still not established:** OS evidence is sampled and OS-owned buffers are outside this gate. New allocation-free fail-closed admission runs before the application ring; call/unknown-owner exclusion latches across ownership loss and monitor restarts. Active recognized call apps exclude local mic entirely. See [privacy and end flow](SCRIBE-PRIVACY-AND-END-FLOW.md). | Decide supported mute evidence contract. Trace ingress → ring → ASR → storage across every transition and unknown state; prove no muted payload reaches prohibited stages. Do not label this complete or loosen safety to get a transcript. |
+| 4 | `ScribeCallPopup` top-right nonactivating popup, calendar/call detection and Record action | Existing lead/late window and polling verified statically; headline refresh addressed without extending expiry | Calendar consent denied/allowed, imminent event, active mic vs idle app, dismissal dedupe, screen changes and one-tap session start. |
+| 5 | Recorder pill, notch recording UI, mini surfaces, motion models and level bars | Existing models and source inspected. Shared interaction polish follows the new design direction. | Video comparison of transitions, waveform response, reversal/interruption, focus restoration, Reduce Motion, multi-display and frame pacing. A screenshot is insufficient. |
+| 6 | Manual end confirmation and final recap | Manual Stop and a positively identified bound native call-app exit now start a monotonic 9-second countdown with Keep recording and End now. Processing/save failure and durable completed notes have an actual native window. Browser remote hangup remains unsupported; microphone disappearance is never treated as call-ended. | Execute fake-controller lifecycle fixtures on macOS and verify production reachability/window behavior with automation. Extend only to trustworthy remote-call lifecycle evidence; never infer hangup from lost input ownership. |
+| 7 | Scribe transcript ticker/reveal and recording/top-bar visuals | Both producers now use shared time-driven glow/frost/reveal feedback bound to actual start/save/export states. Completion is durable and expires; partial exports remain failures. Production-frame tests emit timed GIFs and frame/source hashes on macOS. | Run actual native production renderer tests, then verify top-bar reachability and temporal reference parity. Synthetic offscreen frames do not prove donor parity or whole-app behavior. |
+| 8 | Native Recordly tab, capture, trim/zoom planning and export | Fixed host-clock alignment, visible cursor, no-frame/write errors and honest QA receipts; bounded larger-file streaming, cursor-follow crop planning and exclusive export publication are implemented. Region stays off. | Whole-display capture/export, cursor motion, trim/speed/aspect/fps, cancellation, >512 MiB file, source removal, no-frame and playback. Window/region coordinate proof separately required. |
+| 9 | Buddy spring/flight, coordinate mapper, spatial/drawing models, guided targets, Drive | Delayed click/timer cannot advance replacement tour; cancelled speech timeline stays cancelled. Display-frame changes rebase the flight, eventual target and hit visuals together; display loss cancels; Reduced Motion exposes full Unicode labels immediately. Drive yields to user input, validates focus and secure fields, and refuses unsafe fallbacks. | Complete P0–P7 matrix below; native multi-display/scale/Spaces and temporal comparison. Existing pure drawing/timeline types alone do not prove a live renderer integration. |
+| 10 | Local memory, to-do learning and meeting-fed Wiki with edits/forget/review/promotion/export | Selected vault/access now governs capture; path confinement and no-overwrite added. Saved meeting sources open existing recaps without interrupting active sessions. Edited `[[Page title]]` links produce incoming/outgoing connections; shared sources remain separately labeled. | Selected export to an explicit Obsidian/local Markdown root now uses the bundled stdio MCP helper, immutable preview, no-follow create-only writes, idempotent IDs, exact readback and durable uncertain-outcome recovery. Native UI transport, visual graph and unified preference/to-do learning remain open. See [second-brain plan](SECOND-BRAIN-PLAN.md). |
+| 11 | Ultron persona, local/cloud TTS routing and file/stream playback | Fixed effect generating sound during silence, multichannel processing and stream phase continuity. This is a texture fix, not proof of desired voice/delivery. | A/B original authorized voices on target Mac; latency, pronunciation, fallback, interruption, volume and long replies. Never label a provider failure as a successful preview. |
+| 12 | Real bundled vector provider logos, orb, tabs, copy/volume controls | Several provider mappings exist; Grok/unknown use fallback. One snapshot test incorrectly wrote into Tony's hardcoded path; now uses a temporary directory. | Light/dark contrast, hover/pressed/focus/disabled/copied states, VoiceOver, keyboard-only use, small displays and provider identification. Resolve asset provenance before distribution. |
+| 13 | Large unit suite, scripts, Chrome fixtures and snapshot hooks | Added an exact 19-item executable acceptance map, caught-failure registry, source-bound receipts and a fail-closed aggregate. Model tests, native fixtures and device acceptance are distinct obligations. Local mocks do not establish daily-use behavior. | Automate the native journey below on the exact binary; preserve command logs, assertions and artifact identity. No manual click-through or manually authored passing receipt. |
+
+## Sunday's six reruns
+
+| Test area | Automated evidence available | Native result still required |
+| --- | --- | --- |
+| Scribe/live text/mic ownership | Reducer, capture acknowledgement, transcript/session/speaker-stat rules | Idle browser/Zoom never counts; real active app does; unknown owner excludes local input; live text and mute boundaries |
+| Polyglot running/no translation | Label/harness compilation, heard text without translation, target changes, per-input language, Clear barriers | Actual recognizer output and language packs on supported macOS versions; honest unsupported/pack-needed UI |
+| Pin | UI wiring and native model test source | Pin stays visible outside panel, Stop still works, explicit dismiss works, reopen works, unpin/tab switch restores auto-hide |
+| Recordly startup/export | Timeline, output metadata validation, release scripts; streaming/follow regressions | Permission delay, rapid Start/Stop, no-frame, screen disconnect, real MP4/GIF export and playback; region disabled |
+| Meeting recap/end-call | Transcript, durable completion, ingress and monotonic countdown tests; native controller scenarios authored | Execute actual native window/controller tests and source-linked saved note journey; remote hangup still needs trustworthy evidence |
+| Packaging/signing | Secure timestamp/notary/staple/Gatekeeper path and rollback installer tested with mocks | Developer ID + notary profile on Mac; actual accepted/stapled artifacts and clean-machine launch |
+
+## REA / Screen Buddy implementation order
+
+| Stage | Source inventory | Required next proof / work |
+| --- | --- | --- |
+| P0 baseline/safety | `ScreenCoordinateMapper`, permission gates, per-display overlay windows | Baseline talk→text→reply→point, negative origins, 1x/2x mixed displays; no TCC mutation in tests |
+| P1 physical pointer | `DriveController`, default-off `PhysicalPointerSettings`, event attribution | Keep off by default. Verify exact endpoint, user takeover, cancelled menu/focus/type, no stale click; drag ownership/guaranteed release still needs a deliberate implementation |
+| P2 companion | `CompanionSpring`, `CompanionFlight`, `BuddyController` | Compare retained velocity, retarget/return, glow/scale/tangent, unplug/replug and Reduce Motion in native video |
+| P3 spatial paint | `SpatialTrail` and separate annotation/Drive paths | Verify the actual user-gesture renderer uses the intended threshold, dwell, spacing, parent opacity and age fade. Do not relabel the Drive trail as observed donor parity |
+| P4 drawing | `DrawingScene`, geometry/reveal helpers, overlays | Wire/verify geometry, reveal and pen travel as distinct phases; deterministic seed, 109/110 boundary, pause/stop/erase/restart, labels and accessibility |
+| P5 speech clock | `SpeechDrawingTimeline`; late completion cancellation fixed | Real word cues must drive the production renderer. Crowded three-stroke/one-second fixture, cues-before-code, late audio, repeated cancel, no revived ink |
+| P6 guided targets | `GuidedPresent`, `WalkthroughSession`, controller revision barriers | Correct-click only, double-click once, old tour callbacks rejected, window move/disappearance, source/focus identity |
+| P7 agent/browser/integrations | Existing hooks, approvals, jobs, Chrome/MCP paths | Browser mutations now bind approved document. Still require reconnect/no-replay, durable dispatch, exact session identity and disposable MCP target readback |
+
+## Native acceptance sequence
+
+1. **Build without capturing.** Restore CI budget or use a Mac with Xcode 26.1.1/SDK 26.1. Run `swift build`, `scripts/test.sh`, extension tests/build, and release-script tests. A compiler/test failure stops installation. Preserve raw logs and the source SHA.
+2. **Prepare rollback.** Keep the currently installed Zeus bundle before replacement. Use `scripts/install.sh` only after inspecting the build and with an explicit install destination. Keep the backup path and binary SHA in the receipt. Do not auto-launch capture.
+3. **Automated fresh onboarding.** Use a disposable macOS account/profile and executable scenario driver, never a human click-through. Test each denied, skipped, later-granted and revoked permission. Tony answers OS prompts. Keyboard navigation, VoiceOver, Reduce Motion, completion/resume and every settings route must work.
+4. **Automated daily use with synthetic content.** Dedicated TextEdit/browser fixtures; known prerecorded speech where possible. Exercise all six Sunday rows, all thirteen Friday rows and every native tab/settings page. Capture only after Tony's own OS consent. No customer meeting or private vault is needed.
+5. **Automated temporal quality.** Assert production frame sequences and record complete consented interactions at known display scale/refresh rate: start→record→stop→settle→note, reverse/cancel midway, pin/dismiss, tab switch, copy, volume, onboarding next/back. Check input responsiveness, layout stability, no hidden Stop, no indefinite spinner, and accessible reduced-motion equivalents. Compare time traces and video to supplied references; do not certify motion with stills.
+6. **Failure and recovery.** Quit/crash/relaunch, network unavailable, provider timeout, model absent/corrupt, disk full, permission revoked, input/output device removed, display disconnect, second call, wrong field, cancelled approval, late transcript and export cancellation. Existing data must survive; uncertain external actions must not replay.
+7. **Release artifact.** Set final version/build, resolve commercial entitlements and asset notices, then run the explicit release packaging path with configured Developer ID and notary profile. Verify accepted notarization, stapled app/DMG, Gatekeeper and clean-machine launch. Test upgrade and rollback from the exact artifact, not an ad-hoc development bundle.
+
+Each case needs: feature/case ID, source SHA, app executable SHA-256, macOS and hardware, engine/model/version, display geometry/scale, stimulus, expected result, actual result, pass/fail/blocked, evidence path, and any recovery action. A missing result is **blocked**, not pass.
+
+## Release decisions still open
+
+- Strict mute's literal no-capture guarantee needs an agreed supported-app evidence design and native proof. Current safeguards do not meet that statement.
+- Bound native call-app exit, countdown and durable completion windows are implemented but await macOS execution. Actual remote-call hangup and full reference-window parity remain unfinished.
+- Source navigation, explicit page connections and selected Obsidian MCP exports are implemented but await native acceptance. The visual graph and automatic semantic connections remain unfinished.
+- Full reference motion parity and automated onboarding/daily-use journeys remain unexecuted. The latest user rule prohibits manual click-through verification.
+- `Entitlements.gatingEnabled` in `LicenseManager.swift` is intentionally false. Decide the commercial behavior before selling; do not silently enable paid gating as a code cleanup.
+- `NOTICES.md` records uncertain provenance for legacy provider PNG media. Resolve or replace unverified distributable assets before release.
+- Signing credentials, a notary profile, final version/build and a suitable Mac are required. Never paste credentials into chat.
+
+The safe completion order is: correctness/privacy → native build/test → verified capture/export/dictation → reference motion and onboarding → memory/MCP → exact release artifact. No checklist item becomes accepted solely because its button or test exists.

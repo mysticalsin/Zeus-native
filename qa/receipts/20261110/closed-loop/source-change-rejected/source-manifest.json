@@ -1,0 +1,4165 @@
+{
+  "sha256": "160b8e9fbb1c60386ee4552cd255bd8254410bd94595494994ae53b51d92e768",
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "sha256": "6b7d06a75424071836f52dcc8bf26ee06edc5b498f0a7efb171dc3ddb7047860"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "9b9303477f28dca115e4af2c181e243a52f3279041a953d7005c5e20e8c9e1c6"
+    },
+    {
+      "path": "Design/brand-logos-src/anthropic.svg",
+      "sha256": "1cc599f6ebce2016dc388cf84e54a52c6b13487655c7e243554d654c7bce1882"
+    },
+    {
+      "path": "Design/brand-logos-src/claude.svg",
+      "sha256": "2d6fda79eb18ddccca35b799eeb3cece0dfabc22520ce3b10abd25668df9fa93"
+    },
+    {
+      "path": "Design/brand-logos-src/cursor.svg",
+      "sha256": "71572a9be192cc069ec22b48d785e61d754eeed7edb7d082d615f6d5620f70ec"
+    },
+    {
+      "path": "Design/brand-logos-src/googlegemini.svg",
+      "sha256": "a6228d8846040401e941a39ed17459785e8324dbb7b870ce84233c9b3e9863a0"
+    },
+    {
+      "path": "Design/brand-logos-src/kimi.svg",
+      "sha256": "01fb4be70032974e2c9a4f2af9688ea505ad7d996de8866cea0844c4b0581091"
+    },
+    {
+      "path": "Design/brand-logos-src/moonshotai.svg",
+      "sha256": "2b9efa8dd053294bc133f1c57cb618ac75487363bce6425b79dd5c0c92f73569"
+    },
+    {
+      "path": "Design/brand-logos-src/openai.svg",
+      "sha256": "2b4a04ddc2395b20d168694d3850ce2050a702c4a0cdeb4d8b31b9a970481a8c"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Character_Guide.pdf",
+      "sha256": "6ed5687805c13f11e7c4d86aa9fe0176f85eafd0ae6ba123fa2836dcce91a0ad"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/SHA256SUMS.txt",
+      "sha256": "f9210664dd2c348dcbf30794cf22d24e05baa0196071cfe61798c75ab6369f1e"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/START_HERE.txt",
+      "sha256": "d5d98822916de9f48dd747f71ee1889c8e755d59250301c2d79426a0fa44628e"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/ZEUS_Character_Guide.pdf",
+      "sha256": "6ed5687805c13f11e7c4d86aa9fe0176f85eafd0ae6ba123fa2836dcce91a0ad"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/overlays/zzz.png",
+      "sha256": "036aee6868b652dd449a9a34daa24f23e4a35b308479ffe73d2405444b5591b3"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/approval_wait.png",
+      "sha256": "82c04f78faf0ef8baf492121880e74c5f8aa0342ebfcc9d09c8bc54ccf0c7405"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/carrying.png",
+      "sha256": "7d2c1e2410f29c32827cec7b671c648723b45902652183ffe671c631f749deb5"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/celebrate.png",
+      "sha256": "4569462fe5840fc9204ac4c6f67580e2aacb23ecc5d5be52dbe10aa043812539"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/confused.png",
+      "sha256": "8330ea3ab3ce58def6aee15865f48faaed9f1c747aa979e9639d03bcb2c616dd"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/curious.png",
+      "sha256": "11150895a1d75158188e6c7f02cfc410ccb46ddfede574931d5aecb518364e30"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/error.png",
+      "sha256": "596f5ea8ea6e52bcb5e096bbb6d555c1a492d5b510754604b18520accedbc51e"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/goodbye.png",
+      "sha256": "879d47016474dd9ad8f4ea826d8c9643b289973a1d154429ca87ae9afc053689"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/grateful.png",
+      "sha256": "eda6b8a7e58523dc3f34cf544e2188e8d0b5c091370ef54e9b9e9b53465339a2"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/guiding.png",
+      "sha256": "fa7ba440053931a424ca55cdde15b3184bfd86d0c1879c7bcfee8fc16137ee61"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/idle.png",
+      "sha256": "062bae6f469ec8fedcba43fa8e9726bd23d4133c006828d8bb0aa6dc6d244b0f"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/listening.png",
+      "sha256": "1f4f7a63542ffa1cb985a3b1dd3bd18df8a874cee0447265af05cfe416eb4114"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/offline.png",
+      "sha256": "b2eb97721d766e3d7b6bd9d05dc1b286ff61e2e12261ac8378ed19337eeb5735"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/organizing.png",
+      "sha256": "9563877bd918b90f51ad3d4daf1d90cfed115e0cb61197213c69fe2656002ec2"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/paused.png",
+      "sha256": "cd22221f15453daedc717d5b8d22ea2e2f360bc6fcb61583d1f8a7ba0e760bdd"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/searching.png",
+      "sha256": "a706c05e242596bb715af17048ef0b0560066126fbd8bc0359e00a71b7be6f5a"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/sleeping-clean.png",
+      "sha256": "59194e46ff2dd5e0ae9956a2d9a5e8ae01166cc97b7c2f3ffd0d39f36cf23706"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/sleeping.png",
+      "sha256": "8416e52743d9391f43e92bec497fbfe74163463903eb8ce6e7246e26cb151d51"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/success.png",
+      "sha256": "923395d6e2261c7a8fab1048b66701e0bb1b0ee67f183d5b73b8b58c682ccd32"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/surprised.png",
+      "sha256": "1e64f8a20d143666f6642902b05da14c554e9f372001c8c8fa2a1ceec0e31ff7"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/thinking.png",
+      "sha256": "c547d7aa9fcdaa751d3e5321dc72b070cea5ffe9fb945fe9ea37ca1a335034f0"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/typing.png",
+      "sha256": "225bdfc7c3266a7d514639ca534532857d771f3fff8d3d12fcc914a050148d4c"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/waking.png",
+      "sha256": "0a5286380b6795f8bebab804807a22a5c4458bc25444167099ef6ddc8b81a887"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/walking.png",
+      "sha256": "88f245e458843dbe184c9f531562849196626404356818eb461a20b68bc61a1e"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/welcome.png",
+      "sha256": "fa75d13f51f7a7d60a250bb29452e6da1d412ae11dfebb2be009fd1de994404c"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/poses/working.png",
+      "sha256": "d024246ec8c71357cb08cabebb6d1f4366b87637bd546db94890374293f0edd9"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/assets/reference/turnaround.png",
+      "sha256": "19524d208d4d09bf81d7085c3bf29aae45049f2d0faf58212b9ef40a5dec7b71"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/docs/ANIMATOR_BRIEF.txt",
+      "sha256": "ba406c5302f68b206fce94f20b4211a16914478647964d7a9dc95d843d2837c0"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/docs/ONBOARDING_STORYBOARD.txt",
+      "sha256": "9f04a177bd4beb22ad1ea4fc2268bb3aaae2a58ccd3b56f35a0862695d5438c7"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/index.html",
+      "sha256": "7dc062f92549851f26a992b39a478d6486582444fd194706c6db2ade18538d22"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/manifest.json",
+      "sha256": "d23e2b9db81584e6258328666330a478c7d89a0309d48e67163d7996c2cae1c2"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/GENERATION_GUIDE.txt",
+      "sha256": "e139c7f766921d85b8d18d1d406347ce5bedea05cdf2fbd397bfb6d2b21e22c3"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/asset-checks.json",
+      "sha256": "738c89d3d2778f8347d3eb4053bf9182631854f528043f4243e2e0696083d8eb"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/build_pack.py",
+      "sha256": "f10280f9c99f14fc08382877419d9466a519ffbcffe12494729acb6d725cd486"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/design-tokens.json",
+      "sha256": "491cfc6567721c2e1f049a28a1e4d733eed3cfd84724480c6a36c2f92a0b4656"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/preview-review.json",
+      "sha256": "43e53f09b6103382ff45281949ee4e6a3345c9cf8d5f717a46b4101e44d938c3"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/prompts-core.json",
+      "sha256": "dec4b5893a5cbc2a7653b902dcbbac9d47c233011c6fde15dba5615ff8ba86bb"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/prompts-feedback.json",
+      "sha256": "7927f3ff9dbdb9deaf38e8f3692ddb1b65809c5f304045da90157341064d8c6c"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/prompts-functional.json",
+      "sha256": "db8269632586a2319ab8b03c4d5407cce767d7c4764a7a07b82ad6e994df7635"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/prompts-personality.json",
+      "sha256": "be74e99229065ba224ba9c4ad2926dca2f4c125ae31f367b37d4f71d45b43376"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/requirements.txt",
+      "sha256": "834212b206747e72c0426b6e179a2648712438f8c7ea7fab74c0090ff50b8539"
+    },
+    {
+      "path": "Design/mascot-v2/ZEUS_Mascot_Pack_v2/production/visual-review.json",
+      "sha256": "9b3f739f53aeb44a8750eb3537d76e77c59e40edb2fe84784f93f5e7eea4c3d4"
+    },
+    {
+      "path": "Design/zeus-icon-1024.png",
+      "sha256": "aa9d84077c5de3c065347a42dbf5bc3e7baedf260982170307ae3b92b6361a33"
+    },
+    {
+      "path": "Design/zeus-icon.svg",
+      "sha256": "db2cd4d711c3e6a69e5fc4f1e4adb2b2edda888dbedaef1b950191689fcd0387"
+    },
+    {
+      "path": "Design/zeus-mark-template.svg",
+      "sha256": "515aed2bc56c2c1e59d76a34f35cb4ef17db9b78a98184fe9fbac92084cedf1e"
+    },
+    {
+      "path": "Package.resolved",
+      "sha256": "277d4ac609832c18b4cfadd430e98b44956bcdf4fbc89178c916c3e9937f974f"
+    },
+    {
+      "path": "Package.swift",
+      "sha256": "893461afa5e713b202e9ca1c5397231af6efa5ba3ebc398b17d973af47d538d9"
+    },
+    {
+      "path": "Resources/AppIcon.icns",
+      "sha256": "7fc153bbccc96bbe548cd8b7b8549e786f41fcf2c7ef9e863a75357791893fa4"
+    },
+    {
+      "path": "Resources/Info.plist",
+      "sha256": "698e6efd5a20afd3c93654faeedf3f4c329aa42821cf36615f387e3c778c2992"
+    },
+    {
+      "path": "Resources/Logo.pdf",
+      "sha256": "d72840ee87575c0cafd50264041574ae099b236791f831543d4c97db8c7b912a"
+    },
+    {
+      "path": "Resources/Logo.png",
+      "sha256": "25bbf5c6fdebadacea91add3464208507da36b14419e5bac0bc22bb4bcbfbe74"
+    },
+    {
+      "path": "Resources/MenuBarTemplate.png",
+      "sha256": "98a4db78c9c0acf1bbee3258a939bfa6eb2c402d322cd36deef617d414fcc274"
+    },
+    {
+      "path": "Resources/MenuBarTemplate@2x.png",
+      "sha256": "943cb79bf2f31ccc23cece8d826079d0c840bdf6db3422498f9e681d7781f83d"
+    },
+    {
+      "path": "Resources/NOTICES.txt",
+      "sha256": "f528028efc836550e8bd999cc53c99c38732d4d925624da348d420a440ee38a1"
+    },
+    {
+      "path": "Resources/Zeus.entitlements",
+      "sha256": "19b00bd11cf28c230357f353a0b0adb1c74b6965427a46ec8015f94cd5982ded"
+    },
+    {
+      "path": "Sources/Zeus/Agents/AgentCardsUI.swift",
+      "sha256": "c57fa84994856f9c0117890698eb8a8b5144aa3befafa924241a188c15eb00f3"
+    },
+    {
+      "path": "Sources/Zeus/Agents/AgentEventServer.swift",
+      "sha256": "d18317af4e364bac17ec4579742c536dea19e6d4e6db7276497fb52322ad5bd5"
+    },
+    {
+      "path": "Sources/Zeus/Agents/AgentHub.swift",
+      "sha256": "6dfba47b5caccefd78e58dd681eaadb0ab5efb92eda0384c97b326f0ed030242"
+    },
+    {
+      "path": "Sources/Zeus/Agents/AgentTroubleCard.swift",
+      "sha256": "d268133d00829bcf1027a08343caa802e8dcf09196c1be9f51d3fc01a95a6c30"
+    },
+    {
+      "path": "Sources/Zeus/Agents/BackgroundAgentTracker.swift",
+      "sha256": "e7eb360d9a74decbd02757ee18b05ee4529d4e39043ee30e14e1841de31352ff"
+    },
+    {
+      "path": "Sources/Zeus/Agents/ClaudeHookInstaller.swift",
+      "sha256": "61803cda6c83cf9955c382e3fecfb75bbc9dd6946a5836fd0b7898fe16800528"
+    },
+    {
+      "path": "Sources/Zeus/Agents/OtherAgents.swift",
+      "sha256": "36c3a0a4b0fd36c24f0a815539d84a83d3004ad930b393b3bb65a24993be110b"
+    },
+    {
+      "path": "Sources/Zeus/Agents/TrustedChatStore.swift",
+      "sha256": "20bd6e407a5e61afe4a6a6351ba1f2f976d8ffdc15ac6ef09ba73f7446899f94"
+    },
+    {
+      "path": "Sources/Zeus/Agents/WelcomeBackRecap.swift",
+      "sha256": "52f1b4f81fba7e482e83bef9f9dbd15882f5b31c55ce0cc20f6cac140669befe"
+    },
+    {
+      "path": "Sources/Zeus/App/AboutYouOnboarding.swift",
+      "sha256": "b4067c92d0ab336be92479d24a4e8ef52ea603b3dd8af552da4f11fd07a991eb"
+    },
+    {
+      "path": "Sources/Zeus/App/AppDelegate.swift",
+      "sha256": "6887aa3fb9b47585da96b41f9af0c9044f17e69c8f7904d41353f24ac1c1dd56"
+    },
+    {
+      "path": "Sources/Zeus/App/AssistantKeyImporter.swift",
+      "sha256": "719ce47565de266a9ea7a7c87f9a32b9279bccf236e4bddac4e0c2c51aad40c9"
+    },
+    {
+      "path": "Sources/Zeus/App/BannerAutoDismisser.swift",
+      "sha256": "19fdc5ff2503dcfd80de9f8afb5877b5435ec7dfa4a7d88e51758527190b3d5f"
+    },
+    {
+      "path": "Sources/Zeus/App/Brand.swift",
+      "sha256": "75035d0260c84a4ceb0d6bd2860ff9bc6337576de90e6f034c10b8eacab39047"
+    },
+    {
+      "path": "Sources/Zeus/App/CommandCenter.swift",
+      "sha256": "f468e1ec5ca2b17988d5a57e947db28fac11380f1fa667b657c211e9a92cb29a"
+    },
+    {
+      "path": "Sources/Zeus/App/CommandModeSettings.swift",
+      "sha256": "be8847219d891f33adc2f0d773c0d5f6064ddd72d708735f1671e2afa03f65a7"
+    },
+    {
+      "path": "Sources/Zeus/App/ConnectionsModel.swift",
+      "sha256": "93625f173d947ca67b82a34b8db16b811588829f2e75dca1c411501c4d3d2422"
+    },
+    {
+      "path": "Sources/Zeus/App/DebugCommands.swift",
+      "sha256": "99a8c299dceff5de7d21c1e2b1e7fcf1ab029b7e1fdd746e3852e676f00880ce"
+    },
+    {
+      "path": "Sources/Zeus/App/DebugForward.swift",
+      "sha256": "691b52d7371ee4dda7ca2b991d443ff1783a231a0ce12621cf89d71257b72b0d"
+    },
+    {
+      "path": "Sources/Zeus/App/DebugScreenshot.swift",
+      "sha256": "00743dd084eeebae717e004585bc6e79113cd7befc56744061555a04e861adaa"
+    },
+    {
+      "path": "Sources/Zeus/App/DeepLinks.swift",
+      "sha256": "d1d5ade94dfbc928a8132b41078f3ca1967b2695e9eb7cebc615703fa821b017"
+    },
+    {
+      "path": "Sources/Zeus/App/DemoDirector.swift",
+      "sha256": "ae319189b73a13bb95475862e501e49de413c978fe71d60a076e84cb5fa41d04"
+    },
+    {
+      "path": "Sources/Zeus/App/ExtraPreferences.swift",
+      "sha256": "31f51b5f994c5b73dd18e27b44f2a2a13d7b9a746784715903aa77c11a9ad4a9"
+    },
+    {
+      "path": "Sources/Zeus/App/FolderAccess.swift",
+      "sha256": "1191d51bcb0b2d53c63670b40a5717a45abded8c69037ece998187131ca5929f"
+    },
+    {
+      "path": "Sources/Zeus/App/GlassTheme.swift",
+      "sha256": "05c013c65bc9de57fb25b1f2f363b21f2e93f0fa80737d78b336cbc31ee61d8d"
+    },
+    {
+      "path": "Sources/Zeus/App/JevSettingsTestHarness.swift",
+      "sha256": "535115831a8944a18c883d88b3223d94f3c008bce77a43220c647f1e37f97836"
+    },
+    {
+      "path": "Sources/Zeus/App/KeychainSelfTest.swift",
+      "sha256": "f189db720df869d702cc81c17cd43bfcf4e9d9f5c0bcef5840a8fd0a1e69afd3"
+    },
+    {
+      "path": "Sources/Zeus/App/LicenseManager.swift",
+      "sha256": "41c9780f8dc1c22bc2507233079f3082bb15cf85596303424aef40ff0395626a"
+    },
+    {
+      "path": "Sources/Zeus/App/Licensing.swift",
+      "sha256": "c41f790c9f5459d39c588201ff38537429ab51bf9b09eebb91ec620537bf3e70"
+    },
+    {
+      "path": "Sources/Zeus/App/MenuBarPanel.swift",
+      "sha256": "ab0af9cff28515d633d1eb32b485a9d2a1fba259f7aeefa902e86654734c1b20"
+    },
+    {
+      "path": "Sources/Zeus/App/OnboardingPermissions.swift",
+      "sha256": "f4f800dc715d49af0bcf0636ca1f28f20af0d55328acdc0981c73d85f3573687"
+    },
+    {
+      "path": "Sources/Zeus/App/OnboardingView.swift",
+      "sha256": "140ded468d9c87ef8d347eb90a2360ccdbe95ee5f531fde63a73d3f4a0f499b3"
+    },
+    {
+      "path": "Sources/Zeus/App/PanelView.swift",
+      "sha256": "9a9e5dd70e57c95f5630c7fd1b2415d2579fe874e8166f44d512af3d4ed316e6"
+    },
+    {
+      "path": "Sources/Zeus/App/PermissionsModel.swift",
+      "sha256": "781395b7e21fa1e2e09363565ead7936c9509ac2f9de28b4ce73aa5c8cfa2da2"
+    },
+    {
+      "path": "Sources/Zeus/App/Preferences.swift",
+      "sha256": "3c77ade51fdcec7a4d30c8ef1bce8d460e1300356f5d7dec6ebcfc5e65442594"
+    },
+    {
+      "path": "Sources/Zeus/App/ScreenShareMigration.swift",
+      "sha256": "e1168bba7e434a58bbe0eae8e51c8e20fe377c0d40f3fca9311f77ca2cbac165"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsCatalog.swift",
+      "sha256": "2c5c468ca814bf758a64ec13d1a71a552b765e145f535cb2050009084ee481fe"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsCatalogViews.swift",
+      "sha256": "b4bad269739f10cd2db4632f457ee239f124035066d068b094c2800243f786ca"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsExtraPages.swift",
+      "sha256": "db22562be430122b5a82d4246d22acbd2aeaa9a52ea2f64da11f56cab5a6352e"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsLicensePages.swift",
+      "sha256": "40c98a188b72e43dc1bb22cb95ef1fe522d2117ed29d5b399500577a2630c956"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsLicensePane.swift",
+      "sha256": "b8cd34972c6611875b106285dd551ffd4dccb721ffb78f6f3e23854c0e3f9fc9"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsStore.swift",
+      "sha256": "540a0a2069dae8fb56b95004a21707359cdd84e789d5bdeb30c11ce70b99347a"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsView.swift",
+      "sha256": "6b1f3e0330b9f38fafffe1682bbbe01b3734af08215b28908210f0efa72809a0"
+    },
+    {
+      "path": "Sources/Zeus/App/SnapshotRenderer.swift",
+      "sha256": "a9dd7bd7ac7bf9f00107a909b6132cd04d8107a021934df833ec7d955f69616b"
+    },
+    {
+      "path": "Sources/Zeus/App/SystemNotificationService.swift",
+      "sha256": "895f09f7f9b784b84be28283d8672e696f6f827d74993541acdb85bb8b35da60"
+    },
+    {
+      "path": "Sources/Zeus/App/Theme.swift",
+      "sha256": "9e099d09f90ad3569183f231e4f6f3f6f7976cb5393c104b679c22df92ec0477"
+    },
+    {
+      "path": "Sources/Zeus/App/UpdateCoordinator.swift",
+      "sha256": "35b87574c6c1bb31b7bbe26f95ddca59c508377ed4278253b03067b17808c6c8"
+    },
+    {
+      "path": "Sources/Zeus/App/VoiceTurnController.swift",
+      "sha256": "031ede2991624e9dd2fae8f14331dbe499cecf07435f266a788854285ab88f73"
+    },
+    {
+      "path": "Sources/Zeus/App/ZeusSettingsPages.swift",
+      "sha256": "3f2258a40715177a2b7da6e53828a9f95fc783dec732239bc47b37f44f9031c9"
+    },
+    {
+      "path": "Sources/Zeus/App/ZeusWindowSharing.swift",
+      "sha256": "845f785811a35979b2b5b2205fa4f4deed996fe6104ef21f2d05ae42e3028bb6"
+    },
+    {
+      "path": "Sources/Zeus/App/main.swift",
+      "sha256": "6cdec3e3617bd82fb22be4a8a3727a73d904f2bfd92f114d6b2e852953d7ba75"
+    },
+    {
+      "path": "Sources/Zeus/Audio/AudioSpectrumService.swift",
+      "sha256": "c22fc2545a28f90e110afb3d5eed9f8c037ce760306624e9d73571a30ef69d1d"
+    },
+    {
+      "path": "Sources/Zeus/Audio/SystemAudioTap.swift",
+      "sha256": "ae530a8f27720a14561720012fe31c66d60000a795680ba71db1353725e5d048"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/approval_wait.png",
+      "sha256": "8f0f1ee62e7ba59956e9049e9db4d9884e5a497de3fb4672ea41219eb09fb935"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/carrying.png",
+      "sha256": "dc66b546656d13e16077e35383448c1bfcda3670c0ec41924e5f8430a42cb46d"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/celebrate.png",
+      "sha256": "e335ebaebb80229d30396cfb26a2fcdbf7f3165f9b361521083baa5e3fcd8557"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/confused.png",
+      "sha256": "0b8ac740bfa0820d9d81ee3ea8bfa3d26663dbe9db8efd0329a33ba713265f30"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/curious.png",
+      "sha256": "9301ee16e8aade2b599caccc22c3b5114fcef83f16f376053d5da6c7cf2781bb"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/error.png",
+      "sha256": "df25c9f069a3e8325199d48d44e0dd830f40fefac84abc7795403e84891b7fec"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/goodbye.png",
+      "sha256": "8c413a04a73e3f3ecf43c54320fe08b1881e72d284ee8c2c8b7493aa4dc8886c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/grateful.png",
+      "sha256": "333d7b868a2aa71fbcb1f7fc0ab1d1941516d9a0c650e30bbfd84586eacaf4a0"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/guiding.png",
+      "sha256": "e1ea0033446ffae5ed590511b9b4c75a16a6c91b213f0e1271d5c73c05572668"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/idle.png",
+      "sha256": "63bdbee09455212e14b81717d99f1497c4d56f391c0c7a77ce9d5a05c316a54c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/listening.png",
+      "sha256": "f38a9e99240d86de8f7964b3e3c17d05df8b9fc1bd0251d560dcd7ea7f67eec8"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/offline.png",
+      "sha256": "e530711aa9f636919174043ec4f14fe2316666baf7953d2af54a63188b7c63b1"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/organizing.png",
+      "sha256": "dcbcd6ecb1137864a10d6c9b7cf797441243de2bb214420c09e884f74fb6c624"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/paused.png",
+      "sha256": "200b529568e504305ab5fc532659514e2dd9b8c558289caabafc42b6efb1c05d"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/searching.png",
+      "sha256": "5533099e3d81faaebf32a02f3e8ba8b38371f73c9ddfa1a0d175fbdd58c80cca"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/sleeping.png",
+      "sha256": "53c1a9f4f719ec6f12c341b7cc8da8f81eaba8595a5cb8292570b87f98e8ed01"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/success.png",
+      "sha256": "e7d5bf3aae6a9338d4cabe897e1c3f49b9b95cdd50c989293b56368e7a8b83f4"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/surprised.png",
+      "sha256": "52e5e81e08e139e8be08342e1d8f00b47bc85fc94cc85c073533afeff7636843"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/thinking.png",
+      "sha256": "ceb64de5285d7ab8e88e02f0cea2545c53767935667aaaa690ed3b8d85f94cc2"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/typing.png",
+      "sha256": "0aee00c504776698b8b7718c7ffa77e2f67c88d1df205acb4803d8db679c2961"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/waking.png",
+      "sha256": "f4a040318f0330f0ee05ef17f6e8c326ef0991abf41c51936fbfc9c3312b1cf9"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/walking.png",
+      "sha256": "7b3bcec9c1e6e4abb69edce9d8140bc2044740947f77f1e65e7a4c8999126750"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/welcome.png",
+      "sha256": "66b2eff27c6e4d9aaa23f68219b0b1e3ff8d04b650f733e25e13ba7ea66fd8d3"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/128/working.png",
+      "sha256": "5135917cf0bf2cda74e09c272499d7696c68d2fc9e1d204f9f64259530bd1b27"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/approval_wait.png",
+      "sha256": "73b8ea29f986ae748979b921c371e0e023ebeb24dedc794d08e2239731ba3840"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/carrying.png",
+      "sha256": "a50ec17d3737c62b82324dc3ead4a0fd50420bcfcdca3b5ed0472f8c2d25265b"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/celebrate.png",
+      "sha256": "7d77c5f1b23ac6ebfdbbb8ec8563d39c6abca42f8ec3f7709c9660031c181fa5"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/confused.png",
+      "sha256": "ef8a6a672a1dfbf976228eecd7f6cfd269722c7c6246a3c4a68aaa5c635a858f"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/curious.png",
+      "sha256": "037f68fcdfe9507f851aeab45a497412d783f0e0dd9bb27ccdce81ca5ccf4790"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/error.png",
+      "sha256": "6caa764271cc24f58d65d373e5058490c6a4c09be7606f107926f16b51558837"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/goodbye.png",
+      "sha256": "e6821a95dc1876295cb9825e020ff2da6f6855f4391c99794aee23ed0d3ecb8e"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/grateful.png",
+      "sha256": "ba1312a7f58ed8009f1e1e7f6493a679ec07dae97ca3b9f6aaf8737ebe9e5c57"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/guiding.png",
+      "sha256": "55e0e304940f19f8039281df2a7da7f890016a078f0911859af0bb0bbeae94df"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/idle.png",
+      "sha256": "75fdb8d2d20e2568d37ea1c07482dc8b80f2d5202472400133043d813152a2a4"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/listening.png",
+      "sha256": "e0528b5e269167a9e7a2e838063a6be96ae8a475b32fcd9d85e0464b6c974195"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/offline.png",
+      "sha256": "9aff5bcb2526109bba95e756b1346fb38791df5b0b032160a2c734bdc34048f4"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/organizing.png",
+      "sha256": "8549ce2df09eaa9775767af302b591b250af8df1112f0c1aee3248a82195cc33"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/paused.png",
+      "sha256": "7346ddc74d7d7e5bbfd08a882d5a49caab656f9219263c304c5b4ab04091f06c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/searching.png",
+      "sha256": "b85f9290befc353eab384bba51487b6f78e0e547b61b0620a55643b8e70d2ae3"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/sleeping.png",
+      "sha256": "a818b7d1b3babaeec5016a09734e4de6816457e69c33ebceb81b1a7703ab576b"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/success.png",
+      "sha256": "f0d089f7fe7e48c79d7f885135b3bcc3d3eb2d123a10a73ccac75cf44e0cd63c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/surprised.png",
+      "sha256": "1ed041fe2a1d07a1b5b341a8724e16759ab89d8e6ee9c54636dada3e5a1fcf23"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/thinking.png",
+      "sha256": "f18ccc714227e8e90b88fed53acaf53cffa34bcc04dc756bade48a713d22cfe7"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/typing.png",
+      "sha256": "53802722d363b97d7daf1fea0f2d337b05a2ba8a91fe8f8307ed5bab6c94ce8c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/waking.png",
+      "sha256": "8f4028af52b755c504252738fa5ba15fc20ba0bc75d9788da8c09edfa018284d"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/walking.png",
+      "sha256": "30cb286b417f0a882c91ff7effe11587758a06203a7805f2b9fc53c53b280ea9"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/welcome.png",
+      "sha256": "f3dade8f41abcf7b164201eb61a4890595d2361b8a4197be252f8ed538cb8ea2"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/320/working.png",
+      "sha256": "9633b3ee0f2db3d7ce2ac445a58061818b93dc71c9b4751641a802d1a2c6a8c7"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/approval_wait.json",
+      "sha256": "33f8018a09cbbbfb48766330b4fcc527b4a93e10e2cdefc546c316be118b6204"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/carrying.json",
+      "sha256": "98094bf6678497425b5def56afb5deecf10b48a2fb18de1fc30d6102f8154cf1"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/celebrate.json",
+      "sha256": "d310df9a75a8d13726b14d045d6a7221012740ddb2c20d7f1142fbec25bc31fe"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/confused.json",
+      "sha256": "65c15c27697bf86a60d6b042ebf38cbfa1b8b562c3570e472a4d2f75145d708c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/curious.json",
+      "sha256": "7664b84978556f734ec3a3302660263d980f11774f913692eaca03a84f3d5a3d"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/error.json",
+      "sha256": "69d6174e07ce91e540378e19c9b42efc6ae7c360aa3c3372de0b9afe226a0404"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/goodbye.json",
+      "sha256": "e60ae20918de598a54687aa8ae78c2880c60620eae6a69886f9af507df421242"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/grateful.json",
+      "sha256": "1df4ad1cd41d237b215e58fcbd12ea1c71a5f0d32e64d5ba889aeede326fd5c6"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/guiding.json",
+      "sha256": "aa7bb5b0205abd36c4bca90ee24e818dac5029be6d3d71512e00277cb5a4f8e4"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/idle.json",
+      "sha256": "1679d7a391fec877bb5525a4d2bad5092a0ba5a913d95fbae4d335e9b25d7216"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/index.json",
+      "sha256": "4a7b2ecff88e4bc9966bdaea4f42d908aad7081e3ea15cc9c4b1e02ec2b3c5e7"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/listening.json",
+      "sha256": "40c966200ae64b5fe820169271c9c28a6f329695fb09eede54e724f60eecaefe"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/offline.json",
+      "sha256": "2481b1ed6611c1338e388fc5afd54e9ca67837d21b95b0ee839e191419ffebc7"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/organizing.json",
+      "sha256": "884488988ceab9a6c93982144c299ec9f83dc4c4fd4a63d888143e940a8afa1c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/paused.json",
+      "sha256": "67821f5404aaf9ebc383f55c7d0f2b22eda8747031e09e102766458a804fe116"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/searching.json",
+      "sha256": "33d3ed28bb4b4943d61ea6c148eec450c8a17a8cd9ca5d62adb5c2506bc7ebbc"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/sleeping.json",
+      "sha256": "8db62923a04bfde3220e33da6e1d065c4cb35ffc007da4847323127239a15fc3"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/success.json",
+      "sha256": "fa7f5986399662123155a83c0c2649c951fc51334f84fb5debf42a9b6266d7cf"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/surprised.json",
+      "sha256": "1dc3fb6df0e021f5a1e7ac116bc1befcd133f817531e0ed474fd0850fb40c75a"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/thinking.json",
+      "sha256": "a436f1acfaf7c14138cbe09b8790b3b679c8b3879ec4e250e200c9b69321ac54"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/typing.json",
+      "sha256": "833e9b5c2984c4bad97a5c0b9b0e9f44a3910c2a655cc6120004835ed72f54f9"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/waking.json",
+      "sha256": "080cbaefecb42da3fcaa51cde4e1a58b04540005ac4937a82622d010358cba77"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/walking.json",
+      "sha256": "8cc6792e832ce4a1f17e2706dfacc4d08ca64aca2158cfec92d5c272675db7d5"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/welcome.json",
+      "sha256": "2d5eb4478a243c97fdc6ba6a57d8d8055af0dbc393996507fb4b799b1212523a"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Anim/working.json",
+      "sha256": "e331d8fb2289c0558ab3e2a64bcccf0d58e10817bf62391807de64f90d3e2a98"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Avatar.swift",
+      "sha256": "c8d987e996ae58140a26f9c37fa781dc1b939d62113fea9949c41ae9ed49e461"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/BotAvatarView.swift",
+      "sha256": "898cde55618ef1f241f64cb407a7aca764c43a413a47968004b7d78b018bc3fe"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/LivingMascot.swift",
+      "sha256": "353e9485c143ecb70bf3778a7eac136f4f16a48dfd4224bb9730cb36c4497d15"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/MascotAtlas.swift",
+      "sha256": "20a821c1f3e59409c618babfb9391bceae850406b73ce8ac9f21be3ec1cadee4"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/MascotMotion.swift",
+      "sha256": "f793209b8e638625439b28504dd71c9603d19c1f3cc3c40650173b388b224f4e"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/approval_wait.png",
+      "sha256": "82c04f78faf0ef8baf492121880e74c5f8aa0342ebfcc9d09c8bc54ccf0c7405"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/carrying.png",
+      "sha256": "7d2c1e2410f29c32827cec7b671c648723b45902652183ffe671c631f749deb5"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/celebrate.png",
+      "sha256": "4569462fe5840fc9204ac4c6f67580e2aacb23ecc5d5be52dbe10aa043812539"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/confused.png",
+      "sha256": "8330ea3ab3ce58def6aee15865f48faaed9f1c747aa979e9639d03bcb2c616dd"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/curious.png",
+      "sha256": "11150895a1d75158188e6c7f02cfc410ccb46ddfede574931d5aecb518364e30"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/error.png",
+      "sha256": "596f5ea8ea6e52bcb5e096bbb6d555c1a492d5b510754604b18520accedbc51e"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/goodbye.png",
+      "sha256": "879d47016474dd9ad8f4ea826d8c9643b289973a1d154429ca87ae9afc053689"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/grateful.png",
+      "sha256": "eda6b8a7e58523dc3f34cf544e2188e8d0b5c091370ef54e9b9e9b53465339a2"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/guiding.png",
+      "sha256": "fa7ba440053931a424ca55cdde15b3184bfd86d0c1879c7bcfee8fc16137ee61"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/idle.png",
+      "sha256": "062bae6f469ec8fedcba43fa8e9726bd23d4133c006828d8bb0aa6dc6d244b0f"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/listening.png",
+      "sha256": "1f4f7a63542ffa1cb985a3b1dd3bd18df8a874cee0447265af05cfe416eb4114"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/offline.png",
+      "sha256": "b2eb97721d766e3d7b6bd9d05dc1b286ff61e2e12261ac8378ed19337eeb5735"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/organizing.png",
+      "sha256": "9563877bd918b90f51ad3d4daf1d90cfed115e0cb61197213c69fe2656002ec2"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/paused.png",
+      "sha256": "cd22221f15453daedc717d5b8d22ea2e2f360bc6fcb61583d1f8a7ba0e760bdd"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/searching.png",
+      "sha256": "a706c05e242596bb715af17048ef0b0560066126fbd8bc0359e00a71b7be6f5a"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/sleeping-clean.png",
+      "sha256": "59194e46ff2dd5e0ae9956a2d9a5e8ae01166cc97b7c2f3ffd0d39f36cf23706"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/sleeping.png",
+      "sha256": "8416e52743d9391f43e92bec497fbfe74163463903eb8ce6e7246e26cb151d51"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/success.png",
+      "sha256": "923395d6e2261c7a8fab1048b66701e0bb1b0ee67f183d5b73b8b58c682ccd32"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/surprised.png",
+      "sha256": "1e64f8a20d143666f6642902b05da14c554e9f372001c8c8fa2a1ceec0e31ff7"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/thinking.png",
+      "sha256": "c547d7aa9fcdaa751d3e5321dc72b070cea5ffe9fb945fe9ea37ca1a335034f0"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/typing.png",
+      "sha256": "225bdfc7c3266a7d514639ca534532857d771f3fff8d3d12fcc914a050148d4c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/waking.png",
+      "sha256": "0a5286380b6795f8bebab804807a22a5c4458bc25444167099ef6ddc8b81a887"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/walking.png",
+      "sha256": "88f245e458843dbe184c9f531562849196626404356818eb461a20b68bc61a1e"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/welcome.png",
+      "sha256": "fa75d13f51f7a7d60a250bb29452e6da1d412ae11dfebb2be009fd1de994404c"
+    },
+    {
+      "path": "Sources/Zeus/Avatar/Poses/working.png",
+      "sha256": "d024246ec8c71357cb08cabebb6d1f4366b87637bd546db94890374293f0edd9"
+    },
+    {
+      "path": "Sources/Zeus/Brain/AheadRunner.swift",
+      "sha256": "8dcb5d3f39af0b0eb93a59292547590a3082bfb25fb7db8d75c03f448ec54c6b"
+    },
+    {
+      "path": "Sources/Zeus/Brain/BrainWarmScheduler.swift",
+      "sha256": "0ec167d0ede557e0aae32d943819c0a4d95a677812856584ef6b52b48a3d6ece"
+    },
+    {
+      "path": "Sources/Zeus/Brain/CLILocator.swift",
+      "sha256": "51d689fc0dece8c6860312395e281a1ccbbbdea5fe680ca4b365730894f6856e"
+    },
+    {
+      "path": "Sources/Zeus/Brain/Providers/AnthropicAPIProvider.swift",
+      "sha256": "dd1882d089821dfecb7f46b5d887d5c730b96d8c258a401ba81f8e73dbfc30f6"
+    },
+    {
+      "path": "Sources/Zeus/Brain/Providers/ClaudeCLIProvider.swift",
+      "sha256": "5947d73d578082d5f6659f9eeea430ae6235b7b1197fd9ed5b603bbd563373e9"
+    },
+    {
+      "path": "Sources/Zeus/Brain/Providers/OpenAICompatProvider.swift",
+      "sha256": "bb50ba2b5918af37ac17d1f08ceb2bfa2a66c9d5ef4ddd66734d93530cd449fd"
+    },
+    {
+      "path": "Sources/Zeus/Brain/Router.swift",
+      "sha256": "d44fb8a5904daaac2e51f96bec8c741da05d718d05ac35dc0b53607818aab2eb"
+    },
+    {
+      "path": "Sources/Zeus/Brain/SpotlightClient.swift",
+      "sha256": "4e6715bfc9b5cd0de3a62cc789aab3379f2ff512280d484fe7ffd826a6d09189"
+    },
+    {
+      "path": "Sources/Zeus/Brain/ZeusPrompt.swift",
+      "sha256": "10422f2ce930b4bb9014b2ff83022793072d5981d51617f67f35d1b111100565"
+    },
+    {
+      "path": "Sources/Zeus/BrowserAgent/BrowserAgentRunner.swift",
+      "sha256": "15600c88dd5a33089078eaf5321116138297506465aacad14c5ec8e9fb3eb08d"
+    },
+    {
+      "path": "Sources/Zeus/BrowserAgent/BrowserUseBackend.swift",
+      "sha256": "a7a1b86ecc6657a475d13565ce945a9961f73faa3bad2278bea387b154064337"
+    },
+    {
+      "path": "Sources/Zeus/BrowserAgent/BrowserUseSetup.swift",
+      "sha256": "6f3e76f56def5e58b70f5648217fbd3f6f2d78c574d8762964fe0bd712f15404"
+    },
+    {
+      "path": "Sources/Zeus/BrowserAgent/BrowserUseSmoke.swift",
+      "sha256": "7b4d459696f022556d423dba98195d22af3edb820c21dcbfaf541a5dd48254ca"
+    },
+    {
+      "path": "Sources/Zeus/BrowserAgent/MCPStdioClient.swift",
+      "sha256": "927100078ae84f97a57577e376bdd96b6d4dec7d61e8605af879aec52510874b"
+    },
+    {
+      "path": "Sources/Zeus/Chat/ChatHotkeyMonitor.swift",
+      "sha256": "fd659c36e5d847a4c6d818a495f463106be2b5506f0598cb3c85fcf7e7397c08"
+    },
+    {
+      "path": "Sources/Zeus/Chat/ChatModel.swift",
+      "sha256": "0591e45a001d9950c10951294ccce82429069009d530abcc28b55f8362fc9623"
+    },
+    {
+      "path": "Sources/Zeus/Chat/ChatWindow.swift",
+      "sha256": "812462a2c03fa48e37513c667d96f3aac6c7bb3d32b86c143bf7c0a715a8563f"
+    },
+    {
+      "path": "Sources/Zeus/Chat/MarkdownBlocksView.swift",
+      "sha256": "1b9505b90a15178534372937f9bf5bbcc0610f18eb6b1e2773e716085bfe9af9"
+    },
+    {
+      "path": "Sources/Zeus/Chrome/ChromeActions.swift",
+      "sha256": "87d7a91eb3e0706b487d58786aa5ce8b5a556e15f682f0629daa457acc1c56fe"
+    },
+    {
+      "path": "Sources/Zeus/Chrome/ChromeBridge.swift",
+      "sha256": "c30314569699c559b71e9f4290d007556bac98cf5e6514ea1826ffaa93f23920"
+    },
+    {
+      "path": "Sources/Zeus/Chrome/ChromeInstaller.swift",
+      "sha256": "29d4e6945b54ac98972173ef54be1137ae9b43754bb0e2793b513fa179f5903c"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/AppleAnalyzerEngine.swift",
+      "sha256": "83da9d8b7071734974e2d4725860dcf2e31f1c0d586877b9d7a51d590feefe04"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/ClaudeRewriter.swift",
+      "sha256": "e63287db75f00a9a4fb303f18794ce8a9fd7262e7226971523f110de179731d6"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/CloudSpeechEngines.swift",
+      "sha256": "b6c22c271173986a04597193d1fc7cecc85e0ca2e6576b1c3195028c2369993e"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationController.swift",
+      "sha256": "184cec70d89f693d50d94c1adc65098a36dd8a8ddbf6f56ea6f831107526e8db"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationDisplay.swift",
+      "sha256": "8dce663cf9b5dab6abec1b36dc332f090d2c36644cc63256bbdf2008a5577d01"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationExtrasSettings.swift",
+      "sha256": "fe3271340334f0c1bb6e9870fb6df6cd27a7c48a1e941846f8769ba8879906c9"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationHistoryWindow.swift",
+      "sha256": "f9967dc594e34add5fc69f51d2dd44011c85293e7c2d6f285a37b9c01e7d023d"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationHub.swift",
+      "sha256": "4c84e7360e600847cd5b1752e07d82050e2bbfeb5618ebb1a409f9c3181b5b21"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationInsertionTracker.swift",
+      "sha256": "c2c5a4624eddb6a42f25dc9d3bed452ddc761a66080db8f5851c8865bb37d96b"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationPreviewCard.swift",
+      "sha256": "fe68ba3377d3029a00d8a95086449802ac99b1c15d7f3d218c4053a0aa315b17"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/Microphones.swift",
+      "sha256": "f28555208d2dea879e7168dc911067193c1529f40a6e1a472106972d42e16653"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/SpeechEngineBoard.swift",
+      "sha256": "9e500aca17be7b4bc6a649e8b75d174338afca67e133ccfe7f6e3a2d44901a56"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/SpeechEngineSettings.swift",
+      "sha256": "c00384a11bc179b6e3df194b45859e14e4c4d249b4e0fe593dc557fc2d944b57"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/SpeechEngines.swift",
+      "sha256": "f20b4a0e334964178c3d623b67d0bb829d5330cdbb2d2754331a19a1e0df91e6"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/TextInserter.swift",
+      "sha256": "1ca5d2d822d4958bb70ab3d32519a3417b1ea19a7165db373c0d92dc39752f51"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/WhisperKitEngine.swift",
+      "sha256": "0fc487728e0d0950612273e2bc6e42d7cd46f1e033f15831ae95ad6856e76333"
+    },
+    {
+      "path": "Sources/Zeus/Fonts/OFL.txt",
+      "sha256": "995c7199cab65954f545996326755daee7b63cc6b42b06c13da1f9502ab08a99"
+    },
+    {
+      "path": "Sources/Zeus/Fonts/PlusJakartaSans.ttf",
+      "sha256": "89b3fb38aa0d275d7a731d0d817a4f1622b316b4d7fbdedcf02ee9099ff68bc8"
+    },
+    {
+      "path": "Sources/Zeus/Hands/HandsLane.swift",
+      "sha256": "6a7020e672dace87a1b454b6a73875f7fcce25d51f935a1a86cd456087f5a38a"
+    },
+    {
+      "path": "Sources/Zeus/Insomnia/InsomniaController.swift",
+      "sha256": "5813a6f78f0765508f85e5d4a00d227cfa5c6098181a07732b8ae30f722a95bc"
+    },
+    {
+      "path": "Sources/Zeus/Insomnia/InsomniaInstaller.swift",
+      "sha256": "93da2e9da81b34096a6d1fbb6eb31701eb3912b95a6435906fa75b1fdcc0b3ee"
+    },
+    {
+      "path": "Sources/Zeus/Insomnia/InsomniaPage.swift",
+      "sha256": "46ff20ae604ddac35a75c496f8ac695c24028beae75c7e8a4d9e15292ec258cf"
+    },
+    {
+      "path": "Sources/Zeus/Insomnia/LidMonitor.swift",
+      "sha256": "30cb8c23f854225cf3107e9783f73d0d42267a945f3f395320929b122e619ff8"
+    },
+    {
+      "path": "Sources/Zeus/Insomnia/LidSleepGuard.swift",
+      "sha256": "94673b3bb48620697b8c5e06e8c1096de03984a985c62f1891d7354859acc470"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/AIConnectActions.swift",
+      "sha256": "a5583b349f0299ca9e52ed81a707e15e1214762b3700b64a426d5f0ec186e4f6"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/AIConnections.swift",
+      "sha256": "5c763bbb251e0f38743c17b38db9f4f274ba57809805cf0c8f048dec08da12a4"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Beamer/BeamerService.swift",
+      "sha256": "a5ea7bd0558b3ce73042068d4edcf688907e13ae986bef2dde13cfae4acd92c6"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Beamer/ContinuityPage.swift",
+      "sha256": "1b5e239745afc8bb908157d307b7f328dcca4a1b97d402ecb7126890716d75a0"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Beamer/FastActions+Beamer.swift",
+      "sha256": "65ee8ce2d439df52c2a87abbb812dc4e3c1d4119e1bafbd8a8071f8305e6e16d"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/BrandMark.swift",
+      "sha256": "8d0050f78f9cd3056c03aa2ddb040041fdb5cedf1d402a23735436429e4b865f"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/chatgpt.png",
+      "sha256": "29a63f80864a00daa15dd1a721b81e0aea59d10cb1827fb023e7587ebcd90c1e"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/claude.png",
+      "sha256": "eb3faa1ffaf88cf6692a98e7b608cd481a2d202eab096d9dc9efd89dbac60597"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/cursor.png",
+      "sha256": "7fae23c345917f1efddd04d7d11b71fc59716c877a20d077b7761bb2ae087c9e"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-anthropic.pdf",
+      "sha256": "5aa68b813bb8f9c59017a64bdf9e4591e3c18a715014bf6dfc6956c6792b9d07"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-claude.pdf",
+      "sha256": "3dce82656d06a48bfabfee66e150cafb5178dda175ac759f72712c0a48bbcc58"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-cursor.pdf",
+      "sha256": "67899eacaaf44441e7c91f0a55fef5048b51833301c4e8f603a1e586f8af763e"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-fallback.pdf",
+      "sha256": "6501e295bd004f6c52b1275ce116a5e6a34ad0046bcad488995170084ea32efc"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-gemini.pdf",
+      "sha256": "8320df94d35292d56eea589e27dec18aa849e0944c6b6af41378df2c4c330106"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-kimi.pdf",
+      "sha256": "23a3befdee88a896411888bf79b9036d9b0ef6aa1d7268358bec956e1a1afc52"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/engine-openai.pdf",
+      "sha256": "c3316f73350caf39513ea758afe4460bb81004c4d57d3026e246595c5e049682"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/gemini.png",
+      "sha256": "18b5519ad420a3bde35c71504a045c797ca81ef0bb434b148c0085e0a7f1b383"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/Brands/grok.png",
+      "sha256": "ed98af275df444e2f08213537399cc458800831329f446f0402445640a21c61d"
+    },
+    {
+      "path": "Sources/Zeus/Integrations/EngineBrandLogo.swift",
+      "sha256": "2ca5d1cf35d91418e3dc0cf867bb3803317e2c3147bbc54487d526672f128226"
+    },
+    {
+      "path": "Sources/Zeus/Intelligence/IntelligenceCenter.swift",
+      "sha256": "94c3882bbf7fe397625ed4ae6e8205846127a9824e1107935a531d30a3c6463d"
+    },
+    {
+      "path": "Sources/Zeus/Intelligence/IntelligenceSettings.swift",
+      "sha256": "7bebdcf25f2d38728bdebd374acadebc16208f402ae146a1ab437cbc8c5abe2f"
+    },
+    {
+      "path": "Sources/Zeus/Intelligence/LayaHelper.swift",
+      "sha256": "3dcfc10f03c940ee090b1d85be2ec8477b93cb593123f4e47e1b901c790b1bdc"
+    },
+    {
+      "path": "Sources/Zeus/Intent/AppIndex.swift",
+      "sha256": "818ac2d8d8d82f796c13b1f088d5722421d2118cedec8453436175dda7cba115"
+    },
+    {
+      "path": "Sources/Zeus/Intent/FastActions.swift",
+      "sha256": "0e48fe0afacb90b4f39ed0bb29b89bdee8b4bf13abf6230bda97d0c818d78974"
+    },
+    {
+      "path": "Sources/Zeus/Intent/FastPath.swift",
+      "sha256": "ce96a92c07de6d69d2b0359da8038a9d4d55643955806d35044d8d52d19d1ed2"
+    },
+    {
+      "path": "Sources/Zeus/Intent/SpotifyPlayer.swift",
+      "sha256": "2380e5007eeaf897e3bc0183a68bbc5dfa375c9d8caddbd96b6c7a8c4b7a7b3a"
+    },
+    {
+      "path": "Sources/Zeus/Mac/AXSnapshotter.swift",
+      "sha256": "553b8f364d90a0df62467eebd4a90b87575b8a59d2776b742fe396bae2f57d58"
+    },
+    {
+      "path": "Sources/Zeus/Mac/AnnotationController.swift",
+      "sha256": "7f281b12301c178d9fb743d6cc8d26db10da443dc7be3b48d4f529066ffc50c0"
+    },
+    {
+      "path": "Sources/Zeus/Mac/DriveController.swift",
+      "sha256": "0fc293b86d2df785b2873fa03faeedb1791a6f2d6d3d5f886152d32d75832578"
+    },
+    {
+      "path": "Sources/Zeus/Mac/MacControlSelfTest.swift",
+      "sha256": "489e71189499afa82446675493b4a3da1cda93efe08036e097c806c8b81f9329"
+    },
+    {
+      "path": "Sources/Zeus/Mac/MarkOverlay.swift",
+      "sha256": "6e92dc639b7e356d834093cf3d9ac566f58ef2dc4a0fc9e9227fba729bcb6ec9"
+    },
+    {
+      "path": "Sources/Zeus/Mac/WalkthroughController.swift",
+      "sha256": "fe1a3fa1d9f0430b8203e1594397a29c8084cc7124054e73be4e6166ff3e2f07"
+    },
+    {
+      "path": "Sources/Zeus/Meeting/MeetingCopilotController.swift",
+      "sha256": "35a90d44edc1d1fccb82517724e63a468fa57e040a8bbb454a19e3499a669c95"
+    },
+    {
+      "path": "Sources/Zeus/Notch/EdgeWave.swift",
+      "sha256": "ba590fa6180915f17cd9259d5e7f864838f91f87e7279234fd6eb2194dedd0fc"
+    },
+    {
+      "path": "Sources/Zeus/Notch/GlassBloom.swift",
+      "sha256": "a6b83f3a44ecc08ded75e36df36b61dfea8df1b2fc5c266a7e07f4af816c47ac"
+    },
+    {
+      "path": "Sources/Zeus/Notch/HaloRenderer.swift",
+      "sha256": "ef52c7a1424b531962472efc3f7ee6144b81b92afe925dabe49ff8df4ce43047"
+    },
+    {
+      "path": "Sources/Zeus/Notch/NotchController.swift",
+      "sha256": "713ce2b60725a5672bdcf4c48df24753c7209f1e40962942ec108a3e23fec291"
+    },
+    {
+      "path": "Sources/Zeus/Notch/NotchLights.swift",
+      "sha256": "19bcba506163369e78f1a21db5b1acb0e926fd607cf546bb1b8ed0a31d81bc7d"
+    },
+    {
+      "path": "Sources/Zeus/Notch/NotchModel.swift",
+      "sha256": "9d581ad24b6ffdb5c71eb9812c4580959309d0994a52f721c5c50cc65d3ec021"
+    },
+    {
+      "path": "Sources/Zeus/Notch/NotchView.swift",
+      "sha256": "92b798fbc53b588703e35debe3c12c3b04e58f706a8455318a2cadb8ba7ad965"
+    },
+    {
+      "path": "Sources/Zeus/Notch/ScreenEdgeGlowController.swift",
+      "sha256": "426855cd4c31b60671b3d06edeae9b781e230c58494aedc7b5359aed0660b87f"
+    },
+    {
+      "path": "Sources/Zeus/Notch/WallpaperLuminance.swift",
+      "sha256": "cbc73ecb6ac2c81cb186424f5c8f8e1de191701638a2b9b7730ef338d9a7706e"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/intro.mp4",
+      "sha256": "3b50f3fb5f51e7c8fdcbefaf871cf32c10161dc39afd94cc15b7b24af6a52093"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/learn-approve.mp4",
+      "sha256": "0cb869174b4e92f42551b8aaabefd7d0358dbf19d12bd58258d8a0ce4dedc8e7"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/learn-everywhere.mp4",
+      "sha256": "258edf0fadebd045d7dc58eec39b66ee87fa632c692c43adbfd45bc75e27be84"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/learn-murmure.mp4",
+      "sha256": "9e26ee66e31c61783d54c5d301bdd550067733c19e70ad2f1f5ec9d5090594fe"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/learn-previews.mp4",
+      "sha256": "2e6859ce306a9b321e225da862598e1d45ea90a42c62301f205af69d3e8569db"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/learn-running.mp4",
+      "sha256": "7ac02a4b85d1b3085b6bd52bfb4cdc67090827d97c81cb618eaa85cc90c9f602"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/Media/Films/learn-shortcuts.mp4",
+      "sha256": "f685c6e759dc0ebbd245aee4440f322d3cafe377ab3310b410bf198aa7350852"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingFilmScenes.swift",
+      "sha256": "01a834f7263a489ce278f3fc333e57e1537aac12e3bafdfac80eea8a124dd1ec"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingFilms.swift",
+      "sha256": "2dc3637d346685553582a37547acea95bc445ffcb5d0140cb71e48b2942f7cc6"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingFlow.swift",
+      "sha256": "fb64e867dc5697b3a9773ad63ac8177b1ff62c24144142eb0d53df1123ca01cc"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingMascot.swift",
+      "sha256": "2a0faf6006a102c84c3a4d383a3747601007121c548e36ee31f630441400ce78"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingServices.swift",
+      "sha256": "1997a420ec7c97de0c2ebd90123c4922f7b8592e86143966177fb82294ce1231"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingSteps.swift",
+      "sha256": "0af48882b45a22f08635116b6154c55a4163e633c2bd65de3f0c66fe6cc7a4c0"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingStyle.swift",
+      "sha256": "28e5e1ef6478c64ad55be3c1f56fce23200584232e8eb9bc9d5ecdfa39c309b8"
+    },
+    {
+      "path": "Sources/Zeus/Onboarding/OnboardingVisuals.swift",
+      "sha256": "8c0e60aae14a5d491d4cacf66011836bff8eb42de4f3c86f0317baede619f2b5"
+    },
+    {
+      "path": "Sources/Zeus/Overlay/BoltShape.swift",
+      "sha256": "6ebe21690f791c78c2ce121e2b21a000205f2dec5c2e4b1a997aacacf86bd84d"
+    },
+    {
+      "path": "Sources/Zeus/Overlay/BuddyController.swift",
+      "sha256": "c4de18c19025fc3fef524a12f76389e29ecdcbf76a552b37e7beb7b975ac5ef0"
+    },
+    {
+      "path": "Sources/Zeus/Overlay/BuddyModel.swift",
+      "sha256": "4c9de2e2421ba49d4a86cfb2a1827855f7b2d6f0b84eeca71f16329a2c160226"
+    },
+    {
+      "path": "Sources/Zeus/Overlay/BuddyOverlayView.swift",
+      "sha256": "2c32dda75f4a2250fa5dc2ce4c94e84b947db4ec2d35b98c480d618f4ef46d95"
+    },
+    {
+      "path": "Sources/Zeus/Overlay/CursorPresenceController.swift",
+      "sha256": "399a2519d769d70d68cd9bb84dc416a609c56f720233eda4ed982635cf3720ba"
+    },
+    {
+      "path": "Sources/Zeus/Perf/TickingView.swift",
+      "sha256": "095a08598650f1ab5399425ec91aa4f303c590f220c5e62c2807d16500338994"
+    },
+    {
+      "path": "Sources/Zeus/Polyglot/PolyglotAudio.swift",
+      "sha256": "b101819eb76fe8e3a5f1a39a2c1158f5e09a6e9627c8e998affbefdc674c5478"
+    },
+    {
+      "path": "Sources/Zeus/Polyglot/PolyglotController.swift",
+      "sha256": "f00d5c95ae19123f0fe52b36f4f14357c05101e903dc56f531a0b64e8b8f4e12"
+    },
+    {
+      "path": "Sources/Zeus/Polyglot/PolyglotEngines.swift",
+      "sha256": "7a3856b0812c49ce930260a72aa151f519ff673f7ba23f788b9aee6c656ec6f6"
+    },
+    {
+      "path": "Sources/Zeus/Polyglot/PolyglotSettings.swift",
+      "sha256": "d596500d3d5461a2ca27cbd59c86999a773217b67957005eccf6671561451c59"
+    },
+    {
+      "path": "Sources/Zeus/Polyglot/PolyglotViews.swift",
+      "sha256": "777e2303db6ca7bcd60f4dcea929e61a9d13f30c04d9ea68afedf8f0a20a677c"
+    },
+    {
+      "path": "Sources/Zeus/Proactive/BriefCard.swift",
+      "sha256": "54516f21ec69e008e99813a77c261b8cfe2e559a7ab8c7a6b4e81b66efe9bdee"
+    },
+    {
+      "path": "Sources/Zeus/Proactive/ProactiveController.swift",
+      "sha256": "c95757e9802a88c9ecd9045cabae41ffbc64dbf3946b70f2248b4a32c6450069"
+    },
+    {
+      "path": "Sources/Zeus/Projects/ProjectScanner.swift",
+      "sha256": "5734cad07805753f464b5380f8a9ac69abdee9c3b96eef1effd08767ce5d3290"
+    },
+    {
+      "path": "Sources/Zeus/Prompter/PresenterNotesController.swift",
+      "sha256": "cabdc0a2a5de12ed9d54435c5bf1a366eb79fc48f93a5f19d4c76c038f55f881"
+    },
+    {
+      "path": "Sources/Zeus/Prompter/PrompterRecorder.swift",
+      "sha256": "3b118a7d4eb8b083befbb52587c36930eb37cc5f2aada3e6201c0d625d595ba6"
+    },
+    {
+      "path": "Sources/Zeus/Prompter/PrompterWindow.swift",
+      "sha256": "1a05c5179565341a4fa10a30e598c2c555e9a1cc46b423ea6d9ffe34bd33a9a6"
+    },
+    {
+      "path": "Sources/Zeus/Prompter/PrompterWindowView.swift",
+      "sha256": "6bcc4c847dde1e3bfcdfc2776363b5c7fd0aa985cfe32f97956235d1464fa47c"
+    },
+    {
+      "path": "Sources/Zeus/Recordly/RecordlyCaptureEngine.swift",
+      "sha256": "685f6915711948fc68ce24b4c60887321b5086c2e933f8af8e9c8df4c123fe2d"
+    },
+    {
+      "path": "Sources/Zeus/Recordly/RecordlyController.swift",
+      "sha256": "e80fff6395860209b575b7a4f01af83c19c04ad9a5b062b7ebd5a11878ccdc97"
+    },
+    {
+      "path": "Sources/Zeus/Recordly/RecordlyExporter.swift",
+      "sha256": "5787e81be8dda1cd76c25a04a19624d6f4bc926e128ac6da14f0d181084f14b6"
+    },
+    {
+      "path": "Sources/Zeus/Recordly/RecordlyMediaResource.swift",
+      "sha256": "60e85eeeb692bb9dad18c66a535cf13861f912c14e409a225b63a72c01bb492b"
+    },
+    {
+      "path": "Sources/Zeus/Recordly/RecordlyPage.swift",
+      "sha256": "58f328f63b72fd32727a084700802ffe98e79fb99ba3581e79893cf251a9ab09"
+    },
+    {
+      "path": "Sources/Zeus/Research/ResearchRunner.swift",
+      "sha256": "b3070ec4d64fc2799889581d9b545c9b36f2e3af69e052712473723e0f0da050"
+    },
+    {
+      "path": "Sources/Zeus/Routines/RoutineRunner.swift",
+      "sha256": "62c72b889ba0564f07572dd26905576f20177d4f44b006af714684b6e128d992"
+    },
+    {
+      "path": "Sources/Zeus/Routines/RoutinesSettingsView.swift",
+      "sha256": "8f4736e0c645985e9def27bef3e484647debfbf57b8514234eaa08808dd1960e"
+    },
+    {
+      "path": "Sources/Zeus/Screen/ScreenCapture.swift",
+      "sha256": "30c8984c1d47bb90abb18b0825462043babc17651290ed97c4b3df20d6fb6cb5"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeCallPopup.swift",
+      "sha256": "73206819fd75811f47725c2d3eb488caaed6f7ef7c9838e5d9f33801ac1c42a3"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeCallWatcher.swift",
+      "sha256": "630bb839044d3d2ab195c40e601ceff6368a2e09dd5a1b8603476bb293a92de8"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeController.swift",
+      "sha256": "6f7cfb451f3f482b2ac6546dcb76f84f95ed1c680674c1136633e770d578f3b4"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeEndWindow.swift",
+      "sha256": "4581b11ca75522b2aab6a6fa80889a0eefcb6066daa52e878ced150b855b199a"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeLiveCapture.swift",
+      "sha256": "47bb2d8b38e573f89c037681b8aecbda284248e89f40f944f7fddd514c4cf846"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeMuteDetector.swift",
+      "sha256": "099ed471b07e2c024507148108b27fdb81b1060fcad986cbbe4758b420fb8322"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribePage.swift",
+      "sha256": "89b22413064aec992c89e61575072202d93ca29d7bb751424ec58bd48b2c3b9b"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeTranscriberBridge.swift",
+      "sha256": "2739cae046d0f600617da7492980e18bc93b84d01ca163c3bbb729a01ca206c9"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSAIConnectionsPage.swift",
+      "sha256": "35688aedb572d4b4bec11e6607d5931d6161c866fc7d8ea1603533d6926dbd6a"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSAgentHubCards.swift",
+      "sha256": "380af33796724371d6b851f32f3c4b6c0d1a566cf5a9bf91d4cbb89db65af49b"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSBeamerPage.swift",
+      "sha256": "ff1c687c457435bf50cec4d76a59105fd0881868fa17879672a4bf1fda4fefe3"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSBrowserUseRows.swift",
+      "sha256": "e977138a3f46ad0752acd556825d7d4032bef9929c0b03ca4ca2ec09375880ca"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSDiagnosticsLogs.swift",
+      "sha256": "1527eaf6b571a126dd3dcfd8e85233122a8e375314463a8c8698c587acf3191f"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSDictationPage.swift",
+      "sha256": "fb17c485cfdef68b040d4e94d5016de9ddd60e0eb2cb4ebede9041f0477a4048"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSEnginePage.swift",
+      "sha256": "a3819184a4e3cd08a0bbec401aa2ff2018f36e5da8a6eb75400b18389db1f3c1"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSFeaturesPage.swift",
+      "sha256": "8fca4b81fe6b95516443a5c4527c5c2ca2ec0daa0d24ba6fc966026edd0cab65"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSInsomniaPage.swift",
+      "sha256": "872af9a22824c8f257e4f3e982bb0dc55d1ef6d902d831846d0ec13cbeee2f11"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSPolyglotPage.swift",
+      "sha256": "a5da6796b9a7976724e9a14c2d1c85b89e268ccb886fe6405b3137b5314fc3b9"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSShortcutRecorder.swift",
+      "sha256": "4a776675e01a105d025f6e36e9595ca6c9247f2aaaf8e2e3d87c31daee9d18f4"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSSpeechEngineCard.swift",
+      "sha256": "5815813fed526391a3b0343ea69edbf680350eea1fa6a6aa2172881fa0f9cd67"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GSVoiceCards.swift",
+      "sha256": "56c362461c5fe39ed52e314818aed20ad22c9e45052e6261841701048480c8d0"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GlanceSettingsPages.swift",
+      "sha256": "027d204b4c9cad7941a9d4a525b6aa773d0007673e5f90f1daf551f6f0782acb"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GlanceSettingsStyle.swift",
+      "sha256": "b5cad7259fb73ebae509cd6efe29926cc0e8c50e08f7ec6747bc4698b92c0de6"
+    },
+    {
+      "path": "Sources/Zeus/Settings/GlanceSettingsWindow.swift",
+      "sha256": "d2c1fa5c5c2085a55e2c9ceba67df2ee594dfdda0d6aba38f9207bfba13e451c"
+    },
+    {
+      "path": "Sources/Zeus/Settings/SoundStyles.swift",
+      "sha256": "caf8647a7eac72964fae95c44411e1c5da2ad096891e49521336cf13df2616fd"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/answer_done.m4a",
+      "sha256": "12bc129c612c9bb7e54627f8a85558ced71af2ab5592968033c42bcc89a190dd"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/dictation_begin.m4a",
+      "sha256": "ba3d748dca41ec5b74bedb81539b5d48d1b18ed5e37b91abbf8ffd81903623f4"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/dictation_end.m4a",
+      "sha256": "a9d6853f1964d817bb63307a8cf2c37354c6f5241a83ef02ea1120bf1147cf8e"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/failure.m4a",
+      "sha256": "9a221a10fdec7355c695e7019436659d1db57016a2c108eefbfb85bf068ba448"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/listen_start.m4a",
+      "sha256": "b228f1cc88f9968ef24191f8a4399a454994c4260ee9542a04593c6e06a4ea31"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/listen_stop.m4a",
+      "sha256": "a26cef90221ff79ef89af5eecf4845698b62c38b6e620ffe9c47b94a70e877b0"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/permission_classic.m4a",
+      "sha256": "4d4d802e2ed2254fe2d7798ba2dd99e794d04810f2efcab9d8501790846eb214"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/permission_gamealert.m4a",
+      "sha256": "1e6827521d001886ff145d7c42bd9da9d839f5230e5429d5223882058384a3c6"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/permission_notebook.m4a",
+      "sha256": "c983b63dbc992f2b54de45df45f5685769385d2d6dd62e3f5e88417b403d2b49"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/permission_shortwarning.m4a",
+      "sha256": "7878c1898fd493f1cc9b610575fad3b290bdf0d8ffc2e1d6010473ee70be62f5"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/permission_weard.m4a",
+      "sha256": "3566db97caaddd86cf4cb9c582fb3c2f540049b00c090193aa9844550e22ae08"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/permission_weard2.m4a",
+      "sha256": "878b4697b2fb42e936ecc52e87ddcf40b671ab5cdc32bfb7bda065cad6cb7383"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/respond_futuristic1.m4a",
+      "sha256": "bc7b8f22a9b48fdda18d17b2e0f1215dba25370492c285a6135f959d1b4777f8"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/respond_futuristic2.m4a",
+      "sha256": "550f559deb54773824a020e964741d8140cf1739ba6a6ba5a127010a4f2f953f"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/running_classic.m4a",
+      "sha256": "6668ce7b641f542da66dd7ed39f1b9931c1e3ce7ffd6f3e486ebfc194938699c"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/running_loop.m4a",
+      "sha256": "e213e54bd244ed07b026f750f06c4f724c333974ff68080b68cd2e1fcd752010"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/running_mystery.m4a",
+      "sha256": "50de66d76a0c78a4f87895ec4bc76db2457df8f8a076399960358b2c005bcc92"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/running_spaceship.m4a",
+      "sha256": "c708f5c32e38a6ad353f37095f6185b9f2c26df91ff42c70726ebe38722e3774"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/running_tap.m4a",
+      "sha256": "4367b7ef3d0151a5e39f92a86554b1082855aacd7e47249ecc64296619ac454b"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/success.m4a",
+      "sha256": "83f73cc80a9566629d67029db21307cf77c143c97759a53d09b51c40b5a48c04"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/success_gentle.m4a",
+      "sha256": "59302cf8073ef86d0ce0025c588212abc78763654452e33dfb6f82d720e3e337"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/success_spark.m4a",
+      "sha256": "9733cb3b5c289d7d2395c2c1411dcc38695a01aeb7a66b149b4cb6d818b459b5"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/timer_alarm.m4a",
+      "sha256": "08a0979cfae1ad4a8bf008b0cc4ec2ba93d1570fbe2f38c9b10414e10a47fadf"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/todo_check.m4a",
+      "sha256": "269b717b3d5f5909a6b7de93886bb46ac1d6d0cca9d70f0c7e59dadaa4759c42"
+    },
+    {
+      "path": "Sources/Zeus/Sounds/voice_error.m4a",
+      "sha256": "c2e128b1e2b4b58f5780a5cc36699f18d7ef27e3c0f5ab299c140f37229fce22"
+    },
+    {
+      "path": "Sources/Zeus/Stickies/BrainCaptureWindow.swift",
+      "sha256": "643e986779ab1393c567a5084d695d87c2da1577fe54bcbb82e282653eaf16a7"
+    },
+    {
+      "path": "Sources/Zeus/Stickies/ShelfBrainMenu.swift",
+      "sha256": "bdefea943698032a7d13e21ba62c924cdd4fc3c7d7225b6e9e2bdd96e52880d9"
+    },
+    {
+      "path": "Sources/Zeus/Stickies/Stickies.swift",
+      "sha256": "350f5b3a8f1f9c66ba9e57552ad23b68a6990a89ec4833eb15470be3a2aba510"
+    },
+    {
+      "path": "Sources/Zeus/Terminal/CodeActions.swift",
+      "sha256": "64eb9831bdc55d0037094463dd1e30cb42273114810db0f9ee325f11fe4ecea7"
+    },
+    {
+      "path": "Sources/Zeus/Terminal/TerminalLauncher.swift",
+      "sha256": "7ea94ef0e18d480c8494f7766831daf3121260b89e6e61e027132a368080a99e"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/AirDropScreenshotWatcher.swift",
+      "sha256": "8da1a247c795da62d48009d1406ea0560fa3aa109b7ad417af57650ef50712d6"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/ArtworkStore.swift",
+      "sha256": "36248f0aa3e0b99c08494c10c4a408b3ef3cbd28062e66bd94f127b033c53165"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/CardHoverLift.swift",
+      "sha256": "e190a3eea7feeea2aacace99b3ed3ccb36fd79205cf25f9456bf6eba13da0da7"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/ChatPage.swift",
+      "sha256": "47df3cbb7d9109bfdea95e09bf10a78e2be8de11f479140667d2f0275bd2affd"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/ClipboardMedia.swift",
+      "sha256": "2318beb20b8db7866fdb9cf6747875823c422586c6c49cefc21b467df8ce925b"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/GlanceEmptyStates.swift",
+      "sha256": "350dc365e00b33d3608aa2adc8cd2dd0dd81b55fddbbaed1f369fe24d3a6ccbe"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/GlanceHomeCards.swift",
+      "sha256": "b963e3db78c7c293b61407b56099e40c179d9a0717823149fd98fef6643c0fdc"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/HomeBackdrops.swift",
+      "sha256": "ce97e168483fddedc3ff2c1357ae1dbae37f004d6bfb0e16d1537e9ebf4e23ea"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/HomeStripView.swift",
+      "sha256": "839376ae884d4293635415fff5a498c1fb2fd53953daff409bb9043ab47ff2c0"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/HomeWidgetViews.swift",
+      "sha256": "65a1ccd9be3114424a947df3e0d8e553c5127238a1c78fcb43caede71bc41a8b"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/KeepAwakeSession.swift",
+      "sha256": "deb1eb49dda4e4bf4e522db53f736875423d32db5589f63c0091a1f0831a88db"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/LyricsViews.swift",
+      "sha256": "4deaa0cc9bda20704b8f48cfe56a6474f419b7f1916a7cea0cbca37c00c3ad31"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/NotchDebugAnimator.swift",
+      "sha256": "17ab97164a356639c78380c7f5ec708be8626f30b8ee6477e00ab466d1e11630"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/NotchTextField.swift",
+      "sha256": "03d53d9161fb6a75fa160bcf7a2d6df13a50eb641cd0913172ef2ea9b92c3b18"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/OutputDevices.swift",
+      "sha256": "929a3b26fce97988898fa574dce13310dba82cf4a7114a1a53a3192846f269e6"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/PowerMonitor.swift",
+      "sha256": "dfe27975da61f004a0af239b041b2c73a941d1293ee332c13e475c2b3b146354"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/RecordingActivityWings.swift",
+      "sha256": "05b9df33d883394781cce0612f03d1968f53925615d98b893f15a9659b0bd3e8"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/RecordingFeedbackView.swift",
+      "sha256": "f5aad18eb3ae1981d8c1f5fe333e4d28ecf01373a834194ec54fbaa35ddd34a3"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/SystemHUDEventTap.swift",
+      "sha256": "7649576101ce3125d33a849640966dcde3862903be8cb8d4cdb48373504084df"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/SystemHUDHardware.swift",
+      "sha256": "261de46bd7b78a01ae7316b281ceab9fb8a951a8d2f76f82d6e332a74a8a3d08"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/SystemHUDMonitor.swift",
+      "sha256": "4bd3bbafa364730def9461b410bd1fd574df3a5b5e9e618a291932cbf7387302"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TeleprompterController.swift",
+      "sha256": "acf54c889bfc81ef3fc47af024fed6bdaed82d50cb9d32c77200f2d1065647c1"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TeleprompterPage.swift",
+      "sha256": "7f59c60c19151a2331b3250df6d55c8644a2dc2620acbea781e57980612b27f6"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TodayController.swift",
+      "sha256": "39fcd3c1f05b79ef0c04c38c8a71ebdeadba4fd9c684882ee51a7c1c80f26b06"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TodayPages.swift",
+      "sha256": "abaae5180cb46e96fcc2440f1aaef043b652eee648cdc8678b4df8a53ca8e41d"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TodoController.swift",
+      "sha256": "4ceca5284b1eff9cbcdb73bd0ce259ffddef7bda6cf0f30c5d058d63137b6f8e"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TodoPage.swift",
+      "sha256": "01f9ae295cb22697702b3c5499345daf026ee4e217d6aa723a8caa42502d8746"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TopBarModel.swift",
+      "sha256": "df82947cfc5ebf819b482329b6acd8bb03aa5125cc41abf1c24e540c7554cbce"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TopBarServices.swift",
+      "sha256": "b57ade1857f2180c7005ea50ee910a11b7dbb5bcdbc0b880540196d9a0b8a5ba"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/TopBarViews.swift",
+      "sha256": "f74ea106ec76d8076973520b81ccc952014d39e8650a58f768a7669a5886b85b"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/UsagePage.swift",
+      "sha256": "3d68870f190f4e82f2e7f03517dcb1ecdf724a0a4db6349e3d1bc525e7146c50"
+    },
+    {
+      "path": "Sources/Zeus/TopBar/WavesPage.swift",
+      "sha256": "1cc4baaa219a9d8ec02a3b083c160aed1f9cc9a58d1eaa630dc28925312d8bab"
+    },
+    {
+      "path": "Sources/Zeus/UI/ZeusBadge.swift",
+      "sha256": "7a7a8fff5918f13369b3f463f25be6980249521ad38491b19edb6946886114ef"
+    },
+    {
+      "path": "Sources/Zeus/Usage/LogWatcher.swift",
+      "sha256": "a6c17fc5d63304391bb145d600b62b0747067639946bf171242b01ab6ca7bf08"
+    },
+    {
+      "path": "Sources/Zeus/Usage/UsageModel.swift",
+      "sha256": "935f4d8236d956cc7c4489cf5abf820a3441ed02cf10dc1969b48819fed19cb3"
+    },
+    {
+      "path": "Sources/Zeus/Voice/ChatterboxVoice.swift",
+      "sha256": "8c43e5a431f7981d3471255522082737496ae5af7ba6fd8b2c384ad7936fc41c"
+    },
+    {
+      "path": "Sources/Zeus/Voice/ElevenLabsVoice.swift",
+      "sha256": "0a83db7db4540c88a9ac289467c0aaedca3bc0d31f324772545ed7998b617367"
+    },
+    {
+      "path": "Sources/Zeus/Voice/HotkeyMonitor.swift",
+      "sha256": "add5e151c546cdb43bbf591fd783ab3667986ee17dfeeb58ebf4cc44a05dbd52"
+    },
+    {
+      "path": "Sources/Zeus/Voice/KokoroWorker.swift",
+      "sha256": "404cafc2d8610352f08a9c1306588b208fb82d183192ffa7f99cb719e14aaf03"
+    },
+    {
+      "path": "Sources/Zeus/Voice/KokoroWorkerSession.swift",
+      "sha256": "3aa08fba54e6fff4c6324001394a0ec2f5345aea2285cf57bc1529e5ba5df29b"
+    },
+    {
+      "path": "Sources/Zeus/Voice/LocalPython.swift",
+      "sha256": "7346ac0c4c41c6cf17f582f0f0330aff592dcf81317fe1212376ef944b638c01"
+    },
+    {
+      "path": "Sources/Zeus/Voice/LocalWhisper.swift",
+      "sha256": "7e2377668f420529625cdeab8610a503cbadabaaa07d1768b2eca15bc47eabe3"
+    },
+    {
+      "path": "Sources/Zeus/Voice/OpenAITTSVoice.swift",
+      "sha256": "33ae92d114f63923846b6ecbab426a41618006735970e32ee8c86a4a4b03922d"
+    },
+    {
+      "path": "Sources/Zeus/Voice/RecorderPill.swift",
+      "sha256": "96534052403f717f0bc4338abce16602bfd2b0ac70f88a859915b5bbd0bad776"
+    },
+    {
+      "path": "Sources/Zeus/Voice/Speaker.swift",
+      "sha256": "13e3ea29cdc10ad7f820a7a2102429667a5df61dfe48dd795467309f1ba88cf7"
+    },
+    {
+      "path": "Sources/Zeus/Voice/SpeechInput.swift",
+      "sha256": "468321afa7dae8a609688bc4cdf6eb89c1fe58be4306366f1e20621cbe533709"
+    },
+    {
+      "path": "Sources/Zeus/Voice/SystemAudioDucker.swift",
+      "sha256": "3398b8da8ea2d8da2c1f548b3836ab8009ba4053e2d0414dde8cd0622803bbd3"
+    },
+    {
+      "path": "Sources/Zeus/Voice/ThinkingOrb.swift",
+      "sha256": "1a3ac156e9d7efef4befe7e0636c466165968c939672b5196126bb29db808be1"
+    },
+    {
+      "path": "Sources/Zeus/Voice/UltronVoiceEffect.swift",
+      "sha256": "dd924ddb6a935800d603f61af402a1ab04f9107883384c9169303ac36c5d30c2"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceDesigner.swift",
+      "sha256": "932e5d7b97f0c625d4e6e64006f3f2b612563e1a904b590123107e615f83ee5c"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceGlowView.swift",
+      "sha256": "5260a5e297d315ae14899fb3ef07a70d1adb0646f6865fcdf0a44c11fb9a3beb"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceLog.swift",
+      "sha256": "a333470962fdb67af64b00ca8f2580333f545d2e2cd0687626bd9e4db915ce66"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoicePermissions.swift",
+      "sha256": "152748c2613db8e814dc1ccfcd52ae10af8e66db70d253bf3b24948ec96b73b0"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceRingView.swift",
+      "sha256": "a15dc34f5974f0979f6022639c855525170e91488c628efd6bb0db895477ba23"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceRouting.swift",
+      "sha256": "a723df8428d6698593fdc3d4a77e55818cfedb9641ba4385679da21de5124d6d"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceSample.swift",
+      "sha256": "90045d5544d4c5bcf83bbcc010e8b405a23c89024fc6e844deaaac51bd6b138f"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceSelfTest.swift",
+      "sha256": "d33fd7f932fc253fe69384ddbc27da49eca1c24741f1c74ae8ad5429c78477bd"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceSettings.swift",
+      "sha256": "a3178d79920f6f82ef4d743d9ecd87eb68aa4735cb7aea5c01c96a04d9048580"
+    },
+    {
+      "path": "Sources/Zeus/Voice/VoiceWAVPlayback.swift",
+      "sha256": "fa72044e6f4fa2c2ff216c6d6fb50abfef4250e8c20a97409a294a3e6c134ace"
+    },
+    {
+      "path": "Sources/Zeus/Voice/WakeWordController.swift",
+      "sha256": "917a697206d5abfd6c38924ba20508648965605d9b59f6e01fc498c54b58ab11"
+    },
+    {
+      "path": "Sources/Zeus/Voice/WakeWordFilePlayer.swift",
+      "sha256": "d1c33b6bed49754647f095bcd8f31324c47a7eb77ddf85809eb7a85b5815485c"
+    },
+    {
+      "path": "Sources/Zeus/Voice/WakeWordListener.swift",
+      "sha256": "217dc9b9ab1cc0f9c70084914ef4fec77131db032742184c0c4aab667e878c56"
+    },
+    {
+      "path": "Sources/Zeus/Watch/ZeusWatchRunner.swift",
+      "sha256": "f3fb50dfb9306f5ca0b1fcc97ff29cb3285628fe4221277c55267f05fc0fdd91"
+    },
+    {
+      "path": "Sources/Zeus/Wiki/WikiController.swift",
+      "sha256": "82ed7ef9a2976541ff234126caa7745b00563d0592cc4a6f771d8769a066329e"
+    },
+    {
+      "path": "Sources/Zeus/Wiki/WikiMCPExport.swift",
+      "sha256": "a462ca492aabbdd6aeaaedde6fcf961f283a5a4b2464adc1ecd605b6887a2f3d"
+    },
+    {
+      "path": "Sources/Zeus/Wiki/WikiView.swift",
+      "sha256": "b1688737877d1e231f385bbbefc2fd13479227e2542e8c863105f4580068f413"
+    },
+    {
+      "path": "Sources/ZeusCore/AboutYou.swift",
+      "sha256": "d726f7fee5ba590b1d339f93e3030d4177e3cd8ea4c01ea4922f0166936d0833"
+    },
+    {
+      "path": "Sources/ZeusCore/AgentCards.swift",
+      "sha256": "25f6305328dd95e17a9f3bfd47b573ba95764ffdb543f61ca804322dcc8900fc"
+    },
+    {
+      "path": "Sources/ZeusCore/AgentFollowUps.swift",
+      "sha256": "923d27237670ac8dfc5341ff180dce8e0fdaff0c6a56c9fc544affa8f0d2a87c"
+    },
+    {
+      "path": "Sources/ZeusCore/AgentHealth.swift",
+      "sha256": "4ebbbdb76a3dc8ad843e5d010d3a87e3b6a73bba78216b6ae1bb6c027ae0b3ce"
+    },
+    {
+      "path": "Sources/ZeusCore/AgentHooks.swift",
+      "sha256": "0974c2d6e2020b21c6c2dccbdba5031d3acebc6a82d4fdbdec168de5f8665681"
+    },
+    {
+      "path": "Sources/ZeusCore/AgentHubRules.swift",
+      "sha256": "ac5148a964c6ccef6a52827215ddddb48c012f30336845ca02ccc97966ea4d8e"
+    },
+    {
+      "path": "Sources/ZeusCore/AgentReply.swift",
+      "sha256": "c8ac1b79504bd58d6026b8cb3dd15ef40b5cc971642f2cf68377746c338e6588"
+    },
+    {
+      "path": "Sources/ZeusCore/Audio/Spectrum.swift",
+      "sha256": "4998395d4d2528e324f5b0bfebee2ba9a8605ac3b0f8a9e62562d5909fdd6dff"
+    },
+    {
+      "path": "Sources/ZeusCore/Avatar/BotAvatarSpec.swift",
+      "sha256": "fea6e4f8a361fc3710b50ba1af0083c945b90102154fb5f30e0b241035c4215c"
+    },
+    {
+      "path": "Sources/ZeusCore/Avatar/MascotRasterScale.swift",
+      "sha256": "6479eb27afe5c3fccf47335e095f5dcf5dab75fe6b02b15c9f745cbfce97983b"
+    },
+    {
+      "path": "Sources/ZeusCore/BackgroundAgent.swift",
+      "sha256": "a0d94aa69649eb8eee63843c276932812ea094c89d024bfb16f49af9d789d366"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain.swift",
+      "sha256": "dd5b04d688ea114d566680f1c61defb085074fb74c67c018b30eaca78571cb1e"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain/BrainRace.swift",
+      "sha256": "9a1f5b285ba6031be3f2431770f9af58bbe5bce15b7e4e281bbe67abebdee672"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain/BrainRoute.swift",
+      "sha256": "b0e52f5e58a4453e4e493842b8cd137c89a4236c4c26bfaa6225923e5be24ff1"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain/BrainTurnPrep.swift",
+      "sha256": "d9756105cf0357fb3eb5666d8d9368715bf56ed5009da2e2d5af0aa5852deb55"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain/BrainWarmPlan.swift",
+      "sha256": "71ba144dca1d9dc8658039b42bd5603fab7699536d93f76b28879e69bad47ac6"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain/OllamaHTTPProbe.swift",
+      "sha256": "1d20fa3a98e49b433b51ba659803316690c85e8d8ef59918ad2654cb6503e21c"
+    },
+    {
+      "path": "Sources/ZeusCore/Brain/OpenAICompat.swift",
+      "sha256": "ffdec0cfee208545d0dcffa255e68b251649d41d34c36617f3aa0d772503da14"
+    },
+    {
+      "path": "Sources/ZeusCore/BrainCapture.swift",
+      "sha256": "2965f2ae38850841e10cda725a74dd69dba6894ed941cf4ffb1df24efd768973"
+    },
+    {
+      "path": "Sources/ZeusCore/Bridge.swift",
+      "sha256": "c2cd6fbd175c2b63fbede84f0ae90e5d7c3f7bf7af21d452cae78cac05d17fcb"
+    },
+    {
+      "path": "Sources/ZeusCore/BrowserAgent/BrowserAgentLoop.swift",
+      "sha256": "333672f354c93384c42535eb3ad7af5d99ca679de01edfdb14791a6bf715e9b3"
+    },
+    {
+      "path": "Sources/ZeusCore/BrowserAgent/BrowserUseMapping.swift",
+      "sha256": "625a1938241e81af3c0014dcd473b4e538544bc71304299292689088d753c75a"
+    },
+    {
+      "path": "Sources/ZeusCore/BrowserAgent/BrowserUseProtocol.swift",
+      "sha256": "8fc1232781c1d5a7feadb95e80b0703d1bdcbfba6bb4c642dc615be01a181547"
+    },
+    {
+      "path": "Sources/ZeusCore/BrowserCommand.swift",
+      "sha256": "7784af8dc5b4c2dea521f3544e7bb6398fa30e8b04de25eba999468ba367e256"
+    },
+    {
+      "path": "Sources/ZeusCore/BuddyVisibility.swift",
+      "sha256": "190f0711ca3d79569166959a63b89690f6f7efb8f058e4bb86486da52330cf7f"
+    },
+    {
+      "path": "Sources/ZeusCore/Calendar/CalendarGrid.swift",
+      "sha256": "0ef37d2f5651eb00c5c2b50736846084b241699e584a6e83a474e551781046b7"
+    },
+    {
+      "path": "Sources/ZeusCore/Calendar/CalendarQuickAdd.swift",
+      "sha256": "f989ad7487adbd9ea7564512b27bf0ed5af48c4f06b57f2dbfaa6a6b7e3e729a"
+    },
+    {
+      "path": "Sources/ZeusCore/Chat.swift",
+      "sha256": "ea314521eac2d039b1c2b4b482c8df3a3d1f21f9c9357797176e18d7f4adf2b6"
+    },
+    {
+      "path": "Sources/ZeusCore/ChatHotkey.swift",
+      "sha256": "02e134e4cb14de793e87ee5105863552c7368ba628f09d9bc48c646982ff96e6"
+    },
+    {
+      "path": "Sources/ZeusCore/Compliance/AtticusCleanRoom.swift",
+      "sha256": "884e5e01d2d45967ac8beed0a4628cd4bc57cbdc08b4766d55c0a2906d52c290"
+    },
+    {
+      "path": "Sources/ZeusCore/Connections/AIConnectFlow.swift",
+      "sha256": "61ebf5006a94197fe76a631e226ce2dab3d753c46a6dfe105f27f9cfd3eda588"
+    },
+    {
+      "path": "Sources/ZeusCore/Connections/AIProviders.swift",
+      "sha256": "3e700c3142e1669d86e9dd227c14b945c2c49ece9d2ba5fe9d43284471d5f762"
+    },
+    {
+      "path": "Sources/ZeusCore/Debug/NotchDebugEffects.swift",
+      "sha256": "c02143a212d9dd6a78d798e7daa26500191ea1b33d0321b1b4cd8c009654c02a"
+    },
+    {
+      "path": "Sources/ZeusCore/Debug/ScreenshotCapturePlan.swift",
+      "sha256": "57e62667f3f0aa5a5f42477e5d69b891c8c85bb92914441bf18039f1a7f016aa"
+    },
+    {
+      "path": "Sources/ZeusCore/DebugAudioPath.swift",
+      "sha256": "b2962e026727bde225169f3edfbf457e0c086c73bcf18517c19bff3651be7128"
+    },
+    {
+      "path": "Sources/ZeusCore/DebugSubcommandCatalog.swift",
+      "sha256": "4b22307d097fba7a313ed2544db353cb6b5190ea4e94f52ee779be9e5b7e87c8"
+    },
+    {
+      "path": "Sources/ZeusCore/Decision/DecisionProvider.swift",
+      "sha256": "474d45722b7486bf6016fd4ede8ea03aab9440dd4d7c8abf9f2c7f04f5f95acb"
+    },
+    {
+      "path": "Sources/ZeusCore/Decision/JevBudget.swift",
+      "sha256": "3c7dcf69d5db95f42debc0ba5a0e926cfbd1358b941582a778dc16e5d96a6459"
+    },
+    {
+      "path": "Sources/ZeusCore/Decision/OllamaDecision.swift",
+      "sha256": "2bfc9ddddbd08fac32fcaafcb7871804f861b51319af34da5a1074843d77462f"
+    },
+    {
+      "path": "Sources/ZeusCore/Decision/SystemOne.swift",
+      "sha256": "c87e4012c0b0635c92557620824151df90a5ac384e87a77effc19a88ac478dd4"
+    },
+    {
+      "path": "Sources/ZeusCore/Diagnostics/FlightRecorder.swift",
+      "sha256": "2c27f61d6fd33ffd520e87e3cd2f7f658b185ea14fe09d771fcbf3ce65be3aa1"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/CloudTranscription.swift",
+      "sha256": "2983e7929bdebc4d961cd88d9b426518c6460d964b3e05290274c0a91b268d0d"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/DictationCore.swift",
+      "sha256": "e9775aead9f627c39ecf0cdbd78cac2b44b31030262cb75ff228f157cbfe18c6"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/DictationExtras.swift",
+      "sha256": "b6c07513b0cf29f1e5b77b7d99887e0ef0fd9f9b6fbf3f904a901b53a68eb80f"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/DictationPreview.swift",
+      "sha256": "04c7f80473c8f29095266613c838e7d3b2f4022b54b0cfbc18cf235b80d705a0"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/SpeechEngineCatalog.swift",
+      "sha256": "019c189847b2bb62445642f7322c3f71c660459bcb25569793395a724b5827e8"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/SpokenDictationMarkup.swift",
+      "sha256": "e1f82642537775f8e9449c2f6854aefdab56b554a8e1e1ad8d6ec7fa6e4f6442"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/TextInsertionReceipt.swift",
+      "sha256": "04f2f41fdbcaa0ce79761d0a55e3f45d258fd8fc1961157a3816b4b27a93d47d"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/ThinkingOrbMath.swift",
+      "sha256": "8017bc58e35907379552f6edb414f7e8cb561d100e9d7865a76734c52108e9a9"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/TranscriptionEngine.swift",
+      "sha256": "e471cbd77794ed1a3c5f89a482fbad0210777143e4a2019766e8b9a82cb7a65a"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/WhisperKitModel.swift",
+      "sha256": "37055758f6a8d333aaf361a04a30e5507932dbbeca55ca098ed5918c719968d7"
+    },
+    {
+      "path": "Sources/ZeusCore/Dictation/WhisperPromptRecovery.swift",
+      "sha256": "38a67facae91d9916416a0cfd0d39ff483d7745852152aa5e4e5f4845248ae8e"
+    },
+    {
+      "path": "Sources/ZeusCore/DictationBehavior.swift",
+      "sha256": "d24ac800537f3ae4ad550e0026ef87ec1567c4175709c60687d1601d42d7b3c8"
+    },
+    {
+      "path": "Sources/ZeusCore/DictationFileInject.swift",
+      "sha256": "f8ea45331977394a672cbcc65d7844233aa00371f83259c7731f298e6bdfc916"
+    },
+    {
+      "path": "Sources/ZeusCore/DictationPartialUpdateGate.swift",
+      "sha256": "bfc6917a0bce11311d6f211fcb157c2bc14c44d5e293dbc5f651eaa975db948e"
+    },
+    {
+      "path": "Sources/ZeusCore/Edit/SelectionEdit.swift",
+      "sha256": "681c9921d6c9d9fe68cd5ad9a16734f210eca0876573c133a276bc6259bba281"
+    },
+    {
+      "path": "Sources/ZeusCore/Eval/SilentEvalHarness.swift",
+      "sha256": "dc341834e98d08739d714d3b92be9c88c24c198c0c3e95797f992cebb6b3e458"
+    },
+    {
+      "path": "Sources/ZeusCore/FeatureSettings.swift",
+      "sha256": "9016c811cf709de6016bc629b4e458cecc2886a114314f375af90d9d254e1cb3"
+    },
+    {
+      "path": "Sources/ZeusCore/Hands/HandsAct.swift",
+      "sha256": "2ac1fb91b59797e628f4580fe442bb6ea0e06e0b943356db9ccca34d5ca0bd33"
+    },
+    {
+      "path": "Sources/ZeusCore/Hands/HandsGate.swift",
+      "sha256": "ab9f81a7e3af37e0fd280b21befeba98ed8509df0a196f8c9f89d4912ad7940d"
+    },
+    {
+      "path": "Sources/ZeusCore/Home/HomeWidgets.swift",
+      "sha256": "b92ae04faadf2c7b510b91243c6505cd16ce48eb8d83761be8b88f94ca901f90"
+    },
+    {
+      "path": "Sources/ZeusCore/HookEnvelope.swift",
+      "sha256": "7ec920d1261158b86549e15856e055b76378d6f452b3ebba5d10f99c1de9f209"
+    },
+    {
+      "path": "Sources/ZeusCore/Insomnia/InsomniaCommands.swift",
+      "sha256": "f3476e388e7d89827186c5502ddfc93a439d8e7ae116a2e88365ec9d6210050a"
+    },
+    {
+      "path": "Sources/ZeusCore/Insomnia/InsomniaJournal.swift",
+      "sha256": "f2516a09fc878e3fda0d32db874203e61a6c4b5f7830bf5292c4289357ef406c"
+    },
+    {
+      "path": "Sources/ZeusCore/Insomnia/InsomniaPolicy.swift",
+      "sha256": "6549014d5bf5568a44e27e30fd993751379dc13632c032d0ff1d7ae2c6a283f1"
+    },
+    {
+      "path": "Sources/ZeusCore/Insomnia/InsomniaRestore.swift",
+      "sha256": "36d51a4d76d3274fbebc24c2048c07c86e8841f455f910c542703db46c7d0c83"
+    },
+    {
+      "path": "Sources/ZeusCore/Insomnia/InsomniaSudoers.swift",
+      "sha256": "2cf816ab0428a185abfc8ae0b8b2f74e31442a22fb2bc44151d950e700d12a3c"
+    },
+    {
+      "path": "Sources/ZeusCore/Insomnia/TmuxStallDetector.swift",
+      "sha256": "176409a91d51716e570c0521a2506840f55ae8807f987c627e43a36aa2c478bc"
+    },
+    {
+      "path": "Sources/ZeusCore/Integrations/Beamer/BeamerClient.swift",
+      "sha256": "2d2d2679ae454f17fe2a2f3127e898f9c315309c8c671a5db6774b5ae7e2f8c6"
+    },
+    {
+      "path": "Sources/ZeusCore/Integrations/Beamer/BeamerProtocol.swift",
+      "sha256": "0a815b9e2058a12dd395dc3cee02de4d5b8159e88ffa1e7616ad93eaf1b0f8da"
+    },
+    {
+      "path": "Sources/ZeusCore/Integrations/EngineBrand.swift",
+      "sha256": "def65faede400645999aa33dbf4f8d52f2596aeb0581c543cabe646694a54c19"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/AckLines.swift",
+      "sha256": "27ab59d1e6303e03f810324e31a1e01b4421c9a19cce8b3fceb2f27e38eb0e64"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/AppMatcher.swift",
+      "sha256": "75bf5447838c297d20775521063c5b10cfc9d86843112ce4b46a48146f42ea33"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/BeamerIntents.swift",
+      "sha256": "4bfc6e47212117e538763d0a057dfb702cdfd623dca558a6249ec770a2e08afe"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/CodeIntents.swift",
+      "sha256": "9008d407f0548767c11bd887fff47cb80125c1ec9234abaf191079289af60b3b"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/EventIntents.swift",
+      "sha256": "5731a3972c339bfb594dff04a3f4a0e26bdd4c7c4119bb04688c9bb9ce4384b1"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/FastIntent.swift",
+      "sha256": "c6875b66d0750070ae64ab34df7922e43e47549a290257e6b4bc3ed76d37d976"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/InstantTable.swift",
+      "sha256": "8c37d11c1843b49f54ec3127a1d175c876e798b0d5ee7a22aa369dfe16925357"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/IntentTemplates.swift",
+      "sha256": "340b1008ba30fd7db5afc62c287082a70ce5373e1d2dd808ddd77070ec9ae994"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/Utterance.swift",
+      "sha256": "970b133835a917a09254847224ecd7e8f86f0b5a0c3f8fdcfe633478c05748aa"
+    },
+    {
+      "path": "Sources/ZeusCore/Intent/WakePhrase.swift",
+      "sha256": "b52089bd6e09e759a0412164c8e768d0797b55d5b73536fd2ec4925386d9d4b6"
+    },
+    {
+      "path": "Sources/ZeusCore/JSONValue.swift",
+      "sha256": "85ebad8ae1240e0d241fbfa52ee6eee20657473e3c11b58afccf75709415b0b5"
+    },
+    {
+      "path": "Sources/ZeusCore/Keychain/KeychainStore.swift",
+      "sha256": "99a0408491be1a77efe6c06a01672e8871a629f3c5f0c2bc93ec1ee7f5d9b3b3"
+    },
+    {
+      "path": "Sources/ZeusCore/Learn/LearnedShortcuts.swift",
+      "sha256": "ab7e30249b638a11c6ca664565498ecb8209e822a38f91cf06ee8840ca009fb9"
+    },
+    {
+      "path": "Sources/ZeusCore/License/License.swift",
+      "sha256": "8d201c7a50a55d086fb859f8dc03e1cc98a3ce51bfaab0f581320846833b7868"
+    },
+    {
+      "path": "Sources/ZeusCore/License/LicenseEngine.swift",
+      "sha256": "07e00377ce0c33708228754bbd8e5331a27090032e8b3bb2a22869493c2f2717"
+    },
+    {
+      "path": "Sources/ZeusCore/License/LicenseKeys.swift",
+      "sha256": "2d98e692a3226aee4ea0c05663c93ec98c4ecee797850332c4d1b2f3755d89ed"
+    },
+    {
+      "path": "Sources/ZeusCore/License/LicenseServerClient.swift",
+      "sha256": "22f7a9a19f87e4c4fe253ee096e130ae46fbb2f8e90100a75cf7613286e48bd5"
+    },
+    {
+      "path": "Sources/ZeusCore/Lyrics/Lyrics.swift",
+      "sha256": "cb29e5e0939b841ee19cf30e2c8128dd54435c524cc746d9442c2229c0977d09"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/AXSnapshot.swift",
+      "sha256": "25f3d5e5280fe2428eb9abfc0d26eac0a2b4cfb07409c4afae095050a1a25ae1"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/Annotation.swift",
+      "sha256": "b2693dc6016f59ba5ad9346ea60cda7917c69e7af7b60196356e95f8e4e2c95c"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/DrivePlan.swift",
+      "sha256": "5e0c9270ef9f19e82b510e10588c27e0f1e7ef0907c01e90425a388bbcb62e40"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/DriveTypingFlow.swift",
+      "sha256": "cb684d1a6018a2d63482b457758f2b1ed44367fab4cf8f652d6ab07e33006e86"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/MacActionNumbers.swift",
+      "sha256": "ae11106f4aafa8ce5ca40d6f335b9afe9662f8422a2f4644d00d506b369d6d4f"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/NamedAgents.swift",
+      "sha256": "2637b217eddcdde411a93b036682a39f875c92ad094a93b9cce23b8414b641bc"
+    },
+    {
+      "path": "Sources/ZeusCore/Mac/Walkthrough.swift",
+      "sha256": "f4a813f10214e2d35094949e06547f3012780a66fc7cc7e19100160ac4fbd4ab"
+    },
+    {
+      "path": "Sources/ZeusCore/MarkdownBlocks.swift",
+      "sha256": "acfaab4979e05e17273b3015f944d94a274b95d7ccecfeeeb9f859515956ea29"
+    },
+    {
+      "path": "Sources/ZeusCore/MeetingCopilot.swift",
+      "sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a"
+    },
+    {
+      "path": "Sources/ZeusCore/ModelCap.swift",
+      "sha256": "66d2f94e6c4b71404ae0eefda45bca5c6fc63a5b8c7336f55d47ff2bd4975136"
+    },
+    {
+      "path": "Sources/ZeusCore/ModelRouter.swift",
+      "sha256": "f8827536d25cbecf3b6927ee639a8cc81267bc4613ce9ef052bd4f8e72f3626b"
+    },
+    {
+      "path": "Sources/ZeusCore/NewChat.swift",
+      "sha256": "8f02eeb5925475a1ffc2514e44f35d77160ea2a861bad5a97221b64f71cffc0d"
+    },
+    {
+      "path": "Sources/ZeusCore/Onboarding/OnboardingChromeLayout.swift",
+      "sha256": "dc2ab428edd327818676579e661249d51c8584a38bf457bce064b9b4e0ffb9e2"
+    },
+    {
+      "path": "Sources/ZeusCore/Overlay/CursorPresence.swift",
+      "sha256": "9c5dc198efd3f726de6d3585b1fdb0ce5f06873269d3049088ac5f502f4565f3"
+    },
+    {
+      "path": "Sources/ZeusCore/Performance/PerformanceBudget.swift",
+      "sha256": "04212e0e7a3d72f9048e9b4743c616edf50f6544e48530232a5a47d73001d186"
+    },
+    {
+      "path": "Sources/ZeusCore/Permissions/CapturePermissions.swift",
+      "sha256": "92163407a3dc0016010f93211313521fb45303fab0e3ad91022ce27433ada876"
+    },
+    {
+      "path": "Sources/ZeusCore/Persona/LocalClock.swift",
+      "sha256": "078b3ce4f89abe29fbc7bf2954eb1159e1a33f8909cd2a2d557f12331a088d15"
+    },
+    {
+      "path": "Sources/ZeusCore/Persona/PersonaArithmetic.swift",
+      "sha256": "7f9ffd49d6aefca15f938290a1ad5441b21377e6550d49e25f1ce307b5436158"
+    },
+    {
+      "path": "Sources/ZeusCore/Persona/PersonaCompliance.swift",
+      "sha256": "39595dc2b1190771928ccc8ba29bdda971e5d87e2ba66ec5b71db99ecfbae562"
+    },
+    {
+      "path": "Sources/ZeusCore/Persona/PersonaQueries.swift",
+      "sha256": "25c91659b2d49cbb47836a648a352cf7882107f7927d9cb402631a96d20ed015"
+    },
+    {
+      "path": "Sources/ZeusCore/Persona/SpokenFailure.swift",
+      "sha256": "fc84bb3c7527c99c7fc1e985a163b914fb88786fbb474eb455426cc462e55059"
+    },
+    {
+      "path": "Sources/ZeusCore/Persona/ZeusVoiceLines.swift",
+      "sha256": "a8c55f019c06c59a8f8105a7965f0b31d0b4d8775a66ed8c488fbb5bdb4a7821"
+    },
+    {
+      "path": "Sources/ZeusCore/PersonaReplyClamp.swift",
+      "sha256": "6082908c187614907e4797a43e4fa2b64acb52bcf635d786c912f46155201006"
+    },
+    {
+      "path": "Sources/ZeusCore/Polyglot/PolyglotModels.swift",
+      "sha256": "379887437b806f6fe13f74463ad3e40792b88a81e9f1d1925b4628d735423d42"
+    },
+    {
+      "path": "Sources/ZeusCore/Polyglot/PolyglotPipeline.swift",
+      "sha256": "d7a35a423d8ecb65f18590e102a7f9036cd6d428caf820a31b2d3cc3487abac8"
+    },
+    {
+      "path": "Sources/ZeusCore/Polyglot/PolyglotSegmenter.swift",
+      "sha256": "375695b947f2dc8800838da0a98bb34d311f5a234a6d99d429b2c3b59a397c4b"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/AnnotationCrop.swift",
+      "sha256": "311119d9a8dac3392299968c6f6f4eb3ea4be28ae0c097c5747221e988d8ff23"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/CompanionMotion.swift",
+      "sha256": "7dc37f94147d4a726313e3ad179788c6cbe46e35dd495a4fc01659bbd959fe4c"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/CompanionPointing.swift",
+      "sha256": "d984d40a4f406615c6fdaa84c6fa992050ed89464cb1c1a29f503b212aedfbf3"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/CoordinateMapper.swift",
+      "sha256": "5985236e93904f9093adfdac297648d7e1bffe3d9be1a6578a118afe664a6832"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/DrawingScene.swift",
+      "sha256": "b9d10a52ddaa05ddcc726ac61e88f142110ebbe9c9d16e4408fb01de55b6301a"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/GuidedPresent.swift",
+      "sha256": "ed26fee4f427490d79e0f912abf6cef4ba80dd65b0694c398f75186bc848653f"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/PhysicalPointerSettings.swift",
+      "sha256": "39ac392b12bad9b1c6e7f3df77881157505a20d7494edad393cbbf49481763e7"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/PresentCard.swift",
+      "sha256": "749149ffab6d0881cafc6103f543d7e85092e6744970a165814f2fa947f4f403"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/PresentPointMapping.swift",
+      "sha256": "2126dbc71d9d38b5c697e7cf695cd0e03098c5d72c15ff63979fd6351e26329e"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/ScreenAwareness.swift",
+      "sha256": "930210851fbdb050f7bd1564b4fd5c5940e3d6b87ecf072618154a68c1a74873"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/SpatialTrail.swift",
+      "sha256": "378087cd8a497e4bfb11d63ea1a5e9a3a8f3f20e5219cc82e8baab01378a488e"
+    },
+    {
+      "path": "Sources/ZeusCore/Present/SpeechTimeline.swift",
+      "sha256": "80cec169ad0b4bcd6bb8e2d7e66731d40dcd79ac24e5e81435b578fc6328325d"
+    },
+    {
+      "path": "Sources/ZeusCore/Proactive.swift",
+      "sha256": "1eaafc472c378609bed3d1f40b47d27fb145c2e02f1af0d81b6dba8793519eff"
+    },
+    {
+      "path": "Sources/ZeusCore/Projects/ProjectIndex.swift",
+      "sha256": "e57b5b66f43f395cdbde4e409c93903a78ecf77b407673072bb57bb39d8012d9"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCameraBubble.swift",
+      "sha256": "9ba32a956c4d7ddc538acc54f604318a24d14fd9d7709d1f05db669467b603d1"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCaptureSource.swift",
+      "sha256": "d37c61cb67c6c2394b36ec04aadb11d4f58e6f3198f5b70b1b83c55630ec93ee"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCaptureTimeline.swift",
+      "sha256": "debf3213054602645bee4ee4f13d0631db8b70b8519510a7701a4f8e69129873"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCheckpointStore.swift",
+      "sha256": "caf34b03e70f9a51a512fb93c3c28b72eaf928a7889270a8c20ef2bd59d7cd5c"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCursorFollowPath.swift",
+      "sha256": "28810a2540a369396f1849c8afb5a35908393a79c46bbe77eaf97b7e80c65f22"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCursorLog.swift",
+      "sha256": "6d95a845e49fdfd19ad85e5da592913553b808a37447939a1919f99a388e4141"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyCursorSmoother.swift",
+      "sha256": "53a761b0735271274cb77c33f4473e5df7dce10f6465170fa3dcb9aa18e26445"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyDebugPlan.swift",
+      "sha256": "721f3319107cff9710155e93ddb12ae632b181b97779bab53e7f954d455185db"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyExportFiles.swift",
+      "sha256": "2b452fe534553fc2e0dd5690ff574f766a37171a1294c341886e15c8a1af46af"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyExportPlan.swift",
+      "sha256": "16a1f6bfd28f2d4a148890b20019d9919b1e69bacc2814000e7c20007ad8e72e"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyExportSettings.swift",
+      "sha256": "896fe781551e102a5c91a9f77b2f69bbe13b8fde27c6852ed95c32cc6ae7f543"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyProject.swift",
+      "sha256": "82d268af9bbde8a21ac8a781006283aca20876a18e2e17b746428a267598d347"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyRecordingSession.swift",
+      "sha256": "ede94133927835ccdd88ab9e5b12ecb8d2ca3fc202a830d0d5f1d06582191f3d"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlySourcePicker.swift",
+      "sha256": "c294b632dba16ecd3033b2b46e6e6771e04b88397b0108492c2f31d2ffd64bb2"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlySourceSelection.swift",
+      "sha256": "68308bc9d15fd4f4bbe08a096943c068be45084ad85e48d4bec3cc900e15e553"
+    },
+    {
+      "path": "Sources/ZeusCore/Recordly/RecordlyZoomRegions.swift",
+      "sha256": "717367d1d4c7b2ddf5e317a7a857d4fcf589a927a4a2c833b06f5671420d3dd2"
+    },
+    {
+      "path": "Sources/ZeusCore/Research/ResearchReport.swift",
+      "sha256": "e53f87de9e21c8618389b5ad69333588c70495633638c15de047dd5ceab86b77"
+    },
+    {
+      "path": "Sources/ZeusCore/ResponseSanitizer.swift",
+      "sha256": "92b096463590d2e242ae8e02077db15afcd92e8ce15a4565095b1305fb19b1e4"
+    },
+    {
+      "path": "Sources/ZeusCore/RoutineLaunchd.swift",
+      "sha256": "63035d0eabca431fab76d610b9cd1fe89af40101a0e04ebede11ff7a5ceb2713"
+    },
+    {
+      "path": "Sources/ZeusCore/Routines.swift",
+      "sha256": "e07557caa093d255073ac6dbb9438a62510521cf15ef013d0d802a9c2a28336f"
+    },
+    {
+      "path": "Sources/ZeusCore/ScreenShare/ZeusScreenSharePolicy.swift",
+      "sha256": "8860f507152ecf3fddbb9b2a834b58bbeb6d16fab1634a7041ba2c786bca89ed"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeCallPrompt.swift",
+      "sha256": "5dc2e21b22350b5caced0166490edb75694d1f93346eaf415fe1badad767c100"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeDiarizer.swift",
+      "sha256": "c542b45761f071fc2cca57e09a0ce313803f31a85dc1f563798477bf0ad59a37"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeEndWorkflow.swift",
+      "sha256": "15913f0b799d2a33c1007df0bec1655b5c3bc8e6550ebc2a9693edd8c6dff88f"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "sha256": "e81d0befc6e88443164d94c2e5f8cff0fbed55557ad6f38f578676d24b442ee0"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeMicGate.swift",
+      "sha256": "1d926f669407a8813c13581cf83d17ae2b79042af08aab808e893f92fc634b22"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeMicrophoneIngress.swift",
+      "sha256": "fda71403fa77b8bbfdc2ed87cc488ce56f3a181a103f5eb6f34f7f92b070e538"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribePresentation.swift",
+      "sha256": "605f2a647755b1c60202e13daacc93b1925811aafa5717e594ccc26df2055153"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeRecapNavigation.swift",
+      "sha256": "39c5247c45ec9a096eecce8c7caf086d00a6d891e2e4d613b8f70d8732726565"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeSession.swift",
+      "sha256": "d5ee1f81e391d2ca50a8453534552512a2b3be280eaca438cf64e07314508719"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeSpeakerStats.swift",
+      "sha256": "2d599bc7537df2569dbc2cc7378938ae9a4c8a6a2b38ef9f30e303d2bb73d73c"
+    },
+    {
+      "path": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/BrainRecall.swift",
+      "sha256": "53064c48d83a1f4c754b67f872c7428a36ebf51a51448bf28841c2f23e30097b"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/BrainToday.swift",
+      "sha256": "fbb3219c610680b3621889bf677a8b38d800a49fcdf92a7fb1d95a24fba996d5"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/SecondBrain.swift",
+      "sha256": "b8363b65e9ef17256281bebbc6c458532debadb51f2e7ef62f16b9beca44704f"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/TodayBrief.swift",
+      "sha256": "55bce500ceae2abc91aa137cd0e1e1c72340c4d0007b271424bde684e3764d69"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/Todo.swift",
+      "sha256": "055f66a187a2d8ff8d5e586846419464e6c3b3bbd51f465d7d45196c7b3f5972"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/TodoLearning.swift",
+      "sha256": "0d99418e601fc56490d5a180398ef7516468e6e87aa4edb4221747423805565f"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/TodoSync.swift",
+      "sha256": "fe5cf0d1a9a0e9a198043b7aad5e15c284f748ebc52098c440eb9c5e480e9dbb"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/TodoVoice.swift",
+      "sha256": "b3a4067553309dbcf8a50c5b651558aac492c50bb60a063075396cc22c31afde"
+    },
+    {
+      "path": "Sources/ZeusCore/SecondBrain/VaultPathBoundary.swift",
+      "sha256": "6af90078ce7b5a912777a8e7f63284cd91f6ebd0dd66468eb37675b65c28ddeb"
+    },
+    {
+      "path": "Sources/ZeusCore/Settings/GlanceSettingsSnapshotHeight.swift",
+      "sha256": "08920ec0475248090ccaa6d2c037ca00344f1841f4aaabea4a09953c59c04cd6"
+    },
+    {
+      "path": "Sources/ZeusCore/Settings/GlanceSettingsSnapshotMapping.swift",
+      "sha256": "2141f50484cdad9fb4cb7cb165f7fe5493f1ee94530a16114ff9eda1ae10e885"
+    },
+    {
+      "path": "Sources/ZeusCore/Settings/KokoroVoiceLabels.swift",
+      "sha256": "bdc9d386a5eb12386d275199f04c93f5a5a3056114f4b6d673c241634d528467"
+    },
+    {
+      "path": "Sources/ZeusCore/SharedKeyGesture.swift",
+      "sha256": "944c7b6bafc47379d87e46468110c24e82df21b695c7e0da801e333f450bbd7c"
+    },
+    {
+      "path": "Sources/ZeusCore/Shortcut.swift",
+      "sha256": "9ad4e67728cfa0d1723f21aa6c3b6092df8807d61dd2637a8a9bb1972ca0ff91"
+    },
+    {
+      "path": "Sources/ZeusCore/Sound/SoundCatalog.swift",
+      "sha256": "82063f306dd9c4519abc2f35005a2bf59539eec60a9009bcb7ebf0e99ae25c89"
+    },
+    {
+      "path": "Sources/ZeusCore/SpeechText.swift",
+      "sha256": "a08d2f54a7dbeec9a0d4f3a6bd0fc50245d5888e35c1caf1b57a24982d496434"
+    },
+    {
+      "path": "Sources/ZeusCore/StartupPolicy.swift",
+      "sha256": "86bd6ea54891f1501db5652bc39159aa7052091df0d3ef92e89c1110196f4bfc"
+    },
+    {
+      "path": "Sources/ZeusCore/Stickies.swift",
+      "sha256": "7dae94272acbdc63bc89ce86f296031a014c261fd2853a718ed79da2336254e1"
+    },
+    {
+      "path": "Sources/ZeusCore/Terminal/CodeCommand.swift",
+      "sha256": "c567ac7452076f50eef5801f7e304f4a88e216b3b06d02e468a686fbad0711bc"
+    },
+    {
+      "path": "Sources/ZeusCore/Terminal/ShellQuote.swift",
+      "sha256": "6209f933154938c0f96c80d65c0332d3823481d8ff5175283eac834b495ad784"
+    },
+    {
+      "path": "Sources/ZeusCore/Terminal/ShellRisk.swift",
+      "sha256": "fe28cadb4f4bf49a8633133dd2eee4d3d326ab3604e43fa44caa1a69e3f13037"
+    },
+    {
+      "path": "Sources/ZeusCore/Terminal/TerminalLaunch.swift",
+      "sha256": "545da699c052c0c687b04d3ca3ebc4946a0e1e7b90ed483a4ff3183aae75ec53"
+    },
+    {
+      "path": "Sources/ZeusCore/ThemeTokens.swift",
+      "sha256": "ac9d0382c81e567173a4e6ecad07295c973a63a0ccb01311872b16c3800be662"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/Artwork.swift",
+      "sha256": "3649b234aaf5cdf21bc603c7beda1a89670f449a6fb0293c38e19eb8e3c2ec89"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/BannerDismissRules.swift",
+      "sha256": "ec7ad8a66a1a87271a5e9b473cfec440e4e425625d1276bac9f108872c4ff8c2"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/ClipboardHistory.swift",
+      "sha256": "b369a2419420f620193fa6ed3e38263bbac03e357c834096554e2b32ea9f8828"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/FocusTimer.swift",
+      "sha256": "08e602b997d72f47380c731e7e4cf7d75cafc207e20fcf4f98d0d0bf0ffb78cc"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/GlanceMetrics.swift",
+      "sha256": "b6c2d2f846fd2516415282c6d5352220ff27734a36ba509a2048751c6814125b"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/GlanceTopBar.swift",
+      "sha256": "a82a0b9580a6ba9221025def9db1157bc3c948e99a568efea7eb054ea6a76966"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/HaloKit.swift",
+      "sha256": "fbd366040936fabd6196fab590adcfcf5cc7172ca60ffd31f92bdfc98062e1ca"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/HomeStrip.swift",
+      "sha256": "5634cde314e79fb4492c36752c565c28ebcf75fa95ff6b835b59886f757bd197"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/KeepAwakeRules.swift",
+      "sha256": "a33e298db16756ba404e0f75a2f5d9556df0f56310796c206ca75c3aef32adb9"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/MusicSeek.swift",
+      "sha256": "87c9cedd9e3bbf97d50af9c4ff43a1ba7d47ef4bd0891b347fa9adf030a73882"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/NotchClosedBodyLayout.swift",
+      "sha256": "6da1cda85fab287c86aaaa6ce53ab0537e3fd20df46e181f402e1a1c7027b96a"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/NotchLights.swift",
+      "sha256": "50685ca98e96d83d1251aa53f197061f23fcb04550075f7b6c18214d41312b0d"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/NotificationMirror.swift",
+      "sha256": "4755775b5c42dc0a660c08e668e720fde143a295a0bb9bf80ee7caca679b3456"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/NowPlaying.swift",
+      "sha256": "855c701052e63768464a6c6efa97542d31ffba9d178b12d1976fa7ccc326106f"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/PresenterNotes.swift",
+      "sha256": "62247dead7b9f96cf51c26234d0465f6b60a15f2200de66d16d992cf3bb2053e"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/PresenterSync.swift",
+      "sha256": "f1d6986a03d8f973a6ed69aad05e04a9eb6845b378a349ea1e87ea07140cba64"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/PrompterFollow.swift",
+      "sha256": "4a22abfba20b5059f3828d50db7eb3655868ac1288fd13a0e31a33771c6bbff7"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/QuarantineParser.swift",
+      "sha256": "384f632ec08f99f39a3ddeec887d854303690ef59c768ca8fd00708cf79eb0a3"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/RecordingFeedback.swift",
+      "sha256": "739d24d265dc08808b6f1c4a179004e200613cf441e4334d0b8fd32e0d5e4ac0"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/RecordingMotion.swift",
+      "sha256": "9ef7c90ae6322ba1dc038e295949dccdc991a91eb6a12e320c104819ad34e343"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/ReminderFilters.swift",
+      "sha256": "60ba00d7bc44661a9d20c696e074aac0e4154c3a49e854cc76fb9cc347670873"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/ScreenEdgeGlow.swift",
+      "sha256": "444a3d9ff5892b12570bd3a15655fe89f844248f32b212b7802a607e5514e133"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/ScreenshotDetector.swift",
+      "sha256": "ff11f5efc33f2b4a76c318748d4eee9d90f64dcaa96d91354f351b8ad78f96d8"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/SystemHUD.swift",
+      "sha256": "5e6a90eba4c929bb889260dd4f147ddc8cf8be96585d1caffa9abb1394aa5a30"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/SystemHUDWingMotion.swift",
+      "sha256": "1b422a34d27a088fa25f8b1503a1135f4323d8bb76e4b6841945ccdad273403b"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/Teleprompter.swift",
+      "sha256": "0aa01b43ad6a2da8440e9675c866ccbbc3e1b285d7c283bc2b4cb1daa1e279c7"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/TopBarLayout.swift",
+      "sha256": "f0ff99e4fbc4832d39888a81d1079a84850774cca0f508ba8845424a8bbbbbb8"
+    },
+    {
+      "path": "Sources/ZeusCore/TopBar/Weather.swift",
+      "sha256": "226e02021ce9198ab861555c6372a608cc192a74c1db7f1315344b7730228381"
+    },
+    {
+      "path": "Sources/ZeusCore/UnixSocket.swift",
+      "sha256": "89eafc4b7832d7ebae148991d1782d8663f44b5e5f1edad47d552e99c35defc3"
+    },
+    {
+      "path": "Sources/ZeusCore/Updates/UpdateAvailability.swift",
+      "sha256": "e4b51d281643809aae6fa9f19cf53db772297cc2207cd533755f561b9b252482"
+    },
+    {
+      "path": "Sources/ZeusCore/UsageLimits.swift",
+      "sha256": "f95e4951b137ca929bc7dfd17647f9f8cc989fe80cfc205404d294e131fc6425"
+    },
+    {
+      "path": "Sources/ZeusCore/UserMemory.swift",
+      "sha256": "54f5ca93154e24c84c2bfa25e3aa0234f994aed133b573aca1ca3a3613ee4d16"
+    },
+    {
+      "path": "Sources/ZeusCore/Version.swift",
+      "sha256": "717f6e07ba20bcdbaffa69c228a347b1da38ecd9bf37334e0d8f7d2f37d47e6f"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/AudioQuiet.swift",
+      "sha256": "90ed4823e8bf5f83c1874d87538c6ddefaa300c251fe8bb48d1d20eb517265f5"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/OnDeviceSpeechAcceptance.swift",
+      "sha256": "84475668fb1b84002a7d9aa60288ecea856936cd38caf3be84208fd875be841f"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/OpenAITTSRequest.swift",
+      "sha256": "de8398d42e4056447f331811addeee40309d3ae0cd07e500e2fb65cffce7bcd7"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/PartialActionGate.swift",
+      "sha256": "2b9c9fd8c83219e4e6b713ddb484bcff1ef0d9502463781293c110186c957df7"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/QuietHoursVoiceTest.swift",
+      "sha256": "8d8861cbb0f56ef64a4479c9940557fb966d1757e7df247d5446fa31169232e2"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/UltronVoicePlan.swift",
+      "sha256": "6d694c5834d0246f94b15a161ff31cd953e41f4c6946657552f57ffd32a3ec74"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/UltronVoiceSignal.swift",
+      "sha256": "f799b04022e63cb955f73be6b317335039437cab87b60bfd7e8322131dd16961"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/VoiceAnswerLatency.swift",
+      "sha256": "17c85ef6140cc262c1605e3fafe7cba9813a1957f7785ba68b040c8f0b68fc35"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/VoiceGlowModel.swift",
+      "sha256": "48910dcb0b5cd334181ff130cc0c6490f5f371b12c232f93a3b2867a4edf9d81"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/VoiceProviderKeychain.swift",
+      "sha256": "bdaf1e6bd81053b6336163da260e964b0d81b06c288cba1d4bf665a90b6bf914"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/VoiceRingModel.swift",
+      "sha256": "637b5de47115efa5e8f8be7f476655d58788f5022b4076958c1a51edf203dcae"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/VoiceTTSChain.swift",
+      "sha256": "d83efc419af17ddaee5b4b786cbf2e49c09653f6487b4576b40de85fb593c802"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/VoiceTTSProvider.swift",
+      "sha256": "226365fc70a85f9fddd2c3ccd340e5430fe2d81916c9985fff94be6440ad5306"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/WakeConversationTiming.swift",
+      "sha256": "7b0606a09c7b9b1f2438b663a389ba26e07d23ea000493c5470410f6de3f8150"
+    },
+    {
+      "path": "Sources/ZeusCore/Voice/WakeFalseTriggerFixtures.swift",
+      "sha256": "362352659e1282bc88de0d95ec77fc18f34a88af1b4313c50d2fdacd9391ed49"
+    },
+    {
+      "path": "Sources/ZeusCore/WelcomeBack.swift",
+      "sha256": "4cdfcff793872f82a8ffa93f052728b41726a0cb5406d6680a249b8f4eecd8c2"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/SensitiveInfoScanner.swift",
+      "sha256": "13533c12622d014851cb43c96bd1b9fdbabd5e0fd2baffe18da0aac8075da92a"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiCompiler.swift",
+      "sha256": "5f6a4f9a7adb3528a427bfbf7d9404959b2ee8836794543c4a03d8a46e01e291"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiExportJournal.swift",
+      "sha256": "bf99ab16165f1e9cd7509b13e961719f72d326681c70dfd727dda81a8b496977"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiExportMCP.swift",
+      "sha256": "fe228fea720a2131a0fbb7dc3947eb58285202337a6a9c65f3d4fb70e60d7aa4"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiExportModels.swift",
+      "sha256": "a446ed747ad7311dbeef08d53579a026a8321354957d43fe0e300c2a127d28cb"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiExportTransaction.swift",
+      "sha256": "c1c713697bb9982f982724a7b478dce9b93ef6fce849dc7e6fe8a99d73543893"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiExportVault.swift",
+      "sha256": "d298e2ec37bbac92bce89e0d8d76f4c989ac4534b9bae4c0dcda2710b46001a2"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiPage.swift",
+      "sha256": "0473df7b046240457fb840b6d4f253ae23af600700587773d09e5e4b6f957ef3"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiRelationships.swift",
+      "sha256": "bc83ab30ef5ad230599a0d14659e95c9600fb6c797d6b6c1750073c61963ad9e"
+    },
+    {
+      "path": "Sources/ZeusCore/Wiki/WikiStore.swift",
+      "sha256": "2507f54a78a12744f8aed7bad7df421fcace1851b0579515845a2ece49abafe0"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusCommand.swift",
+      "sha256": "c1f7520beb5e9166389ed7f8cf87d847949b0455949a67f0dc1a59981317123f"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusDates.swift",
+      "sha256": "8cce7137cb61681f92502a34ec852f8284dc09dcf4eca999db338d95eb9276de"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusPaths.swift",
+      "sha256": "ba4dec4d36621843c84d1a513383242cc8457e5d032ce501b72eedb62357f378"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusStartupMode.swift",
+      "sha256": "b4321b01effd043f16cd19919ee692430b883ffe7fe40d3610f2f37bed40c43f"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusTag.swift",
+      "sha256": "be0800f8b005a16ee2d2e77cb1aab65340c7d299558d219c9d1a66c2563691f7"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusWatch.swift",
+      "sha256": "4a107c5626c9442c322653fe63bfccd17289f93389bed1352035b46bd0dde963"
+    },
+    {
+      "path": "Sources/ZeusCore/ZeusWatchVoice.swift",
+      "sha256": "4ef249393ac4cd19dfd6e1a43676e000cb00e5459f7962d6cf5b5892cad61466"
+    },
+    {
+      "path": "Sources/zeus-bridge/main.swift",
+      "sha256": "3accfb6a2a08f80daf4f42d1f257c1c1cec71152a8b4f1d5a494fa9b116c15ab"
+    },
+    {
+      "path": "Sources/zeus-cli/InsomniaGuardCommand.swift",
+      "sha256": "05b8a148f2e4abf338ae39b099a3e9be22a5d8bd2f795d19d7a1b5de0d12ae96"
+    },
+    {
+      "path": "Sources/zeus-cli/LicenseCommand.swift",
+      "sha256": "f06f2aa8ef94f9746173017fd1d147b88893d22bf2252866357049a1433782b9"
+    },
+    {
+      "path": "Sources/zeus-cli/main.swift",
+      "sha256": "b5497eb42867838603c7b717097b6d8d0516a3128a163f2210508374e1c1a4ad"
+    },
+    {
+      "path": "Sources/zeus-hook/main.swift",
+      "sha256": "244973ffd7d367c1fde0c6ce74cefb99196b2809db4072942961d924e3ec0e1b"
+    },
+    {
+      "path": "Sources/zeus-silent-eval/main.swift",
+      "sha256": "275f0cf8e67d62ff035e36fc4534e3a7f32be3d00a1aa7ddcd22327f7715e734"
+    },
+    {
+      "path": "Tests/Fixtures/browseruse/example-com.json",
+      "sha256": "2d35d70217cdf80610b3cc39fcb10520092b87b5b8a985d8a06084a876ad17af"
+    },
+    {
+      "path": "Tests/Fixtures/browseruse/fake_mcp_server.py",
+      "sha256": "e8a48d7420132fde4a546b1075da2f5a1d636f479ebf915cd20dcf1e68fd1e0b"
+    },
+    {
+      "path": "Tests/Fixtures/browseruse/form-extras.json",
+      "sha256": "34ea29b6de031dec90181642564fb4cce118c7cd5e9a5e22b4ae3854c5f78e7d"
+    },
+    {
+      "path": "Tests/Fixtures/browseruse/form-page.json",
+      "sha256": "a4bfc17b575bcae3f715f823d7237298ba7e67105c631db5812f8709ae6f33a4"
+    },
+    {
+      "path": "Tests/Fixtures/browseruse/probe.py",
+      "sha256": "43992117843494ce9fc2c2452b9ce4365960ef98907f3f5b0440de16baca907f"
+    },
+    {
+      "path": "Tests/ZeusAppTests/AgentStatusTests.swift",
+      "sha256": "52e6b6ab6525269efce299d1c2f544da50eb5626aaddf0053d9632aa0aee3b4d"
+    },
+    {
+      "path": "Tests/ZeusAppTests/BrainCaptureModelTests.swift",
+      "sha256": "d909c898be201e72e3837fd3a84eab04c9080921d422d41c62152feca181e6df"
+    },
+    {
+      "path": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+      "sha256": "77a770acd40be9f39fbe0e30a04cc04b513a3f1946b78c9b316102206e53d775"
+    },
+    {
+      "path": "Tests/ZeusAppTests/BrandTests.swift",
+      "sha256": "c9a6c79587450f4800b0e7286315f4cb2e8bb5381dfd193f352ea2123b873464"
+    },
+    {
+      "path": "Tests/ZeusAppTests/BrowserUseBackendTests.swift",
+      "sha256": "8edae22890c523010988647891da9b6b2c8369e3ba188979069723b8729e6caf"
+    },
+    {
+      "path": "Tests/ZeusAppTests/CLIEngineProviderPromptTests.swift",
+      "sha256": "6cd262da36b67a4966891c73b1aa7c9cdc29c7f72a18560bc9780cd0dc1701e6"
+    },
+    {
+      "path": "Tests/ZeusAppTests/DebugCommandTests.swift",
+      "sha256": "ddb9ff89d4689614c14f76d974b77feaaeca9aa445071bbee075c7fc8d9044a3"
+    },
+    {
+      "path": "Tests/ZeusAppTests/DictationAutoInsertE2ETests.swift",
+      "sha256": "6168303cfe569aaf263e53253ef51624db7abb0a21ab221655e2e64bfed9a45c"
+    },
+    {
+      "path": "Tests/ZeusAppTests/DictationOwnershipIntegrationTests.swift",
+      "sha256": "8bb494446f47464c159b14a1a40cc7d8cf8801ec0bb9c31e2850933358617eca"
+    },
+    {
+      "path": "Tests/ZeusAppTests/DictationSettingsTests.swift",
+      "sha256": "5004e5252341813e429bffa2b1a731f6e7b9c5fe0f5b16b08c47f4dd0c0d365a"
+    },
+    {
+      "path": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+      "sha256": "fc97eadad6031ec70c4ab71d02917fcebf545b295c2c9536d7d69059d80028ed"
+    },
+    {
+      "path": "Tests/ZeusAppTests/FastPathTests.swift",
+      "sha256": "64658bbaf98956d46f575e634949cd12a67a9ffbb97c5143fa4c577048735c41"
+    },
+    {
+      "path": "Tests/ZeusAppTests/HaloRendererTests.swift",
+      "sha256": "83e927127a6bd9228742383b5f6c7e7f77d8d0eec0008019681000bc3c7d0387"
+    },
+    {
+      "path": "Tests/ZeusAppTests/HomeAppTests.swift",
+      "sha256": "10a4f0058260b0b4b4414465898be69f6969d94dea96313007a069b07369fe4d"
+    },
+    {
+      "path": "Tests/ZeusAppTests/InsomniaAppTests.swift",
+      "sha256": "98795b56fd52a0e50148d90a37810e3747c81531231e3064c30339eae40037fe"
+    },
+    {
+      "path": "Tests/ZeusAppTests/JevSettingsHarnessTests.swift",
+      "sha256": "492f868e80b6ca8e1a573a173509abd03b2ce2fcd4857deac0605a54d766efd4"
+    },
+    {
+      "path": "Tests/ZeusAppTests/KeyAccessNoticeTests.swift",
+      "sha256": "3bc31dbf67f5c83804a90a0b61161106d60e38b2e431bcafc3eef9cff30ce33c"
+    },
+    {
+      "path": "Tests/ZeusAppTests/KokoroWorkerTests.swift",
+      "sha256": "4969aefbbc1ec3835466c895e87575f9f79a3890666cacdfb3d7eace44704d10"
+    },
+    {
+      "path": "Tests/ZeusAppTests/MascotMotionTests.swift",
+      "sha256": "12800dcc2387c16e626e1a3ef5a4eb8604d78ee3045c29b04b2d553638b38d9f"
+    },
+    {
+      "path": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+      "sha256": "df031870c3724c3fc5099268ed84b9a21080c5e4f0fff4f7e39f471a5cb806c6"
+    },
+    {
+      "path": "Tests/ZeusAppTests/NotchDebugAnimatorTests.swift",
+      "sha256": "83f7d217f9dddbe0d5ca4e3cf7fb340a236d51bbf64f5f65be1c8d872baf3de6"
+    },
+    {
+      "path": "Tests/ZeusAppTests/OnboardingTests.swift",
+      "sha256": "ef384d377036ee9c5906c32cc7aeb07dc6130ac94ba36217992566881cf52fef"
+    },
+    {
+      "path": "Tests/ZeusAppTests/PermissionsAutomationTests.swift",
+      "sha256": "f5cf8faf340262c3058f935a61984de94df0a36b582b4b572f5301ebd1137eec"
+    },
+    {
+      "path": "Tests/ZeusAppTests/PermissionsCaptureTests.swift",
+      "sha256": "716b54ec1db052e06964af29a8b4283ba0ac9e7be20198abc867423d287341b1"
+    },
+    {
+      "path": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+      "sha256": "0ee1d4c51151ae5ff7597038ac20fde0edaa7e73dc735544b964bd104be0bd65"
+    },
+    {
+      "path": "Tests/ZeusAppTests/PromptBudgetTests.swift",
+      "sha256": "4c2f56b39defc670e0db836969923fe0602b903bf8a8c0520b27d8caaf9d8d0a"
+    },
+    {
+      "path": "Tests/ZeusAppTests/QA22SettingsTests.swift",
+      "sha256": "87300367c7294b2196dabbb1efdceabeb76f0c7523fc4aca1f54223d3c89421c"
+    },
+    {
+      "path": "Tests/ZeusAppTests/R24AppTests.swift",
+      "sha256": "4dc01b314a6eba9a73879c77d35e187da19db3e234faefb3a59f94b7e46c699b"
+    },
+    {
+      "path": "Tests/ZeusAppTests/RecorderPillTests.swift",
+      "sha256": "3232834a8fd11144329e7640848f9493697d8f10c9345161012f961d86258041"
+    },
+    {
+      "path": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+      "sha256": "c365ae762f286f13bf4483fd16ad62d0624c4f24bca4f27f65c1b089e890f697"
+    },
+    {
+      "path": "Tests/ZeusAppTests/RecordlyDebugWiringTests.swift",
+      "sha256": "f2dca996ca1536cdafc95048ed584e7a3679dcd768e40e9e5ef2156b1de8dc8e"
+    },
+    {
+      "path": "Tests/ZeusAppTests/RouterRaceTests.swift",
+      "sha256": "2b4d333273955b2312184f95a5a033870787a8ee158704228499bd7c8e5e071e"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+      "sha256": "2f97a008f10bc2f39e34a6178f03110471d49bd3c7b042755fcf8b9af0e05df0"
+    },
+    {
+      "path": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+      "sha256": "606112d225237f7d3b2a1460dfcfecf2af0d95d423a3b7761fac14e0e6a7e340"
+    },
+    {
+      "path": "Tests/ZeusAppTests/SettingsConsumerTests.swift",
+      "sha256": "0784f917956fcd576a1c14af2a7d6a9d5a3437ab09317265b726b3e92905e93f"
+    },
+    {
+      "path": "Tests/ZeusAppTests/SystemHUDLiveTests.swift",
+      "sha256": "5b0ff70bd3bcf6639b8b8678bec661a6efeb251e02028aa52674e5d8d688329c"
+    },
+    {
+      "path": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+      "sha256": "bbd5191bdf9d94887bfdcb1c1394aa344a16b572f17b6881220c693d988be5a5"
+    },
+    {
+      "path": "Tests/ZeusAppTests/TickingTests.swift",
+      "sha256": "af6607f38474faddcbc3feabc65b2f7382fdd79537eceaed49b320eba7c46ab9"
+    },
+    {
+      "path": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+      "sha256": "0bccb83aed0582ca24c2677c545d57e03b0f2ac76d50e3cd175b59373ac23bcf"
+    },
+    {
+      "path": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
+      "sha256": "610b839a40d10264932ce63cab69b1f40bebe28398e15d033d67db6993494440"
+    },
+    {
+      "path": "Tests/ZeusAppTests/VoiceRestoreTests.swift",
+      "sha256": "3fbbc47c564f9a37a9673139aa684d4b2b7184754d85f456f7a078ab94aba257"
+    },
+    {
+      "path": "Tests/ZeusAppTests/VoiceRoutingTests.swift",
+      "sha256": "7077416707f144249ed54cf98e37dc698740c017bcbea8b2597e3223dd904bb2"
+    },
+    {
+      "path": "Tests/ZeusAppTests/VoiceSelfTestTests.swift",
+      "sha256": "433f7444fd95fe437ccc67c7de509a32719a131597c6ea89a560dba83a2e5758"
+    },
+    {
+      "path": "Tests/ZeusAppTests/WhisperKitEngineTests.swift",
+      "sha256": "854abf4495b51e5634243e3c5a0c608f0b0b2c32a4c8a999236cd4033ba710eb"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+      "sha256": "c05c1af465847126fd58ec0ea739bc601366aae2540547c95879307d58f8f32a"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AIConnectFlowTests.swift",
+      "sha256": "69eceb0ae687fb559b41d4732da3d23912dc09795f095bf43fc5d6d9d8981fb8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AIProvidersTests.swift",
+      "sha256": "b64e463972df6ee0f720d0056fa64ea98759f9d6a2ce876f90a4b4da46c68fd8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AboutYouTests.swift",
+      "sha256": "1a85e56f64848d56de83d5881ffd790492b636626d60425593fa04c535d4b4db"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AckLinesTests.swift",
+      "sha256": "d57efbd3bba22d9688a2602a84eec643a96b3a59c960f7115444c14d72aa7611"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AgentCardsTests.swift",
+      "sha256": "ca7bba53885fb5a2c51b45fe1795b56837857ff21c5d9b3fa8bc0b8eee13610e"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AgentFollowUpsTests.swift",
+      "sha256": "d41277af68b4b06a3e8b9d6811abca22aafdf2af2ac778513805e15b78a79733"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AgentHooksTests.swift",
+      "sha256": "7a90748a9b538d2924ceaed017f2c3a5f70fbdd023deebb0b71d51f404a315e5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AgentHubTests.swift",
+      "sha256": "17a2733e64589bb62d2cc6e52e0822e403a406c24f3380fd0a079ef072371235"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ArtworkTests.swift",
+      "sha256": "3f069cffadb42280fd438659e17aacf44d2e39a44ac9f9638e34fe6e2de781b4"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/AtticusCleanRoomTests.swift",
+      "sha256": "22640b10786972c3df02d9d89f1b44762f1e184ad2ff75764d61709b6f5855ac"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BannerDismissRulesTests.swift",
+      "sha256": "8b736ed48a6a6deac477902c857c7687c66a3b34557a67af77da35bde2b5eb4d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BeamerTests.swift",
+      "sha256": "7cc0f42941e623d5e80c957c6ad0dc9f9de5e3d9e23c5d37c48c5adac9d36094"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BotAvatarSpecTests.swift",
+      "sha256": "4fc9d1f1deadf34af9024a7cb829cf32346b20edb82691f14d5d7ee4a2beee3f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BrainCaptureTests.swift",
+      "sha256": "cffec07d6cee2d60722063932de0cc9852cd0034073df51df99b85e243d58cf2"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BrainWarmPlanTests.swift",
+      "sha256": "3cd370d728eb414bd66fd3e31b189959c6170ed06b1d92663bad3e6fb2c6eca5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BrowserAgentLoopTests.swift",
+      "sha256": "18bdd5b12dc0a47dd418e5a320b577f4e1e5fdaa736df63ba3999d6dbee2265d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BrowserCommandTests.swift",
+      "sha256": "782e79f92f179bbc4bd5178be975ebfc236a36b63b7dd79f9852c7c133063686"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+      "sha256": "ac52acaf969cf50b44bb3ddf2d59ba271cd9f301a501e24abcbb635676338f99"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/BuddyVisibilityTests.swift",
+      "sha256": "cca4d99dbc56f74fcee8f1f824f8db577e450cbf70e60aa2cda3ea7139504738"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CapturePermissionsTests.swift",
+      "sha256": "41e50028daedf2439f16ee8eb49ff2bce68ff3fc9d7ff782f0b60d4d103194f8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ChatHotkeyTests.swift",
+      "sha256": "00ebdcdb270d377433e6f6166ff01728f73f0b973b9e5df22d738e9a8aceac15"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ChatTests.swift",
+      "sha256": "fe81da7c433d8533e536fc32216e1beb19f8df2ed0b48afc29b3da3e26432d55"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CloudTranscriptionTests.swift",
+      "sha256": "3c4480f8873a3bd7bfbe253cdbc1bf077fd4aa85fc282d9b136ac4642abdd2b5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CodeCommandTests.swift",
+      "sha256": "62ff2210d661d32ad00ef107508b64433a3e0d3617b7e52a61a21720c1240555"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CodeIntentTests.swift",
+      "sha256": "d22e81842ee40d8224eabc39e31d8af5e2de6201142933501a0a877c2457f018"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CompanionMotionTests.swift",
+      "sha256": "5b73804804933d18393b9efda3b89bd6540b47a82b0796ab7e924969d900944c"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+      "sha256": "2f031e07238641a1917045195c7d34cb6c405d76c354d41a631144416cb7293c"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CoordinateMapperTests.swift",
+      "sha256": "dddeabfa50ae0d551a2eeaad04a0e74f7bf0f656bf0a36b0f4b300edaeb441f7"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/CursorPresenceTests.swift",
+      "sha256": "593b41e0f2f5d2e9f45d255f1b569962d8389fdf7fb675677324a9fa41cc4f6f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DebugSubcommandCatalogTests.swift",
+      "sha256": "def5a417a6901ded063d14a8745f36c1285fd133cd5c15ff587b07db1e27c23b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DecisionTests.swift",
+      "sha256": "f479ae42d307960ee4cb3a2e8d052c7ff122be9bbee07d1cbd8a76c0e1285bf4"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictateFileRoutingTests.swift",
+      "sha256": "0c708c78dce32486f7250522e97bba646b8961a6163543e851fb16842487daca"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationBehaviorTests.swift",
+      "sha256": "6951d0976d702a7c8570fd526a24280718611b1d395a29e27dcc145925e4df9c"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationExplicitCorrectionTests.swift",
+      "sha256": "17d901dd4bc4fd402d4f374fe155a12475a3691f453f4dbfd3c034ba4de23de2"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationExtrasTests.swift",
+      "sha256": "c3aca5db876a8d5a91fe77eb4f7e8b1c47083e4014bf56983037c31710de2be9"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationFileInjectTests.swift",
+      "sha256": "62c403a7a336b01f5666a81419046128e57bec93e06eef676c8f823c0b36b2cd"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationLanguageTests.swift",
+      "sha256": "a2bca497e79bf3eec1d5ebd0ce55bb388fb3ad332011f7bf021e8cad26d2b857"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationPartialUpdateGateTests.swift",
+      "sha256": "e88e4dc63e6c864db81e01f071f9cd550d1ec6bad9f858bb81a2d3f5d5315236"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationPreviewTests.swift",
+      "sha256": "b1cf452e6b4d169a7f8bb521f83a409499ddf8a5bd91e784e44003470eb1f83c"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DictationQAFixTests.swift",
+      "sha256": "662c8796243213d842deb379300680e5c75e1d7a6e4f04e743e45f804b320560"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DrawingSceneTests.swift",
+      "sha256": "6638131dedd77bdd92f0db15cb78e286829db9330fb306cfef42b73024244990"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+      "sha256": "32b9aeafb795993f03435b2741e3b3303a933899de7794898ac5bd12c307241b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/EngineBrandTests.swift",
+      "sha256": "d22eedd29c8c4cb690ae2b1a95223e7b82100aef20f37f99e095359376c181d8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/FastIntentTests.swift",
+      "sha256": "4020ec521f9a6c124e8267dd554dbb934046052d27c0a9bed7bf95897f1ff1b5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/Fixtures/meeting-call.txt",
+      "sha256": "c27607bac5931bcd83dfd51cf34ca2fbca6f6d3b050fdbd84915b3970ee91aec"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/GlanceMetricsTests.swift",
+      "sha256": "f67c5fff998ac71153bb9ee3eeae8cc34a8e1c4479e13d5b7b423f784ee5a6fd"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/GlanceTopBarTests.swift",
+      "sha256": "0496021f55ca25163cd026cc31601ce622eb5f56456df5a1024a01efd61ab0f3"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/HaloKitTests.swift",
+      "sha256": "ddc7651422b0044aeaccdce4942c3b34f317c1c8d72bf84846d21c10670e83e7"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/HandsActTests.swift",
+      "sha256": "b16b6e9cdc9621c10caa6c1fde47d3e3d0544b9aea31851a50ec4481aac354ba"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/HandsGateTests.swift",
+      "sha256": "8aac3b12d7e747de628833a978b30ad7c724a5b2a176a615aa1bebbf5e501d9b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/HomeWidgetsTests.swift",
+      "sha256": "e51aa575621a224b128300946a81fb8be291b83646b6ddbd752b5609b674ad80"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/InsomniaTests.swift",
+      "sha256": "6ecd1e771560d09d12abe704084fa541f7956e353ce63ec0d77a16081c752712"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/InstantTableTests.swift",
+      "sha256": "2ce70fb76ece9a7949beec5de5f5534ee6c0461fc5ead704effc77785762b730"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/KeepAwakeRulesTests.swift",
+      "sha256": "24e4ffc59511f08c007d4e950cfe13792d2fa0578af0a6f5c2c049fe5ad152ee"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+      "sha256": "d002f38cf35e983bfd81f68873ffc417e87ca6b04883ac8c1016163cdaa3701f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/LaneETests.swift",
+      "sha256": "98ddcba3c35a3c739bb99115301bd4b2f9ad75fecd27227787c46f928a8a2da5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/LearnedShortcutTests.swift",
+      "sha256": "4d24e549bf37d8703b73463aad83325802c25e758467b697d5d6f8f9700e0478"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/LicensePortalVectorTests.swift",
+      "sha256": "c6d0b7eefc04db51da08518af34f3d662f38acd5eed4741e1469af8895047056"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/LicenseTests.swift",
+      "sha256": "310e1357e167636830480769d86243a4cf73bb2606b7bae4103403652651daae"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/MacActionNumberTests.swift",
+      "sha256": "bf7dacd23342c0338bed89a1fc65cbca2e51e40404e714e354c6aced27495936"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/MacControlTests.swift",
+      "sha256": "18ec98253fbde2b0540382547413e4b38d56bf2680e192e195fdbfc336747d42"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/MarkdownBlocksTests.swift",
+      "sha256": "4a74620b771e4caf44bb2d8ac91a0f361a29f2a0f2a7f1080b95b7cbabcbca07"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ModelCapTests.swift",
+      "sha256": "96c44fe9e3c82bc0e0ab85fb6efccc006ba720d2d9bcf87ff2174ce207e7fd40"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ModelRouterTests.swift",
+      "sha256": "55dadefa0288a2f73325bdf2eb9042c22dd050de056a5ce0d31adbfe96480c19"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+      "sha256": "be524c7b57ba9f97e2c26be273d49f17033e29293672562c39565d79ecdc2c61"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/NotchLightsTests.swift",
+      "sha256": "dc09d090f0d6109300f38a5cfbe661927d3100239d712a190861edcef8519175"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/NotificationMirrorTests.swift",
+      "sha256": "f7f76f79f2b1cab0d0c3a757d741baf32057c10d7f972d34e884ce1a619a0371"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/OnDeviceSpeechAcceptanceTests.swift",
+      "sha256": "d031929f6115e93b063b4a37b1e8649840c047b446c16d919ae2a1885979e828"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/OnboardingChromeLayoutTests.swift",
+      "sha256": "4dafc9655fecba5f34b2e623a01998b83cc421ad207117270e44cbc5a702c9e0"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ParityTests.swift",
+      "sha256": "f07f22ab959353943f0d5057c9ebc87bb72c0a0ce019d1fadf908a92992c9526"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PerformanceTests.swift",
+      "sha256": "dbb382d7e7c46b5c2274b9b3bb2ffae7918f075af49561d5a1f2b541ec9a6b68"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PersonaHedgeFilterTests.swift",
+      "sha256": "270f6411925df918255b1e50bbe43c7dcd3df5113ef7ab8bdf9fa3a3fe4fb300"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PersonaQueriesTests.swift",
+      "sha256": "909178cd444629d25f04fce5cd99ac430a4f6794b6b86533656e2f1a3df66e60"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PersonaReplyClampTests.swift",
+      "sha256": "5aec26fe461c8f906bb425a5eb6b23a8de8dee6a7d5f4178a4f3b12bffdb4165"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+      "sha256": "1ac2334ab3cf8b0c9db7a5222cc4d7ee89c837840be2ce3d64c47541c82d2073"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PolyglotTests.swift",
+      "sha256": "8f19ccb679af0410286f3000caa2ea6fec3edb123f914926446815ab360bc1e6"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PresentLaneTests.swift",
+      "sha256": "f484e5289772955f505e6918a79ae61c609033055d1c44406e179b538c45994b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PresenterNotesTests.swift",
+      "sha256": "7432913324b014f868e582759933b89fd09d600a52f39a9320272ae3a0df7c8b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PresenterSyncTests.swift",
+      "sha256": "2e1fc42523b9bed75a75455058badcd71578e4198fca1fc34b8ea560cf832130"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ProactiveTests.swift",
+      "sha256": "2f9ddbbcd250360fe243e63573ff27191a8cc04744d924e943c15213b4082200"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ProjectIndexTests.swift",
+      "sha256": "fadbe3d35e73c8d60fba0ad8fcc491ee7c3f08ffd070228b740b19d25ad55050"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/PrompterFollowTests.swift",
+      "sha256": "c1e577084cdf66ec46e604ff86d3477c6aa3854d3bb51f919cd50c8fd39831cd"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/QA20FixTests.swift",
+      "sha256": "494bce718ad1b0c18323addd7e0a0d15d3e68b6e0b6c04fc1ada9b4344a4e2a1"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/QA21FixTests.swift",
+      "sha256": "af5173f493bd8120c6ba1b5d1d0ebcf9533956dd22bd3c52b1abb3084a0c26b9"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/QA22FixTests.swift",
+      "sha256": "b6922c17290b98972505415915a372111a7ca4a38a0fde954e31a21cb2f16951"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/QuarantineParserTests.swift",
+      "sha256": "648c31b4eddb4aee1a1bb1fe577107d387fd02d582125f8f1963d8016b24ceae"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/R24LaneTests.swift",
+      "sha256": "b445229c5cb317794b45cfa8ef14cd22a801322fff7ee4fb5e398731f0d91587"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+      "sha256": "f3ee2e70281b04b4713c721c291ca89e2a23251f336e6c4e254a9190da468692"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordingMotionTests.swift",
+      "sha256": "4f0064c11806a9226383469b9b5946a33f2ec3f0c3545bc1d5fa0b838e83b9dd"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+      "sha256": "7444007b6ab48c684a280820d4e2dfd1c2d4aa3c376c9005233bdc178c1d8f5f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift",
+      "sha256": "c45f7352fbcb92e4dfa50f50982005c6d574318e7abfb3425c883e58fc7e39b5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyCursorFollowTests.swift",
+      "sha256": "fbc1cb680362539fc63b463684419007853c0f24c70087297738f1a32c55f7b4"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyExportFilesTests.swift",
+      "sha256": "c0c6ac1f09a04562c31d99ff3b5061539a857fc496e9e5ab7948a3b0f53c0eff"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyExportPlanTests.swift",
+      "sha256": "1f712aa2733186f0f939a04c42742c187c668b589560e3027977f3ebdd6b4672"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyExportValidationTests.swift",
+      "sha256": "00048c328a9798608b85f2ab52fb4b79faeb1460ba0d5421fc1cbf8ce9eea860"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyRecordingSessionTests.swift",
+      "sha256": "9c710c167390ac383ae17c3617141969a5c3f90661e950a8ea32939bde648ca9"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlySourceSelectionTests.swift",
+      "sha256": "5a63924aa554124dcf7546509159e24155b835c2376dee9b37f495e30c9976f6"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RecordlyTests.swift",
+      "sha256": "f8898275e08e97861b511a938632be28c4755780102631f608f92edd55c72608"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ResearchReportTests.swift",
+      "sha256": "51edbae8ee33918beea6f11fa7b99407a10e10d84aadb32ea1aa0ffc27b77fad"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ResponseSanitizerTests.swift",
+      "sha256": "6efc816d95314e26f35e4020fe54f71dabec2f446d085e4fb6078c085ff11119"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/Round6FixTests.swift",
+      "sha256": "a1eb942275e04c6eb5eb762962c7e0d168e55603538bc8d88f1c6e8e7156048f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/RoutinesTests.swift",
+      "sha256": "f420548697d67656067d0b709a3d501029833b6cb063254ea914e306e160d072"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScreenEdgeGlowTests.swift",
+      "sha256": "d99f63c75eb97bf2cad088c8aefb9fdd094bc48c17ae4b9dc850b475c2bff7ac"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
+      "sha256": "df74f58e2c8e2f6d6de1e4900117068a13108e56315a042efe25a01ed168b7d0"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScreenshotDetectorTests.swift",
+      "sha256": "651cd4a23fda0ba0bb404dda885d148cca4d8d741a0c0bdcdc9efca3417876c9"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeCompletionTests.swift",
+      "sha256": "99d011ce0b52f950e9c461f726bebb3c03ad5df787609e09362fcca3b3365c77"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+      "sha256": "28e0b0b339b95ba18e61bac17f7e4d6781e8ac6967043d7409aa658a134e9b5d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeDiarizerTests.swift",
+      "sha256": "0a66c1086e74cfe18e4b9b0f2ed02f5f0337d8b2d2b59a81757b503ec9d62c63"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+      "sha256": "e40e5fc33ab299db824d107440119d43297972dad44d6156ce79dc52b8eaec70"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+      "sha256": "e86acf29e5c309b3882c7107fce4c9e57a23746419a241f8b04ed0f920ba1846"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+      "sha256": "8e16d41f5e1f716fe926bf7fd6d3bfa355a91ad4bd10a40b2ef63c395ed3b25d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribePresentationTests.swift",
+      "sha256": "a1c4665e62b889490dbe5f5a96ea9016ada12e35818e16a1b2accd446364dcd2"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeQAFixTests.swift",
+      "sha256": "26ffeb145ed159815146ab3521c9686bb778eb702be4c7769dbe71b21afee3b5"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+      "sha256": "8f881a8c5fad174c9144802fc155e633dca41eb72acac9e9ae92bde0d9cd8991"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SecondBrainTests.swift",
+      "sha256": "9b3b1235b53d871395b5de196979b4a78a9a18bc35304f7c1e0ba55986003d2f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SelectionEditTests.swift",
+      "sha256": "51054f10c027c70eaf0dc4e9a9dff033c202f9eaeeb7853704d262e7dc5c9f7c"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SettingsVoiceCardContractTests.swift",
+      "sha256": "5985142830bde95af21c56d20109ad236ecf8c26e517c61da6c692228dbf5783"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SharedKeyGestureTests.swift",
+      "sha256": "951e610a359a03b027e27ad2866c1f59d6771703064fd287c4421aa40b1a3e04"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ShellRiskTests.swift",
+      "sha256": "4bbe74a25c6fc9b83a2123033a09cdf74eb4de4ae7e73a041a35de452bbac207"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ShortcutTests.swift",
+      "sha256": "9d9ea2cef9e5461f731f04cbb0fd7ee6ab73417955e3d0009239d3fe7aca1460"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SoundCatalogTests.swift",
+      "sha256": "faae7826fef1a95ec5ddbd44140feea2e496253bff8fbf18280e0b5f8faa4d96"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SpatialTrailTests.swift",
+      "sha256": "c621b52a905c64f786855eced552ee13964c7dc5b5447e699bef799f2953b762"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SpectrumTests.swift",
+      "sha256": "4a8e87041928d94eab9dfefe7991440b31b501791d9f1ce16bd0300420d74298"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SpeechEngineCatalogTests.swift",
+      "sha256": "67940c9f9e82657b7dd78ce31166d5744fe5deaa45ea01fff8504444fc488eef"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SpeechTimelineTests.swift",
+      "sha256": "49dd115bef28c1c902128ebbb277b2a47543eb0b8b28acc6a6b20e3faf0dbbe2"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/StartupPolicyTests.swift",
+      "sha256": "73793722e76bfcd01f7d7fd0bed6f4242159c435bc4ccdaa4b3f070cd1b70ddd"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/StickiesTests.swift",
+      "sha256": "916add55c916e0a9d56f0526f4c854f044615ff58fb2962377d1a98923d8a3c8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SystemHUDTests.swift",
+      "sha256": "f3d5980e41f4f2c942063eb66c329d5a9fe6f2069b7abc580d95fde6ec76f6d8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/SystemHUDWingMotionTests.swift",
+      "sha256": "933500e6018e218001240f8d694cffbdb2a5f41ef117c7547b22a6147bb9d8ee"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TeleprompterTests.swift",
+      "sha256": "07c44b2666c759a11a11a5ded888743be4cad1fd8f5a749668f92009e3658364"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TerminalLaunchTests.swift",
+      "sha256": "9a7ad88855e5edad618854623ce8ee9edd0287b3da066cd8ba37d91bbc5f020d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TextInsertionReceiptTests.swift",
+      "sha256": "8035ad2bc70fefcd19706a287d9f64941d5546b2a017c2e668dcc611a239c3a8"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ThemeTokensTests.swift",
+      "sha256": "31bddc3c50710ca40a47b6eabdc8fd6700e367952be9ed6cb380afe90b01e989"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ThinkingOrbMathTests.swift",
+      "sha256": "185ac2640feed77969340b23cf88d6568e55bbfc2a750ee9ec0528e25a01f7b0"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TodayTests.swift",
+      "sha256": "461aa4bcac9b5500c2be71678c805f34e83bc907f26a5f4c181cbe675eeb2421"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TodoSyncTests.swift",
+      "sha256": "6c463caf7686a123cb1fece4289c40b10d96b8c685e7cf4eed6619ffcce5af7b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TopBarLayoutUpgradeTests.swift",
+      "sha256": "b3fda394001773ed13fa64940f4f084743583a3a6814785949358a5e8c78e4e1"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TopBarQAFixTests.swift",
+      "sha256": "6c1c65a6110738898b19e272c90ac979317946ca8acab580e914cd9edc2c8507"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TopBarTests.swift",
+      "sha256": "24bb3cfcdab41e34f74e78291e208339a7de74a7236b2249ae943753bd68ff1a"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/TranscriptionEngineTests.swift",
+      "sha256": "db22522cb18577b223d049ffbadecd83e23df5ead983575da416065016943475"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+      "sha256": "ae6f269013e946b71889cb56925bba9da9d76d5419a65be4e8c5cf0794338c50"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/UsageLimitsTests.swift",
+      "sha256": "b85c7d57f9331e93728d9827e3fd74039b5691a84ccbe77dadeac98ee9f99c74"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/UserMemoryPersistenceDateTests.swift",
+      "sha256": "0c316d07070cc1fdd9e4c92c4a1b5e8f32c3733f15f25051cf7a7370a2f27601"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/UserMemoryQAFixTests.swift",
+      "sha256": "682bdb8102409b594e3e0ed2f3c080969fa9405c2aceab089e1b0b5ad6ebdb41"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/VaultBoundaryTests.swift",
+      "sha256": "7707d86f67ed8dc575a962eeb0180c3b7ce1bc7c1c544bf9e0f98949730b5c15"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/VoiceGlowModelTests.swift",
+      "sha256": "11337960971949a809267301d7b71bae5caedda8b4cf2ce318348203dc47d01f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/VoiceKeywordTests.swift",
+      "sha256": "b99760fd0051adb59274d4c2d0af15089fd15e3dd51eb5d8d6d897c18b01653e"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/VoiceRingModelTests.swift",
+      "sha256": "3d7bcc6cfe3fb6dd78eb1a115d5ad35858da520e5c5c414e86d336d47b490057"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/VoiceTTSProviderTests.swift",
+      "sha256": "fb5a88a7bcef31921f7d0ae507a085811c8d4607f976fe9555de5e631dfe4ae1"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W5AgentsAutomationTests.swift",
+      "sha256": "fd881abcffed9ad909e987302bef6b28eb7fc63a05120be9a4c7062626d2d54d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W5ChatBrainTodoTests.swift",
+      "sha256": "d902400a37a69f0e141545ef732ffec1c2ab737ca327f752a55d7e81264be526"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W5DictVoiceTests.swift",
+      "sha256": "9679c3bd7ba27662efb939f179f3fda088e14aa1b0040aab338e772d2784f8cd"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W5SettingsTests.swift",
+      "sha256": "41a9b682b123cd9f605fd223c219b6eaa3fdf076f012a725024d071800ddbbc7"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W5TopBarNotchTests.swift",
+      "sha256": "b53a9a887972679297a226b9b90d514e42045594bd00d490a4451bcd48e31991"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W6IntegBTests.swift",
+      "sha256": "d1f2f3931f782567083e519824e03a6b90fb9b27467e0f803598b5922e486532"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W6IntegTests.swift",
+      "sha256": "d4e6ec171eaf253325510cf08aa54c482fa02308f32b588c2544cac16db2fb13"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W7CliBrainTests.swift",
+      "sha256": "1bcca951116b3be3da7d95a71b38e5be3882b3a7bd228c9f20bc0ca1ce984833"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W7PolyglotTests.swift",
+      "sha256": "c7797194c634314e68e93b9a56cff79c6783c86ad8c58ac478aac9593c2376d7"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W7ScribeTests.swift",
+      "sha256": "541a591f548a153081c7a15d699c35e821deab4a0d8b99a57742a5da30b57ee4"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W7SettingsVoiceTests.swift",
+      "sha256": "bf1d8697722fbcdeb30f994b8e8994d33016f0265282b66306760772890f580a"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W7TodoTodayTests.swift",
+      "sha256": "7afe827036e41ab78882a2dc487291b07bfc4b8339bc9a8f096b0378f54ebd3b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W8NowPlayingTests.swift",
+      "sha256": "eb3d78160adcd937fbcc26ca3f89a21b3609de89909bee645f63ce304582ec50"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/W8ScribeLookTests.swift",
+      "sha256": "6f600eb03db7e781e65354bf2b2ac81aff2eb81da4e117f1f3579cc4d7e58853"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/WalkthroughRevisionTests.swift",
+      "sha256": "c0de29c2f582c2de1785867539eb2322bacd790a19a6502acd66598693239f9e"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/WhisperKitModelTests.swift",
+      "sha256": "ed4e299cabdf990cca9c6e48d2914947ae176a3f3f017e9b66a6e0a7ca357f1a"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/WhisperPromptRecoveryTests.swift",
+      "sha256": "e5778ceedab4dfbb44ed264fb66d15d4c4b59c843cdd92d41f1ad677a922cce0"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/WikiExportTests.swift",
+      "sha256": "89b4391eec9006fb8300d7df567d21368a7196635b5a715a582c19ab58811dea"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+      "sha256": "3c66d314e7fb8498663df67b461d0530d2d5e45b4218956a80b17a36f8158b1d"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/WikiTests.swift",
+      "sha256": "15ea65c9408b592338fdf59b3c61574778a26853c55332911ace6dc6e8c9ac07"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ZeusCLITests.swift",
+      "sha256": "5fb625e7ffe52d2dcfa41e6b357932084c353ced658c97a08ccac537c5d591d0"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ZeusDatesTests.swift",
+      "sha256": "a0e4bed5275de402fed6c0b566f356c213c3da4515a20dbc57c1f77ea4e0556f"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+      "sha256": "eed56f4224d4a12af4f25139d060fd6c64485eede9cd93a920a9158f21d3a596"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ZeusVoiceLinesTests.swift",
+      "sha256": "5176ed874e94906a8d5154afe6fe01e198313dd3701c3fcd89ddf6f354f1a874"
+    },
+    {
+      "path": "Tests/e2e/axtree.swift",
+      "sha256": "6e51580b3e75137142cb090b7928ddaeb9b371dab481fc70430b095a8ac6ce2e"
+    },
+    {
+      "path": "Tests/e2e/fixture.html",
+      "sha256": "702f2baa676cc2a04d5b61ad3bcd2d2e897b2f22b075865733899a7f1801c4f4"
+    },
+    {
+      "path": "Tests/e2e/hooks_check.py",
+      "sha256": "e53fe50767f6b2390c7caaa0776e102cf59bc601075f74acea094b005be07135"
+    },
+    {
+      "path": "bench/dictation/Package.resolved",
+      "sha256": "5c2999d30ed57ab6903c3397fbe31d3d2ebc7ed08587874066a6ec57b989ff21"
+    },
+    {
+      "path": "bench/dictation/Package.swift",
+      "sha256": "45ee6c83e0c1a9db85bf34c8a00003915deee1bc6e0999f0ba98467cbd2783d6"
+    },
+    {
+      "path": "bench/dictation/Sources/dictation-bench/main.swift",
+      "sha256": "f852a9352478a883e3ba3ac540b245a60569d7e2d8e4c41221343c2f79a27632"
+    },
+    {
+      "path": "bench/dictation/make-clips.sh",
+      "sha256": "a6f5eb4ea37771543c19944d53e654b26cd161210e2349e661957ac45399548f"
+    },
+    {
+      "path": "bench/dictation/sentences.txt",
+      "sha256": "22ad0b1a98cb440562271235cd35f1fd31ea17a4fe4540de0a8ccc009f08a129"
+    },
+    {
+      "path": "extension/icons/icon-128.png",
+      "sha256": "25bbf5c6fdebadacea91add3464208507da36b14419e5bac0bc22bb4bcbfbe74"
+    },
+    {
+      "path": "extension/icons/icon-16.png",
+      "sha256": "6be6d20b1843f9da3e076b6b85181139b5764d747f8ef954e3afb7e7254c4cd7"
+    },
+    {
+      "path": "extension/icons/icon-32.png",
+      "sha256": "b05381615a310bafdc8af5e6fd5a695475a87a07b92325dde7c6f65d55f221a3"
+    },
+    {
+      "path": "extension/icons/icon-48.png",
+      "sha256": "f5f0abff07bf16a0e62c4cac7a73630217556df18529bd900153bb2f1db9b3ad"
+    },
+    {
+      "path": "extension/manifest.json",
+      "sha256": "63f296b22892246ff34e03aadc8a72045534072711786c2df4bc7456e38f99d7"
+    },
+    {
+      "path": "extension/package-lock.json",
+      "sha256": "de93cf209c96e2470aacb2280dd12e79c51e0e0a4489a16830aced434d2fb47d"
+    },
+    {
+      "path": "extension/package.json",
+      "sha256": "960c2084b665cc25594af29f326862999e3d2a1c637af0bfa8b2129b341fc3cc"
+    },
+    {
+      "path": "extension/popup.html",
+      "sha256": "24810e9c517b3b235a9bf78c69c4b1bdf2a2796a986a7c0950330fe83d4eacf8"
+    },
+    {
+      "path": "extension/src/page.ts",
+      "sha256": "2085aff6ba05fabe1f35088787a31b9c7e752bf733d60fdc454ba96f3a80023d"
+    },
+    {
+      "path": "extension/src/popup.ts",
+      "sha256": "576b96590f661efa081ab06d17a09d11f594de009f23dd3b8ff7c62a507fae25"
+    },
+    {
+      "path": "extension/src/sw.ts",
+      "sha256": "fea850eb1d2becac5957d37be81d9b2a8aa229c46772ac2a5ad17327638a35ac"
+    },
+    {
+      "path": "extension/tests/browser-target.test.mjs",
+      "sha256": "702aa0ed2a0c9ae48dba79dd80168b04a008e3fba4d38f876fb12f4a1b10fc73"
+    },
+    {
+      "path": "extension/tsconfig.json",
+      "sha256": "ce35dde07cba6dc259b35746298c1562f1fa18aca3bb516846f05fa57a6b94d4"
+    },
+    {
+      "path": "portal/README.md",
+      "sha256": "501f968180c3ced70c429f5ba8f51cf6ebd8f29d26896e6e2630e079026127ea"
+    },
+    {
+      "path": "portal/bin/zeus-portal.js",
+      "sha256": "be7e7024a28c62165c9e8c21a22bfbb35a81d1b2a9267a624510bf88627eb082"
+    },
+    {
+      "path": "portal/core/crypto.js",
+      "sha256": "553fbcbb99c2eeeeda904ecdaf23340ce1faa7cb1f6737a2939b7c280928940a"
+    },
+    {
+      "path": "portal/core/email.js",
+      "sha256": "d53fb2d8f6dd982f9b1d68ca1af4bfe00dc8fbddfe036e130216d190625a5b81"
+    },
+    {
+      "path": "portal/core/portal.js",
+      "sha256": "2bc45d6bd16d24b6b7c9f437c8a4e8818ff0022f5ba4f41e9868ea792789e2df"
+    },
+    {
+      "path": "portal/core/router.js",
+      "sha256": "3389618519bd863874ad69f2c1c526e14b5ca943b7730ff07372875ed6cbfc4e"
+    },
+    {
+      "path": "portal/core/schema.js",
+      "sha256": "6300f5f75bac94076ba2d80bad7e16d611efe77358562799bdecd0cbae40b814"
+    },
+    {
+      "path": "portal/core/schema.sql",
+      "sha256": "3424351473ef6b5fd322565b53ca70483738c5e33768734cedf56eb5b5c957aa"
+    },
+    {
+      "path": "portal/core/webhooks.js",
+      "sha256": "62a5cb8e17d0ddcc3220b2d8cf2ce984b95e3437048d1191ae6cbfa0a3ca338b"
+    },
+    {
+      "path": "portal/local/app.js",
+      "sha256": "23c4fbcc75262a625fd174aa13b350586a93afc6cc3140fec0baea8c63743f62"
+    },
+    {
+      "path": "portal/local/d1.js",
+      "sha256": "c1ed5280a51f1790c4fb98af51b623af0de5b092ede7a82ca6133baf3bbc4963"
+    },
+    {
+      "path": "portal/local/gen-schema.js",
+      "sha256": "c632271bff17abfb047513b6d4a3d05aa7bb8538863cc13e1095dc52a57068a0"
+    },
+    {
+      "path": "portal/local/keychain.js",
+      "sha256": "c6036e0ebb146d760316b866eb8d73a8c52216fc337d204ab56c2856f034a8cc"
+    },
+    {
+      "path": "portal/local/server.js",
+      "sha256": "807e6451bbaf0db49d8015b97fd768462da3023d853e92c27e118af3feca689f"
+    },
+    {
+      "path": "portal/package.json",
+      "sha256": "07868bb770067d378e75fdc890c6e78f542475c544b1d40cbae1deb39d070764"
+    },
+    {
+      "path": "portal/public/app.css",
+      "sha256": "08f46a3cb312acf8b62b1a10485c4e1c854236335c097e450372756eea28e4ef"
+    },
+    {
+      "path": "portal/public/app.js",
+      "sha256": "cfc9a14435c0f705d145ffba6fa7c0644cf989850ea1ca5ff6b8fecf7519effa"
+    },
+    {
+      "path": "portal/public/bolt.svg",
+      "sha256": "e11c158e2aa40af69457e4c293989df656880e80f9413dee5ccbda19cc74ab21"
+    },
+    {
+      "path": "portal/public/index.html",
+      "sha256": "db15aab1d0cc96156a977ea16ff012a44b8232ba7fa809ab2b1499c52be87a23"
+    },
+    {
+      "path": "portal/test/helpers.js",
+      "sha256": "e0144dabfdbb49c58ef653f87511a64bbd69395475b709442f2d3826769280d7"
+    },
+    {
+      "path": "portal/test/license.test.js",
+      "sha256": "906d766c07a267a3a68eea69688ad10aab641c39af96b60def1f3a5705bb62e1"
+    },
+    {
+      "path": "portal/test/router.test.js",
+      "sha256": "546b1951e6472cac1c64ccb5bd6b4c2dee3cf068bedefe8f59c02735a3a89b8d"
+    },
+    {
+      "path": "portal/test/webhooks.test.js",
+      "sha256": "08791e55c07d8afcfc76d851f6e05b75cd5e1dc92c8a1d98ed722a3565446e17"
+    },
+    {
+      "path": "qa/O38/silent-eval-last.json",
+      "sha256": "c24ea39791f348bf1b4cfe4cbca2699e8daf90c91397e3f7f2d3c6a8332f282f"
+    },
+    {
+      "path": "qa/closed-loop/.gitignore",
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793"
+    },
+    {
+      "path": "qa/closed-loop/contracts.py",
+      "sha256": "bbeb7556627ceaae4ba2ac267cdd1dbaddfbc336b865f3122c31604f6e56730d"
+    },
+    {
+      "path": "qa/closed-loop/gate.py",
+      "sha256": "47f6900edec3f0db4515bd0261b8059bcb7202331ea1f72db355a0269ec13794"
+    },
+    {
+      "path": "qa/closed-loop/result.schema.json",
+      "sha256": "7724162f79bb04b8abbd48914165481919416c342a2a16b3d9709f468a930ef9"
+    },
+    {
+      "path": "qa/closed-loop/run.py",
+      "sha256": "bf910c27047566e7a21d1ead85a2b60ff21dc34fbbc6755a395b7b312947d95c"
+    },
+    {
+      "path": "qa/closed-loop/tests/test_contracts.py",
+      "sha256": "30189b3697af0b748d7b8377f318960210e64ed7061a8af2d31d5fbb67768cae"
+    },
+    {
+      "path": "qa/closed-loop/tests/test_gate.py",
+      "sha256": "f7844e20d09995c89766c83de6056f28c7a5a51fbb3cfa48ff97b9d7a6b3e9bd"
+    },
+    {
+      "path": "qa/feature-map.json",
+      "sha256": "9eb9746d22dde51d6f3415a51032af56c509c254f8be18ccb08086a76f18c185"
+    },
+    {
+      "path": "qa/feature-map.schema.json",
+      "sha256": "ad9b9e23597d819e27182297f343588eee615c0c09693dd8fb6ad9a761ae0eb2"
+    },
+    {
+      "path": "qa/polyglot-swiftc/SHA256SUMS",
+      "sha256": "3e54b70874879a5d51c984b4198604890fc0420b280ee681a8e8a0cbe14e1a5b"
+    },
+    {
+      "path": "qa/polyglot-swiftc/main.swift",
+      "sha256": "aa89fae55038ae31ba5eaff25bdf3c97c19965e5eeaff4ed70bb21ff03433d07"
+    },
+    {
+      "path": "qa/portable-core/.gitignore",
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793"
+    },
+    {
+      "path": "qa/portable-core/prepare.py",
+      "sha256": "d28d58b3d232dfa5505ec474d0ea83be9d45d39fc8a3680054937a83aefabcd2"
+    },
+    {
+      "path": "qa/portable-core/reproduce-foundation-replace.swift",
+      "sha256": "41e957e06d8897821dd13bd230250f03cc8ac81c3e0c81d007a2778935338e24"
+    },
+    {
+      "path": "qa/regressions.json",
+      "sha256": "aa634602f29f9d9b9dacea36701dc696630fb6473153e89d694539ac7a9b371d"
+    },
+    {
+      "path": "qa/regressions.schema.json",
+      "sha256": "f2b3ab711b3ce6136c5afd90cb1f583e1e9d9c4633b613c6de5fa33a3488d5ce"
+    },
+    {
+      "path": "qa/release-scripts/test_release_scripts.py",
+      "sha256": "5ccfadc603c0cbcb107ed47ac7ac972994c0e95fc9fd1d7c167b2e600cc65a87"
+    },
+    {
+      "path": "scripts/build-labeled.sh",
+      "sha256": "7d34965d213199876955e62553d9b2b151f3bc439d906e489617000231d65549"
+    },
+    {
+      "path": "scripts/bundle.sh",
+      "sha256": "069a35c6c6fa9aa207d5fcb8c929684ad6548950eab52285e2191bb2eb86b3b4"
+    },
+    {
+      "path": "scripts/check-keychain-prompts.sh",
+      "sha256": "6f1ecf9f347bc91ed99aff3d71486996850f820f5c1dc30928506af06014d9d2"
+    },
+    {
+      "path": "scripts/check-perf-budget.sh",
+      "sha256": "b0d99217674d852ccb5f869baa72deaa2e705e388c8c13f571085663bb2c0b87"
+    },
+    {
+      "path": "scripts/check-settings-catalog.sh",
+      "sha256": "a340f04d367df9f0883bf6469c6b32df0c8e08f7d659d5e1e345b1d98a3d6f63"
+    },
+    {
+      "path": "scripts/e2e.sh",
+      "sha256": "0eb2a2ed18eb0e717755df2fdae5797c830c262d6fc0c43e5d8d57c1350ad850"
+    },
+    {
+      "path": "scripts/gen-settings-catalog.py",
+      "sha256": "07c75b921cf2cec5d0fcf3bbb2bd7f1731cc76ce8c7184ac6c60a7f0567d61c5"
+    },
+    {
+      "path": "scripts/install.sh",
+      "sha256": "e245a43afbc9470d5def5281a78b17526c45fa8dcbb87dba6b2020aaced9b3c4"
+    },
+    {
+      "path": "scripts/make-dev-identity.sh",
+      "sha256": "93ef6b1e3ca1e0f850d828986e202c3a41abe1e4a996329a6001d6e58660171a"
+    },
+    {
+      "path": "scripts/make-license.sh",
+      "sha256": "d42a30f04f6d34d77fb8ba8db3423361bb12af54bfd77c53bf41320572dfb432"
+    },
+    {
+      "path": "scripts/make-license.swift",
+      "sha256": "5ef48411710ebc4144be87c8b914d5129d5a348ab39eea61ea3333a6c3231654"
+    },
+    {
+      "path": "scripts/migrate-legacy-keychain.sh",
+      "sha256": "33a2dc868556dfb1cfbdc539e5206820d94afb7ef6b8aaa8d7ee638917b06d75"
+    },
+    {
+      "path": "scripts/package.sh",
+      "sha256": "1121c5d012335dbd1afd9ab84cd0bb716edf41972713bd1c3597bcc76431bb35"
+    },
+    {
+      "path": "scripts/qa-n-lane-hooks.sh",
+      "sha256": "1e4217c1ed73a9a2265d29a913a37f810f3a5d095d7416f873e0f463c3dbb6fc"
+    },
+    {
+      "path": "scripts/qa-startup-launch.sh",
+      "sha256": "e2deec287c33e5f1f936454d5e4e61e78881d9749c0be5d21e8c30d029e377c6"
+    },
+    {
+      "path": "scripts/render-onboarding-films.sh",
+      "sha256": "2fbe0cb45696dcdbd2bf12c81561855db93ccc315a5026897fd163195ea33664"
+    },
+    {
+      "path": "scripts/silent-eval.sh",
+      "sha256": "ccaebc68c4677f95940d2e365c21ddd42a6b8cfbf0dd61352c0fd170cd14e5e2"
+    },
+    {
+      "path": "scripts/test.sh",
+      "sha256": "f702a0b507ba0935c96bbddc7b40845da969716df5fc3494a4c495b7e09667f3"
+    },
+    {
+      "path": "scripts/verify-release-signature.sh",
+      "sha256": "3b2d0caeb359de7f5be0c222bf960e5bec69ee4d1deaffbb705e0bf8332259d8"
+    },
+    {
+      "path": "tools/convert-engine-brand-pdfs.swift",
+      "sha256": "42fcd0f80c3a4d16c517bbed35cc210cdec7004982ded82d4be3f0e87431f64e"
+    },
+    {
+      "path": "tools/mascot/build_animated_zeus.py",
+      "sha256": "615afd91a67902568e737491102ec8587c943b8a0d2e0540938ea8a41b1496b2"
+    },
+    {
+      "path": "tools/mascot/requirements.txt",
+      "sha256": "0ccd2fbf2eca6d56f87ef9f586651c3f3598684efbf6669e45484f3db20f1f49"
+    },
+    {
+      "path": "tools/sounds/make_sounds.py",
+      "sha256": "502a95440ae063c9a5446d1cfeae8dba388bd0e46d611f37d3b006a707e92f6d"
+    }
+  ]
+}

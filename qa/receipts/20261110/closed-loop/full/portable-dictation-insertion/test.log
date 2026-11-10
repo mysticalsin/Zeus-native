@@ -1,0 +1,92 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/15] Emitting module ZeusCore
+[5/15] Compiling ZeusCore TextInsertionReceipt.swift
+[6/16] Wrapping AST for ZeusCore for debugging
+[8/18] Emitting module ZeusCoreTests
+[9/18] Compiling ZeusCoreTests TextInsertionReceiptTests.swift
+[10/19] /workspace/zeus-validation/closed-loop-full-frozen/portable-dictation-insertion/dictation-insertion/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[11/19] Write sources
+[12/19] Wrapping AST for ZeusCoreTests for debugging
+[14/21] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[15/21] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[16/22] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[17/23] /workspace/zeus-validation/closed-loop-full-frozen/portable-dictation-insertion/dictation-insertion/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[18/23] Write sources
+[19/25] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[21/25] Emitting module ZeusPortableValidationPackageTests
+[22/25] Compiling ZeusPortableValidationPackageTests runner.swift
+[23/26] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[24/26] Write Objects.LinkFileList
+[25/26] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (21.24s)
+Test Suite 'All tests' started at 2026-11-10 00:44:41.736
+Test Suite 'debug.xctest' started at 2026-11-10 00:44:41.739
+Test Suite 'debug.xctest' passed at 2026-11-10 00:44:41.739
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:44:41.739
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Acknowledged dictation ownership" started.
+◇ Test setterFailureIsUnconfirmedNeverRetries() started.
+◇ Test focusDriftOrCancellationAfterSelectionCannotWrite() started.
+◇ Test utf16ReadbackHandlesEmojiAndCombiningMarks() started.
+◇ Test ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test sameFieldWholeTurnReplacementAcknowledgesAndCanCorrectAgain() started.
+◇ Test failedSelectionDoesNotCallTextSetter() started.
+◇ Test cancellationWhileAwaitingReadbackNeverRenewsReceipt() started.
+◇ Test cancellationBeforeSelectionDoesNothing() started.
+◇ Test acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test explicitLeadingCommandHasWholeTurnSemantics() started.
+◇ Test onlyProvenPlainEditableRolesSupportReceipts() started.
+◇ Test selectionReplacementOrInvalidOffsetsNeverEarnReceipt() started.
+◇ Test delayedReadbackIsBoundedAndDoesNotRepeatMutation() started.
+◇ Test cancellationInsideInspectionCannotReachSelection() started.
+◇ Test everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test stateChangedDuringReadbackCannotAcknowledgeStaleTurn() started.
+◇ Test acknowledgmentRequiresExactNativeReadback() started.
+◇ Test case passing 1 argument text → "I meant Tuesday." to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "Email Paul, no, I meant Marc." to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "Nobody meant Tuesday." to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "Say ‘no, I meant Tuesday’." to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "No, I meant" to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "‘No, I meant Tuesday’" to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "No, I meantness." to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "No, I meant …" to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument drift → "field" to acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test case passing 1 argument drift → "pid" to acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test case passing 1 argument drift → "count" to acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test case passing 1 argument drift → "bundle" to acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test case passing 1 argument drift → "caret" to acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test case passing 1 argument text → ""No, I meant Tuesday"" to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument text → "No, I meant..." to ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) started.
+◇ Test case passing 1 argument drift → "selection" to acknowledgmentRejectsIdentityCountAndCaretDrift(_:) started.
+◇ Test case passing 1 argument drift → "field" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test case passing 1 argument drift → "pid" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test case passing 1 argument drift → "caret" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test case passing 1 argument drift → "text" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test case passing 1 argument drift → "selection" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test case passing 1 argument drift → "count" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+◇ Test case passing 1 argument drift → "bundle" to everyOwnershipDriftRefusesBeforeSelecting(_:) started.
+✔ Test focusDriftOrCancellationAfterSelectionCannotWrite() passed after 0.003 seconds.
+✔ Test cancellationWhileAwaitingReadbackNeverRenewsReceipt() passed after 0.003 seconds.
+✔ Test failedSelectionDoesNotCallTextSetter() passed after 0.003 seconds.
+✔ Test setterFailureIsUnconfirmedNeverRetries() passed after 0.003 seconds.
+✔ Test sameFieldWholeTurnReplacementAcknowledgesAndCanCorrectAgain() passed after 0.003 seconds.
+✔ Test delayedReadbackIsBoundedAndDoesNotRepeatMutation() passed after 0.002 seconds.
+✔ Test stateChangedDuringReadbackCannotAcknowledgeStaleTurn() passed after 0.002 seconds.
+✔ Test cancellationBeforeSelectionDoesNothing() passed after 0.002 seconds.
+✔ Test everyOwnershipDriftRefusesBeforeSelecting(_:) with 7 test cases passed after 0.011 seconds.
+✔ Test utf16ReadbackHandlesEmojiAndCombiningMarks() passed after 0.012 seconds.
+✔ Test cancellationInsideInspectionCannotReachSelection() passed after 0.011 seconds.
+✔ Test acknowledgmentRejectsIdentityCountAndCaretDrift(_:) with 6 test cases passed after 0.012 seconds.
+✔ Test selectionReplacementOrInvalidOffsetsNeverEarnReceipt() passed after 0.011 seconds.
+✔ Test onlyProvenPlainEditableRolesSupportReceipts() passed after 0.012 seconds.
+✔ Test explicitLeadingCommandHasWholeTurnSemantics() passed after 0.012 seconds.
+✔ Test acknowledgmentRequiresExactNativeReadback() passed after 0.011 seconds.
+✔ Test ordinaryOrIncompleteSpeechDoesNotRequestReplacement(_:) with 10 test cases passed after 0.012 seconds.
+✔ Suite "Acknowledged dictation ownership" passed after 0.013 seconds.
+✔ Test run with 17 tests in 1 suite passed after 0.014 seconds.

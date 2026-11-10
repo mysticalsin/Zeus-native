@@ -1,0 +1,94 @@
+Building for debugging...
+[0/15] Write sources
+[3/15] Write swift-version-457096A79D733C59.txt
+[5/17] Emitting module CoreGraphics
+[6/17] Compiling CoreGraphics ValueTypes.swift
+[7/18] Wrapping AST for CoreGraphics for debugging
+[9/21] Emitting module ZeusCore
+[10/21] Compiling ZeusCore BuddyVisibility.swift
+[11/21] Compiling ZeusCore CompanionMotion.swift
+[12/23] Compiling ZeusCore CompanionPointing.swift
+[13/23] Compiling ZeusCore CoordinateMapper.swift
+[14/24] Wrapping AST for ZeusCore for debugging
+[16/26] Emitting module ZeusCoreTests
+[17/27] Compiling ZeusCoreTests CompanionMotionTests.swift
+[18/27] Compiling ZeusCoreTests CompanionPointingTests.swift
+[19/28] /workspace/zeus-validation/buddy-regression-mutant-20261110/.build/x86_64-unknown-linux-gnu/debug/BuddyRegressionPackageDiscoveredTests.derived/all-discovered-tests.swift
+[20/28] Write sources
+[21/28] Wrapping AST for ZeusCoreTests for debugging
+[23/30] Compiling BuddyRegressionPackageDiscoveredTests ZeusCoreTests.swift
+[24/30] Emitting module BuddyRegressionPackageDiscoveredTests
+[25/31] Compiling BuddyRegressionPackageDiscoveredTests all-discovered-tests.swift
+[26/32] /workspace/zeus-validation/buddy-regression-mutant-20261110/.build/x86_64-unknown-linux-gnu/debug/BuddyRegressionPackageTests.derived/runner.swift
+[27/32] Write sources
+[28/32] Wrapping AST for BuddyRegressionPackageDiscoveredTests for debugging
+[30/34] Compiling BuddyRegressionPackageTests runner.swift
+[31/34] Emitting module BuddyRegressionPackageTests
+[32/35] Wrapping AST for BuddyRegressionPackageTests for debugging
+[33/35] Write Objects.LinkFileList
+[34/35] Linking BuddyRegressionPackageTests.xctest
+Build complete! (31.22s)
+Test Suite 'All tests' started at 2026-11-10 00:16:24.955
+Test Suite 'debug.xctest' started at 2026-11-10 00:16:24.957
+Test Suite 'debug.xctest' passed at 2026-11-10 00:16:24.957
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:16:24.957
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite CompanionMotionTests started.
+◇ Suite "Companion display changes and accessible labels" started.
+◇ Test reducedMotionSkipsTheArc() started.
+◇ Test reducedMotionShowsTheWholeUnicodeLabelAtArrival() started.
+◇ Test retargetKeepsTheCurrentPointAndReturnKeepsTheLandingTangent() started.
+◇ Test springKeepsVelocityAndSettles() started.
+◇ Test ringSnapsToTheAXFrameNotThePixelGuess() started.
+◇ Test ringOnANegativeDisplayUsesThatDisplaysOverlay() started.
+◇ Test flightStaysInsideTheControlHullAndTheAngleDoesNotJump() started.
+◇ Test companionNeverDrivesTheSystemPointer() started.
+◇ Test movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether() started.
+◇ Test displayMoveShiftsTheFlightAndUnplugDoesNot() started.
+◇ Test sixHundredPointFlightIsSevenHundredFiftyMilliseconds() started.
+◇ Test unpluggingTheTargetDoesNotAdoptAReplacementDisplayAtTheSameCoordinates() started.
+◇ Test snapPrefersTheSmallestFrameThatContainsThePoint() started.
+◇ Test nextClickClearsTheRing() started.
+◇ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() started.
+◇ Test normalLabelKeepsItsDelayAndEmptyLabelsAreAlreadyComplete() started.
+◇ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() started.
+◇ Test restSpotIsThirtyFiveRightAndTwentyFiveDown() started.
+◇ Test changingAnotherDisplayDoesNotShiftThisTarget() started.
+◇ Test presentProbeReportsTheFixture() started.
+✘ Test reducedMotionShowsTheWholeUnicodeLabelAtArrival() recorded an issue at CompanionPointingTests.swift:64:9: Expectation failed: (label.visibleText → "") == (text → "Choose 👩🏽‍💻 Café")
+✘ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() recorded an issue at CompanionPointingTests.swift:73:9: Expectation failed: (label.visibleText → "S") == "Save changes"
+✘ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() recorded an issue at CompanionPointingTests.swift:25:9: Expectation failed: (shiftedFlight.sample(at: shiftedFlight.duration).position → CGPoint(x: -180.0, y: 300.0)) == (nextPointingTarget → CGPoint(x: -500.0, y: 400.0))
+↳ // Arrival and the next pointing tick must agree, not snap back to the old display coordinates.
+✘ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() recorded an issue at CompanionPointingTests.swift:26:9: Expectation failed: (nextPointingTarget → CGPoint(x: -500.0, y: 400.0)) == (CGPoint(x: -180, y: 300) → CGPoint(x: -180.0, y: 300.0))
+✘ Test reducedMotionShowsTheWholeUnicodeLabelAtArrival() recorded an issue at CompanionPointingTests.swift:65:9: Expectation failed: (label → CompanionPointingLabel(text: "Choose 👩🏽‍💻 Café", visibleCount: 0, nextCharacterAt: 50.12)).isComplete → false
+✘ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() recorded an issue at CompanionPointingTests.swift:28:9: Expectation failed: (rebased.strikeCenter → CGPoint(x: -180.0, y: 300.0)) == (nextPointingTarget → CGPoint(x: -500.0, y: 400.0))
+✘ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() recorded an issue at CompanionPointingTests.swift:74:9: Expectation failed: (label → CompanionPointingLabel(text: "Save changes", visibleCount: 1, nextCharacterAt: 10.26)).isComplete → false
+✘ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() recorded an issue at CompanionPointingTests.swift:76:9: Expectation failed: (label.visibleText → "Sa") == "Save changes"
+✔ Test ringSnapsToTheAXFrameNotThePixelGuess() passed after 0.002 seconds.
+✔ Test reducedMotionSkipsTheArc() passed after 0.002 seconds.
+✔ Test ringOnANegativeDisplayUsesThatDisplaysOverlay() passed after 0.002 seconds.
+✔ Test springKeepsVelocityAndSettles() passed after 0.002 seconds.
+✔ Test companionNeverDrivesTheSystemPointer() passed after 0.002 seconds.
+✔ Test displayMoveShiftsTheFlightAndUnplugDoesNot() passed after 0.002 seconds.
+✔ Test sixHundredPointFlightIsSevenHundredFiftyMilliseconds() passed after 0.002 seconds.
+✔ Test flightStaysInsideTheControlHullAndTheAngleDoesNotJump() passed after 0.002 seconds.
+✔ Test unpluggingTheTargetDoesNotAdoptAReplacementDisplayAtTheSameCoordinates() passed after 0.002 seconds.
+✔ Test snapPrefersTheSmallestFrameThatContainsThePoint() passed after 0.002 seconds.
+✔ Test nextClickClearsTheRing() passed after 0.002 seconds.
+✔ Test retargetKeepsTheCurrentPointAndReturnKeepsTheLandingTangent() passed after 0.002 seconds.
+✔ Test normalLabelKeepsItsDelayAndEmptyLabelsAreAlreadyComplete() passed after 0.002 seconds.
+✔ Test restSpotIsThirtyFiveRightAndTwentyFiveDown() passed after 0.002 seconds.
+✔ Test changingAnotherDisplayDoesNotShiftThisTarget() passed after 0.002 seconds.
+✔ Test presentProbeReportsTheFixture() passed after 0.002 seconds.
+✘ Test reducedMotionShowsTheWholeUnicodeLabelAtArrival() failed after 0.002 seconds with 2 issues.
+✘ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() failed after 0.002 seconds with 3 issues.
+✘ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() failed after 0.002 seconds with 3 issues.
+✔ Suite CompanionMotionTests passed after 0.003 seconds.
+✘ Test movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether() recorded an issue at CompanionPointingTests.swift:39:9: Expectation failed: (rebased.position → CGPoint(x: -180.0, y: 300.0)) == (rebased.target → CGPoint(x: -500.0, y: 400.0))
+✘ Test movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether() failed after 0.003 seconds with 1 issue.
+✘ Suite "Companion display changes and accessible labels" failed after 0.004 seconds with 9 issues.
+✘ Test run with 20 tests in 2 suites failed after 0.004 seconds with 9 issues.

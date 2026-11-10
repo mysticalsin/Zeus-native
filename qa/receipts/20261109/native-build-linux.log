@@ -1,0 +1,42 @@
+Fetching https://github.com/argmaxinc/argmax-oss-swift.git
+Fetching https://github.com/apple/swift-argument-parser.git
+Fetching https://github.com/FluidInference/FluidAudio.git
+[1/9501] Fetching argmax-oss-swift
+[952/28877] Fetching argmax-oss-swift, swift-argument-parser
+[1918/79624] Fetching argmax-oss-swift, swift-argument-parser, fluidaudio
+Fetched https://github.com/apple/swift-argument-parser.git from cache (2.84s)
+[9624/60248] Fetching argmax-oss-swift, fluidaudio
+Fetched https://github.com/argmaxinc/argmax-oss-swift.git from cache (7.08s)
+[12687/50747] Fetching fluidaudio
+Fetched https://github.com/FluidInference/FluidAudio.git from cache (67.59s)
+Computing version for https://github.com/argmaxinc/argmax-oss-swift.git
+Computed https://github.com/argmaxinc/argmax-oss-swift.git at 1.1.1 (73.38s)
+Computing version for https://github.com/FluidInference/FluidAudio.git
+Computed https://github.com/FluidInference/FluidAudio.git at 0.18.0 (0.86s)
+Computing version for https://github.com/apple/swift-argument-parser.git
+Computed https://github.com/apple/swift-argument-parser.git at 1.8.2 (0.43s)
+Creating working copy for https://github.com/argmaxinc/argmax-oss-swift.git
+Working copy of https://github.com/argmaxinc/argmax-oss-swift.git resolved at 1.1.1
+Creating working copy for https://github.com/FluidInference/FluidAudio.git
+Working copy of https://github.com/FluidInference/FluidAudio.git resolved at 0.18.0
+Creating working copy for https://github.com/apple/swift-argument-parser.git
+Working copy of https://github.com/apple/swift-argument-parser.git resolved at 1.8.2
+Downloading binary artifact https://github.com/FluidInference/text-processing-rs/releases/download/v0.3.1/NemoTextProcessing.xcframework.zip
+[16375/87267919] Downloading https://github.com/FluidInference/text-processing-rs/releases/download/v0.3.1/NemoTextProcessing.xcframework.zip
+Downloaded https://github.com/FluidInference/text-processing-rs/releases/download/v0.3.1/NemoTextProcessing.xcframework.zip (9.94s)
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for debugging...
+[2/43] Write sources
+[9/43] Copying luxtts_en_us_lexicon.tsv.zz
+[10/43] Copying luxtts_en_us_g2p_aux.json
+[11/43] Write sources
+[12/43] Copying Sounds
+/workspace/Zeus/.build/checkouts/FluidAudio/Sources/MachTaskSelfWrapper/MachTaskSelf.c:3:10: fatal error: 'mach/mach.h' file not found
+    3 | #include <mach/mach.h>
+      |          ^~~~~~~~~~~~~
+1 error generated.
+[13/43] Compiling MachTaskSelfWrapper MachTaskSelf.c
+[13/43] Write sources
+[13/43] Write swift-version-457096A79D733C59.txt
+[13/43] Copying Poses

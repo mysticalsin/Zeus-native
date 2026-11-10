@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ZEUS fixture</title></head><body>
+<h1>ZEUS end-to-end fixture</h1>
+<p id="status">Nothing happened yet.</p>
+<a href="#docs">Read the docs</a>
+<button onclick="document.getElementById('status').textContent='Signed in!'">Sign in</button>
+<form onsubmit="event.preventDefault(); document.getElementById('status').textContent='Searched: '+document.getElementById('q').value">
+  <label for="q">Search</label><input id="q" name="q">
+  <input type="password" aria-label="Password" id="pw">
+</form>
+<div class="ProseMirror" contenteditable="true" role="textbox" style="min-height:20px;border:1px solid #ccc"></div>
+<button data-testid="send-button" onclick="document.getElementById('status').textContent='Sent: '+document.querySelector('.ProseMirror').innerText">Send</button>
+</body></html>

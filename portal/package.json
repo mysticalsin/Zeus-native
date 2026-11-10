@@ -1,0 +1,14 @@
+{
+  "name": "zeus-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZEUS license portal: issue, manage and deliver ZEUS licenses. Runs locally; no dependencies.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "bin": { "zeus-portal": "bin/zeus-portal.js" },
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node bin/zeus-portal.js serve",
+    "test": "node --test test/*.test.js"
+  }
+}

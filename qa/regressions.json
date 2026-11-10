@@ -1,0 +1,435 @@
+{
+  "schema_version": 1,
+  "policy": "A caught product failure must gain a reproducible production-path test/type/lint guard before resolution. These historical defects have executable test guards. New failed runs emit regression-candidates.json and stay red; candidates are not automatically declared fixed or counted as tests. Native guards remain not-run until executed on macOS.",
+  "regressions": [
+    {
+      "id": "REG-001",
+      "failure": "Explicit no-I-meant restart left stale word in inserted text.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationExplicitCorrectionTests.swift",
+        "function": "noIMeantReplacesTheStaleWordBeforeInsert"
+      }
+    },
+    {
+      "id": "REG-002",
+      "failure": "Vocabulary prompt echo could be inserted as speech.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WhisperPromptRecoveryTests.swift",
+        "function": "silenceOnTheUnpromptedRetryDoesNotInsertTheDictionary"
+      }
+    },
+    {
+      "id": "REG-003",
+      "failure": "Late target translation overwrote current language.",
+      "features": [
+        "S02"
+      ],
+      "check": "portable-polyglot",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+        "function": "targetChangedDuringTranslationDropsTheOldAnswerEvenAfterSwitchingBack"
+      }
+    },
+    {
+      "id": "REG-004",
+      "failure": "Clear allowed pending old recognition to reappear.",
+      "features": [
+        "S02"
+      ],
+      "check": "portable-polyglot",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+        "function": "clearDiscardsPendingRecognitionAndContinuesWithNewSpeech"
+      }
+    },
+    {
+      "id": "REG-005",
+      "failure": "Stop/target recovery missed captions while producer drained.",
+      "features": [
+        "S02"
+      ],
+      "check": "portable-polyglot",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+        "function": "targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes"
+      }
+    },
+    {
+      "id": "REG-006",
+      "failure": "Permission-setup buffers could reach meeting content.",
+      "features": [
+        "F02",
+        "F03"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+        "function": "audioFromPermissionSetupIsNotReplayedIntoTheMeeting"
+      }
+    },
+    {
+      "id": "REG-007",
+      "failure": "Unknown external microphone owner was silently ignored.",
+      "features": [
+        "F03",
+        "S01"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+        "function": "anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition"
+      }
+    },
+    {
+      "id": "REG-008",
+      "failure": "Host uptime created leading recording time.",
+      "features": [
+        "F08",
+        "S04"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+        "function": "hostUptimeDoesNotBecomeMovieLeadIn"
+      }
+    },
+    {
+      "id": "REG-009",
+      "failure": "Late drawing word cues revived cancelled timeline.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechTimelineTests.swift",
+        "function": "lateWordTimingsCannotReviveACancelledDrawing"
+      }
+    },
+    {
+      "id": "REG-010",
+      "failure": "Stale click advanced replacement tour.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WalkthroughRevisionTests.swift",
+        "function": "lateClickCannotAdvanceAReplacementTourAtTheSameIndex"
+      }
+    },
+    {
+      "id": "REG-011",
+      "failure": "Huge coordinates could trap Int conversion.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MacActionNumberTests.swift",
+        "function": "hugeSerializedCoordinatesAreRejectedWithoutAnIntegerTrap"
+      }
+    },
+    {
+      "id": "REG-012",
+      "failure": "Malformed explicit target could downgrade into untargeted typing.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MacActionNumberTests.swift",
+        "function": "aMalformedExplicitRefCannotBecomeUntargetedTyping"
+      }
+    },
+    {
+      "id": "REG-013",
+      "failure": "Typing continued after user focus drift.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+        "function": "focusDriftBetweenChunksStopsBeforeWritingIntoTheNewField"
+      }
+    },
+    {
+      "id": "REG-014",
+      "failure": "Ultron additive oscillator injected tone into silent pauses.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+        "function": "pausesStaySilentAtEveryIntensity"
+      }
+    },
+    {
+      "id": "REG-015",
+      "failure": "Streaming effect phase reset at chunk boundaries.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+        "function": "streamingChunksMatchOneContinuousBuffer"
+      }
+    },
+    {
+      "id": "REG-016",
+      "failure": "Forgotten evidence could reconnect memory pages.",
+      "features": [
+        "F10"
+      ],
+      "check": "portable-wiki-relationships",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+        "function": "missingAndForgottenEvidenceNeverResurrectsEditedSources"
+      }
+    },
+    {
+      "id": "REG-017",
+      "failure": "Opening recap source could disturb an active session.",
+      "features": [
+        "F10",
+        "S05"
+      ],
+      "check": "portable-wiki-relationships",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+        "function": "everyActivePhaseRefusesSavedSourceNavigation"
+      }
+    },
+    {
+      "id": "REG-018",
+      "failure": "Completion could reveal before final persistence succeeded.",
+      "features": [
+        "F06",
+        "S05"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeCompletionTests.swift",
+        "function": "failedFinalSaveCannotRevealCompletionAndExactPayloadCanBeRetried"
+      }
+    },
+    {
+      "id": "REG-019",
+      "failure": "Permission unit test called actual OS camera prompt and refreshed unrelated permission integrations.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PermissionsCaptureTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift",
+        "function": "cameraRequestReadsTheResultWithoutStartingCapture"
+      }
+    },
+    {
+      "id": "REG-020",
+      "failure": "Display shift during flight rebased eventual pointing target incorrectly.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-buddy",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+        "function": "movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget"
+      }
+    },
+    {
+      "id": "REG-021",
+      "failure": "Pointing after landing ignored display shifts.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-buddy",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+        "function": "movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether"
+      }
+    },
+    {
+      "id": "REG-022",
+      "failure": "Reduce Motion still delayed the label using typewriter animation.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-buddy",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+        "function": "reducedMotionShowsTheWholeUnicodeLabelAtArrival"
+      }
+    },
+    {
+      "id": "REG-023",
+      "failure": "Microphone callback copied samples before mute admission.",
+      "features": [
+        "F03"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+        "function": "mutedUnknownExpiredAndInvalidTimingNeverInvokeTheCopy"
+      }
+    },
+    {
+      "id": "REG-024",
+      "failure": "Meetings and Recordly feedback models could diverge after stop; pure temporal contract now shared (native wing wiring remains a separate unverified obligation).",
+      "features": [
+        "F07"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+        "function": "bothProductionSourcesUseTheSameTemporalContract"
+      }
+    },
+    {
+      "id": "REG-025",
+      "failure": "Elapsed processing time could imply success before saved output.",
+      "features": [
+        "F07"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+        "function": "processingNeverBecomesSuccessBecauseTimePasses"
+      }
+    },
+    {
+      "id": "REG-026",
+      "failure": "Unreadable accessibility subrole passed a not-equal-secure check and could permit replacement.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-dictation-insertion",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TextInsertionReceiptTests.swift",
+        "function": "onlyProvenPlainEditableRolesSupportReceipts"
+      }
+    },
+    {
+      "id": "REG-027",
+      "failure": "A skipped, cancelled, missing, or unsuccessful prerequisite could escape a check aggregate.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_any_non_success_prerequisite_blocks"
+      }
+    },
+    {
+      "id": "REG-028",
+      "failure": "A successful status could reuse a stale artifact from another head, run, or attempt.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_wrong_revision_head_or_run_cannot_be_reused"
+      }
+    },
+    {
+      "id": "REG-029",
+      "failure": "Swift Testing suite-count summaries were parsed as zero tests, while weak test summaries could hide skips.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_real_swift_testing_and_node_summary_formats"
+      }
+    },
+    {
+      "id": "REG-030",
+      "failure": "A release_ready boolean could override incomplete feature obligations.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_full_run_requires_full_mode_and_completed_obligations"
+      }
+    },
+    {
+      "id": "REG-031",
+      "failure": "Duplicate JSON keys or non-finite values could disguise a failed or malformed receipt.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_duplicate_json_keys_and_nonfinite_numbers_are_rejected"
+      }
+    },
+    {
+      "id": "REG-032",
+      "failure": "Partial Recordly export output could emit whole-export completion feedback.",
+      "features": [
+        "F07",
+        "F08"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+        "function": "partialExportRequiresAttentionAndNeverEmitsWholeExportSuccess"
+      }
+    },
+    {
+      "id": "REG-033",
+      "failure": "Native Scribe save/retry could claim completion before durable notes, or drop newer private notes.",
+      "features": [
+        "F06",
+        "F07",
+        "S05"
+      ],
+      "check": "native-ScribeLifecycleScenarioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+        "function": "failedFinalSaveDoesNotCompleteAndRetryKeepsNewerPrivateNotes"
+      }
+    },
+    {
+      "id": "REG-034",
+      "failure": "A positive native test total could hide an omitted required regression case on every push.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_missing_native_guard_blocks_despite_other_passing_tests"
+      }
+    },
+    {
+      "id": "REG-035",
+      "failure": "Positively active microphone input with unresolved PID or bundle identity was discarded, allowing a later empty scan to restore capture.",
+      "features": [
+        "F03",
+        "S01"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+        "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
+      }
+    }
+  ]
+}

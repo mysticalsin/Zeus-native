@@ -1,0 +1,7 @@
+{
+  "scope": "Exact-source pure session-bound9second end workflow; no OS call detection or capture validation",
+  "tests": 7,
+  "suites": 1,
+  "exit_code": 0,
+  "initial_test_compile_failure": "Direct mutating calls inside Swift Testing #expect expand through immutable receiver. Tests now evaluate mutating call into local Boolean first. Production helper unchanged."
+}

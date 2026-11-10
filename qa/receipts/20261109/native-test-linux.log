@@ -1,0 +1,15 @@
+[0/1] Planning build
+[1/1] Compiling plugin GenerateManual
+[2/2] Compiling plugin GenerateDoccReference
+Building for debugging...
+[2/45] Write sources
+[4/47] Copying Fixtures
+/workspace/Zeus/.build/checkouts/FluidAudio/Sources/MachTaskSelfWrapper/MachTaskSelf.c:3:10: fatal error: 'mach/mach.h' file not found
+    3 | #include <mach/mach.h>
+      |          ^~~~~~~~~~~~~
+1 error generated.
+[5/47] Compiling MachTaskSelfWrapper MachTaskSelf.c
+[5/47] Compiling FastClusterWrapper FastClusterWrapper.cpp
+[5/47] Write swift-version-457096A79D733C59.txt
+[5/47] Copying Poses
+error: fatalError

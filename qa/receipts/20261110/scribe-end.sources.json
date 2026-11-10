@@ -1,0 +1,14 @@
+[
+  {
+    "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+    "sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357"
+  },
+  {
+    "source": "Sources/ZeusCore/Scribe/ScribeEndWorkflow.swift",
+    "sha256": "15913f0b799d2a33c1007df0bec1655b5c3bc8e6550ebc2a9693edd8c6dff88f"
+  },
+  {
+    "source": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+    "sha256": "e40e5fc33ab299db824d107440119d43297972dad44d6156ce79dc52b8eaec70"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "name": "zeus-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/sw.ts src/popup.ts --bundle --format=esm --target=chrome120 --outdir=dist",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3"
+  }
+}

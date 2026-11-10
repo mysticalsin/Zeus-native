@@ -1,0 +1,15 @@
+{
+  "scope": "Synthetic portable exact-source Buddy math/state tests. Linux CoreGraphics module reexports Foundation geometry types; no native UI/capture validation.",
+  "tests": 20,
+  "suites": 2,
+  "exit_code": 0,
+  "native_controller_parse": "passed",
+  "native_controller_sha256": "c4de18c19025fc3fef524a12f76389e29ecdcbf76a552b37e7beb7b975ac5ef0",
+  "mutation": {
+    "description": "Temporary harness only: omit target shift and restore unreduced label typing to reproduce caught defects",
+    "exit_code": 1,
+    "failed_tests": 4,
+    "issues": 9
+  },
+  "independent_review": "Root reviewed production helper, native call sites and tests; no source blocker reported."
+}

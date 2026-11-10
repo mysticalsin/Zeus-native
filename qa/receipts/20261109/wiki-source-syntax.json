@@ -1,0 +1,51 @@
+[
+  {
+    "file": "Sources/Zeus/Scribe/ScribeController.swift",
+    "sha256": "89a52cbcaad679e0512e94aa98e7a69da0d612d0fc0d481d451d8c45de5d7430",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  },
+  {
+    "file": "Sources/Zeus/Wiki/WikiController.swift",
+    "sha256": "ee666433c558b05e05aac8b83e73a8cfd5786ef9a029b323f60958aa21294741",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  },
+  {
+    "file": "Sources/Zeus/Wiki/WikiView.swift",
+    "sha256": "5b652b47aa2880f7ef5c6a3d13c810276613c876a57aa8455aded6b95e7d48a9",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  },
+  {
+    "file": "Sources/ZeusCore/Scribe/ScribeRecapNavigation.swift",
+    "sha256": "39c5247c45ec9a096eecce8c7caf086d00a6d891e2e4d613b8f70d8732726565",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  },
+  {
+    "file": "Sources/ZeusCore/Wiki/WikiRelationships.swift",
+    "sha256": "bc83ab30ef5ad230599a0d14659e95c9600fb6c797d6b6c1750073c61963ad9e",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  },
+  {
+    "file": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+    "sha256": "8f881a8c5fad174c9144802fc155e633dca41eb72acac9e9ae92bde0d9cd8991",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  },
+  {
+    "file": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+    "sha256": "3c66d314e7fb8498663df67b461d0530d2d5e45b4218956a80b17a36f8158b1d",
+    "exit_code": 0,
+    "output": "",
+    "scope": "Syntax only; not typecheck/link/native runtime"
+  }
+]

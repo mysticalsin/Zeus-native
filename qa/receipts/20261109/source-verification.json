@@ -1,0 +1,609 @@
+{
+  "checked_at_utc": "2026-11-09T23:58:51.947789+00:00",
+  "all_match": true,
+  "method": "Complete copied files compare full SHA256; verbatim excerpt declarations compare exact marker-delimited UTF-8 content. App/native runtime is not implied.",
+  "checks": [
+    {
+      "group": "polyglot",
+      "source": "Sources/ZeusCore/Polyglot/PolyglotModels.swift",
+      "kind": "complete file",
+      "recorded_sha256": "379887437b806f6fe13f74463ad3e40792b88a81e9f1d1925b4628d735423d42",
+      "current_sha256": "379887437b806f6fe13f74463ad3e40792b88a81e9f1d1925b4628d735423d42",
+      "matches": true
+    },
+    {
+      "group": "polyglot",
+      "source": "Sources/ZeusCore/Polyglot/PolyglotPipeline.swift",
+      "kind": "complete file",
+      "recorded_sha256": "d7a35a423d8ecb65f18590e102a7f9036cd6d428caf820a31b2d3cc3487abac8",
+      "current_sha256": "d7a35a423d8ecb65f18590e102a7f9036cd6d428caf820a31b2d3cc3487abac8",
+      "matches": true
+    },
+    {
+      "group": "polyglot",
+      "source": "Sources/ZeusCore/Polyglot/PolyglotSegmenter.swift",
+      "kind": "complete file",
+      "recorded_sha256": "375695b947f2dc8800838da0a98bb34d311f5a234a6d99d429b2c3b59a397c4b",
+      "current_sha256": "375695b947f2dc8800838da0a98bb34d311f5a234a6d99d429b2c3b59a397c4b",
+      "matches": true
+    },
+    {
+      "group": "polyglot",
+      "source": "Tests/ZeusCoreTests/PolyglotTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "8f19ccb679af0410286f3000caa2ea6fec3edb123f914926446815ab360bc1e6",
+      "current_sha256": "8f19ccb679af0410286f3000caa2ea6fec3edb123f914926446815ab360bc1e6",
+      "matches": true
+    },
+    {
+      "group": "polyglot",
+      "source": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "1ac2334ab3cf8b0c9db7a5222cc4d7ee89c837840be2ce3d64c47541c82d2073",
+      "current_sha256": "1ac2334ab3cf8b0c9db7a5222cc4d7ee89c837840be2ce3d64c47541c82d2073",
+      "matches": true
+    },
+    {
+      "group": "polyglot",
+      "source": "Tests/ZeusCoreTests/W7PolyglotTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "c7797194c634314e68e93b9a56cff79c6783c86ad8c58ac478aac9593c2376d7",
+      "current_sha256": "c7797194c634314e68e93b9a56cff79c6783c86ad8c58ac478aac9593c2376d7",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Dictation/DictationCore.swift",
+      "kind": "complete file",
+      "recorded_sha256": "e9775aead9f627c39ecf0cdbd78cac2b44b31030262cb75ff228f157cbfe18c6",
+      "current_sha256": "e9775aead9f627c39ecf0cdbd78cac2b44b31030262cb75ff228f157cbfe18c6",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Dictation/SpeechEngineCatalog.swift",
+      "kind": "complete file",
+      "recorded_sha256": "019c189847b2bb62445642f7322c3f71c660459bcb25569793395a724b5827e8",
+      "current_sha256": "019c189847b2bb62445642f7322c3f71c660459bcb25569793395a724b5827e8",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Dictation/SpokenDictationMarkup.swift",
+      "kind": "complete file",
+      "recorded_sha256": "e1f82642537775f8e9449c2f6854aefdab56b554a8e1e1ad8d6ec7fa6e4f6442",
+      "current_sha256": "e1f82642537775f8e9449c2f6854aefdab56b554a8e1e1ad8d6ec7fa6e4f6442",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Dictation/TranscriptionEngine.swift",
+      "kind": "complete file",
+      "recorded_sha256": "e471cbd77794ed1a3c5f89a482fbad0210777143e4a2019766e8b9a82cb7a65a",
+      "current_sha256": "e471cbd77794ed1a3c5f89a482fbad0210777143e4a2019766e8b9a82cb7a65a",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Dictation/WhisperPromptRecovery.swift",
+      "kind": "complete file",
+      "recorded_sha256": "38a67facae91d9916416a0cfd0d39ff483d7745852152aa5e4e5f4845248ae8e",
+      "current_sha256": "38a67facae91d9916416a0cfd0d39ff483d7745852152aa5e4e5f4845248ae8e",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Voice/UltronVoiceSignal.swift",
+      "kind": "complete file",
+      "recorded_sha256": "f799b04022e63cb955f73be6b317335039437cab87b60bfd7e8322131dd16961",
+      "current_sha256": "f799b04022e63cb955f73be6b317335039437cab87b60bfd7e8322131dd16961",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Recordly/RecordlyCaptureTimeline.swift",
+      "kind": "complete file",
+      "recorded_sha256": "debf3213054602645bee4ee4f13d0631db8b70b8519510a7701a4f8e69129873",
+      "current_sha256": "debf3213054602645bee4ee4f13d0631db8b70b8519510a7701a4f8e69129873",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Sources/ZeusCore/Mac/DriveTypingFlow.swift",
+      "kind": "complete file",
+      "recorded_sha256": "cb684d1a6018a2d63482b457758f2b1ed44367fab4cf8f652d6ab07e33006e86",
+      "current_sha256": "cb684d1a6018a2d63482b457758f2b1ed44367fab4cf8f652d6ab07e33006e86",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/DictationExplicitCorrectionTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "17d901dd4bc4fd402d4f374fe155a12475a3691f453f4dbfd3c034ba4de23de2",
+      "current_sha256": "17d901dd4bc4fd402d4f374fe155a12475a3691f453f4dbfd3c034ba4de23de2",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/DictationQAFixTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "662c8796243213d842deb379300680e5c75e1d7a6e4f04e743e45f804b320560",
+      "current_sha256": "662c8796243213d842deb379300680e5c75e1d7a6e4f04e743e45f804b320560",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/SpeechEngineCatalogTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "67940c9f9e82657b7dd78ce31166d5744fe5deaa45ea01fff8504444fc488eef",
+      "current_sha256": "67940c9f9e82657b7dd78ce31166d5744fe5deaa45ea01fff8504444fc488eef",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "ae6f269013e946b71889cb56925bba9da9d76d5419a65be4e8c5cf0794338c50",
+      "current_sha256": "ae6f269013e946b71889cb56925bba9da9d76d5419a65be4e8c5cf0794338c50",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "7444007b6ab48c684a280820d4e2dfd1c2d4aa3c376c9005233bdc178c1d8f5f",
+      "current_sha256": "7444007b6ab48c684a280820d4e2dfd1c2d4aa3c376c9005233bdc178c1d8f5f",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "32b9aeafb795993f03435b2741e3b3303a933899de7794898ac5bd12c307241b",
+      "current_sha256": "32b9aeafb795993f03435b2741e3b3303a933899de7794898ac5bd12c307241b",
+      "matches": true
+    },
+    {
+      "group": "regressions",
+      "source": "Tests/ZeusCoreTests/WhisperPromptRecoveryTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "e5778ceedab4dfbb44ed264fb66d15d4c4b59c843cdd92d41f1ad677a922cce0",
+      "current_sha256": "e5778ceedab4dfbb44ed264fb66d15d4c4b59c843cdd92d41f1ad677a922cce0",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/MeetingCopilot.swift",
+      "kind": "complete file",
+      "recorded_sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a",
+      "current_sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/TopBar/RecordingMotion.swift",
+      "kind": "complete file",
+      "recorded_sha256": "9ef7c90ae6322ba1dc038e295949dccdc991a91eb6a12e320c104819ad34e343",
+      "current_sha256": "9ef7c90ae6322ba1dc038e295949dccdc991a91eb6a12e320c104819ad34e343",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeCallPrompt.swift",
+      "kind": "complete file",
+      "recorded_sha256": "5dc2e21b22350b5caced0166490edb75694d1f93346eaf415fe1badad767c100",
+      "current_sha256": "5dc2e21b22350b5caced0166490edb75694d1f93346eaf415fe1badad767c100",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "kind": "complete file",
+      "recorded_sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357",
+      "current_sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeMicGate.swift",
+      "kind": "complete file",
+      "recorded_sha256": "1d926f669407a8813c13581cf83d17ae2b79042af08aab808e893f92fc634b22",
+      "current_sha256": "1d926f669407a8813c13581cf83d17ae2b79042af08aab808e893f92fc634b22",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "kind": "complete file",
+      "recorded_sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19",
+      "current_sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribePresentation.swift",
+      "kind": "complete file",
+      "recorded_sha256": "605f2a647755b1c60202e13daacc93b1925811aafa5717e594ccc26df2055153",
+      "current_sha256": "605f2a647755b1c60202e13daacc93b1925811aafa5717e594ccc26df2055153",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeSession.swift",
+      "kind": "complete file",
+      "recorded_sha256": "97e772cceeb3cc7de7dc757f48f0e4a00f862c79d7b3e4a62ebc6573e6a3d191",
+      "current_sha256": "97e772cceeb3cc7de7dc757f48f0e4a00f862c79d7b3e4a62ebc6573e6a3d191",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeSpeakerStats.swift",
+      "kind": "complete file",
+      "recorded_sha256": "2d599bc7537df2569dbc2cc7378938ae9a4c8a6a2b38ef9f30e303d2bb73d73c",
+      "current_sha256": "2d599bc7537df2569dbc2cc7378938ae9a4c8a6a2b38ef9f30e303d2bb73d73c",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "kind": "complete file",
+      "recorded_sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d",
+      "current_sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "28e0b0b339b95ba18e61bac17f7e4d6781e8ac6967043d7409aa658a134e9b5d",
+      "current_sha256": "28e0b0b339b95ba18e61bac17f7e4d6781e8ac6967043d7409aa658a134e9b5d",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Tests/ZeusCoreTests/ScribePresentationTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "a1c4665e62b889490dbe5f5a96ea9016ada12e35818e16a1b2accd446364dcd2",
+      "current_sha256": "a1c4665e62b889490dbe5f5a96ea9016ada12e35818e16a1b2accd446364dcd2",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Tests/ZeusCoreTests/W7ScribeTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "541a591f548a153081c7a15d699c35e821deab4a0d8b99a57742a5da30b57ee4",
+      "current_sha256": "541a591f548a153081c7a15d699c35e821deab4a0d8b99a57742a5da30b57ee4",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Tests/ZeusCoreTests/W8ScribeLookTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "6f600eb03db7e781e65354bf2b2ac81aff2eb81da4e117f1f3579cc4d7e58853",
+      "current_sha256": "6f600eb03db7e781e65354bf2b2ac81aff2eb81da4e117f1f3579cc4d7e58853",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "kind": "verbatim excerpt",
+      "start": "public enum ScribeAudioMath {",
+      "end_exclusive": "// MARK: - Streaming resampler",
+      "recorded_sha256": "7694fd5e8b2087a34deb682e88a9875bbb288236b945443a5ad9567407437389",
+      "current_sha256": "7694fd5e8b2087a34deb682e88a9875bbb288236b945443a5ad9567407437389",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "kind": "verbatim excerpt",
+      "start": "// MARK: - Call-app identification",
+      "end_exclusive": "// MARK: - Recap notes, cloud disclosure, system-audio stall",
+      "recorded_sha256": "baa638deb25188ffbaaea29ff02059f060240ceb6d84cac4a5a004f92f283f5d",
+      "current_sha256": "baa638deb25188ffbaaea29ff02059f060240ceb6d84cac4a5a004f92f283f5d",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "kind": "verbatim excerpt",
+      "start": "// MARK: - Mute evidence (fail closed)",
+      "end_exclusive": "// MARK: - Mute evidence timeline",
+      "recorded_sha256": "903c4b89d8311ffc423d931eb791268c462b1e80448c3ec5271e1d71825b757c",
+      "current_sha256": "903c4b89d8311ffc423d931eb791268c462b1e80448c3ec5271e1d71825b757c",
+      "matches": true
+    },
+    {
+      "group": "scribe",
+      "source": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+      "kind": "verbatim excerpt",
+      "start": "    @Test func freshEvidenceIsServedAndExpiredEvidenceIsUnknown()",
+      "end_exclusive": "    // MARK: Evidence coverage",
+      "recorded_sha256": "c0c9bb77b61c3f1d4d514531895fea81cc02faeae83957dc7df02de8cfb58eb9",
+      "current_sha256": "c0c9bb77b61c3f1d4d514531895fea81cc02faeae83957dc7df02de8cfb58eb9",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/JSONValue.swift",
+      "kind": "complete file",
+      "recorded_sha256": "85ebad8ae1240e0d241fbfa52ee6eee20657473e3c11b58afccf75709415b0b5",
+      "current_sha256": "85ebad8ae1240e0d241fbfa52ee6eee20657473e3c11b58afccf75709415b0b5",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/Mac/Walkthrough.swift",
+      "kind": "complete file",
+      "recorded_sha256": "f4a813f10214e2d35094949e06547f3012780a66fc7cc7e19100160ac4fbd4ab",
+      "current_sha256": "f4a813f10214e2d35094949e06547f3012780a66fc7cc7e19100160ac4fbd4ab",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/Mac/MacActionNumbers.swift",
+      "kind": "complete file",
+      "recorded_sha256": "ae11106f4aafa8ce5ca40d6f335b9afe9662f8422a2f4644d00d506b369d6d4f",
+      "current_sha256": "ae11106f4aafa8ce5ca40d6f335b9afe9662f8422a2f4644d00d506b369d6d4f",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/Mac/DrivePlan.swift",
+      "kind": "complete file",
+      "recorded_sha256": "5e0c9270ef9f19e82b510e10588c27e0f1e7ef0907c01e90425a388bbcb62e40",
+      "current_sha256": "5e0c9270ef9f19e82b510e10588c27e0f1e7ef0907c01e90425a388bbcb62e40",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/Present/SpeechTimeline.swift",
+      "kind": "complete file",
+      "recorded_sha256": "80cec169ad0b4bcd6bb8e2d7e66731d40dcd79ac24e5e81435b578fc6328325d",
+      "current_sha256": "80cec169ad0b4bcd6bb8e2d7e66731d40dcd79ac24e5e81435b578fc6328325d",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Tests/ZeusCoreTests/WalkthroughRevisionTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "c0de29c2f582c2de1785867539eb2322bacd790a19a6502acd66598693239f9e",
+      "current_sha256": "c0de29c2f582c2de1785867539eb2322bacd790a19a6502acd66598693239f9e",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Tests/ZeusCoreTests/SpeechTimelineTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "49dd115bef28c1c902128ebbb277b2a47543eb0b8b28acc6a6b20e3faf0dbbe2",
+      "current_sha256": "49dd115bef28c1c902128ebbb277b2a47543eb0b8b28acc6a6b20e3faf0dbbe2",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Tests/ZeusCoreTests/MacActionNumberTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "bf7dacd23342c0338bed89a1fc65cbca2e51e40404e714e354c6aced27495936",
+      "current_sha256": "bf7dacd23342c0338bed89a1fc65cbca2e51e40404e714e354c6aced27495936",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/ZeusTag.swift",
+      "kind": "verbatim excerpt",
+      "start": "public struct PointTarget:",
+      "end_exclusive": "public struct HighlightTarget:",
+      "recorded_sha256": "529f7dd4ea719e645afe3cea2a34a11995c47e068733aa96eba02b9d6d286c3a",
+      "current_sha256": "529f7dd4ea719e645afe3cea2a34a11995c47e068733aa96eba02b9d6d286c3a",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/Present/DrawingScene.swift",
+      "kind": "verbatim excerpt",
+      "start": "public struct MathLayout:",
+      "end_exclusive": "EOF",
+      "recorded_sha256": "6972e94fbe2af5f69d7ffdbb144e44b3a014d95114707260b8b598cc38d629b9",
+      "current_sha256": "6972e94fbe2af5f69d7ffdbb144e44b3a014d95114707260b8b598cc38d629b9",
+      "matches": true
+    },
+    {
+      "group": "presentation",
+      "source": "Sources/ZeusCore/Mac/AXSnapshot.swift",
+      "kind": "verbatim excerpt",
+      "start": "public struct AXRef:",
+      "end_exclusive": "/// What the frontmost window looked like",
+      "recorded_sha256": "a404ffa01201224f5b596aa415634eacc5efb1a84e2b9b29143a466e0226c8ba",
+      "current_sha256": "a404ffa01201224f5b596aa415634eacc5efb1a84e2b9b29143a466e0226c8ba",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/BuddyVisibility.swift",
+      "kind": "complete file",
+      "recorded_sha256": "190f0711ca3d79569166959a63b89690f6f7efb8f058e4bb86486da52330cf7f",
+      "current_sha256": "190f0711ca3d79569166959a63b89690f6f7efb8f058e4bb86486da52330cf7f",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Recordly/RecordlyCursorFollowPath.swift",
+      "kind": "complete file",
+      "recorded_sha256": "28810a2540a369396f1849c8afb5a35908393a79c46bbe77eaf97b7e80c65f22",
+      "current_sha256": "28810a2540a369396f1849c8afb5a35908393a79c46bbe77eaf97b7e80c65f22",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Recordly/RecordlyCursorSmoother.swift",
+      "kind": "complete file",
+      "recorded_sha256": "53a761b0735271274cb77c33f4473e5df7dce10f6465170fa3dcb9aa18e26445",
+      "current_sha256": "53a761b0735271274cb77c33f4473e5df7dce10f6465170fa3dcb9aa18e26445",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Recordly/RecordlyCursorLog.swift",
+      "kind": "complete file",
+      "recorded_sha256": "6d95a845e49fdfd19ad85e5da592913553b808a37447939a1919f99a388e4141",
+      "current_sha256": "6d95a845e49fdfd19ad85e5da592913553b808a37447939a1919f99a388e4141",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Recordly/RecordlyZoomRegions.swift",
+      "kind": "complete file",
+      "recorded_sha256": "717367d1d4c7b2ddf5e317a7a857d4fcf589a927a4a2c833b06f5671420d3dd2",
+      "current_sha256": "717367d1d4c7b2ddf5e317a7a857d4fcf589a927a4a2c833b06f5671420d3dd2",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Recordly/RecordlyExportPlan.swift",
+      "kind": "complete file",
+      "recorded_sha256": "16a1f6bfd28f2d4a148890b20019d9919b1e69bacc2814000e7c20007ad8e72e",
+      "current_sha256": "16a1f6bfd28f2d4a148890b20019d9919b1e69bacc2814000e7c20007ad8e72e",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Recordly/RecordlyExportSettings.swift",
+      "kind": "complete file",
+      "recorded_sha256": "896fe781551e102a5c91a9f77b2f69bbe13b8fde27c6852ed95c32cc6ae7f543",
+      "current_sha256": "896fe781551e102a5c91a9f77b2f69bbe13b8fde27c6852ed95c32cc6ae7f543",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Tests/ZeusCoreTests/RecordlyCursorFollowTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "fbc1cb680362539fc63b463684419007853c0f24c70087297738f1a32c55f7b4",
+      "current_sha256": "fbc1cb680362539fc63b463684419007853c0f24c70087297738f1a32c55f7b4",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Tests/ZeusCoreTests/RecordlyExportPlanTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "1f712aa2733186f0f939a04c42742c187c668b589560e3027977f3ebdd6b4672",
+      "current_sha256": "1f712aa2733186f0f939a04c42742c187c668b589560e3027977f3ebdd6b4672",
+      "matches": true
+    },
+    {
+      "group": "recordly-geometry",
+      "source": "Sources/ZeusCore/Present/CompanionMotion.swift",
+      "kind": "verbatim excerpt",
+      "start": "public struct CompanionSpring:",
+      "end_exclusive": "/// One frame of a flight.",
+      "recorded_sha256": "21a0a763ac7d233534cbaca46fbc0ffe523cb7ca3337beda9e36186a5549bcaf",
+      "current_sha256": "21a0a763ac7d233534cbaca46fbc0ffe523cb7ca3337beda9e36186a5549bcaf",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/MeetingCopilot.swift",
+      "kind": "complete file",
+      "recorded_sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a",
+      "current_sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "kind": "complete file",
+      "recorded_sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357",
+      "current_sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "kind": "complete file",
+      "recorded_sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19",
+      "current_sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "kind": "complete file",
+      "recorded_sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d",
+      "current_sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Scribe/ScribeSession.swift",
+      "kind": "complete file",
+      "recorded_sha256": "97e772cceeb3cc7de7dc757f48f0e4a00f862c79d7b3e4a62ebc6573e6a3d191",
+      "current_sha256": "97e772cceeb3cc7de7dc757f48f0e4a00f862c79d7b3e4a62ebc6573e6a3d191",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Scribe/ScribeRecapNavigation.swift",
+      "kind": "complete file",
+      "recorded_sha256": "39c5247c45ec9a096eecce8c7caf086d00a6d891e2e4d613b8f70d8732726565",
+      "current_sha256": "39c5247c45ec9a096eecce8c7caf086d00a6d891e2e4d613b8f70d8732726565",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Wiki/WikiPage.swift",
+      "kind": "complete file",
+      "recorded_sha256": "0473df7b046240457fb840b6d4f253ae23af600700587773d09e5e4b6f957ef3",
+      "current_sha256": "0473df7b046240457fb840b6d4f253ae23af600700587773d09e5e4b6f957ef3",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Wiki/WikiCompiler.swift",
+      "kind": "complete file",
+      "recorded_sha256": "5f6a4f9a7adb3528a427bfbf7d9404959b2ee8836794543c4a03d8a46e01e291",
+      "current_sha256": "5f6a4f9a7adb3528a427bfbf7d9404959b2ee8836794543c4a03d8a46e01e291",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Wiki/SensitiveInfoScanner.swift",
+      "kind": "complete file",
+      "recorded_sha256": "13533c12622d014851cb43c96bd1b9fdbabd5e0fd2baffe18da0aac8075da92a",
+      "current_sha256": "13533c12622d014851cb43c96bd1b9fdbabd5e0fd2baffe18da0aac8075da92a",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Wiki/WikiRelationships.swift",
+      "kind": "complete file",
+      "recorded_sha256": "bc83ab30ef5ad230599a0d14659e95c9600fb6c797d6b6c1750073c61963ad9e",
+      "current_sha256": "bc83ab30ef5ad230599a0d14659e95c9600fb6c797d6b6c1750073c61963ad9e",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "3c66d314e7fb8498663df67b461d0530d2d5e45b4218956a80b17a36f8158b1d",
+      "current_sha256": "3c66d314e7fb8498663df67b461d0530d2d5e45b4218956a80b17a36f8158b1d",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+      "kind": "complete file",
+      "recorded_sha256": "8f881a8c5fad174c9144802fc155e633dca41eb72acac9e9ae92bde0d9cd8991",
+      "current_sha256": "8f881a8c5fad174c9144802fc155e633dca41eb72acac9e9ae92bde0d9cd8991",
+      "matches": true
+    },
+    {
+      "group": "wiki-relationships",
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "kind": "verbatim excerpt",
+      "start": "public struct ScribeMeetingRecord:",
+      "end_exclusive": "public enum ScribeMeetingStoreError:",
+      "recorded_sha256": "3ee17527f475555e38fe74032ca997816242b4d3483a008657de6a3d1188f1e3",
+      "current_sha256": "3ee17527f475555e38fe74032ca997816242b4d3483a008657de6a3d1188f1e3",
+      "matches": true
+    }
+  ]
+}

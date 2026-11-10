@@ -1,0 +1,47 @@
+[0/1] Planning build
+Building for debugging...
+[0/12] Write sources
+[1/12] Write swift-version-457096A79D733C59.txt
+[3/13] Compiling ZeusCoreTests ScribeEndWorkflowTests.swift
+[4/13] Emitting module ZeusCoreTests
+[5/14] /workspace/zeus-validation/scribe-end-hajay3bu/.build/x86_64-unknown-linux-gnu/debug/ScribeEndRegressionPackageDiscoveredTests.derived/all-discovered-tests.swift
+[6/14] Write sources
+[7/14] Wrapping AST for ZeusCoreTests for debugging
+[9/16] Compiling ScribeEndRegressionPackageDiscoveredTests ZeusCoreTests.swift
+[10/16] Emitting module ScribeEndRegressionPackageDiscoveredTests
+[11/17] Compiling ScribeEndRegressionPackageDiscoveredTests all-discovered-tests.swift
+[12/18] /workspace/zeus-validation/scribe-end-hajay3bu/.build/x86_64-unknown-linux-gnu/debug/ScribeEndRegressionPackageTests.derived/runner.swift
+[13/18] Write sources
+[14/18] Wrapping AST for ScribeEndRegressionPackageDiscoveredTests for debugging
+[16/20] Emitting module ScribeEndRegressionPackageTests
+[17/20] Compiling ScribeEndRegressionPackageTests runner.swift
+[18/21] Wrapping AST for ScribeEndRegressionPackageTests for debugging
+[19/21] Write Objects.LinkFileList
+[20/21] Linking ScribeEndRegressionPackageTests.xctest
+Build complete! (6.05s)
+Test Suite 'All tests' started at 2026-11-10 00:23:58.746
+Test Suite 'debug.xctest' started at 2026-11-10 00:23:58.748
+Test Suite 'debug.xctest' passed at 2026-11-10 00:23:58.748
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:23:58.749
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Scribe owned call end confirmation" started.
+◇ Test explicitStopWaitsNineSecondsAndEmitsOnlyOneStopRequest() started.
+◇ Test nonfiniteNegativeAndUnrepresentableClocksCannotArmOrComplete() started.
+◇ Test replacingTheSessionRejectsEveryOldCommandAndNotification() started.
+◇ Test keepingAtTheDeadlineSuppressesDuplicateAppExitButExplicitStopCanRearm() started.
+◇ Test onlyTheExactBoundProcessInstanceCanStartAutomaticConfirmation() started.
+◇ Test exitDuringManualConfirmationIsConsumedWhenTheUserKeepsRecording() started.
+◇ Test invalidProcessIdentityNeverBindsButManualStopStillWorks() started.
+✔ Test replacingTheSessionRejectsEveryOldCommandAndNotification() passed after 0.001 seconds.
+✔ Test invalidProcessIdentityNeverBindsButManualStopStillWorks() passed after 0.001 seconds.
+✔ Test explicitStopWaitsNineSecondsAndEmitsOnlyOneStopRequest() passed after 0.001 seconds.
+✔ Test nonfiniteNegativeAndUnrepresentableClocksCannotArmOrComplete() passed after 0.001 seconds.
+✔ Test exitDuringManualConfirmationIsConsumedWhenTheUserKeepsRecording() passed after 0.001 seconds.
+✔ Test keepingAtTheDeadlineSuppressesDuplicateAppExitButExplicitStopCanRearm() passed after 0.001 seconds.
+✔ Test onlyTheExactBoundProcessInstanceCanStartAutomaticConfirmation() passed after 0.001 seconds.
+✔ Suite "Scribe owned call end confirmation" passed after 0.001 seconds.
+✔ Test run with 7 tests in 1 suite passed after 0.002 seconds.

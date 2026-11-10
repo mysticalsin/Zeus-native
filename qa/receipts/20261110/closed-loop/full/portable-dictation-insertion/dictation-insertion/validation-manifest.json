@@ -1,0 +1,17 @@
+{
+  "group": "dictation-insertion",
+  "repository": "/workspace/Zeus",
+  "platform": "linux",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/Dictation/TextInsertionReceipt.swift",
+      "sha256": "04f2f41fdbcaa0ce79761d0a55e3f45d258fd8fc1961157a3816b4b27a93d47d"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/TextInsertionReceiptTests.swift",
+      "sha256": "8035ad2bc70fefcd19706a287d9f64941d5546b2a017c2e668dcc611a239c3a8"
+    }
+  ],
+  "excerpts": []
+}

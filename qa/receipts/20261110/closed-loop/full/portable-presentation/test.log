@@ -1,0 +1,78 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/17] Emitting module ZeusCore
+[5/20] Compiling ZeusCore JSONValue.swift
+[6/20] Compiling ZeusCore DrivePlan.swift
+[7/20] Compiling ZeusCore MacActionNumbers.swift
+[8/20] Compiling ZeusCore Walkthrough.swift
+[9/20] Compiling ZeusCore PortableExcerpts.swift
+[10/20] Compiling ZeusCore SpeechTimeline.swift
+[11/24] Wrapping AST for ZeusCore for debugging
+[13/24] Emitting module ZeusCoreTests
+[14/24] Compiling ZeusCoreTests MacActionNumberTests.swift
+[15/24] Compiling ZeusCoreTests SpeechTimelineTests.swift
+[16/25] Compiling ZeusCoreTests WalkthroughRevisionTests.swift
+[17/26] /workspace/zeus-validation/closed-loop-full-frozen/portable-presentation/presentation/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[18/26] Write sources
+[19/26] Wrapping AST for ZeusCoreTests for debugging
+[21/28] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[22/28] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[23/29] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[24/30] /workspace/zeus-validation/closed-loop-full-frozen/portable-presentation/presentation/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[25/30] Write sources
+[26/30] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[28/32] Compiling ZeusPortableValidationPackageTests runner.swift
+[29/32] Emitting module ZeusPortableValidationPackageTests
+[30/33] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[31/33] Write Objects.LinkFileList
+[32/33] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (20.41s)
+Test Suite 'All tests' started at 2026-11-10 00:42:48.300
+Test Suite 'debug.xctest' started at 2026-11-10 00:42:48.302
+Test Suite 'debug.xctest' passed at 2026-11-10 00:42:48.302
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:42:48.302
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Untrusted Mac action numbers" started.
+◇ Suite WalkthroughRevisionTests started.
+◇ Suite SpeechTimelineTests started.
+◇ Test signedIntegralCoordinatesAndNumericStringsRemainSupported() started.
+◇ Test aMalformedExplicitRefCannotBecomeUntargetedTyping() started.
+◇ Test nonfiniteWaitAndToggleInputsAreRejected() started.
+◇ Test screenNumbersMustBePositiveRepresentableIntegers() started.
+◇ Test hugeSerializedCoordinatesAreRejectedWithoutAnIntegerTrap() started.
+◇ Test scrollingIsBoundedToTheNativeSigned32BitInput() started.
+◇ Test invalidCoordinatesCannotDowngradeTargetedTypingToCurrentFocus() started.
+◇ Test lateClickCannotAdvanceAReplacementTourAtTheSameIndex() started.
+◇ Test goingBackDoesNotRevalidateAnOldTimer() started.
+◇ Test threeStepsShareAOneSecondUtteranceWithoutStartingTogether() started.
+◇ Test stoppedAndEmptyToursCannotAdvance() started.
+◇ Test doubleClickOnlyAdvancesItsOriginalStepOnce() started.
+◇ Test aClickOrKeyCancelsTheRest() started.
+◇ Test dictateTextReportDrawsTheIdentityWithoutDollarSigns() started.
+◇ Test realWordTimesReplaceTheEstimate() started.
+◇ Test lateWordTimingsCannotReviveACancelledDrawing() started.
+✔ Test signedIntegralCoordinatesAndNumericStringsRemainSupported() passed after 0.001 seconds.
+✔ Test aMalformedExplicitRefCannotBecomeUntargetedTyping() passed after 0.001 seconds.
+✔ Test screenNumbersMustBePositiveRepresentableIntegers() passed after 0.002 seconds.
+✔ Test nonfiniteWaitAndToggleInputsAreRejected() passed after 0.002 seconds.
+✔ Test stoppedAndEmptyToursCannotAdvance() passed after 0.001 seconds.
+✔ Test invalidCoordinatesCannotDowngradeTargetedTypingToCurrentFocus() passed after 0.001 seconds.
+✔ Test doubleClickOnlyAdvancesItsOriginalStepOnce() passed after 0.001 seconds.
+✔ Test threeStepsShareAOneSecondUtteranceWithoutStartingTogether() passed after 0.001 seconds.
+✔ Test aClickOrKeyCancelsTheRest() passed after 0.001 seconds.
+✔ Test goingBackDoesNotRevalidateAnOldTimer() passed after 0.001 seconds.
+✔ Test scrollingIsBoundedToTheNativeSigned32BitInput() passed after 0.002 seconds.
+✔ Test lateWordTimingsCannotReviveACancelledDrawing() passed after 0.001 seconds.
+✔ Test realWordTimesReplaceTheEstimate() passed after 0.001 seconds.
+✔ Test hugeSerializedCoordinatesAreRejectedWithoutAnIntegerTrap() passed after 0.002 seconds.
+✔ Suite "Untrusted Mac action numbers" passed after 0.002 seconds.
+✔ Test dictateTextReportDrawsTheIdentityWithoutDollarSigns() passed after 0.001 seconds.
+✔ Suite SpeechTimelineTests passed after 0.002 seconds.
+✔ Test lateClickCannotAdvanceAReplacementTourAtTheSameIndex() passed after 0.002 seconds.
+✔ Suite WalkthroughRevisionTests passed after 0.002 seconds.
+✔ Test run with 16 tests in 3 suites passed after 0.003 seconds.

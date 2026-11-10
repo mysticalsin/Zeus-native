@@ -1,0 +1,392 @@
+[
+  {
+    "file": "Sources/Zeus/App/GlassTheme.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/App/Preferences.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/BrowserAgent/BrowserAgentRunner.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Chrome/ChromeActions.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Chrome/ChromeBridge.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Dictation/WhisperKitEngine.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Mac/DriveController.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Mac/WalkthroughController.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Notch/NotchController.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Notch/NotchView.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Onboarding/OnboardingFlow.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Onboarding/OnboardingStyle.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Polyglot/PolyglotController.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Polyglot/PolyglotViews.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Recordly/RecordlyCaptureEngine.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Recordly/RecordlyController.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Recordly/RecordlyExporter.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Recordly/RecordlyMediaResource.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Recordly/RecordlyPage.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Scribe/ScribeCallPopup.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Scribe/ScribeCallWatcher.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Scribe/ScribeLiveCapture.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Scribe/ScribeMuteDetector.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Stickies/BrainCaptureWindow.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/TopBar/TopBarViews.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Voice/ElevenLabsVoice.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Voice/LocalWhisper.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Voice/UltronVoiceEffect.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/Zeus/Voice/VoiceWAVPlayback.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/AboutYou.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/BrainCapture.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Dictation/SpeechEngineCatalog.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Dictation/WhisperPromptRecovery.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Mac/DrivePlan.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Mac/DriveTypingFlow.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Mac/MacActionNumbers.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Mac/Walkthrough.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Polyglot/PolyglotModels.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Polyglot/PolyglotPipeline.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Present/SpeechTimeline.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyCaptureTimeline.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyCheckpointStore.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyCursorFollowPath.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyDebugPlan.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyExportFiles.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyExportPlan.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Recordly/RecordlyExportSettings.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/SecondBrain/BrainRecall.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/SecondBrain/BrainToday.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/SecondBrain/SecondBrain.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/SecondBrain/TodayBrief.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/SecondBrain/VaultPathBoundary.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Sources/ZeusCore/Voice/UltronVoiceSignal.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusAppTests/BrainCaptureModelTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/DictationExplicitCorrectionTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/MacActionNumberTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/RecordlyCursorFollowTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/RecordlyExportFilesTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/RecordlyExportValidationTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/ScribeQAFixTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/SpeechTimelineTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/VaultBoundaryTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/WalkthroughRevisionTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "Tests/ZeusCoreTests/WhisperPromptRecoveryTests.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "qa/polyglot-swiftc/main.swift",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "file": "qa/portable-core/reproduce-foundation-replace.swift",
+    "exit_code": 0,
+    "output": ""
+  }
+]

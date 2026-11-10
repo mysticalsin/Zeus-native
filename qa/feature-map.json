@@ -1,0 +1,1434 @@
+{
+  "schema_version": 1,
+  "scope": "Finite acceptance obligations for the user-requested Friday13 and Sunday6 checklist, not an exhaustive inventory of all Zeus app features. Every obligation is mandatory for full mode; contract passes never imply device acceptance.",
+  "checks": [
+    {
+      "id": "portable-polyglot",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Actual caption pipeline with fake recognizer and translator; no live listening.",
+      "group": "polyglot"
+    },
+    {
+      "id": "portable-regressions",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Correction, vocabulary echo, offline DSP, typing and clock contracts; no native insertion, playback or capture.",
+      "group": "regressions"
+    },
+    {
+      "id": "portable-scribe",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact selected admission, transcript, session and presentation code plus bounded pure excerpts; not ingress or speaker quality proof.",
+      "group": "scribe"
+    },
+    {
+      "id": "portable-presentation",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact selected walkthrough, numeric and speech timeline contracts; not native event injection or renderer.",
+      "group": "presentation"
+    },
+    {
+      "id": "portable-recordly-geometry",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Real crop/follow planning; Linux geometry import reexport only; not exported pixels or native cursor capture.",
+      "group": "recordly-geometry"
+    },
+    {
+      "id": "portable-wiki-relationships",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact compiler, connection and recap navigation policy; temporary synthetic data, no personal vault.",
+      "group": "wiki-relationships"
+    },
+    {
+      "id": "release-mocks",
+      "kind": "release-mocks",
+      "tier": "contract",
+      "scope": "Fake signing/notary/install tools and throwaway bundles; no Developer ID, real notarization, Gatekeeper or installation."
+    },
+    {
+      "id": "native-DictationOwnershipIntegrationTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual delivery/turn seams with fake closures, no OS typing or pasteboard.",
+      "suite": "DictationOwnershipIntegrationTests",
+      "file": "Tests/ZeusAppTests/DictationOwnershipIntegrationTests.swift"
+    },
+    {
+      "id": "native-PolyglotPinTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual NotchController dismissal model with explicit pin closure; no capture or translation.",
+      "suite": "PolyglotPinTests",
+      "file": "Tests/ZeusAppTests/PolyglotPinTests.swift"
+    },
+    {
+      "id": "native-RecorderPillTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual pill timer formatting only; no animation parity.",
+      "suite": "RecorderPillTests",
+      "file": "Tests/ZeusAppTests/RecorderPillTests.swift"
+    },
+    {
+      "id": "native-BrainCaptureModelTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual app preview/save model with injected temporary selected vault; no personal vault.",
+      "suite": "BrainCaptureModelTests",
+      "file": "Tests/ZeusAppTests/BrainCaptureModelTests.swift"
+    },
+    {
+      "id": "native-UltronVoiceEffectTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual native wrapper on generated sample arrays; no audio playback.",
+      "suite": "UltronVoiceEffectTests",
+      "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift"
+    },
+    {
+      "id": "native-EngineBrandLogoTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Bundled asset resolution and offscreen SwiftUI rendering; no screen capture or visual parity claim.",
+      "suite": "EngineBrandLogoTests",
+      "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift"
+    },
+    {
+      "id": "native-OnboardingTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual onboarding state and bundled media metadata, injected sounds; not whole-app interaction acceptance.",
+      "suite": "OnboardingTests",
+      "file": "Tests/ZeusAppTests/OnboardingTests.swift"
+    },
+    {
+      "id": "native-PermissionsCaptureTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Injected permission ports; no real camera/screen request or capture.",
+      "suite": "PermissionsCaptureTests",
+      "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift"
+    },
+    {
+      "id": "native-RecordlyExportValidationTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "AVFoundation rejects missing/invalid synthetic media; does not prove successful export.",
+      "suite": "RecordlyExportValidationTests",
+      "file": "Tests/ZeusCoreTests/RecordlyExportValidationTests.swift"
+    },
+    {
+      "id": "native-RecordlyCheckpointStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual Darwin filesystem confinement and large sparse checkpoint fixtures under temporary roots.",
+      "suite": "RecordlyCheckpointStoreTests",
+      "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift"
+    },
+    {
+      "id": "native-RecordlyExportFilesTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual Darwin exclusive export publication in temporary roots.",
+      "suite": "RecordlyExportFilesTests",
+      "file": "Tests/ZeusCoreTests/RecordlyExportFilesTests.swift"
+    },
+    {
+      "id": "native-RecordlyDebugWiringTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual debug dispatch with fake handler; no real recorder.",
+      "suite": "RecordlyDebugWiringTests",
+      "file": "Tests/ZeusAppTests/RecordlyDebugWiringTests.swift"
+    },
+    {
+      "id": "missing-F01-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Recognize public/prerecorded multilingual speech through actual engine; insert/correct only in disposable focused fixture, interrupted/offline and cross-turn cases. Keep transcript, focus events and exact model/binary hashes.",
+      "reason": "Automated recognizer-to-focused-field corpus and cross-turn rewriting acceptance are not implemented."
+    },
+    {
+      "id": "missing-F02-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Drive native controller with injected dual-source audio, ASR/diarizer, clock and temporary persistence; assert ordered session events and durable recap.",
+      "reason": "No complete native dual-source/controller fixture exists."
+    },
+    {
+      "id": "missing-F02-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Synthetic known speakers/overlap through real supported audio and recognizer adapters; measure diarization against labeled ground truth and retain trace.",
+      "reason": "No device/engine speaker-quality receipt or complete automated fixture runner exists."
+    },
+    {
+      "id": "missing-F03-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject permission, mute, owner and timestamp transitions at actual callback ingress; forbidden payload never enters ring, recognition or storage.",
+      "reason": "Production admission-before-copy helper has synthetic contract tests; actual OS callback-to-ring/ASR/storage integration still lacks a native fixture."
+    },
+    {
+      "id": "missing-F03-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated trace over mute/unmute/unknown transitions and every supported call adapter; zero forbidden payload at each stage. Owner OS consent required for any real capture.",
+      "reason": "Strict literal no-capture guarantee and supported mute evidence are not yet proven."
+    },
+    {
+      "id": "missing-F04-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject calendar/clock/session and activate actual popup Start once; assert one session, screen placement and refreshed headline.",
+      "reason": "Native popup automation fixture is absent."
+    },
+    {
+      "id": "missing-F04-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated disposable calendar permission denial/grant, display changes, focus restoration and one-tap launch trace.",
+      "reason": "No automated permission/calendar/display acceptance runner."
+    },
+    {
+      "id": "missing-F05-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Native temporal render sequence of start/level/stop/interruption and mini-window transitions, compared to authorized motion reference with frame pacing/reduced-motion thresholds.",
+      "reason": "No temporal reference baseline or automated native motion comparator; still screenshots cannot pass."
+    },
+    {
+      "id": "missing-F06-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject verified call-end/resume events and clock through actual controller; countdown supports Keep recording/End now and one stop, then saved note.",
+      "reason": "Verified call lifecycle integration fixture is not implemented."
+    },
+    {
+      "id": "missing-F06-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Actual countdown and completed note window traces for session replacement, resumed call, write failure and retry; no idle-mic heuristic as call end.",
+      "reason": "No automated native window/lifecycle acceptance receipt."
+    },
+    {
+      "id": "missing-F07-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Drive both actual Recordly and Meetings top bars through start/record/settle/complete/failure; old-session events cannot animate current session.",
+      "reason": "Production shared feedback model/view exists with contract tests; both actual native controllers/views still need end-to-end integration fixtures."
+    },
+    {
+      "id": "missing-F07-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Temporal frames and event trace for both producers, interruption and reduced motion; readable stable top-bar layout and no completion before persistence.",
+      "reason": "No automated native temporal acceptance runner."
+    },
+    {
+      "id": "missing-F08-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated public animation capture after owner consent; export MP4/GIF trim/speed/aspect/fps, decode frames/audio timing and compare cursor-follow motion; cancellation and >512MiB playback.",
+      "reason": "Successful native capture/render/playback acceptance not yet implemented; no region coordinate proof."
+    },
+    {
+      "id": "missing-F09-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Production companion/drawing/speech/guided-target fixtures exercise P0-P7, timing and cancellation; no physical pointer or typing outside disposable injected sink.",
+      "reason": "Complete actual renderer/controller P0-P7 integration tests do not exist."
+    },
+    {
+      "id": "missing-F09-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated native multi-display/scale/Spaces/removal traces, velocity continuity, speech-to-drawing motion and exact targets; optional physical actions remain disabled by default.",
+      "reason": "No complete automated native screen geometry and reference temporal comparison."
+    },
+    {
+      "id": "missing-F10-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated meeting/preference/lesson/todo learning through UI, source-linked graph and selected/previewed MCP delivery to disposable Obsidian vault with idempotency, durable retry and exact readback.",
+      "reason": "Unified learning/graph/MCP end-to-end acceptance is incomplete; local file-save tests are not MCP proof."
+    },
+    {
+      "id": "missing-F11-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Authorized voice corpus, real TTS adapter output (offline files), pronunciation/latency/loudness, long replies and interruption/fallback; reproducible delivery evaluation.",
+      "reason": "No native/provider voice quality and playback acceptance fixture or reference baseline."
+    },
+    {
+      "id": "missing-F12-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated light/dark/hover/pressed/focus/disabled/copied and volume/tab/orb interaction traces, keyboard/VoiceOver/small-display contrast; distributable logo provenance.",
+      "reason": "No complete native interaction/a11y runner or resolved distribution provenance for every legacy asset."
+    },
+    {
+      "id": "missing-F13-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated disposable-account onboarding, denied/revoked permissions, every tab/settings route, daily workflow, crash/relaunch, offline/provider/storage failure and accessibility acceptance on exact binary.",
+      "reason": "No complete automated UI daily-journey runner. Manual clickthrough cannot fill this obligation."
+    },
+    {
+      "id": "missing-S01-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject actual watcher snapshot, native capture/controller callbacks and ASR partials into visible recording UI.",
+      "reason": "Native watcher-to-live-text synthetic fixture not implemented."
+    },
+    {
+      "id": "missing-S01-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated known idle browser/Zoom versus active mic owners, stale/unknown ownership, live text and UI transition traces on supported OS.",
+      "reason": "No actual mic-owner/device/live-UI acceptance receipt."
+    },
+    {
+      "id": "missing-S02-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Feed prerecorded fixtures through real native recognizer/translation adapter and actual controller; pack-needed/unsupported errors remain honest.",
+      "reason": "No native recognizer/translation controller fixture runner."
+    },
+    {
+      "id": "missing-S02-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Actual installed model/translation pack corpus on supported macOS, both input streams, repeated target changes and latency trace.",
+      "reason": "No supported-device/model/pack acceptance receipt."
+    },
+    {
+      "id": "missing-S03-contract",
+      "kind": "unimplemented",
+      "tier": "contract",
+      "scope": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
+      "reason": "No isolated portable pin contract; native dismissal model is separately executable."
+    },
+    {
+      "id": "missing-S03-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated actual bar pin/Stop/dismiss/reopen/unpin/tab-switch event sequence, accessibility target availability and no leaked listening session.",
+      "reason": "Native model tests do not execute Stop or actual visible UI interactions."
+    },
+    {
+      "id": "missing-S04-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated permission-delay/rapid Start-Stop/no-frame/display-disconnect/cancel/retry and decoded MP4/GIF; region feature must remain unavailable until recorded coordinate proof exists.",
+      "reason": "Native capture startup/export acceptance missing; region proof not supplied."
+    },
+    {
+      "id": "missing-S05-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Actual controller receives verified call-ended event, single countdown/stop, persisted recap and completed window; replay/retry/late callback coverage.",
+      "reason": "End-call adapter/window native synthetic integration coverage incomplete."
+    },
+    {
+      "id": "missing-S05-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated actual countdown/completion window and source-linked recap sequence, including resumed call and storage failure; compare authorized reference timing.",
+      "reason": "No native temporal acceptance runner or device receipt."
+    },
+    {
+      "id": "missing-S06-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Build and bundle exact source; verify executable/resources/entitlements and upgrade/rollback against disposable app destination.",
+      "reason": "No actual release artifact integration fixture; ad-hoc preview is not a release."
+    },
+    {
+      "id": "missing-S06-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Developer ID signature+secure timestamp+runtime, accepted notarization, stapled app/DMG, Gatekeeper clean-machine launch and rollback; exact app/DMG hashes, licenses/assets/version and commercial gating settled.",
+      "reason": "No signing identity/notary/clean-Mac proof or completed commercial readiness decision; no placeholder receipt accepted."
+    },
+    {
+      "id": "portable-buddy",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "buddy",
+      "scope": "Actual companion pointing, flight and coordinate math; Linux Foundation geometry shim, no native display or renderer proof."
+    },
+    {
+      "id": "portable-dictation-insertion",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "dictation-insertion",
+      "scope": "Actual receipt/replacement flow with injected native read/write ports; no real focused field or OS event proof."
+    },
+    {
+      "id": "portable-wiki-export",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "wiki-export",
+      "scope": "Actual selected export transaction, MCP protocol and confined filesystem with synthetic temporary vault and injected transport. Independent process checks included only when their named test executes; no personal vault."
+    },
+    {
+      "id": "native-ScribeLifecycleScenarioTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ScribeLifecycleScenarioTests",
+      "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+      "scope": "Actual ScribeController with fake capture/notes, synthetic temp persistence and clock; no real capture, permission, end windows or device proof."
+    },
+    {
+      "id": "native-RecordingFeedbackRenderTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "RecordingFeedbackRenderTests",
+      "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+      "scope": "Actual production SwiftUI frame renderer evaluated at fixed synthetic times to PNG/GIF artifacts, no desktop capture. Does not prove native controller timing, frame pacing or reference parity."
+    }
+  ],
+  "features": [
+    {
+      "id": "F01",
+      "title": "Reliable dictation and explicit self-correction",
+      "obligations": [
+        {
+          "id": "F01.receipt",
+          "check": "portable-dictation-insertion",
+          "acceptance": "Only an acknowledged exact field/text/caret receipt permits cross-turn replacement; changed ownership and unconfirmed writes never retry.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/TextInsertionReceiptTests.swift",
+              "function": "sameFieldWholeTurnReplacementAcknowledgesAndCanCorrectAgain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TextInsertionReceiptTests.swift",
+              "function": "focusDriftOrCancellationAfterSelectionCannotWrite"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TextInsertionReceiptTests.swift",
+              "function": "setterFailureIsUnconfirmedNeverRetries"
+            }
+          ]
+        },
+        {
+          "check": "portable-regressions",
+          "acceptance": "Explicit restart replaces stale words and dictionary echo retries locally.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/DictationExplicitCorrectionTests.swift",
+              "function": "noIMeantReplacesTheStaleWordBeforeInsert"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WhisperPromptRecoveryTests.swift",
+              "function": "recoveryUsesOnePromptFreeVadFreeLocalRetry"
+            }
+          ],
+          "id": "F01.1"
+        },
+        {
+          "check": "native-DictationOwnershipIntegrationTests",
+          "acceptance": "Queued stale turns and focus drift cannot deliver into a new target.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/DictationOwnershipIntegrationTests.swift",
+              "function": "cancelBetweenEnqueueAndExecutionDropsThePartial"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DictationOwnershipIntegrationTests.swift",
+              "function": "targetDriftingDuringTheSettleDelayLeavesTheTextOnTheClipboard"
+            }
+          ],
+          "id": "F01.2"
+        },
+        {
+          "check": "missing-F01-device",
+          "acceptance": "Recognize public/prerecorded multilingual speech through actual engine; insert/correct only in disposable focused fixture, interrupted/offline and cross-turn cases. Keep transcript, focus events and exact model/binary hashes.",
+          "cases": [],
+          "id": "F01.3"
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "title": "Native Meetings recording, transcription and speaker identification",
+      "obligations": [
+        {
+          "id": "F02.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "acceptance": "Actual injected controller saves before completed feedback, keeps newer private notes on retry, and stops once after its nine-second confirmation. Does not prove actual hardware/ASR/window behavior.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "manualCountdownKeepAndRepeatedTicksStopExactlyOnceAfterNineSeconds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "failedFinalSaveDoesNotCompleteAndRetryKeepsNewerPrivateNotes"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "acceptance": "Acknowledgement precedes recording; final transcript excludes unresolved partials.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "recordingBeginsOnlyAfterAcknowledgement"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "finalizedTranscriptNeverFeedsUnresolvedTextToNotes"
+            }
+          ],
+          "id": "F02.1"
+        },
+        {
+          "check": "missing-F02-native",
+          "acceptance": "Drive native controller with injected dual-source audio, ASR/diarizer, clock and temporary persistence; assert ordered session events and durable recap.",
+          "cases": [],
+          "id": "F02.2"
+        },
+        {
+          "check": "missing-F02-device",
+          "acceptance": "Synthetic known speakers/overlap through real supported audio and recognizer adapters; measure diarization against labeled ground truth and retain trace.",
+          "cases": [],
+          "id": "F02.3"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Strict mute protects every capture and transcription stage",
+      "obligations": [
+        {
+          "id": "F03.ingress",
+          "check": "portable-scribe",
+          "acceptance": "Only fresh allowed evidence permits the actual ingress helper to copy sample memory; mute/unknown/expired/contended states never copy.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+              "function": "onlyAcknowledgedFreshEvidenceCanTouchSampleMemory"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+              "function": "mutedUnknownExpiredAndInvalidTimingNeverInvokeTheCopy"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+              "function": "contendedCallbackReturnsWithoutTouchingSamples"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+              "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "acceptance": "Known muted and unknown frames reach neither storage nor ASR.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "mutedAndUnknownMicFramesReachNeitherStoreNorTranscriber"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition"
+            }
+          ],
+          "id": "F03.1"
+        },
+        {
+          "check": "missing-F03-native",
+          "acceptance": "Inject permission, mute, owner and timestamp transitions at actual callback ingress; forbidden payload never enters ring, recognition or storage.",
+          "cases": [],
+          "id": "F03.2"
+        },
+        {
+          "check": "missing-F03-device",
+          "acceptance": "Automated trace over mute/unmute/unknown transitions and every supported call adapter; zero forbidden payload at each stage. Owner OS consent required for any real capture.",
+          "cases": [],
+          "id": "F03.3"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "title": "Upcoming meeting popup with one-tap start",
+      "obligations": [
+        {
+          "check": "portable-scribe",
+          "acceptance": "Upcoming windows, dismissal dedupe and active recording suppress prompts.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "upcomingWindowEdges"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "dismissedSlotIsSkipped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "recordingSuppressesEveryPrompt"
+            }
+          ],
+          "id": "F04.1"
+        },
+        {
+          "check": "missing-F04-native",
+          "acceptance": "Inject calendar/clock/session and activate actual popup Start once; assert one session, screen placement and refreshed headline.",
+          "cases": [],
+          "id": "F04.2"
+        },
+        {
+          "check": "missing-F04-device",
+          "acceptance": "Automated disposable calendar permission denial/grant, display changes, focus restoration and one-tap launch trace.",
+          "cases": [],
+          "id": "F04.3"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "title": "Recording animation, pill and mini-window motion parity",
+      "obligations": [
+        {
+          "id": "F05.rendered-feedback",
+          "check": "native-RecordingFeedbackRenderTests",
+          "acceptance": "Production shared renderer changes normal frames for both producers, remains steady within reduced-motion phases and expires completion on the bounded deadline; artifacts carry source/timing hashes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "normalFramesEvolveForBothProducers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "reducedMotionFramesStayStableWithinPhase"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "completionFramesExpireAtBoundedDeadline"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "acceptance": "Recording pulse and reduced-motion model follow actual lifecycle.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordingMotionTests.swift",
+              "function": "recordlyRecordingBreathes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingMotionTests.swift",
+              "function": "reduceMotionIsSteady"
+            }
+          ],
+          "id": "F05.1"
+        },
+        {
+          "check": "native-RecorderPillTests",
+          "acceptance": "The actual native pill keeps its timer one line.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RecorderPillTests.swift",
+              "function": "clockNeverContainsWhitespaceOrNewlines"
+            }
+          ],
+          "id": "F05.2"
+        },
+        {
+          "check": "missing-F05-device",
+          "acceptance": "Native temporal render sequence of start/level/stop/interruption and mini-window transitions, compared to authorized motion reference with frame pacing/reduced-motion thresholds.",
+          "cases": [],
+          "id": "F05.3"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "title": "End-call countdown then completed note",
+      "obligations": [
+        {
+          "id": "F06.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "acceptance": "Actual injected controller saves before completed feedback, keeps newer private notes on retry, and stops once after its nine-second confirmation. Does not prove actual hardware/ASR/window behavior.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "manualCountdownKeepAndRepeatedTicksStopExactlyOnceAfterNineSeconds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "failedFinalSaveDoesNotCompleteAndRetryKeepsNewerPrivateNotes"
+            }
+          ]
+        },
+        {
+          "id": "F06.countdown",
+          "check": "portable-scribe",
+          "acceptance": "Session-bound monotonic nine-second countdown rejects stale identities and emits a single stop; only exact bound process termination is automatic evidence.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+              "function": "explicitStopWaitsNineSecondsAndEmitsOnlyOneStopRequest"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+              "function": "onlyTheExactBoundProcessInstanceCanStartAutomaticConfirmation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+              "function": "replacingTheSessionRejectsEveryOldCommandAndNotification"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "acceptance": "Expiry alone cannot claim capture ended; durable save precedes completion.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "countdownExpiryAloneDoesNotEndCapture"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCompletionTests.swift",
+              "function": "persistencePrecedesTheOnlyCompletionEvent"
+            }
+          ],
+          "id": "F06.1"
+        },
+        {
+          "check": "missing-F06-native",
+          "acceptance": "Inject verified call-end/resume events and clock through actual controller; countdown supports Keep recording/End now and one stop, then saved note.",
+          "cases": [],
+          "id": "F06.2"
+        },
+        {
+          "check": "missing-F06-device",
+          "acceptance": "Actual countdown and completed note window traces for session replacement, resumed call, write failure and retry; no idle-mic heuristic as call end.",
+          "cases": [],
+          "id": "F06.3"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "title": "Transcript and completion glow, frost and reveal in both top-bar producers",
+      "obligations": [
+        {
+          "id": "F07.rendered-feedback",
+          "check": "native-RecordingFeedbackRenderTests",
+          "acceptance": "Production shared renderer changes normal frames for both producers, remains steady within reduced-motion phases and expires completion on the bounded deadline; artifacts carry source/timing hashes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "normalFramesEvolveForBothProducers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "reducedMotionFramesStayStableWithinPhase"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+              "function": "completionFramesExpireAtBoundedDeadline"
+            }
+          ]
+        },
+        {
+          "id": "F07.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "acceptance": "Actual injected controller saves before completed feedback, keeps newer private notes on retry, and stops once after its nine-second confirmation. Does not prove actual hardware/ASR/window behavior.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "manualCountdownKeepAndRepeatedTicksStopExactlyOnceAfterNineSeconds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "failedFinalSaveDoesNotCompleteAndRetryKeepsNewerPrivateNotes"
+            }
+          ]
+        },
+        {
+          "id": "F07.shared-feedback",
+          "check": "portable-scribe",
+          "acceptance": "Both production producers share temporal feedback; processing cannot become success by clock passage and stale completion cannot move to a new project.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "bothProductionSourcesUseTheSameTemporalContract"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "processingNeverBecomesSuccessBecauseTimePasses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+              "function": "anOldCompletionCannotBeDisplayedForAnotherProjectOrAfterExpiry"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "acceptance": "Scribe writing waits for notes; reveal and reduced motion remain bounded.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribePresentationTests.swift",
+              "function": "writingPersistsUntilNotesReadyNoMatterHowLongItTakes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribePresentationTests.swift",
+              "function": "reduceMotionHasStaticBandAndNoSurge"
+            }
+          ],
+          "id": "F07.1"
+        },
+        {
+          "check": "missing-F07-native",
+          "acceptance": "Drive both actual Recordly and Meetings top bars through start/record/settle/complete/failure; old-session events cannot animate current session.",
+          "cases": [],
+          "id": "F07.2"
+        },
+        {
+          "check": "missing-F07-device",
+          "acceptance": "Temporal frames and event trace for both producers, interruption and reduced motion; readable stable top-bar layout and no completion before persistence.",
+          "cases": [],
+          "id": "F07.3"
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "title": "Native Recordly capture, cursor follow and polished export",
+      "obligations": [
+        {
+          "check": "portable-regressions",
+          "acceptance": "First video establishes origin; pre-origin audio is rejected.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+              "function": "hostUptimeDoesNotBecomeMovieLeadIn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+              "function": "audioCannotStartSessionOrPrecedeFirstVideo"
+            }
+          ],
+          "id": "F08.1"
+        },
+        {
+          "check": "portable-recordly-geometry",
+          "acceptance": "Production follow/crop path follows smoothed bounded points.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCursorFollowTests.swift",
+              "function": "exportedZoomFollowsTheSmoothedPath"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCursorFollowTests.swift",
+              "function": "longRecordingsKeepABoundedPath"
+            }
+          ],
+          "id": "F08.2"
+        },
+        {
+          "check": "native-RecordlyExportValidationTests",
+          "acceptance": "Bytes alone never certify playable media.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyExportValidationTests.swift",
+              "function": "bytesAloneDoNotProveAVideoOrDuration"
+            }
+          ],
+          "id": "F08.3"
+        },
+        {
+          "check": "native-RecordlyExportFilesTests",
+          "acceptance": "Publication tests run actual confined/exclusive file operations.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyExportFilesTests.swift",
+              "function": "concurrentExportsNeverOverwriteEachOther"
+            }
+          ],
+          "id": "F08.4"
+        },
+        {
+          "check": "native-RecordlyCheckpointStoreTests",
+          "acceptance": "Large sparse files and checkpoint failure paths use real native filesystem operations.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift",
+              "function": "saveThenLoadRoundTripsProjectAndSettings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift",
+              "function": "largeExportStreamsTailAndCapsAllocationWhilePreviewRemainsLimited"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift",
+              "function": "largeExportRejectsGrowthLinksAndReleasedAuthority"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCheckpointStoreTests.swift",
+              "function": "largeExportNeverReopensAReplacedPath"
+            }
+          ],
+          "id": "F08.5"
+        },
+        {
+          "check": "missing-F08-device",
+          "acceptance": "Automated public animation capture after owner consent; export MP4/GIF trim/speed/aspect/fps, decode frames/audio timing and compare cursor-follow motion; cancellation and >512MiB playback.",
+          "cases": [],
+          "id": "F08.6"
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "title": "Screen Buddy combined behavior",
+      "obligations": [
+        {
+          "id": "F09.buddy",
+          "check": "portable-buddy",
+          "acceptance": "Display moves rebase in-flight and arrived targets consistently; reduced motion reveals the full label immediately.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+              "function": "movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+              "function": "movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CompanionPointingTests.swift",
+              "function": "reducedMotionShowsTheWholeUnicodeLabelAtArrival"
+            }
+          ]
+        },
+        {
+          "check": "portable-presentation",
+          "acceptance": "Old tour callbacks and late word timings cannot revive cancelled/replaced work.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/WalkthroughRevisionTests.swift",
+              "function": "lateClickCannotAdvanceAReplacementTourAtTheSameIndex"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechTimelineTests.swift",
+              "function": "lateWordTimingsCannotReviveACancelledDrawing"
+            }
+          ],
+          "id": "F09.1"
+        },
+        {
+          "check": "portable-regressions",
+          "acceptance": "Typing yields before replacement and on focus changes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+              "function": "cancellationDuringFocusDelayPreventsSelectAllAndTyping"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DriveTypingFlowTests.swift",
+              "function": "focusDriftBetweenChunksStopsBeforeWritingIntoTheNewField"
+            }
+          ],
+          "id": "F09.2"
+        },
+        {
+          "check": "missing-F09-native",
+          "acceptance": "Production companion/drawing/speech/guided-target fixtures exercise P0-P7, timing and cancellation; no physical pointer or typing outside disposable injected sink.",
+          "cases": [],
+          "id": "F09.3"
+        },
+        {
+          "check": "missing-F09-device",
+          "acceptance": "Automated native multi-display/scale/Spaces/removal traces, velocity continuity, speech-to-drawing motion and exact targets; optional physical actions remain disabled by default.",
+          "cases": [],
+          "id": "F09.4"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Embedded memory, sources, connections and selected MCP export",
+      "obligations": [
+        {
+          "id": "F10.mcp-contract",
+          "check": "portable-wiki-export",
+          "acceptance": "Selected reviewed pages retain provenance; transaction rechecks immutable destination/content and reads back exact delivery with bounded recovery.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/WikiExportTests.swift",
+              "function": "selectionPreviewContainsOnlyReviewedPagesAndStableProvenance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiExportTests.swift",
+              "function": "realProtocolSelectionTransactionVerifiesAndErasesRecoveryBytes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiExportTests.swift",
+              "function": "lostCreateReplyRequiresReadOnlyReconciliationAndNeverDuplicates"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiExportTests.swift",
+              "function": "symbolicInboxAndFileLinksCannotRedirectWritesOrReads"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "bundledHelperCompletesInteractiveMCPRoundTrip"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "handshakeTimeoutClosesTheChildProcess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+              "function": "cancelledHandshakeClosesTheChildProcess"
+            }
+          ]
+        },
+        {
+          "check": "portable-wiki-relationships",
+          "acceptance": "Connections require current explicit evidence; saved-source navigation never interrupts active meetings.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+              "function": "compiledPagesBecomeConnectedByAnExplicitEditedLink"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+              "function": "missingAndForgottenEvidenceNeverResurrectsEditedSources"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+              "function": "everyActivePhaseRefusesSavedSourceNavigation"
+            }
+          ],
+          "id": "F10.1"
+        },
+        {
+          "check": "native-BrainCaptureModelTests",
+          "acceptance": "Native preview saves only selected temporary destination and refuses revoked access.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/BrainCaptureModelTests.swift",
+              "function": "previewIsStableAndSaveWritesOnlyAfterTheExplicitAction"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainCaptureModelTests.swift",
+              "function": "accessRevokedWhilePreviewIsOpenBlocksSave"
+            }
+          ],
+          "id": "F10.2"
+        },
+        {
+          "check": "missing-F10-device",
+          "acceptance": "Automated meeting/preference/lesson/todo learning through UI, source-linked graph and selected/previewed MCP delivery to disposable Obsidian vault with idempotency, durable retry and exact readback.",
+          "cases": [],
+          "id": "F10.3"
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "Ultron-style voice and delivery",
+      "obligations": [
+        {
+          "check": "portable-regressions",
+          "acceptance": "Silence remains silence and streamed chunks equal whole-buffer DSP.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+              "function": "pausesStaySilentAtEveryIntensity"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoiceSignalTests.swift",
+              "function": "streamingChunksMatchOneContinuousBuffer"
+            }
+          ],
+          "id": "F11.1"
+        },
+        {
+          "check": "native-UltronVoiceEffectTests",
+          "acceptance": "Actual native DSP wrapper processes synthetic buffer and bypass.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "effectChainRendersNonSilentBuffer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "disabledEffectPassesThrough"
+            }
+          ],
+          "id": "F11.2"
+        },
+        {
+          "check": "missing-F11-device",
+          "acceptance": "Authorized voice corpus, real TTS adapter output (offline files), pronunciation/latency/loudness, long replies and interruption/fallback; reproducible delivery evaluation.",
+          "cases": [],
+          "id": "F11.3"
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "title": "Provider logos and polished Chat orb, tabs, volume and copy",
+      "obligations": [
+        {
+          "check": "portable-regressions",
+          "acceptance": "Orb coordinates, radius and opacity stay bounded while animation advances.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ThinkingOrbMathTests.swift",
+              "function": "everyDotIsInBoundsWithPositiveRadiusAndClampedOpacity"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ThinkingOrbMathTests.swift",
+              "function": "theFrameMovesOverTime"
+            }
+          ],
+          "id": "F12.1"
+        },
+        {
+          "check": "native-EngineBrandLogoTests",
+          "acceptance": "Actual bundled provider marks resolve and render in native SwiftUI.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+              "function": "vectorAssetsExistInBundle"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+              "function": "rowRendersEverySampleMark"
+            }
+          ],
+          "id": "F12.2"
+        },
+        {
+          "check": "missing-F12-device",
+          "acceptance": "Automated light/dark/hover/pressed/focus/disabled/copied and volume/tab/orb interaction traces, keyboard/VoiceOver/small-display contrast; distributable logo provenance.",
+          "cases": [],
+          "id": "F12.3"
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "title": "Automated onboarding through daily use",
+      "obligations": [
+        {
+          "check": "portable-scribe",
+          "acceptance": "Deterministic meeting lifecycle events and terminal admission are guarded.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "fullLifecycleEmitsEventsInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+              "function": "framesAfterFinishAreRejectedAndFinishIsIdempotent"
+            }
+          ],
+          "id": "F13.1"
+        },
+        {
+          "check": "native-OnboardingTests",
+          "acceptance": "Native onboarding step/media/transition fixtures use injected sound.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OnboardingTests.swift",
+              "function": "stepOrderIsTheNineStepFlow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingTests.swift",
+              "function": "reduceMotionFallsBackToACrossfade"
+            }
+          ],
+          "id": "F13.2"
+        },
+        {
+          "check": "native-PermissionsCaptureTests",
+          "acceptance": "Permission fixture request uses injected fake port without OS prompts.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift",
+              "function": "captureReportUsesInjectedStatesWithoutRequestingAccess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift",
+              "function": "cameraRequestReadsTheResultWithoutStartingCapture"
+            }
+          ],
+          "id": "F13.3"
+        },
+        {
+          "check": "missing-F13-device",
+          "acceptance": "Automated disposable-account onboarding, denied/revoked permissions, every tab/settings route, daily workflow, crash/relaunch, offline/provider/storage failure and accessibility acceptance on exact binary.",
+          "cases": [],
+          "id": "F13.4"
+        }
+      ]
+    },
+    {
+      "id": "S01",
+      "title": "Scribe live text, recording UI and actual microphone ownership",
+      "obligations": [
+        {
+          "check": "portable-scribe",
+          "acceptance": "Idle apps cannot count as a call; unknown owners block admission.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+              "function": "aFullyReadScanWithOnlyIdleExternalAppsIsEmptyAndPositive"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+              "function": "anUnknownActiveMicrophoneOwnerFailsClosedWithoutInventingACall"
+            }
+          ],
+          "id": "S01.1"
+        },
+        {
+          "check": "missing-S01-native",
+          "acceptance": "Inject actual watcher snapshot, native capture/controller callbacks and ASR partials into visible recording UI.",
+          "cases": [],
+          "id": "S01.2"
+        },
+        {
+          "check": "missing-S01-device",
+          "acceptance": "Automated known idle browser/Zoom versus active mic owners, stale/unknown ownership, live text and UI transition traces on supported OS.",
+          "cases": [],
+          "id": "S01.3"
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "title": "Polyglot listens and translates while running",
+      "obligations": [
+        {
+          "check": "portable-polyglot",
+          "acceptance": "Production coordinator translates and rejects stale target/clear work.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "sentenceIsTranscribedDetectedAndTranslated"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+              "function": "clearDiscardsPendingRecognitionAndContinuesWithNewSpeech"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+              "function": "targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes"
+            }
+          ],
+          "id": "S02.1"
+        },
+        {
+          "check": "missing-S02-native",
+          "acceptance": "Feed prerecorded fixtures through real native recognizer/translation adapter and actual controller; pack-needed/unsupported errors remain honest.",
+          "cases": [],
+          "id": "S02.2"
+        },
+        {
+          "check": "missing-S02-device",
+          "acceptance": "Actual installed model/translation pack corpus on supported macOS, both input streams, repeated target changes and latency trace.",
+          "cases": [],
+          "id": "S02.3"
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "title": "Polyglot pin, Stop, dismiss and unpinned auto-hide",
+      "obligations": [
+        {
+          "check": "missing-S03-contract",
+          "acceptance": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
+          "cases": [],
+          "id": "S03.1"
+        },
+        {
+          "check": "native-PolyglotPinTests",
+          "acceptance": "Actual notch model preserves pinned page on automatic dismiss and permits explicit dismiss; unpin/other tabs hide normally.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "pinnedPageSurvivesAutomaticDismissButCanBeDismissedExplicitly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "unpinAndOtherTabsUseNormalDismissal"
+            }
+          ],
+          "id": "S03.2"
+        },
+        {
+          "check": "missing-S03-device",
+          "acceptance": "Automated actual bar pin/Stop/dismiss/reopen/unpin/tab-switch event sequence, accessibility target availability and no leaked listening session.",
+          "cases": [],
+          "id": "S03.3"
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "title": "Recordly startup/export reliability; region stays off",
+      "obligations": [
+        {
+          "check": "portable-regressions",
+          "acceptance": "A new recording resets the time origin.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyCaptureTimelineTests.swift",
+              "function": "aNewRecordingGetsANewOrigin"
+            }
+          ],
+          "id": "S04.1"
+        },
+        {
+          "check": "portable-recordly-geometry",
+          "acceptance": "Unverified coordinate space cannot zoom.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyExportPlanTests.swift",
+              "function": "cursorSpaceRejectsUnverifiedFrames"
+            }
+          ],
+          "id": "S04.2"
+        },
+        {
+          "check": "native-RecordlyDebugWiringTests",
+          "acceptance": "Actual debug router fails closed when unwired.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RecordlyDebugWiringTests.swift",
+              "function": "unwiredHandlerFailsClosed"
+            }
+          ],
+          "id": "S04.3"
+        },
+        {
+          "check": "native-RecordlyExportValidationTests",
+          "acceptance": "Missing recording is never a successful export.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyExportValidationTests.swift",
+              "function": "missingRecordingCannotPass"
+            }
+          ],
+          "id": "S04.4"
+        },
+        {
+          "check": "missing-S04-device",
+          "acceptance": "Automated permission-delay/rapid Start-Stop/no-frame/display-disconnect/cancel/retry and decoded MP4/GIF; region feature must remain unavailable until recorded coordinate proof exists.",
+          "cases": [],
+          "id": "S04.5"
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "title": "Meetings recap, end-call countdown and completion windows",
+      "obligations": [
+        {
+          "id": "S05.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "acceptance": "Actual injected controller saves before completed feedback, keeps newer private notes on retry, and stops once after its nine-second confirmation. Does not prove actual hardware/ASR/window behavior.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "manualCountdownKeepAndRepeatedTicksStopExactlyOnceAfterNineSeconds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+              "function": "failedFinalSaveDoesNotCompleteAndRetryKeepsNewerPrivateNotes"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "acceptance": "Final persistence failure cannot present completed notes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeCompletionTests.swift",
+              "function": "failedFinalSaveCannotRevealCompletionAndExactPayloadCanBeRetried"
+            }
+          ],
+          "id": "S05.1"
+        },
+        {
+          "check": "portable-wiki-relationships",
+          "acceptance": "Missing/cancelled sources never close current notes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+              "function": "missingOrCancelledSourcesNeverCloseTheCurrentNotes"
+            }
+          ],
+          "id": "S05.2"
+        },
+        {
+          "check": "missing-S05-native",
+          "acceptance": "Actual controller receives verified call-ended event, single countdown/stop, persisted recap and completed window; replay/retry/late callback coverage.",
+          "cases": [],
+          "id": "S05.3"
+        },
+        {
+          "check": "missing-S05-device",
+          "acceptance": "Automated actual countdown/completion window and source-linked recap sequence, including resumed call and storage failure; compare authorized reference timing.",
+          "cases": [],
+          "id": "S05.4"
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "title": "Signed, notarized, Gatekeeper-clean sellable package",
+      "obligations": [
+        {
+          "check": "release-mocks",
+          "acceptance": "Notary rejection prevents publish and failed backup prevents replacement.",
+          "cases": [
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_rejected_notarization_never_staples_or_publishes"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_failed_backup_does_not_replace_installed_copy"
+            }
+          ],
+          "id": "S06.1"
+        },
+        {
+          "check": "missing-S06-native",
+          "acceptance": "Build and bundle exact source; verify executable/resources/entitlements and upgrade/rollback against disposable app destination.",
+          "cases": [],
+          "id": "S06.2"
+        },
+        {
+          "check": "missing-S06-device",
+          "acceptance": "Developer ID signature+secure timestamp+runtime, accepted notarization, stapled app/DMG, Gatekeeper clean-machine launch and rollback; exact app/DMG hashes, licenses/assets/version and commercial gating settled.",
+          "cases": [],
+          "id": "S06.3"
+        }
+      ]
+    }
+  ]
+}

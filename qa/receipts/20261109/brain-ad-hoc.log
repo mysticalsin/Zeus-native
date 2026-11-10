@@ -1,0 +1,102 @@
+[0/1] Planning build
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/15] Compiling ZeusCore VaultPathBoundary.swift
+[5/15] Emitting module ZeusCore
+[7/17] Compiling ZeusCoreTests VaultBoundaryTests.swift
+[8/17] Emitting module ZeusCoreTests
+[9/18] /workspace/zeus-validation/brain/.build/x86_64-unknown-linux-gnu/debug/BrainValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[10/18] Write sources
+[11/21] Wrapping AST for ZeusCoreTests for debugging
+[13/21] Compiling BrainValidationPackageDiscoveredTests ZeusCoreTests.swift
+[14/21] Emitting module BrainValidationPackageDiscoveredTests
+[15/21] Compiling BrainValidationPackageDiscoveredTests all-discovered-tests.swift
+[16/22] /workspace/zeus-validation/brain/.build/x86_64-unknown-linux-gnu/debug/BrainValidationPackageTests.derived/runner.swift
+[17/22] Write sources
+[18/22] Wrapping AST for BrainValidationPackageDiscoveredTests for debugging
+[20/24] Emitting module BrainValidationPackageTests
+[21/24] Compiling BrainValidationPackageTests runner.swift
+[22/24] Write Objects.LinkFileList
+[23/24] Linking BrainValidationPackageTests.xctest
+Build complete! (4.35s)
+Test Suite 'All tests' started at 2026-11-09 23:34:02.158
+Test Suite 'debug.xctest' started at 2026-11-09 23:34:02.162
+Test Suite 'debug.xctest' passed at 2026-11-09 23:34:02.162
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-09 23:34:02.162
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "About you" started.
+◇ Suite TodayTests started.
+◇ Suite "To-do" started.
+◇ Suite "Vault boundaries and selected capture" started.
+◇ Suite "Second brain" started.
+◇ Suite "Brain capture" started.
+◇ Test summaryCountsNotesAndFolders() started.
+◇ Test detectsBrainOnlyWhenItLooksLikeAVault() started.
+◇ Test profileMarkdown() started.
+◇ Test writerOnlyWritesInsideFromZeusAndNeverOverwrites() started.
+◇ Test scansVaultForToday() started.
+◇ Test adoptKeepsIDs() started.
+◇ Test applyToEmptyAndRemovals() started.
+◇ Test voiceAddsSeveral() started.
+◇ Test parsesTaskLines() started.
+◇ Test applyKeepsOtherLines() started.
+◇ Test explicitlyChosenRootMayBeAnAlias() started.
+◇ Test writeScopeRejectsLinkedNotesAndFoldersIncludingDanglingLinks() started.
+◇ Test inboxIsTheOnlyWritablePlace() started.
+◇ Test captureUsesChosenInboxAndNeverOverwritesOrWritesElsewhere() started.
+◇ Test configuredDestinationAndReadOnlySettingNeverFallBack() started.
+◇ Test allVaultReadersSkipExternalMarkdownLinks() started.
+◇ Test dotSegmentsCannotHideAReadOrWriteThroughASymlink() started.
+◇ Test captureChecksScopeAgainWhenThePreviewIsSaved() started.
+◇ Test quickAddDates() started.
+◇ Test dailyNotePath() started.
+◇ Test profileCannotWriteThroughLinkedInbox() started.
+◇ Test detectsKinds() started.
+◇ Test ranking() started.
+◇ Test writeGuard() started.
+◇ Test aliasesInsideTheVaultCannotBroadenTheInboxScope() started.
+◇ Test writesOnlyNewNotesInsideFromZeus() started.
+◇ Test slugs() started.
+◇ Test vaultChoice() started.
+◇ Test noteFormat() started.
+✔ Test profileMarkdown() passed after 0.022 seconds.
+✔ Test adoptKeepsIDs() passed after 0.022 seconds.
+✔ Test applyToEmptyAndRemovals() passed after 0.023 seconds.
+✔ Test voiceAddsSeveral() passed after 0.023 seconds.
+✔ Test parsesTaskLines() passed after 0.023 seconds.
+✔ Test applyKeepsOtherLines() passed after 0.023 seconds.
+✔ Test detectsBrainOnlyWhenItLooksLikeAVault() passed after 0.023 seconds.
+✔ Test writeScopeRejectsLinkedNotesAndFoldersIncludingDanglingLinks() passed after 0.023 seconds.
+✔ Test explicitlyChosenRootMayBeAnAlias() passed after 0.023 seconds.
+✔ Test inboxIsTheOnlyWritablePlace() passed after 0.023 seconds.
+✔ Test configuredDestinationAndReadOnlySettingNeverFallBack() passed after 0.023 seconds.
+✔ Test allVaultReadersSkipExternalMarkdownLinks() passed after 0.023 seconds.
+✔ Test captureChecksScopeAgainWhenThePreviewIsSaved() passed after 0.024 seconds.
+✔ Test captureUsesChosenInboxAndNeverOverwritesOrWritesElsewhere() passed after 0.024 seconds.
+✔ Test writerOnlyWritesInsideFromZeusAndNeverOverwrites() passed after 0.026 seconds.
+✔ Test quickAddDates() passed after 0.029 seconds.
+✔ Test dotSegmentsCannotHideAReadOrWriteThroughASymlink() passed after 0.029 seconds.
+✔ Test scansVaultForToday() passed after 0.029 seconds.
+✔ Test ranking() passed after 0.029 seconds.
+✔ Test profileCannotWriteThroughLinkedInbox() passed after 0.029 seconds.
+✔ Test writeGuard() passed after 0.029 seconds.
+✔ Test aliasesInsideTheVaultCannotBroadenTheInboxScope() passed after 0.011 seconds.
+✔ Test slugs() passed after 0.009 seconds.
+✔ Test noteFormat() passed after 0.009 seconds.
+✔ Test dailyNotePath() passed after 0.029 seconds.
+✔ Suite TodayTests passed after 0.032 seconds.
+✔ Suite "To-do" passed after 0.032 seconds.
+✔ Test summaryCountsNotesAndFolders() passed after 0.030 seconds.
+✔ Suite "Vault boundaries and selected capture" passed after 0.032 seconds.
+✔ Suite "About you" passed after 0.032 seconds.
+✔ Test vaultChoice() passed after 0.013 seconds.
+✔ Test writesOnlyNewNotesInsideFromZeus() passed after 0.014 seconds.
+✔ Suite "Brain capture" passed after 0.037 seconds.
+✔ Test detectsKinds() passed after 0.046 seconds.
+✔ Suite "Second brain" passed after 0.047 seconds.
+✔ Test run with 29 tests in 6 suites passed after 0.049 seconds.

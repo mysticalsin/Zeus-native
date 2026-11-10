@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "ZEUS",
+  "description": "Lets the ZEUS Mac app read and act on pages you ask it about.",
+  "version": "0.4.0",
+  "minimum_chrome_version": "120",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0MGf/iBVggHvGkcor+4PHgEPAJOdcSmArD3bbE8ZmUP//ew3Dh389UBU0RLZ4rSjbdO4yOxtPlJa6EuYxrRSzw67B044MdKDn9DiSRtC7IYAUXYlNzFPvCOMz961QZBl+KWG+4NV9LEi0hh4ajCIJLuRGJZdAT0cKYY3rdcgof3TLTImGVLDFQdFiKdgSa8sog+YhzqtciIPYF/ACeUv25Ml+5G2p95A0n+r1dFxaj8YW4OhLSwSmM5EUuivOIJt7q1XjMm6UWCWlWv05YHbC795JEP06ICjtXlk0QCRELQWjbH+FNrmcWPRJxjnFrYZkSq9p+hfRi4/lGKKvxunTQIDAQAB",
+  "background": {
+    "service_worker": "dist/sw.js",
+    "type": "module"
+  },
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_title": "ZEUS",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

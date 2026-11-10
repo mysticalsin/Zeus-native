@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>app.zeus.mac</string>
+	<key>CFBundleName</key>
+	<string>ZEUS</string>
+	<key>CFBundleDisplayName</key>
+	<string>ZEUS</string>
+	<key>CFBundleExecutable</key>
+	<string>Zeus</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.2</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ZEUS uses the microphone while you hold the talk or dictation key, when you turn on the optional "Hey Zeus" wake word, for meeting notes (Scribe), for live captions (Polyglot), and when you record the screen with your voice. It listens only for those features.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>ZEUS listens to the sound your Mac is playing to draw the live audio bars in the notch, to make live captions and meeting transcripts, and, if you choose, to include it in screen recordings (Recordly). Recordings and transcripts are saved only when you record, and stay on this Mac unless you choose a cloud engine.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ZEUS records you with the camera while you read from the teleprompter, only when you press Record.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>ZEUS turns what you say into text so it can answer your question.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>ZEUS shows your next events in the notch and lets you join calls in one click.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>ZEUS shows today's reminders in the notch.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.zeus.mac.links</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zeus</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

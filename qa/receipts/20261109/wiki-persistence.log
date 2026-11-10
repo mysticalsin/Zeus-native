@@ -1,0 +1,229 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/22] Emitting module ZeusCore
+[5/24] Compiling ZeusCore ScribeNotes.swift
+[6/24] Compiling ZeusCore ScribeTranscript.swift
+[7/24] Compiling ZeusCore SensitiveInfoScanner.swift
+[8/24] Compiling ZeusCore WikiCompiler.swift
+[9/24] Compiling ZeusCore WikiPage.swift
+[10/24] Compiling ZeusCore MeetingCopilot.swift
+/workspace/zeus-validation/repro-wiki/wiki/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[11/24] Compiling ZeusCore PortableExcerpts.swift
+/workspace/zeus-validation/repro-wiki/wiki/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[12/24] Compiling ZeusCore ScribeCapture.swift
+/workspace/zeus-validation/repro-wiki/wiki/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[13/24] Compiling ZeusCore WikiStore.swift
+[14/24] Compiling ZeusCore ZeusPaths.swift
+[15/25] Wrapping AST for ZeusCore for debugging
+[17/27] Emitting module ZeusCoreTests
+[18/27] Compiling ZeusCoreTests WikiTests.swift
+[19/28] /workspace/zeus-validation/repro-wiki/wiki/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[20/28] Write sources
+[21/28] Wrapping AST for ZeusCoreTests for debugging
+[23/31] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[24/31] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[25/31] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[26/32] /workspace/zeus-validation/repro-wiki/wiki/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[27/32] Write sources
+[28/32] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[30/34] Emitting module ZeusPortableValidationPackageTests
+[31/34] Compiling ZeusPortableValidationPackageTests runner.swift
+[32/35] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[33/35] Write Objects.LinkFileList
+[34/35] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (34.90s)
+Test Suite 'All tests' started at 2026-11-09 23:44:19.714
+Test Suite 'debug.xctest' started at 2026-11-09 23:44:19.720
+Test Suite 'debug.xctest' passed at 2026-11-09 23:44:19.721
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-09 23:44:19.721
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite WikiTests started.
+◇ Test missingFolderLoadsEmpty() started.
+◇ Test pauseFlagPersistsAcrossStores() started.
+◇ Test compilerBuildsTopicPageFromDecisionsAndActions() started.
+◇ Test rewordedLineWithMarkerRemovedAndFactGoneLaterStillFlagsOnForget() started.
+◇ Test luhnChecksum() started.
+◇ Test stateFileIsNotLoadedAsAPage() started.
+◇ Test scannerFindsAddresses() started.
+◇ Test scannerFindsCardNumbersOnlyWhenLuhnPasses() started.
+◇ Test uneditedPageBodyIsRegeneratedEvenWhenTheStoredBodyDrifted() started.
+◇ Test compilerIsIdempotent() started.
+◇ Test compilerUpdatesWhenMeetingContentChanges() started.
+◇ Test pausedDeletionHoldsThroughTheStore() started.
+◇ Test resetCopiesTheUnreadableFileAndNeverLeavesNoStateFile() started.
+◇ Test tornJournalLineKeepsLearningPausedUntilReset() started.
+◇ Test userEditedIsNeverClearedAutomatically() started.
+◇ Test failedForgetWriteThrowsSoItIsNeverAcknowledged() started.
+◇ Test privateNotesSummaryAndTranscriptAreNeverIngested() started.
+◇ Test editedLineOfAKeptFactSurvivesForgettingAnotherMeeting() started.
+◇ Test forgetSurvivesCorruptStateAndResetAcrossStores() started.
+◇ Test mergedFactSharedByTwoMeetingsStillFlagsAnEditedPageWhenOneIsForgotten() started.
+◇ Test learningNewFactsMakesAGlobalPagePersonalAgain() started.
+◇ Test deletionStillRunsWhileSettingsAreUnreadableAndIngestionStaysOff() started.
+◇ Test forgottenMeetingsPersistWithoutDuplicates() started.
+◇ Test promotionNeedsEveryFindingAcknowledged() started.
+◇ Test resetStateKeepsTheOldFileAndEveryForgottenMeeting() started.
+◇ Test storeRoundTripsPages() started.
+◇ Test promotionIsBlockedByFindings() started.
+◇ Test scannerFindsEmailWithRange() started.
+◇ Test forgottenMeetingsAreNeverIngested() started.
+◇ Test corruptStateIsSurfacedNotIgnored() started.
+◇ Test scannerFindsPhoneNumbers() started.
+◇ Test pausedLearningStillRemovesDeletedAndForgottenMeetings() started.
+◇ Test scannerDoesNotFlagPathsOrSlugsAsSecrets() started.
+◇ Test editingAGlobalPageMakesItPersonalAgain() started.
+◇ Test removingASourceKeepsAGlobalPageGlobal() started.
+◇ Test failedEditSaveIsRetainedAndRetriedAfterASelectionChange() started.
+◇ Test participantNamesSkipGenericLabels() started.
+◇ Test uneditedPageIsRegeneratedWithoutAForgottenMeetingsFacts() started.
+◇ Test findingsCarryAcknowledgementKeysAndRedaction() started.
+◇ Test overlappingFindingsOfOneKindAreCollapsed() started.
+◇ Test scannerFindsParticipantNames() started.
+◇ Test promotionScansTheTitleAndParticipantNames() started.
+◇ Test compilerSkipsMeetingsWithNothingToLearn() started.
+◇ Test storeWritesOwnerOnlyFilesAtomically() started.
+◇ Test editedSourcedLineIsRemovedWhenItsMeetingIsForgotten() started.
+◇ Test failedSaveIsRetainedThroughPauseAndRetriedOnRefresh() started.
+◇ Test aDirectSaveNeverBringsBackAPageWithAPendingDelete() started.
+◇ Test corruptStateFailsClosedButKeepsReadableForgottenMeetings() started.
+◇ Test markersAreInvisibleInExport() started.
+◇ Test promotionNeedsAPromoterName() started.
+◇ Test pageFilesWithTheOldBodyEditedKeyStillLoad() started.
+◇ Test failedPinAndPromotionSavesAreStagedAndKeepTheirValues() started.
+◇ Test scannerFindsIBANsWithChecksum() started.
+◇ Test searchFiltersByEveryWordAndPinsFirst() started.
+◇ Test storeSurfacesAMismatchedPageID() started.
+◇ Test storeRejectsUnsafePageIDs() started.
+◇ Test markerEditedAwayFlagsThePageAndBlocksExportAndPromotion() started.
+◇ Test scannerFindsHealthAndFinanceTerms() started.
+◇ Test removingAMeetingThatIsNotThereChangesNothing() started.
+◇ Test reviewFlagSurvivesRecompileAndStoreRoundTrip() started.
+✘ Test pauseFlagPersistsAcrossStores() recorded an issue at WikiTests.swift:1025:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+◇ Test scannerFindsEachSecretPattern() started.
+◇ Test markdownExportHasTitleAndBody() started.
+✘ Test resetCopiesTheUnreadableFileAndNeverLeavesNoStateFile() recorded an issue at WikiTests.swift:1110:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+◇ Test compilerMergesSameTopicAndDedupesFacts() started.
+◇ Test interruptedResetKeepsLearningPausedWithHealthyFiles() started.
+◇ Test compileDropsFactsOfMeetingsThatNoLongerExist() started.
+◇ Test editedBodyIsKeptAndOnlyForgottenLinesAreRemoved() started.
+✘ Test tornJournalLineKeepsLearningPausedUntilReset() recorded an issue at WikiTests.swift:1093:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+◇ Test removingASourceRemovesItsFactsAndDropsEmptyPages() started.
+◇ Test topicIDIgnoresDatesCaseAndAccents() started.
+◇ Test joinedLineWithForgottenAndKeptMarkersIsRemovedEntirely() started.
+◇ Test promotionRecordsWhoAndWhen() started.
+◇ Test failedDeleteIsRetainedAndNotOverwrittenByACompile() started.
+✘ Test forgottenMeetingsPersistWithoutDuplicates() recorded an issue at WikiTests.swift:1045:9: Expectation failed: try store.loadState().forgottenMeetings == [a, b]
+✘ Test forgetSurvivesCorruptStateAndResetAcrossStores() recorded an issue at WikiTests.swift:1064:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+◇ Test recompileKeepsPinAndGlobalScopeWhenNothingNewWasLearned() started.
+◇ Test storeRefusesGlobalPagesWithoutAPromotionRecord() started.
+◇ Test storeSurfacesCorruptFilesAndKeepsTheRest() started.
+✘ Test forgottenMeetingsPersistWithoutDuplicates() recorded an issue at WikiTests.swift:1047:9: Expectation failed: try store.loadState().forgottenMeetings == [a, b]
+✘ Test resetStateKeepsTheOldFileAndEveryForgottenMeeting() recorded an issue at WikiTests.swift:1150:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+◇ Test scannerIgnoresDatesCountsAndDecimals() started.
+◇ Test storeDeletesPageFiles() started.
+✘ Test pausedDeletionHoldsThroughTheStore() recorded an issue at WikiTests.swift:658:9: Expectation failed: (compiled → [ZeusCore.WikiPage(version: 1, id: "topic-planning", title: "Planning", body: "## Decisions\n- Only in A.⁠‌​‌‌​‌​‌​​‌​‌​​‌‌‌‌​​‌‌​‌‌‌​​‌‌‌⁠", userEdited: false, facts: [ZeusCore.WikiFact(id: "decision:only in a", kind: ZeusCore.WikiFact.Kind.decision, text: "Only in A.", done: false, sources: [ZeusCore.WikiSource.meeting(129EB260-D6D9-42D5-BFD0-9A17CAEFDA04)], participants: [])], sources: [ZeusCore.WikiSource.meeting(129EB260-D6D9-42D5-BFD0-9A17CAEFDA04)], scope: ZeusCore.WikiScope.personal, promotedBy: nil, promotedAt: nil, updatedAt: 2023-11-16 02:00:00 +0000, pinned: false, contributors: [129EB260-D6D9-42D5-BFD0-9A17CAEFDA04], forgottenContributors: [], needsReview: false, reviewReason: nil)]).isEmpty → false
+✘ Test pausedDeletionHoldsThroughTheStore() recorded an issue at WikiTests.swift:660:9: Expectation failed: (store.loadPages().pages → [ZeusCore.WikiPage(version: 1, id: "topic-planning", title: "Planning", body: "## Decisions\n- Only in A.⁠‌​‌‌​‌​‌​​‌​‌​​‌‌‌‌​​‌‌​‌‌‌​​‌‌‌⁠", userEdited: false, facts: [ZeusCore.WikiFact(id: "decision:only in a", kind: ZeusCore.WikiFact.Kind.decision, text: "Only in A.", done: false, sources: [ZeusCore.WikiSource.meeting(129EB260-D6D9-42D5-BFD0-9A17CAEFDA04)], participants: [])], sources: [ZeusCore.WikiSource.meeting(129EB260-D6D9-42D5-BFD0-9A17CAEFDA04)], scope: ZeusCore.WikiScope.personal, promotedBy: nil, promotedAt: nil, updatedAt: 2023-11-16 02:00:00 +0000, pinned: false, contributors: [129EB260-D6D9-42D5-BFD0-9A17CAEFDA04], forgottenContributors: [], needsReview: false, reviewReason: nil)]).isEmpty → false
+✔ Test luhnChecksum() passed after 0.044 seconds.
+✔ Test missingFolderLoadsEmpty() passed after 0.044 seconds.
+✘ Test corruptStateFailsClosedButKeepsReadableForgottenMeetings() recorded an issue at WikiTests.swift:1126:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+✘ Test storeWritesOwnerOnlyFilesAtomically() recorded an issue at WikiTests.swift:929:6: Caught error: write("Couldn\'t save “Sample”: The operation could not be completed. The file doesn’t exist.")
+✔ Test compilerBuildsTopicPageFromDecisionsAndActions() passed after 0.048 seconds.
+✔ Test rewordedLineWithMarkerRemovedAndFactGoneLaterStillFlagsOnForget() passed after 0.048 seconds.
+✔ Test stateFileIsNotLoadedAsAPage() passed after 0.048 seconds.
+✔ Test uneditedPageBodyIsRegeneratedEvenWhenTheStoredBodyDrifted() passed after 0.048 seconds.
+✔ Test compilerIsIdempotent() passed after 0.048 seconds.
+✔ Test compilerUpdatesWhenMeetingContentChanges() passed after 0.048 seconds.
+✘ Test pauseFlagPersistsAcrossStores() failed after 0.049 seconds with 1 issue.
+✔ Test scannerFindsAddresses() passed after 0.049 seconds.
+✔ Test userEditedIsNeverClearedAutomatically() passed after 0.050 seconds.
+✘ Test resetCopiesTheUnreadableFileAndNeverLeavesNoStateFile() failed after 0.050 seconds with 1 issue.
+✔ Test privateNotesSummaryAndTranscriptAreNeverIngested() passed after 0.050 seconds.
+✔ Test editedLineOfAKeptFactSurvivesForgettingAnotherMeeting() passed after 0.050 seconds.
+✔ Test scannerFindsCardNumbersOnlyWhenLuhnPasses() passed after 0.053 seconds.
+✘ Test tornJournalLineKeepsLearningPausedUntilReset() failed after 0.053 seconds with 1 issue.
+✔ Test mergedFactSharedByTwoMeetingsStillFlagsAnEditedPageWhenOneIsForgotten() passed after 0.053 seconds.
+✔ Test learningNewFactsMakesAGlobalPagePersonalAgain() passed after 0.053 seconds.
+✔ Test failedForgetWriteThrowsSoItIsNeverAcknowledged() passed after 0.055 seconds.
+✔ Test deletionStillRunsWhileSettingsAreUnreadableAndIngestionStaysOff() passed after 0.054 seconds.
+✔ Test promotionNeedsEveryFindingAcknowledged() passed after 0.054 seconds.
+✘ Test forgetSurvivesCorruptStateAndResetAcrossStores() failed after 0.055 seconds with 1 issue.
+✘ Test forgottenMeetingsPersistWithoutDuplicates() failed after 0.055 seconds with 2 issues.
+✘ Test resetStateKeepsTheOldFileAndEveryForgottenMeeting() failed after 0.056 seconds with 1 issue.
+✘ Test interruptedResetKeepsLearningPausedWithHealthyFiles() recorded an issue at WikiTests.swift:663:6: Caught error: write("Couldn\'t save the Memory settings: The operation could not be completed. The file doesn’t exist.")
+✔ Test promotionIsBlockedByFindings() passed after 0.057 seconds.
+✔ Test forgottenMeetingsAreNeverIngested() passed after 0.057 seconds.
+✔ Test storeRoundTripsPages() passed after 0.057 seconds.
+✔ Test scannerFindsEmailWithRange() passed after 0.057 seconds.
+✔ Test corruptStateIsSurfacedNotIgnored() passed after 0.057 seconds.
+✔ Test scannerFindsPhoneNumbers() passed after 0.057 seconds.
+✔ Test pausedLearningStillRemovesDeletedAndForgottenMeetings() passed after 0.057 seconds.
+✔ Test removingASourceKeepsAGlobalPageGlobal() passed after 0.057 seconds.
+✔ Test participantNamesSkipGenericLabels() passed after 0.057 seconds.
+✔ Test uneditedPageIsRegeneratedWithoutAForgottenMeetingsFacts() passed after 0.057 seconds.
+✔ Test findingsCarryAcknowledgementKeysAndRedaction() passed after 0.057 seconds.
+✔ Test overlappingFindingsOfOneKindAreCollapsed() passed after 0.057 seconds.
+✔ Test editingAGlobalPageMakesItPersonalAgain() passed after 0.058 seconds.
+✘ Test pausedDeletionHoldsThroughTheStore() failed after 0.059 seconds with 2 issues.
+✔ Test compilerSkipsMeetingsWithNothingToLearn() passed after 0.057 seconds.
+✔ Test scannerFindsParticipantNames() passed after 0.057 seconds.
+✔ Test scannerDoesNotFlagPathsOrSlugsAsSecrets() passed after 0.058 seconds.
+✔ Test editedSourcedLineIsRemovedWhenItsMeetingIsForgotten() passed after 0.057 seconds.
+✔ Test aDirectSaveNeverBringsBackAPageWithAPendingDelete() passed after 0.057 seconds.
+✔ Test promotionScansTheTitleAndParticipantNames() passed after 0.057 seconds.
+✔ Test markersAreInvisibleInExport() passed after 0.057 seconds.
+✔ Test promotionNeedsAPromoterName() passed after 0.057 seconds.
+✔ Test failedEditSaveIsRetainedAndRetriedAfterASelectionChange() passed after 0.058 seconds.
+✘ Test corruptStateFailsClosedButKeepsReadableForgottenMeetings() failed after 0.058 seconds with 1 issue.
+✘ Test storeWritesOwnerOnlyFilesAtomically() failed after 0.058 seconds with 1 issue.
+✔ Test pageFilesWithTheOldBodyEditedKeyStillLoad() passed after 0.057 seconds.
+✔ Test scannerFindsIBANsWithChecksum() passed after 0.057 seconds.
+✔ Test searchFiltersByEveryWordAndPinsFirst() passed after 0.054 seconds.
+✔ Test failedSaveIsRetainedThroughPauseAndRetriedOnRefresh() passed after 0.058 seconds.
+✔ Test storeRejectsUnsafePageIDs() passed after 0.053 seconds.
+✔ Test removingAMeetingThatIsNotThereChangesNothing() passed after 0.052 seconds.
+✔ Test markerEditedAwayFlagsThePageAndBlocksExportAndPromotion() passed after 0.052 seconds.
+✔ Test storeSurfacesAMismatchedPageID() passed after 0.053 seconds.
+✔ Test markdownExportHasTitleAndBody() passed after 0.047 seconds.
+✔ Test compilerMergesSameTopicAndDedupesFacts() passed after 0.045 seconds.
+✔ Test failedPinAndPromotionSavesAreStagedAndKeepTheirValues() passed after 0.057 seconds.
+✔ Test compileDropsFactsOfMeetingsThatNoLongerExist() passed after 0.044 seconds.
+✔ Test editedBodyIsKeptAndOnlyForgottenLinesAreRemoved() passed after 0.044 seconds.
+✔ Test removingASourceRemovesItsFactsAndDropsEmptyPages() passed after 0.042 seconds.
+✔ Test topicIDIgnoresDatesCaseAndAccents() passed after 0.041 seconds.
+✔ Test scannerFindsHealthAndFinanceTerms() passed after 0.052 seconds.
+✔ Test joinedLineWithForgottenAndKeptMarkersIsRemovedEntirely() passed after 0.040 seconds.
+✔ Test reviewFlagSurvivesRecompileAndStoreRoundTrip() passed after 0.052 seconds.
+✔ Test recompileKeepsPinAndGlobalScopeWhenNothingNewWasLearned() passed after 0.033 seconds.
+✔ Test promotionRecordsWhoAndWhen() passed after 0.041 seconds.
+✔ Test failedDeleteIsRetainedAndNotOverwrittenByACompile() passed after 0.041 seconds.
+✘ Test interruptedResetKeepsLearningPausedWithHealthyFiles() failed after 0.044 seconds with 1 issue.
+✔ Test scannerFindsEachSecretPattern() passed after 0.047 seconds.
+✔ Test storeSurfacesCorruptFilesAndKeepsTheRest() passed after 0.033 seconds.
+✔ Test storeDeletesPageFiles() passed after 0.031 seconds.
+✔ Test scannerIgnoresDatesCountsAndDecimals() passed after 0.032 seconds.
+✔ Test storeRefusesGlobalPagesWithoutAPromotionRecord() passed after 0.033 seconds.
+✘ Suite WikiTests failed after 0.061 seconds with 12 issues.
+✘ Test run with 76 tests in 1 suite failed after 0.062 seconds with 12 issues.

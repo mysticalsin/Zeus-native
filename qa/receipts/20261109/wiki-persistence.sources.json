@@ -1,0 +1,56 @@
+{
+  "group": "wiki",
+  "repository": "/workspace/Zeus",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/MeetingCopilot.swift",
+      "sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a"
+    },
+    {
+      "source": "Sources/ZeusCore/ZeusPaths.swift",
+      "sha256": "ba4dec4d36621843c84d1a513383242cc8457e5d032ce501b72eedb62357f378"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiPage.swift",
+      "sha256": "0473df7b046240457fb840b6d4f253ae23af600700587773d09e5e4b6f957ef3"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiCompiler.swift",
+      "sha256": "5f6a4f9a7adb3528a427bfbf7d9404959b2ee8836794543c4a03d8a46e01e291"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiStore.swift",
+      "sha256": "2507f54a78a12744f8aed7bad7df421fcace1851b0579515845a2ece49abafe0"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/SensitiveInfoScanner.swift",
+      "sha256": "13533c12622d014851cb43c96bd1b9fdbabd5e0fd2baffe18da0aac8075da92a"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/WikiTests.swift",
+      "sha256": "15ea65c9408b592338fdf59b3c61574778a26853c55332911ace6dc6e8c9ac07"
+    }
+  ],
+  "excerpts": [
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "source_sha256": "98b61369e04ffa868d7ec8e429ee5b7fac5129b8e8e1779f43b68c3f7e0722b9",
+      "start": "public struct ScribeMeetingRecord:",
+      "end_exclusive": "public enum ScribeMeetingStoreError:",
+      "excerpt_sha256": "3ee17527f475555e38fe74032ca997816242b4d3483a008657de6a3d1188f1e3"
+    }
+  ]
+}

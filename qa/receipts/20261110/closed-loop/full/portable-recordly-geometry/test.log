@@ -1,0 +1,110 @@
+Building for debugging...
+[0/15] Write sources
+[3/15] Write swift-version-457096A79D733C59.txt
+[5/17] Emitting module CoreGraphics
+[6/17] Compiling CoreGraphics FoundationGeometry.swift
+[7/18] Wrapping AST for CoreGraphics for debugging
+[9/23] Emitting module ZeusCore
+[10/23] Compiling ZeusCore BuddyVisibility.swift
+[11/23] Compiling ZeusCore PortableExcerpts.swift
+[12/23] Compiling ZeusCore RecordlyCursorFollowPath.swift
+[13/23] Compiling ZeusCore RecordlyCursorLog.swift
+[14/27] Compiling ZeusCore RecordlyCursorSmoother.swift
+[15/27] Compiling ZeusCore RecordlyExportPlan.swift
+[16/27] Compiling ZeusCore RecordlyExportSettings.swift
+[17/27] Compiling ZeusCore RecordlyZoomRegions.swift
+[18/28] Wrapping AST for ZeusCore for debugging
+[20/30] Emitting module ZeusCoreTests
+[21/30] Compiling ZeusCoreTests RecordlyCursorFollowTests.swift
+[22/31] Compiling ZeusCoreTests RecordlyExportPlanTests.swift
+[23/32] /workspace/zeus-validation/closed-loop-full-frozen/portable-recordly-geometry/recordly-geometry/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[24/32] Write sources
+[25/32] Wrapping AST for ZeusCoreTests for debugging
+[27/34] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[28/34] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[29/35] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[30/36] /workspace/zeus-validation/closed-loop-full-frozen/portable-recordly-geometry/recordly-geometry/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[31/36] Write sources
+[32/36] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[34/38] Compiling ZeusPortableValidationPackageTests runner.swift
+[35/38] Emitting module ZeusPortableValidationPackageTests
+[36/39] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[37/39] Write Objects.LinkFileList
+[38/39] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (26.28s)
+Test Suite 'All tests' started at 2026-11-10 00:43:15.657
+Test Suite 'debug.xctest' started at 2026-11-10 00:43:15.659
+Test Suite 'debug.xctest' passed at 2026-11-10 00:43:15.659
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:43:15.659
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Recordly cursor-follow export" started.
+◇ Suite RecordlyExportPlanTests started.
+◇ Test pathIsContinuousAndRejectsNonFiniteSamples() started.
+◇ Test cropOutsideRegionIsFullFrame() started.
+◇ Test outputDirectoryIsUnderMovies() started.
+◇ Test gifFrameCountFollowsRate() started.
+◇ Test gifCapsAtThirtySecondsAndSixHundredFrames() started.
+◇ Test easingBoundsAndMidpoint() started.
+◇ Test followPreferenceSurvivesRoundTripAndOldProjectsDecode() started.
+◇ Test shortRegionStaysContinuousAndBelowFull() started.
+◇ Test cropInsideRegionIsFullyZoomed() started.
+◇ Test longRecordingsKeepABoundedPath() started.
+◇ Test cropFlipsYAndClampsToFrame() started.
+◇ Test easingIsMonotonicOnRampUp() started.
+◇ Test exportedZoomFollowsTheSmoothedPath() started.
+◇ Test sizes16x10() started.
+◇ Test sizesAreEvenAndRejectBadSources() started.
+◇ Test sizes16x9() started.
+◇ Test sizesPortrait() started.
+◇ Test cursorSpaceFlipsIntoAppKitPoints() started.
+◇ Test trimClampsToDuration() started.
+◇ Test pendingSpaceIsDroppedWhenDisplayMoved() started.
+◇ Test cropOffsetsByCursorSpaceOrigin() started.
+◇ Test trimRejectsEmptyOrInvertedRanges() started.
+◇ Test cropWithoutCursorSpaceDoesNotZoom() started.
+◇ Test offCenterZoomScalesToVideoPixels() started.
+◇ Test pendingSpaceCompletesWithVideoSize() started.
+◇ Test gifScheduleHasAtLeastOneFrameAndRejectsBadRate() started.
+◇ Test offCenterZoomMapsThroughProductionPath() started.
+◇ Test cursorSpaceRejectsUnverifiedFrames() started.
+◇ Test fileNameFormatAndSafety() started.
+◇ Test missingOrMismatchedSpaceDoesNotZoom() started.
+◇ Test trimDefaultsToFullDuration() started.
+✔ Test outputDirectoryIsUnderMovies() passed after 0.003 seconds.
+✔ Test cropOutsideRegionIsFullFrame() passed after 0.003 seconds.
+✔ Test easingBoundsAndMidpoint() passed after 0.003 seconds.
+✔ Test shortRegionStaysContinuousAndBelowFull() passed after 0.003 seconds.
+✔ Test cropInsideRegionIsFullyZoomed() passed after 0.003 seconds.
+✔ Test pathIsContinuousAndRejectsNonFiniteSamples() passed after 0.003 seconds.
+✔ Test gifCapsAtThirtySecondsAndSixHundredFrames() passed after 0.003 seconds.
+✔ Test sizes16x10() passed after 0.002 seconds.
+✔ Test easingIsMonotonicOnRampUp() passed after 0.003 seconds.
+✔ Test sizes16x9() passed after 0.002 seconds.
+✔ Test cropFlipsYAndClampsToFrame() passed after 0.003 seconds.
+✔ Test sizesAreEvenAndRejectBadSources() passed after 0.002 seconds.
+✔ Test sizesPortrait() passed after 0.003 seconds.
+✔ Test trimClampsToDuration() passed after 0.002 seconds.
+✔ Test exportedZoomFollowsTheSmoothedPath() passed after 0.003 seconds.
+✔ Test cursorSpaceFlipsIntoAppKitPoints() passed after 0.003 seconds.
+✔ Test cropOffsetsByCursorSpaceOrigin() passed after 0.002 seconds.
+✔ Test trimRejectsEmptyOrInvertedRanges() passed after 0.002 seconds.
+✔ Test pendingSpaceIsDroppedWhenDisplayMoved() passed after 0.003 seconds.
+✔ Test cropWithoutCursorSpaceDoesNotZoom() passed after 0.002 seconds.
+✔ Test pendingSpaceCompletesWithVideoSize() passed after 0.002 seconds.
+✔ Test gifScheduleHasAtLeastOneFrameAndRejectsBadRate() passed after 0.002 seconds.
+✔ Test followPreferenceSurvivesRoundTripAndOldProjectsDecode() passed after 0.003 seconds.
+✔ Test offCenterZoomMapsThroughProductionPath() passed after 0.002 seconds.
+✔ Test cursorSpaceRejectsUnverifiedFrames() passed after 0.002 seconds.
+✔ Test missingOrMismatchedSpaceDoesNotZoom() passed after 0.002 seconds.
+✔ Test trimDefaultsToFullDuration() passed after 0.002 seconds.
+✔ Test offCenterZoomScalesToVideoPixels() passed after 0.002 seconds.
+✔ Test gifFrameCountFollowsRate() passed after 0.004 seconds.
+✔ Test fileNameFormatAndSafety() passed after 0.006 seconds.
+✔ Suite RecordlyExportPlanTests passed after 0.008 seconds.
+✔ Test longRecordingsKeepABoundedPath() passed after 0.021 seconds.
+✔ Suite "Recordly cursor-follow export" passed after 0.022 seconds.
+✔ Test run with 31 tests in 2 suites passed after 0.022 seconds.

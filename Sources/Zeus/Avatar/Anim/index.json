@@ -1,0 +1,232 @@
+{
+ "version": 1,
+ "sizes": [
+  128,
+  320
+ ],
+ "crop": {
+  "x": -76,
+  "y": -135,
+  "side": 1405,
+  "poseCanvas": 1254,
+  "note": "window in 1254 px pose-canvas coordinates (negative = padding above/left)"
+ },
+ "states": {
+  "idle": {
+   "name": "Ready",
+   "kind": "loop",
+   "seconds": 4.0,
+   "fps": 12,
+   "frameCount": 48,
+   "cols": 7,
+   "rows": 7
+  },
+  "welcome": {
+   "name": "Hello",
+   "kind": "one-shot",
+   "seconds": 1.6,
+   "fps": 20,
+   "frameCount": 32,
+   "cols": 6,
+   "rows": 6
+  },
+  "listening": {
+   "name": "Listening",
+   "kind": "loop",
+   "seconds": 3.0,
+   "fps": 12,
+   "frameCount": 36,
+   "cols": 6,
+   "rows": 6
+  },
+  "thinking": {
+   "name": "Thinking",
+   "kind": "loop",
+   "seconds": 3.2,
+   "fps": 12,
+   "frameCount": 38,
+   "cols": 7,
+   "rows": 6
+  },
+  "searching": {
+   "name": "Searching",
+   "kind": "loop",
+   "seconds": 2.4,
+   "fps": 20,
+   "frameCount": 48,
+   "cols": 7,
+   "rows": 7
+  },
+  "working": {
+   "name": "Working",
+   "kind": "loop",
+   "seconds": 2.0,
+   "fps": 20,
+   "frameCount": 40,
+   "cols": 7,
+   "rows": 6
+  },
+  "typing": {
+   "name": "Typing",
+   "kind": "loop",
+   "seconds": 1.2,
+   "fps": 24,
+   "frameCount": 29,
+   "cols": 6,
+   "rows": 5
+  },
+  "organizing": {
+   "name": "Organizing",
+   "kind": "loop",
+   "seconds": 2.4,
+   "fps": 20,
+   "frameCount": 48,
+   "cols": 7,
+   "rows": 7
+  },
+  "guiding": {
+   "name": "This way",
+   "kind": "one-shot",
+   "seconds": 1.0,
+   "fps": 20,
+   "frameCount": 20,
+   "cols": 5,
+   "rows": 4
+  },
+  "approval_wait": {
+   "name": "Your call",
+   "kind": "loop",
+   "seconds": 4.0,
+   "fps": 12,
+   "frameCount": 48,
+   "cols": 7,
+   "rows": 7
+  },
+  "success": {
+   "name": "Done",
+   "kind": "one-shot",
+   "seconds": 1.2,
+   "fps": 20,
+   "frameCount": 24,
+   "cols": 5,
+   "rows": 5
+  },
+  "celebrate": {
+   "name": "Hooray",
+   "kind": "one-shot",
+   "seconds": 1.8,
+   "fps": 24,
+   "frameCount": 43,
+   "cols": 7,
+   "rows": 7
+  },
+  "error": {
+   "name": "Needs help",
+   "kind": "one-shot",
+   "seconds": 1.2,
+   "fps": 24,
+   "frameCount": 29,
+   "cols": 6,
+   "rows": 5
+  },
+  "offline": {
+   "name": "Offline",
+   "kind": "loop",
+   "seconds": 4.0,
+   "fps": 12,
+   "frameCount": 48,
+   "cols": 7,
+   "rows": 7
+  },
+  "paused": {
+   "name": "Paused",
+   "kind": "one-shot",
+   "seconds": 0.8,
+   "fps": 12,
+   "frameCount": 10,
+   "cols": 4,
+   "rows": 3
+  },
+  "sleeping": {
+   "name": "Zzz",
+   "kind": "loop",
+   "seconds": 4.5,
+   "fps": 12,
+   "frameCount": 54,
+   "cols": 8,
+   "rows": 7
+  },
+  "waking": {
+   "name": "Good morning",
+   "kind": "one-shot",
+   "seconds": 2.0,
+   "fps": 12,
+   "frameCount": 24,
+   "cols": 5,
+   "rows": 5
+  },
+  "curious": {
+   "name": "Curious",
+   "kind": "one-shot",
+   "seconds": 1.2,
+   "fps": 20,
+   "frameCount": 24,
+   "cols": 5,
+   "rows": 5
+  },
+  "confused": {
+   "name": "One question",
+   "kind": "one-shot",
+   "seconds": 1.0,
+   "fps": 20,
+   "frameCount": 20,
+   "cols": 5,
+   "rows": 4
+  },
+  "surprised": {
+   "name": "Oh!",
+   "kind": "one-shot",
+   "seconds": 0.8,
+   "fps": 24,
+   "frameCount": 19,
+   "cols": 5,
+   "rows": 4
+  },
+  "grateful": {
+   "name": "Thank you",
+   "kind": "one-shot",
+   "seconds": 1.5,
+   "fps": 20,
+   "frameCount": 30,
+   "cols": 6,
+   "rows": 5
+  },
+  "walking": {
+   "name": "On my way",
+   "kind": "loop",
+   "seconds": 0.9,
+   "fps": 24,
+   "frameCount": 22,
+   "cols": 5,
+   "rows": 5
+  },
+  "carrying": {
+   "name": "Got it",
+   "kind": "loop",
+   "seconds": 1.0,
+   "fps": 24,
+   "frameCount": 24,
+   "cols": 5,
+   "rows": 5
+  },
+  "goodbye": {
+   "name": "See you",
+   "kind": "one-shot",
+   "seconds": 1.8,
+   "fps": 20,
+   "frameCount": 36,
+   "cols": 6,
+   "rows": 6
+  }
+ }
+}

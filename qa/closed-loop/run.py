@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""Run fresh, source-bound Zeus checks. Full mode fails every unproved obligation."""
+import argparse
+from datetime import datetime, timezone
+import importlib.util
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+from contracts import (ROOT, Invalid, case_passed, digest, evaluate_features, load,
+                       manifest_matches, require, source_snapshot, swift_summary, validate_map, validate_registry)
+
+
+def portable_module():
+    spec = importlib.util.spec_from_file_location("zeus_portable", ROOT / "qa/portable-core/prepare.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def git(*args):
+    return subprocess.check_output(["git", *args], cwd=ROOT).decode().strip()
+
+
+def snapshot(output):
+    return source_snapshot(ROOT, output)
+
+
+def save(path, data):
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def artifact(path, output):
+    return {"path": str(path.relative_to(output)), "sha256": digest(path.read_bytes())}
+
+
+def execute(command, log, timeout, environment=None):
+    started = time.monotonic()
+    with log.open("w") as stream:
+        try:
+            process = subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT,
+                                     timeout=timeout, check=False, env={**os.environ, "NO_COLOR": "1", "PYTHONDONTWRITEBYTECODE": "1", **(environment or {})})
+            code = process.returncode
+        except subprocess.TimeoutExpired:
+            stream.write(f"\nCHECK TIMEOUT after {timeout} seconds\n")
+            code = 124
+        except OSError as error:
+            stream.write(f"\nCHECK COULD NOT START: {error}\n")
+            code = 127
+    return code, round(time.monotonic() - started, 3)
+
+
+def python_summary(log, code):
+    require(code == 0, f"command exited {code}")
+    summaries = re.findall(r"^Ran (\d+) tests? in ", log, re.MULTILINE)
+    require(len(summaries) == 1 and int(summaries[0]) > 0, "missing or empty Python test summary")
+    require(re.search(r"^OK\s*$", log, re.MULTILINE), "skipped, failed or expected-failure Python suite cannot pass")
+    functions = sorted(set(re.findall(r"^(test_\w+) \([^\n]+\) \.\.\. ok$", log, re.MULTILINE)))
+    require(len(functions) == int(summaries[0]), "Python cases missing/duplicated/skipped")
+    return int(summaries[0]), 1, functions
+
+
+def run_check(definition, args, output, portable):
+    ident, kind = definition["id"], definition["kind"]
+    row = {"id": ident, "kind": kind, "tier": definition.get("tier", "contract"),
+           "scope": definition["scope"], "status": "not-run", "command": [], "exit_code": None,
+           "tests": 0, "suites": 0, "passed_functions": [], "artifacts": []}
+    if kind == "unimplemented":
+        row.update(status="unimplemented", reason=definition["reason"])
+        return row
+    if kind == "native-fixture" and args.mode != "full":
+        row["reason"] = "Native fixture is separate from the portable development check; run full mode on macOS."
+        return row
+    if kind == "native-fixture" and platform.system() != "Darwin":
+        row.update(status="blocked", reason="Actual production native target requires macOS and Apple SDKs.")
+        return row
+    folder = output / ident
+    folder.mkdir()
+    log = folder / "test.log"
+    try:
+        if kind == "portable":
+            package = portable.prepare(folder, definition["group"])
+            row["package"] = str(package.relative_to(output))
+            command = ["swift", "test", "--package-path", str(package), "--jobs", str(args.jobs)]
+        elif kind == "native-fixture":
+            # Selector is a checked bare suite name. No shell, user content, actual
+            # capture command or unrestricted app test suite is accepted here.
+            module = "ZeusAppTests" if definition["file"].startswith("Tests/ZeusAppTests/") else "ZeusCoreTests"
+            command = ["swift", "test", "--jobs", str(args.jobs), "--filter", "^" + module + r"\." + definition["suite"] + "/"]
+        elif kind == "release-mocks":
+            command = [sys.executable, "qa/release-scripts/test_release_scripts.py"]
+        elif kind == "selftests":
+            command = [sys.executable, "-m", "unittest", "discover", "-s", "qa/closed-loop/tests", "-p", "test_*.py", "-v"]
+        else:
+            raise Invalid("unknown executable checker")
+        row["command"] = command
+        code, seconds = execute(command, log, args.timeout,
+                                {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")})
+        row.update(exit_code=code, duration_seconds=seconds)
+        count, suites, functions = (python_summary if kind in {"selftests", "release-mocks"} else swift_summary)(log.read_text(), code)
+        row.update(tests=count, suites=suites, passed_functions=functions)
+        if kind == "portable":
+            # Recreate from current repository after execution; catches omission,
+            # stale manifests and any edits to the actual compiled source snapshot.
+            with tempfile.TemporaryDirectory(prefix="zeus-receipt-verify-") as tmp:
+                expected = portable.prepare(Path(tmp), definition["group"])
+                manifest_matches(package, expected)
+            row["artifacts"].append(artifact(package / "validation-manifest.json", output))
+        row["status"] = "passed"
+    except (Invalid, OSError, ValueError) as error:
+        row.update(status="failed", reason=str(error))
+    if log.is_file():
+        row["artifacts"].append(artifact(log, output))
+    for file in sorted((folder / "native-artifacts").rglob("*")):
+        if file.is_file():
+            require(not file.is_symlink() and file.resolve().is_relative_to(output), "native artifact escaped output")
+            row["artifacts"].append(artifact(file, output))
+    print(f"{ident}: {row['status']} ({row['tests']} tests)", flush=True)
+    return row
+
+
+def evaluate_registry(registry, checks, output):
+    rows = []
+    for entry in registry:
+        check = checks[entry["check"]]
+        status, reason = check["status"], check.get("reason", "")
+        if status == "passed":
+            try:
+                case_passed(entry["guard"], check, output)
+            except (Invalid, OSError, ValueError) as error:
+                status, reason = "failed", str(error)
+        rows.append({"id": entry["id"], "check": entry["check"], "status": status, "reason": reason})
+    return rows
+
+
+def finish(args, output, result):
+    save(output / "result.json", result)
+    candidates = [{"check": r["id"], "status": r["status"], "reason": r.get("reason", ""),
+                   "tested_sha": result.get("tested_sha"), "source_snapshot_sha256": result.get("source_snapshot_sha256"),
+                   "command": r["command"], "artifacts": r["artifacts"],
+                   "required_action": "Reproduce, repair, and add a real type/lint/test guard to qa/regressions.json; do not mark this candidate as resolved evidence."}
+                  for r in result.get("checks", []) if r["status"] == "failed"]
+    save(output / "regression-candidates.json", {"schema_version": 1, "failures": candidates})
+    lines = [f"Zeus {args.mode}: {result['status']}", "", f"Tested SHA: {result.get('tested_sha', 'unknown')}",
+             f"Source snapshot: {result.get('source_snapshot_sha256', 'unavailable')}",
+             f"Fully accepted checklist items: {sum(f['status'] == 'passed' for f in result.get('features', []))}/19",
+             f"Release ready: {str(result.get('release_ready', False)).lower()}", "",
+             "Development success establishes only its executed guards. Native fixtures are not device proof.", ""]
+    for feature in result.get("features", []):
+        lines.append(f"- {feature['id']} {feature['title']}: {feature['status']}")
+        lines.extend(f"  - {o['id']}: {o['status']} — {o.get('reason') or o['check']}" for o in feature["obligations"])
+    if result.get("errors"):
+        lines.extend(["", *result["errors"]])
+    (output / "summary.md").write_text("\n".join(lines) + "\n")
+    print(f"CLOSED_LOOP status={result['status']} mode={args.mode} tests={result.get('totals', {}).get('tests', 0)}", flush=True)
+    return 0 if result["status"] == "passed" else 1
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mode", required=True, choices=("development", "full"))
+    parser.add_argument("--output", required=True, type=Path, help="New directory; never overwrite old evidence")
+    parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument("--timeout", type=int, default=1800, help="Per-check seconds; timeout is failure")
+    args = parser.parse_args(argv)
+    if args.jobs < 1 or args.timeout < 1:
+        parser.error("jobs and timeout must be positive")
+    output = args.output.expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    result = {"schema_version": 1, "mode": args.mode, "status": "failed", "release_ready": False,
+              "started_at": datetime.now(timezone.utc).isoformat(), "host": platform.platform(), "platform": sys.platform,
+              "checks": [], "features": [], "regressions": [], "totals": {"tests": 0, "suites": 0}, "errors": []}
+    try:
+        tested_sha = git("rev-parse", "HEAD")
+        result.update(tested_sha=tested_sha, head_sha=os.environ.get("ZEUS_HEAD_SHA", tested_sha),
+                      dirty=bool(git("status", "--porcelain")))
+        require(os.environ.get("ZEUS_TESTED_SHA", tested_sha) == tested_sha, "ZEUS_TESTED_SHA does not identify the actual checkout")
+        require(re.fullmatch(r"[0-9a-f]{40}", result["head_sha"]), "invalid head SHA")
+        before = snapshot(output)
+        result["source_snapshot_sha256"] = before["sha256"]
+        save(output / "source-manifest.json", before)
+        result["source_manifest"] = artifact(output / "source-manifest.json", output)
+        portable = portable_module()
+        feature_map = load(ROOT / "qa/feature-map.json")
+        definitions = validate_map(feature_map, portable)
+        registry = validate_registry(load(ROOT / "qa/regressions.json"), definitions)
+        result["map_sha256"] = digest((ROOT / "qa/feature-map.json").read_bytes())
+        result["registry_sha256"] = digest((ROOT / "qa/regressions.json").read_bytes())
+        selftest = {"id": "closed-loop-selftests", "kind": "selftests", "scope": "Runner/schema/receipt/aggregate rejection regressions."}
+        for definition in [selftest, *definitions.values()]:
+            result["checks"].append(run_check(definition, args, output, portable))
+        checks = {row["id"]: row for row in result["checks"]}
+        result["features"] = evaluate_features(feature_map, checks, output)
+        result["regressions"] = evaluate_registry(registry, checks, output)
+        result["totals"] = {key: sum(r[key] for r in result["checks"]) for key in ("tests", "suites")}
+        required = {"closed-loop-selftests"} | {c["id"] for c in definitions.values() if args.mode == "full" or c["kind"] in {"portable", "release-mocks"}}
+        bad = [c["id"] for c in result["checks"] if c["id"] in required and c["status"] != "passed"]
+        # A passing group cannot hide a removed/not-executed feature or regression case.
+        bad += [o["id"] for f in result["features"] for o in f["obligations"] if o["check"] in required and o["status"] != "passed"]
+        bad += [r["id"] for r in result["regressions"] if r["check"] in required and r["status"] != "passed"]
+        require(snapshot(output) == before, "Repository input changed while checks ran; rerun on a stable snapshot")
+        require(git("rev-parse", "HEAD") == tested_sha, "Checkout changed while checks ran")
+        result["release_ready"] = args.mode == "full" and all(f["status"] == "passed" for f in result["features"])
+        if bad:
+            result["errors"].append("Unmet required checks/cases: " + ", ".join(bad))
+        result["status"] = "passed" if not bad else "failed"
+    except (Invalid, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        result["errors"].append(str(error))
+    result["finished_at"] = datetime.now(timezone.utc).isoformat()
+    return finish(args, output, result)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

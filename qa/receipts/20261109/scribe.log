@@ -1,0 +1,318 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/23] Emitting module ZeusCore
+[5/25] Compiling ZeusCore ScribePresentation.swift
+[6/25] Compiling ZeusCore ScribeSession.swift
+[7/25] Compiling ZeusCore ScribeSpeakerStats.swift
+[8/25] Compiling ZeusCore ScribeTranscript.swift
+[9/25] Compiling ZeusCore RecordingMotion.swift
+[10/25] Compiling ZeusCore ScribeCapture.swift
+[11/25] Compiling ZeusCore ScribeMicGate.swift
+[12/25] Compiling ZeusCore ScribeNotes.swift
+[13/25] Compiling ZeusCore MeetingCopilot.swift
+/workspace/zeus-validation/repro-checkpoint-2-core/scribe/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[14/25] Compiling ZeusCore PortableExcerpts.swift
+/workspace/zeus-validation/repro-checkpoint-2-core/scribe/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[15/25] Compiling ZeusCore ScribeCallPrompt.swift
+/workspace/zeus-validation/repro-checkpoint-2-core/scribe/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[16/26] Wrapping AST for ZeusCore for debugging
+[18/31] Emitting module ZeusCoreTests
+[19/31] Compiling ZeusCoreTests ScribePresentationTests.swift
+[20/31] Compiling ZeusCoreTests PortableMuteTests.swift
+[21/31] Compiling ZeusCoreTests ScribeCoreTests.swift
+[22/31] Compiling ZeusCoreTests W7ScribeTests.swift
+[23/32] Compiling ZeusCoreTests W8ScribeLookTests.swift
+[24/33] /workspace/zeus-validation/repro-checkpoint-2-core/scribe/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[25/33] Write sources
+[26/33] Wrapping AST for ZeusCoreTests for debugging
+[28/36] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[29/36] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[30/36] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[31/37] /workspace/zeus-validation/repro-checkpoint-2-core/scribe/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[32/37] Write sources
+[33/37] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[35/39] Compiling ZeusPortableValidationPackageTests runner.swift
+[36/39] Emitting module ZeusPortableValidationPackageTests
+[37/40] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[38/40] Write Objects.LinkFileList
+[39/40] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (29.59s)
+Test Suite 'All tests' started at 2026-11-09 23:43:38.612
+Test Suite 'debug.xctest' started at 2026-11-09 23:43:38.614
+Test Suite 'debug.xctest' passed at 2026-11-09 23:43:38.614
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-09 23:43:38.614
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Scribe call prompt" started.
+◇ Suite "Scribe look: speaker stats and ticker text" started.
+◇ Suite "Scribe mic gate and router" started.
+◇ Suite "Scribe capture acknowledgement boundary" started.
+◇ Suite "Scribe presentation" started.
+◇ Suite "Scribe session machine" started.
+◇ Suite "Scribe transcript" started.
+◇ Suite "Scribe mute portable excerpts" started.
+◇ Suite "W7 Scribe preview rules" started.
+◇ Suite "Scribe notes" started.
+◇ Test upcomingSlotWinsOverBareCallDetection() started.
+◇ Test upcomingWindowEdges() started.
+◇ Test dismissedSlotIsSkipped() started.
+◇ Test endedSlotIsNotOffered() started.
+◇ Test callDetectedWithoutSlot() started.
+◇ Test talkTimeSharesAndCountsPerSpeaker() started.
+◇ Test tickerTailKeepsTheNewestWords() started.
+◇ Test lonelySpeakerWithNoTalkTimeIsHidden() started.
+◇ Test emptyTextIsIgnored() started.
+◇ Test closestEligibleSlotWins() started.
+◇ Test recordingSuppressesEveryPrompt() started.
+◇ Test negativeLengthCountsAsZero() started.
+◇ Test firstAppearanceOrderIsKept() started.
+◇ Test dismissedCallAppIsNotOfferedAgain() started.
+◇ Test zeroLengthSegmentsShareByCount() started.
+◇ Test placeholderIsNotWords() started.
+◇ Test talkTimeFormatsAsMinutesAndSeconds() started.
+◇ Test emptyTranscriptHasNoSpeakers() started.
+◇ Test gateIsPureAndFailsClosedOnUnknown() started.
+◇ Test mutedAndUnknownMicFramesReachNeitherStoreNorTranscriber() started.
+◇ Test systemAudioIsIndependentOfMute() started.
+◇ Test finishDrainsInFlightDeliveryBeforeTranscriberFinishAndClosesAdmission() started.
+◇ Test unmutedMicFramesReachBothSinks() started.
+◇ Test muteChangeTakesEffectOnVeryNextFrame() started.
+◇ Test storeFailureStillFeedsTranscriberAndIsCounted() started.
+◇ Test finishNotifiesTranscriberForActiveSession() started.
+◇ Test dropReasonDistinguishesMutedFromUnknown() started.
+◇ Test anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition() started.
+◇ Test staleSessionFramesAreDroppedFromBothSinks() started.
+◇ Test setActiveSessionWaitsForInFlightDeliveryAndNoOldFrameReachesSinksAfterward() started.
+◇ Test riseIsMonotonicAndReachesQuarterHeight() started.
+◇ Test switchingActiveSessionMakesOldFramesStale() started.
+◇ Test failureCarriesItsReasonAndCancelReturnsToIdle() started.
+◇ Test audioFromPermissionSetupIsNotReplayedIntoTheMeeting() started.
+◇ Test unknownTimingAndUnacknowledgedCaptureFailClosed() started.
+◇ Test writingGlowIsContinuousThroughTheRecede() started.
+◇ Test everyStateHasAccessibilityLabelAndValue() started.
+◇ Test framesAfterFinishAreRejectedAndFinishIsIdempotent() started.
+◇ Test tickOutsideEndingIsInvalid() started.
+◇ Test micIndicatorFailsClosed() started.
+◇ Test completeAnnouncesNotesReadyAtRevealStart() started.
+◇ Test commandsOnIdleMachineAreStale() started.
+◇ Test cancelOrFailOnTerminalSessionIsInvalid() started.
+◇ Test surgeRisesMonotonicallyToFullThenHoldsThenClears() started.
+◇ Test cancelFromEveryActivePhase() started.
+◇ Test surgeExistsOnlyInTheRevealStage() started.
+◇ Test machineEventsMapToPresentationInOrder() started.
+◇ Test breathingBandStaysInItsRangeForAsLongAsWritingLasts() started.
+◇ Test systemIndicatorFollowsFrames() started.
+◇ Test topBarRecordingStateCoversRecordingAndConfirm() started.
+◇ Test measuredConstantsMatchTheReference() started.
+◇ Test failEmitsReasonAndStopsActivity() started.
+◇ Test writingPersistsUntilNotesReadyNoMatterHowLongItTakes() started.
+◇ Test revealingOnlyAfterNotesReadyAndEndsByRevealClock() started.
+◇ Test startWhileActiveReplacesAndCancelsOldSession() started.
+◇ Test restartingSameActiveIDIsInvalid() started.
+◇ Test startAfterTerminalSessionEmitsNoCancel() started.
+◇ Test countdownExpiryAloneDoesNotEndCapture() started.
+◇ Test glowHeightStaysInUnitRange() started.
+◇ Test negativeGraceIsClampedToZero() started.
+◇ Test keepRecordingIsOnlyValidInEnding() started.
+◇ Test glowStageFollowsState() started.
+◇ Test recordingBeginsOnlyAfterAcknowledgement() started.
+◇ Test staleCommandsAreRejectedWithoutChange() started.
+◇ Test captureEndedMovesToProcessingFromRecordingAndEnding() started.
+◇ Test finalizedTranscriptNeverFeedsUnresolvedTextToNotes() started.
+◇ Test notesSwapInBeneathTheWashNotBefore() started.
+◇ Test reduceMotionHasStaticBandAndNoSurge() started.
+◇ Test fullLifecycleEmitsEventsInOrder() started.
+◇ Test transcriptUpdatesAreRejectedBeforeRecordingAndAfterComplete() started.
+◇ Test speakerMappingFollowsSource() started.
+◇ Test otherSessionSegmentsAreRejected() started.
+◇ Test finalizeRejectsLateSegmentsAndDoesNotPromoteProvisional() started.
+◇ Test invalidTimesAreRejected() started.
+◇ Test segmentsAreOrderedByStart() started.
+◇ Test exportsToMeetingTranscriptWithFinalSegmentsOnlyByDefault() started.
+◇ Test provisionalUpsertReplacesInPlace() started.
+◇ Test finalReplacesProvisionalAndThenLocks() started.
+◇ Test freshEvidenceIsServedAndExpiredEvidenceIsUnknown() started.
+◇ Test twoBrowserCallWindowsAreTwoIdentities() started.
+◇ Test distinctBrowserWindowsWithIdenticalTitlesAreDistinctIdentities() started.
+◇ Test browserTitlesDecideCallOrNoCall() started.
+◇ Test refreshStartsWhenStaleAndNotWhileOneIsFreshlyInFlight() started.
+◇ Test anUnreadableProcessMakesTheScanIncomplete() started.
+◇ Test theExcludedNoticeSaysWhatHappenedAndWhatIsStillRecorded() started.
+◇ Test aNativeCallAppIsAnIdentityOnlyWhileItCapturesTheMic() started.
+◇ Test aCapturingBrowserWithoutReadableTitlesIsUnknownButAnIdleOneIsNot() started.
+◇ Test aFullyReadScanWithOnlyIdleExternalAppsIsEmptyAndPositive() started.
+◇ Test anUnknownInputDoesNotHideKnownCallEvidence() started.
+◇ Test aBrowserUsingTheMicWithoutACallTitleIsUnknown() started.
+◇ Test oneReadableWindowPlusOneUnreadableWindowIsUnknown() started.
+◇ Test twoBrowserWindowsWithIdenticalTitlesAreTwoIdentities() started.
+◇ Test aMutedOrUnreadableDeviceNeverReadsUnmuted() started.
+◇ Test aNativeAppPlusABrowserCallListsBoth() started.
+◇ Test ownProcessesAreIgnored() started.
+◇ Test zeroIdentitiesOnACompleteScanWithAnUnmutedDeviceIsAdmitted() started.
+◇ Test browserUncertaintyIsUnknown() started.
+◇ Test missingOrFutureEvidenceIsUnknown() started.
+◇ Test anUnknownActiveMicrophoneOwnerFailsClosedWithoutInventingACall() started.
+◇ Test aCallIsReportedAsTheReasonOnlyForACompleteScanWithAnIdentityOrBrowserDoubt() started.
+◇ Test everyKnownCallAppCapturingTheMicIsAnIdentity() started.
+◇ Test anyDetectedCallIsUnknownSoAccessibilityCanNeverAdmitTheMicrophone() started.
+◇ Test previewReplacesPlaceholderThenFinalReplacesPreview() started.
+◇ Test lateProvisionalNeverOverwritesFinal() started.
+◇ Test unmatchedPreviewSpeakerIsNotYou() started.
+◇ Test aMissingWindowNumberStillKeepsIdenticalTitlesApart() started.
+◇ Test anIncompleteScanIsUnknownNeverUnmuted() started.
+◇ Test keywordsMatchWholeWordsOnly() started.
+◇ Test provisionalLinesAreIgnored() started.
+◇ Test privateNotesSurviveRegenerationByteForByte() started.
+◇ Test emptyTranscriptGivesHonestEmptyNotes() started.
+◇ Test mergingEmptyGeneratedNotesStillKeepsPrivateNotes() started.
+◇ Test lineWithDecisionAndActionKeywordsYieldsBoth() started.
+◇ Test regenerationPreservesDoneFlagForUnchangedActionItem() started.
+◇ Test extractiveGenerationFindsDecisionsActionsAndSummary() started.
+✔ Test dismissedSlotIsSkipped() passed after 0.214 seconds.
+✔ Test upcomingSlotWinsOverBareCallDetection() passed after 0.214 seconds.
+✔ Test upcomingWindowEdges() passed after 0.214 seconds.
+✔ Test endedSlotIsNotOffered() passed after 0.214 seconds.
+✔ Test callDetectedWithoutSlot() passed after 0.214 seconds.
+✔ Test closestEligibleSlotWins() passed after 0.214 seconds.
+✔ Test tickerTailKeepsTheNewestWords() passed after 0.214 seconds.
+✔ Test emptyTextIsIgnored() passed after 0.214 seconds.
+✔ Test firstAppearanceOrderIsKept() passed after 0.214 seconds.
+✔ Test zeroLengthSegmentsShareByCount() passed after 0.214 seconds.
+✔ Test lonelySpeakerWithNoTalkTimeIsHidden() passed after 0.214 seconds.
+✔ Test dismissedCallAppIsNotOfferedAgain() passed after 0.214 seconds.
+✔ Test placeholderIsNotWords() passed after 0.214 seconds.
+✔ Test emptyTranscriptHasNoSpeakers() passed after 0.214 seconds.
+✔ Test recordingSuppressesEveryPrompt() passed after 0.214 seconds.
+✔ Test talkTimeFormatsAsMinutesAndSeconds() passed after 0.214 seconds.
+✔ Test negativeLengthCountsAsZero() passed after 0.214 seconds.
+✔ Test gateIsPureAndFailsClosedOnUnknown() passed after 0.214 seconds.
+✔ Test talkTimeSharesAndCountsPerSpeaker() passed after 0.215 seconds.
+✔ Test mutedAndUnknownMicFramesReachNeitherStoreNorTranscriber() passed after 0.214 seconds.
+✔ Test systemAudioIsIndependentOfMute() passed after 0.214 seconds.
+✔ Test unmutedMicFramesReachBothSinks() passed after 0.214 seconds.
+✔ Test storeFailureStillFeedsTranscriberAndIsCounted() passed after 0.214 seconds.
+✔ Test muteChangeTakesEffectOnVeryNextFrame() passed after 0.214 seconds.
+✔ Test finishNotifiesTranscriberForActiveSession() passed after 0.214 seconds.
+✔ Test staleSessionFramesAreDroppedFromBothSinks() passed after 0.214 seconds.
+✔ Test dropReasonDistinguishesMutedFromUnknown() passed after 0.214 seconds.
+✔ Test anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition() passed after 0.214 seconds.
+✔ Test finishDrainsInFlightDeliveryBeforeTranscriberFinishAndClosesAdmission() passed after 0.214 seconds.
+✔ Test failureCarriesItsReasonAndCancelReturnsToIdle() passed after 0.214 seconds.
+✔ Test riseIsMonotonicAndReachesQuarterHeight() passed after 0.214 seconds.
+✔ Test unknownTimingAndUnacknowledgedCaptureFailClosed() passed after 0.214 seconds.
+✔ Test audioFromPermissionSetupIsNotReplayedIntoTheMeeting() passed after 0.214 seconds.
+✔ Test everyStateHasAccessibilityLabelAndValue() passed after 0.214 seconds.
+✔ Test framesAfterFinishAreRejectedAndFinishIsIdempotent() passed after 0.214 seconds.
+✔ Test tickOutsideEndingIsInvalid() passed after 0.214 seconds.
+✔ Test micIndicatorFailsClosed() passed after 0.214 seconds.
+✔ Test completeAnnouncesNotesReadyAtRevealStart() passed after 0.214 seconds.
+✔ Test switchingActiveSessionMakesOldFramesStale() passed after 0.214 seconds.
+✔ Test commandsOnIdleMachineAreStale() passed after 0.214 seconds.
+✔ Test cancelOrFailOnTerminalSessionIsInvalid() passed after 0.214 seconds.
+✔ Test writingGlowIsContinuousThroughTheRecede() passed after 0.214 seconds.
+✔ Test cancelFromEveryActivePhase() passed after 0.214 seconds.
+✔ Test surgeRisesMonotonicallyToFullThenHoldsThenClears() passed after 0.214 seconds.
+✔ Test machineEventsMapToPresentationInOrder() passed after 0.214 seconds.
+✔ Test surgeExistsOnlyInTheRevealStage() passed after 0.214 seconds.
+✔ Test systemIndicatorFollowsFrames() passed after 0.214 seconds.
+✔ Test measuredConstantsMatchTheReference() passed after 0.214 seconds.
+✔ Test topBarRecordingStateCoversRecordingAndConfirm() passed after 0.214 seconds.
+✔ Test failEmitsReasonAndStopsActivity() passed after 0.214 seconds.
+✔ Test writingPersistsUntilNotesReadyNoMatterHowLongItTakes() passed after 0.214 seconds.
+✔ Test revealingOnlyAfterNotesReadyAndEndsByRevealClock() passed after 0.214 seconds.
+✔ Test startWhileActiveReplacesAndCancelsOldSession() passed after 0.214 seconds.
+✔ Test startAfterTerminalSessionEmitsNoCancel() passed after 0.214 seconds.
+✔ Test countdownExpiryAloneDoesNotEndCapture() passed after 0.214 seconds.
+✔ Test restartingSameActiveIDIsInvalid() passed after 0.214 seconds.
+✔ Test glowHeightStaysInUnitRange() passed after 0.214 seconds.
+✔ Test negativeGraceIsClampedToZero() passed after 0.214 seconds.
+✔ Test keepRecordingIsOnlyValidInEnding() passed after 0.214 seconds.
+✔ Test glowStageFollowsState() passed after 0.214 seconds.
+✔ Test recordingBeginsOnlyAfterAcknowledgement() passed after 0.214 seconds.
+✔ Test staleCommandsAreRejectedWithoutChange() passed after 0.214 seconds.
+✔ Test captureEndedMovesToProcessingFromRecordingAndEnding() passed after 0.214 seconds.
+✔ Test finalizedTranscriptNeverFeedsUnresolvedTextToNotes() passed after 0.214 seconds.
+✔ Test notesSwapInBeneathTheWashNotBefore() passed after 0.214 seconds.
+✔ Test breathingBandStaysInItsRangeForAsLongAsWritingLasts() passed after 0.215 seconds.
+✔ Test reduceMotionHasStaticBandAndNoSurge() passed after 0.214 seconds.
+✔ Test fullLifecycleEmitsEventsInOrder() passed after 0.214 seconds.
+✔ Test transcriptUpdatesAreRejectedBeforeRecordingAndAfterComplete() passed after 0.214 seconds.
+✔ Test otherSessionSegmentsAreRejected() passed after 0.214 seconds.
+✔ Test invalidTimesAreRejected() passed after 0.214 seconds.
+✔ Test speakerMappingFollowsSource() passed after 0.214 seconds.
+✔ Test segmentsAreOrderedByStart() passed after 0.214 seconds.
+✔ Test finalizeRejectsLateSegmentsAndDoesNotPromoteProvisional() passed after 0.214 seconds.
+✔ Test provisionalUpsertReplacesInPlace() passed after 0.214 seconds.
+✔ Test finalReplacesProvisionalAndThenLocks() passed after 0.214 seconds.
+✔ Test freshEvidenceIsServedAndExpiredEvidenceIsUnknown() passed after 0.214 seconds.
+✔ Test exportsToMeetingTranscriptWithFinalSegmentsOnlyByDefault() passed after 0.214 seconds.
+✔ Test twoBrowserCallWindowsAreTwoIdentities() passed after 0.214 seconds.
+✔ Test distinctBrowserWindowsWithIdenticalTitlesAreDistinctIdentities() passed after 0.214 seconds.
+✔ Test refreshStartsWhenStaleAndNotWhileOneIsFreshlyInFlight() passed after 0.214 seconds.
+✔ Test anUnreadableProcessMakesTheScanIncomplete() passed after 0.214 seconds.
+✔ Test theExcludedNoticeSaysWhatHappenedAndWhatIsStillRecorded() passed after 0.214 seconds.
+✔ Test browserTitlesDecideCallOrNoCall() passed after 0.214 seconds.
+✔ Test aCapturingBrowserWithoutReadableTitlesIsUnknownButAnIdleOneIsNot() passed after 0.214 seconds.
+✔ Test aFullyReadScanWithOnlyIdleExternalAppsIsEmptyAndPositive() passed after 0.214 seconds.
+✔ Test anUnknownInputDoesNotHideKnownCallEvidence() passed after 0.214 seconds.
+✔ Test aBrowserUsingTheMicWithoutACallTitleIsUnknown() passed after 0.214 seconds.
+✔ Test oneReadableWindowPlusOneUnreadableWindowIsUnknown() passed after 0.214 seconds.
+✔ Test twoBrowserWindowsWithIdenticalTitlesAreTwoIdentities() passed after 0.214 seconds.
+✔ Test aMutedOrUnreadableDeviceNeverReadsUnmuted() passed after 0.214 seconds.
+✔ Test ownProcessesAreIgnored() passed after 0.214 seconds.
+✔ Test aNativeAppPlusABrowserCallListsBoth() passed after 0.214 seconds.
+✔ Test zeroIdentitiesOnACompleteScanWithAnUnmutedDeviceIsAdmitted() passed after 0.213 seconds.
+✔ Test browserUncertaintyIsUnknown() passed after 0.213 seconds.
+✔ Test aNativeCallAppIsAnIdentityOnlyWhileItCapturesTheMic() passed after 0.214 seconds.
+✔ Test missingOrFutureEvidenceIsUnknown() passed after 0.213 seconds.
+✔ Test anUnknownActiveMicrophoneOwnerFailsClosedWithoutInventingACall() passed after 0.214 seconds.
+✔ Test aCallIsReportedAsTheReasonOnlyForACompleteScanWithAnIdentityOrBrowserDoubt() passed after 0.213 seconds.
+✔ Test anyDetectedCallIsUnknownSoAccessibilityCanNeverAdmitTheMicrophone() passed after 0.213 seconds.
+✔ Test previewReplacesPlaceholderThenFinalReplacesPreview() passed after 0.213 seconds.
+✔ Test lateProvisionalNeverOverwritesFinal() passed after 0.213 seconds.
+✔ Test unmatchedPreviewSpeakerIsNotYou() passed after 0.213 seconds.
+✔ Test aMissingWindowNumberStillKeepsIdenticalTitlesApart() passed after 0.213 seconds.
+✔ Test everyKnownCallAppCapturingTheMicIsAnIdentity() passed after 0.214 seconds.
+✔ Test anIncompleteScanIsUnknownNeverUnmuted() passed after 0.213 seconds.
+✔ Test keywordsMatchWholeWordsOnly() passed after 0.212 seconds.
+✔ Test provisionalLinesAreIgnored() passed after 0.212 seconds.
+✔ Test emptyTranscriptGivesHonestEmptyNotes() passed after 0.211 seconds.
+✔ Test mergingEmptyGeneratedNotesStillKeepsPrivateNotes() passed after 0.211 seconds.
+✔ Test privateNotesSurviveRegenerationByteForByte() passed after 0.212 seconds.
+✔ Test regenerationPreservesDoneFlagForUnchangedActionItem() passed after 0.211 seconds.
+✔ Test extractiveGenerationFindsDecisionsActionsAndSummary() passed after 0.211 seconds.
+✔ Test lineWithDecisionAndActionKeywordsYieldsBoth() passed after 0.211 seconds.
+✔ Suite "Scribe call prompt" passed after 0.220 seconds.
+✔ Suite "Scribe look: speaker stats and ticker text" passed after 0.220 seconds.
+✔ Suite "Scribe capture acknowledgement boundary" passed after 0.220 seconds.
+✔ Suite "Scribe presentation" passed after 0.220 seconds.
+✔ Suite "Scribe transcript" passed after 0.220 seconds.
+✔ Suite "Scribe session machine" passed after 0.220 seconds.
+✔ Suite "W7 Scribe preview rules" passed after 0.220 seconds.
+✔ Suite "Scribe mute portable excerpts" passed after 0.220 seconds.
+✔ Suite "Scribe notes" passed after 0.220 seconds.
+✔ Test setActiveSessionWaitsForInFlightDeliveryAndNoOldFrameReachesSinksAfterward() passed after 0.406 seconds.
+✔ Suite "Scribe mic gate and router" passed after 0.409 seconds.
+✔ Test run with 115 tests in 10 suites passed after 0.410 seconds.

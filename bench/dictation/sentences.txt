@@ -1,0 +1,12 @@
+Samantha|Hey, can you send me the quarterly report before Friday? I want to review the numbers with the team.
+Samantha|Open the terminal, run swift build, and then push the fix to the devon branch once the tests pass.
+Daniel|The meeting with Sarah moved to three thirty tomorrow afternoon, so please update the calendar invite.
+Daniel|Remind me to buy milk, eggs, and coffee on the way home tonight.
+Karen|I think we should refactor the notch controller so the dictation tab and the chat window share one store.
+Karen|Please write a short email to the landlord saying the heating has been broken since Monday.
+Moira|Glance, Superwhisper and Vibe Island all live in the menu bar, but each one solves a different problem.
+Moira|The latency budget for dictation is under three hundred milliseconds after the key is released.
+Samantha|Add a unit test that checks the word error rate is zero when both strings match exactly.
+Daniel|Let's grab lunch at the Italian place near the station around twelve fifteen.
+Karen|Use Parakeet as the default engine and fall back to Apple speech when the model is not downloaded.
+Moira|My flight lands at Heathrow at seven in the morning, so I will join the call from the taxi.

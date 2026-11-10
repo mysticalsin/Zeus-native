@@ -1,0 +1,58 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version-457096A79D733C59.txt
+Build complete! (0.18s)
+Test Suite 'All tests' started at 2026-11-10 00:15:42.197
+Test Suite 'debug.xctest' started at 2026-11-10 00:15:42.198
+Test Suite 'debug.xctest' passed at 2026-11-10 00:15:42.198
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:15:42.198
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite CompanionMotionTests started.
+◇ Suite "Companion display changes and accessible labels" started.
+◇ Test snapPrefersTheSmallestFrameThatContainsThePoint() started.
+◇ Test nextClickClearsTheRing() started.
+◇ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() started.
+◇ Test changingAnotherDisplayDoesNotShiftThisTarget() started.
+◇ Test displayMoveShiftsTheFlightAndUnplugDoesNot() started.
+◇ Test unpluggingTheTargetDoesNotAdoptAReplacementDisplayAtTheSameCoordinates() started.
+◇ Test sixHundredPointFlightIsSevenHundredFiftyMilliseconds() started.
+◇ Test movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether() started.
+◇ Test companionNeverDrivesTheSystemPointer() started.
+◇ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() started.
+◇ Test ringOnANegativeDisplayUsesThatDisplaysOverlay() started.
+◇ Test normalLabelKeepsItsDelayAndEmptyLabelsAreAlreadyComplete() started.
+◇ Test reducedMotionShowsTheWholeUnicodeLabelAtArrival() started.
+◇ Test flightStaysInsideTheControlHullAndTheAngleDoesNotJump() started.
+◇ Test ringSnapsToTheAXFrameNotThePixelGuess() started.
+◇ Test springKeepsVelocityAndSettles() started.
+◇ Test restSpotIsThirtyFiveRightAndTwentyFiveDown() started.
+◇ Test retargetKeepsTheCurrentPointAndReturnKeepsTheLandingTangent() started.
+◇ Test reducedMotionSkipsTheArc() started.
+◇ Test presentProbeReportsTheFixture() started.
+✔ Test nextClickClearsTheRing() passed after 0.001 seconds.
+✔ Test changingAnotherDisplayDoesNotShiftThisTarget() passed after 0.001 seconds.
+✔ Test unpluggingTheTargetDoesNotAdoptAReplacementDisplayAtTheSameCoordinates() passed after 0.001 seconds.
+✔ Test companionNeverDrivesTheSystemPointer() passed after 0.001 seconds.
+✔ Test displayMoveShiftsTheFlightAndUnplugDoesNot() passed after 0.001 seconds.
+✔ Test sixHundredPointFlightIsSevenHundredFiftyMilliseconds() passed after 0.001 seconds.
+✔ Test snapPrefersTheSmallestFrameThatContainsThePoint() passed after 0.001 seconds.
+✔ Test enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline() passed after 0.001 seconds.
+✔ Test ringOnANegativeDisplayUsesThatDisplaysOverlay() passed after 0.001 seconds.
+✔ Test movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether() passed after 0.001 seconds.
+✔ Test normalLabelKeepsItsDelayAndEmptyLabelsAreAlreadyComplete() passed after 0.001 seconds.
+✔ Test movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget() passed after 0.001 seconds.
+✔ Test retargetKeepsTheCurrentPointAndReturnKeepsTheLandingTangent() passed after 0.001 seconds.
+✔ Test reducedMotionSkipsTheArc() passed after 0.001 seconds.
+✔ Test reducedMotionShowsTheWholeUnicodeLabelAtArrival() passed after 0.001 seconds.
+✔ Test springKeepsVelocityAndSettles() passed after 0.001 seconds.
+✔ Test flightStaysInsideTheControlHullAndTheAngleDoesNotJump() passed after 0.001 seconds.
+✔ Test restSpotIsThirtyFiveRightAndTwentyFiveDown() passed after 0.001 seconds.
+✔ Test presentProbeReportsTheFixture() passed after 0.001 seconds.
+✔ Test ringSnapsToTheAXFrameNotThePixelGuess() passed after 0.001 seconds.
+✔ Suite "Companion display changes and accessible labels" passed after 0.002 seconds.
+✔ Suite CompanionMotionTests passed after 0.002 seconds.
+✔ Test run with 20 tests in 2 suites passed after 0.003 seconds.

@@ -1,0 +1,218 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/19] Emitting module ZeusCore
+[5/19] Compiling ZeusCore DictationCore.swift
+[6/19] Compiling ZeusCore SpeechEngineCatalog.swift
+[7/19] Compiling ZeusCore SpokenDictationMarkup.swift
+[8/19] Compiling ZeusCore ThinkingOrbMath.swift
+[9/19] Compiling ZeusCore TranscriptionEngine.swift
+[10/23] Compiling ZeusCore WhisperPromptRecovery.swift
+[11/23] Compiling ZeusCore DriveTypingFlow.swift
+[12/23] Compiling ZeusCore RecordlyCaptureTimeline.swift
+[13/23] Compiling ZeusCore UltronVoiceSignal.swift
+[14/24] Wrapping AST for ZeusCore for debugging
+[16/29] Emitting module ZeusCoreTests
+[17/29] Compiling ZeusCoreTests DictationExplicitCorrectionTests.swift
+[18/29] Compiling ZeusCoreTests DictationQAFixTests.swift
+[19/29] Compiling ZeusCoreTests DriveTypingFlowTests.swift
+[20/29] Compiling ZeusCoreTests RecordlyCaptureTimelineTests.swift
+[21/33] Compiling ZeusCoreTests SpeechEngineCatalogTests.swift
+[22/33] Compiling ZeusCoreTests ThinkingOrbMathTests.swift
+[23/33] Compiling ZeusCoreTests UltronVoiceSignalTests.swift
+[24/33] Compiling ZeusCoreTests WhisperPromptRecoveryTests.swift
+[25/34] /workspace/zeus-validation/closed-loop-full-frozen/portable-regressions/regressions/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[26/34] Write sources
+[27/34] Wrapping AST for ZeusCoreTests for debugging
+[29/36] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[30/37] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[31/37] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[32/38] /workspace/zeus-validation/closed-loop-full-frozen/portable-regressions/regressions/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[33/38] Write sources
+[34/38] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[36/40] Compiling ZeusPortableValidationPackageTests runner.swift
+[37/40] Emitting module ZeusPortableValidationPackageTests
+[38/41] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[39/41] Write Objects.LinkFileList
+[40/41] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (38.29s)
+Test Suite 'All tests' started at 2026-11-10 00:41:34.929
+Test Suite 'debug.xctest' started at 2026-11-10 00:41:34.931
+Test Suite 'debug.xctest' passed at 2026-11-10 00:41:34.931
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:41:34.931
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Thinking orb geometry" started.
+◇ Suite "Dictation QA fixes: corrupt history metadata" started.
+◇ Suite UltronVoiceSignalTests started.
+◇ Suite "Recordly capture timeline" started.
+◇ Suite "Speech engine catalog" started.
+◇ Suite "Dictation QA fixes: text transforms" started.
+◇ Suite "Drive typing interruption" started.
+◇ Suite WhisperPromptRecoveryTests started.
+◇ Suite DictationExplicitCorrectionTests started.
+◇ Test corruptMetadataIsMovedAsideAndReported() started.
+◇ Test pruneWorksOnceTheHistoryIsClean() started.
+◇ Test pruneNeverRunsFromAFailedLoad() started.
+◇ Test cleanHistoryReportsNoProblem() started.
+◇ Test disabledOrInvalidConfigurationPassesThrough() started.
+◇ Test effectPreservesTimingAndDoesNotAddSoundOutsideSpeech() started.
+◇ Test pausesStaySilentAtEveryIntensity() started.
+◇ Test malformedSamplesAndCursorTimesAreRejected() started.
+◇ Test secondBackupNeverOverwritesTheFirst() started.
+◇ Test aNewRecordingGetsANewOrigin() started.
+◇ Test streamingChunksMatchOneContinuousBuffer() started.
+◇ Test audioCannotStartSessionOrPrecedeFirstVideo() started.
+◇ Test everyDotIsInBoundsWithPositiveRadiusAndClampedOpacity() started.
+◇ Test hostUptimeDoesNotBecomeMovieLeadIn() started.
+◇ Test theFrameMovesOverTime() started.
+◇ Test listeningIsNeverFullyFlatEvenInSilence() started.
+◇ Test fibonacciDirectionsAreUnitVectors() started.
+◇ Test workingUsesItsOwnSmallerDotCount() started.
+◇ Test louderLevelsMakeTheWaveReachFurtherThanSilence() started.
+◇ Test textureFrequencyIsIndependentOfProviderSampleRate() started.
+◇ Test listeningUsesTheDefaultDotCount() started.
+◇ Test polishTidiesSpacingAndCapitalises() started.
+◇ Test workingAndListeningAreVisiblyDifferentPatterns() started.
+◇ Test fallbackRetranscribesWhenAppleHadNoLiveWords() started.
+◇ Test whisperKitCLIArguments() started.
+◇ Test groupsSplitLocalFromCloud() started.
+◇ Test selfCorrectScratchThatDropsTheClauseBeforeIt() started.
+◇ Test selfCorrectSwapsSpelledOutNumbersWithCommasAroundTheCue() started.
+◇ Test fallbackUsesAppleLiveWordsWithAToastWhenTheEngineFails() started.
+◇ Test outputIsBoundedAndNonFiniteInputDoesNotPropagate() started.
+◇ Test cloudIsNeverAnAutomaticFallback() started.
+◇ Test everyEngineHasATitleDescriptionAndGroup() started.
+◇ Test selfCorrectSwapsNumbersAroundNoAndNoWait() started.
+◇ Test fallbackQuietlyUsesAppleWhenTheEngineHeardNothing() started.
+◇ Test whisperPromptIsAPunctuatedSentenceWithinBudget() started.
+◇ Test selfCorrectMakeThatReplacesTheStaleValue() started.
+◇ Test persistedEngineNamesStillDecode() started.
+◇ Test recommendationBadges() started.
+◇ Test cloudEnginesSayAudioLeavesAndUseExistingKeySlots() started.
+◇ Test fasterWhisperIsLabelledSlowerOnMac() started.
+◇ Test fallbackKeepsTheChosenEnginesWords() started.
+◇ Test mergedVocabularyRestoresNameCasingButNotOrdinaryWords() started.
+◇ Test statusLinesMatchThePicker() started.
+◇ Test selfCorrectActuallyAndIMeanAndFrenchEquivalents() started.
+◇ Test prepareForInsertHandlesO19ScratchAndFillers() started.
+◇ Test selfCorrectHasNoFalsePositives() started.
+◇ Test whisperKitCLIOutputIsCleaned() started.
+◇ Test selfCorrectDropsTheWordBeforeSorryAndSplicesWhatFollows() started.
+◇ Test termsPutTheUsersWordsFirstThenTheBuiltInNames() started.
+◇ Test cloudKeywordsDropWhatTheApisReject() started.
+◇ Test ordinaryIMeanKeepsEveryWord() started.
+◇ Test ordinaryActuallyKeepsEveryWord() started.
+◇ Test nounUsesOfPointAndPeriodSurvive() started.
+◇ Test restartedPhraseStillCorrects() started.
+◇ Test periodAtTheEndBecomesAStop() started.
+◇ Test unambiguousCommandsStillWork() started.
+◇ Test selfCorrectLeavesOrdinaryTextAlone() started.
+◇ Test literalKeepsTheWord() started.
+◇ Test ordinarySorryKeepsEveryWord() started.
+◇ Test makeThatStillCorrects() started.
+◇ Test focusDriftBetweenChunksStopsBeforeWritingIntoTheNewField() started.
+◇ Test stableOwnershipReplacesAndClearsInOrder() started.
+◇ Test onlyExplicitlyAttributedEventsRetainAgentOwnership() started.
+◇ Test clearingRechecksFocusAfterSelectAll() started.
+◇ Test cancellationDuringFocusDelayPreventsSelectAllAndTyping() started.
+◇ Test cancelledTurnNeverStartsRecovery() started.
+◇ Test failedRetryPropagatesInsteadOfReturningTheSuspectPrompt() started.
+◇ Test recoveryUsesOnePromptFreeVadFreeLocalRetry() started.
+◇ Test identifiesWholePromptAndLoopedTerms() started.
+◇ Test ordinarySpeechDoesNotDecodeTwice() started.
+◇ Test silenceOnTheUnpromptedRetryDoesNotInsertTheDictionary() started.
+◇ Test preservesShortAndOrdinaryDictionarySpeech() started.
+◇ Test unpromptedConfirmationKeepsGenuineDictionaryRecitals() started.
+◇ Test quotedAndOrdinarySpeechArePreserved() started.
+◇ Test repeatedPhraseCanRestartTheClause() started.
+◇ Test noIMeantReplacesTheStaleWordBeforeInsert() started.
+✔ Test disabledOrInvalidConfigurationPassesThrough() passed after 0.036 seconds.
+✔ Test effectPreservesTimingAndDoesNotAddSoundOutsideSpeech() passed after 0.036 seconds.
+✔ Test pausesStaySilentAtEveryIntensity() passed after 0.036 seconds.
+✔ Test aNewRecordingGetsANewOrigin() passed after 0.036 seconds.
+✔ Test cleanHistoryReportsNoProblem() passed after 0.036 seconds.
+✔ Test audioCannotStartSessionOrPrecedeFirstVideo() passed after 0.036 seconds.
+✔ Test pruneNeverRunsFromAFailedLoad() passed after 0.037 seconds.
+✔ Test hostUptimeDoesNotBecomeMovieLeadIn() passed after 0.036 seconds.
+✔ Test everyDotIsInBoundsWithPositiveRadiusAndClampedOpacity() passed after 0.036 seconds.
+✔ Test theFrameMovesOverTime() passed after 0.036 seconds.
+✔ Test listeningIsNeverFullyFlatEvenInSilence() passed after 0.036 seconds.
+✔ Test corruptMetadataIsMovedAsideAndReported() passed after 0.037 seconds.
+✔ Test workingUsesItsOwnSmallerDotCount() passed after 0.036 seconds.
+✔ Test fibonacciDirectionsAreUnitVectors() passed after 0.036 seconds.
+✔ Test louderLevelsMakeTheWaveReachFurtherThanSilence() passed after 0.036 seconds.
+✔ Test listeningUsesTheDefaultDotCount() passed after 0.036 seconds.
+✔ Test pruneWorksOnceTheHistoryIsClean() passed after 0.037 seconds.
+✔ Test fallbackRetranscribesWhenAppleHadNoLiveWords() passed after 0.036 seconds.
+✔ Test groupsSplitLocalFromCloud() passed after 0.036 seconds.
+✔ Test whisperKitCLIArguments() passed after 0.036 seconds.
+✔ Test textureFrequencyIsIndependentOfProviderSampleRate() passed after 0.037 seconds.
+✔ Test secondBackupNeverOverwritesTheFirst() passed after 0.038 seconds.
+✔ Test malformedSamplesAndCursorTimesAreRejected() passed after 0.039 seconds.
+✔ Test polishTidiesSpacingAndCapitalises() passed after 0.039 seconds.
+✔ Test workingAndListeningAreVisiblyDifferentPatterns() passed after 0.040 seconds.
+✔ Test outputIsBoundedAndNonFiniteInputDoesNotPropagate() passed after 0.040 seconds.
+✔ Test fallbackUsesAppleLiveWordsWithAToastWhenTheEngineFails() passed after 0.039 seconds.
+✔ Test cloudIsNeverAnAutomaticFallback() passed after 0.039 seconds.
+✔ Test everyEngineHasATitleDescriptionAndGroup() passed after 0.039 seconds.
+✔ Test fallbackQuietlyUsesAppleWhenTheEngineHeardNothing() passed after 0.039 seconds.
+✔ Test selfCorrectMakeThatReplacesTheStaleValue() passed after 0.039 seconds.
+✔ Test persistedEngineNamesStillDecode() passed after 0.040 seconds.
+✔ Test whisperPromptIsAPunctuatedSentenceWithinBudget() passed after 0.039 seconds.
+✔ Test recommendationBadges() passed after 0.039 seconds.
+✔ Test fasterWhisperIsLabelledSlowerOnMac() passed after 0.039 seconds.
+✔ Test fallbackKeepsTheChosenEnginesWords() passed after 0.039 seconds.
+✔ Test selfCorrectSwapsSpelledOutNumbersWithCommasAroundTheCue() passed after 0.040 seconds.
+✔ Test statusLinesMatchThePicker() passed after 0.039 seconds.
+✔ Test cloudEnginesSayAudioLeavesAndUseExistingKeySlots() passed after 0.040 seconds.
+✔ Test selfCorrectSwapsNumbersAroundNoAndNoWait() passed after 0.040 seconds.
+✔ Test selfCorrectScratchThatDropsTheClauseBeforeIt() passed after 0.040 seconds.
+✔ Test whisperKitCLIOutputIsCleaned() passed after 0.040 seconds.
+✔ Test streamingChunksMatchOneContinuousBuffer() passed after 0.041 seconds.
+✔ Test selfCorrectDropsTheWordBeforeSorryAndSplicesWhatFollows() passed after 0.042 seconds.
+✔ Test prepareForInsertHandlesO19ScratchAndFillers() passed after 0.044 seconds.
+✔ Test cloudKeywordsDropWhatTheApisReject() passed after 0.044 seconds.
+✔ Test termsPutTheUsersWordsFirstThenTheBuiltInNames() passed after 0.044 seconds.
+✔ Test ordinaryIMeanKeepsEveryWord() passed after 0.044 seconds.
+✔ Test ordinaryActuallyKeepsEveryWord() passed after 0.044 seconds.
+✔ Test selfCorrectActuallyAndIMeanAndFrenchEquivalents() passed after 0.044 seconds.
+✔ Test restartedPhraseStillCorrects() passed after 0.044 seconds.
+✔ Test unambiguousCommandsStillWork() passed after 0.044 seconds.
+✔ Test selfCorrectLeavesOrdinaryTextAlone() passed after 0.044 seconds.
+✔ Test literalKeepsTheWord() passed after 0.043 seconds.
+✔ Test periodAtTheEndBecomesAStop() passed after 0.044 seconds.
+✔ Test nounUsesOfPointAndPeriodSurvive() passed after 0.044 seconds.
+✔ Test makeThatStillCorrects() passed after 0.043 seconds.
+✔ Test ordinarySorryKeepsEveryWord() passed after 0.044 seconds.
+✔ Test recoveryUsesOnePromptFreeVadFreeLocalRetry() passed after 0.028 seconds.
+✔ Test selfCorrectHasNoFalsePositives() passed after 0.045 seconds.
+✔ Test ordinarySpeechDoesNotDecodeTwice() passed after 0.023 seconds.
+✔ Test silenceOnTheUnpromptedRetryDoesNotInsertTheDictionary() passed after 0.023 seconds.
+✔ Test preservesShortAndOrdinaryDictionarySpeech() passed after 0.023 seconds.
+✔ Test unpromptedConfirmationKeepsGenuineDictionaryRecitals() passed after 0.023 seconds.
+✔ Test identifiesWholePromptAndLoopedTerms() passed after 0.023 seconds.
+✔ Test failedRetryPropagatesInsteadOfReturningTheSuspectPrompt() passed after 0.029 seconds.
+✔ Test repeatedPhraseCanRestartTheClause() passed after 0.018 seconds.
+✔ Suite UltronVoiceSignalTests passed after 0.048 seconds.
+✔ Suite "Recordly capture timeline" passed after 0.048 seconds.
+✔ Suite "Thinking orb geometry" passed after 0.049 seconds.
+✔ Test focusDriftBetweenChunksStopsBeforeWritingIntoTheNewField() passed after 0.045 seconds.
+✔ Test stableOwnershipReplacesAndClearsInOrder() passed after 0.045 seconds.
+✔ Test clearingRechecksFocusAfterSelectAll() passed after 0.045 seconds.
+✔ Test cancellationDuringFocusDelayPreventsSelectAllAndTyping() passed after 0.045 seconds.
+✔ Suite "Dictation QA fixes: text transforms" passed after 0.049 seconds.
+✔ Test cancelledTurnNeverStartsRecovery() passed after 0.030 seconds.
+✔ Test onlyExplicitlyAttributedEventsRetainAgentOwnership() passed after 0.045 seconds.
+✔ Suite WhisperPromptRecoveryTests passed after 0.050 seconds.
+✔ Suite "Drive typing interruption" passed after 0.050 seconds.
+✔ Suite "Dictation QA fixes: corrupt history metadata" passed after 0.049 seconds.
+✔ Test quotedAndOrdinarySpeechArePreserved() passed after 0.024 seconds.
+✔ Test noIMeantReplacesTheStaleWordBeforeInsert() passed after 0.024 seconds.
+✔ Suite DictationExplicitCorrectionTests passed after 0.054 seconds.
+✔ Test mergedVocabularyRestoresNameCasingButNotOrdinaryWords() passed after 0.056 seconds.
+✔ Suite "Speech engine catalog" passed after 0.058 seconds.
+✔ Test run with 76 tests in 9 suites passed after 0.060 seconds.

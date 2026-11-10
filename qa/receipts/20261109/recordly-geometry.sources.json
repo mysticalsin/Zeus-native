@@ -1,0 +1,53 @@
+{
+  "group": "recordly-geometry",
+  "repository": "/workspace/Zeus",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/BuddyVisibility.swift",
+      "sha256": "190f0711ca3d79569166959a63b89690f6f7efb8f058e4bb86486da52330cf7f"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyCursorFollowPath.swift",
+      "sha256": "28810a2540a369396f1849c8afb5a35908393a79c46bbe77eaf97b7e80c65f22"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyCursorSmoother.swift",
+      "sha256": "53a761b0735271274cb77c33f4473e5df7dce10f6465170fa3dcb9aa18e26445"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyCursorLog.swift",
+      "sha256": "6d95a845e49fdfd19ad85e5da592913553b808a37447939a1919f99a388e4141"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyZoomRegions.swift",
+      "sha256": "717367d1d4c7b2ddf5e317a7a857d4fcf589a927a4a2c833b06f5671420d3dd2"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyExportPlan.swift",
+      "sha256": "16a1f6bfd28f2d4a148890b20019d9919b1e69bacc2814000e7c20007ad8e72e"
+    },
+    {
+      "source": "Sources/ZeusCore/Recordly/RecordlyExportSettings.swift",
+      "sha256": "896fe781551e102a5c91a9f77b2f69bbe13b8fde27c6852ed95c32cc6ae7f543"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/RecordlyCursorFollowTests.swift",
+      "sha256": "fbc1cb680362539fc63b463684419007853c0f24c70087297738f1a32c55f7b4"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/RecordlyExportPlanTests.swift",
+      "sha256": "1f712aa2733186f0f939a04c42742c187c668b589560e3027977f3ebdd6b4672"
+    }
+  ],
+  "excerpts": [
+    {
+      "source": "Sources/ZeusCore/Present/CompanionMotion.swift",
+      "source_sha256": "7dc37f94147d4a726313e3ad179788c6cbe46e35dd495a4fc01659bbd959fe4c",
+      "start": "public struct CompanionSpring:",
+      "end_exclusive": "/// One frame of a flight.",
+      "excerpt_sha256": "21a0a763ac7d233534cbaca46fbc0ffe523cb7ca3337beda9e36186a5549bcaf"
+    }
+  ],
+  "compatibility": "Linux-only CoreGraphics module reexports Foundation geometry value types. Not Apple CoreGraphics validation."
+}

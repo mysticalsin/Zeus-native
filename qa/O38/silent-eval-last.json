@@ -1,0 +1,146 @@
+{
+  "generated" : "2026-11-03T23:59:35Z",
+  "pass" : true,
+  "scenarios" : [
+    {
+      "id" : "fast_open_safari",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.03520095348358154
+    },
+    {
+      "id" : "fast_mute_volume",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 5.3048133850097656e-05
+    },
+    {
+      "id" : "fast_timer_90",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 7.30752944946289e-05
+    },
+    {
+      "id" : "fast_lock_screen",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 4.1961669921875e-05
+    },
+    {
+      "id" : "fake_shell_test",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 9.000301361083984e-05
+    },
+    {
+      "id" : "watch_window_gone",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.004577040672302246
+    },
+    {
+      "id" : "memory_remember_metric",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.0004470348358154297
+    },
+    {
+      "id" : "memory_forget",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 2.09808349609375e-05
+    },
+    {
+      "id" : "memory_blocks_sensitive",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.00014388561248779297
+    },
+    {
+      "id" : "memory_command_parse",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.00011909008026123047
+    },
+    {
+      "id" : "routine_weekday_schedule",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.00027191638946533203
+    },
+    {
+      "id" : "routine_relaunch_guard",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.0017069578170776367
+    },
+    {
+      "id" : "launchd_plist_shape",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 7.104873657226562e-05
+    },
+    {
+      "id" : "background_move_threshold",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0
+    },
+    {
+      "id" : "background_steer_session",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 3.0994415283203125e-05
+    },
+    {
+      "id" : "meeting_fixture_transcript",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.0032099485397338867
+    },
+    {
+      "id" : "meeting_answer_budget",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 7.104873657226562e-05
+    },
+    {
+      "id" : "meeting_archive_mode",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.0047149658203125
+    },
+    {
+      "id" : "agent_steer_parse",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.00012505054473876953
+    },
+    {
+      "id" : "routine_due_once",
+      "llmCalls" : 0,
+      "notes" : "ok",
+      "ok" : true,
+      "seconds" : 0.006028890609741211
+    }
+  ]
+}

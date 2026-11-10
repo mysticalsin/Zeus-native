@@ -1,0 +1,65 @@
+{
+  "group": "wiki-relationships",
+  "repository": "/workspace/Zeus",
+  "platform": "linux",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/MeetingCopilot.swift",
+      "sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeSession.swift",
+      "sha256": "d5ee1f81e391d2ca50a8453534552512a2b3be280eaca438cf64e07314508719"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeRecapNavigation.swift",
+      "sha256": "39c5247c45ec9a096eecce8c7caf086d00a6d891e2e4d613b8f70d8732726565"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiPage.swift",
+      "sha256": "0473df7b046240457fb840b6d4f253ae23af600700587773d09e5e4b6f957ef3"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiCompiler.swift",
+      "sha256": "5f6a4f9a7adb3528a427bfbf7d9404959b2ee8836794543c4a03d8a46e01e291"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/SensitiveInfoScanner.swift",
+      "sha256": "13533c12622d014851cb43c96bd1b9fdbabd5e0fd2baffe18da0aac8075da92a"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiRelationships.swift",
+      "sha256": "bc83ab30ef5ad230599a0d14659e95c9600fb6c797d6b6c1750073c61963ad9e"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/WikiRelationshipsTests.swift",
+      "sha256": "3c66d314e7fb8498663df67b461d0530d2d5e45b4218956a80b17a36f8158b1d"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ScribeRecapNavigationTests.swift",
+      "sha256": "8f881a8c5fad174c9144802fc155e633dca41eb72acac9e9ae92bde0d9cd8991"
+    }
+  ],
+  "excerpts": [
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "source_sha256": "e81d0befc6e88443164d94c2e5f8cff0fbed55557ad6f38f578676d24b442ee0",
+      "start": "public struct ScribeMeetingRecord:",
+      "end_exclusive": "public enum ScribeMeetingStoreError:",
+      "excerpt_sha256": "3ee17527f475555e38fe74032ca997816242b4d3483a008657de6a3d1188f1e3"
+    }
+  ]
+}

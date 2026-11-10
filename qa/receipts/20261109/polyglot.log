@@ -1,0 +1,163 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/16] Compiling ZeusCore PolyglotModels.swift
+[5/16] Compiling ZeusCore PolyglotPipeline.swift
+[6/16] Emitting module ZeusCore
+[7/17] Compiling ZeusCore PolyglotSegmenter.swift
+[8/18] Wrapping AST for ZeusCore for debugging
+[10/21] Emitting module ZeusCoreTests
+[11/21] Compiling ZeusCoreTests PolyglotTargetChangeTests.swift
+[12/21] Compiling ZeusCoreTests PolyglotTests.swift
+[13/22] Compiling ZeusCoreTests W7PolyglotTests.swift
+[14/23] /workspace/zeus-validation/polyglot-drain-final-fixed/polyglot/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[15/23] Write sources
+[16/23] Wrapping AST for ZeusCoreTests for debugging
+[18/25] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[19/25] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[20/26] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[21/27] /workspace/zeus-validation/polyglot-drain-final-fixed/polyglot/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[22/27] Write sources
+[23/27] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[25/29] Compiling ZeusPortableValidationPackageTests runner.swift
+[26/29] Emitting module ZeusPortableValidationPackageTests
+[27/30] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[28/30] Write Objects.LinkFileList
+[29/30] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (64.88s)
+Test Suite 'All tests' started at 2026-11-09 23:48:29.623
+Test Suite 'debug.xctest' started at 2026-11-09 23:48:29.636
+Test Suite 'debug.xctest' passed at 2026-11-09 23:48:29.636
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-09 23:48:29.636
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite PolyglotSegmenterTests started.
+◇ Suite PolyglotRunIDTests started.
+◇ Suite PolyglotEventDrainTests started.
+◇ Suite "W7 Polyglot transcript order" started.
+◇ Suite PolyglotPipelineTests started.
+◇ Suite PolyglotLogicTests started.
+◇ Suite PolyglotTargetChangeTests started.
+◇ Test runsOwnDisjointBlocks() started.
+◇ Test linesFromTwoRunsStayDistinctInTheTranscript() started.
+◇ Test anOlderRunsFinalNeverClearsTheNewRunsPartial() started.
+◇ Test aRunBelowOneStillGetsAValidBlock() started.
+◇ Test silenceNeverStartsAnything() started.
+◇ Test aLongMonologueCutStartsANewUtteranceNumber() started.
+◇ Test utterancesAreNumberedAndPartialsShareTheirFinalsNumber() started.
+◇ Test twoSentencesApart() started.
+◇ Test onlySettledEventsSurviveARunEnding() started.
+◇ Test shortBlipsAreDropped() started.
+◇ Test flushClosesWhatWasBeingSaid() started.
+◇ Test longTalkGivesPartialsThenIsCut() started.
+◇ Test oneSentenceBecomesOneFinalAfterTheHangover() started.
+◇ Test draining_run_caption_arriving_last_still_sorts_first() started.
+◇ Test feedingInSmallPiecesGivesTheSameResult() started.
+◇ Test recoveryUsesStateAfterHandlingTheLastEvent() started.
+◇ Test in_order_arrival_still_appends() started.
+◇ Test targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes() started.
+◇ Test clearAndUnchangedDestinationSuppressDrainRecovery() started.
+◇ Test trimming_drops_the_oldest_lines() started.
+◇ Test updating_a_known_id_keeps_its_place() started.
+◇ Test linesOfALaterRunStartAboveTheEarlierOnes() started.
+◇ Test finishWithNothingSaidReturnsAtOnce() started.
+◇ Test targetLanguageSpeechIsNotTranslated() started.
+◇ Test unsupportedPairSaysSo() started.
+◇ Test missingPackAsksToDownloadAndTranslatesNothing() started.
+◇ Test phantomTextNeverReachesTheCard() started.
+◇ Test aPartialCarriesTheIdOfTheLineItBecomes() started.
+◇ Test eachInputKeepsItsOwnUtterance() started.
+◇ Test detectedLanguageIsHandedBackToTheRecognizer() started.
+◇ Test aPhantomFinalRetiresItsUtterance() started.
+◇ Test sentenceIsTranscribedDetectedAndTranslated() started.
+◇ Test targetChangeAppliesToTheNextSentence() started.
+◇ Test microphoneDoesNotInheritTheRemoteSpeakersLanguage() started.
+◇ Test aBacklogIsTranslatedInBatchesPerLanguage() started.
+◇ Test anOlderSettingsTaskCannotUndoTheLatestTarget() started.
+◇ Test aPartialThatAnswersAfterItsFinalWasQueuedIsDropped() started.
+◇ Test stoppingKeepsWhatEndedAndANewRunForgetsIt() started.
+◇ Test captionSizes() started.
+◇ Test clearDuringTranslationDiscardsTheOldAnswerBehindAnOrderedBarrier() started.
+◇ Test aFinalClearsItsOwnPartialAndLaterPartialsOfThatUtteranceAreRefused() started.
+◇ Test clearDiscardsPendingRecognitionAndContinuesWithNewSpeech() started.
+◇ Test phantomCaptionsAreDropped() started.
+◇ Test retargetKeepsOriginalsAndRecomputesWhichLinesNeedTranslation() started.
+◇ Test sourcesSayWhatTheyNeed() started.
+◇ Test trackerHoldsTheLanguageThroughNoise() started.
+◇ Test aDiscardedUtteranceCannotShowAPartialLater() started.
+◇ Test targetChangedDuringTranslationDropsTheOldAnswerEvenAfterSwitchingBack() started.
+◇ Test aStalePartialCannotReplaceANewerOne() started.
+◇ Test targetChangedDuringPackCheckDoesNotLaunchTheStaleTranslation() started.
+◇ Test inputsDoNotAffectEachOther() started.
+◇ Test aFinalNeverClearsTheNextUtterancesPartial() started.
+◇ Test languageBadgesAndBases() started.
+◇ Test trackerBelievesAStrongFirstGuessEvenWhenShort() started.
+◇ Test transcriptKeepsOrderUpdatesAndCopiesAsText() started.
+◇ Test batchingGroupsByLanguageAndSplitsLongRuns() started.
+✔ Test runsOwnDisjointBlocks() passed after 0.035 seconds.
+✔ Test aRunBelowOneStillGetsAValidBlock() passed after 0.035 seconds.
+✔ Test anOlderRunsFinalNeverClearsTheNewRunsPartial() passed after 0.035 seconds.
+✔ Test linesFromTwoRunsStayDistinctInTheTranscript() passed after 0.052 seconds.
+✔ Test onlySettledEventsSurviveARunEnding() passed after 0.091 seconds.
+✔ Test shortBlipsAreDropped() passed after 0.090 seconds.
+✔ Test silenceNeverStartsAnything() passed after 0.091 seconds.
+✔ Test flushClosesWhatWasBeingSaid() passed after 0.091 seconds.
+✔ Test twoSentencesApart() passed after 0.106 seconds.
+✔ Test draining_run_caption_arriving_last_still_sorts_first() passed after 0.106 seconds.
+✔ Test feedingInSmallPiecesGivesTheSameResult() passed after 0.106 seconds.
+✔ Test in_order_arrival_still_appends() passed after 0.112 seconds.
+✔ Test oneSentenceBecomesOneFinalAfterTheHangover() passed after 0.121 seconds.
+✔ Test updating_a_known_id_keeps_its_place() passed after 0.120 seconds.
+✔ Test trimming_drops_the_oldest_lines() passed after 0.120 seconds.
+✔ Test finishWithNothingSaidReturnsAtOnce() passed after 0.120 seconds.
+✔ Test aLongMonologueCutStartsANewUtteranceNumber() passed after 0.122 seconds.
+✔ Test utterancesAreNumberedAndPartialsShareTheirFinalsNumber() passed after 0.122 seconds.
+✔ Test stoppingKeepsWhatEndedAndANewRunForgetsIt() passed after 0.098 seconds.
+✔ Test captionSizes() passed after 0.098 seconds.
+✔ Test aFinalClearsItsOwnPartialAndLaterPartialsOfThatUtteranceAreRefused() passed after 0.098 seconds.
+✔ Test phantomCaptionsAreDropped() passed after 0.098 seconds.
+✔ Test retargetKeepsOriginalsAndRecomputesWhichLinesNeedTranslation() passed after 0.098 seconds.
+✔ Test sourcesSayWhatTheyNeed() passed after 0.098 seconds.
+✔ Test trackerHoldsTheLanguageThroughNoise() passed after 0.098 seconds.
+✔ Test aDiscardedUtteranceCannotShowAPartialLater() passed after 0.098 seconds.
+✔ Test aStalePartialCannotReplaceANewerOne() passed after 0.098 seconds.
+✔ Test inputsDoNotAffectEachOther() passed after 0.098 seconds.
+✔ Test aFinalNeverClearsTheNextUtterancesPartial() passed after 0.097 seconds.
+✔ Test languageBadgesAndBases() passed after 0.097 seconds.
+✔ Test trackerBelievesAStrongFirstGuessEvenWhenShort() passed after 0.097 seconds.
+✔ Test transcriptKeepsOrderUpdatesAndCopiesAsText() passed after 0.097 seconds.
+✔ Test batchingGroupsByLanguageAndSplitsLongRuns() passed after 0.097 seconds.
+✔ Suite PolyglotRunIDTests passed after 0.126 seconds.
+✔ Suite "W7 Polyglot transcript order" passed after 0.131 seconds.
+✔ Test targetLanguageSpeechIsNotTranslated() passed after 0.129 seconds.
+✔ Test linesOfALaterRunStartAboveTheEarlierOnes() passed after 0.130 seconds.
+✔ Test unsupportedPairSaysSo() passed after 0.129 seconds.
+✔ Test missingPackAsksToDownloadAndTranslatesNothing() passed after 0.129 seconds.
+✔ Test eachInputKeepsItsOwnUtterance() passed after 0.130 seconds.
+✔ Test phantomTextNeverReachesTheCard() passed after 0.129 seconds.
+✔ Test aPhantomFinalRetiresItsUtterance() passed after 0.129 seconds.
+✔ Test sentenceIsTranscribedDetectedAndTranslated() passed after 0.129 seconds.
+✔ Suite PolyglotLogicTests passed after 0.132 seconds.
+✔ Test anOlderSettingsTaskCannotUndoTheLatestTarget() passed after 0.129 seconds.
+✔ Test recoveryUsesStateAfterHandlingTheLastEvent() passed after 0.131 seconds.
+✔ Test aPartialCarriesTheIdOfTheLineItBecomes() passed after 0.130 seconds.
+✔ Test targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes() passed after 0.132 seconds.
+✔ Test aBacklogIsTranslatedInBatchesPerLanguage() passed after 0.131 seconds.
+✔ Test detectedLanguageIsHandedBackToTheRecognizer() passed after 0.131 seconds.
+✔ Test clearDuringTranslationDiscardsTheOldAnswerBehindAnOrderedBarrier() passed after 0.107 seconds.
+✔ Test targetChangedDuringTranslationDropsTheOldAnswerEvenAfterSwitchingBack() passed after 0.107 seconds.
+✔ Test clearAndUnchangedDestinationSuppressDrainRecovery() passed after 0.133 seconds.
+✔ Test targetChangedDuringPackCheckDoesNotLaunchTheStaleTranslation() passed after 0.107 seconds.
+✔ Suite PolyglotEventDrainTests passed after 0.134 seconds.
+✔ Test clearDiscardsPendingRecognitionAndContinuesWithNewSpeech() passed after 0.110 seconds.
+✔ Suite PolyglotTargetChangeTests passed after 0.137 seconds.
+✔ Test longTalkGivesPartialsThenIsCut() passed after 0.137 seconds.
+✔ Suite PolyglotSegmenterTests passed after 0.139 seconds.
+✔ Test targetChangeAppliesToTheNextSentence() passed after 0.139 seconds.
+✔ Test microphoneDoesNotInheritTheRemoteSpeakersLanguage() passed after 0.142 seconds.
+✔ Test aPartialThatAnswersAfterItsFinalWasQueuedIsDropped() passed after 0.221 seconds.
+✔ Suite PolyglotPipelineTests passed after 0.235 seconds.
+✔ Test run with 56 tests in 7 suites passed after 0.236 seconds.

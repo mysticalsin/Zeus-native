@@ -1,0 +1,96 @@
+{
+  "recorded_at_utc": "2026-11-09T23:58:51.948639+00:00",
+  "toolchain": "Swift 6.2.1, x86_64 Linux (Debian 13)",
+  "groups": [
+    {
+      "group": "polyglot",
+      "tests": 56,
+      "suites": 7,
+      "status": "passed",
+      "log": "polyglot.log",
+      "source_manifest": "polyglot.sources.json"
+    },
+    {
+      "group": "regressions",
+      "tests": 68,
+      "suites": 8,
+      "status": "passed",
+      "log": "regressions.log",
+      "source_manifest": "regressions.sources.json"
+    },
+    {
+      "group": "scribe",
+      "tests": 115,
+      "suites": 10,
+      "status": "passed",
+      "log": "scribe.log",
+      "source_manifest": "scribe.sources.json"
+    },
+    {
+      "group": "presentation",
+      "tests": 16,
+      "suites": 3,
+      "status": "passed",
+      "log": "presentation.log",
+      "source_manifest": "presentation.sources.json"
+    },
+    {
+      "group": "recordly-geometry",
+      "tests": 31,
+      "suites": 2,
+      "status": "passed",
+      "log": "recordly-geometry.log",
+      "source_manifest": "recordly-geometry.sources.json"
+    },
+    {
+      "group": "wiki-relationships",
+      "tests": 14,
+      "suites": 2,
+      "status": "passed",
+      "log": "wiki-relationships.log",
+      "source_manifest": "wiki-relationships.sources.json"
+    }
+  ],
+  "passed_tests": 300,
+  "suites": 32,
+  "sources_match_current_checkout": true,
+  "separate_evidence": {
+    "brain_ad_hoc": {
+      "passed": 29,
+      "suites": 6,
+      "scope": "ResearchReport folder-constant stub; not included in portable aggregate"
+    },
+    "wiki_filesystem": {
+      "passed": 66,
+      "failed_tests": 10,
+      "issues": 12,
+      "scope": "Linux Foundation replaceItemAt behavior independently reproduced; macOS unresolved"
+    },
+    "brain_app_model": {
+      "typechecked": 3,
+      "executed": 0,
+      "scope": "Native provider stubs; Observation runtime linking failed"
+    },
+    "extension": {
+      "passed": 12,
+      "typecheck": "passed",
+      "build": "passed",
+      "scope": "Mocked Chrome APIs; no live browser QA"
+    },
+    "release_scripts": {
+      "passed": 13,
+      "scope": "Mocked native commands; no real signing/notarization/install"
+    },
+    "syntax": {
+      "prior_file_checks": 78,
+      "late_wiki_file_checks": 7,
+      "scope": "Parse only, not native typecheck/link"
+    },
+    "native": {
+      "local_build": "blocked: mach/mach.h unavailable on Linux",
+      "local_test": "blocked before suite execution",
+      "macos_ci": "job not started: Actions budget prevents further use",
+      "live_qa": "not performed"
+    }
+  }
+}

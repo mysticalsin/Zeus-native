@@ -1,0 +1,37 @@
+
+> zeus-extension@0.1.0 test
+> node --test tests/*.test.mjs
+
+✔ a mutation without a captured target fails closed (16.99454ms)
+✔ the approved tab and document receive a normal click (7.961773ms)
+✔ switch-tab while consent is open cannot redirect a write (9.19829ms)
+✔ navigate while consent is open cannot redirect a write (11.705057ms)
+✔ reload-same-url while consent is open cannot redirect a write (9.942269ms)
+✔ new-document between validation and injection is rejected (7.759608ms)
+✔ same-document-url between validation and injection is rejected (7.104238ms)
+✔ typing retains field matching and submit behavior on the approved page (5.9728ms)
+✔ indexed actions use both document binding and element-state freshness (7.725273ms)
+✔ context exposes its exact target and a later element read refuses a tab switch (7.682943ms)
+✔ closing a named inactive tab does not retarget the current tab (6.127863ms)
+✔ closing a tab after its URL changes is rejected (15.610131ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 392.100439
+
+> zeus-extension@0.1.0 typecheck
+> tsc --noEmit
+
+
+> zeus-extension@0.1.0 build
+> esbuild src/sw.ts src/popup.ts --bundle --format=esm --target=chrome120 --outdir=dist
+
+
+  dist/sw.js     32.9kb
+  dist/popup.js   804b
+
+⚡ Done in 20ms

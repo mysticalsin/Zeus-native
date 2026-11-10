@@ -1,0 +1,2254 @@
+{
+  "schema_version": 1,
+  "mode": "development",
+  "status": "failed",
+  "release_ready": false,
+  "started_at": "2026-11-10T00:36:32.335953+00:00",
+  "host": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "platform": "linux",
+  "checks": [
+    {
+      "id": "closed-loop-selftests",
+      "kind": "selftests",
+      "tier": "contract",
+      "scope": "Runner/schema/receipt/aggregate rejection regressions.",
+      "status": "passed",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "qa/closed-loop/tests",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 42,
+      "suites": 1,
+      "passed_functions": [
+        "test_adding_portable_group_without_feature_binding_is_rejected",
+        "test_any_non_success_prerequisite_blocks",
+        "test_artifacts_cannot_escape_or_follow_symlinks",
+        "test_complete_current_revision_evidence_passes",
+        "test_cross_host_receipt_normalizes_checkout_path_but_not_platform_or_code",
+        "test_current_map_has_all_nineteen_requirements_and_real_case_bindings",
+        "test_deleting_a_checklist_item_cannot_make_full_gate_easier",
+        "test_device_obligation_cannot_be_satisfied_by_native_fixture_kind",
+        "test_duplicate_ids_and_unknown_fields_are_rejected",
+        "test_duplicate_json_keys_and_nonfinite_numbers_are_rejected",
+        "test_duplicate_json_keys_cannot_overwrite_failure_with_success",
+        "test_every_feature_keeps_all_three_evidence_tiers",
+        "test_excerpt_case_outside_compiled_boundary_cannot_borrow_group_pass",
+        "test_extra_versioned_package_manifest_cannot_change_compiled_recipe",
+        "test_failed_or_skipped_test_summaries_do_not_pass",
+        "test_feature_map_evidence_must_exist_and_match",
+        "test_feature_map_false_green_values_and_totals_block",
+        "test_full_run_requires_full_mode_and_completed_obligations",
+        "test_input_snapshot_detects_code_changes_and_excludes_archived_evidence",
+        "test_manifest_omission_hash_tampering_and_compiled_byte_tampering_fail",
+        "test_missing_artifact_blocks_even_when_jobs_succeed",
+        "test_missing_native_guard_blocks_despite_other_passing_tests",
+        "test_missing_native_suite_and_missing_case_are_errors",
+        "test_missing_or_changed_feature_obligation_blocks",
+        "test_missing_or_malformed_receipt_blocks",
+        "test_missing_unexpected_and_non_object_job_sets_block",
+        "test_native_filter_is_anchored_to_only_reviewed_map_suites",
+        "test_ordinary_helper_is_not_an_executed_test_declaration",
+        "test_pass_counts_do_not_turn_unimplemented_or_missing_obligations_green",
+        "test_python_skips_and_zero_cases_do_not_pass",
+        "test_real_swift_testing_and_node_summary_formats",
+        "test_removed_regression_guard_is_a_schema_failure",
+        "test_same_named_test_in_another_file_cannot_lend_its_pass",
+        "test_source_manifest_must_match_current_bytes",
+        "test_success_job_cannot_hide_skipped_or_missing_commands",
+        "test_swift_nonzero_empty_missing_or_ambiguous_summary_is_failure",
+        "test_tampered_test_log_blocks",
+        "test_test_paths_cannot_escape_repository",
+        "test_timeout_or_missing_tool_is_failed_command_with_log",
+        "test_workflow_covers_all_pushes_and_preserves_required_failures",
+        "test_wrong_revision_head_or_run_cannot_be_reused",
+        "test_zero_tests_is_not_green"
+      ],
+      "artifacts": [
+        {
+          "path": "closed-loop-selftests/test.log",
+          "sha256": "7cc0409722356a07784432b5acafc9b2c4d4162eac828c854687b51b45cd142c"
+        }
+      ],
+      "duration_seconds": 38.846
+    },
+    {
+      "id": "portable-polyglot",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Actual caption pipeline with fake recognizer and translator; no live listening.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-polyglot/polyglot",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 56,
+      "suites": 7,
+      "passed_functions": [
+        "aBacklogIsTranslatedInBatchesPerLanguage",
+        "aDiscardedUtteranceCannotShowAPartialLater",
+        "aFinalClearsItsOwnPartialAndLaterPartialsOfThatUtteranceAreRefused",
+        "aFinalNeverClearsTheNextUtterancesPartial",
+        "aLongMonologueCutStartsANewUtteranceNumber",
+        "aPartialCarriesTheIdOfTheLineItBecomes",
+        "aPartialThatAnswersAfterItsFinalWasQueuedIsDropped",
+        "aPhantomFinalRetiresItsUtterance",
+        "aRunBelowOneStillGetsAValidBlock",
+        "aStalePartialCannotReplaceANewerOne",
+        "anOlderRunsFinalNeverClearsTheNewRunsPartial",
+        "anOlderSettingsTaskCannotUndoTheLatestTarget",
+        "batchingGroupsByLanguageAndSplitsLongRuns",
+        "captionSizes",
+        "clearAndUnchangedDestinationSuppressDrainRecovery",
+        "clearDiscardsPendingRecognitionAndContinuesWithNewSpeech",
+        "clearDuringTranslationDiscardsTheOldAnswerBehindAnOrderedBarrier",
+        "detectedLanguageIsHandedBackToTheRecognizer",
+        "draining_run_caption_arriving_last_still_sorts_first",
+        "eachInputKeepsItsOwnUtterance",
+        "feedingInSmallPiecesGivesTheSameResult",
+        "finishWithNothingSaidReturnsAtOnce",
+        "flushClosesWhatWasBeingSaid",
+        "in_order_arrival_still_appends",
+        "inputsDoNotAffectEachOther",
+        "languageBadgesAndBases",
+        "linesFromTwoRunsStayDistinctInTheTranscript",
+        "linesOfALaterRunStartAboveTheEarlierOnes",
+        "longTalkGivesPartialsThenIsCut",
+        "microphoneDoesNotInheritTheRemoteSpeakersLanguage",
+        "missingPackAsksToDownloadAndTranslatesNothing",
+        "oneSentenceBecomesOneFinalAfterTheHangover",
+        "onlySettledEventsSurviveARunEnding",
+        "phantomCaptionsAreDropped",
+        "phantomTextNeverReachesTheCard",
+        "recoveryUsesStateAfterHandlingTheLastEvent",
+        "retargetKeepsOriginalsAndRecomputesWhichLinesNeedTranslation",
+        "runsOwnDisjointBlocks",
+        "sentenceIsTranscribedDetectedAndTranslated",
+        "shortBlipsAreDropped",
+        "silenceNeverStartsAnything",
+        "sourcesSayWhatTheyNeed",
+        "stoppingKeepsWhatEndedAndANewRunForgetsIt",
+        "targetChangeAppliesToTheNextSentence",
+        "targetChangedDuringPackCheckDoesNotLaunchTheStaleTranslation",
+        "targetChangedDuringTranslationDropsTheOldAnswerEvenAfterSwitchingBack",
+        "targetLanguageSpeechIsNotTranslated",
+        "targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes",
+        "trackerBelievesAStrongFirstGuessEvenWhenShort",
+        "trackerHoldsTheLanguageThroughNoise",
+        "transcriptKeepsOrderUpdatesAndCopiesAsText",
+        "trimming_drops_the_oldest_lines",
+        "twoSentencesApart",
+        "unsupportedPairSaysSo",
+        "updating_a_known_id_keeps_its_place",
+        "utterancesAreNumberedAndPartialsShareTheirFinalsNumber"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-polyglot/polyglot/validation-manifest.json",
+          "sha256": "b31dcbca40a6d03354d326c68582c7ae575e393bf567e3303e6f61f8afc91cb7"
+        },
+        {
+          "path": "portable-polyglot/test.log",
+          "sha256": "fa21b581a9b7975bdd098534ccb078a4554bf147952eedb37d9510d5949ba480"
+        }
+      ],
+      "package": "portable-polyglot/polyglot",
+      "duration_seconds": 50.426
+    },
+    {
+      "id": "portable-regressions",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Correction, vocabulary echo, offline DSP, typing and clock contracts; no native insertion, playback or capture.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-regressions/regressions",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 76,
+      "suites": 9,
+      "passed_functions": [
+        "aNewRecordingGetsANewOrigin",
+        "audioCannotStartSessionOrPrecedeFirstVideo",
+        "cancellationDuringFocusDelayPreventsSelectAllAndTyping",
+        "cancelledTurnNeverStartsRecovery",
+        "cleanHistoryReportsNoProblem",
+        "clearingRechecksFocusAfterSelectAll",
+        "cloudEnginesSayAudioLeavesAndUseExistingKeySlots",
+        "cloudIsNeverAnAutomaticFallback",
+        "cloudKeywordsDropWhatTheApisReject",
+        "corruptMetadataIsMovedAsideAndReported",
+        "disabledOrInvalidConfigurationPassesThrough",
+        "effectPreservesTimingAndDoesNotAddSoundOutsideSpeech",
+        "everyDotIsInBoundsWithPositiveRadiusAndClampedOpacity",
+        "everyEngineHasATitleDescriptionAndGroup",
+        "failedRetryPropagatesInsteadOfReturningTheSuspectPrompt",
+        "fallbackKeepsTheChosenEnginesWords",
+        "fallbackQuietlyUsesAppleWhenTheEngineHeardNothing",
+        "fallbackRetranscribesWhenAppleHadNoLiveWords",
+        "fallbackUsesAppleLiveWordsWithAToastWhenTheEngineFails",
+        "fasterWhisperIsLabelledSlowerOnMac",
+        "fibonacciDirectionsAreUnitVectors",
+        "focusDriftBetweenChunksStopsBeforeWritingIntoTheNewField",
+        "groupsSplitLocalFromCloud",
+        "hostUptimeDoesNotBecomeMovieLeadIn",
+        "identifiesWholePromptAndLoopedTerms",
+        "listeningIsNeverFullyFlatEvenInSilence",
+        "listeningUsesTheDefaultDotCount",
+        "literalKeepsTheWord",
+        "louderLevelsMakeTheWaveReachFurtherThanSilence",
+        "makeThatStillCorrects",
+        "malformedSamplesAndCursorTimesAreRejected",
+        "mergedVocabularyRestoresNameCasingButNotOrdinaryWords",
+        "noIMeantReplacesTheStaleWordBeforeInsert",
+        "nounUsesOfPointAndPeriodSurvive",
+        "onlyExplicitlyAttributedEventsRetainAgentOwnership",
+        "ordinaryActuallyKeepsEveryWord",
+        "ordinaryIMeanKeepsEveryWord",
+        "ordinarySorryKeepsEveryWord",
+        "ordinarySpeechDoesNotDecodeTwice",
+        "outputIsBoundedAndNonFiniteInputDoesNotPropagate",
+        "pausesStaySilentAtEveryIntensity",
+        "periodAtTheEndBecomesAStop",
+        "persistedEngineNamesStillDecode",
+        "polishTidiesSpacingAndCapitalises",
+        "prepareForInsertHandlesO19ScratchAndFillers",
+        "preservesShortAndOrdinaryDictionarySpeech",
+        "pruneNeverRunsFromAFailedLoad",
+        "pruneWorksOnceTheHistoryIsClean",
+        "quotedAndOrdinarySpeechArePreserved",
+        "recommendationBadges",
+        "recoveryUsesOnePromptFreeVadFreeLocalRetry",
+        "repeatedPhraseCanRestartTheClause",
+        "restartedPhraseStillCorrects",
+        "secondBackupNeverOverwritesTheFirst",
+        "selfCorrectActuallyAndIMeanAndFrenchEquivalents",
+        "selfCorrectDropsTheWordBeforeSorryAndSplicesWhatFollows",
+        "selfCorrectHasNoFalsePositives",
+        "selfCorrectLeavesOrdinaryTextAlone",
+        "selfCorrectMakeThatReplacesTheStaleValue",
+        "selfCorrectScratchThatDropsTheClauseBeforeIt",
+        "selfCorrectSwapsNumbersAroundNoAndNoWait",
+        "selfCorrectSwapsSpelledOutNumbersWithCommasAroundTheCue",
+        "silenceOnTheUnpromptedRetryDoesNotInsertTheDictionary",
+        "stableOwnershipReplacesAndClearsInOrder",
+        "statusLinesMatchThePicker",
+        "streamingChunksMatchOneContinuousBuffer",
+        "termsPutTheUsersWordsFirstThenTheBuiltInNames",
+        "textureFrequencyIsIndependentOfProviderSampleRate",
+        "theFrameMovesOverTime",
+        "unambiguousCommandsStillWork",
+        "unpromptedConfirmationKeepsGenuineDictionaryRecitals",
+        "whisperKitCLIArguments",
+        "whisperKitCLIOutputIsCleaned",
+        "whisperPromptIsAPunctuatedSentenceWithinBudget",
+        "workingAndListeningAreVisiblyDifferentPatterns",
+        "workingUsesItsOwnSmallerDotCount"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-regressions/regressions/validation-manifest.json",
+          "sha256": "6ede1ed7c6a75978637a70d805f320a235888c9934c802043b3a2ac4850baa4b"
+        },
+        {
+          "path": "portable-regressions/test.log",
+          "sha256": "9e749392c22d12cd9bafdfd0b1d46972700de451d59efa708be74251490a124e"
+        }
+      ],
+      "package": "portable-regressions/regressions",
+      "duration_seconds": 26.773
+    },
+    {
+      "id": "portable-scribe",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact selected admission, transcript, session and presentation code plus bounded pure excerpts; not ingress or speaker quality proof.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-scribe/scribe",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 151,
+      "suites": 15,
+      "passed_functions": [
+        "aBrowserUsingTheMicWithoutACallTitleIsUnknown",
+        "aCallIsReportedAsTheReasonOnlyForACompleteScanWithAnIdentityOrBrowserDoubt",
+        "aCapturingBrowserWithoutReadableTitlesIsUnknownButAnIdleOneIsNot",
+        "aFullyReadScanWithOnlyIdleExternalAppsIsEmptyAndPositive",
+        "aMissingWindowNumberStillKeepsIdenticalTitlesApart",
+        "aMutedOrUnreadableDeviceNeverReadsUnmuted",
+        "aNativeAppPlusABrowserCallListsBoth",
+        "aNativeCallAppIsAnIdentityOnlyWhileItCapturesTheMic",
+        "anIncompleteScanIsUnknownNeverUnmuted",
+        "anOldCompletionCannotBeDisplayedForAnotherProjectOrAfterExpiry",
+        "anUnknownActiveMicrophoneOwnerFailsClosedWithoutInventingACall",
+        "anUnknownInputDoesNotHideKnownCallEvidence",
+        "anUnreadableProcessMakesTheScanIncomplete",
+        "anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition",
+        "anyDetectedCallIsUnknownSoAccessibilityCanNeverAdmitTheMicrophone",
+        "audioFromPermissionSetupIsNotReplayedIntoTheMeeting",
+        "bothProductionSourcesUseTheSameTemporalContract",
+        "breatheEndpoints",
+        "breathingBandStaysInItsRangeForAsLongAsWritingLasts",
+        "browserTitlesDecideCallOrNoCall",
+        "browserUncertaintyIsUnknown",
+        "callDetectedWithoutSlot",
+        "cancelFromEveryActivePhase",
+        "cancelOrFailOnTerminalSessionIsInvalid",
+        "captureEndedMovesToProcessingFromRecordingAndEnding",
+        "closestEligibleSlotWins",
+        "commandsOnIdleMachineAreStale",
+        "completeAnnouncesNotesReadyAtRevealStart",
+        "completionSurgesRevealsThenExpires",
+        "contendedCallbackReturnsWithoutTouchingSamples",
+        "countdownExpiryAloneDoesNotEndCapture",
+        "dismissedCallAppIsNotOfferedAgain",
+        "dismissedSlotIsSkipped",
+        "distinctBrowserWindowsWithIdenticalTitlesAreDistinctIdentities",
+        "dropReasonDistinguishesMutedFromUnknown",
+        "emptyTextIsIgnored",
+        "emptyTranscriptGivesHonestEmptyNotes",
+        "emptyTranscriptHasNoSpeakers",
+        "endedSlotIsNotOffered",
+        "everyKnownCallAppCapturingTheMicIsAnIdentity",
+        "everyStateHasAccessibilityLabelAndValue",
+        "exitDuringManualConfirmationIsConsumedWhenTheUserKeepsRecording",
+        "explicitStopWaitsNineSecondsAndEmitsOnlyOneStopRequest",
+        "exportsToMeetingTranscriptWithFinalSegmentsOnlyByDefault",
+        "externalOwnerDisappearanceAndRecordingRestartCannotUnmute",
+        "extractiveGenerationFindsDecisionsActionsAndSummary",
+        "failEmitsReasonAndStopsActivity",
+        "failedFinalSaveCannotRevealCompletionAndExactPayloadCanBeRetried",
+        "failureCarriesItsReasonAndCancelReturnsToIdle",
+        "finalReplacesProvisionalAndThenLocks",
+        "finalizeRejectsLateSegmentsAndDoesNotPromoteProvisional",
+        "finalizedTranscriptNeverFeedsUnresolvedTextToNotes",
+        "finishDrainsInFlightDeliveryBeforeTranscriberFinishAndClosesAdmission",
+        "finishNotifiesTranscriberForActiveSession",
+        "firstAppearanceOrderIsKept",
+        "framesAfterFinishAreRejectedAndFinishIsIdempotent",
+        "freshEvidenceCannotEraseTheReportOfPreviouslyWithheldAudio",
+        "freshEvidenceIsServedAndExpiredEvidenceIsUnknown",
+        "fullLifecycleEmitsEventsInOrder",
+        "gateIsPureAndFailsClosedOnUnknown",
+        "glowHeightStaysInUnitRange",
+        "glowStageFollowsState",
+        "invalidClocksNeverRevealSuccessOrNonfiniteFrames",
+        "invalidProcessIdentityNeverBindsButManualStopStillWorks",
+        "invalidTimesAreRejected",
+        "keepRecordingIsOnlyValidInEnding",
+        "keepingAtTheDeadlineSuppressesDuplicateAppExitButExplicitStopCanRearm",
+        "keywordsMatchWholeWordsOnly",
+        "lateExternalOwnerEvidenceStillLatchesAgainstAFresherEmptyScan",
+        "lateProvisionalNeverOverwritesFinal",
+        "lineWithDecisionAndActionKeywordsYieldsBoth",
+        "lonelySpeakerWithNoTalkTimeIsHidden",
+        "machineEventsMapToPresentationInOrder",
+        "measuredConstantsMatchTheReference",
+        "meetingFixtureIsHonest",
+        "mergingEmptyGeneratedNotesStillKeepsPrivateNotes",
+        "micIndicatorFailsClosed",
+        "missingClockNeverPulses",
+        "missingOrFutureEvidenceIsUnknown",
+        "muteChangeTakesEffectOnVeryNextFrame",
+        "mutedAndUnknownMicFramesReachNeitherStoreNorTranscriber",
+        "mutedUnknownExpiredAndInvalidTimingNeverInvokeTheCopy",
+        "negativeGraceIsClampedToZero",
+        "negativeLengthCountsAsZero",
+        "nonfiniteNegativeAndUnrepresentableClocksCannotArmOrComplete",
+        "notRecordingIsInactive",
+        "notesSwapInBeneathTheWashNotBefore",
+        "oneReadableWindowPlusOneUnreadableWindowIsUnknown",
+        "onlyAcknowledgedFreshEvidenceCanTouchSampleMemory",
+        "onlyTheExactBoundProcessInstanceCanStartAutomaticConfirmation",
+        "otherSessionSegmentsAreRejected",
+        "ownProcessesAreIgnored",
+        "partialExportRequiresAttentionAndNeverEmitsWholeExportSuccess",
+        "persistencePrecedesTheOnlyCompletionEvent",
+        "placeholderIsNotWords",
+        "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput",
+        "previewReplacesPlaceholderThenFinalReplacesPreview",
+        "privateNotesSurviveRegenerationByteForByte",
+        "processingNeverBecomesSuccessBecauseTimePasses",
+        "provisionalLinesAreIgnored",
+        "provisionalUpsertReplacesInPlace",
+        "pulseIsSlowAndWellSampled",
+        "recordingBeginsOnlyAfterAcknowledgement",
+        "recordingSuppressesEveryPrompt",
+        "recordlyRecordingBreathes",
+        "reduceMotionHasStaticBandAndNoSurge",
+        "reduceMotionIsSteady",
+        "reduceTransparencyEliminatesFrost",
+        "reducedMotionIsStaticWhileStatusRemainsReadable",
+        "refreshStartsWhenStaleAndNotWhileOneIsFreshlyInFlight",
+        "regenerationPreservesDoneFlagForUnchangedActionItem",
+        "replacingTheSessionRejectsEveryOldCommandAndNotification",
+        "restartingSameActiveIDIsInvalid",
+        "revealingOnlyAfterNotesReadyAndEndsByRevealClock",
+        "riseIsMonotonicAndReachesQuarterHeight",
+        "segmentsAreOrderedByStart",
+        "setActiveSessionWaitsForInFlightDeliveryAndNoOldFrameReachesSinksAfterward",
+        "speakerMappingFollowsSource",
+        "spokenElapsedMatchesClockRounding",
+        "staleCommandsAreRejectedWithoutChange",
+        "staleOrUnfinalizedSessionCannotWriteOrComplete",
+        "staleSessionFramesAreDroppedFromBothSinks",
+        "startAfterTerminalSessionEmitsNoCancel",
+        "startWhileActiveReplacesAndCancelsOldSession",
+        "steadyEqualsTodaysDot",
+        "stopClosesAdmissionAndStaleShutdownCannotCloseANewSession",
+        "stopHintPromisesNothing",
+        "storeFailureStillFeedsTranscriberAndIsCounted",
+        "surgeExistsOnlyInTheRevealStage",
+        "surgeRisesMonotonicallyToFullThenHoldsThenClears",
+        "switchingActiveSessionMakesOldFramesStale",
+        "systemAudioIsIndependentOfMute",
+        "systemIndicatorFollowsFrames",
+        "talkTimeFormatsAsMinutesAndSeconds",
+        "talkTimeSharesAndCountsPerSpeaker",
+        "theExcludedNoticeSaysWhatHappenedAndWhatIsStillRecorded",
+        "tickOutsideEndingIsInvalid",
+        "tickerTailKeepsTheNewestWords",
+        "topBarRecordingStateCoversRecordingAndConfirm",
+        "transcriptUpdatesAreRejectedBeforeRecordingAndAfterComplete",
+        "twoBrowserCallWindowsAreTwoIdentities",
+        "twoBrowserWindowsWithIdenticalTitlesAreTwoIdentities",
+        "unknownTimingAndUnacknowledgedCaptureFailClosed",
+        "unmatchedPreviewSpeakerIsNotYou",
+        "unmutedMicFramesReachBothSinks",
+        "upcomingSlotWinsOverBareCallDetection",
+        "upcomingWindowEdges",
+        "writingGlowIsContinuousThroughTheRecede",
+        "writingPersistsUntilNotesReadyNoMatterHowLongItTakes",
+        "zeroIdentitiesOnACompleteScanWithAnUnmutedDeviceIsAdmitted",
+        "zeroLengthSegmentsShareByCount"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-scribe/scribe/validation-manifest.json",
+          "sha256": "c975908caec931a839cc67e01bd169a73e45d4760e03c87869883855d923de82"
+        },
+        {
+          "path": "portable-scribe/test.log",
+          "sha256": "0e06a2390bfdcaec682a1e37b7fd39664f3cc5604c716707dae0ebed46ecb941"
+        }
+      ],
+      "package": "portable-scribe/scribe",
+      "duration_seconds": 48.775
+    },
+    {
+      "id": "portable-presentation",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact selected walkthrough, numeric and speech timeline contracts; not native event injection or renderer.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-presentation/presentation",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 16,
+      "suites": 3,
+      "passed_functions": [
+        "aClickOrKeyCancelsTheRest",
+        "aMalformedExplicitRefCannotBecomeUntargetedTyping",
+        "dictateTextReportDrawsTheIdentityWithoutDollarSigns",
+        "doubleClickOnlyAdvancesItsOriginalStepOnce",
+        "goingBackDoesNotRevalidateAnOldTimer",
+        "hugeSerializedCoordinatesAreRejectedWithoutAnIntegerTrap",
+        "invalidCoordinatesCannotDowngradeTargetedTypingToCurrentFocus",
+        "lateClickCannotAdvanceAReplacementTourAtTheSameIndex",
+        "lateWordTimingsCannotReviveACancelledDrawing",
+        "nonfiniteWaitAndToggleInputsAreRejected",
+        "realWordTimesReplaceTheEstimate",
+        "screenNumbersMustBePositiveRepresentableIntegers",
+        "scrollingIsBoundedToTheNativeSigned32BitInput",
+        "signedIntegralCoordinatesAndNumericStringsRemainSupported",
+        "stoppedAndEmptyToursCannotAdvance",
+        "threeStepsShareAOneSecondUtteranceWithoutStartingTogether"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-presentation/presentation/validation-manifest.json",
+          "sha256": "d1e794b4ebf84161b8648b1af3fe4934ff778c8ca524f6cfb711f7b5bb625ca0"
+        },
+        {
+          "path": "portable-presentation/test.log",
+          "sha256": "7d17adeed1ec2da67bd8bee689f4f8419e25314a3ea77d710f0d742f70918f44"
+        }
+      ],
+      "package": "portable-presentation/presentation",
+      "duration_seconds": 22.408
+    },
+    {
+      "id": "portable-recordly-geometry",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Real crop/follow planning; Linux geometry import reexport only; not exported pixels or native cursor capture.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-recordly-geometry/recordly-geometry",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 31,
+      "suites": 2,
+      "passed_functions": [
+        "cropFlipsYAndClampsToFrame",
+        "cropInsideRegionIsFullyZoomed",
+        "cropOffsetsByCursorSpaceOrigin",
+        "cropOutsideRegionIsFullFrame",
+        "cropWithoutCursorSpaceDoesNotZoom",
+        "cursorSpaceFlipsIntoAppKitPoints",
+        "cursorSpaceRejectsUnverifiedFrames",
+        "easingBoundsAndMidpoint",
+        "easingIsMonotonicOnRampUp",
+        "exportedZoomFollowsTheSmoothedPath",
+        "fileNameFormatAndSafety",
+        "followPreferenceSurvivesRoundTripAndOldProjectsDecode",
+        "gifCapsAtThirtySecondsAndSixHundredFrames",
+        "gifFrameCountFollowsRate",
+        "gifScheduleHasAtLeastOneFrameAndRejectsBadRate",
+        "longRecordingsKeepABoundedPath",
+        "missingOrMismatchedSpaceDoesNotZoom",
+        "offCenterZoomMapsThroughProductionPath",
+        "offCenterZoomScalesToVideoPixels",
+        "outputDirectoryIsUnderMovies",
+        "pathIsContinuousAndRejectsNonFiniteSamples",
+        "pendingSpaceCompletesWithVideoSize",
+        "pendingSpaceIsDroppedWhenDisplayMoved",
+        "shortRegionStaysContinuousAndBelowFull",
+        "sizes16x10",
+        "sizes16x9",
+        "sizesAreEvenAndRejectBadSources",
+        "sizesPortrait",
+        "trimClampsToDuration",
+        "trimDefaultsToFullDuration",
+        "trimRejectsEmptyOrInvertedRanges"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-recordly-geometry/recordly-geometry/validation-manifest.json",
+          "sha256": "95aa24f83732e76343d597c49b9f56ddd1449e8dda13a8275ba7a4fefe9d365c"
+        },
+        {
+          "path": "portable-recordly-geometry/test.log",
+          "sha256": "418f35f6fbf1915378c574d91d9ad96d1ca66cca5ab5afe0403aca517ad7ce47"
+        }
+      ],
+      "package": "portable-recordly-geometry/recordly-geometry",
+      "duration_seconds": 29.509
+    },
+    {
+      "id": "portable-wiki-relationships",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Exact compiler, connection and recap navigation policy; temporary synthetic data, no personal vault.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-wiki-relationships/wiki-relationships",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 14,
+      "suites": 2,
+      "passed_functions": [
+        "aSourceOfAnotherKindIsNotTheSameEvidence",
+        "ambiguousMissingSelfAndUnsupportedLinksAreNotConnections",
+        "compiledPagesBecomeConnectedByAnExplicitEditedLink",
+        "deletingAnExplicitTargetRemovesBothDirectionsWithoutChangingTheDraft",
+        "duplicateSourcesAndPagesDoNotInflateConnections",
+        "everyActivePhaseRefusesSavedSourceNavigation",
+        "exactIDsDisambiguateTitlesAndReciprocalLinksKeepTheirDirection",
+        "existingSourcesLeaveOnlyTerminalStagesBeforeOpening",
+        "forgettingRemovesEdgesAndPreservesReviewRequirements",
+        "generatedMeetingTextAndUnreviewedForgottenTextCannotCreateLinks",
+        "missingAndForgottenEvidenceNeverResurrectsEditedSources",
+        "missingOrCancelledSourcesNeverCloseTheCurrentNotes",
+        "relationshipsHaveStableEvidenceAndPageOrdering",
+        "sharedCurrentSourceIDsAreTheOnlyEvidence"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-wiki-relationships/wiki-relationships/validation-manifest.json",
+          "sha256": "9f626175e36ff6ce3a5081519fb7293cb0b834b15a4f5624395d01265cae26b1"
+        },
+        {
+          "path": "portable-wiki-relationships/test.log",
+          "sha256": "6e580ae140e184712fc3800ac2042d39827da1311c3f5118aadc81d8286565bf"
+        }
+      ],
+      "package": "portable-wiki-relationships/wiki-relationships",
+      "duration_seconds": 27.615
+    },
+    {
+      "id": "release-mocks",
+      "kind": "release-mocks",
+      "tier": "contract",
+      "scope": "Fake signing/notary/install tools and throwaway bundles; no Developer ID, real notarization, Gatekeeper or installation.",
+      "status": "passed",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "qa/release-scripts/test_release_scripts.py"
+      ],
+      "exit_code": 0,
+      "tests": 13,
+      "suites": 1,
+      "passed_functions": [
+        "test_ad_hoc_bundle_remains_available_for_local_validation",
+        "test_developer_id_bundle_uses_secure_timestamps",
+        "test_failed_backup_does_not_replace_installed_copy",
+        "test_failed_image_keeps_previous_dmg",
+        "test_failed_install_restores_previous_copy",
+        "test_installer_keeps_verified_rollback",
+        "test_preview_is_explicitly_not_a_release",
+        "test_rejected_notarization_never_staples_or_publishes",
+        "test_release_assesses_app_and_dmg_before_publication",
+        "test_release_requires_identity_and_profile_before_build",
+        "test_running_app_is_not_replaced",
+        "test_signature_checks_fail_closed",
+        "test_test_defaults_cleanup_reaches_matching_domains_only"
+      ],
+      "artifacts": [
+        {
+          "path": "release-mocks/test.log",
+          "sha256": "544fb6c86708b1861a64f76a11ff3dfda70689b50341097c70d2184d81c6ca29"
+        }
+      ],
+      "duration_seconds": 5.992
+    },
+    {
+      "id": "native-DictationOwnershipIntegrationTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual delivery/turn seams with fake closures, no OS typing or pasteboard.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-PolyglotPinTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual NotchController dismissal model with explicit pin closure; no capture or translation.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-RecorderPillTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual pill timer formatting only; no animation parity.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-BrainCaptureModelTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual app preview/save model with injected temporary selected vault; no personal vault.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-UltronVoiceEffectTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual native wrapper on generated sample arrays; no audio playback.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-EngineBrandLogoTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Bundled asset resolution and offscreen SwiftUI rendering; no screen capture or visual parity claim.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-OnboardingTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual onboarding state and bundled media metadata, injected sounds; not whole-app interaction acceptance.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-PermissionsCaptureTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Injected permission ports; no real camera/screen request or capture.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-RecordlyExportValidationTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "AVFoundation rejects missing/invalid synthetic media; does not prove successful export.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-RecordlyCheckpointStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual Darwin filesystem confinement and large sparse checkpoint fixtures under temporary roots.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-RecordlyExportFilesTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual Darwin exclusive export publication in temporary roots.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-RecordlyDebugWiringTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual debug dispatch with fake handler; no real recorder.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "missing-F01-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Recognize public/prerecorded multilingual speech through actual engine; insert/correct only in disposable focused fixture, interrupted/offline and cross-turn cases. Keep transcript, focus events and exact model/binary hashes.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Automated recognizer-to-focused-field corpus and cross-turn rewriting acceptance are not implemented."
+    },
+    {
+      "id": "missing-F02-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Drive native controller with injected dual-source audio, ASR/diarizer, clock and temporary persistence; assert ordered session events and durable recap.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No complete native dual-source/controller fixture exists."
+    },
+    {
+      "id": "missing-F02-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Synthetic known speakers/overlap through real supported audio and recognizer adapters; measure diarization against labeled ground truth and retain trace.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No device/engine speaker-quality receipt or complete automated fixture runner exists."
+    },
+    {
+      "id": "missing-F03-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject permission, mute, owner and timestamp transitions at actual callback ingress; forbidden payload never enters ring, recognition or storage.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Production admission-before-copy helper has synthetic contract tests; actual OS callback-to-ring/ASR/storage integration still lacks a native fixture."
+    },
+    {
+      "id": "missing-F03-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated trace over mute/unmute/unknown transitions and every supported call adapter; zero forbidden payload at each stage. Owner OS consent required for any real capture.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Strict literal no-capture guarantee and supported mute evidence are not yet proven."
+    },
+    {
+      "id": "missing-F04-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject calendar/clock/session and activate actual popup Start once; assert one session, screen placement and refreshed headline.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native popup automation fixture is absent."
+    },
+    {
+      "id": "missing-F04-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated disposable calendar permission denial/grant, display changes, focus restoration and one-tap launch trace.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No automated permission/calendar/display acceptance runner."
+    },
+    {
+      "id": "missing-F05-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Native temporal render sequence of start/level/stop/interruption and mini-window transitions, compared to authorized motion reference with frame pacing/reduced-motion thresholds.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No temporal reference baseline or automated native motion comparator; still screenshots cannot pass."
+    },
+    {
+      "id": "missing-F06-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject verified call-end/resume events and clock through actual controller; countdown supports Keep recording/End now and one stop, then saved note.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Verified call lifecycle integration fixture is not implemented."
+    },
+    {
+      "id": "missing-F06-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Actual countdown and completed note window traces for session replacement, resumed call, write failure and retry; no idle-mic heuristic as call end.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No automated native window/lifecycle acceptance receipt."
+    },
+    {
+      "id": "missing-F07-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Drive both actual Recordly and Meetings top bars through start/record/settle/complete/failure; old-session events cannot animate current session.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Production shared feedback model/view exists with contract tests; both actual native controllers/views still need end-to-end integration fixtures."
+    },
+    {
+      "id": "missing-F07-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Temporal frames and event trace for both producers, interruption and reduced motion; readable stable top-bar layout and no completion before persistence.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No automated native temporal acceptance runner."
+    },
+    {
+      "id": "missing-F08-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated public animation capture after owner consent; export MP4/GIF trim/speed/aspect/fps, decode frames/audio timing and compare cursor-follow motion; cancellation and >512MiB playback.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Successful native capture/render/playback acceptance not yet implemented; no region coordinate proof."
+    },
+    {
+      "id": "missing-F09-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Production companion/drawing/speech/guided-target fixtures exercise P0-P7, timing and cancellation; no physical pointer or typing outside disposable injected sink.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Complete actual renderer/controller P0-P7 integration tests do not exist."
+    },
+    {
+      "id": "missing-F09-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated native multi-display/scale/Spaces/removal traces, velocity continuity, speech-to-drawing motion and exact targets; optional physical actions remain disabled by default.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No complete automated native screen geometry and reference temporal comparison."
+    },
+    {
+      "id": "missing-F10-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated meeting/preference/lesson/todo learning through UI, source-linked graph and selected/previewed MCP delivery to disposable Obsidian vault with idempotency, durable retry and exact readback.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Unified learning/graph/MCP end-to-end acceptance is incomplete; local file-save tests are not MCP proof."
+    },
+    {
+      "id": "missing-F11-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Authorized voice corpus, real TTS adapter output (offline files), pronunciation/latency/loudness, long replies and interruption/fallback; reproducible delivery evaluation.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No native/provider voice quality and playback acceptance fixture or reference baseline."
+    },
+    {
+      "id": "missing-F12-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated light/dark/hover/pressed/focus/disabled/copied and volume/tab/orb interaction traces, keyboard/VoiceOver/small-display contrast; distributable logo provenance.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No complete native interaction/a11y runner or resolved distribution provenance for every legacy asset."
+    },
+    {
+      "id": "missing-F13-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated disposable-account onboarding, denied/revoked permissions, every tab/settings route, daily workflow, crash/relaunch, offline/provider/storage failure and accessibility acceptance on exact binary.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No complete automated UI daily-journey runner. Manual clickthrough cannot fill this obligation."
+    },
+    {
+      "id": "missing-S01-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Inject actual watcher snapshot, native capture/controller callbacks and ASR partials into visible recording UI.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native watcher-to-live-text synthetic fixture not implemented."
+    },
+    {
+      "id": "missing-S01-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated known idle browser/Zoom versus active mic owners, stale/unknown ownership, live text and UI transition traces on supported OS.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No actual mic-owner/device/live-UI acceptance receipt."
+    },
+    {
+      "id": "missing-S02-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Feed prerecorded fixtures through real native recognizer/translation adapter and actual controller; pack-needed/unsupported errors remain honest.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No native recognizer/translation controller fixture runner."
+    },
+    {
+      "id": "missing-S02-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Actual installed model/translation pack corpus on supported macOS, both input streams, repeated target changes and latency trace.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No supported-device/model/pack acceptance receipt."
+    },
+    {
+      "id": "missing-S03-contract",
+      "kind": "unimplemented",
+      "tier": "contract",
+      "scope": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No isolated portable pin contract; native dismissal model is separately executable."
+    },
+    {
+      "id": "missing-S03-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated actual bar pin/Stop/dismiss/reopen/unpin/tab-switch event sequence, accessibility target availability and no leaked listening session.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native model tests do not execute Stop or actual visible UI interactions."
+    },
+    {
+      "id": "missing-S04-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated permission-delay/rapid Start-Stop/no-frame/display-disconnect/cancel/retry and decoded MP4/GIF; region feature must remain unavailable until recorded coordinate proof exists.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native capture startup/export acceptance missing; region proof not supplied."
+    },
+    {
+      "id": "missing-S05-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Actual controller receives verified call-ended event, single countdown/stop, persisted recap and completed window; replay/retry/late callback coverage.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "End-call adapter/window native synthetic integration coverage incomplete."
+    },
+    {
+      "id": "missing-S05-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Automated actual countdown/completion window and source-linked recap sequence, including resumed call and storage failure; compare authorized reference timing.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No native temporal acceptance runner or device receipt."
+    },
+    {
+      "id": "missing-S06-native",
+      "kind": "unimplemented",
+      "tier": "native-integration",
+      "scope": "Build and bundle exact source; verify executable/resources/entitlements and upgrade/rollback against disposable app destination.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No actual release artifact integration fixture; ad-hoc preview is not a release."
+    },
+    {
+      "id": "missing-S06-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Developer ID signature+secure timestamp+runtime, accepted notarization, stapled app/DMG, Gatekeeper clean-machine launch and rollback; exact app/DMG hashes, licenses/assets/version and commercial gating settled.",
+      "status": "unimplemented",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "No signing identity/notary/clean-Mac proof or completed commercial readiness decision; no placeholder receipt accepted."
+    },
+    {
+      "id": "portable-buddy",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Actual companion pointing, flight and coordinate math; Linux Foundation geometry shim, no native display or renderer proof.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-buddy/buddy",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 20,
+      "suites": 2,
+      "passed_functions": [
+        "changingAnotherDisplayDoesNotShiftThisTarget",
+        "companionNeverDrivesTheSystemPointer",
+        "displayMoveShiftsTheFlightAndUnplugDoesNot",
+        "enablingReducedMotionMidLabelDoesNotWaitForTheNextCharacterDeadline",
+        "flightStaysInsideTheControlHullAndTheAngleDoesNotJump",
+        "movingDisplayAfterArrivalMovesTheLabelTargetAndRingTogether",
+        "movingDisplayDuringFlightKeepsLandingAndPointingAtTheSameTarget",
+        "nextClickClearsTheRing",
+        "normalLabelKeepsItsDelayAndEmptyLabelsAreAlreadyComplete",
+        "presentProbeReportsTheFixture",
+        "reducedMotionShowsTheWholeUnicodeLabelAtArrival",
+        "reducedMotionSkipsTheArc",
+        "restSpotIsThirtyFiveRightAndTwentyFiveDown",
+        "retargetKeepsTheCurrentPointAndReturnKeepsTheLandingTangent",
+        "ringOnANegativeDisplayUsesThatDisplaysOverlay",
+        "ringSnapsToTheAXFrameNotThePixelGuess",
+        "sixHundredPointFlightIsSevenHundredFiftyMilliseconds",
+        "snapPrefersTheSmallestFrameThatContainsThePoint",
+        "springKeepsVelocityAndSettles",
+        "unpluggingTheTargetDoesNotAdoptAReplacementDisplayAtTheSameCoordinates"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-buddy/buddy/validation-manifest.json",
+          "sha256": "c7900ffd7362786d9989e0aeb535e40827dfa1a74770b52f3c5df660b6498774"
+        },
+        {
+          "path": "portable-buddy/test.log",
+          "sha256": "8b6a9e461480c986fcf4875b6d62d0e099f742fb90fed20140675415946ca1f9"
+        }
+      ],
+      "package": "portable-buddy/buddy",
+      "duration_seconds": 31.846
+    },
+    {
+      "id": "portable-dictation-insertion",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Actual receipt/replacement flow with injected native read/write ports; no real focused field or OS event proof.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-dictation-insertion/dictation-insertion",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 17,
+      "suites": 1,
+      "passed_functions": [
+        "acknowledgmentRequiresExactNativeReadback",
+        "cancellationBeforeSelectionDoesNothing",
+        "cancellationInsideInspectionCannotReachSelection",
+        "cancellationWhileAwaitingReadbackNeverRenewsReceipt",
+        "delayedReadbackIsBoundedAndDoesNotRepeatMutation",
+        "explicitLeadingCommandHasWholeTurnSemantics",
+        "failedSelectionDoesNotCallTextSetter",
+        "focusDriftOrCancellationAfterSelectionCannotWrite",
+        "onlyProvenPlainEditableRolesSupportReceipts",
+        "sameFieldWholeTurnReplacementAcknowledgesAndCanCorrectAgain",
+        "selectionReplacementOrInvalidOffsetsNeverEarnReceipt",
+        "setterFailureIsUnconfirmedNeverRetries",
+        "stateChangedDuringReadbackCannotAcknowledgeStaleTurn",
+        "utf16ReadbackHandlesEmojiAndCombiningMarks"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-dictation-insertion/dictation-insertion/validation-manifest.json",
+          "sha256": "3393aebc98703844f04b5fb4137bb5b374198ff31b7d5548e771be4fbfd6c595"
+        },
+        {
+          "path": "portable-dictation-insertion/test.log",
+          "sha256": "7ddbf24ae3c027cd949f2a61ade1afc292c8617e520c0856485db7e70763b259"
+        }
+      ],
+      "package": "portable-dictation-insertion/dictation-insertion",
+      "duration_seconds": 19.759
+    },
+    {
+      "id": "portable-wiki-export",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Actual selected export transaction, MCP protocol and confined filesystem with synthetic temporary vault and injected transport. Independent process checks included only when their named test executes; no personal vault.",
+      "status": "passed",
+      "command": [
+        "swift",
+        "test",
+        "--package-path",
+        "/workspace/zeus-validation/closed-loop-development-final/portable-wiki-export/wiki-export",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "tests": 26,
+      "suites": 2,
+      "passed_functions": [
+        "abandoningStaleRecoveryErasesDraftWithoutAnotherWrite",
+        "bundledHelperCompletesInteractiveMCPRoundTrip",
+        "cancelledHandshakeClosesTheChildProcess",
+        "changedReadbackIsAConflictAndNeverReplaced",
+        "collisionsNeverOverwriteAnExistingNote",
+        "corruptRecoveryRecordBlocksReplacement",
+        "emptyMissingAndTooManySelectionsAreRejected",
+        "explicitWritableDestinationIsRequired",
+        "forgettingErasesPendingContentAndBlocksRecovery",
+        "handshakeTimeoutClosesTheChildProcess",
+        "hardlinkedUUIDNoteCannotExposeAnUnrelatedFile",
+        "immutableRevisionAndDestinationAreRechecked",
+        "incompatibleDiscoveryAndChangedReviewPerformNoWrites",
+        "lostCreateReplyRequiresReadOnlyReconciliationAndNeverDuplicates",
+        "missingReadbackPermitsOnlyTheSameImmutableRetry",
+        "olderReceiptCannotMasqueradeAsANewFailedExport",
+        "oversizedPreviewIsRejected",
+        "protocolRequiresHandshakeAndAcceptsOnlyBoundedTools",
+        "readbackDoesNotCreateFoldersAndCreateIsExactAndIdempotent",
+        "realProtocolSelectionTransactionVerifiesAndErasesRecoveryBytes",
+        "rootReplacementIsRejected",
+        "selectionPreviewContainsOnlyReviewedPagesAndStableProvenance",
+        "sensitiveReviewCannotBeSkipped",
+        "sourceReviewForgettingAvailabilityAndSettingsFailClosed",
+        "symbolicInboxAndFileLinksCannotRedirectWritesOrReads",
+        "traversalHiddenAndAbsoluteInboxPathsAreRejected"
+      ],
+      "artifacts": [
+        {
+          "path": "portable-wiki-export/wiki-export/validation-manifest.json",
+          "sha256": "e88e54ee0c384a2022a8f277926cc97c0da86200c8cdd269b7c8ee6c66d61d5b"
+        },
+        {
+          "path": "portable-wiki-export/test.log",
+          "sha256": "f0d3669bbc88524d6f0ebcb12084e4eb6bf2774a80a66d6796fee933d85a3481"
+        }
+      ],
+      "package": "portable-wiki-export/wiki-export",
+      "duration_seconds": 38.878
+    },
+    {
+      "id": "native-ScribeLifecycleScenarioTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual ScribeController with fake capture/notes, synthetic temp persistence and clock; no real capture, permission, end windows or device proof.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "native-RecordingFeedbackRenderTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual production SwiftUI frame renderer evaluated at fixed synthetic times to PNG/GIF artifacts, no desktop capture. Does not prove native controller timing, frame pacing or reference parity.",
+      "status": "not-run",
+      "command": [],
+      "exit_code": null,
+      "tests": 0,
+      "suites": 0,
+      "passed_functions": [],
+      "artifacts": [],
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    }
+  ],
+  "features": [
+    {
+      "id": "F01",
+      "title": "Reliable dictation and explicit self-correction",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F01.receipt",
+          "check": "portable-dictation-insertion",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F01.1",
+          "check": "portable-regressions",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F01.2",
+          "check": "native-DictationOwnershipIntegrationTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F01.3",
+          "check": "missing-F01-device",
+          "status": "unimplemented",
+          "reason": "Automated recognizer-to-focused-field corpus and cross-turn rewriting acceptance are not implemented."
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "title": "Native Meetings recording, transcription and speaker identification",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F02.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F02.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F02.2",
+          "check": "missing-F02-native",
+          "status": "unimplemented",
+          "reason": "No complete native dual-source/controller fixture exists."
+        },
+        {
+          "id": "F02.3",
+          "check": "missing-F02-device",
+          "status": "unimplemented",
+          "reason": "No device/engine speaker-quality receipt or complete automated fixture runner exists."
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Strict mute protects every capture and transcription stage",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F03.ingress",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F03.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F03.2",
+          "check": "missing-F03-native",
+          "status": "unimplemented",
+          "reason": "Production admission-before-copy helper has synthetic contract tests; actual OS callback-to-ring/ASR/storage integration still lacks a native fixture."
+        },
+        {
+          "id": "F03.3",
+          "check": "missing-F03-device",
+          "status": "unimplemented",
+          "reason": "Strict literal no-capture guarantee and supported mute evidence are not yet proven."
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "title": "Upcoming meeting popup with one-tap start",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F04.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F04.2",
+          "check": "missing-F04-native",
+          "status": "unimplemented",
+          "reason": "Native popup automation fixture is absent."
+        },
+        {
+          "id": "F04.3",
+          "check": "missing-F04-device",
+          "status": "unimplemented",
+          "reason": "No automated permission/calendar/display acceptance runner."
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "title": "Recording animation, pill and mini-window motion parity",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F05.rendered-feedback",
+          "check": "native-RecordingFeedbackRenderTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F05.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F05.2",
+          "check": "native-RecorderPillTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F05.3",
+          "check": "missing-F05-device",
+          "status": "unimplemented",
+          "reason": "No temporal reference baseline or automated native motion comparator; still screenshots cannot pass."
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "title": "End-call countdown then completed note",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F06.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F06.countdown",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F06.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F06.2",
+          "check": "missing-F06-native",
+          "status": "unimplemented",
+          "reason": "Verified call lifecycle integration fixture is not implemented."
+        },
+        {
+          "id": "F06.3",
+          "check": "missing-F06-device",
+          "status": "unimplemented",
+          "reason": "No automated native window/lifecycle acceptance receipt."
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "title": "Transcript and completion glow, frost and reveal in both top-bar producers",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F07.rendered-feedback",
+          "check": "native-RecordingFeedbackRenderTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F07.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F07.shared-feedback",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F07.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F07.2",
+          "check": "missing-F07-native",
+          "status": "unimplemented",
+          "reason": "Production shared feedback model/view exists with contract tests; both actual native controllers/views still need end-to-end integration fixtures."
+        },
+        {
+          "id": "F07.3",
+          "check": "missing-F07-device",
+          "status": "unimplemented",
+          "reason": "No automated native temporal acceptance runner."
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "title": "Native Recordly capture, cursor follow and polished export",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F08.1",
+          "check": "portable-regressions",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F08.2",
+          "check": "portable-recordly-geometry",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F08.3",
+          "check": "native-RecordlyExportValidationTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F08.4",
+          "check": "native-RecordlyExportFilesTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F08.5",
+          "check": "native-RecordlyCheckpointStoreTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F08.6",
+          "check": "missing-F08-device",
+          "status": "unimplemented",
+          "reason": "Successful native capture/render/playback acceptance not yet implemented; no region coordinate proof."
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "title": "Screen Buddy combined behavior",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F09.buddy",
+          "check": "portable-buddy",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F09.1",
+          "check": "portable-presentation",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F09.2",
+          "check": "portable-regressions",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F09.3",
+          "check": "missing-F09-native",
+          "status": "unimplemented",
+          "reason": "Complete actual renderer/controller P0-P7 integration tests do not exist."
+        },
+        {
+          "id": "F09.4",
+          "check": "missing-F09-device",
+          "status": "unimplemented",
+          "reason": "No complete automated native screen geometry and reference temporal comparison."
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Embedded memory, sources, connections and selected MCP export",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F10.mcp-contract",
+          "check": "portable-wiki-export",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F10.1",
+          "check": "portable-wiki-relationships",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F10.2",
+          "check": "native-BrainCaptureModelTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F10.3",
+          "check": "missing-F10-device",
+          "status": "unimplemented",
+          "reason": "Unified learning/graph/MCP end-to-end acceptance is incomplete; local file-save tests are not MCP proof."
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "Ultron-style voice and delivery",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F11.1",
+          "check": "portable-regressions",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F11.2",
+          "check": "native-UltronVoiceEffectTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F11.3",
+          "check": "missing-F11-device",
+          "status": "unimplemented",
+          "reason": "No native/provider voice quality and playback acceptance fixture or reference baseline."
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "title": "Provider logos and polished Chat orb, tabs, volume and copy",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F12.1",
+          "check": "portable-regressions",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F12.2",
+          "check": "native-EngineBrandLogoTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F12.3",
+          "check": "missing-F12-device",
+          "status": "unimplemented",
+          "reason": "No complete native interaction/a11y runner or resolved distribution provenance for every legacy asset."
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "title": "Automated onboarding through daily use",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "F13.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "F13.2",
+          "check": "native-OnboardingTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F13.3",
+          "check": "native-PermissionsCaptureTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "F13.4",
+          "check": "missing-F13-device",
+          "status": "unimplemented",
+          "reason": "No complete automated UI daily-journey runner. Manual clickthrough cannot fill this obligation."
+        }
+      ]
+    },
+    {
+      "id": "S01",
+      "title": "Scribe live text, recording UI and actual microphone ownership",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "S01.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S01.2",
+          "check": "missing-S01-native",
+          "status": "unimplemented",
+          "reason": "Native watcher-to-live-text synthetic fixture not implemented."
+        },
+        {
+          "id": "S01.3",
+          "check": "missing-S01-device",
+          "status": "unimplemented",
+          "reason": "No actual mic-owner/device/live-UI acceptance receipt."
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "title": "Polyglot listens and translates while running",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "S02.1",
+          "check": "portable-polyglot",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S02.2",
+          "check": "missing-S02-native",
+          "status": "unimplemented",
+          "reason": "No native recognizer/translation controller fixture runner."
+        },
+        {
+          "id": "S02.3",
+          "check": "missing-S02-device",
+          "status": "unimplemented",
+          "reason": "No supported-device/model/pack acceptance receipt."
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "title": "Polyglot pin, Stop, dismiss and unpinned auto-hide",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "S03.1",
+          "check": "missing-S03-contract",
+          "status": "unimplemented",
+          "reason": "No isolated portable pin contract; native dismissal model is separately executable."
+        },
+        {
+          "id": "S03.2",
+          "check": "native-PolyglotPinTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "S03.3",
+          "check": "missing-S03-device",
+          "status": "unimplemented",
+          "reason": "Native model tests do not execute Stop or actual visible UI interactions."
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "title": "Recordly startup/export reliability; region stays off",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "S04.1",
+          "check": "portable-regressions",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S04.2",
+          "check": "portable-recordly-geometry",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S04.3",
+          "check": "native-RecordlyDebugWiringTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "S04.4",
+          "check": "native-RecordlyExportValidationTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "S04.5",
+          "check": "missing-S04-device",
+          "status": "unimplemented",
+          "reason": "Native capture startup/export acceptance missing; region proof not supplied."
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "title": "Meetings recap, end-call countdown and completion windows",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "S05.controller-fixture",
+          "check": "native-ScribeLifecycleScenarioTests",
+          "status": "not-run",
+          "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+        },
+        {
+          "id": "S05.1",
+          "check": "portable-scribe",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S05.2",
+          "check": "portable-wiki-relationships",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S05.3",
+          "check": "missing-S05-native",
+          "status": "unimplemented",
+          "reason": "End-call adapter/window native synthetic integration coverage incomplete."
+        },
+        {
+          "id": "S05.4",
+          "check": "missing-S05-device",
+          "status": "unimplemented",
+          "reason": "No native temporal acceptance runner or device receipt."
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "title": "Signed, notarized, Gatekeeper-clean sellable package",
+      "status": "incomplete",
+      "obligations": [
+        {
+          "id": "S06.1",
+          "check": "release-mocks",
+          "status": "passed",
+          "reason": ""
+        },
+        {
+          "id": "S06.2",
+          "check": "missing-S06-native",
+          "status": "unimplemented",
+          "reason": "No actual release artifact integration fixture; ad-hoc preview is not a release."
+        },
+        {
+          "id": "S06.3",
+          "check": "missing-S06-device",
+          "status": "unimplemented",
+          "reason": "No signing identity/notary/clean-Mac proof or completed commercial readiness decision; no placeholder receipt accepted."
+        }
+      ]
+    }
+  ],
+  "regressions": [
+    {
+      "id": "REG-001",
+      "check": "portable-regressions",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-002",
+      "check": "portable-regressions",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-003",
+      "check": "portable-polyglot",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-004",
+      "check": "portable-polyglot",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-005",
+      "check": "portable-polyglot",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-006",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-007",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-008",
+      "check": "portable-regressions",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-009",
+      "check": "portable-presentation",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-010",
+      "check": "portable-presentation",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-011",
+      "check": "portable-presentation",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-012",
+      "check": "portable-presentation",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-013",
+      "check": "portable-regressions",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-014",
+      "check": "portable-regressions",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-015",
+      "check": "portable-regressions",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-016",
+      "check": "portable-wiki-relationships",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-017",
+      "check": "portable-wiki-relationships",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-018",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-019",
+      "check": "native-PermissionsCaptureTests",
+      "status": "not-run",
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "REG-020",
+      "check": "portable-buddy",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-021",
+      "check": "portable-buddy",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-022",
+      "check": "portable-buddy",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-023",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-024",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-025",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-026",
+      "check": "portable-dictation-insertion",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-027",
+      "check": "closed-loop-selftests",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-028",
+      "check": "closed-loop-selftests",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-029",
+      "check": "closed-loop-selftests",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-030",
+      "check": "closed-loop-selftests",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-031",
+      "check": "closed-loop-selftests",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-032",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-033",
+      "check": "native-ScribeLifecycleScenarioTests",
+      "status": "not-run",
+      "reason": "Native fixture is separate from the portable development check; run full mode on macOS."
+    },
+    {
+      "id": "REG-034",
+      "check": "closed-loop-selftests",
+      "status": "passed",
+      "reason": ""
+    },
+    {
+      "id": "REG-035",
+      "check": "portable-scribe",
+      "status": "passed",
+      "reason": ""
+    }
+  ],
+  "totals": {
+    "tests": 462,
+    "suites": 45
+  },
+  "errors": [
+    "Repository input changed while checks ran; rerun on a stable snapshot"
+  ],
+  "tested_sha": "f0e36ab4b8e78c908ed3dedc0a251458563ffe74",
+  "head_sha": "f0e36ab4b8e78c908ed3dedc0a251458563ffe74",
+  "dirty": true,
+  "source_snapshot_sha256": "160b8e9fbb1c60386ee4552cd255bd8254410bd94595494994ae53b51d92e768",
+  "source_manifest": {
+    "path": "source-manifest.json",
+    "sha256": "3b86e2e447a200fd63700f4e10fadef8fc4eaf52e4ee988aa6c23284df1d3f49"
+  },
+  "map_sha256": "9eb9746d22dde51d6f3415a51032af56c509c254f8be18ccb08086a76f18c185",
+  "registry_sha256": "aa634602f29f9d9b9dacea36701dc696630fb6473153e89d694539ac7a9b371d",
+  "finished_at": "2026-11-10T00:42:16.391790+00:00"
+}

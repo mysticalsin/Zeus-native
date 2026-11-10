@@ -1,0 +1,2 @@
+replaceItemAt error: Error Domain=NSCocoaErrorDomain Code=4 "The file doesn’t exist."UserInfo={NSURL=file:///tmp/zeus-replace-check-BD7518DD-AFEB-4899-9AB6-3E1D95BB9A2D/old.json, NSFilePath=/tmp/zeus-replace-check-BD7518DD-AFEB-4899-9AB6-3E1D95BB9A2D/old.json, NSUnderlyingError=Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}
+old exists: false new exists: true

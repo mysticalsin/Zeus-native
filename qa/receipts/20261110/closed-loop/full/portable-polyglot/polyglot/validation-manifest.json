@@ -1,0 +1,33 @@
+{
+  "group": "polyglot",
+  "repository": "/workspace/Zeus",
+  "platform": "linux",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/Polyglot/PolyglotModels.swift",
+      "sha256": "379887437b806f6fe13f74463ad3e40792b88a81e9f1d1925b4628d735423d42"
+    },
+    {
+      "source": "Sources/ZeusCore/Polyglot/PolyglotPipeline.swift",
+      "sha256": "d7a35a423d8ecb65f18590e102a7f9036cd6d428caf820a31b2d3cc3487abac8"
+    },
+    {
+      "source": "Sources/ZeusCore/Polyglot/PolyglotSegmenter.swift",
+      "sha256": "375695b947f2dc8800838da0a98bb34d311f5a234a6d99d429b2c3b59a397c4b"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/PolyglotTests.swift",
+      "sha256": "8f19ccb679af0410286f3000caa2ea6fec3edb123f914926446815ab360bc1e6"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
+      "sha256": "1ac2334ab3cf8b0c9db7a5222cc4d7ee89c837840be2ce3d64c47541c82d2073"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/W7PolyglotTests.swift",
+      "sha256": "c7797194c634314e68e93b9a56cff79c6783c86ad8c58ac478aac9593c2376d7"
+    }
+  ],
+  "excerpts": []
+}

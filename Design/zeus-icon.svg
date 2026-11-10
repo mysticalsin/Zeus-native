@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1D2738"/>
+      <stop offset="0.55" stop-color="#121722"/>
+      <stop offset="1" stop-color="#0B0E13"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.47" r="0.5">
+      <stop offset="0" stop-color="#FFC83D" stop-opacity="0.34"/>
+      <stop offset="0.45" stop-color="#FF9F1C" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FF9F1C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bolt" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FFF4C2"/>
+      <stop offset="0.35" stop-color="#FFD45C"/>
+      <stop offset="0.75" stop-color="#FFC83D"/>
+      <stop offset="1" stop-color="#FF9A1F"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4DA3FF" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#4DA3FF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#4DA3FF" stop-opacity="0.25"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <clipPath id="clip"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#tile)"/>
+    <!-- storm arcs -->
+    <g fill="none" stroke="#4DA3FF" stroke-linecap="round">
+      <path d="M40 330 Q 512 150 984 330" stroke-width="3" stroke-opacity="0.10"/>
+      <path d="M40 800 Q 512 960 984 760" stroke-width="3" stroke-opacity="0.08"/>
+    </g>
+    <circle cx="512" cy="512" r="420" fill="url(#halo)"/>
+  </g>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="185" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <!-- the Z-bolt -->
+  <g id="mark">
+    <path id="z" d="M300 280 H724 V352 L500 540 H612 L388 672 H724 V744 H300 V672 L524 484 H412 L636 352 H300 Z"/>
+  </g>
+  <use href="#z" fill="#FFB52E" opacity="0.75" filter="url(#glow)"/>
+  <use href="#z" fill="url(#bolt)"/>
+  <!-- spark -->
+  <g transform="translate(748 236)" fill="#FFF4C2">
+    <path d="M0 -34 L8 -8 L34 0 L8 8 L0 34 L-8 8 L-34 0 L-8 -8 Z" opacity="0.95"/>
+  </g>
+</svg>

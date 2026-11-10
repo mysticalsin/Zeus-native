@@ -1,0 +1,178 @@
+Building for debugging...
+[0/19] Write sources
+[4/19] Write swift-version-457096A79D733C59.txt
+[6/29] Emitting module ZeusCore
+[7/37] Compiling ZeusCore BrowserUseProtocol.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[8/37] Compiling ZeusCore JSONValue.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[9/37] Compiling ZeusCore MeetingCopilot.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[10/37] Compiling ZeusCore PortableExcerpts.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[11/37] Compiling ZeusCore ScribeCapture.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[12/37] Compiling ZeusCore ScribeNotes.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[13/37] Compiling ZeusCore ScribeTranscript.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[14/37] Compiling ZeusCore SecondBrain.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[15/37] Compiling ZeusCore VaultPathBoundary.swift
+/workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[16/37] Compiling ZeusCore SensitiveInfoScanner.swift
+[17/37] Compiling ZeusCore WikiCompiler.swift
+[18/37] Compiling ZeusCore WikiExportJournal.swift
+[19/37] Compiling ZeusCore WikiExportMCP.swift
+[20/37] Compiling ZeusCore WikiExportModels.swift
+[21/37] Compiling ZeusCore WikiExportTransaction.swift
+[22/37] Compiling ZeusCore WikiExportVault.swift
+[23/37] Compiling ZeusCore WikiPage.swift
+[25/42] Emitting module zeus_memory_helper
+[26/42] Compiling zeus_memory_helper main.swift
+[27/43] Wrapping AST for ZeusCore for debugging
+[28/43] Wrapping AST for zeus-memory-helper for debugging
+[29/43] Write Objects.LinkFileList
+[30/43] Linking zeus-memory-helper
+[32/43] Emitting module MCPTransportValidation
+[33/43] Compiling MCPTransportValidation MCPStdioClient.swift
+[34/44] Compiling MCPTransportValidation MemoryMCPConformance.swift
+[35/45] Wrapping AST for MCPTransportValidation for debugging
+[37/47] Emitting module ZeusCoreTests
+[38/47] Compiling ZeusCoreTests MemoryMCPTransportTests.swift
+[39/48] Compiling ZeusCoreTests WikiExportTests.swift
+[40/49] /workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[41/49] Write sources
+[42/51] Wrapping AST for ZeusCoreTests for debugging
+[44/51] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[45/51] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[46/52] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[47/53] /workspace/zeus-validation/closed-loop-full-frozen/portable-wiki-export/wiki-export/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[48/53] Write sources
+[49/53] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[51/55] Compiling ZeusPortableValidationPackageTests runner.swift
+[52/55] Emitting module ZeusPortableValidationPackageTests
+[53/56] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[54/56] Write Objects.LinkFileList
+[55/56] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (23.00s)
+Test Suite 'All tests' started at 2026-11-10 00:45:05.890
+Test Suite 'debug.xctest' started at 2026-11-10 00:45:05.893
+Test Suite 'debug.xctest' passed at 2026-11-10 00:45:05.893
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:45:05.893
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Selected Memory MCP exports" started.
+◇ Suite "Memory MCP process transport" started.
+◇ Test bundledHelperCompletesInteractiveMCPRoundTrip() started.
+◇ Test traversalHiddenAndAbsoluteInboxPathsAreRejected() started.
+◇ Test realProtocolSelectionTransactionVerifiesAndErasesRecoveryBytes() started.
+◇ Test sensitiveReviewCannotBeSkipped() started.
+◇ Test lostCreateReplyRequiresReadOnlyReconciliationAndNeverDuplicates() started.
+◇ Test symbolicInboxAndFileLinksCannotRedirectWritesOrReads() started.
+◇ Test immutableRevisionAndDestinationAreRechecked() started.
+◇ Test corruptRecoveryRecordBlocksReplacement() started.
+◇ Test changedReadbackIsAConflictAndNeverReplaced() started.
+◇ Test collisionsNeverOverwriteAnExistingNote() started.
+◇ Test readbackDoesNotCreateFoldersAndCreateIsExactAndIdempotent() started.
+◇ Test missingReadbackPermitsOnlyTheSameImmutableRetry() started.
+◇ Test cancelledHandshakeClosesTheChildProcess() started.
+◇ Test oversizedPreviewIsRejected() started.
+◇ Test forgettingErasesPendingContentAndBlocksRecovery() started.
+◇ Test incompatibleDiscoveryAndChangedReviewPerformNoWrites() started.
+◇ Test sourceReviewForgettingAvailabilityAndSettingsFailClosed() started.
+◇ Test emptyMissingAndTooManySelectionsAreRejected() started.
+◇ Test rootReplacementIsRejected() started.
+◇ Test abandoningStaleRecoveryErasesDraftWithoutAnotherWrite() started.
+◇ Test selectionPreviewContainsOnlyReviewedPagesAndStableProvenance() started.
+◇ Test explicitWritableDestinationIsRequired() started.
+◇ Test handshakeTimeoutClosesTheChildProcess() started.
+◇ Test protocolRequiresHandshakeAndAcceptsOnlyBoundedTools() started.
+◇ Test olderReceiptCannotMasqueradeAsANewFailedExport() started.
+◇ Test hardlinkedUUIDNoteCannotExposeAnUnrelatedFile() started.
+✔ Test traversalHiddenAndAbsoluteInboxPathsAreRejected() passed after 0.029 seconds.
+✔ Test symbolicInboxAndFileLinksCannotRedirectWritesOrReads() passed after 0.029 seconds.
+✔ Test immutableRevisionAndDestinationAreRechecked() passed after 0.029 seconds.
+✔ Test sensitiveReviewCannotBeSkipped() passed after 0.029 seconds.
+✔ Test corruptRecoveryRecordBlocksReplacement() passed after 0.032 seconds.
+✔ Test collisionsNeverOverwriteAnExistingNote() passed after 0.032 seconds.
+✔ Test sourceReviewForgettingAvailabilityAndSettingsFailClosed() passed after 0.032 seconds.
+✔ Test emptyMissingAndTooManySelectionsAreRejected() passed after 0.032 seconds.
+✔ Test selectionPreviewContainsOnlyReviewedPagesAndStableProvenance() passed after 0.033 seconds.
+✔ Test readbackDoesNotCreateFoldersAndCreateIsExactAndIdempotent() passed after 0.033 seconds.
+✔ Test rootReplacementIsRejected() passed after 0.033 seconds.
+✔ Test explicitWritableDestinationIsRequired() passed after 0.033 seconds.
+✔ Test protocolRequiresHandshakeAndAcceptsOnlyBoundedTools() passed after 0.035 seconds.
+✔ Test hardlinkedUUIDNoteCannotExposeAnUnrelatedFile() passed after 0.037 seconds.
+✔ Test cancelledHandshakeClosesTheChildProcess() passed after 0.064 seconds.
+✔ Test forgettingErasesPendingContentAndBlocksRecovery() passed after 0.110 seconds.
+✔ Test realProtocolSelectionTransactionVerifiesAndErasesRecoveryBytes() passed after 0.110 seconds.
+✔ Test incompatibleDiscoveryAndChangedReviewPerformNoWrites() passed after 0.126 seconds.
+✔ Test abandoningStaleRecoveryErasesDraftWithoutAnotherWrite() passed after 0.126 seconds.
+✔ Test lostCreateReplyRequiresReadOnlyReconciliationAndNeverDuplicates() passed after 0.126 seconds.
+✔ Test changedReadbackIsAConflictAndNeverReplaced() passed after 0.127 seconds.
+✔ Test olderReceiptCannotMasqueradeAsANewFailedExport() passed after 0.127 seconds.
+✔ Test oversizedPreviewIsRejected() passed after 0.134 seconds.
+✔ Test missingReadbackPermitsOnlyTheSameImmutableRetry() passed after 0.142 seconds.
+✔ Suite "Selected Memory MCP exports" passed after 0.143 seconds.
+✔ Test bundledHelperCompletesInteractiveMCPRoundTrip() passed after 0.286 seconds.
+✔ Test handshakeTimeoutClosesTheChildProcess() passed after 6.297 seconds.
+✔ Suite "Memory MCP process transport" passed after 6.299 seconds.
+✔ Test run with 26 tests in 2 suites passed after 6.299 seconds.

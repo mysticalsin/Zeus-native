@@ -1,0 +1,215 @@
+name: Zeus checks
+
+on:
+  push:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+  schedule:
+    # 03:17 America/Sao_Paulo. GitHub activates schedules only from the default branch.
+    - cron: '17 6 * * *'
+
+permissions:
+  contents: read
+  actions: read
+
+# Each revision/event keeps its own run. A push cannot cancel the PR's required check,
+# and a later push cannot silently discard a revision that still needs validation.
+concurrency:
+  group: zeus-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # PRs test the synthetic merge revision. Receipts also bind the precise source head.
+  ZEUS_TESTED_SHA: ${{ github.sha }}
+  ZEUS_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+  ZEUS_FEATURE_MODE: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && 'full' || 'development' }}
+
+jobs:
+  release-scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - run: mkdir -p "$RUNNER_TEMP/zeus-results/release-scripts"
+      - name: Release and rollback failure paths (mock tools only)
+        id: test
+        run: python3 qa/release-scripts/test_release_scripts.py 2>&1 | tee "$RUNNER_TEMP/zeus-results/release-scripts/test.log"
+      - name: Record exact revision and step outcomes
+        if: always()
+        env:
+          ZEUS_STEP_RESULTS: '{"test":"${{ steps.test.outcome }}"}'
+        run: python3 qa/closed-loop/gate.py record --job release-scripts --output "$RUNNER_TEMP/zeus-results/release-scripts"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-check-release-scripts
+          path: ${{ runner.temp }}/zeus-results/release-scripts
+          if-no-files-found: error
+          retention-days: 30
+
+  app:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - run: mkdir -p "$RUNNER_TEMP/zeus-results/app"
+      - name: Select Xcode 26.1.1
+        run: sudo xcode-select --switch /Applications/Xcode_26.1.1.app/Contents/Developer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Native build
+        id: build
+        run: |
+          { xcodebuild -version && swift --version && swift build; } 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/build.log"
+      - name: Native integration fixtures (no OS consent requests or capture)
+        id: test
+        env:
+          ZEUS_QA_ARTIFACT_DIR: ${{ runner.temp }}/zeus-results/app/recording-feedback
+        # This reviewed allowlist is deliberate. Full mode reports the unimplemented device obligations.
+        # Every selected test uses injected ports, generated buffers, offscreen rendering or temporary files.
+        run: |
+          native_filter="$(python3 qa/closed-loop/gate.py native-filter)"
+          scripts/test.sh --filter "$native_filter" 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+      - name: Bundle local preview (ad-hoc only; no credentials)
+        id: bundle
+        run: CONFIG=debug SIGN_IDENTITY=- RELEASE=0 scripts/bundle.sh 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/bundle.log"
+      - name: Preserve preview bundle metadata
+        id: archive
+        run: ditto -c -k --keepParent build/Zeus.app "$RUNNER_TEMP/Zeus-preview.zip" 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/archive.log"
+      - name: Upload local preview (not signed for distribution)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeus-macOS-preview-${{ github.sha }}
+          path: ${{ runner.temp }}/Zeus-preview.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record exact revision and step outcomes
+        if: always()
+        env:
+          ZEUS_STEP_RESULTS: '{"build":"${{ steps.build.outcome }}","test":"${{ steps.test.outcome }}","bundle":"${{ steps.bundle.outcome }}","archive":"${{ steps.archive.outcome }}"}'
+        run: python3 qa/closed-loop/gate.py record --job app --output "$RUNNER_TEMP/zeus-results/app"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-check-app
+          path: ${{ runner.temp }}/zeus-results/app
+          if-no-files-found: error
+          retention-days: 30
+
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - run: mkdir -p "$RUNNER_TEMP/zeus-results/extension"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Install locked dependencies
+        id: install
+        working-directory: extension
+        run: npm ci 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/install.log"
+      - name: Typecheck
+        id: typecheck
+        working-directory: extension
+        run: npm run typecheck 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/typecheck.log"
+      - name: Browser target and consent regressions
+        id: test
+        working-directory: extension
+        run: npm test 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/test.log"
+      - name: Build extension
+        id: build
+        working-directory: extension
+        run: npm run build 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/build.log"
+      - name: Record exact revision and step outcomes
+        if: always()
+        env:
+          ZEUS_STEP_RESULTS: '{"install":"${{ steps.install.outcome }}","typecheck":"${{ steps.typecheck.outcome }}","test":"${{ steps.test.outcome }}","build":"${{ steps.build.outcome }}"}'
+        run: python3 qa/closed-loop/gate.py record --job extension --output "$RUNNER_TEMP/zeus-results/extension"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-check-extension
+          path: ${{ runner.temp }}/zeus-results/extension
+          if-no-files-found: error
+          retention-days: 30
+
+  feature-map:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Select Xcode 26.1.1
+        run: sudo xcode-select --switch /Applications/Xcode_26.1.1.app/Contents/Developer
+      - name: Run current-source feature map
+        id: map
+        run: |
+          python3 qa/closed-loop/run.py --mode "$ZEUS_FEATURE_MODE" --output "$RUNNER_TEMP/zeus-results/feature-map" 2>&1 | tee "$RUNNER_TEMP/zeus-feature-map.log"
+      - name: Preserve runner diagnostics
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/zeus-results/feature-map"
+          if [ -f "$RUNNER_TEMP/zeus-feature-map.log" ]; then cp "$RUNNER_TEMP/zeus-feature-map.log" "$RUNNER_TEMP/zeus-results/feature-map/runner.log"; fi
+      - name: Record exact revision and step outcomes
+        if: always()
+        env:
+          ZEUS_STEP_RESULTS: '{"map":"${{ steps.map.outcome }}"}'
+        run: python3 qa/closed-loop/gate.py record --job feature-map --output "$RUNNER_TEMP/zeus-results/feature-map"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-check-feature-map
+          path: |
+            ${{ runner.temp }}/zeus-results/feature-map
+            !${{ runner.temp }}/zeus-results/feature-map/**/.build/**
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  required-checks:
+    name: required-checks
+    if: always()
+    needs: [app, extension, release-scripts, feature-map]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Download this run's evidence
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          pattern: zeus-check-*
+          path: ${{ runner.temp }}/zeus-inputs
+      - name: Fail closed on every prerequisite and its evidence
+        if: always()
+        env:
+          ZEUS_NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 qa/closed-loop/gate.py evaluate --mode "$ZEUS_FEATURE_MODE" --inputs "$RUNNER_TEMP/zeus-inputs" --output "$RUNNER_TEMP/zeus-results/required-checks"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-required-checks
+          path: ${{ runner.temp }}/zeus-results/required-checks
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,93 @@
+{
+  "group": "scribe",
+  "repository": "/workspace/Zeus",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/MeetingCopilot.swift",
+      "sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a"
+    },
+    {
+      "source": "Sources/ZeusCore/TopBar/RecordingMotion.swift",
+      "sha256": "9ef7c90ae6322ba1dc038e295949dccdc991a91eb6a12e320c104819ad34e343"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeCallPrompt.swift",
+      "sha256": "5dc2e21b22350b5caced0166490edb75694d1f93346eaf415fe1badad767c100"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeMicGate.swift",
+      "sha256": "1d926f669407a8813c13581cf83d17ae2b79042af08aab808e893f92fc634b22"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribePresentation.swift",
+      "sha256": "605f2a647755b1c60202e13daacc93b1925811aafa5717e594ccc26df2055153"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeSession.swift",
+      "sha256": "97e772cceeb3cc7de7dc757f48f0e4a00f862c79d7b3e4a62ebc6573e6a3d191"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeSpeakerStats.swift",
+      "sha256": "2d599bc7537df2569dbc2cc7378938ae9a4c8a6a2b38ef9f30e303d2bb73d73c"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+      "sha256": "28e0b0b339b95ba18e61bac17f7e4d6781e8ac6967043d7409aa658a134e9b5d"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ScribePresentationTests.swift",
+      "sha256": "a1c4665e62b889490dbe5f5a96ea9016ada12e35818e16a1b2accd446364dcd2"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/W7ScribeTests.swift",
+      "sha256": "541a591f548a153081c7a15d699c35e821deab4a0d8b99a57742a5da30b57ee4"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/W8ScribeLookTests.swift",
+      "sha256": "6f600eb03db7e781e65354bf2b2ac81aff2eb81da4e117f1f3579cc4d7e58853"
+    }
+  ],
+  "excerpts": [
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "source_sha256": "98b61369e04ffa868d7ec8e429ee5b7fac5129b8e8e1779f43b68c3f7e0722b9",
+      "start": "public enum ScribeAudioMath {",
+      "end_exclusive": "// MARK: - Streaming resampler",
+      "excerpt_sha256": "7694fd5e8b2087a34deb682e88a9875bbb288236b945443a5ad9567407437389"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "source_sha256": "98b61369e04ffa868d7ec8e429ee5b7fac5129b8e8e1779f43b68c3f7e0722b9",
+      "start": "// MARK: - Call-app identification",
+      "end_exclusive": "// MARK: - Recap notes, cloud disclosure, system-audio stall",
+      "excerpt_sha256": "baa638deb25188ffbaaea29ff02059f060240ceb6d84cac4a5a004f92f283f5d"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "source_sha256": "98b61369e04ffa868d7ec8e429ee5b7fac5129b8e8e1779f43b68c3f7e0722b9",
+      "start": "// MARK: - Mute evidence (fail closed)",
+      "end_exclusive": "// MARK: - Mute evidence timeline",
+      "excerpt_sha256": "903c4b89d8311ffc423d931eb791268c462b1e80448c3ec5271e1d71825b757c"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+      "source_sha256": "64a790eae1863cabc4f8d25f520eae4bcb647445f1b9d7774d684f06c55f53d0",
+      "start": "    @Test func freshEvidenceIsServedAndExpiredEvidenceIsUnknown()",
+      "end_exclusive": "    // MARK: Evidence coverage",
+      "excerpt_sha256": "c0c9bb77b61c3f1d4d514531895fea81cc02faeae83957dc7df02de8cfb58eb9"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "group": "presentation",
+  "repository": "/workspace/Zeus",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/JSONValue.swift",
+      "sha256": "85ebad8ae1240e0d241fbfa52ee6eee20657473e3c11b58afccf75709415b0b5"
+    },
+    {
+      "source": "Sources/ZeusCore/Mac/Walkthrough.swift",
+      "sha256": "f4a813f10214e2d35094949e06547f3012780a66fc7cc7e19100160ac4fbd4ab"
+    },
+    {
+      "source": "Sources/ZeusCore/Mac/MacActionNumbers.swift",
+      "sha256": "ae11106f4aafa8ce5ca40d6f335b9afe9662f8422a2f4644d00d506b369d6d4f"
+    },
+    {
+      "source": "Sources/ZeusCore/Mac/DrivePlan.swift",
+      "sha256": "5e0c9270ef9f19e82b510e10588c27e0f1e7ef0907c01e90425a388bbcb62e40"
+    },
+    {
+      "source": "Sources/ZeusCore/Present/SpeechTimeline.swift",
+      "sha256": "80cec169ad0b4bcd6bb8e2d7e66731d40dcd79ac24e5e81435b578fc6328325d"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/WalkthroughRevisionTests.swift",
+      "sha256": "c0de29c2f582c2de1785867539eb2322bacd790a19a6502acd66598693239f9e"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/SpeechTimelineTests.swift",
+      "sha256": "49dd115bef28c1c902128ebbb277b2a47543eb0b8b28acc6a6b20e3faf0dbbe2"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/MacActionNumberTests.swift",
+      "sha256": "bf7dacd23342c0338bed89a1fc65cbca2e51e40404e714e354c6aced27495936"
+    }
+  ],
+  "excerpts": [
+    {
+      "source": "Sources/ZeusCore/ZeusTag.swift",
+      "source_sha256": "be0800f8b005a16ee2d2e77cb1aab65340c7d299558d219c9d1a66c2563691f7",
+      "start": "public struct PointTarget:",
+      "end_exclusive": "public struct HighlightTarget:",
+      "excerpt_sha256": "529f7dd4ea719e645afe3cea2a34a11995c47e068733aa96eba02b9d6d286c3a"
+    },
+    {
+      "source": "Sources/ZeusCore/Present/DrawingScene.swift",
+      "source_sha256": "b9d10a52ddaa05ddcc726ac61e88f142110ebbe9c9d16e4408fb01de55b6301a",
+      "start": "public struct MathLayout:",
+      "end_exclusive": "EOF",
+      "excerpt_sha256": "6972e94fbe2af5f69d7ffdbb144e44b3a014d95114707260b8b598cc38d629b9"
+    },
+    {
+      "source": "Sources/ZeusCore/Mac/AXSnapshot.swift",
+      "source_sha256": "25f3d5e5280fe2428eb9abfc0d26eac0a2b4cfb07409c4afae095050a1a25ae1",
+      "start": "public struct AXRef:",
+      "end_exclusive": "/// What the frontmost window looked like",
+      "excerpt_sha256": "a404ffa01201224f5b596aa415634eacc5efb1a84e2b9b29143a466e0226c8ba"
+    }
+  ]
+}

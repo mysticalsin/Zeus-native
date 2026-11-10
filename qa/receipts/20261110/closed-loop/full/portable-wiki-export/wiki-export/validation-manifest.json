@@ -1,0 +1,110 @@
+{
+  "group": "wiki-export",
+  "repository": "/workspace/Zeus",
+  "platform": "linux",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/MeetingCopilot.swift",
+      "sha256": "dc69e21b874a75514e09b8a7d19feb691f68844cae34d8e7cea98f11d03fc94a"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeCapture.swift",
+      "sha256": "53656f1662b3eb3e6a25cb283ed9804b4ed54a8d52e0bf58b4c55e863824e357"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeNotes.swift",
+      "sha256": "6a1abb7241dbd1aa2d43014bdb9892a3909f6368d6388e37435945cc232e9d19"
+    },
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeTranscript.swift",
+      "sha256": "c749c859aafe9b360b1188708e5853e54be970942c7d3401f8d5fa2e3342ac6d"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiPage.swift",
+      "sha256": "0473df7b046240457fb840b6d4f253ae23af600700587773d09e5e4b6f957ef3"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiCompiler.swift",
+      "sha256": "5f6a4f9a7adb3528a427bfbf7d9404959b2ee8836794543c4a03d8a46e01e291"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/SensitiveInfoScanner.swift",
+      "sha256": "13533c12622d014851cb43c96bd1b9fdbabd5e0fd2baffe18da0aac8075da92a"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiExportModels.swift",
+      "sha256": "a446ed747ad7311dbeef08d53579a026a8321354957d43fe0e300c2a127d28cb"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiExportVault.swift",
+      "sha256": "d298e2ec37bbac92bce89e0d8d76f4c989ac4534b9bae4c0dcda2710b46001a2"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiExportMCP.swift",
+      "sha256": "fe228fea720a2131a0fbb7dc3947eb58285202337a6a9c65f3d4fb70e60d7aa4"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiExportJournal.swift",
+      "sha256": "bf99ab16165f1e9cd7509b13e961719f72d326681c70dfd727dda81a8b496977"
+    },
+    {
+      "source": "Sources/ZeusCore/Wiki/WikiExportTransaction.swift",
+      "sha256": "c1c713697bb9982f982724a7b478dce9b93ef6fce849dc7e6fe8a99d73543893"
+    },
+    {
+      "source": "Sources/ZeusCore/SecondBrain/SecondBrain.swift",
+      "sha256": "b8363b65e9ef17256281bebbc6c458532debadb51f2e7ef62f16b9beca44704f"
+    },
+    {
+      "source": "Sources/ZeusCore/SecondBrain/VaultPathBoundary.swift",
+      "sha256": "6af90078ce7b5a912777a8e7f63284cd91f6ebd0dd66468eb37675b65c28ddeb"
+    },
+    {
+      "source": "Sources/ZeusCore/JSONValue.swift",
+      "sha256": "85ebad8ae1240e0d241fbfa52ee6eee20657473e3c11b58afccf75709415b0b5"
+    },
+    {
+      "source": "Sources/ZeusCore/BrowserAgent/BrowserUseProtocol.swift",
+      "sha256": "8fc1232781c1d5a7feadb95e80b0703d1bdcbfba6bb4c642dc615be01a181547"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/WikiExportTests.swift",
+      "sha256": "89b4391eec9006fb8300d7df567d21368a7196635b5a715a582c19ab58811dea"
+    },
+    {
+      "source": "Sources/Zeus/BrowserAgent/MCPStdioClient.swift",
+      "sha256": "927100078ae84f97a57577e376bdd96b6d4dec7d61e8605af879aec52510874b",
+      "target": "Sources/MCPTransportValidation/MCPStdioClient.swift"
+    },
+    {
+      "source": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+      "sha256": "df031870c3724c3fc5099268ed84b9a21080c5e4f0fff4f7e39f471a5cb806c6",
+      "target": "Tests/ZeusCoreTests/MemoryMCPTransportTests.swift"
+    }
+  ],
+  "excerpts": [
+    {
+      "source": "Sources/ZeusCore/Scribe/ScribeLiveLogic.swift",
+      "source_sha256": "e81d0befc6e88443164d94c2e5f8cff0fbed55557ad6f38f578676d24b442ee0",
+      "start": "public struct ScribeMeetingRecord:",
+      "end_exclusive": "public enum ScribeMeetingStoreError:",
+      "excerpt_sha256": "3ee17527f475555e38fe74032ca997816242b4d3483a008657de6a3d1188f1e3"
+    },
+    {
+      "source": "Sources/ZeusCore/Research/ResearchReport.swift",
+      "source_sha256": "e53f87de9e21c8618389b5ad69333588c70495633638c15de047dd5ceab86b77",
+      "start": "    public static let vaultFolder = \"ZEUS/Research\"",
+      "end_exclusive": "    /// Where the report goes:",
+      "excerpt_sha256": "9f1b50175c2f261f81cf324b35cb81c016ca01f16d47b7cbe43a9a2b86cd9094"
+    },
+    {
+      "source": "Sources/Zeus/Wiki/WikiMCPExport.swift",
+      "source_sha256": "a462ca492aabbdd6aeaaedde6fcf961f283a5a4b2464adc1ecd605b6887a2f3d",
+      "start": "extension MCPStdioClient: WikiExportToolClient {",
+      "end_exclusive": "/// One user-opened selection/review transaction.",
+      "excerpt_sha256": "ca7548a48384ab6cb10c1dd22ddcad82cbd766c46c52ae544ee3fe3aae23aa7d"
+    }
+  ],
+  "executable_wrapper": "Exact production WikiExportMCPCommand.run; wrapper only forwards arguments. No app control, capture or vault discovery."
+}

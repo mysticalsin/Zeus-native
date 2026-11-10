@@ -1,0 +1,726 @@
+[
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 1,
+   "method": "initialize",
+   "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": {
+     "name": "zeus",
+     "version": "1"
+    }
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 1,
+   "result": {
+    "capabilities": {
+     "experimental": {},
+     "prompts": {
+      "listChanged": false
+     },
+     "resources": {
+      "listChanged": false,
+      "subscribe": false
+     },
+     "tools": {
+      "listChanged": false
+     }
+    },
+    "protocolVersion": "2025-06-18",
+    "serverInfo": {
+     "name": "browser-use",
+     "version": "0.13.14"
+    }
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "method": "notifications/initialized"
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 2,
+   "method": "tools/list",
+   "params": {}
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 2,
+   "result": {
+    "tools": [
+     {
+      "description": "Navigate to a URL in the browser",
+      "inputSchema": {
+       "properties": {
+        "url": {
+         "type": "string",
+         "description": "The URL to navigate to"
+        },
+        "new_tab": {
+         "type": "boolean",
+         "description": "Whether to open in a new tab",
+         "default": false
+        }
+       },
+       "required": [
+        "url"
+       ],
+       "type": "object"
+      },
+      "name": "browser_navigate"
+     },
+     {
+      "description": "Click an element by index or at specific viewport coordinates. Use index for elements from browser_get_state, or coordinate_x/coordinate_y for pixel-precise clicking.",
+      "inputSchema": {
+       "properties": {
+        "index": {
+         "type": "integer",
+         "description": "The index of the element to click (from browser_get_state). Provide this OR coordinate_x+coordinate_y."
+        },
+        "coordinate_x": {
+         "type": "integer",
+         "description": "X coordinate in pixels from the left edge of the viewport. Must be used together with coordinate_y. Provide this OR index."
+        },
+        "coordinate_y": {
+         "type": "integer",
+         "description": "Y coordinate in pixels from the top edge of the viewport. Must be used together with coordinate_x. Provide this OR index."
+        },
+        "new_tab": {
+         "type": "boolean",
+         "description": "Whether to open any resulting navigation in a new tab",
+         "default": false
+        }
+       },
+       "type": "object"
+      },
+      "name": "browser_click"
+     },
+     {
+      "description": "Type text into an input field. Clears existing text by default; pass text=\"\" to clear only.",
+      "inputSchema": {
+       "properties": {
+        "index": {
+         "type": "integer",
+         "description": "The index of the input element (from browser_get_state)"
+        },
+        "text": {
+         "type": "string",
+         "description": "The text to type. Pass an empty string (\"\") to clear the field without typing."
+        }
+       },
+       "required": [
+        "index",
+        "text"
+       ],
+       "type": "object"
+      },
+      "name": "browser_type"
+     },
+     {
+      "annotations": {
+       "readOnlyHint": true
+      },
+      "description": "Get the current state of the page including all interactive elements",
+      "inputSchema": {
+       "properties": {
+        "include_screenshot": {
+         "type": "boolean",
+         "description": "Whether to include a screenshot of the current page",
+         "default": false
+        }
+       },
+       "type": "object"
+      },
+      "name": "browser_get_state"
+     },
+     {
+      "description": "Extract structured content from the current page based on a query",
+      "inputSchema": {
+       "properties": {
+        "query": {
+         "type": "string",
+         "description": "What information to extract from the page"
+        },
+        "extract_links": {
+         "type": "boolean",
+         "description": "Whether to include links in the extraction",
+         "default": false
+        }
+       },
+       "required": [
+        "query"
+       ],
+       "type": "object"
+      },
+      "name": "browser_extract_content"
+     },
+     {
+      "annotations": {
+       "readOnlyHint": true
+      },
+      "description": "Get the raw HTML of the current page or a specific element by CSS selector",
+      "inputSchema": {
+       "properties": {
+        "selector": {
+         "type": "string",
+         "description": "Optional CSS selector to get HTML of a specific element. If omitted, returns full page HTML."
+        }
+       },
+       "type": "object"
+      },
+      "name": "browser_get_html"
+     },
+     {
+      "annotations": {
+       "readOnlyHint": true
+      },
+      "description": "Take a screenshot of the current page. Returns viewport metadata as text and the screenshot as an image.",
+      "inputSchema": {
+       "properties": {
+        "full_page": {
+         "type": "boolean",
+         "description": "Whether to capture the full scrollable page or just the visible viewport",
+         "default": false
+        }
+       },
+       "type": "object"
+      },
+      "name": "browser_screenshot"
+     },
+     {
+      "description": "Scroll the page",
+      "inputSchema": {
+       "properties": {
+        "direction": {
+         "type": "string",
+         "enum": [
+          "up",
+          "down"
+         ],
+         "description": "Direction to scroll",
+         "default": "down"
+        }
+       },
+       "type": "object"
+      },
+      "name": "browser_scroll"
+     },
+     {
+      "description": "Go back to the previous page",
+      "inputSchema": {
+       "properties": {},
+       "type": "object"
+      },
+      "name": "browser_go_back"
+     },
+     {
+      "annotations": {
+       "readOnlyHint": true
+      },
+      "description": "List all open tabs",
+      "inputSchema": {
+       "properties": {},
+       "type": "object"
+      },
+      "name": "browser_list_tabs"
+     },
+     {
+      "description": "Switch to a different tab",
+      "inputSchema": {
+       "properties": {
+        "tab_id": {
+         "type": "string",
+         "description": "4 Character Tab ID of the tab to switch to"
+        }
+       },
+       "required": [
+        "tab_id"
+       ],
+       "type": "object"
+      },
+      "name": "browser_switch_tab"
+     },
+     {
+      "description": "Close a tab",
+      "inputSchema": {
+       "properties": {
+        "tab_id": {
+         "type": "string",
+         "description": "4 Character Tab ID of the tab to close"
+        }
+       },
+       "required": [
+        "tab_id"
+       ],
+       "type": "object"
+      },
+      "name": "browser_close_tab"
+     },
+     {
+      "description": "Retry a task using the browser-use agent. Only use this as a last resort if you fail to interact with a page multiple times.",
+      "inputSchema": {
+       "properties": {
+        "task": {
+         "type": "string",
+         "description": "The high-level goal and detailed step-by-step description of the task the AI browser agent needs to attempt, along with any relevant data needed to complete the task and info about previous attempts."
+        },
+        "max_steps": {
+         "type": "integer",
+         "description": "Maximum number of steps an agent can take.",
+         "default": 100
+        },
+        "model": {
+         "type": "string",
+         "description": "LLM model to use (e.g., gpt-4o, claude-3-opus-20240229). Defaults to the configured model."
+        },
+        "allowed_domains": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "description": "List of domains the agent is allowed to visit (security feature). Omit to use the server-configured profile defaults. An empty list is treated the same as omitting the argument and will NOT disable server-configured restrictions."
+        },
+        "use_vision": {
+         "type": "boolean",
+         "description": "Whether to use vision capabilities (screenshots) for the agent",
+         "default": true
+        }
+       },
+       "required": [
+        "task"
+       ],
+       "type": "object"
+      },
+      "name": "retry_with_browser_use_agent"
+     },
+     {
+      "annotations": {
+       "readOnlyHint": true
+      },
+      "description": "List all active browser sessions with their details and last activity time",
+      "inputSchema": {
+       "properties": {},
+       "type": "object"
+      },
+      "name": "browser_list_sessions"
+     },
+     {
+      "description": "Close a specific browser session by its ID",
+      "inputSchema": {
+       "properties": {
+        "session_id": {
+         "type": "string",
+         "description": "The browser session ID to close (get from browser_list_sessions)"
+        }
+       },
+       "required": [
+        "session_id"
+       ],
+       "type": "object"
+      },
+      "name": "browser_close_session"
+     },
+     {
+      "description": "Close all active browser sessions and clean up resources",
+      "inputSchema": {
+       "properties": {},
+       "type": "object"
+      },
+      "name": "browser_close_all"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 3,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_navigate",
+    "arguments": {
+     "url": "https://example.com"
+    }
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 3,
+   "result": {
+    "content": [
+     {
+      "text": "Navigated to: https://example.com",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 4,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_get_state",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 4,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"url\": \"https://example.com/\",\n  \"title\": \"example.com\",\n  \"tabs\": [\n    {\n      \"url\": \"https://example.com/\",\n      \"title\": \"example.com\"\n    }\n  ],\n  \"interactive_elements\": [\n    {\n      \"index\": 35,\n      \"tag\": \"a\",\n      \"text\": \"Learn more\",\n      \"href\": \"https://iana.org/help/example-domains\"\n    }\n  ],\n  \"viewport\": {\n    \"width\": 1728,\n    \"height\": 1117\n  },\n  \"page\": {\n    \"width\": 1728,\n    \"height\": 1117\n  },\n  \"scroll\": {\n    \"x\": 0,\n    \"y\": 0\n  }\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 5,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_get_html",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 5,
+   "result": {
+    "content": [
+     {
+      "text": "<html lang=\"en\"><head><meta charset=\"utf-8\"><link rel=\"icon\" href=\"data:,\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Example Domain</title><style>html{color-scheme:light dark;background:light-dark(#eee,#222)}body{font:16px/1.6 system-ui,sans-serif;max-width:26em;margin:auto;padding:25vh 2em 2em;text-align:center}</style></head><body><style>svg{display:block;margin:-2.75em auto 0;opacity:.55}p+p{font-size:.875em;opacity:.6}</style><svg viewBox=\"0,0,20,20\" width=\"44\" height=\"44\" fill=\"currentColor\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linejoin=\"round\" d=\"M6 4H3v12q4 0 7 1.5-1-3.5-4-4.5V2q3.5 1 4 3v12.5q3-1.5 7-1.5V4q-4.5 0-7 1\"></path><g transform=\"rotate(-6,13.6,8.3)\"><path id=\"q\" d=\"M11.5 6.6h1.8v1.8l-1 1.6-.6-.3.8-1.3h-1z\"></path><use href=\"#q\" x=\"2.4\"></use></g></svg><p lang=\"en\">This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.</p><p lang=\"ar\" dir=\"rtl\">\u0647\u0630\u0627 \u0627\u0644\u0646\u0637\u0627\u0642 \u0645\u064f\u062e\u0635\u0635 \u0644\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0641\u064a \u0623\u0645\u062b\u0644\u0629 \u0627\u0644\u062a\u0648\u062b\u064a\u0642 \u062f\u0648\u0646 \u0627\u0644\u062d\u0627\u062c\u0629 \u0625\u0644\u0649 \u0625\u0630\u0646. \u0647\u0630\u0647 \u0644\u064a\u0633\u062a \u062e\u062f\u0645\u0629\u060c \u064a\u064f\u0631\u062c\u0649 \u062a\u062c\u0646\u0628 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f \u0639\u0644\u064a\u0647\u0627 \u0644\u0623\u063a\u0631\u0627\u0636 \u0627\u0644\u0627\u062e\u062a\u0628\u0627\u0631 \u0648\u0627\u0644\u0645\u0631\u0627\u0642\u0628\u0629.</p><p lang=\"zh\">\u8be5\u57df\u540d\u4ec5\u7528\u4e8e\u6587\u6863\u793a\u4f8b\uff0c\u65e0\u9700\u83b7\u5f97\u8bb8\u53ef\u3002\u8fd9\u5e76\u975e\u4e00\u9879\u670d\u52a1\uff0c\u8bf7\u52ff\u5c06\u5176\u7528\u4e8e\u6d4b\u8bd5\u548c\u76d1\u63a7\u76ee\u7684\u3002</p><p lang=\"fr\">L\u2019usage de ce domaine est r\u00e9serv\u00e9 \u00e0 des exemples de documentation, sans autorisation pr\u00e9alable.  Il ne s\u2019agit pas d\u2019un service ; son utilisation \u00e0 des fins de test ou de surveillance est \u00e0 \u00e9viter.</p><p lang=\"ru\">\u0414\u0430\u043d\u043d\u044b\u0439 \u0434\u043e\u043c\u0435\u043d \u043f\u0440\u0435\u0434\u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d \u0434\u043b\u044f \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u044f \u0432 \u043f\u0440\u0438\u043c\u0435\u0440\u0430\u0445 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u0438 \u0431\u0435\u0437 \u043d\u0435\u043e\u0431\u0445\u043e\u0434\u0438\u043c\u043e\u0441\u0442\u0438 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044f \u043f\u0440\u0435\u0434\u0432\u0430\u0440\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d\u0438\u044f. \u042d\u0442\u043e \u043d\u0435 \u0441\u0435\u0440\u0432\u0438\u0441; \u043d\u0435 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0443\u0435\u0442\u0441\u044f \u0435\u0433\u043e \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u0435 \u0434\u043b\u044f \u0442\u0435\u0441\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f \u0438 \u043c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433\u0430.</p><p lang=\"es\">Este dominio est\u00e1 destinado al uso en ejemplos de documentaci\u00f3n sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.</p><a href=\"https://iana.org/help/example-domains\">Learn more</a><script src=\"/s.js\"></script>\n</body></html>",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 6,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_list_tabs",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 6,
+   "result": {
+    "content": [
+     {
+      "text": "[\n  {\n    \"tab_id\": \"DF25\",\n    \"url\": \"https://example.com/\",\n    \"title\": \"example.com\"\n  }\n]",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 7,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_scroll",
+    "arguments": {
+     "direction": "down"
+    }
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 7,
+   "result": {
+    "content": [
+     {
+      "text": "Scrolled down",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 8,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_click",
+    "arguments": {
+     "index": 1
+    }
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 8,
+   "result": {
+    "content": [
+     {
+      "text": "Element with index 1 not found",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 9,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_get_state",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 9,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"url\": \"https://example.com/\",\n  \"title\": \"example.com\",\n  \"tabs\": [\n    {\n      \"url\": \"https://example.com/\",\n      \"title\": \"example.com\"\n    }\n  ],\n  \"interactive_elements\": [\n    {\n      \"index\": 35,\n      \"tag\": \"a\",\n      \"text\": \"Learn more\",\n      \"href\": \"https://iana.org/help/example-domains\"\n    }\n  ],\n  \"viewport\": {\n    \"width\": 1728,\n    \"height\": 1117\n  },\n  \"page\": {\n    \"width\": 1728,\n    \"height\": 1117\n  },\n  \"scroll\": {\n    \"x\": 0,\n    \"y\": 0\n  }\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 10,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_go_back",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 10,
+   "result": {
+    "content": [
+     {
+      "text": "Navigated back",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 11,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_get_state",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 11,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"url\": \"about:blank\",\n  \"title\": \"Empty Tab\",\n  \"tabs\": [\n    {\n      \"url\": \"about:blank\",\n      \"title\": \"\"\n    }\n  ],\n  \"interactive_elements\": [],\n  \"viewport\": {\n    \"width\": 1728,\n    \"height\": 1117\n  },\n  \"page\": {\n    \"width\": 1728,\n    \"height\": 1117\n  },\n  \"scroll\": {\n    \"x\": 0,\n    \"y\": 0\n  }\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 12,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_extract_content",
+    "arguments": {
+     "query": "title"
+    }
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 12,
+   "result": {
+    "content": [
+     {
+      "text": "Error: LLM not initialized (set OPENAI_API_KEY)",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 13,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_click",
+    "arguments": {
+     "index": 999
+    }
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 13,
+   "result": {
+    "content": [
+     {
+      "text": "Element with index 999 not found",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 14,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_nonexistent",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 14,
+   "result": {
+    "content": [
+     {
+      "text": "Error: Unknown tool: browser_nonexistent",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "dir": "->",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 15,
+   "method": "tools/call",
+   "params": {
+    "name": "browser_close_all",
+    "arguments": {}
+   }
+  }
+ },
+ {
+  "dir": "<-",
+  "msg": {
+   "jsonrpc": "2.0",
+   "id": 15,
+   "result": {
+    "content": [
+     {
+      "text": "Closed 1 sessions",
+      "type": "text"
+     }
+    ],
+    "isError": false
+   }
+  }
+ }
+]
