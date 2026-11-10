@@ -63,8 +63,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - run: mkdir -p "$RUNNER_TEMP/zeus-results/app"
-      - name: Select Xcode 26.1.1
-        run: sudo xcode-select --switch /Applications/Xcode_26.1.1.app/Contents/Developer
+      - name: Select Xcode 26.3
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -157,8 +157,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Select Xcode 26.1.1
-        run: sudo xcode-select --switch /Applications/Xcode_26.1.1.app/Contents/Developer
+      - name: Select Xcode 26.3
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
       - name: Run current-source feature map
         id: map
         run: |
