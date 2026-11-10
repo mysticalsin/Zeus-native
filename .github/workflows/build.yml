@@ -119,10 +119,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: extension/package-lock.json
-      - name: Install locked dependencies
+      - name: Install and audit locked dependencies
         id: install
         working-directory: extension
-        run: npm ci 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/install.log"
+        run: |
+          npm ci --include=dev --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/install.log"
+          npm audit --include=dev --audit-level=moderate --json 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/audit.log"
       - name: Typecheck
         id: typecheck
         working-directory: extension

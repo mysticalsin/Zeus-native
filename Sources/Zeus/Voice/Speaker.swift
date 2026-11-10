@@ -53,7 +53,7 @@ final class Speaker {
         if let first = chain.first {
             return Self.describe(provider: first, settings: settings)
         }
-        if KokoroVoice.isSetUp {
+        if settings.kokoroReady {
             return "Kokoro \(settings.kokoroVoice) voice (on this Mac)"
         }
         return voice.map { "system voice (\($0.name) \(Self.qualityName($0.quality)))" } ?? "system voice (default)"
@@ -69,7 +69,7 @@ final class Speaker {
     }
 
     private static func elevenLabsDescription(_ settings: VoiceSettings) -> String {
-        if settings.isProviderPaused(.elevenLabs), KokoroVoice.isSetUp {
+        if settings.isProviderPaused(.elevenLabs), settings.kokoroReady {
             return "Kokoro \(ElevenLabsVoice.offlineKokoroVoice) \(ElevenLabsVoice.offlineKokoroSpeed) (ElevenLabs key rejected)"
         }
         return "ElevenLabs George"
@@ -158,7 +158,7 @@ final class Speaker {
                 settings.noteProviderFailure(.chatterbox, reason: .missingModel)
             }
         }
-        if KokoroVoice.isSetUp {
+        if settings.kokoroReady {
             let voice = ElevenLabsVoice.offlineKokoroVoice
             let ok = await speakKokoroFile(text, voice: voice, speed: ElevenLabsVoice.offlineKokoroSpeed, began: Date())
             if ok { logSpoken(engine: "kokoro", voice: voice) }

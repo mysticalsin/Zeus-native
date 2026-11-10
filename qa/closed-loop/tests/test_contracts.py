@@ -42,9 +42,15 @@ class MatrixContractTests(unittest.TestCase):
                 c.validate_map(data, self.portable)
 
     def test_every_feature_keeps_all_three_evidence_tiers(self):
-        self.data["features"][0]["obligations"].pop()
-        with self.assertRaises(c.Invalid):
-            c.validate_map(self.data, self.portable)
+        checks = {check["id"]: check for check in self.data["checks"]}
+        for index, feature in enumerate(self.data["features"]):
+            for tier in ("contract", "native-integration", "device-proof"):
+                with self.subTest(feature=feature["id"], missing_tier=tier):
+                    data = copy.deepcopy(self.data)
+                    data["features"][index]["obligations"] = [
+                        row for row in feature["obligations"] if checks[row["check"]]["tier"] != tier]
+                    with self.assertRaisesRegex(c.Invalid, feature["id"] + " needs contract, native integration, and device proof"):
+                        c.validate_map(data, self.portable)
 
     def test_missing_native_suite_and_missing_case_are_errors(self):
         data = copy.deepcopy(self.data)

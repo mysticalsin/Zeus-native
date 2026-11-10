@@ -1,5 +1,10 @@
 import Foundation
 import Testing
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 @testable import ZeusCore
 
 /// Disposable anonymous pipes only. No Chrome, app launch, provider, settings, permission or capture.
@@ -119,15 +124,23 @@ struct NativeMessageIOTests {
         let output = try NativeMessageOutput(handle: pipe.fileHandleForWriting, writeTimeout: 20)
         try pipe.fileHandleForWriting.close()
         defer { output.stop(); try? pipe.fileHandleForReading.close() }
-        let completions = Box(0)
+        let completions = Box<[ContinuousClock.Instant]>([])
         for _ in 0..<2 {
-            let admission8 = output.enqueue(try largeFrame()) { _ in completions.change { $0 += 1 } }
+            let admission8 = output.enqueue(try largeFrame()) { result in
+                let completedAt = ContinuousClock.now
+                #expect(throws: NativeMessageOutput.Failure.closed) { try result.get() }
+                completions.change { $0.append(completedAt) }
+            }
             #expect(admission8 == .accepted)
         }
         let began = ContinuousClock.now
         output.stop(); output.stop()
-        try await eventually { completions.read() == 2 }
-        #expect(began.duration(to: .now) < .milliseconds(500))
+        try await eventually { completions.read().count == 2 }
+        // Measure completion on the worker, not when the test executor next schedules
+        // this observer. The deadline remains 500 ms, including actual queue contention.
+        for completedAt in completions.read() {
+            #expect(began.duration(to: completedAt) < .milliseconds(500))
+        }
         #expect(output.queuedFrameCount == 0 && output.queuedByteCount == 0)
     }
 
@@ -168,10 +181,13 @@ struct NativeMessageIOTests {
                 let endings = Box<[NativeMessageInput.End]>([])
                 if stopFirst { input.stop() }
                 let peerFD = pipe.fileHandleForWriting.fileDescriptor
+                let flags = fcntl(peerFD, F_GETFL)
+                try #require(flags >= 0 && fcntl(peerFD, F_SETFL, flags | O_NONBLOCK) == 0)
+                #if canImport(Darwin)
+                try #require(fcntl(peerFD, F_SETNOSIGPIPE, 1) == 0)
+                #endif
                 let started = input.start(consume: { _ in Issue.record("Stopped input consumed bytes") }, ended: { end in
-                    var readiness = pollfd(fd: peerFD, events: Int16(POLLOUT), revents: 0)
-                    _ = poll(&readiness, 1, 0)
-                    #expect(readiness.revents & Int16(POLLERR) != 0, "The read descriptor must close before its terminal callback")
+                    #expect(Self.hasNoReaders(peerFD), "The read descriptor must close before its terminal callback")
                     endings.change { $0.append(end) }
                 })
                 #expect(started)
@@ -194,5 +210,54 @@ struct NativeMessageIOTests {
         input?.start(consume: { _ in }, ended: { end in endings.change { $0.append(end) } })
         input = nil
         try await eventually { weakInput == nil && endings.read() == [.stopped] }
+    }
+
+    @Test func startedInputClosesItsReadDescriptorBeforeCompletion() async throws {
+        let pipe = Pipe()
+        let input = try NativeMessageInput(handle: pipe.fileHandleForReading)
+        try pipe.fileHandleForReading.close()
+        let descriptor = pipe.fileHandleForWriting.fileDescriptor
+        let flags = fcntl(descriptor, F_GETFL)
+        try #require(flags >= 0 && fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == 0)
+        #if canImport(Darwin)
+        try #require(fcntl(descriptor, F_SETNOSIGPIPE, 1) == 0)
+        #endif
+        defer { input.stop(); try? pipe.fileHandleForWriting.close() }
+        let received = Box(Data()), endings = Box<[NativeMessageInput.End]>([])
+        input.start(consume: { data in received.change { $0.append(data) } }, ended: { end in
+            #expect(Self.hasNoReaders(descriptor), "An active read source must close before its terminal callback")
+            endings.change { $0.append(end) }
+        })
+        try pipe.fileHandleForWriting.write(contentsOf: Data([7]))
+        // Actual consumption proves the readiness source exists before stop; no timing guess.
+        try await eventually { received.read() == Data([7]) }
+        input.stop()
+        try await eventually { endings.read() == [.stopped] }
+    }
+
+    /// Darwin and Linux report different poll flags for a pipe with no readers. A one-byte
+    /// nonblocking write must fail with EPIPE at the callback itself; success or EAGAIN fails.
+    private static func hasNoReaders(_ descriptor: Int32) -> Bool {
+        #if !canImport(Darwin)
+        var mask = sigset_t(), previous = sigset_t(), pending = sigset_t()
+        sigemptyset(&mask); sigaddset(&mask, SIGPIPE)
+        guard pthread_sigmask(SIG_BLOCK, &mask, &previous) == 0 else { return false }
+        sigpending(&pending)
+        let wasPending = sigismember(&pending, SIGPIPE) == 1
+        defer {
+            if !wasPending {
+                sigpending(&pending)
+                if sigismember(&pending, SIGPIPE) == 1 {
+                    var zero = timespec(tv_sec: 0, tv_nsec: 0)
+                    _ = sigtimedwait(&mask, nil, &zero)
+                }
+            }
+            pthread_sigmask(SIG_SETMASK, &previous, nil)
+        }
+        #endif
+        var byte: UInt8 = 0
+        let result = write(descriptor, &byte, 1)
+        let code = errno
+        return result == -1 && code == EPIPE
     }
 }

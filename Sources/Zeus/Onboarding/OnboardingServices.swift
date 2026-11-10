@@ -66,9 +66,16 @@ final class OnboardingServices: OnboardingServing {
     /// Only asked `isDownloaded`; the dictation controller owns the engine that downloads and loads.
     @ObservationIgnored private let modelProbe = ParakeetEngine()
     @ObservationIgnored private var polling: Task<Void, Never>?
+    @ObservationIgnored private var notificationRefresh: Task<Void, Never>?
+    @ObservationIgnored private var refreshGeneration: UInt64 = 0
 
     init(permissions: PermissionsModel) {
         self.permissions = permissions
+    }
+
+    isolated deinit {
+        polling?.cancel()
+        notificationRefresh?.cancel()
     }
 
     /// `--onboarding-fresh` (parity captures only): draw every row as on a new Mac.
@@ -99,20 +106,27 @@ final class OnboardingServices: OnboardingServing {
         fullDiskAccess = !Self.fresh && Self.hasFullDiskAccess()
         let status = location.authorizationStatus
         locationAllowed = !Self.fresh && (status == .authorizedAlways || status == .authorized)
-        guard Self.hasBundle else { return }
-        Task { @MainActor in
+        guard Self.hasBundle, notificationRefresh == nil else { return }
+        let generation = refreshGeneration
+        notificationRefresh = Task { @MainActor [weak self] in
+            guard !Task.isCancelled else { self?.notificationRefresh = nil; return }
             let settings = await UNUserNotificationCenter.current().notificationSettings()
-            notificationsAllowed = !Self.fresh && (settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+            guard let self else { return }
+            self.notificationRefresh = nil
+            guard !Task.isCancelled, generation == self.refreshGeneration else { return }
+            self.notificationsAllowed = !Self.fresh && (settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
         }
     }
 
     /// Grants made in System Settings show up without reopening the window; stops when hidden.
     func startPolling() {
-        polling?.cancel()
+        guard polling == nil else { return }
         polling = Task { @MainActor [weak self] in
             while !Task.isCancelled {
+                guard self != nil else { return }
                 self?.refresh()
-                try? await Task.sleep(for: .seconds(1.5))
+                do { try await Task.sleep(for: .seconds(1.5)) }
+                catch { return }
             }
         }
     }
@@ -120,6 +134,10 @@ final class OnboardingServices: OnboardingServing {
     func stopPolling() {
         polling?.cancel()
         polling = nil
+        refreshGeneration &+= 1
+        // The OS read may ignore cancellation. Keep its slot until it returns so a quick
+        // hide/show cannot build a backlog; its old generation cannot publish a result.
+        notificationRefresh?.cancel()
     }
 
     // MARK: Actions

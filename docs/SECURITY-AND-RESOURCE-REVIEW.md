@@ -19,6 +19,16 @@ Native control, consented hardware, signing and distribution proof remain requir
 - Native-host framing validates the four-byte header before retaining its body.
   Output admission is bounded to 32 frames / 8 MiB with absolute write deadlines.
   A broken stream closes the host; clean EOF drains accepted responses first.
+- Browser extension callbacks and replies belong to their original native
+  connection. Retired messages cannot dispatch new work, clear a replacement
+  connection or settle its reused request IDs. A failed handshake is displayed as
+  disconnected. This does not undo browser actions already dispatched before a
+  disconnect or establish a complete browser recovery journey.
+- The extension's locked esbuild version is updated to 0.28.2, outside the affected
+  range for [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99).
+  That advisory affects its development server; Zeus uses the build CLI. CI now
+  audits development dependencies too and blocks on moderate-or-higher findings.
+  A clean registry audit is a dependency check, not a security certification.
 - Local Python helper execution now bounds stdin writes, stdout/stderr retention
   and termination cleanup. A helper that ignores SIGTERM cannot turn a timeout
   into a reported success. This does not establish task cancellation or kill an
@@ -44,6 +54,19 @@ Native control, consented hardware, signing and distribution proof remain requir
 - Recording effects use display-synchronized clocks, pause when hidden or reduced,
   and stop after finite reveals. Meetings separates decorative drawing from
   static content. Incoming-word layout is cached until actual text admission.
+- The resident Kokoro worker now acknowledges an atomic completed WAV before the
+  app validates and publishes its own exclusive copy. Requests, output size,
+  cancellation, cleanup and idle lifetime are bounded; stale replies cannot
+  complete a replacement request. Synthetic fixtures execute the production
+  worker protocol with disposable modules, without loading a voice model.
+- WAV decoding validates the complete declared RIFF structure before reading
+  chunk fields or samples. Truncated chunks and malformed PCM are rejected;
+  sliced `Data` uses buffer-relative offsets. A previously crashing 44-byte
+  fixture is retained as a regression test.
+- Repeating UI clocks invalidate their timers when their owner is released.
+  Hidden, occluded or minimized onboarding windows stop polling, and cancelled
+  notification refreshes cannot publish stale status. Cloud-only selections do
+  not warm a local voice model; only the selected, ready local voice is warmed.
 
 The tests use memory-only credentials, synthetic data, disposable vaults and
 local subprocesses. They do not read a personal vault, use provider credentials,
@@ -69,13 +92,16 @@ owned-window event journeys. A failure or an unavailable GUI is not a passing
 user journey. Signing, notarization, Gatekeeper, rollback and clean-machine
 installation also require evidence from the exact final artifact.
 
-At 82e310c, production and test-target compilation passed, but the combined
-native test process ended without its terminal summary. It is not a passing
-native run. The next runner isolates each selected app suite from other suites'
-snapshot flags and application lifecycle, retaining the same strict assertions
-and complete compiler-derived test selection.
+At `dd19cb5`, the PR run compiled production and test targets and executed every
+selected partition. Eighteen App suites completed with 147 passing tests. Core
+and three GUI partitions still failed; the aggregate is not a native pass. See
+[the exact run receipt](../qa/receipts/20261110/mac-dd19-ci.json). Suite isolation
+preserves strict assertions and complete compiler-derived test selection. A
+separate push run emitted a compiler internal error despite exit code zero;
+the compiler barrier correctly rejected it.
 
-The resident Kokoro voice worker still needs a separate cancellation and output
-publication repair: synthetic process reproduction showed a cancelled render
-waiting and a WAV path returned while its file was still being written. The
-bounded one-shot helper repair above does not fix this resident-worker path.
+The subsequent resident-worker, WAV and idle-resource repairs above have focused
+source-bound synthetic evidence and independent review. Fresh native compilation
+and execution remain required. Bounded worker lifetimes do not prove measured
+CPU, energy or real-voice latency, and ordinary file syscalls do not provide a
+hard real-time deadline or an arbitrary descendant-process sandbox.

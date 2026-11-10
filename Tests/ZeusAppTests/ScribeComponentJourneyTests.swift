@@ -163,16 +163,14 @@ private struct ScribeComponentFixture {
             if let button = matches.first {
                 let frame = button.accessibilityFrame()
                 let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
-                guard button.accessibilityRole() == .button else {
-                    throw ScenarioFailure.unavailableControl(id,
-                        "identified \(String(reflecting: type(of: button))) has role " +
-                        "\(button.accessibilityRole()?.rawValue ?? "nil"), enabled=\(button.isAccessibilityEnabled())")
-                }
                 guard finite else { throw ScenarioFailure.unavailableControl(id, "nonfinite geometry") }
                 // Model transitions precede SwiftUI's layout/animation and accessibility updates.
                 // Keep the same deadline for missing and not-yet-ready controls, and always resolve
                 // the current object again; never press an unavailable or stale proxy.
-                if !window.isVisible {
+                if button.accessibilityRole() != .button {
+                    lastUnavailableReason = "identified \(String(reflecting: type(of: button))) has role " +
+                        "\(button.accessibilityRole()?.rawValue ?? "nil"), enabled=\(button.isAccessibilityEnabled())"
+                } else if !window.isVisible {
                     lastUnavailableReason = "owning window stayed hidden"
                 } else if !button.isAccessibilityEnabled() {
                     lastUnavailableReason = "button stayed disabled"
@@ -237,6 +235,38 @@ private struct ScribeComponentFixture {
         }
         #expect(target.presses == 1)
         #expect(trace == ["pressed scribe.start"])
+    }
+
+    func persistentWrongAccessibilityRoleNeverReceivesAPress() async throws {
+        let originalPolicy = try prepareFixtureApplication()
+        defer { OwnedWindowFixtureApplication.restore(originalPolicy) }
+        let target = ButtonTarget()
+        let button = NSButton(title: "Synthetic mismatched role", target: target,
+                              action: #selector(ButtonTarget.performAction(_:)))
+        button.setAccessibilityIdentifier("scribe.start")
+        button.setAccessibilityRole(.staticText)
+        button.isEnabled = true
+        button.frame = NSRect(x: 20, y: 20, width: 240, height: 32)
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 90))
+        content.addSubview(button)
+        let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 300, height: 90),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "Synthetic wrong accessibility role fixture"
+        window.isReleasedWhenClosed = false
+        window.contentView = content
+        defer { OwnedWindowFixtureApplication.close(window) }
+        window.makeKeyAndOrderFront(nil)
+        #expect(button.accessibilityRole() != .button)
+        var trace: [String] = []
+        do {
+            try await press("scribe.start", in: window, trace: &trace)
+            Issue.record("A control with a persistent mismatched accessibility role was pressed")
+        } catch ScenarioFailure.unavailableControl(let id, let reason) {
+            #expect(id == "scribe.start")
+            #expect(reason.contains("has role"))
+        }
+        #expect(target.presses == 0)
+        #expect(trace.isEmpty)
     }
 
     func runJourney(useWindowEvents: Bool) async throws {
@@ -417,5 +447,11 @@ struct ScribeAccessibilityJourneyTests {
 
     @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
         try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false) }
+    }
+
+    @Test func persistentWrongAccessibilityRoleNeverReceivesAPress() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            try await ScribeComponentFixture().persistentWrongAccessibilityRoleNeverReceivesAPress()
+        }
     }
 }

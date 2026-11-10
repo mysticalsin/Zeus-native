@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
-/// Real scheduler workers, blocked only by disposable semaphores. No CoreAudio or device reads.
+/// Real scheduler workers, blocked only by disposable fixture-owned gates. No CoreAudio or device reads.
 @Suite("Bounded Scribe mute readers", .serialized)
 struct ScribeMuteReadSchedulerTests {
     private final class Counter: @unchecked Sendable {
@@ -10,6 +10,27 @@ struct ScribeMuteReadSchedulerTests {
         private var count = 0
         var value: Int { lock.withLock { count } }
         func increment() { lock.withLock { count += 1 } }
+    }
+
+    /// A stalled OS read must remain stalled until the test releases it, even when a busy
+    /// native runner resumes its test continuation more than five seconds later. Cleanup
+    /// opens every waiter (including any admitted by a broken budget), so no worker is stranded.
+    private final class ReadGate: @unchecked Sendable {
+        private let condition = NSCondition()
+        private var isOpen = false
+
+        func wait() {
+            condition.lock()
+            defer { condition.unlock() }
+            while !isOpen { condition.wait() }
+        }
+
+        func open() {
+            condition.lock()
+            isOpen = true
+            condition.broadcast()
+            condition.unlock()
+        }
     }
 
     private func eventually(_ condition: @Sendable () -> Bool) async throws {
@@ -20,10 +41,10 @@ struct ScribeMuteReadSchedulerTests {
 
     @Test func twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing() async throws {
         let scheduler = ScribeMuteReadScheduler()
-        let release = DispatchSemaphore(value: 0)
-        defer { release.signal(); release.signal() }
+        let release = ReadGate()
+        defer { release.open() }
         let began = Counter()
-        let blocked: @Sendable () -> Void = { began.increment(); _ = release.wait(timeout: .now() + 5) }
+        let blocked: @Sendable () -> Void = { began.increment(); release.wait() }
         #expect(scheduler.schedule(now: 10, evidenceTakenAt: nil, interval: 0.5, watchdog: 3, read: blocked))
         try await eventually { began.value == 1 }
         #expect(!scheduler.schedule(now: 12.99, evidenceTakenAt: nil, interval: 0.5, watchdog: 3, read: blocked))
@@ -34,18 +55,18 @@ struct ScribeMuteReadSchedulerTests {
         }
         #expect(scheduler.activeReadCount == 2)
         #expect(began.value == 2)
-        release.signal(); release.signal()
+        release.open()
         try await eventually { scheduler.activeReadCount == 0 }
         #expect(began.value == 2, "Rejected refreshes must not become queued work after a slot returns")
     }
 
     @Test func oneStalledReaderDoesNotQueueItsReplacementAndReturnedSlotCanRecover() async throws {
         let scheduler = ScribeMuteReadScheduler()
-        let release = DispatchSemaphore(value: 0)
-        defer { release.signal() }
+        let release = ReadGate()
+        defer { release.open() }
         let began = Counter()
         #expect(scheduler.schedule(now: 10, evidenceTakenAt: nil, interval: 0.5, watchdog: 3) {
-            began.increment(); _ = release.wait(timeout: .now() + 5)
+            began.increment(); release.wait()
         })
         try await eventually { began.value == 1 }
         #expect(scheduler.schedule(now: 13, evidenceTakenAt: nil, interval: 0.5, watchdog: 3) { began.increment() })
@@ -53,15 +74,15 @@ struct ScribeMuteReadSchedulerTests {
         #expect(!scheduler.schedule(now: 13.49, evidenceTakenAt: 13, interval: 0.5, watchdog: 3) { began.increment() })
         #expect(scheduler.schedule(now: 13.5, evidenceTakenAt: 13, interval: 0.5, watchdog: 3) { began.increment() })
         try await eventually { began.value == 3 && scheduler.activeReadCount == 1 }
-        release.signal()
+        release.open()
         try await eventually { scheduler.activeReadCount == 0 }
     }
 
     @Test func simultaneousRefreshRequestsShareTheTwoReaderBudget() async throws {
         let scheduler = ScribeMuteReadScheduler()
-        let release = DispatchSemaphore(value: 0)
-        defer { release.signal(); release.signal() }
-        let blocked: @Sendable () -> Void = { _ = release.wait(timeout: .now() + 5) }
+        let release = ReadGate()
+        defer { release.open() }
+        let blocked: @Sendable () -> Void = { release.wait() }
         #expect(scheduler.schedule(now: 10, evidenceTakenAt: nil, interval: 0.5, watchdog: 3, read: blocked))
         let admitted = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
             for _ in 0..<64 {
@@ -75,7 +96,7 @@ struct ScribeMuteReadSchedulerTests {
         }
         #expect(admitted == 1)
         #expect(scheduler.activeReadCount == 2)
-        release.signal(); release.signal()
+        release.open()
         try await eventually { scheduler.activeReadCount == 0 }
     }
 
@@ -86,10 +107,10 @@ struct ScribeMuteReadSchedulerTests {
         ingress.begin(session: session)
         ingress.record(state: .unmuted, readStart: 10, readEnd: 10.1, externalInputDetected: false)
         #expect(ingress.acknowledge(session: session, at: 10.1))
-        let release = DispatchSemaphore(value: 0)
-        defer { release.signal() }
+        let release = ReadGate()
+        defer { release.open() }
         #expect(scheduler.schedule(now: 10.5, evidenceTakenAt: 10, interval: 0.5, watchdog: 3) {
-            _ = release.wait(timeout: .now() + 5)
+            release.wait()
             ingress.record(state: .unmuted, readStart: 10.5, readEnd: 13.7, externalInputDetected: false)
         })
         #expect(ingress.currentState(now: 12) == .unknown)
@@ -100,7 +121,7 @@ struct ScribeMuteReadSchedulerTests {
             ingress.record(state: .muted, readStart: 13.5, readEnd: 13.6, externalInputDetected: false)
         })
         try await eventually { scheduler.activeReadCount == 1 && ingress.currentState(now: 13.7) == .muted }
-        release.signal()
+        release.open()
         try await eventually { scheduler.activeReadCount == 0 }
         #expect(ingress.currentState(now: 13.8) == .muted)
         #expect(!ingress.admit(session: session, start: 13.7, duration: 0.05, now: 13.8) {
@@ -110,8 +131,8 @@ struct ScribeMuteReadSchedulerTests {
 
     @Test func invalidOrBackwardsTimingDoesNotLaunchReplacementReaders() async throws {
         let scheduler = ScribeMuteReadScheduler()
-        let release = DispatchSemaphore(value: 0)
-        defer { release.signal() }
+        let release = ReadGate()
+        defer { release.open() }
         let began = Counter()
         for now in [Double.nan, .infinity, -.infinity] {
             #expect(!scheduler.schedule(now: now, evidenceTakenAt: nil, interval: 0.5, watchdog: 3) { began.increment() })
@@ -122,10 +143,10 @@ struct ScribeMuteReadSchedulerTests {
         }
         #expect(!scheduler.schedule(now: 10, evidenceTakenAt: .nan, interval: 0.5, watchdog: 3) { began.increment() })
         #expect(scheduler.schedule(now: 10, evidenceTakenAt: nil, interval: 0.5, watchdog: 3) {
-            began.increment(); _ = release.wait(timeout: .now() + 5)
+            began.increment(); release.wait()
         })
         #expect(!scheduler.schedule(now: 9, evidenceTakenAt: nil, interval: 0.5, watchdog: 3) { began.increment() })
-        release.signal()
+        release.open()
         try await eventually { scheduler.activeReadCount == 0 }
         #expect(began.value == 1)
     }

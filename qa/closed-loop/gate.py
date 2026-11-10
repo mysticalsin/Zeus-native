@@ -114,7 +114,40 @@ def job_artifacts(job: str) -> set[str]:
     files = {f"{check}.log" for check in REQUIRED[job]}
     if job == "app":
         files.add("native-evidence/result.json")
+    if job == "extension":
+        files.add("audit.log")
     return files
+
+
+def validate_extension(root: Path) -> int:
+    """Bind mandatory Node regression names and the dependency audit to this job receipt."""
+    log = artifact(root, "test.log")
+    count = positive_test_count("extension", log)
+    repo = Path(__file__).resolve().parents[2]
+    policy = load_object(repo / "qa/extension-regressions.json")
+    names = policy.get("required_tests")
+    if (policy.get("schema_version") != 1 or policy.get("command") != ["npm", "test"]
+            or policy.get("file") != "extension/tests/native-session.test.mjs"
+            or not isinstance(names, list) or not names or any(not isinstance(name, str) or not name for name in names)
+            or len(set(names)) != len(names)):
+        raise ValueError("extension regression policy is invalid")
+    passed = re.findall(r"^ok \d+ - (.+)$", log.read_text(), re.MULTILINE)
+    if len(passed) != count or len(set(passed)) != count:
+        raise ValueError("extension named passes differ from its terminal test count")
+    source = (repo / policy["file"]).read_text()
+    for name in names:
+        if source.count('test(' + json.dumps(name) + ',') != 1:
+            raise ValueError(f"extension regression is missing from current source: {name}")
+        if passed.count(name) != 1:
+            raise ValueError(f"extension regression did not pass exactly once: {name}")
+    audit = load_object(artifact(root, "audit.log"))
+    levels = audit.get("metadata", {}).get("vulnerabilities", {})
+    if (audit.get("auditReportVersion") != 2 or "error" in audit
+            or any(type(levels.get(level)) is not int or levels[level] < 0
+                   for level in ("info", "low", "moderate", "high", "critical", "total"))
+            or any(levels[level] != 0 for level in ("moderate", "high", "critical"))):
+        raise ValueError("extension dependency audit is missing, invalid or has blocking vulnerabilities")
+    return count
 
 
 def record(job: str, output: Path) -> None:
@@ -389,7 +422,9 @@ def evaluate(needs, inputs: Path, expected_sha: str, head_sha: str, run_id: str,
             if job == "feature-map":
                 jobs[job]["tests"] = validate_feature_map(root, expected_sha, head_sha, mode)
             else:
-                count = validate_native(root, expected_sha, head_sha) if job == "app" else positive_test_count(job, artifact(root, "test.log"))
+                count = (validate_native(root, expected_sha, head_sha) if job == "app"
+                         else validate_extension(root) if job == "extension"
+                         else positive_test_count(job, artifact(root, "test.log")))
                 if count <= 0:
                     raise ValueError("test command produced no positive passing test count")
                 jobs[job]["tests"] = count

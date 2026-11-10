@@ -370,8 +370,6 @@ final class VoiceSettings {
 
 /// Kokoro text to speech via kokoro_onnx resident worker (read-only model dir on disk).
 enum KokoroVoice {
-    static var isSetUp: Bool { KokoroWorker.isSetUp() }
-
     /// The WAV for `text`, or nil when Kokoro could not make it.
     static func render(_ text: String, voice: String, speed: Double) async -> URL? {
         await KokoroWorkerSession.shared.render(text, voice: voice, speed: speed)

@@ -366,7 +366,7 @@ struct SettingsView: View {
     private var voice: some View {
         let settings = VoiceSettings.shared
         let paused = settings.elevenLabsPausedUntil.map { $0 > Date() } ?? false
-        let plan = UltronVoicePlan.preferred(kokoroReady: KokoroVoice.isSetUp,
+        let plan = UltronVoicePlan.preferred(kokoroReady: settings.kokoroReady,
                                              elevenLabsKeyValid: settings.elevenKeySaved && !paused)
         return VStack(spacing: Glass.gap) {
             GlassCard(title: "Voice") {

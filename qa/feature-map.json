@@ -476,6 +476,38 @@
       "tier": "contract",
       "group": "bridge-transport",
       "scope": "Exact bridge framing/pipe/ownership source and real zeus-bridge executable with disposable owned pipes/sockets/support directory. No Chrome session, user settings, provider, capture or external network."
+    },
+    {
+      "id": "native-KokoroWorkerSessionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Production worker script and native Foundation session with isolated synthetic Python modules, generated WAV files and disposable directories. No installed models, provider requests, playback, capture, user preferences or real voice-quality acceptance.",
+      "suite": "KokoroWorkerSessionTests",
+      "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift"
+    },
+    {
+      "id": "native-KokoroWorkerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Pure worker line encoding and model-path argv plus a missing-model check in a disposable preferences suite. No process launch, installed model, provider, playback or capture.",
+      "suite": "KokoroWorkerTests",
+      "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift"
+    },
+    {
+      "id": "native-TickingTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Native Timer ownership, injected visibility predicates and one disposable notification-store timestamp fixture. No live notification databases, capture, permissions, providers or measured device refresh rate.",
+      "suite": "TickingTests",
+      "file": "Tests/ZeusAppTests/TickingTests.swift"
+    },
+    {
+      "id": "native-BrainWarmSchedulerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Injected scheduler time, warm callbacks and action ports with synthetic provider selections. No scheduler start, live settings, model loads, provider requests, voice rendering, capture or playback.",
+      "suite": "BrainWarmSchedulerTests",
+      "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift"
     }
   ],
   "features": [
@@ -537,6 +569,37 @@
           "acceptance": "Recognize public/prerecorded multilingual speech through actual engine; insert/correct only in disposable focused fixture, interrupted/offline and cross-turn cases. Keep transcript, focus events and exact model/binary hashes.",
           "cases": [],
           "id": "F01.3"
+        },
+        {
+          "id": "F01.saved-wav-container",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Generated WAV data rejects truncated or oversized chunks, unsupported PCM metadata, partial samples and inconsistent container sizes while accepting valid empty and padded containers and sliced Data. This decoder proof does not capture audio, validate a speech provider or establish dictation quality.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+              "function": "truncatedFormatBodyAtEndOfAValidSizeContainerReturnsNil"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+              "function": "everyTruncatedPrefixAndOversizedChunkIsRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+              "function": "formatIsRequiredAndMustDescribeMonoSixteenBitPCM"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+              "function": "partialOrDuplicateSamplesAreNeverReturnedAsSuccessfulAudio"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+              "function": "paddedUnknownChunksAndNonzeroIndexDataRemainReadable"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+              "function": "emptyEncodedAudioRemainsValidAndDeclaredContainerCannotHideTruncation"
+            }
+          ]
         }
       ]
     },
@@ -894,6 +957,49 @@
               "function": "pausedAndReducedClockUsesFreshTimeForNewCompletionWithoutStartingALink"
             }
           ]
+        },
+        {
+          "id": "F05.timer-ownership",
+          "check": "native-TickingTests",
+          "acceptance": "Native timer ownership stops paused, hidden and released clocks, with injected visibility and disposable file stamps. This does not establish physical refresh cadence, energy use or reference motion parity.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "aViewTicksOnlyWhileShownUnpausedAndVisible"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "hiddenWindowsStopTheTimerUntilVisibleAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "pollingIntervalsStayCheap"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "lightsShareTheMascotsBusyGrid"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "pausedAndHiddenClocksHoldNoRunningTimer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "hiddenWindowStopsTheClockEntirely"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "releasingRunningClockInvalidatesItsRunLoopTimer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "idleMascotTicksSlowly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TickingTests.swift",
+              "function": "mirrorChangeStampTracksTheStoreAndItsLog"
+            }
+          ]
         }
       ]
     },
@@ -974,6 +1080,10 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
             }
           ]
         },
@@ -1667,6 +1777,123 @@
           "acceptance": "Authorized voice corpus, real TTS adapter output (offline files), pronunciation/latency/loudness, long replies and interruption/fallback; reproducible delivery evaluation.",
           "cases": [],
           "id": "F11.3"
+        },
+        {
+          "id": "F11.local-worker-publication",
+          "check": "native-KokoroWorkerSessionTests",
+          "acceptance": "Owned synthetic worker processes publish only complete acknowledged WAVs and bound startup, pending admission, cancellation, idle shutdown, malformed replies and descriptor-based output copying. These fixtures do not establish real model synthesis, playback, delivery quality or device performance.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "productionWorkerPublishesOnlyACompleteAcknowledgedWAV"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "cancellingSynthesisReturnsNoArtifactAndStopsItsWorker"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "pendingAdmissionIsBoundedAndNeverReplaysARejectedRequest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "deadlineIncludesStartupAndANonReadingWorker"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "malformedAndOversizedRepliesEndTheWorker"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "wrongIdentityWrongPathAndSymlinkCannotPublish"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "idleWorkerReleasesItsProcessAndClosedSessionCannotRestart"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "invalidTextAndSpeedNeverStartAWorker"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "cancellationDuringSetupDoesNotCreateAnotherProbeOrReplayTheOldText"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "cancelledPartialWriteCannotLeaveAnAudioArtifact"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "descriptorPublicationCannotBeSubstitutedByAReplacedPath"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "invalidPCMChunkBoundsAndAlignmentCannotBePublished"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+              "function": "cancellationDuringArtifactCopyRemovesTheUnpublishedTarget"
+            }
+          ]
+        },
+        {
+          "id": "F11.local-worker-protocol",
+          "check": "native-KokoroWorkerTests",
+          "acceptance": "Worker line encoding preserves the protocol, quoted model paths travel as separate arguments, and missing-model setup fails in an isolated preferences suite. Actual installed-model availability and synthesis are not proved.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift",
+              "function": "jsonLineEncodingRoundTrip"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift",
+              "function": "argvPassesModelPathsAsArguments"
+            },
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift",
+              "function": "isSetUpFalseWhenModelMissing"
+            }
+          ]
+        },
+        {
+          "id": "F11.selected-idle-warming",
+          "check": "native-BrainWarmSchedulerTests",
+          "acceptance": "Injected action and scheduler policies warm only due model targets and the selected ready unpaused local voice, respect cancellation and stop issuing warm work after inactivity. Real provider latency, model synthesis and energy measurements remain unproved.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "doesNothingUntilZeusIsUsed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "warmsAfterActivityThenWaitsForTheNextInterval"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "wakeForcesBothTargets"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "stopsPingingOnceZeusGoesQuiet"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "cloudOnlyWarmDoesNotInspectVoiceSettingsOrRenderLocalVoice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "localAndStartupWarmOnlyTheSelectedReadyKokoroVoice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "unselectedUnreadyAndPausedVoicesNeverWarmAsFallbacks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+              "function": "canceledWarmStartsNoProvidersOrVoiceRender"
+            }
+          ]
         }
       ]
     },
@@ -2075,6 +2302,10 @@
             {
               "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
               "function": "duplicateRemovedAndUnownedControlsCannotDispatch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+              "function": "consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched"
             }
           ]
         },
@@ -2190,6 +2421,10 @@
             {
               "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
               "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
             }
           ]
         },
@@ -2305,6 +2540,10 @@
             {
               "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
               "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
             }
           ]
         },
@@ -2402,6 +2641,33 @@
             {
               "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
               "function": "actualHTTPRedirectNeverReceivesPromptOrKeyAtItsDestination"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+              "function": "ownedLoopbackReadinessAndRepeatedCleanupDoNotDependOnAChildStartupFile"
+            }
+          ]
+        },
+        {
+          "id": "F13.onboarding-polling-lifecycle",
+          "check": "native-OnboardingIsolationTests",
+          "acceptance": "Injected onboarding polling ownership follows visibility and teardown; a separate owned-window fixture verifies miniaturize, restore and close notifications without service actions. These are policy and window-lifecycle checks, not onboarding button activation or OS-consent proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "pollingVisibilityPolicyPausesForHiddenMinimizedOccludedAndClosedWindows"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "pollingOwnerStartsOncePerVisibleIntervalAndResumesWithoutActions"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "pollingOwnerTeardownStopsAnActiveIntervalExactlyOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "pollingFollowsOwnWindowMiniaturizeRestoreAndCloseWithoutActions"
             }
           ]
         }
@@ -2631,6 +2897,10 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+              "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
             }
           ]
         }

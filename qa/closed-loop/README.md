@@ -54,7 +54,7 @@ failed or incomplete required process fails the app result. A missing, changed o
 unsuccessful compiler/discovery receipt cannot authorize `--skip-build`. Every
 mapped obligation remains required, including both AX and event journey suites.
 
-The audited native selection is **all Core tests plus 21 explicitly mapped app suites**.
+The audited native selection is **all Core tests plus 25 explicitly mapped app suites**.
 Three former narrow Core selections are subsumed by the module; their named
 obligations and regression bindings remain mandatory. The compiler's discovery
 stream must include every current Core `@Test` declaration. A source inventory is
@@ -76,9 +76,14 @@ unknown protocol versions or unselected suite execution fail even when the human
 summary reports success.
 Apple Testing 1400 discovery from commit `df3dcc3` was validated against that
 exact source snapshot, including unexpanded parameters and implicit suites.
-The complete argument lifecycle was additionally probed with Linux Swift 6.2.1;
-Apple execution remains pending. An unsupported variant remains a failed gate
-until its actual evidence is reviewed.
+The complete argument lifecycle was additionally probed with Linux Swift 6.2.1.
+At `dd19cb5`, actual Apple Testing 1400 execution produced complete independently
+validated evidence for 18 separate App suites and 147 tests; all 22 selected
+processes were attempted. Core and three UI suites failed, so the aggregate and
+a complete passing Core/parameterized receipt remain unproved. The same-source
+push compiler internal error also remained blocking despite exit zero. See the
+[dd19 receipt](../receipts/20261110/mac-dd19-ci.json). An unsupported protocol
+variant remains a failed gate until its actual evidence is reviewed.
 
 The CI app stores `native-evidence/result.json`, a source manifest, compiler log,
 discovery log/events and per-process execution log/events. Its version 2 receipt
@@ -93,6 +98,14 @@ borrowing a same-named pass from another file. `native-result.schema.json`
 documents this app receipt; the feature-map receipt remains version 1.
 
 ## Evidence and rejection rules
+
+The separate mandatory extension job runs every Node test and emits TAP. Its
+[session regression registry](../extension-regressions.json) binds named guards
+to current source declarations and exactly one passing result each. The aggregate
+also requires its hashed npm audit JSON, including development dependencies, with
+no moderate, high or critical findings. Missing names, mismatched totals and an
+absent or unsuccessful audit fail the gate. This is synthetic browser-boundary
+evidence; it does not satisfy native Swift or real-browser device obligations.
 
 `result.json` records actual git `tested_sha`, separately supplied PR `head_sha`,
 dirty state, a SHA-256 snapshot of repository files, exact argv, exit code, named

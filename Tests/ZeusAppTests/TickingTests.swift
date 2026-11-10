@@ -60,6 +60,21 @@ struct TickingTests {
         #expect(!clock.isRunning)
     }
 
+    @MainActor @Test func releasingRunningClockInvalidatesItsRunLoopTimer() throws {
+        var clock: TickClock? = TickClock()
+        clock?.configure(interval: 1.0 / 24, paused: false)
+        clock?.appear()
+        weak var releasedClock = clock
+        // Observe the actual private timer without adding a production timer-inspection API.
+        let timer = try #require(Mirror(reflecting: clock!).children
+            .first(where: { $0.label == "timer" })?.value as? Timer)
+        defer { timer.invalidate() }
+        #expect(timer.isValid)
+        clock = nil // Deliberately no disappear: the owner itself must release the scheduled work.
+        #expect(releasedClock == nil)
+        #expect(!timer.isValid)
+    }
+
     @Test func idleMascotTicksSlowly() {
         #expect(LivingAvatar.restFPS <= 8)
         #expect(LivingAvatar.tickInterval(asleep: false, waking: false, state: .idle) >= 1.0 / 8)

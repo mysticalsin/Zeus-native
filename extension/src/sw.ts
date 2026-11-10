@@ -36,37 +36,43 @@ let lastError: string | undefined;
 
 function connect(): void {
   if (port) return;
+  let connection: chrome.runtime.Port;
   try {
-    port = chrome.runtime.connectNative(HOST);
+    connection = chrome.runtime.connectNative(HOST);
+    port = connection;
   } catch (error) {
     console.warn("[ZEUS] connectNative failed", error);
     setTimeout(connect, RECONNECT_MS);
     return;
   }
-  port.onMessage.addListener((message: BridgeRequest | BridgeResponse) => {
+  connection.onMessage.addListener((message: BridgeRequest | BridgeResponse) => {
+    if (port !== connection) return;
     if ("ok" in message) {
       if (message.id === "hello") {
         console.info("[ZEUS] bridge connected", message.result);
-        hostInfo = (message.result as { version?: string }) ?? {};
-        lastError = undefined;
+        hostInfo = message.ok ? (message.result as { version?: string }) ?? {} : null;
+        lastError = message.ok ? undefined : message.error?.message ?? "Bridge handshake failed.";
         void chrome.storage.local.set({ bridgeConnected: message.ok });
       }
       return;
     }
-    void answer(message);
+    void answer(message, connection);
   });
-  port.onDisconnect.addListener(() => {
+  const disconnected = () => {
+    if (port !== connection) return;
     console.warn("[ZEUS] bridge disconnected", chrome.runtime.lastError?.message);
     port = null;
     hostInfo = null;
-    lastError = chrome.runtime.lastError?.message;
+    lastError = chrome.runtime.lastError?.message ?? "The native bridge connection closed.";
     void chrome.storage.local.set({ bridgeConnected: false });
     setTimeout(connect, RECONNECT_MS);
-  });
-  port.postMessage({ id: "hello", type: "ping", params: {} });
+  };
+  connection.onDisconnect.addListener(disconnected);
+  try { connection.postMessage({ id: "hello", type: "ping", params: {} }); }
+  catch { disconnected(); }
 }
 
-async function answer(request: BridgeRequest): Promise<void> {
+async function answer(request: BridgeRequest, connection: chrome.runtime.Port): Promise<void> {
   let response: BridgeResponse;
   try {
     response = { id: request.id, ok: true, result: await handle(request) };
@@ -74,7 +80,11 @@ async function answer(request: BridgeRequest): Promise<void> {
     const code = error instanceof BridgeFailure ? error.code : "failed";
     response = { id: request.id, ok: false, error: { code, message: String((error as Error).message ?? error) } };
   }
-  port?.postMessage(response);
+  // Work already dispatched may finish after disconnect. Its outcome belongs only to that
+  // session; never replay the request or settle a reused ID on a replacement native port.
+  if (port !== connection) return;
+  try { connection.postMessage(response); }
+  catch { /* Chrome can retire the port before delivering its disconnect notification. */ }
 }
 
 async function handle({ type, params }: BridgeRequest): Promise<unknown> {

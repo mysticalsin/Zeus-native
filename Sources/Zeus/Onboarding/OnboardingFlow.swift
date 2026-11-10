@@ -337,10 +337,40 @@ struct OnboardingRoot: View {
     }
 }
 
+/// Pure visibility policy; polling does not require key-window focus.
+enum OnboardingPollingPolicy {
+    static func shouldPoll(presented: Bool, windowVisible: Bool, miniaturized: Bool,
+                           appHidden: Bool, occluded: Bool) -> Bool {
+        presented && windowVisible && !miniaturized && !appHidden && !occluded
+    }
+}
+
+/// Owns the polling interval, independently of how AppKit reports visibility changes.
+@MainActor
+final class OnboardingPollingLifecycle {
+    private let services: any OnboardingServing
+    private(set) var isPolling = false
+
+    init(services: any OnboardingServing) { self.services = services }
+
+    func setVisible(_ visible: Bool) {
+        guard visible != isPolling else { return }
+        isPolling = visible
+        if visible { services.startPolling() }
+        else { services.stopPolling() }
+    }
+
+    isolated deinit {
+        if isPolling { services.stopPolling() }
+    }
+}
+
 /// The guide's window: 960 x 760, centred, traffic lights over a full-size dark canvas.
 @MainActor
 final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
+    private var presented = false
+    private let pollingLifecycle: OnboardingPollingLifecycle
     let flow: OnboardingFlow
     let options: OnboardingOptions
     let services: any OnboardingServing
@@ -350,6 +380,18 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         self.services = services
         self.flow = flow
         self.options = options
+        pollingLifecycle = OnboardingPollingLifecycle(services: services)
+        super.init()
+        for name in [NSApplication.didHideNotification, NSApplication.didUnhideNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(applicationVisibilityChanged),
+                                                   name: name, object: nil)
+        }
+    }
+
+    isolated deinit {
+        NotificationCenter.default.removeObserver(self)
+        flow.cancelPendingTransition()
+        pollingLifecycle.setVisible(false)
     }
 
     var isVisible: Bool { window?.isVisible == true }
@@ -378,14 +420,29 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             window.center()
             self.window = window
         }
+        presented = true
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
-        services.startPolling()
+        synchronizePolling()
     }
 
     func windowWillClose(_ notification: Notification) {
+        presented = false
         flow.cancelPendingTransition()
-        services.stopPolling()
+        pollingLifecycle.setVisible(false)
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) { synchronizePolling() }
+    func windowDidDeminiaturize(_ notification: Notification) { synchronizePolling() }
+    func windowDidChangeOcclusionState(_ notification: Notification) { synchronizePolling() }
+
+    @objc private func applicationVisibilityChanged(_ notification: Notification) { synchronizePolling() }
+
+    private func synchronizePolling() {
+        pollingLifecycle.setVisible(OnboardingPollingPolicy.shouldPoll(
+            presented: presented, windowVisible: window?.isVisible == true,
+            miniaturized: window?.isMiniaturized == true, appHidden: NSApp?.isHidden == true,
+            occluded: window?.occlusionState.contains(.visible) != true))
     }
 
     func close() { window?.close() }

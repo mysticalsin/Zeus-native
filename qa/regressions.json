@@ -1215,6 +1215,234 @@
         "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
         "function": "anthropicMessagesAPIIsNotOfferedAsAnOpenAICompatiblePreset"
       }
+    },
+    {
+      "id": "REG-101",
+      "failure": "The original local voice worker probe returned a WAV path while its producer was still writing incomplete audio bytes.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "productionWorkerPublishesOnlyACompleteAcknowledgedWAV"
+      }
+    },
+    {
+      "id": "REG-102",
+      "failure": "The original local voice worker probe ignored task cancellation and kept synthesis running instead of promptly returning no artifact.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "cancellingSynthesisReturnsNoArtifactAndStopsItsWorker"
+      }
+    },
+    {
+      "id": "REG-103",
+      "failure": "Independent review of the voice-worker repair found a validated file descriptor could be replaced by moving the subsequently reopened pathname.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "descriptorPublicationCannotBeSubstitutedByAReplacedPath"
+      }
+    },
+    {
+      "id": "REG-104",
+      "failure": "Independent review of the voice-worker repair found a RIFF prefix alone could be accepted without complete PCM format, chunk bounds and alignment.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "invalidPCMChunkBoundsAndAlignmentCannotBePublished"
+      }
+    },
+    {
+      "id": "REG-105",
+      "failure": "Independent review of the voice-worker repair found cancellation was checked before artifact copying but not during the copy or before final handoff.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "cancellationDuringArtifactCopyRemovesTheUnpublishedTarget"
+      }
+    },
+    {
+      "id": "REG-106",
+      "failure": "A generated 44-byte WAV with a declared format body beyond the available bytes crashed the original decoder with SIGILL instead of returning failure.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+        "function": "truncatedFormatBodyAtEndOfAValidSizeContainerReturnsNil"
+      }
+    },
+    {
+      "id": "REG-107",
+      "failure": "An original-source timer probe showed releasing TickClock without disappear left its scheduled run-loop timer valid.",
+      "features": [
+        "F05"
+      ],
+      "check": "native-TickingTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TickingTests.swift",
+        "function": "releasingRunningClockInvalidatesItsRunLoopTimer"
+      }
+    },
+    {
+      "id": "REG-108",
+      "failure": "Source review found cloud-only warm work could inspect local voice settings and render Kokoro; an unconditional-warm mutation reproduces the unwanted action.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-BrainWarmSchedulerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+        "function": "cloudOnlyWarmDoesNotInspectVoiceSettingsOrRenderLocalVoice"
+      }
+    },
+    {
+      "id": "REG-109",
+      "failure": "Source review found local voice warm-up could run a ready Kokoro model even when another voice provider was selected or the provider was paused.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-BrainWarmSchedulerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+        "function": "unselectedUnreadyAndPausedVoicesNeverWarmAsFallbacks"
+      }
+    },
+    {
+      "id": "REG-110",
+      "failure": "Source review found onboarding polling ownership was not tied to visible-window intervals and teardown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingIsolationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+        "function": "pollingOwnerStartsOncePerVisibleIntervalAndResumesWithoutActions"
+      }
+    },
+    {
+      "id": "REG-111",
+      "failure": "Actual macOS bridge fixtures rejected closed readers because the test assumed Linux writer-POLLERR readiness semantics on Darwin.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "immediateStopAndStopBeforeStartAlwaysSettleTheAcceptedStartOnce"
+      }
+    },
+    {
+      "id": "REG-112",
+      "failure": "The native pipe-stop fixture measured observer resumption rather than the worker callback, so its observed delay could not distinguish actual transport latency from delayed test-executor scheduling; the guard now measures callback completion with the unchanged 500 ms bound.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "stopSettlesQueuedWritesWithoutWaitingForTheirLongDeadline"
+      }
+    },
+    {
+      "id": "REG-113",
+      "failure": "Independent mutation review showed stop-before-start fixtures did not establish descriptor-closure ordering for an already active native input source.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
+      }
+    },
+    {
+      "id": "REG-114",
+      "failure": "Actual macOS test compilation printed an internal corrupted-JSON error, then exited zero with Build complete; compiler diagnostics must remain blocking despite that exit status.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_missing_or_forged_compiler_log_cannot_authorize_native_reuse"
+      }
+    },
+    {
+      "id": "REG-115",
+      "failure": "Adding a valid WAV native obligation exposed a selftest that assumed the final obligation was device proof; the test must remove each actual evidence tier independently of map order.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_every_feature_keeps_all_three_evidence_tiers"
+      }
+    },
+    {
+      "id": "REG-116",
+      "failure": "Actual concurrent Core execution outlasted the mute fixture's five-second automatic semaphore release, invalidating its still-blocked-reader premise before the observer resumed; the same failure was reproduced with a delayed continuation.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+        "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
+      }
+    },
+    {
+      "id": "REG-117",
+      "failure": "The macOS endpoint fixture failed before obtaining its Python port file; the precise startup cause is unproved. Owned bind/listen readiness and explicit cleanup replace competing startup/helper lifetimes without extending the HTTP deadline.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "ownedLoopbackReadinessAndRepeatedCleanupDoNotDependOnAChildStartupFile"
+      }
+    },
+    {
+      "id": "REG-118",
+      "failure": "Native event dispatch removed and rejected an unrelated queued mouse-up after AppKit had already consumed its own release.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched"
+      }
+    },
+    {
+      "id": "REG-119",
+      "failure": "The AX readiness fixture rejected a transient unknown role immediately, before its existing readiness budget could resolve a valid button; persistent wrong roles must still never receive a press.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
+      }
     }
   ]
 }

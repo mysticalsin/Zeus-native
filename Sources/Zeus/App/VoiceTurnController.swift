@@ -79,8 +79,7 @@ final class VoiceTurnController {
         Task { await BrainLaunchWarm.awaitIfNeeded() }
         BrainWarmScheduler.shared.start()
         Task { @MainActor in
-            let settings = VoiceSettings.shared
-            await KokoroWorkerSession.shared.prewarm(voice: settings.kokoroVoice, speed: settings.kokoroSpeed)
+            await BrainWarmActions.live.warmSelectedVoice()
         }
     }
 

@@ -4,12 +4,22 @@ import Testing
 import SwiftUI
 @testable import Zeus
 
+private func recordOwnedWindowProcessExit() {
+    let trace = Thread.callStackSymbols.prefix(32).joined(separator: "\n")
+    FileHandle.standardError.write(Data("Owned-window fixture: process exit callback\n\(trace)\n".utf8))
+}
+
 @MainActor
 enum OwnedWindowFixtureApplication {
     private(set) static var launchFinished = false
+    private static var exitDiagnosticInstalled = false
 
     static func prepare() throws -> NSApplication.ActivationPolicy {
         let application = NSApplication.shared
+        if !exitDiagnosticInstalled {
+            atexit(recordOwnedWindowProcessExit)
+            exitDiagnosticInstalled = true
+        }
         record("prepare begin; launched=\(launchFinished), policy=\(application.activationPolicy().rawValue), active=\(application.isActive)")
         guard application.delegate == nil else {
             throw OwnedWindowEventDriver.Failure.unavailable("fixture application already has a delegate")
@@ -143,6 +153,45 @@ struct OwnedWindowEventDriverTests {
             driver.register(window)
             try await driver.click("fixture.swiftui", in: window)
             #expect(target.calls == 1)
+        }
+    }
+
+    @Test func consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let registry = OwnedWindowControlRegistry(), target = Target()
+            let content = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 120))
+            content.addSubview(button(target, registry: registry, id: "fixture.queue-owner"))
+            let window = host(content)
+            defer { OwnedWindowFixtureApplication.close(window) }
+            let driver = OwnedWindowEventDriver(registry: registry)
+            driver.register(window)
+            // This event belongs to this regression fixture, not to the driver's gesture.
+            // It has no target action; only this test may remove it during cleanup.
+            let foreign = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero,
+                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 2_000_000, clickCount: 1, pressure: 0))
+            NSApplication.shared.postEvent(foreign, atStart: true)
+            defer {
+                if let pending = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                    inMode: .eventTracking, dequeue: false), OwnedWindowEventDriver.sameEvent(pending, foreign) {
+                    _ = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                        inMode: .eventTracking, dequeue: true)
+                }
+            }
+            try await driver.click("fixture.queue-owner", in: window)
+            #expect(target.calls == 1)
+            let stillQueued = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                inMode: .eventTracking, dequeue: false))
+            #expect(OwnedWindowEventDriver.sameEvent(stillQueued, foreign), "The driver must leave the unrelated release at the queue head")
+            if OwnedWindowEventDriver.sameEvent(stillQueued, foreign) {
+                _ = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                    inMode: .eventTracking, dequeue: true)
+                let remainder = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                    inMode: .eventTracking, dequeue: false)
+                #expect(remainder == nil, "The completed click must not leave its synthetic release for a later fixture")
+            }
         }
     }
 
@@ -287,21 +336,43 @@ final class OwnedWindowEventDriver {
         let up = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: point,
             modifierFlags: [], timestamp: timestamp + 0.001, windowNumber: window.windowNumber,
             context: nil, eventNumber: number + 1, clickCount: 1, pressure: 0))
+        guard up.windowNumber == window.windowNumber else { throw Failure.staleGeometry(id) }
+        OwnedWindowFixtureApplication.record("dispatch \(id) begin; requested=\(number)/\(number + 1); down=\(Self.describe(down)); up=\(Self.describe(up))")
         // An AppKit mouseDown can track synchronously. Its same-window release must already be
         // queued. postEvent stays inside this test process; it never posts system/HID input.
         NSApplication.shared.postEvent(up, atStart: true)
         window.sendEvent(down)
-        // Non-tracking SwiftUI responders return before consuming up. Dequeue and deliver only
-        // our exact release. An unrelated local event is restored untouched and fails the test.
-        if let pending = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: Date(),
-                                                        inMode: .eventTracking, dequeue: true) {
-            guard pending.windowNumber == window.windowNumber, pending.eventNumber == number + 1 else {
-                NSApplication.shared.postEvent(pending, atStart: true)
-                throw Failure.eventQueue
+        OwnedWindowFixtureApplication.record("dispatch \(id) down returned")
+        // Tracking controls may have consumed our release already. An unrelated queue head does
+        // not belong to this gesture: inspect without dequeuing or delivering it. Non-tracking
+        // SwiftUI responders leave our exact release queued, which we deliver to the same window.
+        if let pending = NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                                                        inMode: .eventTracking, dequeue: false) {
+            OwnedWindowFixtureApplication.record("dispatch \(id) release peek=\(Self.describe(pending)); owned=\(Self.sameEvent(pending, up))")
+            if Self.sameEvent(pending, up) {
+                let release = try #require(NSApplication.shared.nextEvent(matching: .leftMouseUp, until: .distantPast,
+                    inMode: .eventTracking, dequeue: true))
+                guard Self.sameEvent(release, up) else {
+                    NSApplication.shared.postEvent(release, atStart: true)
+                    throw Failure.eventQueue
+                }
+                // A real action can replace/remove its SwiftUI button during mouseDown. Complete
+                // the begun gesture on its retained window; do not redirect through a new probe.
+                guard windows[ObjectIdentifier(window)]?.value === window,
+                      window.windowNumber == up.windowNumber else { throw Failure.staleGeometry(id) }
+                window.sendEvent(release)
             }
-            guard probe.window === window else { throw Failure.staleGeometry(id) }
-            window.sendEvent(pending)
         }
         print("Owned-window event: \(id), window=\(window.windowNumber), frame=\(frame), point=\(point), events=\(number)/\(number + 1)")
+    }
+
+    static func sameEvent(_ candidate: NSEvent, _ expected: NSEvent) -> Bool {
+        candidate.type == expected.type && candidate.windowNumber == expected.windowNumber
+            && candidate.eventNumber == expected.eventNumber && candidate.timestamp == expected.timestamp
+            && candidate.locationInWindow == expected.locationInWindow
+    }
+
+    private static func describe(_ event: NSEvent) -> String {
+        "type=\(event.type.rawValue),number=\(event.eventNumber),window=\(event.windowNumber),timestamp=\(event.timestamp),point=\(event.locationInWindow)"
     }
 }

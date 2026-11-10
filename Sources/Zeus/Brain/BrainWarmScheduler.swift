@@ -32,9 +32,57 @@ final class BrainHTTPObserver: NSObject, URLSessionTaskDelegate, @unchecked Send
     }
 }
 
+/// The warm-up actions are explicit so a cloud connection refresh cannot start a local voice worker.
+/// Selection and readiness are read only when a local warm-up is actually due.
+@MainActor
+struct BrainWarmActions {
+    struct VoiceSelection: Sendable {
+        let provider: VoiceTTSProvider
+        let ready: Bool
+        let paused: Bool
+        let voice: String
+        let speed: Double
+    }
+
+    var localModel: @MainActor @Sendable () async -> Void
+    var cloudConnection: @MainActor @Sendable () async -> Void
+    var voiceSelection: @MainActor @Sendable () -> VoiceSelection
+    var renderVoice: @MainActor @Sendable (String, Double) async -> Void
+
+    func run(_ targets: Set<BrainWarmPlan.Target>) async {
+        guard !Task.isCancelled else { return }
+        async let local: Void = targets.contains(.localModel) ? localModel() : ()
+        async let cloud: Void = targets.contains(.cloudConnection) ? cloudConnection() : ()
+        async let voice: Void = targets.contains(.localModel) ? warmSelectedVoice() : ()
+        _ = await (local, cloud, voice)
+    }
+
+    func warmSelectedVoice() async {
+        guard !Task.isCancelled else { return }
+        let selection = voiceSelection()
+        guard selection.provider == .kokoro, selection.ready, !selection.paused else { return }
+        await renderVoice(selection.voice, selection.speed)
+    }
+
+    static var live: Self {
+        Self(localModel: { await OpenAICompatProvider.ollama().prewarm() },
+             cloudConnection: { await AnthropicAPIProvider().prewarm() },
+             voiceSelection: {
+                 let settings = VoiceSettings.shared
+                 return VoiceSelection(provider: settings.ttsProvider, ready: settings.kokoroReady,
+                                       paused: settings.isProviderPaused(.kokoro),
+                                       voice: settings.kokoroVoice, speed: settings.kokoroSpeed)
+             },
+             renderVoice: { voice, speed in
+                 await KokoroWorkerSession.shared.prewarm(voice: voice, speed: speed)
+             })
+    }
+}
+
 /// Keeps the brains warm only while Zeus is in use (`BrainWarmPlan`): a loose 2-minute check, a free
 /// metadata call for the cloud connection, a one-token ping for the local model. Launch and wake
-/// from sleep warm everything at once. Nothing runs on an idle Mac.
+/// from sleep warm both model connections; voice warms only when Kokoro is selected and ready.
+/// The loose check remains scheduled while idle, but an ordinary idle check makes no warm calls.
 @MainActor
 final class BrainWarmScheduler {
     static let shared = BrainWarmScheduler()
@@ -49,11 +97,7 @@ final class BrainWarmScheduler {
     /// Hooks for tests.
     var now: () -> Date = { Date() }
     var warm: (Set<BrainWarmPlan.Target>) async -> Void = { targets in
-        async let local: Void = targets.contains(.localModel) ? OpenAICompatProvider.ollama().prewarm() : ()
-        async let cloud: Void = targets.contains(.cloudConnection) ? AnthropicAPIProvider().prewarm() : ()
-        async let voice: Void = KokoroWorkerSession.shared.prewarm(
-            voice: VoiceSettings.shared.kokoroVoice, speed: VoiceSettings.shared.kokoroSpeed)
-        _ = await (local, cloud, voice)
+        await BrainWarmActions.live.run(targets)
     }
 
     func start() {

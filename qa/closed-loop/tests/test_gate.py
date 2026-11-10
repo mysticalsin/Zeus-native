@@ -52,6 +52,14 @@ class RequiredGateTests(unittest.TestCase):
                 (root / "test.log").write_text(lines[job] + "\n")
                 if job == "app":
                     self.make_native_fixture(root)
+                if job == "extension":
+                    policy = gate.load_object(Path(gate.__file__).resolve().parents[2] / "qa/extension-regressions.json")
+                    names = policy["required_tests"]
+                    log = "".join(f"ok {index} - {name}\n" for index, name in enumerate(names, 1))
+                    log += f"# tests {len(names)}\n# pass {len(names)}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n"
+                    (root / "test.log").write_text(log)
+                    self.write(root / "audit.log", {"auditReportVersion": 2, "metadata": {"vulnerabilities": {
+                        "info": 0, "low": 0, "moderate": 0, "high": 0, "critical": 0, "total": 0}}})
                 files = sorted(gate.job_artifacts(job))
             self.write(root / "job.json", {
                 "schema_version": 1, "job": job, "tested_sha": self.sha, "expected_sha": self.sha,
@@ -167,6 +175,29 @@ class RequiredGateTests(unittest.TestCase):
         result = self.evaluate()
         self.assertEqual(result["status"], "passed", result)
         self.assertGreater(result["jobs"]["feature-map"]["tests"], 0)
+
+    def test_extension_requires_named_regressions_despite_positive_summary(self):
+        path = self.root("extension") / "test.log"
+        original = path.read_text()
+        for changed in [re.sub(r"^ok 1 - .+$", "ok 1 - an unrelated test", original, flags=re.MULTILINE),
+                        original + original.splitlines()[0] + "\n"]:
+            path.write_text(changed)
+            self.refresh_file("extension", "test.log")
+            self.assert_blocked()
+
+    def test_extension_audit_cannot_be_missing_forged_or_contain_blocking_findings(self):
+        path = self.root("extension") / "audit.log"
+        baseline = json.loads(path.read_text())
+        for change in [{}, {"auditReportVersion": 2, "error": {"message": "registry unavailable"}},
+                       {"auditReportVersion": 2, "metadata": {"vulnerabilities": {
+                           "info": 0, "low": 0, "moderate": 1, "high": 0, "critical": 0, "total": 1}}}]:
+            self.write(path, change)
+            self.refresh_file("extension", "audit.log")
+            self.assert_blocked()
+        self.write(path, baseline)
+        self.refresh_file("extension", "audit.log")
+        path.unlink()
+        self.assert_blocked()
 
     def use_ancestor_alias(self):
         alias_directory = tempfile.TemporaryDirectory(prefix="zeus-gate-ancestor-")
@@ -509,6 +540,7 @@ class NativeBuildGateTests(unittest.TestCase):
 
     def test_missing_or_forged_compiler_log_cannot_authorize_native_reuse(self):
         for text in ("Build complete! (0.1s)\nerror: native compile failed\n", "Building for debugging...\n",
+                     'Internal Error: dataCorrupted(Swift.DecodingError.Context(codingPath: [], debugDescription: "Corrupted JSON", underlyingError: Optional(unexpected end of file)))\nBuild complete! (164.43s)\n',
                      "Build complete! (0.1s)\nCHECK TIMEOUT after 10 seconds\n"):
             with self.subTest(text=text):
                 self.log.write_text(text)

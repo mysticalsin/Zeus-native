@@ -105,8 +105,96 @@ struct OnboardingIsolationTests {
         controller.windowWillClose(Notification(name: NSWindow.willCloseNotification))
         try await Task.sleep(for: .milliseconds(20))
         #expect(flow.step == .welcome && memory.writes.isEmpty && memory.finishes == 0)
-        #expect(services.stops == 1)
+        #expect(services.stops == 0) // A controller that never appeared owns no poller to stop.
         #expect(services.requests.isEmpty && services.connections.isEmpty && services.downloads == 0)
+    }
+
+    @Test func pollingVisibilityPolicyPausesForHiddenMinimizedOccludedAndClosedWindows() {
+        // Pure visibility policy, not proof of AppKit notification delivery or actual controls.
+        #expect(OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: true,
+            miniaturized: false, appHidden: false, occluded: false))
+        #expect(!OnboardingPollingPolicy.shouldPoll(presented: false, windowVisible: true,
+            miniaturized: false, appHidden: false, occluded: false))
+        #expect(!OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: false,
+            miniaturized: false, appHidden: false, occluded: false))
+        #expect(!OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: true,
+            miniaturized: true, appHidden: false, occluded: false))
+        #expect(!OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: true,
+            miniaturized: false, appHidden: true, occluded: false))
+        #expect(!OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: true,
+            miniaturized: false, appHidden: false, occluded: true))
+    }
+
+    @Test func pollingOwnerStartsOncePerVisibleIntervalAndResumesWithoutActions() {
+        // Synthetic service ownership test; no window, live permission service or OS action.
+        let services = Services()
+        let polling = OnboardingPollingLifecycle(services: services)
+        polling.setVisible(false)
+        #expect(services.polls == 0 && services.stops == 0)
+        for _ in 0..<3 {
+            polling.setVisible(true)
+            polling.setVisible(true)
+            #expect(polling.isPolling)
+            polling.setVisible(false)
+            polling.setVisible(false)
+            #expect(!polling.isPolling)
+        }
+        #expect(services.polls == 3 && services.stops == 3)
+        #expect(services.refreshes == 0 && services.requests.isEmpty)
+        #expect(services.connections.isEmpty && services.downloads == 0)
+    }
+
+    @Test func pollingOwnerTeardownStopsAnActiveIntervalExactlyOnce() {
+        let services = Services()
+        var polling: OnboardingPollingLifecycle? = OnboardingPollingLifecycle(services: services)
+        weak var released = polling
+        polling?.setVisible(true)
+        polling = nil
+        #expect(released == nil)
+        #expect(services.polls == 1 && services.stops == 1)
+        var stopped: OnboardingPollingLifecycle? = OnboardingPollingLifecycle(services: services)
+        stopped?.setVisible(true)
+        stopped?.setVisible(false)
+        stopped = nil
+        #expect(services.polls == 2 && services.stops == 2)
+        #expect(services.requests.isEmpty && services.connections.isEmpty && services.downloads == 0)
+    }
+
+    @Test func pollingFollowsOwnWindowMiniaturizeRestoreAndCloseWithoutActions() async throws {
+        // Native own-window/delegate lifecycle, not button activation or OS-consent proof.
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let memory = Memory()
+            let services = Services()
+            let controller = OnboardingWindowController(services: services, flow: memory.flow(), options: OnboardingOptions())
+            controller.show()
+            let window = try #require(controller.debugWindow)
+            defer { OwnedWindowFixtureApplication.close(window) }
+
+            try await settlePolling { window.isVisible && !window.isMiniaturized && services.polls == 1 }
+            controller.show()
+            #expect(services.polls == 1 && services.stops == 0)
+            window.miniaturize(nil)
+            try await settlePolling { window.isMiniaturized && services.stops == 1 }
+            #expect(services.polls == 1)
+            window.deminiaturize(nil)
+            try await settlePolling { !window.isMiniaturized && services.polls == 2 }
+            #expect(services.stops == 1)
+            controller.close()
+            try await settlePolling { !window.isVisible && services.stops == 2 }
+            #expect(services.polls == 2)
+            #expect(services.requests.isEmpty && services.connections.isEmpty && services.downloads == 0)
+            #expect(memory.writes.isEmpty && memory.finishes == 0)
+        }
+    }
+
+    private func settlePolling(_ condition: () -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while !condition(), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try #require(condition(), "The native host did not deliver the expected owned-window polling transition")
     }
 
     @Test func invalidResumeStepFallsBackAndReducedMotionStartsAwake() async {
