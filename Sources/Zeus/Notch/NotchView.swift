@@ -810,11 +810,15 @@ private struct NotchSizeReader<Content: View>: View {
 
 /// Dims on press so custom-drawn buttons still show feedback.
 struct PressableStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.isEnabled) private var isEnabled
+    private let reduceMotionOverride: Bool?
+
+    init(reduceMotion: Bool? = nil) { reduceMotionOverride = reduceMotion }
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        let reduceMotion = reduceMotionOverride ?? systemReduceMotion
+        return configuration.label
             .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
             .scaleEffect(configuration.isPressed && isEnabled && !reduceMotion ? Motion.pressedScale : 1)
             .animation(Motion.feedback(reduceMotion: reduceMotion), value: configuration.isPressed)

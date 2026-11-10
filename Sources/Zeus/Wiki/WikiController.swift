@@ -36,6 +36,11 @@ final class WikiController {
     private(set) var settingsUnreadable = false
     var confirmingResetSettings = false
     var vaultExport: WikiMCPExportModel?
+    var graphOpen = false
+    var graphShowsList = false
+    var graphQuery = ""
+    var graphFilter: WikiGraphFilter = .all
+    var graphRelationID: String?
 
     @ObservationIgnored private let store: WikiStore
     @ObservationIgnored private let meetings: ScribeMeetingStore
@@ -108,6 +113,26 @@ final class WikiController {
         guard relatedPages.contains(where: { $0.pageID == id }) else { return }
         query = ""
         select(id)
+    }
+
+    var graphSnapshot: WikiGraphSnapshot {
+        guard !settingsUnreadable else { return .make(focus: nil, relationships: []) }
+        return .make(focus: selectedPage, relationships: relatedPages, filter: graphFilter, query: graphQuery)
+    }
+
+    func openGraph() {
+        guard vaultExport == nil else { return }
+        refreshFromMeetings(force: true) // Explicit navigation refreshes saved-source availability.
+        graphQuery = ""
+        graphFilter = .all
+        graphRelationID = nil
+        graphOpen = true
+    }
+
+    func selectGraphPage(_ id: String) {
+        let previous = selectedID
+        selectRelated(id) // Rechecks current evidence and flushes the editor before navigating.
+        if selectedID != previous { graphRelationID = nil; graphQuery = "" }
     }
 
     /// A visible explanation, not a guessed replacement for an unavailable original source.

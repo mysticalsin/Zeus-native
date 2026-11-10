@@ -125,8 +125,6 @@ struct RecordingFeedbackRenderTests {
         }
         .frame(width: size.width, height: size.height)
         .environment(\.colorScheme, .dark)
-        .environment(\.accessibilityReduceMotion, reduceMotion)
-        .environment(\.accessibilityReduceTransparency, reduceTransparency)
         .transaction { $0.animation = nil }
         let renderer = ImageRenderer(content: content)
         renderer.scale = scale

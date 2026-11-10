@@ -61,9 +61,7 @@ struct RecordingFeedbackFrameView: View {
                         .shadow(color: tint.opacity(frame.glow * 0.45), radius: 6)
                 }
             }
-            .buttonStyle(PressableStyle())
-            .environment(\.accessibilityReduceMotion, reduceMotion)
-            .environment(\.accessibilityReduceTransparency, reduceTransparency)
+            .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(snapshot.label)
             .accessibilityHint("Opens \(snapshot.producer == .meetings ? "Meetings" : "Recordly").")

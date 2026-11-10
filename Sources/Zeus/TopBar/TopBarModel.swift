@@ -8,6 +8,7 @@ import ZeusCore
 @MainActor
 @Observable
 final class TopBarModel {
+    @ObservationIgnored private let defaults: UserDefaults
     struct CalendarItem: Identifiable, Equatable {
         let id: String
         var title: String
@@ -87,8 +88,8 @@ final class TopBarModel {
 
     var layout: TopBarLayout {
         didSet {
-            UserDefaults.standard.set(layout.encoded(), forKey: "topBar.tabs")
-            UserDefaults.standard.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
+            defaults.set(layout.encoded(), forKey: "topBar.tabs")
+            defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
         }
     }
     /// Hover and drop-target state for rows, kept here because the toolchain builds without SwiftUI macros.
@@ -108,17 +109,17 @@ final class TopBarModel {
     }
     /// Short cues on the closed notch (copy, caps lock, volume, battery, track change).
     var cuesEnabled: Bool {
-        didSet { UserDefaults.standard.set(cuesEnabled, forKey: "topBar.cues") }
+        didSet { defaults.set(cuesEnabled, forKey: "topBar.cues") }
     }
     /// Music artwork and bars beside the closed notch while something plays.
     var liveMusicWings: Bool {
-        didSet { UserDefaults.standard.set(liveMusicWings, forKey: "topBar.musicWings") }
+        didSet { defaults.set(liveMusicWings, forKey: "topBar.musicWings") }
     }
     var weatherCity: String {
-        didSet { UserDefaults.standard.set(weatherCity, forKey: "topBar.weatherCity") }
+        didSet { defaults.set(weatherCity, forKey: "topBar.weatherCity") }
     }
     var useCelsius: Bool {
-        didSet { UserDefaults.standard.set(useCelsius, forKey: "topBar.celsius") }
+        didSet { defaults.set(useCelsius, forKey: "topBar.celsius") }
     }
 
     // MARK: Live data
@@ -137,7 +138,7 @@ final class TopBarModel {
     var shelf: [ShelfItem] = []
     var focus = FocusTimer()
     var note: String {
-        didSet { UserDefaults.standard.set(note, forKey: "topBar.note") }
+        didSet { defaults.set(note, forKey: "topBar.note") }
     }
 
     // Dictation
@@ -151,17 +152,17 @@ final class TopBarModel {
     var dictationHistory: [DictationRecord] = []
     var dictationModes: [DictationMode] = DictationMode.builtIns
     var selectedModeKey: String {
-        didSet { UserDefaults.standard.set(selectedModeKey, forKey: "dictation.mode") }
+        didSet { defaults.set(selectedModeKey, forKey: "dictation.mode") }
     }
 
     // Teleprompter
     var script: String {
-        didSet { UserDefaults.standard.set(script, forKey: "prompter.script") }
+        didSet { defaults.set(script, forKey: "prompter.script") }
     }
     var roll: PrompterRoll {
         didSet {
-            if roll.speed != oldValue.speed { UserDefaults.standard.set(roll.speed, forKey: "prompter.speed") }
-            if roll.voiceFollow != oldValue.voiceFollow, !savingVoiceFallback { UserDefaults.standard.set(roll.voiceFollow, forKey: "prompter.voice") }
+            if roll.speed != oldValue.speed { defaults.set(roll.speed, forKey: "prompter.speed") }
+            if roll.voiceFollow != oldValue.voiceFollow, !savingVoiceFallback { defaults.set(roll.voiceFollow, forKey: "prompter.voice") }
         }
     }
     private var savingVoiceFallback = false
@@ -175,10 +176,10 @@ final class TopBarModel {
 
     /// A new run starts from the saved voice-follow choice (a fallback lasted one run only).
     func restoreSavedVoiceFollow() {
-        roll.voiceFollow = UserDefaults.standard.object(forKey: "prompter.voice") as? Bool ?? true
+        roll.voiceFollow = defaults.object(forKey: "prompter.voice") as? Bool ?? true
     }
     var prompterTextSize: Double {
-        didSet { UserDefaults.standard.set(prompterTextSize, forKey: "prompter.size") }
+        didSet { defaults.set(prompterTextSize, forKey: "prompter.size") }
     }
     var prompterHovered = false
     var prompterLevel: Double = 0
@@ -237,8 +238,8 @@ final class TopBarModel {
     /// A menu from the notch (the ... button) is open: the notch stays up while it is.
     var menuOpen = false
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let knownBefore = defaults.string(forKey: "topBar.tabs.known")
         let saved = TopBarLayout.decode(defaults.string(forKey: "topBar.tabs"), known: knownBefore)
         // Once: put the nine-tab row (Glance's seven, Teleprompter, Insomnia) first in a saved layout.

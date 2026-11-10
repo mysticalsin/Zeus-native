@@ -340,6 +340,7 @@ private struct ScribeIdle: View {
                 Spacer(minLength: 0)
                 NotchActionButton(title: "Start", tint: TopBarStyle.rec) { scribe.start() }
                     .accessibilityHint("Starts listening to a meeting.")
+                    .accessibilityIdentifier("scribe.start")
             }
             .frame(width: 270, alignment: .topLeading)
             ScribeRecapList(scribe: scribe)
@@ -624,6 +625,7 @@ private struct ScribeRecording: View {
                     ScribeCircleButton(symbol: "stop.fill", label: "Stop recording", hint: "Asks whether to end the meeting.") {
                         scribe.requestEnd()
                     }
+                    .accessibilityIdentifier("scribe.stop")
                     ScribeCircleButton(symbol: "trash", label: "Discard recording", hint: "Asks before throwing this meeting away.") {
                         scribe.requestDiscard()
                     }
@@ -800,8 +802,10 @@ private struct ScribeConfirmEnd: View {
                         topBar.onOpenTab(.scribe)
                     }
                     .disabled(scribe.endStopRequested)
+                    .accessibilityIdentifier("scribe.endNow")
                     NotchActionButton(title: "Keep recording", tint: Theme.cloudSecondary, filled: false) { scribe.keepRecording() }
                         .disabled(scribe.endStopRequested)
+                        .accessibilityIdentifier("scribe.keep")
                 }
                 .padding(.top, 4)
             }
@@ -980,6 +984,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                 Spacer()
                 actions
                 NotchActionButton(title: closeTitle, tint: Theme.cloudSecondary, filled: false) { close() }
+                    .accessibilityIdentifier("scribe.notes.close")
             }
             HStack(alignment: .top, spacing: 12) {
                 ScrollView {

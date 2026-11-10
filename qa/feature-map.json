@@ -41,7 +41,7 @@
       "id": "portable-wiki-relationships",
       "kind": "portable",
       "tier": "contract",
-      "scope": "Exact compiler, connection and recap navigation policy; temporary synthetic data, no personal vault.",
+      "scope": "Exact compiler, connection/graph projection and recap navigation policy; temporary synthetic data, no personal vault or native view interaction.",
       "group": "wiki-relationships"
     },
     {
@@ -392,6 +392,22 @@
       "suite": "RecordingFeedbackRenderTests",
       "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
       "scope": "Actual production SwiftUI frame renderer evaluated at fixed synthetic times to PNG/GIF artifacts, no desktop capture. Does not prove native controller timing, frame pacing or reference parity."
+    },
+    {
+      "id": "native-WikiGraphNavigationTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "WikiGraphNavigationTests",
+      "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+      "scope": "Actual WikiController graph selection, save/navigation, deletion and forget using disposable app-owned records; no native UI input, personal vault or capture."
+    },
+    {
+      "id": "native-HaloRendererTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "HaloRendererTests",
+      "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
+      "scope": "Actual SwiftUI Path flattening and offscreen HaloOutline geometry/style rendering. No desktop capture, settings mutation or donor/motion parity proof."
     }
   ],
   "features": [
@@ -601,6 +617,25 @@
       "id": "F05",
       "title": "Recording animation, pill and mini-window motion parity",
       "obligations": [
+        {
+          "id": "F05.halo-geometry",
+          "check": "native-HaloRendererTests",
+          "acceptance": "Actual typed Bezier flattening preserves endpoints/midpoints and arc slicing; production halo styles render distinct static pixels. Temporal reference parity remains separately required.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
+              "function": "flattenedBezierCurvesKeepEndpointsAndMidpoints"
+            },
+            {
+              "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
+              "function": "polylineSlicesByArcLength"
+            },
+            {
+              "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
+              "function": "previewDrawsEveryStyleDifferently"
+            }
+          ]
+        },
         {
           "id": "F05.rendered-feedback",
           "check": "native-RecordingFeedbackRenderTests",
@@ -965,6 +1000,52 @@
       "id": "F10",
       "title": "Embedded memory, sources, connections and selected MCP export",
       "obligations": [
+        {
+          "id": "F10.graph-controller",
+          "check": "native-WikiGraphNavigationTests",
+          "acceptance": "Actual controller persists edited links before navigation, refuses stale deleted IDs and removes forgotten evidence; unreadable settings expose no graph. UI click/keyboard journeys remain separate.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "editedLinkBecomesGraphNavigationAndSavesBeforeChangingPage"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "deletedTargetCannotBeReopenedFromAnOldGraphID"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "forgettingCurrentSourceRemovesTheFocusedGraphAndDurablyBlocksRelearning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+              "function": "unreadableMemorySettingsExposeNoGraphEvidence"
+            }
+          ]
+        },
+        {
+          "id": "F10.graph-contract",
+          "check": "portable-wiki-relationships",
+          "acceptance": "Actual graph projection preserves explicit directions and current evidence, bounds visual nodes without hiding accessible overflow, and removes forgotten/deleted edges. This does not prove native view interaction.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/WikiGraphTests.swift",
+              "function": "visualBoundsDoNotRemoveAccessibleOverflow"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiGraphTests.swift",
+              "function": "authoredLinksProduceInspectableDirectionsThroughTheExistingPipeline"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiGraphTests.swift",
+              "function": "forgettingAndDeletingRemoveGraphEdgesWithoutClearingReview"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/WikiGraphTests.swift",
+              "function": "largeProjectionKeepsTheDrawingBoundedAndAllResultsReachable"
+            }
+          ]
+        },
         {
           "id": "F10.mcp-contract",
           "check": "portable-wiki-export",

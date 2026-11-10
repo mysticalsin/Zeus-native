@@ -2,7 +2,11 @@
 
 The stable aggregate check is **`required-checks`** in [`.github/workflows/build.yml`](../.github/workflows/build.yml). It requires `app`, `extension`, `release-scripts`, and `feature-map`. The gate runs with `if: always()` and accepts only `success` from every prerequisite, complete passing command receipts, and verified evidence for the exact tested revision, source head, workflow run, and run attempt. Failed, cancelled, skipped, missing, malformed, stale, or zero-test results do not pass.
 
-This workflow is a check implementation, not a statement that GitHub merge protection is enabled. On 10 November 2026, the connected GitHub integration could read the repository as ADMIN, but protection access returned HTTP 403 and the rulesets API returned “Upgrade to GitHub Pro or make this repository public to enable this feature.” Repository visibility, billing, and the default branch were not changed. Required status enforcement must be enabled with suitable repository plan and permissions before GitHub can guarantee that an unsuccessful or missing check prevents a merge. Require `required-checks`, require current checks for the proposed merge revision, and avoid administrative bypasses. A cancelled or absent aggregate is not approval.
+The active native repository is [mysticalsin/Zeus-native](https://github.com/mysticalsin/Zeus-native), created with a clean native root commit [`f07b1192ebdfb85f0dd9dadba397b52bbd63eebe`](https://github.com/mysticalsin/Zeus-native/commit/f07b1192ebdfb85f0dd9dadba397b52bbd63eebe). The historical private `mysticalsin/Zeus` repository and its unrelated default `main` remain separate and unchanged.
+
+**Merge protection is not yet verified or enabled by this setup.** On 10 November 2026, the connected integration verified public native `main`, the exact audited source hashes, an active workflow, and ADMIN repository visibility. GitHub nevertheless rejected creation of the reviewed ruleset with HTTP 403, “Resource not accessible by integration”; the classic branch-protection read endpoint also returned HTTP 403. The ruleset inventory remained empty. Public visibility resolved the old repository-plan limitation, but did not grant this integration Administration API access.
+
+The prepared policy requires a pull request, strict current-revision `required-checks` from GitHub Actions app 15368, resolved review threads, and no bypass actors, force pushes or branch deletion. It requires zero additional human approvals, so a solo owner can use the PR workflow. The setup has 12 mocked failure-path tests and independent source review, but those do not substitute for successful GitHub policy readback. Apply it using suitable Administration access and verify the effective rules on `main` before claiming GitHub will prevent a merge. A failed, cancelled, skipped, or missing aggregate remains a failed QA result regardless of the current repository permission limitation.
 
 ## Event coverage
 
@@ -17,7 +21,7 @@ This workflow is a check implementation, not a statement that GitHub merge prote
 
 Every event/ref/revision has a separate concurrency group and `cancel-in-progress` is false. A push does not cancel the pull request's check, and a later revision does not discard an earlier revision's validation. The workflow uses `github.sha` for checkout; it does not run `pull_request_target`, use an untrusted scheduled ref, or consume repository-dispatch commands.
 
-**Daily activation boundary:** GitHub schedules only workflows present on the default branch. The current `main` is the historical, unrelated web project. Adding this workflow on the native feature branch does not activate the daily schedule and does not replace that project. The native work needs an explicitly reviewed repository/default-branch transition before daily native runs can become active. A manual dispatch on a branch may also be unavailable until GitHub knows the workflow on the default branch; it is not a substitute for activating the schedule.
+**Daily activation:** In `Zeus-native`, the native workflow is now on the actual default branch `main`, so the daily 06:17 UTC schedule is eligible to run. Its first scheduled execution has not yet been observed. The [initial main-push workflow](https://github.com/mysticalsin/Zeus-native/actions/runs/42731139415) started after the clean initial publication; workflow activation does not establish test success. The old private `Zeus` repository's feature-branch workflow did not activate daily native runs there.
 
 ## What each check proves
 
@@ -49,7 +53,7 @@ On macOS with the required SDK, full mode runs the safe native fixture suites to
 python3 qa/closed-loop/run.py --mode full --output /tmp/zeus-full-new
 ```
 
-The runner refuses an existing output directory, records commands/exit codes/counts/source hashes, and fails if repository input changes while checks run. Full mode does not grant OS permissions or convert mocked/device-unavailable work into a pass. Actual native Actions jobs were previously prevented from starting by the repository's Actions budget; until new jobs run and return their receipts, native build/test success remains unverified.
+The runner refuses an existing output directory, records commands/exit codes/counts/source hashes, and fails if repository input changes while checks run. Full mode does not grant OS permissions or convert mocked/device-unavailable work into a pass. The historical private repository's native Actions jobs were prevented from starting by its Actions budget. The new public native repository has started its initial workflow; inspect that run's actual results and artifacts before asserting native build/test success. No result from the old repository is reused as proof for the new root commit.
 
 ## Turning caught failures into guards
 

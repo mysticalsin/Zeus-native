@@ -430,6 +430,42 @@
         "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
         "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
       }
+    },
+    {
+      "id": "REG-036",
+      "failure": "Native Path flattening failed Apple Swift type-checking; the typed refactor must preserve actual Bezier endpoints and midpoint geometry.",
+      "features": [
+        "F05"
+      ],
+      "check": "native-HaloRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
+        "function": "flattenedBezierCurvesKeepEndpointsAndMidpoints"
+      }
+    },
+    {
+      "id": "REG-037",
+      "failure": "Cloud finish closures captured shadowing locals before declaration; completion must retain the actual missing-key failure.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-DictationOwnershipIntegrationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DictationOwnershipIntegrationTests.swift",
+        "function": "missingCloudKeyRetainsFailureDuringFinish"
+      }
+    },
+    {
+      "id": "REG-038",
+      "failure": "Native feedback attempted to set read-only accessibility environment values; explicit render/style inputs must retain reduced-motion frame stability.",
+      "features": [
+        "F07"
+      ],
+      "check": "native-RecordingFeedbackRenderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+        "function": "reducedMotionFramesStayStableWithinPhase"
+      }
     }
   ]
 }

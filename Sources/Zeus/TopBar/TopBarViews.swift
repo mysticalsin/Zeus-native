@@ -34,7 +34,20 @@ enum TopBarStyle {
 }
 
 /// A rounded glass tile used by every zone and page.
+private struct CardFinishOverrideKey: EnvironmentKey {
+    static var defaultValue: CardFinish? { nil }
+}
+
+extension EnvironmentValues {
+    /// A scoped appearance value, used by isolated hosts without reading process-global preferences.
+    var cardFinishOverride: CardFinish? {
+        get { self[CardFinishOverrideKey.self] }
+        set { self[CardFinishOverrideKey.self] = newValue }
+    }
+}
+
 struct Tile<Content: View>: View {
+    @Environment(\.cardFinishOverride) private var finishOverride
     var padding: CGFloat = CardFinish.inset
     /// Home band tiles follow Home style; every other card follows Card style.
     var home = false
@@ -42,11 +55,11 @@ struct Tile<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        let finish: CardFinish? = home ? CardFinish.home.finish : CardFinish.current
+        let finish: CardFinish? = finishOverride ?? (home ? CardFinish.home.finish : CardFinish.current)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .notchCard(finish, tint: home && CardFinish.home.tinted ? tint : nil)
+            .notchCard(finish, tint: finishOverride == nil && home && CardFinish.home.tinted ? tint : nil)
             .cardHoverLift()
     }
 }
@@ -137,15 +150,20 @@ struct LevelBars: View {
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<count, id: \.self) { index in
-                    let phase = sin(t * (5.1 + Double(index) * 1.7) + Double(index) * 1.3)
-                    let base = level.map { max($0, 0.08) * (0.6 + 0.4 * abs(phase)) } ?? (0.35 + 0.65 * abs(phase))
                     Capsule()
                         .fill(color)
-                        .frame(width: 2.6, height: max(3, height * (active ? base : 0.2)))
+                        .frame(width: 2.6, height: barHeight(index: index, time: t))
                 }
             }
             .frame(height: height)
         }
+    }
+
+    private func barHeight(index: Int, time: TimeInterval) -> CGFloat {
+        let phase: Double = sin(time * (5.1 + Double(index) * 1.7) + Double(index) * 1.3)
+        let base: Double = level.map { max($0, 0.08) * (0.6 + 0.4 * abs(phase)) } ?? (0.35 + 0.65 * abs(phase))
+        let fraction = CGFloat(active ? base : 0.2)
+        return max(CGFloat(3), height * fraction)
     }
 }
 

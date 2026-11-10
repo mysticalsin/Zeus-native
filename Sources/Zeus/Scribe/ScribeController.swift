@@ -207,19 +207,21 @@ private struct ScribeWordRevealEntry {
 enum ScribeCancelTombstones {
     private static let key = "scribe.cancelledMeetings"
 
-    static var ids: Set<UUID> {
-        Set((UserDefaults.standard.stringArray(forKey: key) ?? []).compactMap { UUID(uuidString: $0) })
+    static var ids: Set<UUID> { ids(in: .standard) }
+
+    static func ids(in defaults: UserDefaults) -> Set<UUID> {
+        Set((defaults.stringArray(forKey: key) ?? []).compactMap { UUID(uuidString: $0) })
     }
 
-    static func add(_ id: UUID) { write(ids.union([id])) }
+    static func add(_ id: UUID, in defaults: UserDefaults = .standard) { write(ids(in: defaults).union([id]), to: defaults) }
 
-    static func remove(_ id: UUID) { write(ids.subtracting([id])) }
+    static func remove(_ id: UUID, in defaults: UserDefaults = .standard) { write(ids(in: defaults).subtracting([id]), to: defaults) }
 
-    private static func write(_ ids: Set<UUID>) {
+    private static func write(_ ids: Set<UUID>, to defaults: UserDefaults) {
         if ids.isEmpty {
-            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removeObject(forKey: key)
         } else {
-            UserDefaults.standard.set(ids.map(\.uuidString).sorted(), forKey: key)
+            defaults.set(ids.map(\.uuidString).sorted(), forKey: key)
         }
     }
 }
@@ -315,11 +317,13 @@ final class ScribeController {
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let monotonicClock: () -> TimeInterval
     @ObservationIgnored private let store: ScribeMeetingStore?
+    @ObservationIgnored private let cancellationDefaults: UserDefaults
+    @ObservationIgnored private let transcriptionEngine: () -> TranscriptionEngineKind
     @ObservationIgnored private let writeMeeting: (ScribeMeetingRecord) throws -> Void
     @ObservationIgnored private let muteSourceFactory: () -> any ScribeMicMuteSource
     @ObservationIgnored private let transcriberFactory: (ScribeSessionID, ScribeTranscriberCallbacks) -> any ScribeTranscriber
     @ObservationIgnored private let paceWritingMotion: Bool
-    @ObservationIgnored private let showsEndWindow: Bool
+    @ObservationIgnored private let endWindow: ScribeEndWindow?
     @ObservationIgnored private var router: ScribeFrameRouter?
     @ObservationIgnored private var transcriber: (any ScribeTranscriber)?
     @ObservationIgnored private var sessionTitle: String?
@@ -363,18 +367,23 @@ final class ScribeController {
         },
         paceWritingMotion: Bool = false,
         showsEndWindow: Bool = false,
-        writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil
+        writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil,
+        cancellationDefaults: UserDefaults = .standard,
+        endWindow: ScribeEndWindow? = nil,
+        transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine }
     ) {
         self.provider = provider
         self.generator = generator
         self.clock = clock
         self.monotonicClock = monotonicClock
         self.store = store
+        self.cancellationDefaults = cancellationDefaults
+        self.transcriptionEngine = transcriptionEngine
         self.writeMeeting = writeMeeting ?? { record in try store?.save(record) }
         self.muteSourceFactory = muteSourceFactory
         self.transcriberFactory = transcriberFactory
         self.paceWritingMotion = paceWritingMotion
-        self.showsEndWindow = showsEndWindow
+        self.endWindow = showsEndWindow ? (endWindow ?? .shared) : nil
         loadSavedMeetings()
     }
 
@@ -614,7 +623,7 @@ final class ScribeController {
         guard endWorkflow.requestEnd(session: id, now: now) else { return }
         run { $0.requestEnd(id, now: now, grace: ScribeEndWorkflow.grace) }
         updateEndingCountdown(now: now)
-        if showsEndWindow { ScribeEndWindow.shared.present(scribe: self) }
+        endWindow?.present(scribe: self)
     }
 
     /// Positive termination of the exact native call-app instance bound when Record was chosen.
@@ -630,7 +639,7 @@ final class ScribeController {
         discardRequested = false
         run { $0.requestEnd(id, now: now, grace: ScribeEndWorkflow.grace) }
         updateEndingCountdown(now: now)
-        if showsEndWindow { ScribeEndWindow.shared.present(scribe: self) }
+        endWindow?.present(scribe: self)
     }
 
     /// Trash button, step one: asks the page to confirm throwing the recording away.
@@ -734,7 +743,7 @@ final class ScribeController {
     func openRecap(_ id: ScribeSessionID) -> Bool {
         let decision = ScribeRecapNavigation.decision(
             phase: machine.phase, recapExists: recaps.contains(where: { $0.id == id }),
-            isCancelled: ScribeCancelTombstones.ids.contains(id.rawValue)
+            isCancelled: ScribeCancelTombstones.ids(in: cancellationDefaults).contains(id.rawValue)
         )
         switch decision {
         case .busy, .unavailable: return false
@@ -823,7 +832,7 @@ final class ScribeController {
 
     /// Where the meeting audio goes when the dictation engine is a cloud one, else nil.
     var cloudDisclosure: String? {
-        ScribeCloudDisclosure.text(for: DictationSettings.shared.engine)
+        ScribeCloudDisclosure.text(for: transcriptionEngine())
     }
 
     // MARK: Pipeline inputs (called by a real transcriber later; also used by tests and previews)
@@ -1091,7 +1100,7 @@ final class ScribeController {
             router?.finish()
             if let id = machine.phase.sessionID { checkpointTranscript(id) }
         case .notesReady(let id):
-            if showsEndWindow { ScribeEndWindow.shared.present(scribe: self) }
+            endWindow?.present(scribe: self)
             completedNoticeID = id
             completedNoticeTask?.cancel()
             completedNoticeTask = Task { @MainActor [weak self] in
@@ -1194,7 +1203,7 @@ final class ScribeController {
     private func discardCheckpoint(_ id: ScribeSessionID) {
         guard let store, checkpointedMeetings.contains(id.rawValue) else { return }
         pendingCleanup.insert(id.rawValue)
-        ScribeCancelTombstones.add(id.rawValue)
+        ScribeCancelTombstones.add(id.rawValue, in: cancellationDefaults)
         if removeCheckpoint(id.rawValue) { return }
         if let record = checkpointRecord(id, dismissedAt: clock()) { try? store.save(record) }
         cleanupIssue = Self.cleanupFailedMessage
@@ -1209,7 +1218,7 @@ final class ScribeController {
                 try store.delete(id: raw)
                 pendingCleanup.remove(raw)
                 checkpointedMeetings.remove(raw)
-                ScribeCancelTombstones.remove(raw)
+                ScribeCancelTombstones.remove(raw, in: cancellationDefaults)
                 if pendingCleanup.isEmpty { cleanupIssue = nil }
                 return true
             } catch { continue }
@@ -1265,7 +1274,7 @@ final class ScribeController {
         guard let store else { return }
         // A meeting cancelled in an earlier run whose file couldn't be removed then: finish that deletion now, and
         // never list it as a recap while the file is still there.
-        let cancelled = ScribeCancelTombstones.ids
+        let cancelled = ScribeCancelTombstones.ids(in: cancellationDefaults)
         for raw in cancelled {
             pendingCleanup.insert(raw)
             _ = removeCheckpoint(raw)
@@ -1485,7 +1494,7 @@ final class ScribeController {
     }
 
     private func hideEndWindow() {
-        if showsEndWindow { ScribeEndWindow.shared.hide() }
+        endWindow?.hide()
     }
 
     private func startClock() {

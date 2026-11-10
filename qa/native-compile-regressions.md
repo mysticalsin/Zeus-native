@@ -1,0 +1,50 @@
+# Native compiler regressions — initial public build
+
+The first actual Mac build of audited public commit
+`f07b1192ebdfb85f0dd9dadba397b52bbd63eebe` failed in
+[run 42731139415](https://github.com/mysticalsin/Zeus-native/actions/runs/42731139415),
+app job `129549169770`. It used macOS 15.8.2 arm64, Xcode 26.1.1 (17B100) and
+Apple Swift 6.2.1. Native tests and bundling were correctly skipped after failure.
+The extension and mocked release-script jobs passed.
+
+These are **compiler/type-check guards**, not invented runtime unit tests. The
+mandatory `app` job executes `swift build`; `required-checks` requires its build,
+test, bundle and archive steps to succeed. The separately named native fixture
+commands also compile the real app module before running. Keeping this compiler
+and these source files in those commands makes a recurrence fail the check.
+
+The test-function registry in `regressions.json` describes behavioral tests. This
+ledger records type-check failures separately so they cannot be mislabeled as
+executed behavioral coverage. All rows remain **native verification pending**
+until a later actual Mac build of the repaired source succeeds. Linux frontend
+parsing alone does not clear them.
+
+| ID | File / first failing line | Observed compiler failure | Required guard |
+| --- | --- | --- | --- |
+| TYPE-001 | `Sources/Zeus/App/KeychainSelfTest.swift:73` | `Task.detached` transfers a non-Sendable closure and risks data races | Real app build under Apple Swift 6.2.1 |
+| TYPE-002 | `Sources/Zeus/Dictation/CloudSpeechEngines.swift:143,151` | Closures capture `failure` / `committed` before shadowing locals are declared | Real app build; keep the actual cloud-engine source compiled |
+| TYPE-003 | `Sources/Zeus/Prompter/PrompterWindow.swift:124` | Ambiguous subtraction in mixed floating-point coordinate expression | Real app build; preserve coordinate behavior |
+| TYPE-004 | `Sources/Zeus/Notch/HaloRenderer.swift:27` | Path traversal expression exceeds type-check complexity budget | Real app build; retain rendering behavior |
+| TYPE-005 | `Sources/Zeus/Voice/VoiceSample.swift:31` | `Task.detached` transfers a non-Sendable closure and risks data races | Real app build; no live TTS/network call needed to type-check |
+| TYPE-006 | `Sources/Zeus/TopBar/HomeBackdrops.swift:168,254` | Canvas layer expressions exceed type-check complexity budget | Real app build; retain visual formulas |
+| TYPE-007 | `Sources/Zeus/TopBar/RecordingFeedbackView.swift:65,66` | Accessibility environment keys are read-only, not writable key paths | Real app build plus existing `RecordingFeedbackRenderTests`; no weakened accessibility assertions |
+| TYPE-008 | `Sources/Zeus/TopBar/TopBarViews.swift:135` | `VoiceLevelBars.body` exceeds type-check complexity budget | Real app build; retain waveform behavior |
+
+There were 12 distinct compiler diagnostics across these eight files; repeated
+batch-compile diagnostics are not additional failures. The
+[deduplicated diagnostic receipt](receipts/20261110/native-ci-initial-errors.json)
+contains exact context, source SHA and run/job identity. Full raw logs are
+available in the linked Actions job and its `zeus-check-app` artifact.
+
+The follow-up source refactors split numeric expressions into explicitly typed
+intermediates while preserving the existing geometry formulas. Three repairs
+also bind actual native behavioral guards in `regressions.json`: Bezier endpoint
+and midpoint preservation (`REG-036`), retaining the cloud stream's missing-key
+failure during finish (`REG-037`), and reduced-motion frame stability with explicit
+view/style inputs instead of read-only environment setters (`REG-038`). Those
+guards remain unexecuted until Mac CI runs them; source parsing is not a pass.
+
+Do not lower the language/SDK requirements, skip these files, turn errors into
+ignored output or treat a new native fixture count as proof of physical user
+interaction. These repairs clear compilation only; the feature-map integration,
+window journey, device and signing obligations remain separate.

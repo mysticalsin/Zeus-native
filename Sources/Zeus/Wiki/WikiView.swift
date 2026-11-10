@@ -22,6 +22,9 @@ struct WikiView: View {
         .sheet(item: Binding(get: { controller.vaultExport }, set: { controller.vaultExport = $0 })) { model in
             WikiMCPExportSheet(model: model) { controller.vaultExport = nil }
         }
+        .sheet(isPresented: Binding(get: { controller.graphOpen }, set: { controller.graphOpen = $0 })) {
+            WikiGraphView(controller: controller)
+        }
     }
 }
 
@@ -373,9 +376,16 @@ private struct WikiRelatedPages: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Related pages")
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.cloudPrimary)
-                .accessibilityAddTraits(.isHeader)
+            HStack {
+                Text("Related pages")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.cloudPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button("Explore connections…") { controller.openGraph() }
+                    .font(.system(size: 11))
+                    .disabled(controller.settingsUnreadable)
+                    .accessibilityHint("Shows a graph and an accessible list of authored links and shared sources.")
+            }
             let related = controller.relatedPages
             if related.isEmpty {
                 Text("No linked pages or shared sources yet.")
