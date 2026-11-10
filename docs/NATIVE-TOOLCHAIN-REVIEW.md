@@ -378,3 +378,39 @@ with a trap; actual film tests cannot reach their initial playing/advancing
 condition; the cold Python fixtures retain five issues and sampling is unavailable.
 These three failures remain failures. None of the film pause/requeue assertions
 is accepted merely because the earlier compile errors were repaired.
+
+## Managed test-host motion profile
+
+The [runner-image setup](https://github.com/actions/runner-images/blob/macos-15-arm64/20261104.0514/images/macos/scripts/build/configure-system.sh#L19-L21)
+explicitly enables Reduce Motion. The `e295aaf` guide trace confirms effective
+reduction for both requested settings. The film tests therefore demanded
+movement while the app correctly respected the OS preference. This does not
+establish normal-motion playback or any later lifecycle assertion.
+
+The app CI step now uses a wrapper that accepts only a Darwin, GitHub-hosted
+runner with an existing boolean `reduceMotion` key. It records that value, sets
+normal motion for the disposable profile, then restores and verifies the original
+value in `finally`. Unknown preference state, setup failure, test failure or
+restoration failure cannot pass. SIGTERM invokes cleanup where the process can
+handle it; an uncatchable kill still relies on disposal of the hosted machine.
+No personal Mac preferences, Reduce Transparency, TCC settings, daemon restarts
+or consent prompts are involved. Each fresh owned-window host independently
+checks the real NSWorkspace property before loading tests. Requested reduced
+motion remains covered through the production view policy.
+
+The film diagnostic exposes actual reduction/eligibility and raw player statuses.
+The failure-only AX snapshot now emits bounded fixed phase names immediately,
+so a trap cannot erase all progress markers; rejected semantic presses retain
+exact owned-cell/target facts without an alternate action. These diagnostics do
+not turn either failed journey into a pass.
+
+At `db9d410`, [independent native validation](../qa/receipts/20261110/mac-db9-ci.json)
+confirms 2,330 completed tests across 26 partitions, including all three real
+AVAudioConverter/PCM ownership guards. Accessibility, cold Python startup and
+film playback still failed. The managed-profile change needs fresh native proof.
+
+The separate `e295aaf` PR development job later timed out in
+`portable-bridge-transport` after 1,800 seconds. It reported 613 completed checks
+and 113 passing verification selftests, but the timed-out partition has no
+terminal completion and stays failed. Its counterpart push's 641 passes cannot
+replace that result. The timeout cause remains under investigation.

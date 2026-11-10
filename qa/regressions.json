@@ -1723,6 +1723,30 @@
         "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
         "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
       }
+    },
+    {
+      "id": "REG-143",
+      "failure": "The hosted Mac image enables Reduce Motion, so real decorative-film tests incorrectly required movement in a profile where the app correctly pauses. A wrapper now configures normal motion only in the disposable GitHub-hosted profile, restores the existing boolean, preserves test failures, and requires fresh native NSWorkspace verification before owned-window tests. Product accessibility policy is unchanged.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_original_boolean_marker_and_native_exit_are_preserved"
+      }
+    },
+    {
+      "id": "REG-144",
+      "failure": "A managed-runner motion setup must never report native success if restoring the original accessibility preference fails. The wrapper fails closed on restore errors and refuses local, self-hosted, unknown or non-Mac environments before touching preferences.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_failed_restore_never_turns_native_success_into_job_success"
+      }
     }
   ]
 }

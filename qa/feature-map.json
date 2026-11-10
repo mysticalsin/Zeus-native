@@ -2740,7 +2740,7 @@
         {
           "id": "F13.onboarding-film-lifecycle",
           "check": "native-OnboardingFilmLifecycleTests",
-          "acceptance": "A real muted decorative player advances only while eligible, pauses on native visibility and reduced-motion changes, ignores stale window/foreign-item notifications, and cannot restart after dismantle. Natural completion keeps the owned queue bounded. Tests require usable native visibility and normal OS motion for the initial positive control; no override or simulated pass is allowed. CPU/energy savings remain a separate device obligation.",
+          "acceptance": "A real muted decorative player advances only while eligible, pauses on native visibility and reduced-motion changes, ignores stale window/foreign-item notifications, and cannot restart after dismantle. Natural completion keeps the owned queue bounded. Initial playback requires usable native visibility and actual normal OS motion. CI configures and restores only its disposable hosted profile; the product never overrides the OS preference. CPU/energy savings remain a separate device obligation.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",

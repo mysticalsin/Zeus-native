@@ -12,12 +12,30 @@ private enum OwnedProcessAXDiagnostic {
     static let windowMarkerPrefix = "zeus.synthetic.scribe.window."
 
     private struct Failure: Error { let reason: String }
+    private enum Phase: String {
+        case dispatching, detachedEntered, detachedReturned, dispatchReturned
+        case typeIDBegin, typeIDReturned, trustBegin, trustReturned, createApplicationBegin, createApplicationReturned
+        case timeoutBegin, timeoutReturned, getPIDBegin, getPIDReturned
+        case attributeBegin, attributeReturned, countBegin, countReturned, valuesBegin, valuesReturned
+        case breadcrumbLimit
+    }
+
+    private static func record(_ phase: Phase) {
+        // Fixed names only: no app payload, attribute values, paths or foreign-process details.
+        FileHandle.standardError.write(Data("Own-PID AX phase: \(phase.rawValue)\n".utf8))
+    }
 
     static func collect(pid: Int32, windowMarker: String) async -> [String] {
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        return await Task.detached(priority: .utility) {
-            snapshot(pid: pid, windowMarker: windowMarker, deadline: deadline)
+        record(.dispatching)
+        let result = await Task.detached(priority: .utility) {
+            record(.detachedEntered)
+            let rows = snapshot(pid: pid, windowMarker: windowMarker, deadline: deadline)
+            record(.detachedReturned)
+            return rows
         }.value
+        record(.dispatchReturned)
+        return result
     }
 
     private static func snapshot(pid: Int32, windowMarker: String,
@@ -30,6 +48,13 @@ private enum OwnedProcessAXDiagnostic {
         var visited: [AXUIElement] = []
         var complete = false
         var incompleteBranch = false
+        var breadcrumbs = 0
+        func breadcrumb(_ phase: Phase) {
+            // At most 64 snapshot markers, plus the four fixed dispatch markers above.
+            guard breadcrumbs < 64 else { return }
+            breadcrumbs += 1
+            record(breadcrumbs == 64 ? .breadcrumbLimit : phase)
+        }
         func field(_ value: String) -> String {
             String(value.prefix(160)).replacingOccurrences(of: "\n", with: "\\n")
                 .replacingOccurrences(of: "\r", with: "\\r")
@@ -42,15 +67,26 @@ private enum OwnedProcessAXDiagnostic {
             let seconds = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
             return Float(min(0.1, seconds))
         }
+        guard ContinuousClock.now < deadline else {
+            return ["snapshot stopped: 2-second monotonic budget exhausted; original UI failure remains"]
+        }
+        breadcrumb(.typeIDBegin)
+        let axTypeID = AXUIElementGetTypeID()
+        breadcrumb(.typeIDReturned)
         func prepare(_ element: AXUIElement) throws {
-            let error = AXUIElementSetMessagingTimeout(element, try remainingTimeout())
+            breadcrumb(.timeoutBegin)
+            let timeout = try remainingTimeout()
+            let error = AXUIElementSetMessagingTimeout(element, timeout)
+            breadcrumb(.timeoutReturned)
             guard error == .success else { throw Failure(reason: "set timeout AXError=\(error.rawValue)") }
             _ = try remainingTimeout()
         }
         func requireOwnPID(_ element: AXUIElement) throws {
             try prepare(element)
             var observed: pid_t = 0
+            breadcrumb(.getPIDBegin)
             let error = AXUIElementGetPid(element, &observed)
+            breadcrumb(.getPIDReturned)
             guard error == .success else { throw Failure(reason: "get PID AXError=\(error.rawValue)") }
             _ = try remainingTimeout()
             guard observed == pid else { throw Failure(reason: "foreign PID; details withheld") }
@@ -58,7 +94,9 @@ private enum OwnedProcessAXDiagnostic {
         func attribute(_ element: AXUIElement, _ name: String) throws -> CFTypeRef? {
             try prepare(element)
             var value: CFTypeRef?
+            breadcrumb(.attributeBegin)
             let error = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+            breadcrumb(.attributeReturned)
             if error == .noValue || error == .attributeUnsupported {
                 append("optional \(field(name)) AXError=\(error.rawValue)")
                 _ = try remainingTimeout()
@@ -71,7 +109,9 @@ private enum OwnedProcessAXDiagnostic {
         func elements(_ element: AXUIElement, _ name: String, limit: Int) throws -> [AXUIElement] {
             try prepare(element)
             var count: CFIndex = 0
+            breadcrumb(.countBegin)
             let countError = AXUIElementGetAttributeValueCount(element, name as CFString, &count)
+            breadcrumb(.countReturned)
             if countError == .noValue || countError == .attributeUnsupported {
                 append("array \(field(name)) AXError=\(countError.rawValue)")
                 incompleteBranch = true
@@ -86,14 +126,16 @@ private enum OwnedProcessAXDiagnostic {
             guard count > 0 else { return [] }
             try prepare(element)
             var raw: CFArray?
+            breadcrumb(.valuesBegin)
             let error = AXUIElementCopyAttributeValues(element, name as CFString, 0, count, &raw)
+            breadcrumb(.valuesReturned)
             guard error == .success else { throw Failure(reason: "copy \(field(name)) AXError=\(error.rawValue)") }
             _ = try remainingTimeout()
             guard let values = raw as? [AnyObject], values.count == count else {
                 throw Failure(reason: "\(field(name)) changed size or returned malformed array")
             }
             return try values.map { value in
-                guard CFGetTypeID(value) == AXUIElementGetTypeID() else {
+                guard CFGetTypeID(value) == axTypeID else {
                     throw Failure(reason: "\(field(name)) returned a non-AX element")
                 }
                 return value as! AXUIElement // Type ID was checked before the CF bridge cast.
@@ -101,9 +143,14 @@ private enum OwnedProcessAXDiagnostic {
         }
         do {
             _ = try remainingTimeout()
-            append("trusted=\(AXIsProcessTrusted()), ownPID=true, timeoutMaxMs=100, budgetMs=2000")
+            breadcrumb(.trustBegin)
+            let trusted = AXIsProcessTrusted()
+            breadcrumb(.trustReturned)
+            append("trusted=\(trusted), ownPID=true, timeoutMaxMs=100, budgetMs=2000")
             _ = try remainingTimeout()
+            breadcrumb(.createApplicationBegin)
             let application = AXUIElementCreateApplication(pid)
+            breadcrumb(.createApplicationReturned)
             try requireOwnPID(application)
             let windows = try elements(application, kAXWindowsAttribute, limit: 8)
             var matching: [AXUIElement] = []
@@ -127,7 +174,7 @@ private enum OwnedProcessAXDiagnostic {
                 try requireOwnPID(element)
                 if !CFEqual(element, ownedWindow) {
                     guard let owner = try attribute(element, kAXWindowAttribute),
-                          CFGetTypeID(owner) == AXUIElementGetTypeID(), CFEqual(owner, ownedWindow) else {
+                          CFGetTypeID(owner) == axTypeID, CFEqual(owner, ownedWindow) else {
                         append("branch withheld: owned-window membership unverified")
                         incompleteBranch = true
                         continue
@@ -372,6 +419,25 @@ private struct ScribeComponentFixture {
         return result
     }
 
+    private func pressDiagnostic(_ element: any NSAccessibilityProtocol, in window: NSWindow) -> String {
+        let selector = NSSelectorFromString("accessibilityPerformPress")
+        let allowed = element.isAccessibilitySelectorAllowed(selector)
+        let facts = "element=\(element.isAccessibilityElement()), " +
+            "role=\(diagnosticField(element.accessibilityRole()?.rawValue ?? "nil")), " +
+            "enabled=\(element.isAccessibilityEnabled()), selectorAllowed=\(allowed)"
+        guard let cell = element as? NSButtonCell, let control = cell.controlView as? NSButton,
+              control.window === window, control.cell === cell else {
+            return facts + "; ownedButtonCell=false; control details withheld"
+        }
+        let target = control.target as? NSObject
+        let action = control.action
+        let targetResponds = action.map { target?.responds(to: $0) ?? false } ?? false
+        let fixtureCount = (target as? ButtonTarget).map { String($0.presses) } ?? "unavailable"
+        return facts + "; ownedButtonCell=true, controlEnabled=\(control.isEnabled), " +
+            "targetPresent=\(target != nil), action=\(diagnosticField(action.map(NSStringFromSelector) ?? "nil")), " +
+            "targetResponds=\(targetResponds), fixturePressCount=\(fixtureCount)"
+    }
+
     private func press(_ id: String, in window: NSWindow, trace: inout [String]) async throws {
         guard allowedControls.contains(id) else { throw ScenarioFailure.unavailableControl(id, "not an allowed action") }
         guard window.isVisible else { throw ScenarioFailure.unavailableControl(id, "owning window is hidden") }
@@ -401,7 +467,12 @@ private struct ScribeComponentFixture {
                 } else if let view = button as? NSView, view.isHiddenOrHasHiddenAncestor {
                     lastUnavailableReason = "button stayed hidden"
                 } else {
-                    guard button.accessibilityPerformPress() else { throw ScenarioFailure.rejectedPress(id) }
+                    let before = pressDiagnostic(button, in: window)
+                    guard button.accessibilityPerformPress() else {
+                        OwnedWindowFixtureApplication.record("rejected semantic press: before=[\(before)]; " +
+                            "after=[\(pressDiagnostic(button, in: window))]")
+                        throw ScenarioFailure.rejectedPress(id)
+                    }
                     trace.append("pressed \(id)")
                     return
                 }

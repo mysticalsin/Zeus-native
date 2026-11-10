@@ -706,7 +706,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(workflow.count("ref: ${{ github.sha }}"), len(gate.REQUIRED) + 1)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event_name == 'schedule'", workflow)
-        self.assertIn('python3 qa/closed-loop/native.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence"', workflow)
+        self.assertIn('python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence"', workflow)
         self.assertIn("native-evidence/result.json", gate.job_artifacts("app"))
         self.assertGreaterEqual(workflow.count("if-no-files-found: error"), len(gate.REQUIRED) + 1)
 
@@ -715,7 +715,7 @@ class WorkflowContractTests(unittest.TestCase):
         app = workflow.split("  app:\n", 1)[1].split("\n  extension:", 1)[0]
         build = app.index('swift build; }')
         build_check = app.index('gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/build.log"')
-        tests = app.index("python3 qa/closed-loop/native.py")
+        tests = app.index("python3 qa/closed-loop/ci_motion_profile.py")
         bundle = app.index("scripts/bundle.sh")
         bundle_check = app.index('gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/bundle.log"')
         archive = app.index("ditto -c -k")

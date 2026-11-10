@@ -83,7 +83,7 @@ jobs:
         # Compiler discovery and qualified event streams must prove every selected case ran.
         # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
-          python3 qa/closed-loop/native.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+          python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
       - name: Record Python launcher metadata after cold fixtures
         if: always() && steps.test.outcome != 'skipped'
         timeout-minutes: 1

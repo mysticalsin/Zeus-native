@@ -74,6 +74,15 @@ private enum NativeAppTestHost {
                   (args[6] as NSString).isAbsolutePath else {
                 throw HostFailure("unexpected host arguments")
             }
+            if ProcessInfo.processInfo.environment["ZEUS_CI_REQUIRE_NORMAL_MOTION"] == "1" {
+                let environment = ProcessInfo.processInfo.environment
+                guard environment["GITHUB_ACTIONS"] == "true",
+                      environment["RUNNER_ENVIRONMENT"] == "github-hosted",
+                      !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                    throw HostFailure("CI normal-motion profile unavailable in this fresh host")
+                }
+                report("CI normal-motion profile verified through NSWorkspace")
+            }
             // Keep the image loaded for the process lifetime: discovered Swift
             // metadata can outlive the invocation. Never resolve or invoke main.
             guard let image = dlopen(args[2], RTLD_NOW | RTLD_GLOBAL) else {

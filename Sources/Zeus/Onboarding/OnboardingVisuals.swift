@@ -112,6 +112,13 @@ struct LoopingFilm: NSViewRepresentable {
         struct PlaybackState {
             let rate: Float
             let status: AVPlayer.TimeControlStatus
+            let timeControlStatusRaw: Int
+            let playerStatusRaw: Int
+            let itemStatusRaw: Int?
+            let localReduceMotion: Bool
+            let systemReduceMotion: Bool
+            let effectiveReduceMotion: Bool
+            let eligible: Bool
             let seconds: Double
             let queuedItems: Int
             let queuedFilms: [String]
@@ -122,7 +129,20 @@ struct LoopingFilm: NSViewRepresentable {
         }
 
         var playbackState: PlaybackState {
-            .init(rate: player.rate, status: player.timeControlStatus, seconds: player.currentTime().seconds,
+            let systemReduction = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            let effectiveReduction = motionReduction || systemReduction
+            let eligible: Bool
+            if !disposed, !closing, !effectiveReduction, !isHiddenOrHasHiddenAncestor, let window {
+                eligible = OnboardingPollingPolicy.shouldPoll(presented: true, windowVisible: window.isVisible,
+                    miniaturized: window.isMiniaturized, appHidden: NSApplication.shared.isHidden,
+                    occluded: !window.occlusionState.contains(.visible))
+            } else { eligible = false }
+            return .init(rate: player.rate, status: player.timeControlStatus,
+                  timeControlStatusRaw: player.timeControlStatus.rawValue,
+                  playerStatusRaw: player.status.rawValue, itemStatusRaw: player.currentItem?.status.rawValue,
+                  localReduceMotion: motionReduction, systemReduceMotion: systemReduction,
+                  effectiveReduceMotion: effectiveReduction, eligible: eligible,
+                  seconds: player.currentTime().seconds,
                   queuedItems: player.items().count,
                   queuedFilms: player.items().compactMap { ($0.asset as? AVURLAsset)?.url.lastPathComponent },
                   trackedItems: ownedItems.count, muted: player.isMuted,
