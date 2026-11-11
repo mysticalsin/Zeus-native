@@ -56,6 +56,11 @@ public struct ScribeSpeakerIdentity: Codable, Equatable, Sendable {
 public struct ScribeDeclinedName: Codable, Equatable, Sendable {
     public var label: String
     public var nameKey: String
+
+    public init(label: String, nameKey: String) {
+        self.label = label
+        self.nameKey = nameKey
+    }
 }
 
 /// One block of lines folded into another speaker when tiny voices were pruned.
@@ -63,6 +68,12 @@ public struct ScribeSpeakerFold: Codable, Equatable, Sendable {
     public var segmentID: String
     public var from: ScribeSpeakerRecordLabel
     public var into: ScribeSpeakerRecordLabel
+
+    public init(segmentID: String, from: ScribeSpeakerRecordLabel, into: ScribeSpeakerRecordLabel) {
+        self.segmentID = segmentID
+        self.from = from
+        self.into = into
+    }
 }
 
 /// A speaker as saved: the same encoding as a transcript line.
