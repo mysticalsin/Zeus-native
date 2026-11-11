@@ -245,4 +245,130 @@ struct ExplanationScreenContextTests {
         #expect(overlay.ownedWindows.isEmpty && !window.isVisible && window.contentView == nil)
         #expect(selected.snapshot != nil)
     }
+
+    // MARK: Desktop explanation card (owned panels, injected screen, no real content or capture)
+
+    private static let cardScreen = ExplanationRect(x: 0, y: 0, width: 1440, height: 875)
+    private static let cardTarget = ExplanationRect(x: 700, y: 400, width: 100, height: 40)
+
+    private func makeDesktopCard() -> ExplanationDesktopCard {
+        let card = ExplanationDesktopCard()
+        card.screenProvider = { _, _ in (Self.cardScreen, []) }
+        return card
+    }
+
+    private func cardDiagram(width: Double = 200, height: Double = 100) -> ExplanationScene {
+        let object = ExplanationObject(id: "box", space: .canvas,
+                                       geometry: .init(kind: .roundedRectangle, size: .init(x: width, y: height)),
+                                       transform: .init(position: .init(x: 500, y: 300)), accessibleDescription: "A box")
+        return ExplanationScene(sessionID: UUID(), sceneID: UUID(), objects: ["box": object])
+    }
+
+    private func cardInput(_ token: UUID, scene: ExplanationScene? = nil,
+                           caption: String = "This is the box.") -> ExplanationDesktopCard.Input {
+        ExplanationDesktopCard.Input(token: token, scene: scene ?? cardDiagram(), caption: caption, beatIDs: ["box"],
+                                     anchors: PointingCardAnchors(anchor: Self.cardTarget, protected: [Self.cardTarget]),
+                                     displayID: nil, pointer: nil)
+    }
+
+    @Test func desktopCardPanelsAreNonActivatingNeverKeyOrMainAndOnlyTheCloseControlTakesMouse() {
+        let card = makeDesktopCard()
+        let token = UUID()
+        card.begin(token: token)
+        card.update(cardInput(token))
+        defer { card.end() }
+        #expect(card.isVisible)
+        let windows = card.ownedWindows
+        #expect(windows.count >= 2)
+        for window in windows {
+            #expect(!window.canBecomeKey && !window.canBecomeMain)
+            #expect(!window.isKeyWindow && !window.isMainWindow)
+            #expect(window.styleMask.contains(.nonactivatingPanel))
+        }
+        let interactive = windows.filter { !$0.ignoresMouseEvents }
+        #expect(interactive.count == 1)
+        #expect(interactive.first?.frame.width == 28)
+    }
+
+    @Test func desktopCardIsPlacedBesideTheTargetAndNeverOverIt() throws {
+        let card = makeDesktopCard()
+        let token = UUID()
+        card.begin(token: token)
+        card.update(cardInput(token))
+        defer { card.end() }
+        let layout = try #require(card.lastLayout)
+        let frame = try #require(layout.frame)
+        #expect(layout.rung != .speechOnly)
+        #expect(!ExplanationCardPlacement.intersects(frame, Self.cardTarget))
+        #expect(frame.x >= Self.cardScreen.x && frame.x + frame.width <= Self.cardScreen.x + Self.cardScreen.width)
+        #expect(layout.connector != nil)
+    }
+
+    @Test func desktopCardShowsTheExactSpokenBeatText() {
+        let card = makeDesktopCard()
+        let token = UUID()
+        card.begin(token: token)
+        card.update(cardInput(token, caption: "Click Share, then pick a person."))
+        defer { card.end() }
+        #expect(card.caption == "Click Share, then pick a person.")
+    }
+
+    @Test func desktopCardIgnoresACallbackFromAReplacedOrCancelledTurn() {
+        let card = makeDesktopCard()
+        let first = UUID(), second = UUID()
+        card.begin(token: first)
+        card.begin(token: second)
+        card.update(cardInput(first))
+        #expect(!card.isVisible)
+        card.update(cardInput(second))
+        #expect(card.isVisible)
+        card.end()
+        card.update(cardInput(second))
+        #expect(!card.isVisible && card.ownedWindows.isEmpty)
+    }
+
+    @Test func desktopCardCloseControlDismissesItForThatTurnOnly() throws {
+        let card = makeDesktopCard()
+        let dismissals = Counter()
+        card.onDismissed = { dismissals.value += 1 }
+        let token = UUID()
+        card.begin(token: token)
+        card.update(cardInput(token))
+        defer { card.end() }
+        let closePanel = try #require(card.ownedWindows.first { !$0.ignoresMouseEvents })
+        let button = try #require(closePanel.contentView as? NSButton)
+        button.performClick(nil)
+        #expect(!card.isVisible && dismissals.value == 1)
+        card.update(cardInput(token))
+        #expect(!card.isVisible)
+        let next = UUID()
+        card.begin(token: next)
+        card.update(cardInput(next))
+        #expect(card.isVisible)
+    }
+
+    @Test func desktopCardGoesSpeechOnlyWhenNothingReadableFits() {
+        let card = makeDesktopCard()
+        let token = UUID()
+        card.begin(token: token)
+        card.update(cardInput(token, scene: cardDiagram(width: 3000, height: 2000)))
+        defer { card.end() }
+        #expect(card.lastLayout?.rung == .speechOnly)
+        #expect(!card.isVisible)
+    }
+
+    @Test func desktopCardIgnoresScenesThatHaveOnlyScreenMarks() {
+        let card = makeDesktopCard()
+        let token = UUID(), capture = UUID()
+        let ring = ExplanationObject(id: "ring", space: .capture, captureID: capture,
+                                     geometry: .init(kind: .ring, radius: 20), accessibleDescription: "Ring")
+        var scene = ExplanationScene(sessionID: UUID(), sceneID: UUID(), objects: ["ring": ring])
+        scene.captureID = capture
+        card.begin(token: token)
+        card.update(cardInput(token, scene: scene))
+        defer { card.end() }
+        #expect(!card.isVisible && card.ownedWindows.isEmpty)
+    }
+
+    @MainActor private final class Counter { var value = 0 }
 }

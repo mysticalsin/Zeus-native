@@ -32,6 +32,11 @@ final class ExplanationController {
     struct PointingTurn: Sendable {
         var context: PointingContext
         var snapshot: ExplanationScreenSnapshot?
+        /// For the desktop card: the turn's display, the focused text input's frame and the pointer,
+        /// all AppKit global points. Nothing here is sent to a model.
+        var displayID: UInt32? = nil
+        var inputArea: CGRect? = nil
+        var pointer: CGPoint? = nil
         /// Maps the final transcript's pointing words to candidates. Runs once, in `submit()`.
         var resolveDeixis: (@Sendable (String) -> [PointingContext.Deixis])?
     }
@@ -42,8 +47,12 @@ final class ExplanationController {
     /// Window level of the desktop overlay. Chat keeps `.floating`; pointing sits above menus.
     var overlayLevel: NSWindow.Level {
         get { overlay.windowLevel }
-        set { overlay.windowLevel = newValue }
+        set { overlay.windowLevel = newValue; desktopCard.windowLevel = newValue }
     }
+    /// The desktop card's windows, for own-process window-policy checks.
+    var cardWindows: [NSWindow] { desktopCard.ownedWindows }
+    var cardVisible: Bool { desktopCard.isVisible }
+    var cardLayout: ExplanationCardLayout? { desktopCard.lastLayout }
     /// Real first audio start of a pointing turn (not the request, not the first token).
     @ObservationIgnored var onSpeechStart: (() -> Void)?
     /// A cue was admitted by real playback; the argument is the admitted target scene.
@@ -65,6 +74,10 @@ final class ExplanationController {
     let microphone: ExplanationMicrophone
     let screenContext: ExplanationScreenContext
     private let overlay: ExplanationOverlay
+    private let desktopCard: ExplanationDesktopCard
+    /// Non-capture objects the current beat creates, and the anchors last built from a live capture.
+    private var beatObjectIDs = Set<String>()
+    private var cardAnchors: PointingCardAnchors?
     private let provider: any ExplanationModelProviding
     private let speech: ExplanationSpeechRenderQueue
     private let player: ExplanationAudioPlayer
@@ -105,7 +118,7 @@ final class ExplanationController {
     init(provider: any ExplanationModelProviding, speechProvider: any SpeechOutputProvider,
          player: ExplanationAudioPlayer = .init(), microphone: ExplanationMicrophone = .init(),
          screenContext: ExplanationScreenContext = .init(), overlay: ExplanationOverlay = .init(),
-         store: ExplanationHistoryStore? = nil,
+         desktopCard: ExplanationDesktopCard = .init(), store: ExplanationHistoryStore? = nil,
          storeFactory: (() throws -> ExplanationHistoryStore)? = nil,
          acquireAudio: @escaping () throws -> Void = {}, releaseAudio: @escaping () -> Void = {},
          diagnosticsClock: @escaping () -> Double = { ProcessInfo.processInfo.systemUptime },
@@ -123,6 +136,7 @@ final class ExplanationController {
          }) {
         self.provider = provider; speech = .init(provider: speechProvider); self.player = player
         self.microphone = microphone; self.screenContext = screenContext; self.overlay = overlay
+        self.desktopCard = desktopCard
         self.store = store; self.storeFactory = storeFactory
         self.acquireAudio = acquireAudio; self.releaseAudio = releaseAudio
         self.diagnostics = .init(clock: diagnosticsClock); self.processSample = processSample
@@ -190,6 +204,7 @@ final class ExplanationController {
     /// (never written to disk). A session is reused for follow-ups and replaced after `maxAge`.
     func prepareDesktopSession(maxAge: TimeInterval = 600) {
         guard !isClosing else { return }
+        desktopCard.end() // A new hold starts a new turn: the last card goes.
         if let history, let started = desktopSessionStart, Date().timeIntervalSince(started) < maxAge,
            history.canonicalScene.sessionID == requestedConversationID { return }
         stop(); screenContext.clear(); overlay.hide()
@@ -213,6 +228,9 @@ final class ExplanationController {
         linkedHistoryIDs.insert(history!.id)
         stop(); draft = ""; problem = nil; isReplaying = false
         activePointing = pointing; pointingFirstBeatSeen = false; pointingFirstValidBeatSeen = false
+        beatObjectIDs = []; cardAnchors = nil
+        // The card is bound to this turn's generation token (stop() above issued a new one).
+        if pointing != nil { desktopCard.begin(token: generation) }
         do {
             if let pointing {
                 // Capture-space marks need the scene to carry this capture's identity.
@@ -323,6 +341,7 @@ final class ExplanationController {
             case .audio(let command): player.execute(command)
             case .startBeat(let event):
                 caption = event.speech.text
+                beatObjectIDs = Self.createdCardObjectIDs(in: event)
                 if activePointing != nil, !isReplaying, !pointingFirstBeatSeen {
                     pointingFirstBeatSeen = true; onSpeechStart?()
                 }
@@ -377,6 +396,39 @@ final class ExplanationController {
         if let scene, screenContext.annotationContext != nil {
             _ = overlay.present(scene: scene, context: screenContext, reduceMotion: reduceMotion)
         }
+        updateDesktopCard()
+    }
+
+    /// Non-capture objects a beat creates: the beat's own share of the card.
+    private static func createdCardObjectIDs(in event: ExplanationEvent) -> Set<String> {
+        var ids = Set<String>()
+        for cue in event.cues {
+            for operation in cue.operations {
+                switch operation {
+                case .create(let object), .connect(let object): if object.space != .capture { ids.insert(object.id) }
+                default: break
+                }
+            }
+        }
+        return ids
+    }
+
+    /// Pointing turns only: charts, cards, diagrams and 3D have no overlay surface, so they go to the
+    /// desktop card, beside (never over) what the owner pointed at. Capture-space marks stay on the overlay.
+    private func updateDesktopCard() {
+        guard let pointing = activePointing, !isReplaying, let scene else { return }
+        if let capture = screenContext.annotationContext {
+            let marks = scene.objects.values.filter { $0.space == .capture && $0.captureID == capture.geometry.captureID }
+            cardAnchors = PointingCardAnchorBuilder.make(
+                context: pointing.context, marks: marks, capture: capture,
+                inputArea: pointing.inputArea.map { ExplanationRect(x: $0.minX, y: $0.minY, width: $0.width, height: $0.height) })
+        }
+        // The capture lease can lapse mid-turn; keep the last anchors so the card does not jump.
+        let anchors = cardAnchors ?? PointingCardAnchorBuilder.make(
+            pointer: pointing.pointer.map { ExplanationVector3(x: $0.x, y: $0.y) },
+            inputArea: pointing.inputArea.map { ExplanationRect(x: $0.minX, y: $0.minY, width: $0.width, height: $0.height) })
+        desktopCard.update(.init(token: generation, scene: scene, caption: caption, beatIDs: beatObjectIDs,
+                                 anchors: anchors, displayID: pointing.displayID, pointer: pointing.pointer))
     }
 
     /// Stop freezes the sampled pose, invalidates every asynchronous generation,
@@ -426,7 +478,7 @@ final class ExplanationController {
         activePointing = nil
         isReceiving = false; isReplaying = false; phase = .idle; scene = history?.canonicalScene
         if ownsAudio { ownsAudio = false; releaseAudio() }
-        overlay.hide(); queueSave()
+        overlay.hide(); desktopCard.end(); queueSave()
     }
 
     func pauseOrResume() {
@@ -676,7 +728,9 @@ final class ExplanationController {
         case .awaitingCaptionAdvance: phase = .captions
         case .completed:
             phase = isReceiving ? .thinking : .completed
-            if !isReceiving, activePointing != nil { activePointing = nil; onTurnEnded?(nil) }
+            if !isReceiving, activePointing != nil {
+                activePointing = nil; desktopCard.beginLinger(); onTurnEnded?(nil)
+            }
             if !isReceiving, ownsAudio { ownsAudio = false; releaseAudio() }
             if !isReceiving, let diagnosticTurn {
                 sampleDiagnosticResources()

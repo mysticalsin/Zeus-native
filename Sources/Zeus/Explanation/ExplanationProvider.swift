@@ -7,7 +7,7 @@ struct ExplanationModelRequest: Sendable {
     let history: [ExplanationHistory.Message]
     let prompt: String
     var snapshot: ExplanationScreenSnapshot? = nil
-    /// A desktop pointing turn: protocol v2 and the app-built context (untrusted data).
+    /// A desktop pointing turn: protocol v3 and the app-built context (untrusted data).
     var pointing: PointingContext? = nil
 }
 
@@ -60,9 +60,9 @@ final class ExplanationHTTPProvider: ExplanationModelProviding {
         var example = String(decoding: try ExplanationWire.encode(sample), as: UTF8.self)
         var baseInstructions = ExplanationWire.modelInstructions
         if pointingMode {
-            // Version 2 is the only change; encode() validates v1, so patch the sample text.
-            example = example.replacingOccurrences(of: "\"version\":1", with: "\"version\":2")
-            baseInstructions = baseInstructions.replacingOccurrences(of: "version-1", with: "version-2")
+            // Version 3 is the only change; encode() validates v1, so patch the sample text.
+            example = example.replacingOccurrences(of: "\"version\":1", with: "\"version\":3")
+            baseInstructions = baseInstructions.replacingOccurrences(of: "version-1", with: "version-3")
         }
         let screenInstruction: String
         if let snapshot = input.snapshot {
@@ -160,7 +160,7 @@ final class ExplanationHTTPProvider: ExplanationModelProviding {
         guard http.mimeType?.lowercased() == "text/event-stream" else { throw ExplanationProviderError.invalidResponse }
         var parser = try ExplanationCompletionStream(sessionID: input.scene.sessionID, turnID: input.turnID,
                                                      sceneID: input.scene.sceneID, baseRevision: input.scene.revision,
-                                                     profile: input.pointing.map { .v2(candidateIDs: $0.candidateIDs) } ?? .v1)
+                                                     profile: input.pointing.map { .v3(candidateIDs: $0.candidateIDs) } ?? .v1)
         var line = Data()
         for try await byte in bytes {
             try Task.checkCancellation()

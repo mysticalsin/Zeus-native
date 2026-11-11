@@ -54,6 +54,24 @@ enum PointingTargetProbe {
                                  axFrame: frame, isSecure: secure)
     }
 
+    /// The focused text input's frame in Quartz global points, so the explanation card can stay clear
+    /// of where the owner is typing. Reads only the role and the frame, never a value, so a secure
+    /// field's contents are not collected. Nil when Accessibility is not trusted or nothing editable has focus.
+    nonisolated static func focusedInputFrame() -> CGRect? {
+        guard AXIsProcessTrusted() else { return nil }
+        let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, messagingTimeout)
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+              let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
+        let element = focused as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        guard let role = string(element, kAXRoleAttribute),
+              ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role),
+              let frame = frame(of: element), frame.width > 0, frame.height > 0 else { return nil }
+        return frame
+    }
+
     private nonisolated static func string(_ element: AXUIElement, _ attribute: String) -> String? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,

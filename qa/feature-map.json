@@ -539,7 +539,7 @@
       "kind": "portable",
       "tier": "contract",
       "group": "explanation",
-      "scope": "Exact Foundation scene protocol, bounded NDJSON/SSE, reducer, actual-clock consumer, coordinates, local history and bounded numeric diagnostics with synthetic data. No native rendering, sound, capture, provider requests, measured hardware performance or physical-device acceptance."
+      "scope": "Exact Foundation scene protocol, bounded NDJSON/SSE, reducer, actual-clock consumer, coordinates, local history, bounded numeric diagnostics, chart scales (nice ticks, zero-inclusive bars, finite plans, provenance) and the desktop card's pure placement, fallback ladder and lifecycle with synthetic data. No native rendering, sound, capture, provider requests, measured hardware performance or physical-device acceptance."
     },
     {
       "id": "native-ExplanationAudioTests",
@@ -595,7 +595,7 @@
       "tier": "native-integration",
       "suite": "ExplanationScreenContextTests",
       "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
-      "scope": "Injected selected-display capture services and owned drawing panels: denial, stale completion, context expiry, mapping and pass-through lifecycle. No live screen capture or TCC changes."
+      "scope": "Injected selected-display capture services and owned drawing panels: denial, stale completion, context expiry, mapping and pass-through lifecycle, plus the desktop explanation card's non-activating panels, close control and stale-turn rejection. No live screen capture or TCC changes."
     },
     {
       "id": "missing-explanation-device",
@@ -617,7 +617,7 @@
       "kind": "portable",
       "tier": "contract",
       "group": "pointing",
-      "scope": "Pointing key gesture and spoil rule, session state machine with generation tokens, bounded trace, AX to image coordinate round trips on mixed scales and negative origins, protocol v2 targetID and scene resolver, Anthropic stream envelope, ElevenLabs timestamp parsing, provider selection and error classes. Synthetic data; no capture, key tap, provider request or device acceptance."
+      "scope": "Pointing key gesture and spoil rule, session state machine with generation tokens, bounded trace, AX to image coordinate round trips on mixed scales and negative origins, protocol v2 targetID, v3 chart axis wire additions and scene resolver, desktop card anchors, Anthropic stream envelope, ElevenLabs timestamp parsing, provider selection and error classes. Synthetic data; no capture, key tap, provider request or device acceptance."
     },
     {
       "id": "native-PointingHotkeyMonitorTests",
@@ -2271,6 +2271,190 @@
             {
               "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
               "function": "scratchRootIsCanonicalAndHasNoSymlinkComponents"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTicksCoverZeroToSevenOnNiceSteps"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTicksStartBelowAnOffsetRange"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTicksCrossZeroForNegativeToPositiveData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTicksHandleFractionsWithoutFloatingPointResidue"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTicksHandleHugeMagnitudesWithOneSharedSuffix"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTicksRefuseUnscalableRanges"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTickHintIsClampedAndTickCountStaysBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartThinningKeepsLabelsApartAndKeepsAllWhenTheyFit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartYMappingIsPlotBottomMinusNormalizedTimesHeight"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartBarsIncludeZeroByDefault"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartBarsKeepNegativeValuesBelowALabelledZeroLine"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTruncatedAxisIsAllowedOnlyWhenRequestedAndIsLabelled"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartExplicitDomainIsHonouredAndNeverNarrowerThanTheData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartSingleValueAndAllEqualValuesGetAScale"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartAllZeroValuesGetAUnitDomainAndANote"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartNonFiniteValuesAreRejectedNotDrawn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartMismatchedOrEmptyDataIsRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartEveryAcceptedPlanHasOnlyFiniteBoundedNormalizedPositions"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartPlanHasOneMarkPerObservedValueAndNothingInterpolated"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTimeAxisSpacesPointsByValueAndCategoricalSpacesThemEvenly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTimelineWithoutAnAxisKeepsTheProportionalLegacyBehaviour"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartTimelineWithOneSharedInstantHasACentredTickAndNoZeroWidthScale"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartProvenanceDefaultsToExampleAndCarriesEachSourceNote"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+              "function": "chartAsOfMustBeAnISODateTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementPrefersTheRightOfTheSubjectWithAShortConnector"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementNeverCoversTheTargetThePointerTrailOrTheInputArea"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementMovesToTheLeftWhenTheInputAreaTakesTheRight"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementAvoidsReservedMenuBarAndDockBands"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementShiftsAwayFromAScreenEdge"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementWorksOnADisplayWithANegativeOrigin"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardPlacementOnTheOtherDisplayIsIndependentOfThisOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLadderMovesElsewhereAtFullSizeWhenEveryHuggingSpotIsTaken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLadderShrinksAndDropsNonessentialWorldContentWhenFullDoesNotFit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLadderSplitsIntoBeatsWhenTheWholeSceneIsTooLargeToReadSmall"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLadderEndsInSpeechOnlyWithNoFrameAndNoConnector"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLadderNeverPlacesADiagramBelowTheReadableScale"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardConnectorStaysShortWheneverACardIsShown"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardCaptionIsNeverClippedSoAnOverlongOneMeansSpeechOnly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLayoutReportsTheSectionSizesTheViewMustUse"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardWithNoSubjectGoesToACornerWithoutAConnector"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLifecycleRejectsALateCallbackFromAReplacedTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardLifecycleStaysClosedAfterTheOwnerClosesUntilTheNextTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardContentKeepsOnlyNonCaptureObjectsAndTheirDependencies"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardContentFitsTheDiagramBoundsNotTheWholeStage"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardContentLeavesRoomForLabelsAndShiftsOnlyRootsOfAGroup"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+              "function": "cardContentReportsWorldAndCaptionSizeForPlacement"
             }
           ]
         },
@@ -2647,7 +2831,7 @@
         {
           "id": "F09.ExplanationScreenContextTests",
           "check": "native-ExplanationScreenContextTests",
-          "acceptance": "Injected selected-display capture services and owned drawing panels: denial, stale completion, context expiry, mapping and pass-through lifecycle. No live screen capture or TCC changes.",
+          "acceptance": "Injected selected-display capture services and owned drawing panels: denial, stale completion, context expiry, mapping and pass-through lifecycle, plus the desktop explanation card's non-activating panels, close control and stale-turn rejection. No live screen capture or TCC changes.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
@@ -2700,6 +2884,34 @@
             {
               "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
               "function": "ownedOverlayIsClickThroughReusesItsPanelAndDisappearsWhenContextExpires"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardPanelsAreNonActivatingNeverKeyOrMainAndOnlyTheCloseControlTakesMouse"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardIsPlacedBesideTheTargetAndNeverOverIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardShowsTheExactSpokenBeatText"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardIgnoresACallbackFromAReplacedOrCancelledTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardCloseControlDismissesItForThatTurnOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardGoesSpeechOnlyWhenNothingReadableFits"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+              "function": "desktopCardIgnoresScenesThatHaveOnlyScreenMarks"
             }
           ]
         },
@@ -3042,7 +3254,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
-              "function": "pointingInstructionsHaveNoEmDashAndNameVersionTwo"
+              "function": "pointingInstructionsHaveNoEmDashAndNameVersionThree"
             },
             {
               "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
@@ -3315,6 +3527,102 @@
             {
               "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
               "function": "displayAboveTheMainOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AcceptsAChartAxisOnAVersionThreeEvent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3ChartWithoutAnAxisStillDecodesUnderEveryProfile"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AcceptsATruncatedBarAxisAndTimelineSpacings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3TargetIDStillWorksOnAVersionThreeOrTwoPointingEvent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AxisIsRejectedOutsideTheVersionThreeProfileAndNumber"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3UnknownAndMissingAxisFieldsAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3DuplicateAxisKeysAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AxisRangesAreChecked"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AxisKindMustMatchTheGeometry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AxisIsRejectedOnGeometryThatIsNotAChart"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3LiveDataNeedsAnISOAsOfAndOtherSourcesForbidIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3NonFiniteChartValuesNeverPassValidation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3GeometryRoundTripsAndOmitsAnAbsentAxis"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3ResolverKeepsTheAxisAndStillHandsBackAVersionOneEvent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3AdmittedAxisSurvivesSceneValidationAndAReducerRoundTrip"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3PartialLinesNeverEmitAtAnyByteBoundary"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+              "function": "wireV3ChatInstructionsStayUnchangedAndPointingInstructionsCarryTheAxisRules"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorUsesTheCandidateRectangleConvertedToGlobalPointsOnANegativeDisplay"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorPrefersAdmittedMarksAndProtectsBothMarksAndCandidates"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorProtectsThePointerTrailBoundingBoxAndTheInputArea"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorClampsARectangleThatSpillsOffTheCapturedImageNeverStretchingIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorIsEmptyWhenNothingWasPointedAt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorIgnoresMarksThatAreNotOnTheCapture"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCardAnchorsTests.swift",
+              "function": "cardAnchorFallsBackToAPointerSquareWhenThereIsNoCapture"
             }
           ]
         },

@@ -49,6 +49,7 @@ struct PointingControllerTests {
         services.hasScreenPermission = { permission }
         services.frontmostBundleID = { nil }
         services.probe = { _ in nil }
+        services.focusedInput = { nil }
         services.enabled = { enabled }
         services.sendScreenshot = { false }
         services.drawWhileHeld = { draw }

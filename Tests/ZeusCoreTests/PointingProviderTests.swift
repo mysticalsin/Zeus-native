@@ -211,9 +211,9 @@ struct PointingVendorWireTests {
         #expect(!copies.contains { $0.contains("—") })
     }
 
-    @Test func pointingInstructionsHaveNoEmDashAndNameVersionTwo() {
+    @Test func pointingInstructionsHaveNoEmDashAndNameVersionThree() {
         #expect(!PointingPrompt.instructions.contains("—"))
-        #expect(PointingPrompt.instructions.contains("\"version\":2"))
+        #expect(PointingPrompt.instructions.contains("\"version\":3"))
     }
 
     @Test func contextBlockIsLabelledUntrustedAndKeepsCandidateTextAsData() {

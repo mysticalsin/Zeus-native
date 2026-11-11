@@ -19,6 +19,8 @@ struct ExplanationSceneView: View {
     @Binding var selection: String?
     var isActive = true
     var isInteractive = true
+    /// Render only: no camera controls, provenance line or object list (the desktop card).
+    var compact = false
     var registry: ExplanationRegistry = .empty
     var onEdit: (ExplanationOperation) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -38,9 +40,20 @@ struct ExplanationSceneView: View {
                 ExplanationSceneSurface(scene: pauseMotion ? frozenScene ?? scene : scene,
                     selection: $selection, isActive: isActive, isInteractive: isInteractive,
                     reduceMotion: reduceMotion, motionPaused: pauseMotion, registry: registry, onEdit: onEdit)
-                    .frame(minHeight: 260).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(minHeight: compact ? 0 : 260).clipShape(RoundedRectangle(cornerRadius: 12))
                     .accessibilityLabel("Interactive procedural 3D illustration")
             }
+            if !compact { details }
+        }
+        .onAppear { resetCamera = scene.camera }
+        .onChange(of: scene.sceneID) { _, _ in resetCamera = scene.camera; frozenScene = nil; pauseMotion = false }
+        .onChange(of: pauseMotion) { _, paused in frozenScene = paused ? scene : nil }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Camera controls, the provenance line and the object list. The desktop card omits them: it is click-through.
+    private var details: some View {
+        VStack(spacing: 8) {
             HStack(spacing: 10) {
                 Button { orbit(-Double.pi / 12) } label: { Image(systemName: "rotate.left") }
                     .help("Orbit left").accessibilityLabel("Orbit left")
@@ -63,10 +76,6 @@ struct ExplanationSceneView: View {
                 ExplanationObjectList(objects: worldObjects, selection: $selection, isInteractive: isInteractive, onEdit: onEdit)
             }
         }
-        .onAppear { resetCamera = scene.camera }
-        .onChange(of: scene.sceneID) { _, _ in resetCamera = scene.camera; frozenScene = nil; pauseMotion = false }
-        .onChange(of: pauseMotion) { _, paused in frozenScene = paused ? scene : nil }
-        .accessibilityElement(children: .contain)
     }
 
     private var worldObjects: [ExplanationObject] {

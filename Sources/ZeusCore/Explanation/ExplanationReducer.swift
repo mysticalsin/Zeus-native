@@ -71,12 +71,13 @@ public enum ExplanationSceneReducer {
         switch profile {
         case .v1: try check(event.version == 1, "unsupported event version")
         case .v2: try check(event.version == 1 || event.version == 2, "unsupported event version")
+        case .v3: try check((1...3).contains(event.version), "unsupported event version")
         }
         for cue in event.cues {
             for operation in cue.operations {
                 guard case .create(let object) = operation else { continue }
                 guard let target = object.targetID else { continue }
-                guard case .v2(let candidates) = profile, event.version == 2 else {
+                guard let candidates = profile.candidateIDs, event.version >= 2 else {
                     throw ExplanationFailure.invalid("targetID requires protocol version 2")
                 }
                 try check(isTargetID(target) && candidates.contains(target), "unknown targetID")
@@ -352,7 +353,7 @@ public enum ExplanationSceneReducer {
         case .label: fields([])
         case .arrow, .underline, .path: fields(["points"])
         case .connector: fields(["fromID", "toID"])
-        case .chart, .timeline: fields(["size", "values", "labels"])
+        case .chart, .timeline: fields(["size", "values", "labels"], optional: ["axis"])
         case .box: fields(["size"])
         case .sphere: fields(["radius"])
         case .cylinder: fields(["radius", "depth"])
@@ -366,7 +367,8 @@ public enum ExplanationSceneReducer {
             g.secondaryRadius != nil ? "secondaryRadius" : nil, g.depth != nil ? "depth" : nil,
             g.points != nil ? "points" : nil, g.vertices != nil ? "vertices" : nil,
             g.indices != nil ? "indices" : nil, g.values != nil ? "values" : nil,
-            g.labels != nil ? "labels" : nil, g.fromID != nil ? "fromID" : nil, g.toID != nil ? "toID" : nil
+            g.labels != nil ? "labels" : nil, g.fromID != nil ? "fromID" : nil, g.toID != nil ? "toID" : nil,
+            g.axis != nil ? "axis" : nil
         ].compactMap { $0 })
         try check(required.isSubset(of: present) && present.isSubset(of: allowed), "geometry parameters")
         let is3D = [.box, .sphere, .cylinder, .cone, .tube, .extrusion, .mesh].contains(g.kind)
@@ -417,8 +419,40 @@ public enum ExplanationSceneReducer {
             try check(g.labels?.count == values.count, "chart label count")
         }
         for label in g.labels ?? [] { try text(label, maximum: 80, empty: false) }
+        if let axis = g.axis { try chartAxis(axis, kind: g.kind, values: g.values ?? []) }
         if let id = g.fromID { try identifier(id) }
         if let id = g.toID { try identifier(id) }
+    }
+
+    /// The axis spec is finite data. It can never narrow the domain below the data, and it can
+    /// never make a flat or non-finite plan: the pure plan in `ExplanationChartMath` relies on this.
+    private static func chartAxis(_ axis: ExplanationChartAxis, kind: ExplanationGeometry.Kind, values: [Double]) throws {
+        if kind == .chart {
+            try check(axis.scale == .linear, "chart axis scale")
+        } else {
+            try check(axis.scale == .time || axis.scale == .categorical, "timeline axis scale")
+            try check(axis.includeZero == nil, "timeline axis zero")
+        }
+        if let domain = axis.domain {
+            try check(axis.scale != .categorical, "categorical axis domain")
+            try check(domain.lower.isFinite && domain.upper.isFinite && domain.lower < domain.upper
+                      && abs(domain.lower) <= 1_000_000 && abs(domain.upper) <= 1_000_000, "axis domain")
+            try check(values.allSatisfy { $0 >= domain.lower && $0 <= domain.upper }, "axis domain excludes data")
+        }
+        if let hint = axis.tickHint {
+            try check(axis.scale != .categorical && ExplanationLimits.chartTickHint.contains(hint), "axis tick hint")
+        }
+        if let units = axis.units {
+            try check(axis.scale != .categorical, "categorical axis units")
+            try text(units, maximum: ExplanationLimits.chartUnitsBytes, empty: false)
+        }
+        if axis.source == .live {
+            guard let asOf = axis.asOf else { throw ExplanationFailure.invalid("live data needs asOf") }
+            try text(asOf, maximum: ExplanationLimits.chartAsOfBytes, empty: false)
+            try check(ExplanationChartMath.isISO8601(asOf), "asOf date")
+        } else {
+            try check(axis.asOf == nil, "asOf needs live data")
+        }
     }
 
     private static func camera(_ camera: ExplanationCamera) throws {

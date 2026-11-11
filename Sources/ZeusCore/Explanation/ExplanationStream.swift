@@ -13,9 +13,28 @@ public enum ExplanationWire {
             try schema(value, profile: profile)
             let event = try JSONDecoder().decode(ExplanationEvent.self, from: data)
             try ExplanationSceneReducer.validate(event, profile: profile)
+            try requireVersion3ForAxis(event)
             return event
         } catch let failure as ExplanationFailure { throw failure }
         catch { throw ExplanationFailure.invalid("malformed event JSON") }
+    }
+
+    /// A chart `axis` is a protocol v3 field: an event that carries one must say version 3.
+    /// (The pointing resolver later rewrites accepted events to version 1, so this lives here,
+    /// at the model boundary, and not in the shared validator.)
+    private static func requireVersion3ForAxis(_ event: ExplanationEvent) throws {
+        guard event.version != 3 else { return }
+        for cue in event.cues {
+            for operation in cue.operations {
+                switch operation {
+                case .create(let object), .connect(let object):
+                    guard object.geometry.axis == nil else { throw ExplanationFailure.invalid("axis requires protocol version 3") }
+                case .update(_, let patch):
+                    guard patch.geometry?.axis == nil else { throw ExplanationFailure.invalid("axis requires protocol version 3") }
+                default: break
+                }
+            }
+        }
     }
 
     /// A canonical compact event, without the NDJSON newline delimiter.
@@ -26,6 +45,19 @@ public enum ExplanationWire {
         guard data.count <= ExplanationLimits.frameBytes else { throw ExplanationFailure.limitExceeded("event bytes") }
         return data
     }
+
+    /// Appended to the scene instructions on a pointing turn only (protocol version 3).
+    public static let chartAxisInstructions = """
+    Protocol version 3 adds an optional geometry.axis on chart and timeline:
+    {scale,source,domain:{lower,upper},units,tickHint,includeZero,asOf}. scale and source are required.
+    chart: scale "linear" (bars are evenly spaced categories). timeline: scale "time" (positions follow
+    the values) or "categorical" (evenly spaced, drawn as not to scale). source is one of userProvided,
+    onScreen, live, example; live also requires asOf as an ISO 8601 date-time, other sources forbid it.
+    Say "example" for invented illustrative numbers and never present them as measured. units is a short
+    string such as "USD" or "ms". tickHint is 2..12. domain must contain every value. includeZero defaults
+    to true for bar charts; set false only when you mean a truncated axis (the app labels it).
+    The app draws ticks, gridlines and positions itself: never put tick values in labels.
+    """
 
     public static let modelInstructions = """
     Return only compact NDJSON: one version-1 ExplanationEvent per line, ending each line with LF.
@@ -69,18 +101,19 @@ public enum ExplanationWire {
     """
 
     private static func schema(_ value: ExplanationJSONValue, profile: ExplanationWireProfile) throws {
-        let allowTarget: Bool
-        if case .v2 = profile { allowTarget = true } else { allowTarget = false }
+        let allowTarget = profile.candidateIDs != nil
+        var allowAxis = false
+        if case .v3 = profile { allowAxis = true }
         let root = try object(value, required: ["version", "sessionID", "turnID", "sceneID", "sequence", "baseRevision", "revision", "beatID", "speech", "cues", "isFinal"])
         _ = try object(root["speech"]!, required: ["chunkID", "text"])
         for cue in try array(root["cues"]!, maximum: ExplanationLimits.cuesPerEvent) {
             let c = try object(cue, required: ["id", "anchor", "operations"])
             _ = try object(c["anchor"]!, required: ["kind"], optional: ["wordIndex"])
-            for operation in try array(c["operations"]!, maximum: ExplanationLimits.operationsPerEvent) { try operationSchema(operation, allowTarget: allowTarget) }
+            for operation in try array(c["operations"]!, maximum: ExplanationLimits.operationsPerEvent) { try operationSchema(operation, allowTarget: allowTarget, allowAxis: allowAxis) }
         }
     }
 
-    private static func operationSchema(_ value: ExplanationJSONValue, allowTarget: Bool) throws {
+    private static func operationSchema(_ value: ExplanationJSONValue, allowTarget: Bool, allowAxis: Bool) throws {
         guard case .object(let raw) = value, case .string(let name) = raw["op"] else { throw ExplanationFailure.invalid("operation discriminator") }
         if ExplanationModelOperation.wireNames.contains(name) { try modelOperationSchema(name, value); return }
         let fields: Set<String>
@@ -99,10 +132,10 @@ public enum ExplanationWire {
         default: throw ExplanationFailure.invalid("unknown operation")
         }
         let op = try object(value, required: fields.union(["op"]))
-        if let v = op["object"] { try objectSchema(v, allowTarget: allowTarget) }
+        if let v = op["object"] { try objectSchema(v, allowTarget: allowTarget, allowAxis: allowAxis) }
         if let v = op["patch"] {
             let p = try object(v, required: [], optional: ["geometry", "transform", "style", "text", "accessibleDescription"])
-            try components(p)
+            try components(p, allowAxis: allowAxis)
         }
         if let v = op["position"] { try vectorSchema(v) }
         if let v = op["members"] { _ = try array(v, maximum: ExplanationLimits.objects) }
@@ -116,17 +149,23 @@ public enum ExplanationWire {
         }
     }
 
-    private static func objectSchema(_ value: ExplanationJSONValue, allowTarget: Bool) throws {
+    private static func objectSchema(_ value: ExplanationJSONValue, allowTarget: Bool, allowAxis: Bool) throws {
         var optionalKeys: Set<String> = ["parentID", "space", "captureID", "transform", "style", "text", "assetID", "sourceIDs", "provenance", "highlighted", "reveal"]
         if allowTarget { optionalKeys.insert("targetID") }
         let o = try object(value, required: ["id", "geometry", "accessibleDescription"], optional: optionalKeys)
-        try components(o)
+        try components(o, allowAxis: allowAxis)
         if let v = o["sourceIDs"] { _ = try array(v, maximum: 8) }
     }
 
-    private static func components(_ o: [String: ExplanationJSONValue]) throws {
+    private static func components(_ o: [String: ExplanationJSONValue], allowAxis: Bool) throws {
         if let v = o["geometry"] {
-            let g = try object(v, required: ["kind"], optional: ["size", "radius", "secondaryRadius", "depth", "points", "vertices", "indices", "values", "labels", "fromID", "toID"])
+            var geometryKeys: Set<String> = ["size", "radius", "secondaryRadius", "depth", "points", "vertices", "indices", "values", "labels", "fromID", "toID"]
+            if allowAxis { geometryKeys.insert("axis") }
+            let g = try object(v, required: ["kind"], optional: geometryKeys)
+            if let v = g["axis"] {
+                let axis = try object(v, required: ["scale", "source"], optional: ["domain", "units", "tickHint", "includeZero", "asOf"])
+                if let domain = axis["domain"] { _ = try object(domain, required: ["lower", "upper"]) }
+            }
             if let v = g["size"] { try vectorSchema(v) }
             for (key, limit) in [("points", ExplanationLimits.points), ("vertices", ExplanationLimits.vertices)] {
                 if let v = g[key] { for point in try array(v, maximum: limit) { try vectorSchema(point) } }

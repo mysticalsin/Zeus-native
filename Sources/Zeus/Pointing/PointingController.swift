@@ -56,6 +56,10 @@ final class PointingController {
         var probe: @Sendable (CGPoint) async -> PointingRawTarget? = { point in
             await MainActor.run { PointingTargetProbe.hitTest(atQuartzPoint: point) }
         }
+        /// The focused text input's Quartz frame, for the explanation card. Runs off the main actor.
+        var focusedInput: @Sendable () async -> CGRect? = {
+            await Task.detached(priority: .userInitiated) { PointingTargetProbe.focusedInputFrame() }.value
+        }
         var enabled: () -> Bool = { PointingSettings.enabled }
         var sendScreenshot: () -> Bool = { PointingSettings.sendScreenshot }
         var drawWhileHeld: () -> Bool = { PointingSettings.drawWhileHeld }
@@ -493,7 +497,11 @@ final class PointingController {
         let resolver: @Sendable (String) -> [PointingContext.Deixis] = { transcript in
             PointingDeixis.resolve(words: PointingDeixis.words(in: transcript), evidence: seen, validIDs: known)
         }
-        return .init(context: context, snapshot: services.sendScreenshot() ? snapshot : nil, resolveDeixis: resolver)
+        let inputFrame = await services.focusedInput()
+        let inputArea = inputFrame.flatMap { mapper.convert($0, from: .ax, to: .screen, context: MapContext()) }
+        return .init(context: context, snapshot: services.sendScreenshot() ? snapshot : nil,
+                     displayID: capture?.currentDisplay.displayID ?? displays.first(where: { $0.frame.contains(release) })?.id,
+                     inputArea: inputArea, pointer: release, resolveDeixis: resolver)
     }
 
     // MARK: Pointer samples and ink
