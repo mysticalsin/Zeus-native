@@ -1,20 +1,22 @@
 import AppKit
 import ZeusCore
 
-/// The pointing settings (`Settings > Assistant > Desktop pointing`). Everything is off until the
-/// owner turns it on, and the screenshot upload has its own separate consent.
+/// The pointing settings (`Settings > Assistant > Desktop pointing`). Pointing and drawing while held
+/// are on from the first launch; the screenshot upload has its own separate consent and stays off.
 enum PointingSettings {
-    static var enabled: Bool { FeatureSettings.bool("pointing.enabled", default: false) }
-    static var sendScreenshot: Bool { FeatureSettings.bool("pointing.sendScreenshot", default: false) }
+    static var enabled: Bool { FeatureSettings.pointingEnabled() }
+    static var drawWhileHeld: Bool { FeatureSettings.pointingDrawWhileHeld() }
+    static var sendScreenshot: Bool { FeatureSettings.pointingSendScreenshot() }
     static var providerChoice: PointingProviderChoice {
         PointingProviderChoice(setting: FeatureSettings.string("pointing.provider", default: "Auto"))
     }
     static let shortcutChoices: [String: Shortcut] = [
         "Control-Option": .controlOption, "Right Option": .rightOption, "Fn (Globe)": .function,
     ]
-    static var shortcut: Shortcut {
-        shortcutChoices[FeatureSettings.string("pointing.shortcut", default: "Control-Option")] ?? .controlOption
+    static func resolvedShortcut(defaults: UserDefaults = .standard) -> Shortcut {
+        shortcutChoices[FeatureSettings.pointingShortcutName(defaults: defaults)] ?? .controlOption
     }
+    static var shortcut: Shortcut { resolvedShortcut() }
 }
 
 /// Feeds the keyboard stream to `PointingKeyGesture` and reports what the hold did. It owns no

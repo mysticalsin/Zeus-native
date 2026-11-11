@@ -20,6 +20,23 @@ public enum FeatureSettings {
     /// Instant commands: local rules, then Jev. Off sends every command to the LLM.
     public static func fastPathEnabled(defaults: UserDefaults = .standard) -> Bool { bool("fastPath.enabled", default: true, defaults: defaults) }
 
+    // MARK: Desktop pointing
+
+    /// The pointing keys the owner picked, Control and Option on a fresh install (`docs/FIRST-RUN-DEFAULTS.md`).
+    public static let pointingShortcutDefault = "Control-Option"
+
+    /// Desktop pointing is on from the first launch. Turning it on only installs the key listener the owner's own
+    /// Input Monitoring or Accessibility grant allows; no capture happens until the keys are held.
+    public static func pointingEnabled(defaults: UserDefaults = .standard) -> Bool { bool("pointing.enabled", default: true, defaults: defaults) }
+
+    /// While the keys are held, drags are ink Zeus can see. Off leaves the pointer and clicks to the apps.
+    public static func pointingDrawWhileHeld(defaults: UserDefaults = .standard) -> Bool { bool("pointing.drawWhileHeld", default: true, defaults: defaults) }
+
+    /// A screenshot goes to the provider only with this separate consent, never by default.
+    public static func pointingSendScreenshot(defaults: UserDefaults = .standard) -> Bool { bool("pointing.sendScreenshot", default: false, defaults: defaults) }
+
+    public static func pointingShortcutName(defaults: UserDefaults = .standard) -> String { string("pointing.shortcut", default: pointingShortcutDefault, defaults: defaults) }
+
     // MARK: Browser agent
 
     public static let browserStepChoices = [10, 15, 25, 40, 60]

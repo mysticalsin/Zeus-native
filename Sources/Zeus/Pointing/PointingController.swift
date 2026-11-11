@@ -58,6 +58,7 @@ final class PointingController {
         }
         var enabled: () -> Bool = { PointingSettings.enabled }
         var sendScreenshot: () -> Bool = { PointingSettings.sendScreenshot }
+        var drawWhileHeld: () -> Bool = { PointingSettings.drawWhileHeld }
     }
 
     /// Speech input. Live: the explanation microphone. The self-test injects a fixed transcript.
@@ -201,7 +202,7 @@ final class PointingController {
         }
         attempt = id
         marker.listen()
-        startInk()
+        if services.drawWhileHeld() { startInk() }
         startSampling()
         prepareTask = Task { [prepare] in await prepare() }
         captureTask = Task { [weak self] in await self?.captureAtPointer(generation: generation) }

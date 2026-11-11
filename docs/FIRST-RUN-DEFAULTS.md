@@ -16,5 +16,9 @@ those ship as a ticked, visible choice in onboarding instead.
 | Scribe call start | "Ask me" | Recording people without asking needs the owner's explicit choice |
 | Record | Main display selected | Owner request |
 
-Follow-up: once the current builders land, one pass checks every Settings default against this table and adds a
-test per row that a fresh `UserDefaults` suite yields these values.
+Tests: `Tests/ZeusCoreTests/FirstRunDefaultsTests.swift` proves each row above (except Jev, owned by another branch) against a
+fresh `UserDefaults` suite. The Ultron effect default (on, 60 %) is also proved on the app side in `UltronVoiceEffectTests`.
+Pointing now has a separate "Draw while held" setting (`pointing.drawWhileHeld`, on); the screenshot upload
+(`pointing.sendScreenshot`) stays off and needs Screen Recording already granted. Call-window names
+(`scribe.callWindowNames`) is a policy only so far: `ScribeCallWindowNamesPolicy` says on-by-default and never without
+Accessibility; the reader of the call window is not built yet.

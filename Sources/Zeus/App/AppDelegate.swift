@@ -571,9 +571,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         voice?.press()
     }
 
-    /// Desktop pointing: off until the owner turns it on. Starting it only installs the key
+    /// Desktop pointing: on by default (`docs/FIRST-RUN-DEFAULTS.md`). Starting it only installs the key
     /// listener (gated by the owner's own Accessibility/Input Monitoring grant); no capture and no
-    /// prompt happens until the keys are held.
+    /// prompt happens until the keys are held, and a screenshot needs Screen Recording already granted.
     private func syncPointing() {
         guard on(.pointingHotkey) else { return }
         if PointingSettings.enabled { pointingController().start() }

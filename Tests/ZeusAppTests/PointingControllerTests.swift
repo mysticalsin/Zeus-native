@@ -29,7 +29,7 @@ struct PointingControllerTests {
         }
     }
 
-    private func make(permission: Bool = false, enabled: Bool = true) -> (PointingController, Calls) {
+    private func make(permission: Bool = false, enabled: Bool = true, draw: Bool = true) -> (PointingController, Calls) {
         let calls = Calls()
         let context = ExplanationScreenContext(services: ExplanationScreenServices(
             hasPermission: { permission },
@@ -50,6 +50,7 @@ struct PointingControllerTests {
         services.probe = { _ in nil }
         services.enabled = { enabled }
         services.sendScreenshot = { false }
+        services.drawWhileHeld = { draw }
         let inputs = PointingController.Inputs(begin: { calls.begins += 1; return UUID() },
                                                finish: { _ in calls.finishes += 1 }, cancel: { _ in calls.cancels += 1 })
         let marker = PointingController.Marker(listen: {}, think: {}, idle: { calls.idles += 1 }, flight: { _, _ in true })
@@ -94,6 +95,26 @@ struct PointingControllerTests {
         }
         #expect(permission == ["Privacy_ScreenCapture"], "one notice, not a loop")
         #expect(calls.captures == 0 && controller.metrics.captureAttempts == 0)
+    }
+
+    @Test func drawWhileHeldTakesTheMouseAndReleasingGivesItBack() async {
+        let (controller, _) = make(draw: true)
+        controller.handle(.began)
+        #expect(MarkOverlay.shared.capturesMouse, "drags are ink while the keys are held")
+        controller.handle(.cancelled)
+        await settle { controller.leaks.isEmpty }
+        #expect(!MarkOverlay.shared.capturesMouse)
+        #expect(controller.leaks.isEmpty)
+    }
+
+    @Test func withDrawWhileHeldOffTheMouseStaysWithTheApps() async {
+        let (controller, calls) = make(draw: false)
+        controller.handle(.began)
+        #expect(controller.state == .listening && calls.begins == 1, "the hold still listens")
+        #expect(!MarkOverlay.shared.capturesMouse, "no ink overlay, clicks reach the apps")
+        controller.handle(.cancelled)
+        await settle { controller.leaks.isEmpty }
+        #expect(controller.leaks.isEmpty)
     }
 
     @Test func theHoldIsIgnoredWhileTheSettingIsOff() {
