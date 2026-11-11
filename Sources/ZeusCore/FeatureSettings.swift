@@ -17,7 +17,7 @@ public enum FeatureSettings {
 
     // MARK: Fast path
 
-    /// Instant commands: local rules, then Laya or Jev. Off sends every command to the LLM.
+    /// Instant commands: local rules, then Jev. Off sends every command to the LLM.
     public static func fastPathEnabled(defaults: UserDefaults = .standard) -> Bool { bool("fastPath.enabled", default: true, defaults: defaults) }
 
     // MARK: Browser agent

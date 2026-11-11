@@ -3,19 +3,9 @@
 ZEUS ships or downloads the following third-party work. Attribution lives here and in About,
 never in the product UI.
 
-## Laya (decision engine)
-- Code: https://github.com/NandhaKishorM/laya, Apache License 2.0. Pinned commit
-  55a19f7b7b56787e1a3e41063def9bb9a8737351 (used at build time to export ONNX graphs; the
-  System One request shape ZEUS sends is the public wire format, no Laya code is compiled in).
-- Weights: https://huggingface.co/convaiinnovations/laya-multilingual (default, mmBERT-base,
-  322M) and https://huggingface.co/convaiinnovations/laya (English, ModernBERT-large, 421M),
-  Apache License 2.0. Fetched only from the official convaiinnovations Hugging Face org.
-- Upstream encoders: mmBERT (JHU CLSP, MIT) and ModernBERT (Answer.AI and LightOn, Apache 2.0),
-  as declared by the checkpoints.
-
 ## Qwen 2.5 (last-resort fallback through Ollama, optional, not bundled)
 - qwen2.5:7b by the Qwen team, Alibaba Cloud, Apache License 2.0, run only through a separately
-  installed Ollama and only when Laya is unavailable.
+  installed Ollama and only when Jev gave no answer.
 
 ## Jev (TypeSafe System One API)
 - Cloud service at api.typesafe.ai, used under TypeSafe's terms with the owner's own key. No

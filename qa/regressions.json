@@ -2711,6 +2711,18 @@
         "file": "Tests/ZeusCoreTests/MicTestTests.swift",
         "function": "levelFromAnEarlierTestCannotInflateTheNewPeak"
       }
+    },
+    {
+      "id": "REG-231",
+      "failure": "Instant commands depended on a Laya local decision server that is not installed by default: a probe and a 20 second start wait sat in front of the model stage. Laya is removed and Jev (key plus a monthly limit, 600 ms budget) is the only model stage; a saved Laya or Auto choice now maps to Jev.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_sources_never_mention_laya"
+      }
     }
   ]
 }

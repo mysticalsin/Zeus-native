@@ -8,7 +8,7 @@ public enum StartupService: String, CaseIterable, Sendable {
     // panel (non-interactive startup).
     case permissionStatusRead, notchUI, panelUI, intelligence, windowSharing, systemNotifications
     case buddy, topBarServices, beamer, dictation, teleprompter, prompterWatcher
-    case insomniaLaunch, insomniaShutdown, layaShutdown, chatBrain, chatHotkey
+    case insomniaLaunch, insomniaShutdown, chatBrain, chatHotkey
     case usage, proactive, stickiesRestore, routines, helperRefresh, voiceTurn
     case appIndex, projectScanner, macControl, avatarFeed, shortcuts, todo
     case sleepWatch, notificationPeeker, settingsCatalog, updates, agentServer

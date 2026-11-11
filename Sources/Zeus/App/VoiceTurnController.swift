@@ -54,7 +54,7 @@ final class VoiceTurnController {
         speech.onLevel = { [weak buddy] level in
             Task { @MainActor in buddy?.model.audioLevel = level }
         }
-        // Live partials warm the fast path up (rules, then a speculative Laya answer) and time
+        // Live partials warm the fast path up (rules) and time
         // the end of a hands-free turn.
         speech.onPartial = { [weak self] text in
             Task { @MainActor in
@@ -404,7 +404,7 @@ final class VoiceTurnController {
     }
 
     /// Everything answered without the LLM, in order: local rules (`FastIntent`), the to-do and
-    /// brief phrases (`LocalTurns`), then the decision engine (Laya, Jev). nil means "LLM".
+    /// brief phrases (`LocalTurns`), then the decision engine (Jev). nil means "LLM".
     private func understand(_ transcript: String, finalAt: ContinuousClock.Instant, speak: Bool) async -> TurnResult? {
         let fast = FastPath.shared
         switch fast.rules(transcript) {

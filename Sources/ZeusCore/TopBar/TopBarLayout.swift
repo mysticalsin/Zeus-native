@@ -239,7 +239,7 @@ public enum NotchCue: Equatable, Sendable {
     case keyboardBacklight(Double)
     case shortcut(ShortcutPeek)
     case rain(minutes: Int)
-    /// A command was understood; `engine` is the badge (Rules, Laya, Jev, Ollama).
+    /// A command was understood; `engine` is the badge (Rules, Jev, Ollama).
     case decided(engine: String, summary: String)
     /// A feature needs a permission that is off: where to turn it on (never a system prompt).
     case hint(String)

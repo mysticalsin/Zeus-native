@@ -334,7 +334,7 @@ final class DictationController {
         settings.engine == .apple || !isReadyNow(settings.engine) ? nil : engine(settings.engine)
     }
 
-    /// The person's vocabulary with the built-in names (Zeus, Laya, Jev, Claude, Codex, Murmure…).
+    /// The person's vocabulary with the built-in names (Zeus, Jev, Claude, Codex, Murmure…).
     private var fullVocabulary: Vocabulary { DictationVocabularyPrompt.merged(store.vocabulary()) }
     private var hints: [String] { DictationVocabularyPrompt.terms(store.vocabulary()) }
     /// Rewrites text for AI modes. Injected so tests and snapshots never call a model.

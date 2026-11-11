@@ -2,7 +2,7 @@ import Foundation
 
 /// One answer set plus where it came from and what it cost.
 public struct Decision: Equatable, Sendable {
-    public enum Source: String, Sendable { case rules, laya, jev, ollama, mock }
+    public enum Source: String, Sendable { case rules, jev, ollama, mock }
     public var source: Source
     public var answers: [String: SystemOneAnswer]
     public var inputTokens: Int
@@ -31,7 +31,7 @@ public protocol DecisionProvider: Sendable {
     func decide(_ request: SystemOneRequest) async throws -> Decision
 }
 
-/// Any server with the System One shape: paid Jev (api.typesafe.ai) or local Laya (laya-serve) on 127.0.0.1.
+/// A server with the System One shape: paid Jev (api.typesafe.ai).
 public struct SystemOneClient: DecisionProvider {
     public let source: Decision.Source
     let endpoint: URL
@@ -45,7 +45,6 @@ public struct SystemOneClient: DecisionProvider {
     }
 
     public static let jevEndpoint = URL(string: "https://api.typesafe.ai/v1/systemone")!
-    public static func layaEndpoint(port: Int = 8765) -> URL { URL(string: "http://127.0.0.1:\(port)/v1/systemone")! }
 
     public func decide(_ body: SystemOneRequest) async throws -> Decision {
         var request = URLRequest(url: endpoint, timeoutInterval: timeout)
@@ -134,58 +133,86 @@ public actor JevGuard: DecisionProvider {
     }
 }
 
-/// Which engine answers, from Settings > Intelligence.
+/// The one model stage of instant commands. Older builds stored a retired choice under `settingsKey`;
+/// any such value now means Jev, and `migrateStoredChoice` rewrites the saved value once.
 public enum IntelligenceEngine: String, CaseIterable, Codable, Sendable {
-    case laya, jev, auto
-    public var title: String {
-        switch self {
-        case .laya: "Laya (free, on this Mac)"
-        case .jev: "Jev (cloud)"
-        case .auto: "Auto (Laya, then Jev when unsure)"
-        }
-    }
+    case jev
+    public var title: String { "Jev (cloud)" }
     public static let settingsKey = "intelligence.engine"
+
+    /// Any stored value (including a retired one) maps to Jev. Returns whether the stored value changed.
+    @discardableResult
+    public static func migrateStoredChoice(in defaults: UserDefaults) -> Bool {
+        guard let stored = defaults.string(forKey: settingsKey), stored != IntelligenceEngine.jev.rawValue else { return false }
+        defaults.set(IntelligenceEngine.jev.rawValue, forKey: settingsKey)
+        return true
+    }
 }
 
-/// The order Tony set: local rules, then Laya on this Mac, then paid Jev (only when Laya is unsure,
-/// below 0.80, or the context is heavy, within the local estimate cap), then Ollama last, only when
-/// Laya is down. Provider billing remains authoritative. `engine` narrows that chain; `constrained`
-/// (Low Power Mode or a hot Mac)
-/// skips the local model loads and Ollama so the Mac stays cool.
+/// Why Jev will or will not answer an instant command right now (for Settings).
+public enum JevReadiness: Equatable, Sendable {
+    case noKey, noMonthlyLimit, ready
+    public static func evaluate(hasKey: Bool, monthlyCap: Double?) -> JevReadiness {
+        guard hasKey else { return .noKey }
+        guard let cap = monthlyCap, cap > 0 else { return .noMonthlyLimit }
+        return .ready
+    }
+    public var statusText: String {
+        switch self {
+        case .noKey: "No key saved. Commands go to the assistant."
+        case .noMonthlyLimit: "Set a monthly limit to turn Jev on"
+        case .ready: "Jev is on"
+        }
+    }
+}
+
+/// Local rules, then paid Jev (needs a key and a monthly cap; `JevGuard` refuses otherwise), then Ollama
+/// only if it is already answering on this Mac (never launched). Everything after the rules shares one
+/// time budget; when it runs out the caller gets nil and the LLM brain takes the request. The late call
+/// is never cancelled: a cancelled Jev request would leave its billing reservation uncertain.
+/// `constrained` (Low Power Mode or a hot Mac) skips Ollama so the Mac stays cool.
 public struct DecisionRouter: Sendable {
     public var rules: (@Sendable (SystemOneRequest) -> Decision?)?
-    public var laya: DecisionProvider?
     public var jev: DecisionProvider?
     public var ollama: DecisionProvider?
-    public var engine: IntelligenceEngine = .laya
     public var constrained = false
-    public var confidenceFloor = 0.80
-    /// Estimated input tokens above which a request counts as heavy context.
-    public var heavyTokens = 1_500
+    /// Longest an instant command may delay the voice turn.
+    public var budget: Duration = .milliseconds(600)
 
-    public init(rules: (@Sendable (SystemOneRequest) -> Decision?)? = nil, laya: DecisionProvider? = nil,
-                jev: DecisionProvider? = nil, ollama: DecisionProvider? = nil, engine: IntelligenceEngine = .auto) {
-        self.rules = rules; self.laya = laya; self.jev = jev; self.ollama = ollama; self.engine = engine
+    public init(rules: (@Sendable (SystemOneRequest) -> Decision?)? = nil, jev: DecisionProvider? = nil,
+                ollama: DecisionProvider? = nil, budget: Duration = .milliseconds(600)) {
+        self.rules = rules; self.jev = jev; self.ollama = ollama; self.budget = budget
     }
 
-    /// `forceJev` is the "Try with Jev" re-run: skip rules and Laya, still inside the local estimate cap.
+    /// `forceJev` is the "Try with Jev" re-run: skip rules, still inside the local estimate cap.
     public func decide(_ request: SystemOneRequest, forceJev: Bool = false) async -> Decision? {
         if forceJev { return try? await jev?.decide(request) }
         if let hit = rules?(request) { return hit }
-        if engine == .jev, let paid = try? await jev?.decide(request) { return paid }
-        let heavy = request.estimatedInputTokens > heavyTokens
-        var local: Decision?
-        var layaDown = constrained
-        if !constrained, let laya {
-            do { local = try await laya.decide(request) } catch { layaDown = true }
-        } else { layaDown = true }
-        if let local, engine == .laya { return local }
-        if let local, local.confidence >= confidenceFloor, !heavy { return local }
-        if engine != .laya, let paid = try? await jev?.decide(request) { return paid }
-        if let local { return local }
-        if layaDown, !constrained, let ollama, let fallback = try? await ollama.decide(request) { return fallback }
-        return nil
+        let jev = jev, ollama = constrained ? nil : ollama
+        let task = Task<Decision?, Never> {
+            if let paid = try? await jev?.decide(request) { return paid }
+            if let ollama, let fallback = try? await ollama.decide(request) { return fallback }
+            return nil
+        }
+        return await DecisionRace.first(task, within: budget)
     }
+}
+
+/// Lets exactly one of the task result and the timer through; the task keeps running after a timeout.
+enum DecisionRace {
+    static func first<T: Sendable>(_ task: Task<T?, Never>, within limit: Duration) async -> T? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
+            let gate = DecisionOnce()
+            Task { let value = await task.value; if gate.open() { continuation.resume(returning: value) } }
+            Task { try? await Task.sleep(for: limit); if gate.open() { continuation.resume(returning: nil) } }
+        }
+    }
+}
+
+private final class DecisionOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func open() -> Bool { lock.withLock { if done { return false }; done = true; return true } }
 }
 
 public enum JevKey {

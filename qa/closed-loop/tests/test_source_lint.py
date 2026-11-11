@@ -218,5 +218,34 @@ class SpeakerRecognitionLint(unittest.TestCase):
         self.assertTrue(re.search(r"SpeakerModelController\b", "SpeakerModelController.shared.prepare()"))
 
 
+# "laya" as its own word or name part (not "playback" or "overlay a..."): case-insensitive.
+LAYA_WORD = re.compile(r"(?<![A-Za-z])[Ll][Aa][Yy][Aa](?![a-z])")
+# The one allowed spelling: the owner's existing Kokoro model folder is literally named jarvis-laya-backend.
+LAYA_EXTERNAL_FOLDER = "jarvis-laya-backend"
+
+
+def laya_offenders(text, label="sample"):
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if LAYA_WORD.search(line.replace(LAYA_EXTERNAL_FOLDER, ""))]
+
+
+class LayaRemovedLint(unittest.TestCase):
+    """The Laya local decision server was removed; Jev is the only model stage of instant commands."""
+
+    def test_sources_never_mention_laya(self):
+        offenders = []
+        for path in sorted((ROOT / "Sources").rglob("*.swift")):
+            offenders += laya_offenders(path.read_text(), path.relative_to(ROOT).as_posix())
+        self.assertEqual(offenders, [], "Laya was removed; Jev is the only decision stage")
+
+    def test_laya_lint_detects_its_failure_shapes(self):
+        self.assertTrue(laya_offenders("case laya, jev"))
+        self.assertTrue(laya_offenders("LayaHelper.shared.shutdown()"))
+        self.assertTrue(laya_offenders("// Laya answers on this Mac"))
+        self.assertTrue(laya_offenders('exec("laya-serve")'))
+        self.assertFalse(laya_offenders("let playback = overlayAnimation"))
+        self.assertFalse(laya_offenders('path("AI-Brain-build/jarvis-laya-backend/models")'))
+
+
 if __name__ == "__main__":
     unittest.main()

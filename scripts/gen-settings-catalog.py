@@ -193,7 +193,7 @@ o(S,'Beamer','Beamer: start when Zeus starts','toggle','-','Opens Beamer hidden 
 o(S,'Beamer','Beamer: light the notch when control crosses','toggle','-','A Zeus cue when your keyboard and mouse move to another machine.','missing','beamer.cue','toggle',[],'true','live','Zeus addition. Reads Beamer\'s menu bar status (Accessibility).')
 
 S='voice'
-o(S,'Fast path','Fast path (instant commands)','toggle','-','Simple commands run the moment you finish speaking; off sends everything to the AI.','missing','fastPath.enabled','toggle',[],'true','live','Zeus addition. Laya or Jev is on the Engine page.')
+o(S,'Fast path','Fast path (instant commands)','toggle','-','Simple commands run the moment you finish speaking; off sends everything to the AI.','missing','fastPath.enabled','toggle',[],'true','live','Zeus addition. Jev is on the Engine page.')
 o(S,'Hey Zeus','Listen for "Hey Zeus"','toggle','-','Say it, then your request. Off until you turn it on.','missing','voice.heyZeus','toggle',[],'false','custom','Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off).')
 o(S,'Talk to Zeus','Talk shortcut','recorder','-','Hold to talk, let go to send.','missing','voice.talkKey','choice',[],'','custom','Zeus addition. Recorder on Voice.')
 o(S,'Voice','Personality (Ultron or Plain) and Design voice','menu','-','How Zeus sounds and what it calls itself.','missing','voice.personality','choice',['Ultron','Plain'],'Ultron','custom','Zeus addition. Voice page.')

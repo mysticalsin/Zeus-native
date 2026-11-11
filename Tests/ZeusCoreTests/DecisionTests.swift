@@ -47,33 +47,75 @@ private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T
         #expect(!allowed)
     }
 
-    @Test func routerPrefersConfidentLayaAndEscalatesUnsure() async {
-        let sure = DecisionRouter(laya: Fixed(source: .laya, confidence: 0.9, fails: false), jev: Fixed(source: .jev, confidence: 0.99, fails: false))
-        #expect(await sure.decide(sample())?.source == .laya)
-        let unsure = DecisionRouter(laya: Fixed(source: .laya, confidence: 0.5, fails: false), jev: Fixed(source: .jev, confidence: 0.99, fails: false))
-        #expect(await unsure.decide(sample())?.source == .jev)
-        let capped = DecisionRouter(laya: Fixed(source: .laya, confidence: 0.5, fails: false), jev: Fixed(source: .jev, confidence: 0.99, fails: true),
-                                    ollama: Fixed(source: .ollama, confidence: 0.6, fails: false))
-        #expect(await capped.decide(sample())?.source == .laya)
-        let layaDown = DecisionRouter(laya: Fixed(source: .laya, confidence: nil, fails: true), jev: Fixed(source: .jev, confidence: 0.9, fails: true),
-                                     ollama: Fixed(source: .ollama, confidence: 0.6, fails: false))
-        #expect(await layaDown.decide(sample())?.source == .ollama)
+    private static let jevBody = #"{"model":"jev-1","answers":{"intent":{"type":"choice","choice":"app.open","confidence":0.97}},"usage":{"input_tokens":100,"output_tokens":5}}"#
+
+    private func jevGuard(key: String?, cap: Double?, delay: Duration = .zero) -> (JevGuard, JevBudgetStore) {
+        let store = JevBudgetStore.inMemoryForTesting()
+        _ = store.updateCap(cap)
+        let client = SystemOneClient(source: .jev, endpoint: SystemOneClient.jevEndpoint, key: key ?? "k", timeout: 3) { request in
+            try? await Task.sleep(for: delay)
+            return (Data(Self.jevBody.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        return (JevGuard(key: key, store: store, client: key == nil ? nil : client), store)
     }
 
-    @Test func engineChoiceAndTryWithJev() async {
-        var router = DecisionRouter(laya: Fixed(source: .laya, confidence: 0.4, fails: false), jev: Fixed(source: .jev, confidence: 0.9, fails: false), engine: .laya)
-        #expect(await router.decide(sample())?.source == .laya)
-        #expect(await router.decide(sample(), forceJev: true)?.source == .jev)
-        router.engine = .jev
-        #expect(await router.decide(sample())?.source == .jev)
-        router.engine = .auto
+    @Test func chainWithoutKeyGoesToTheLLM() async {
+        let (jev, _) = jevGuard(key: nil, cap: 5)
+        #expect(await DecisionRouter(jev: jev).decide(sample()) == nil)
+    }
+
+    @Test func chainWithKeyButNoCapGoesToTheLLMAndSaysWhy() async {
+        let (jev, _) = jevGuard(key: "k", cap: nil)
+        #expect(await DecisionRouter(jev: jev).decide(sample()) == nil)
+        #expect(JevReadiness.evaluate(hasKey: true, monthlyCap: nil) == .noMonthlyLimit)
+        #expect(JevReadiness.noMonthlyLimit.statusText == "Set a monthly limit to turn Jev on")
+        #expect(JevReadiness.evaluate(hasKey: false, monthlyCap: 5) == .noKey)
+        #expect(JevReadiness.evaluate(hasKey: true, monthlyCap: 5) == .ready)
+    }
+
+    @Test func chainWithKeyAndCapUsesJev() async {
+        let (jev, _) = jevGuard(key: "k", cap: 5)
+        #expect(await DecisionRouter(jev: jev).decide(sample())?.source == .jev)
+    }
+
+    @Test func jevTimeoutFallsToTheLLMWithinTheBudget() async {
+        let (jev, _) = jevGuard(key: "k", cap: 5, delay: .seconds(3))
+        let router = DecisionRouter(jev: jev, budget: .milliseconds(200))
+        let started = ContinuousClock.now
+        let decision = await router.decide(sample())
+        #expect(decision == nil)
+        #expect(ContinuousClock.now - started < .milliseconds(1500))
+    }
+
+    @Test func ollamaOnlyAnswersWhenJevGaveNothingAndNeverWhenConstrained() async {
+        var router = DecisionRouter(jev: Fixed(source: .jev, confidence: nil, fails: true), ollama: Fixed(source: .ollama, confidence: 0.6, fails: false))
+        #expect(await router.decide(sample())?.source == .ollama)
         router.constrained = true
-        router.ollama = Fixed(source: .ollama, confidence: 0.6, fails: false)
+        #expect(await router.decide(sample()) == nil)
+        router.jev = Fixed(source: .jev, confidence: 0.9, fails: false)
         #expect(await router.decide(sample())?.source == .jev)
+    }
+
+    @Test func tryWithJevSkipsRules() async {
+        let router = DecisionRouter(rules: { _ in Decision(source: .rules, answers: [:]) }, jev: Fixed(source: .jev, confidence: 0.9, fails: false))
+        #expect(await router.decide(sample(), forceJev: true)?.source == .jev)
+    }
+
+    @Test func storedLayaOrAutoPreferenceMigratesToJev() {
+        for old in ["laya", "auto", "garbage"] {
+            let defaults = UserDefaults(suiteName: "zeus.test.engine.\(UUID().uuidString)")!
+            defaults.set(old, forKey: IntelligenceEngine.settingsKey)
+            #expect(IntelligenceEngine.migrateStoredChoice(in: defaults))
+            #expect(defaults.string(forKey: IntelligenceEngine.settingsKey) == "jev")
+            #expect(!IntelligenceEngine.migrateStoredChoice(in: defaults))
+        }
+        let fresh = UserDefaults(suiteName: "zeus.test.engine.\(UUID().uuidString)")!
+        #expect(!IntelligenceEngine.migrateStoredChoice(in: fresh))
+        #expect(fresh.object(forKey: IntelligenceEngine.settingsKey) == nil)
     }
 
     @Test func rulesWinFirst() async {
-        let router = DecisionRouter(rules: { _ in Decision(source: .rules, answers: [:]) }, laya: Fixed(source: .laya, confidence: 0.9, fails: false))
+        let router = DecisionRouter(rules: { _ in Decision(source: .rules, answers: [:]) }, jev: Fixed(source: .jev, confidence: 0.9, fails: false))
         #expect(await router.decide(sample())?.source == .rules)
     }
 

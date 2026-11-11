@@ -79,7 +79,7 @@ enum VoiceSelfTest {
             stage("route", "fast via \(engine) asks back")
             line = question
         case .miss:
-            stage("route", "no local rule: Laya/Jev, then the Claude brain (not called here)")
+            stage("route", "no local rule: Jev, then the Claude brain (not called here)")
         }
         if !line.isEmpty {
             stage("spoken", "would say \"\(line)\"")

@@ -90,7 +90,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointing?.stop()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
-        if on(.layaShutdown) { LayaHelper.shared.shutdown() }
         // A Memory edit typed inside its 600 ms pause is written before Zeus goes.
         if on(.panelUI) { WikiController.shared.flushEdit() }
     }

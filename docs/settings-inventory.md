@@ -243,7 +243,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 
 | Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |
 |---|---|---|---|---|---|---|---|---|
-| Fast path | Fast path (instant commands) | toggle | - | Simple commands run the moment you finish speaking; off sends everything to the AI. | missing | live | `fastPath.enabled` | Zeus addition. Laya or Jev is on the Engine page. |
+| Fast path | Fast path (instant commands) | toggle | - | Simple commands run the moment you finish speaking; off sends everything to the AI. | missing | live | `fastPath.enabled` | Zeus addition. Jev is on the Engine page. |
 | Hey Zeus | Listen for "Hey Zeus" | toggle | - | Say it, then your request. Off until you turn it on. | missing | custom | `voice.heyZeus` | Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off). |
 | Talk to Zeus | Talk shortcut | recorder | - | Hold to talk, let go to send. | missing | custom | `voice.talkKey` | Zeus addition. Recorder on Voice. |
 | Voice | Personality (Ultron or Plain) and Design voice | menu | - | How Zeus sounds and what it calls itself. | missing | custom | `voice.personality` | Zeus addition. Voice page. |
