@@ -68,6 +68,9 @@ struct OnboardingPersistence {
     var writeStep: (Int) -> Void
     var readCompleted: () -> Bool
     var markCompleted: () -> Void
+    /// Whether the person closed the guide before finishing (defaults keep older fixtures valid).
+    var readDismissed: () -> Bool = { false }
+    var markDismissed: () -> Void = {}
 
     static var live: Self {
         Self(readStep: { UserDefaults.standard.integer(forKey: OnboardingFlow.stepKey) },
@@ -77,6 +80,11 @@ struct OnboardingPersistence {
                  guard !TopBarStyle.isSnapshot else { return }
                  UserDefaults.standard.set(true, forKey: OnboardingFlow.completedKey)
                  UserDefaults.standard.set(true, forKey: "didOnboard")
+             },
+             readDismissed: { OnboardingFlow.isDismissed },
+             markDismissed: {
+                 guard !TopBarStyle.isSnapshot else { return }
+                 UserDefaults.standard.set(true, forKey: OnboardingFlow.dismissedKey)
              })
     }
 }

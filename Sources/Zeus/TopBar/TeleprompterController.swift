@@ -12,6 +12,9 @@ final class TeleprompterController {
     private var engine: AVAudioEngine?
     private var timer: Timer?
     private var lastTick = Date()
+    /// Running or not, and which microphone session may report levels (see `PrompterRun`).
+    private var run = PrompterRun.State.idle
+    private var micSessions = 0
     private var editor: NSWindow?
     /// Hides the notch window from screen capture while true.
     var setPrivate: (Bool) -> Void = { _ in }
@@ -31,7 +34,8 @@ final class TeleprompterController {
         topBar.restoreSavedVoiceFollow()
         topBar.roll.start()
         setPrivate(true)
-        if topBar.roll.voiceFollow { startMic() }
+        micSessions += 1
+        perform(apply(.began(voiceFollow: topBar.roll.voiceFollow, session: micSessions)))
         lastTick = Date()
         timer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
@@ -44,6 +48,7 @@ final class TeleprompterController {
     func end() {
         timer?.invalidate()
         timer = nil
+        perform(apply(.ended))
         stopMic()
         topBar.roll.stop()
         topBar.prompterLevel = 0
@@ -61,34 +66,50 @@ final class TeleprompterController {
     private func setVoice(_ on: Bool) {
         topBar.roll.voiceFollow = on
         guard topBar.prompterActive else { return }
-        on ? startMic() : stopMic()
+        micSessions += 1
+        perform(apply(.voiceChanged(on: on, session: micSessions)))
+    }
+
+    private func apply(_ event: PrompterRun.Event) -> [PrompterRun.Effect] {
+        let (next, effects) = PrompterRun.reduce(run, event)
+        run = next
+        return effects
+    }
+
+    private func perform(_ effects: [PrompterRun.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .startMic(let session): startMic(session: session)
+            case .stopMic: stopMic()
+            }
+        }
     }
 
     // MARK: Mic level (no speech recognition, nothing recorded or stored)
 
-    private func startMic() {
+    private func startMic(session: Int) {
         guard engine == nil else { return }
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: break
         case .notDetermined:
             // Asked only in setup or Settings > Permissions, never mid-show.
-            voiceUnavailable()
+            voiceUnavailable(session: session)
             return
         default:
-            voiceUnavailable()
+            voiceUnavailable(session: session)
             return
         }
         // No input device (a Mac mini with nothing plugged in) makes the input node's format invalid, and
         // installTap on it raises an Objective-C exception that Swift cannot catch.
         guard AVCaptureDevice.default(for: .audio) != nil else {
-            voiceUnavailable()
+            voiceUnavailable(session: session)
             return
         }
         let engine = AVAudioEngine()
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
-            voiceUnavailable()
+            voiceUnavailable(session: session)
             return
         }
         OffMainAudioCallbacks.installLevelTap(on: input, format: format, measure: { samples in
@@ -96,7 +117,7 @@ final class TeleprompterController {
             for sample in samples { sum += sample * sample }
             return Double(min(max((sqrt(sum / Float(samples.count)) - 0.008) * 10.2, 0), 1))
         }) { [weak self] level in
-            guard let self else { return }
+            guard let self, self.run.acceptsLevel(from: session) else { return }
             self.topBar.prompterLevel = level
             self.topBar.roll.hear(level: level)
         }
@@ -106,7 +127,7 @@ final class TeleprompterController {
             self.engine = engine
         } catch {
             input.removeTap(onBus: 0)
-            voiceUnavailable()
+            voiceUnavailable(session: session)
         }
     }
 
@@ -116,7 +137,8 @@ final class TeleprompterController {
         engine = nil
     }
 
-    private func voiceUnavailable() {
+    private func voiceUnavailable(session: Int) {
+        perform(apply(.micFailed(session: session)))
         topBar.fallBackFromVoiceFollow()
         topBar.prompterNotice = "Mic is off, so the script scrolls at a steady pace."
     }

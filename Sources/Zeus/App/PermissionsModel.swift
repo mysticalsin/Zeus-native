@@ -43,6 +43,10 @@ final class PermissionsModel {
     private(set) var automationAsking = false
     /// Why the last Automation Allow could not ask (no target app was running); nil otherwise.
     var automationMessage: String?
+    /// The apps ZeusCore may script right now, by name ("Music", "Spotify"); drives the status text.
+    private(set) var automationAllowedNames: [String] = []
+    /// The allowed names when `automationMessage` was written: a change means the message is out of date.
+    private var automationMessageAllowedNames: [String] = []
     private(set) var claudeHooksInstalled = false
     var hookMessage: String?
     private(set) var chromeHostInstalled = false
@@ -135,7 +139,13 @@ final class PermissionsModel {
         Automation.scheduleChecksForRunningPlayers()
         granted[.automation] = Automation.allowedAny
         automationPending = Automation.anyPending
-        if granted[.automation] == true { automationMessage = nil }
+        automationAllowedNames = Automation.allowedTargets.map(Automation.name)
+        if automationMessage != nil, automationAllowedNames != automationMessageAllowedNames { automationMessage = nil }
+    }
+
+    private func setAutomationMessage(_ text: String?) {
+        automationMessage = text
+        automationMessageAllowedNames = automationAllowedNames
     }
 
     /// Push-to-talk works (the key is seen, ZEUS can hear and transcribe). Screen Recording only
@@ -222,19 +232,25 @@ final class PermissionsModel {
     /// otherwise the consent sheet is raised off the main actor (it stays up until the person answers).
     func requestAutomation() {
         guard !automationAsking else { return }
-        let running = Automation.players.contains { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
-        guard running else {
-            automationMessage = "Open Music or Spotify, then press Allow."
+        refreshAutomationOnly()
+        let plan = AutomationAllowPlan.plan(targets: Automation.targets, access: Automation.accessByTarget,
+                                            running: Automation.runningTargets)
+        guard !plan.ask.isEmpty else {
+            setAutomationMessage(plan.message)
+            if plan.opensAutomationPane { open(.automation) }
             refresh()
             return
         }
-        automationMessage = nil
+        setAutomationMessage(nil)
         automationAsking = true
         Task { @MainActor in
-            let result = await Automation.askAsync()
+            let granted = await Automation.askAsync(only: plan.ask)
             automationAsking = false
-            if result == false { open(.automation) }
             refresh()
+            let after = AutomationAllowPlan.afterAsking(
+                targets: Automation.targets.filter { plan.ask.contains($0.id) }, granted: granted, alreadyRefused: plan.refused)
+            setAutomationMessage(after.message)
+            if after.opensAutomationPane { open(.automation) }
         }
     }
 
@@ -354,12 +370,15 @@ enum Automation {
     static var allowedAny: Bool { !allowedTargets.isEmpty }
 
     /// Keeps a grant for an app that is not running, and forgets it once macOS reports it revoked (or never given).
-    private static func remember(_ bundleID: String, _ code: OSStatus) {
+    /// The cache model decides which (see `AutomationConsentCache`); a stale check never reaches here.
+    private static func perform(_ effects: [AutomationConsentCache.Effect], for bundleID: String) {
         let defaults = UserDefaults.standard
-        if code == noErr {
-            defaults.set(true, forKey: grantKey(bundleID))
-        } else if code == OSStatus(errAEEventNotPermitted) || code == OSStatus(errAEEventWouldRequireUserConsent) {
-            defaults.removeObject(forKey: grantKey(bundleID))
+        for effect in effects {
+            switch effect {
+            case .rememberGrant: defaults.set(true, forKey: grantKey(bundleID))
+            case .forgetGrant: defaults.removeObject(forKey: grantKey(bundleID))
+            case .startCheck: break
+            }
         }
     }
 
@@ -373,22 +392,45 @@ enum Automation {
         let running = players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
         guard !running.isEmpty else { return nil }
         var codes: [String: OSStatus] = [:]
+        for id in running { promptBegan(id) }
         for id in running { codes[id] = promptStatus(id) }
-        for (id, code) in codes { storeResolved(id, code) }
+        for (id, code) in codes { promptAnswered(id, code) }
         return codes.values.contains(noErr)
     }
 
-    /// `ask()` without holding the caller: the consent sheet can stay up until the person answers.
-    static func askAsync() async -> Bool? {
-        let running = players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
-        guard !running.isEmpty else { return nil }
+    /// The apps Settings can ask about, with their names.
+    static var targets: [AutomationAllowPlan.Target] { players.map { .init(id: $0, name: name($0)) } }
+
+    static var runningTargets: Set<String> {
+        Set(players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty })
+    }
+
+    /// Allowed, refused (macOS will not ask again) or not decided, per app, from the current cache.
+    static var accessByTarget: [String: AutomationAllowPlan.Access] {
+        var access: [String: AutomationAllowPlan.Access] = [:]
+        for id in players {
+            switch cachedStatus(id) {
+            case .granted: access[id] = .allowed
+            case .denied(let code) where code == OSStatus(errAEEventNotPermitted): access[id] = .refused
+            case .denied, .pending: access[id] = .undecided
+            }
+        }
+        return access
+    }
+
+    /// Asks only `ids` (running apps not yet allowed) without holding the caller: the consent sheet can stay
+    /// up until the person answers. Returns, per app, whether it is now allowed.
+    static func askAsync(only ids: [String]) async -> [String: Bool] {
+        let running = ids.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
+        guard !running.isEmpty else { return [:] }
+        for id in running { promptBegan(id) }
         let codes = await Task.detached(priority: .userInitiated) { () -> [String: OSStatus] in
             var codes: [String: OSStatus] = [:]
             for id in running { codes[id] = promptStatus(id) }
             return codes
         }.value
-        for (id, code) in codes { storeResolved(id, code) }
-        return codes.values.contains(noErr)
+        for (id, code) in codes { promptAnswered(id, code) }
+        return codes.mapValues { $0 == noErr }
     }
 
     /// Starts background checks for running targets (never blocks the caller).
@@ -410,60 +452,46 @@ enum Automation {
         case pending
     }
 
-    private struct Entry {
-        enum State { case resolved(OSStatus), pending }
-        var state: State
-        var updatedAt: Date
-    }
-
-    nonisolated(unsafe) private static var cache: [String: Entry] = [:]
-    nonisolated(unsafe) private static var inFlight: Set<String> = []
+    /// One model per target app, all under `cacheLock`. Every change goes through `apply`.
+    nonisolated(unsafe) private static var states: [String: AutomationConsentCache.State] = [:]
     private static let cacheLock = NSLock()
     /// Status checks are bounded: macOS can block AEDeterminePermission... when a consent sheet is up.
     static let checkTimeout: TimeInterval = 1.0
-    private static let resolvedTTL: TimeInterval = 20
-    private static let pendingRecheck: TimeInterval = 5
+
+    private static var now: Double { Date().timeIntervalSinceReferenceDate }
+
+    /// Runs one event through the consent model for `bundleID` and returns its effects (performed by the caller).
+    private static func apply(_ bundleID: String, _ event: AutomationConsentCache.Event) -> [AutomationConsentCache.Effect] {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        let (next, effects) = AutomationConsentCache.reduce(states[bundleID] ?? AutomationConsentCache.State(), event)
+        states[bundleID] = next
+        return effects
+    }
 
     private static func cachedStatus(_ bundleID: String) -> Cached {
         scheduleCheck(bundleID)
         cacheLock.lock()
         defer { cacheLock.unlock() }
-        guard let entry = cache[bundleID] else { return .pending }
-        switch entry.state {
-        case .resolved(let code):
-            guard Date().timeIntervalSince(entry.updatedAt) < resolvedTTL else { return .pending }
-            return code == noErr ? .granted : .denied(code)
-        case .pending:
-            return .pending
+        switch (states[bundleID] ?? AutomationConsentCache.State()).status(now: now) {
+        case .granted: return .granted
+        case .denied(let code): return .denied(OSStatus(code))
+        case .pending: return .pending
         }
     }
 
-    private static func storeResolved(_ bundleID: String, _ code: OSStatus) {
-        cacheLock.lock()
-        cache[bundleID] = Entry(state: .resolved(code), updatedAt: Date())
-        cacheLock.unlock()
-        remember(bundleID, code)
+    /// The consent sheet is about to be raised: any check already running is now older than the answer.
+    private static func promptBegan(_ bundleID: String) {
+        _ = apply(bundleID, .promptBegan)
     }
 
-    private static func storePending(_ bundleID: String) {
-        cacheLock.lock()
-        cache[bundleID] = Entry(state: .pending, updatedAt: Date())
-        cacheLock.unlock()
+    /// The person answered. This is newer than every check that started before the prompt.
+    static func promptAnswered(_ bundleID: String, _ code: OSStatus) {
+        perform(apply(bundleID, .promptAnswered(code: Int32(code), now: now)), for: bundleID)
     }
 
     private static func scheduleCheck(_ bundleID: String) {
-        cacheLock.lock()
-        if inFlight.contains(bundleID) { cacheLock.unlock(); return }
-        if let entry = cache[bundleID] {
-            let age = Date().timeIntervalSince(entry.updatedAt)
-            switch entry.state {
-            case .resolved where age < resolvedTTL: cacheLock.unlock(); return
-            case .pending where age < pendingRecheck: cacheLock.unlock(); return
-            default: break
-            }
-        }
-        inFlight.insert(bundleID)
-        cacheLock.unlock()
+        guard case .startCheck(let generation)? = apply(bundleID, .checkWanted(now: now)).first else { return }
 
         DispatchQueue.global(qos: .utility).async {
             let box = StatusBox()
@@ -472,16 +500,13 @@ enum Automation {
                 box.value = performStatus(bundleID, ask: false)
                 done.signal()
             }
-            let finishedInTime = done.wait(timeout: .now() + checkTimeout) == .success
-            if !finishedInTime {
-                storePending(bundleID)
-                _ = done.wait(timeout: .now() + 30)
-            } else {
-                storeResolved(bundleID, box.value)
+            var answered = done.wait(timeout: .now() + checkTimeout) == .success
+            if !answered {
+                _ = apply(bundleID, .checkSlow(generation: generation, now: now))
+                answered = done.wait(timeout: .now() + 30) == .success
             }
-            cacheLock.lock()
-            inFlight.remove(bundleID)
-            cacheLock.unlock()
+            let effects = apply(bundleID, .checkEnded(generation: generation, code: answered ? Int32(box.value) : nil, now: now))
+            perform(effects, for: bundleID)
             if let onCacheUpdated { DispatchQueue.main.async { onCacheUpdated() } }
         }
     }
@@ -508,20 +533,28 @@ enum Automation {
 
     /// Test hook: reset cache and in-flight state between tests.
     static func resetCacheForTesting() {
-        let deadline = Date().addingTimeInterval(4)
+        waitForChecksToEndForTesting()
+        cacheLock.lock()
+        states.removeAll()
+        cacheLock.unlock()
+        testStatusProvider = nil
+        for id in players { UserDefaults.standard.removeObject(forKey: grantKey(id)) }
+    }
+
+    /// Test hook: blocks until no background check is running (bounded).
+    static func waitForChecksToEndForTesting(seconds: TimeInterval = 4) {
+        let deadline = Date().addingTimeInterval(seconds)
         while Date() < deadline {
             cacheLock.lock()
-            let busy = !inFlight.isEmpty
+            let busy = states.values.contains { $0.checking }
             cacheLock.unlock()
             if !busy { break }
             Thread.sleep(forTimeInterval: 0.05)
         }
-        cacheLock.lock()
-        cache.removeAll()
-        inFlight.removeAll()
-        cacheLock.unlock()
-        testStatusProvider = nil
     }
+
+    /// Test hook: the persisted grant for a target.
+    static func grantIsRemembered(_ bundleID: String) -> Bool { UserDefaults.standard.bool(forKey: grantKey(bundleID)) }
 }
 
 /// Global key and mouse-posting features wait for Accessibility instead of triggering a macOS
@@ -529,22 +562,48 @@ enum Automation {
 /// from setup or Settings > Permissions.
 @MainActor
 enum AccessibilityGate {
-    private static var waiting: [() -> Void] = []
+    /// The closure for each waiting feature, by key (see `TrustWait`).
+    private static var work: [String: () -> Void] = [:]
+    private static var wait = TrustWait.State()
     private static var timer: Timer?
 
     static var trusted: Bool { AXIsProcessTrusted() }
 
-    static func whenTrusted(_ work: @escaping () -> Void) {
-        if trusted { work(); return }
-        waiting.append(work)
-        guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            MainActor.assumeIsolated {
-                guard trusted else { return }
-                timer?.invalidate(); timer = nil
-                let ready = waiting; waiting.removeAll()
-                NSLog("[ZEUS] permissions: Accessibility granted, starting %d key features", ready.count)
-                ready.forEach { $0() }
+    /// Runs `work` once Accessibility is on. Asking again under the same key replaces the earlier closure,
+    /// so a feature that restarts is started once. The default key names the call site.
+    static func whenTrusted(key: String = "\(#fileID):\(#line)", _ work: @escaping () -> Void) {
+        self.work[key] = work
+        perform(apply(.wanted(key: key, trusted: trusted)))
+    }
+
+    /// The feature behind `key` was turned off: it must not start later, and the poll stops with the last waiter.
+    static func cancelWaiting(key: String) {
+        work[key] = nil
+        perform(apply(.cancelled(key: key)))
+    }
+
+    private static func apply(_ event: TrustWait.Event) -> [TrustWait.Effect] {
+        let (next, effects) = TrustWait.reduce(wait, event)
+        wait = next
+        return effects
+    }
+
+    private static func perform(_ effects: [TrustWait.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .run(let key):
+                work.removeValue(forKey: key)?()
+            case .startPolling:
+                timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+                    MainActor.assumeIsolated {
+                        guard trusted else { return }
+                        NSLog("[ZEUS] permissions: Accessibility granted, starting %d key features", wait.waiting.count)
+                        perform(apply(.becameTrusted))
+                    }
+                }
+            case .stopPolling:
+                timer?.invalidate()
+                timer = nil
             }
         }
     }

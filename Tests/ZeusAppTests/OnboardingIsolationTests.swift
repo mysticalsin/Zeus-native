@@ -11,12 +11,15 @@ struct OnboardingIsolationTests {
     @MainActor private final class Memory {
         var step = 0
         var completed = false
+        var dismissed = false
+        var dismissals = 0
         var writes: [Int] = []
         var finishes = 0
         var sounds: [OnboardingSound] = []
         var persistence: OnboardingPersistence {
             .init(readStep: { self.step }, writeStep: { self.step = $0; self.writes.append($0) },
-                  readCompleted: { self.completed }, markCompleted: { self.completed = true; self.finishes += 1 })
+                  readCompleted: { self.completed }, markCompleted: { self.completed = true; self.finishes += 1 },
+                  readDismissed: { self.dismissed }, markDismissed: { self.dismissed = true; self.dismissals += 1 })
         }
         func flow() -> OnboardingFlow {
             OnboardingFlow(persistence: persistence,
@@ -107,6 +110,45 @@ struct OnboardingIsolationTests {
         #expect(flow.step == .welcome && memory.writes.isEmpty && memory.finishes == 0)
         #expect(services.stops == 0) // A controller that never appeared owns no poller to stop.
         #expect(services.requests.isEmpty && services.connections.isEmpty && services.downloads == 0)
+    }
+
+    @Test func closingTheWindowMidwayRecordsADismissalOnceAndLaunchStopsReopening() async throws {
+        let memory = Memory()
+        let flow = memory.flow()
+        let controller = OnboardingWindowController(services: Services(), flow: flow, options: OnboardingOptions())
+        flow.beginPresentation()
+        flow.next()
+        try await settle(flow, at: .murmure)
+        controller.windowWillClose(Notification(name: NSWindow.willCloseNotification))
+        controller.windowWillClose(Notification(name: NSWindow.willCloseNotification))
+        #expect(memory.dismissed && memory.dismissals == 1 && !memory.completed)
+        let relaunched = memory.flow()
+        #expect(relaunched.progress == .dismissed)
+        #expect(!OnboardingProgress.opensAtLaunch(relaunched.progress, explicitStepRequested: false))
+    }
+
+    @Test func setUpLaterOnTheLastStepDismissesAndOnAMiddleStepOnlySkips() async throws {
+        let memory = Memory()
+        let flow = memory.flow()
+        flow.beginPresentation()
+        flow.skipStep()
+        try await settle(flow, at: .murmure)
+        #expect(!memory.dismissed)
+        flow.step = .sounds
+        flow.skipStep()
+        #expect(memory.dismissed && memory.dismissals == 1 && flow.step == .sounds)
+    }
+
+    @Test func finishingThenClosingTheWindowStaysCompletedNotDismissed() async throws {
+        let memory = Memory()
+        let flow = memory.flow()
+        let controller = OnboardingWindowController(services: Services(), flow: flow, options: OnboardingOptions())
+        flow.beginPresentation()
+        flow.step = .sounds
+        #expect(flow.complete())
+        controller.windowWillClose(Notification(name: NSWindow.willCloseNotification))
+        #expect(memory.completed && !memory.dismissed)
+        #expect(flow.progress == .completed)
     }
 
     @Test func pollingVisibilityPolicyPausesForHiddenMinimizedOccludedAndClosedWindows() {

@@ -11,3 +11,4 @@ extension/dist/
 *.key
 bench/*/.build/
 bench/*/clips/
+__pycache__/
