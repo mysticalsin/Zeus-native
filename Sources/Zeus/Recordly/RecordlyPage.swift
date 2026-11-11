@@ -767,16 +767,37 @@ private struct RecordlyControlRow: View {
 
 /// The round glass capture control. Idle: white ring and a filled dot. Countdown: a ring draws around the digits.
 /// Recording: the dot morphs into a rounded square. Red only appears while capturing.
-private struct RecordlyCaptureControl: View {
+struct RecordlyCaptureControl: View {
     let visual: RecordlyControlVisual
     let enabled: Bool
     let countdownBeganAt: Date?
     let help: String
     let spokenSource: String?
+    /// Scribe draws this symbol in the idle ring instead of the filled dot.
+    let idleSymbol: String?
+    /// The spoken name of the idle action ("Record" on the Record page).
+    let idleLabel: String
+    /// Spoken while capturing ("Stop recording").
+    let stopLabel: String
     let action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hovering = false
+
+    /// Explicit because the private properties above would make the memberwise one private to this file.
+    init(visual: RecordlyControlVisual, enabled: Bool, countdownBeganAt: Date?, help: String, spokenSource: String?,
+         idleSymbol: String? = nil, idleLabel: String = "Record", stopLabel: String = "Stop recording",
+         action: @escaping () -> Void) {
+        self.visual = visual
+        self.enabled = enabled
+        self.countdownBeganAt = countdownBeganAt
+        self.help = help
+        self.spokenSource = spokenSource
+        self.idleSymbol = idleSymbol
+        self.idleLabel = idleLabel
+        self.stopLabel = stopLabel
+        self.action = action
+    }
 
     private var motion: Animation {
         reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : .spring(response: 0.38, dampingFraction: 0.74)
@@ -806,10 +827,10 @@ private struct RecordlyCaptureControl: View {
 
     private var accessibilityLabel: String {
         switch visual {
-        case .idle: "Record"
+        case .idle: idleLabel
         case .countdown(let n): "Cancel countdown, \(n)"
         case .starting: "Cancel starting the recording"
-        case .recording: "Stop recording"
+        case .recording: stopLabel
         case .stopping: "Stopping, unavailable"
         }
     }
@@ -847,19 +868,33 @@ private struct RecordlyCaptureControl: View {
         ZStack {
             if reduceMotion {
                 // Cross-fades only: each glyph keeps its own geometry and fades in or out.
-                Circle().fill(Theme.cloudPrimary).frame(width: 30, height: 30).opacity(visual == .idle ? (enabled ? 1 : 0.3) : 0)
+                Circle().fill(Theme.cloudPrimary).frame(width: 30, height: 30)
+                    .opacity(visual == .idle && idleSymbol == nil ? (enabled ? 1 : 0.3) : 0)
                 RoundedRectangle(cornerRadius: 6, style: .continuous).fill(TopBarStyle.rec).frame(width: 20, height: 20)
                     .opacity(visual == .recording ? 1 : (visual == .stopping ? 0.5 : 0))
             } else {
                 RoundedRectangle(cornerRadius: shapeRadius, style: .continuous)
                     .fill(shapeColor).frame(width: shapeSide, height: shapeSide)
-                    .opacity(isCountdown ? 0 : 1)
+                    .opacity(isCountdown || showsIdleSymbol ? 0 : 1)
             }
+            idleSymbolGlyph
             if case .countdown(let n) = visual {
                 Text("\(n)").font(TopBarStyle.label(24, .bold).monospacedDigit()).foregroundStyle(Theme.cloudPrimary)
                     .contentTransition(.numericText(countsDown: true))
             }
             if visual == .starting || visual == .stopping { ProgressView().controlSize(.small) }
+        }
+    }
+
+    private var showsIdleSymbol: Bool { idleSymbol != nil && (visual == .idle || visual == .starting) }
+
+    @ViewBuilder
+    private var idleSymbolGlyph: some View {
+        if let idleSymbol, showsIdleSymbol {
+            Image(systemName: idleSymbol)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(enabled ? Theme.cloudPrimary : Color.white.opacity(0.3))
+                .opacity(visual == .starting ? 0.5 : 1)
         }
     }
 
@@ -886,7 +921,7 @@ private struct RecordlyCaptureControl: View {
     }
 }
 
-private struct RecordlyControlStyle: ButtonStyle {
+struct RecordlyControlStyle: ButtonStyle {
     let hovering: Bool
     let reduceMotion: Bool
 

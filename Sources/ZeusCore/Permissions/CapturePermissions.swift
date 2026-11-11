@@ -12,6 +12,11 @@ public enum CapturePermissions {
         }
     }
 
+    /// Microphone uses the same `AVAuthorizationStatus` raw values as the camera.
+    public static func microphoneState(authorizationRaw: Int) -> PermissionState {
+        cameraState(authorizationRaw: authorizationRaw)
+    }
+
     /// macOS exposes only `CGPreflightScreenCaptureAccess`; after an explicit request attempt,
     /// a still-false preflight is treated as denied.
     public static func screenRecordingState(preflightGranted: Bool, requestAttempted: Bool) -> PermissionState {
