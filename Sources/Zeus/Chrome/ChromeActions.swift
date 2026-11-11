@@ -167,7 +167,7 @@ final class ChromeActions {
     }
 
     private func ask(site: String, what: String, risk: HookEvent.Risk) async -> Bool {
-        await notch.requestApproval(agent: "ZEUS", project: site, tool: "Chrome", command: what, risk: risk,
+        await notch.requestApproval(agent: "Zeus", project: site, tool: "Chrome", command: what, risk: risk,
                                     timeout: .seconds(30), onTimeout: .deny) == .allow
     }
 }

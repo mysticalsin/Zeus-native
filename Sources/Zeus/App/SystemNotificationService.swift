@@ -39,9 +39,9 @@ struct SystemNotificationPayload: Equatable, Sendable {
         case .rain(let minutes):
             SystemNotificationPayload(title: "Rain soon", body: "Rain may start in \(minutes) minutes.")
         case .hint(let text):
-            SystemNotificationPayload(title: "ZEUS needs access", body: text)
+            SystemNotificationPayload(title: "Zeus needs access", body: text)
         case .permission(let text, _):
-            SystemNotificationPayload(title: "ZEUS needs access", body: text)
+            SystemNotificationPayload(title: "Zeus needs access", body: text)
         case .keepAwake(let text):
             SystemNotificationPayload(title: "Keep awake", body: text)
         default:
@@ -290,7 +290,7 @@ final class SystemNotificationService {
         return switch authorization {
         case .unknown, .notDetermined: "Turn on to ask macOS for permission."
         case .authorized: isEnabled() ? "Focused banners appear while the notch is closed." : "Allowed by macOS; turn on to show banners."
-        case .denied: "Allow ZEUS notifications in System Settings."
+        case .denied: "Allow Zeus notifications in System Settings."
         }
     }
 

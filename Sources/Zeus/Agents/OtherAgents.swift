@@ -113,7 +113,7 @@ struct OtherAgentsSection: View {
                 Toggle(isOn: Binding(get: { state.installed[agent] == true }, set: { state.set(agent, on: $0) })) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Show \(agent.title) in the notch")
-                        Text(AgentHookInstaller.isAvailable(agent) ? "Adds ZEUS to ~/\(agent.relativePath), with a backup." : "\(agent.title) is not set up on this Mac.")
+                        Text(AgentHookInstaller.isAvailable(agent) ? "Adds Zeus to ~/\(agent.relativePath), with a backup." : "\(agent.title) is not set up on this Mac.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 }

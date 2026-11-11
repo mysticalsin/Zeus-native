@@ -196,7 +196,7 @@ final class ChatModel {
         upsert(conversation)
 
         guard let brain = routed else {
-            let message = answering == nil ? decision.reason : "ZEUS isn't connected to \(answering!.title) yet. Open Setup to connect it."
+            let message = answering == nil ? decision.reason : "Zeus isn't connected to \(answering!.title) yet. Open Setup to connect it."
             mutate(conversation.id) { $0.update(reply.id, text: message, failed: true) }
             return
         }

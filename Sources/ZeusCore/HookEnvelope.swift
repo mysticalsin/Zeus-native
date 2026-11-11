@@ -82,7 +82,7 @@ public struct HookDecision: Codable, Equatable, Sendable {
         case .allow:
             decisionObject = ["behavior": .string("allow")]
             if let updatedInput { decisionObject["updatedInput"] = updatedInput }
-        case .deny: decisionObject = ["behavior": .string("deny"), "message": .string(reason ?? "Denied in ZEUS")]
+        case .deny: decisionObject = ["behavior": .string("deny"), "message": .string(reason ?? "Denied in Zeus")]
         }
         return ["hookSpecificOutput": .object([
             "hookEventName": .string("PermissionRequest"),

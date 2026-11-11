@@ -197,7 +197,7 @@ struct RemindersPage: View {
         Group {
             if !reminders.allowed {
                 GlanceEmpty(symbol: "list.bullet.circle.fill", tint: Theme.ember,
-                            text: reminders.access == .notDetermined ? "See and tick off your Apple Reminders here." : "ZEUS can't see Reminders. Turn it on in System Settings, Privacy, Reminders.",
+                            text: reminders.access == .notDetermined ? "See and tick off your Apple Reminders here." : "Zeus can't see Reminders. Turn it on in System Settings, Privacy, Reminders.",
                             button: reminders.access == .notDetermined ? "Allow Reminders" : "Open Settings") {
                     topBar.openPermissions()
                 }
@@ -292,7 +292,7 @@ struct NotificationsPage: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     ),
                     title: "Allow Full Disk Access",
-                    detail: "Turn on ZEUS in Full Disk Access, then relaunch the app so macOS applies the permission.",
+                    detail: "Turn on Zeus in Full Disk Access, then relaunch the app so macOS applies the permission.",
                     primary: "Open Full Disk Access",
                     primaryAction: { notifications.openFullDiskAccess() },
                     secondary: "Try again",

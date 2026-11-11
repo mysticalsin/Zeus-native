@@ -11,8 +11,8 @@ final class PrompterRecorder: NSObject {
 
         var errorDescription: String? {
             switch self {
-            case .cameraDenied: "Allow the camera for ZEUS in System Settings › Privacy & Security › Camera."
-            case .micDenied: "Allow the microphone for ZEUS in System Settings › Privacy & Security › Microphone."
+            case .cameraDenied: "Allow the camera for Zeus in System Settings › Privacy & Security › Camera."
+            case .micDenied: "Allow the microphone for Zeus in System Settings › Privacy & Security › Microphone."
             case .noCamera: "No camera found."
             case .cannotAdd: "The camera or microphone is busy in another app."
             }

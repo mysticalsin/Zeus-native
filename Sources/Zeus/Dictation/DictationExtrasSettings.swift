@@ -61,7 +61,7 @@ struct DictationExtrasSection: View {
 
         Section("History") {
             Button("Open Dictation History…") { DictationHistoryWindow.shared.show(topBar: topBar) }
-            Text("Correct a dictation to teach ZEUS a word, or run it again with another mode or engine.")
+            Text("Correct a dictation to teach Zeus a word, or run it again with another mode or engine.")
                 .font(.callout).foregroundStyle(.secondary)
         }
     }

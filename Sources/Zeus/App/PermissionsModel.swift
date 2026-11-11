@@ -266,7 +266,7 @@ final class PermissionsModel {
     func disconnectChrome() {
         do {
             try ChromeInstaller.uninstall()
-            chromeMessage = "Disconnected. You can remove the ZEUS extension in chrome://extensions."
+            chromeMessage = "Disconnected. You can remove the Zeus extension in chrome://extensions."
         } catch {
             chromeMessage = error.localizedDescription
         }

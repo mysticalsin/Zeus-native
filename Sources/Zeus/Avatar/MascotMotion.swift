@@ -175,7 +175,7 @@ struct LivingAvatar: View {
         }
         .frame(width: size, height: size)
         .accessibilityElement()
-        .accessibilityLabel(asleep ? "ZEUS: sleeping" : "ZEUS: \(state.title)")
+        .accessibilityLabel(asleep ? "Zeus: sleeping" : "Zeus: \(state.title)")
     }
 
     /// Waking starts from its first frame; everything else runs on the shared clock.

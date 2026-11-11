@@ -14,7 +14,7 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 AvatarView(state: AvatarStatus.shared.current, size: 24)
-                Text("ZEUS")
+                Text("Zeus")
                     .font(Glass.font(15, .bold)).tracking(1.1)
                     .foregroundStyle(Theme.cloudPrimary)
                     .accessibilityAddTraits(.isHeader)
@@ -52,7 +52,7 @@ struct PanelView: View {
                           detail: permissions.claudeHooksInstalled ? "Connected" : "Off")
                     .accessibilityElement(children: .combine)
                 Note(permissions.hookMessage
-                     ?? (permissions.claudeHooksInstalled ? nil : "Adds ZEUS's hooks to ~/.claude/settings.json, with a backup. Your other hooks stay."))
+                     ?? (permissions.claudeHooksInstalled ? nil : "Adds Zeus's hooks to ~/.claude/settings.json, with a backup. Your other hooks stay."))
                 Button(permissions.claudeHooksInstalled ? "Disconnect" : "Connect Claude Code") {
                     if permissions.claudeHooksInstalled {
                         permissions.disconnectClaudeCode()
@@ -108,7 +108,7 @@ struct PanelView: View {
                 Spacer()
                 Button("Settings…", action: openSettings)
                     .keyboardShortcut(",", modifiers: .command)
-                Button("Quit ZEUS", action: quit)
+                Button("Quit Zeus", action: quit)
                     .keyboardShortcut("q", modifiers: .command)
             }
             .buttonStyle(ZeusButtonStyle(prominent: false))
@@ -122,7 +122,7 @@ struct PanelView: View {
         )
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("ZEUS")
+        .accessibilityLabel("Zeus")
     }
 }
 

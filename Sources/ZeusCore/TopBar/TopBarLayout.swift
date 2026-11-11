@@ -40,10 +40,10 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Tooltip and VoiceOver name: the title, plus what the less obvious tabs do.
     public var help: String {
         switch self {
-        case .insomnia: "Insomnia — keep working with the lid closed"
-        case .continuity: "Continuity — your keyboard and mouse across Macs and PCs (Beamer)"
-        case .polyglot: "Polyglot — live translated captions"
-        case .scribe: "Scribe — listens to a meeting and writes your notes"
+        case .insomnia: "Insomnia: keep working with the lid closed"
+        case .continuity: "Continuity: your keyboard and mouse across Macs and PCs (Beamer)"
+        case .polyglot: "Polyglot: live translated captions"
+        case .scribe: "Scribe: listens to a meeting and writes your notes"
         default: title
         }
     }

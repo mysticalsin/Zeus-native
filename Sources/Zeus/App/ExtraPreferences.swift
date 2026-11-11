@@ -273,7 +273,7 @@ enum Diagnostics {
         let info = ProcessInfo.processInfo
         let socketUp = FileManager.default.fileExists(atPath: ZeusPaths.socket.path)
         var rows: [(String, String)] = [
-            ("ZEUS", ZeusCoreVersion.string),
+            ("Zeus", ZeusCoreVersion.string),
             ("macOS", info.operatingSystemVersionString),
             ("Agent socket", socketUp ? "Listening" : "Not running"),
             ("Support folder", redact(ZeusPaths.supportDirectory.path)),

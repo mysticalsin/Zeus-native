@@ -128,7 +128,7 @@ final class LicenseManager {
             switch response {
             case .success(let token):
                 guard case .success = evaluator.checkActivation(token, licenseID: payload.id) else {
-                    lastError = "The license server sent a proof ZEUS can't check."
+                    lastError = "The license server sent a proof Zeus can't check."
                     return lastError
                 }
                 guard credentials.set(token, for: "license.activation") else {
@@ -215,7 +215,7 @@ final class LicenseManager {
             case .success(let token):
                 guard let payload = License.read(key, publicKeys: evaluator.publicKeys),
                       case .success = evaluator.checkActivation(token, licenseID: payload.id) else {
-                    lastError = "The license server sent a proof ZEUS can't check."
+                    lastError = "The license server sent a proof Zeus can't check."
                     refresh()
                     return
                 }

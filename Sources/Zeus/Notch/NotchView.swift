@@ -349,7 +349,7 @@ struct NotchView: View {
                 .fill(status.color)
                 .frame(width: 11, height: 13)
                 .shadow(color: status.color.opacity(0.9), radius: 4)
-            Text(model.approval?.agent ?? model.peekSession?.agent ?? "ZEUS")
+            Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(1)
@@ -556,7 +556,7 @@ private struct ApprovalBody: View {
                             .underline()
                     }
                     .buttonStyle(PressableStyle())
-                    .accessibilityHint("Approves this and later requests from \(approval.agent) in this chat, except risky commands, until ZEUS quits.")
+                    .accessibilityHint("Approves this and later requests from \(approval.agent) in this chat, except risky commands, until Zeus quits.")
                 }
             }
             .font(.system(size: 10.5, design: .rounded))
@@ -598,7 +598,7 @@ private struct PanelBody: View {
             HStack(spacing: 7) {
                 BoltShape().fill(Theme.bolt).frame(width: 11, height: 13)
                     .shadow(color: Theme.bolt.opacity(0.8), radius: 4)
-                Text("ZEUS")
+                Text("Zeus")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Theme.cloudPrimary)
                 Spacer(minLength: notchWidth + 8)

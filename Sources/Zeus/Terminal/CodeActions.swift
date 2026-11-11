@@ -103,9 +103,9 @@ final class CodeActions {
         let assessment = ShellRiskClassifier.assess(shell)
         if assessment.needsApproval {
             guard let notch else { return Result(message: "I can't ask you about that command yet, so I left it.", ok: false) }
-            if speak { say(ZeusVoiceLines.line(for: .approval, context: ["agent": "ZEUS"])) }
+            if speak { say(ZeusVoiceLines.line(for: .approval, context: ["agent": "Zeus"])) }
             let verdict = await notch.requestApproval(
-                agent: "ZEUS", project: ProjectIndex.tilde(url.path), tool: "Terminal",
+                agent: "Zeus", project: ProjectIndex.tilde(url.path), tool: "Terminal",
                 command: "\(shell)  (\(assessment.summary))", risk: assessment.cardRisk, timeout: .seconds(90), onTimeout: .deny)
             guard verdict == .allow else { return Result(message: "Okay, I won't run it.", ok: false) }
         }

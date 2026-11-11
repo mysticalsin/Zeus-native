@@ -409,7 +409,7 @@ enum SettingStatus {
         case "integrations.antigravity":
             let found = ["/Applications/Antigravity.app", NSHomeDirectory() + "/Applications/Antigravity.app"].contains { FileManager.default.fileExists(atPath: $0) }
             return found ? (true, "App found") : (false, "Not installed")
-        case "privacy.analytics": return (true, "Off · ZEUS sends nothing")
+        case "privacy.analytics": return (true, "Off · Zeus sends nothing")
         case "interview.key": return (true, "Not needed")
         case "perm.trustedChats": return (false, "None")
         default: return (false, "Coming")
@@ -441,7 +441,7 @@ enum SettingStatus {
         case "dictation.model": (true, "Apple on-device · no download")
         case "integrations.codex": codexConnectionStatus(cliFound: true, hookInstalled: false)
         case "integrations.antigravity": (false, "Not installed")
-        case "privacy.analytics": (true, "Off · ZEUS sends nothing")
+        case "privacy.analytics": (true, "Off · Zeus sends nothing")
         case "interview.key": (true, "Not needed")
         case "diag.agents": (true, "Claude Code · 2 sessions")
         case "perm.trustedChats": (false, "None")

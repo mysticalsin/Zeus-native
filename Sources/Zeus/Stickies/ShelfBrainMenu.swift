@@ -24,6 +24,6 @@ struct ShelfBrainMenu: View {
     }
 
     static func body(for url: URL) -> String {
-        text(of: url) ?? "From the ZEUS shelf: [\(url.lastPathComponent)](\(url.absoluteString))"
+        text(of: url) ?? "From the Zeus shelf: [\(url.lastPathComponent)](\(url.absoluteString))"
     }
 }

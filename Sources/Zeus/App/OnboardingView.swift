@@ -134,7 +134,7 @@ struct OnboardingView: View {
 
     private var welcome: some View {
         OnboardStep(title: "Hi, I’m Zeus.",
-                    text: "Wave back — then we’ll set up your notch, agents and voice together.") {
+                    text: "Wave back, then we’ll set up your notch, agents and voice together.") {
             Button {
                 model.waved = true
                 model.react(.grateful)
@@ -201,7 +201,7 @@ struct OnboardingView: View {
 
     private var agentsStep: some View {
         OnboardStep(title: "Your agents",
-                    text: "Flip a switch for Claude Code or Codex. Zeus waits with open palms until you decide — nothing advances on a timer.") {
+                    text: "Flip a switch for Claude Code or Codex. Zeus waits with open palms until you decide. Nothing advances on a timer.") {
             Toggle(isOn: Binding(
                 get: { UserDefaults.standard.bool(forKey: "zeus.hooks.claude.wanted") },
                 set: {
@@ -229,7 +229,7 @@ struct OnboardingView: View {
 
     private var dayStep: some View {
         OnboardStep(title: "Your day",
-                    text: "Tap Allow on a row — Calendar, Reminders or Weather. Zeus organises as each one lights up.") {
+                    text: "Tap Allow on a row: Calendar, Reminders or Weather. Zeus organises as each one lights up.") {
             interactivePermission("Calendar", kind: .calendar)
             interactivePermission("Reminders", kind: .reminders)
             Button {
@@ -261,7 +261,7 @@ struct OnboardingView: View {
 
     private var murmureStep: some View {
         OnboardStep(title: "Try Murmure",
-                    text: "Hold \(preferences.pushToTalk.title) and say anything. Zeus listens live — speech stays on this Mac unless you pick a cloud engine later.") {
+                    text: "Hold \(preferences.pushToTalk.title) and say anything. Zeus listens live. Speech stays on this Mac unless you pick a cloud engine later.") {
             ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.pushToTalk = $0 }, accessibilityName: "Talk key")
             PermissionLine(name: "Microphone", granted: permissions.granted[.microphone] == true)
             PermissionLine(name: "Speech Recognition", granted: permissions.granted[.speech] == true)
@@ -285,7 +285,7 @@ struct OnboardingView: View {
 
     private var learnStep: some View {
         OnboardStep(title: "You’re set",
-                    text: "Type your name so Zeus can greet you. Then open the notch — approvals, to-dos and Home cards live there.") {
+                    text: "Type your name so Zeus can greet you. Then open the notch. Approvals, to-dos and Home cards live there.") {
             TextField("Your name", text: Binding(
                 get: { model.nameDraft },
                 set: {
@@ -296,7 +296,7 @@ struct OnboardingView: View {
             ))
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: 280)
-            Button("Teach ZEUS About You…") {
+            Button("Teach Zeus About You…") {
                 model.react(.guiding)
                 AboutYouWindow.shared.show()
             }

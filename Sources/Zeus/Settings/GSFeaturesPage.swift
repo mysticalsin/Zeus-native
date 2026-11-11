@@ -46,7 +46,7 @@ struct FeaturesSettingsPage: View {
                 GSTextInput(text: store.stringBinding("browserAgent.alwaysAsk"), placeholder: "e.g. apply, invite", label: "Always ask before")
             }
             GSDivider()
-            GSRow(symbol: "macwindow", title: "Browser for the agent", text: "Your Chrome uses the ZEUS extension and your own logins. A separate browser (browser-use) has its own profile and never touches your Chrome.") {
+            GSRow(symbol: "macwindow", title: "Browser for the agent", text: "Your Chrome uses the Zeus extension and your own logins. A separate browser (browser-use) has its own profile and never touches your Chrome.") {
                 GSPopup(selection: store.stringBinding("browserAgent.backend"), options: FeatureSettings.browserBackendChoices)
             }
             GSDivider()

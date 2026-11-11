@@ -13,7 +13,7 @@ struct CommandModeSettingsPage: View {
                     GlassStatus(ok: true, text: Preferences.shared.pushToTalk.title)
                 }
                 GlassDivider()
-                GlassRow(title: "When ZEUS may drive", note: (DriveAutonomy(rawValue: autonomy) ?? .default).explanation) {
+                GlassRow(title: "When Zeus may drive", note: (DriveAutonomy(rawValue: autonomy) ?? .default).explanation) {
                     Picker("Autonomy", selection: $autonomy) {
                         ForEach(DriveAutonomy.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
                     }
@@ -22,7 +22,7 @@ struct CommandModeSettingsPage: View {
                     .tint(Theme.accent)
                 }
             }
-            GlassCard(title: "What ZEUS can do") {
+            GlassCard(title: "What Zeus can do") {
                 ForEach(Array(Self.actions.enumerated()), id: \.offset) { index, row in
                     if index > 0 { GlassDivider() }
                     GlassRow(title: row.0, note: row.1, icon: (row.2, Theme.accent)) {
@@ -31,7 +31,7 @@ struct CommandModeSettingsPage: View {
                 }
             }
             GlassCard(title: "Show me") {
-                GlassRow(title: "Hold left Command and circle", note: "Marks a spot; ZEUS answers about what you circled.") {
+                GlassRow(title: "Hold left Command and circle", note: "Marks a spot; Zeus answers about what you circled.") {
                     GlassStatus(ok: true, text: "Annotation live")
                 }
             }

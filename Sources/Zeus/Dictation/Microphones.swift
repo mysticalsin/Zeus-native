@@ -86,7 +86,7 @@ final class MicrophoneTester {
     func start(uid: String?, seconds: Double = 5) {
         stop()
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            problem = "Allow the microphone for ZEUS first."
+            problem = "Allow the microphone for Zeus first."
             return
         }
         let engine = AVAudioEngine()

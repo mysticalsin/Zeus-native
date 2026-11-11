@@ -91,7 +91,7 @@ final class IntelligenceCenter {
     static func request(for utterance: String, frontApp: String = "") -> SystemOneRequest {
         SystemOneRequest(model: "jev-latest", state: ["utterance": utterance, "front_app": frontApp],
                          questions: [
-                            "intent": .choice("What does the person want ZEUS to do?", [
+                            "intent": .choice("What does the person want Zeus to do?", [
                                 "app.open": "Open an app", "app.quit": "Quit an app", "media.play": "Play, pause or skip music",
                                 "system.volume": "Change the volume", "timer.start": "Start a timer", "todo.add": "Add a to-do",
                                 "calendar.query": "Ask about the calendar", "browser.open": "Open a website",

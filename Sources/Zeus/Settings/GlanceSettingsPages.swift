@@ -591,7 +591,7 @@ private struct IPhonePage: View {
         GSPageHeading(section: .iPhone, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard {
-            GSRow(symbol: "iphone", title: "iPhone app", text: "Pairing needs the ZEUS iPhone app on your phone.") {
+            GSRow(symbol: "iphone", title: "iPhone app", text: "Pairing needs the Zeus iPhone app on your phone.") {
                 GSStatus(ok: false, text: "Not available")
             }
         }
@@ -615,7 +615,7 @@ private struct GSNotificationsPage: View {
             GSRow(symbol: "checkmark.circle", title: "Finished tasks", text: "A macOS banner when an agent finishes, if Show system notifications below is on.")
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.triangle", title: "Errors and stuck agents",
-                        text: "A red or amber halo and card, plus a macOS notification when macOS allows ZEUS notifications.", isOn: bool("notify.errors"))
+                        text: "A red or amber halo and card, plus a macOS notification when macOS allows Zeus notifications.", isOn: bool("notify.errors"))
             GSDivider()
             GSRow(symbol: "hourglass", title: "Call an agent stuck after", text: "A working agent with no activity for this long turns amber.") {
                 GSPopup(selection: SettingsStore.binding("notify.stallMinutes"), options: AgentStall.choices).popupLabel("Call an agent stuck after")

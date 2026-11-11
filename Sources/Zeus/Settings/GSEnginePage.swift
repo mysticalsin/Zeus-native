@@ -136,7 +136,7 @@ struct EnginePage: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "testtube.2").font(.system(size: 19, weight: .semibold)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("TEST MODE — SYNTHETIC DATA ONLY").font(OB.font(13, .bold))
+                Text("TEST MODE: SYNTHETIC DATA ONLY").font(OB.font(13, .bold))
                 Text("In-memory state only. No Keychain, model providers, routines, hooks, or helper installers are available.")
                     .font(OB.font(12.5)).fixedSize(horizontal: false, vertical: true)
             }
