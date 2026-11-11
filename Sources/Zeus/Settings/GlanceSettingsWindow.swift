@@ -264,6 +264,7 @@ struct GSPageHeading: View {
     let section: GSSection
     let subtitle: String
     var body: some View {
+        let _ = SnapshotPaneProbe.note(section.rawValue) // snapshot harness only; no-op outside snapshot mode
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 9) {
                 Text(section.title).font(GS.pageTitle).tracking(-1.1).foregroundStyle(GS.text)
