@@ -133,12 +133,9 @@ final class PermissionsModel {
 
     /// Microphone, then speech recognition (each system prompt appears only once).
     func requestVoice() async {
-        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-            _ = await AVCaptureDevice.requestAccess(for: .audio)
-        }
-        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-            _ = await SystemAuthorization.requestSpeechRecognition()
-        }
+        // Shares the "voice" request with `VoicePermissions.ensure`: a double click or a talk-key press
+        // during setup joins the prompt that is up instead of asking macOS again.
+        await PermissionPrompts.shared.run("voice") { await VoicePermissions.askForVoice() }
         refresh()
     }
 
@@ -156,7 +153,7 @@ final class PermissionsModel {
 
     func requestCamera() async {
         if cameraPermissionState == .notDetermined {
-            await captureAccess.requestCamera()
+            await PermissionPrompts.shared.run("camera") { await self.captureAccess.requestCamera() }
         }
         granted[.camera] = cameraPermissionState == .authorized
     }
@@ -185,9 +182,11 @@ final class PermissionsModel {
             let type: EKEntityType = kind == .calendar ? .event : .reminder
             guard EKEventStore.authorizationStatus(for: type) == .notDetermined else { return open(kind) }
             Task { @MainActor in
-                let store = EKEventStore()
-                if kind == .calendar { _ = try? await store.requestFullAccessToEvents() }
-                else { _ = try? await store.requestFullAccessToReminders() }
+                await PermissionPrompts.shared.run(kind.rawValue) {
+                    let store = EKEventStore()
+                    if kind == .calendar { _ = try? await store.requestFullAccessToEvents() }
+                    else { _ = try? await store.requestFullAccessToReminders() }
+                }
                 self.refresh()
             }
         case .automation:

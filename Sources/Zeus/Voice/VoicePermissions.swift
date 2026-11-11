@@ -10,7 +10,6 @@ import ZeusCore
 enum VoicePermissions {
     /// Shows the "can't hear you" cue; AppDelegate wires it to the notch.
     static var showDenied: ((String, String) -> Void)?
-    private static var asking = false
     private static var lastCueAt = Date.distantPast
 
     static func state(_ status: AVAuthorizationStatus) -> PermissionState {
@@ -36,17 +35,22 @@ enum VoicePermissions {
     @discardableResult
     static func ensure(explicit: Bool) async -> VoiceAccess {
         var current = access
-        if current.shouldPrompt(wakeOn: WakeWordController.shared.enabled, explicit: explicit), !asking {
-            asking = true
-            VoiceLog.log("permission", "asking (mic \(mic), speech \(speech), explicit \(explicit))")
-            if mic == .notDetermined { _ = await AVCaptureDevice.requestAccess(for: .audio) }
-            if speech == .notDetermined { _ = await SystemAuthorization.requestSpeechRecognition() }
-            asking = false
+        if current.shouldPrompt(wakeOn: WakeWordController.shared.enabled, explicit: explicit) {
+            // One prompt at a time: a second caller waits for the first answer instead of asking again
+            // or returning before there is one.
+            await PermissionPrompts.shared.run("voice") { await VoicePermissions.askForVoice() }
             current = access
-            VoiceLog.log("permission", "result: mic \(mic), speech \(speech)")
         }
         if let cue = current.deniedCue, let pane = current.deniedPane { notifyDenied(cue, pane) }
         return current
+    }
+
+    /// Raises the macOS prompts that are still undetermined. Callers go through `PermissionPrompts` ("voice").
+    static func askForVoice() async {
+        VoiceLog.log("permission", "asking (mic \(mic), speech \(speech))")
+        if mic == .notDetermined { _ = await AVCaptureDevice.requestAccess(for: .audio) }
+        if speech == .notDetermined { _ = await SystemAuthorization.requestSpeechRecognition() }
+        VoiceLog.log("permission", "result: mic \(mic), speech \(speech)")
     }
 
     static func notifyDenied(_ cue: String, _ pane: String) {
