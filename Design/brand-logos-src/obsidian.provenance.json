@@ -1,0 +1,19 @@
+{
+  "provider": "Obsidian",
+  "source_url": "https://obsidian.md/brand",
+  "asset_url": "https://obsidian.md/images/obsidian-logo-gradient.svg",
+  "retrieved_at_utc": "2026-11-11T02:26:00+00:00",
+  "source_page_sha256": "5be25378e5f9a371bf6da60180144489fc7bb99999c1f64d93a73aadf72bf130",
+  "source_asset": "Design/brand-logos-src/obsidian-logo-gradient.svg",
+  "bundled_asset": null,
+  "asset_sha256": "119b01b96c99f736098742c329f440313b6763bd2aea22cafe08179699431280",
+  "asset_bytes": 4872,
+  "viewBox": "0 0 512 512",
+  "extraction": "Exact bytes of the gradient logo image shown on the official Obsidian brand page. No edits.",
+  "rendering": "Not bundled or wired into the UI yet. The brand page says not to edit, distort, recolor or reconfigure the logo, and that single-colour applications use the whole logomark in black or white. Use either this unaltered file or a whole-mark black or white rendering, never a partial recolor.",
+  "guidance": [
+    "Please do not edit, change, distort, recolor, or reconfigure the Obsidian logo.",
+    "The name, logo and app icon are trademarks. Commercial use of the assets needs permission from Obsidian."
+  ],
+  "rights": "Proprietary trademark, nominative provider identification only. The page asks anyone using the assets commercially to contact Obsidian; Zeus is a commercial product, so confirm before shipping this mark in the app. No endorsement claimed."
+}

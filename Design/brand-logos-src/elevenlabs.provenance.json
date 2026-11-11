@@ -1,0 +1,19 @@
+{
+  "provider": "ElevenLabs",
+  "source_url": "https://elevenlabs.io/brand",
+  "asset_url": "https://11labs-nonprd-15f22c1d.s3.eu-west-3.amazonaws.com/a2ea339b-8b5e-41bb-b706-24eda8a4c9e3/elevenlabs-symbol.svg",
+  "retrieved_at_utc": "2026-11-11T02:26:00+00:00",
+  "source_page_sha256": "f963f9b303921fe7cc5d1cfd057a1890d3e3aa832e328caf9523fa09e5f0c927",
+  "source_asset": "Design/brand-logos-src/elevenlabs-symbol.svg",
+  "bundled_asset": null,
+  "asset_sha256": "84041b5ee800dd3cf5a4f731cda268bdaf5804577c2eba0f60e3aebd18edefb9",
+  "asset_bytes": 209,
+  "viewBox": "0 0 876 876",
+  "extraction": "Exact bytes of the 'ElevenLabs Symbol (SVG)' download linked from the official Brand guidelines and press kit page. No edits.",
+  "rendering": "Not bundled or wired into the UI yet. The official page describes the 11 icon as a shorthand for avatars and apps, designed for holding shapes, and asks for generous clear space (holding shape three times the icon height). Render it unaltered, as a single-colour mark, inside such a holding shape. Do not recreate the 11 with other characters.",
+  "guidance": [
+    "Use the exact name ElevenLabs (capital E, capital L, no space, not all caps).",
+    "Do not recreate the symbol from characters or redraw it."
+  ],
+  "rights": "Proprietary trademark, nominative provider identification only. No endorsement or broader trademark permission claimed. The page offers the assets for external entities referring to ElevenLabs under its guidelines."
+}

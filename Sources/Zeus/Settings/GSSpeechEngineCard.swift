@@ -56,12 +56,26 @@ struct SpeechEngineCard: View {
         }
     }
 
-    private func row(_ kind: TranscriptionEngineKind) -> some View {
+    /// OpenAI speech shows the OpenAI mark already in the app (the same verified asset Codex uses);
+    /// the other rows keep their symbol until an official mark is bundled for them.
+    @ViewBuilder private func row(_ kind: TranscriptionEngineKind) -> some View {
+        if kind == .openAI {
+            HStack(spacing: 0) {
+                EngineBrandLogo(agentLabel: "OpenAI", size: 20, tint: GS.text)
+                    .frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                engineRow(kind, symbol: nil)
+            }
+        } else {
+            engineRow(kind, symbol: symbol(kind))
+        }
+    }
+
+    private func engineRow(_ kind: TranscriptionEngineKind, symbol: String?) -> some View {
         let availability = board.availability(kind)
         let megabytes = kind == .whisper ? WhisperCppEngine.selectedModel.megabytes : nil
         let line = EngineStatusMapping.line(for: kind, availability: availability, selected: settings.engine == kind, megabytes: megabytes, cancellable: kind == .whisperKit)
         let text = line.reason ?? ""
-        return GSRow(symbol: symbol(kind), title: kind.title, text: text) {
+        return GSRow(symbol: symbol, title: kind.title, text: text) {
             HStack(spacing: 10) {
                 if line.action == .inUse {
                     GSStatus(ok: true, text: "In use")
