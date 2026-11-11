@@ -299,11 +299,11 @@ final class ScribeController {
     @ObservationIgnored var meetingTitleHint: String?
     /// Display names from the calendar invite the call popup matched; for the next recording only.
     @ObservationIgnored var meetingAttendeeHint: [String] = []
-    /// This recording's attendee names, and each finished meeting's (memory only, display names only).
+    /// This recording's attendee names, and each finished meeting's (display names only). Saved with the meeting file.
     @ObservationIgnored private var sessionAttendees: [String] = []
     @ObservationIgnored private var attendeesByMeeting: [UUID: [String]] = [:]
-    /// The voice of each closed turn, in memory only: from the end of a recording until the next one starts or
-    /// the meeting is dismissed or deleted. Never written to disk.
+    /// The voice of each closed turn, per meeting. Saved only inside that meeting's own file (0600) so naming works
+    /// after a relaunch, dropped from memory when the meeting is dismissed, and removed with the file on delete.
     @ObservationIgnored private var liveTurns: [ScribeTurnEmbedding] = []
     @ObservationIgnored private var turnVoices: [UUID: [ScribeTurnEmbedding]] = [:]
     @ObservationIgnored var meetingCallHint: ScribeCallProcessIdentity?
@@ -578,7 +578,6 @@ final class ScribeController {
         sessionAttendees = meetingAttendeeHint
         meetingAttendeeHint = []
         liveTurns = []
-        turnVoices = [:]
         let readout = ScribeLiveReadout()
         self.readout = readout
         // One ordered stream for everything the capture side says (see `ScribeCaptureInput`).
@@ -1333,7 +1332,7 @@ final class ScribeController {
         )
     }
 
-    /// Invitee display names for this meeting (empty after a relaunch: they are not saved).
+    /// Invitee display names for this meeting (saved with the meeting, so they survive a relaunch).
     func attendeeNames(for id: ScribeSessionID) -> [String] { attendeesByMeeting[id.rawValue] ?? [] }
 
     /// A voice can be remembered only from this session's trained embeddings, for a speaker other than "You".
@@ -1414,6 +1413,8 @@ final class ScribeController {
             .filter { $0.dismissedAt == nil && !cancelled.contains($0.id) }
             .map { record in
                 let id = ScribeSessionID(rawValue: record.id)
+                if !record.attendeeNames.isEmpty { attendeesByMeeting[record.id] = record.attendeeNames }
+                if !record.turnEmbeddings.isEmpty { turnVoices[record.id] = record.turnEmbeddings }
                 return ScribeRecap(
                     id: id,
                     title: record.title,
@@ -1447,7 +1448,9 @@ final class ScribeController {
             transcript: recap.transcript,
             dismissedAt: dismissedAt,
             transcriptionNote: recap.transcriptionNote,
-            micExcludedDuringCall: recap.micExcludedDuringCall
+            micExcludedDuringCall: recap.micExcludedDuringCall,
+            attendees: ScribeAttendeeNames.clean(attendeesByMeeting[recap.id.rawValue] ?? []),
+            turnVoices: (turnVoices[recap.id.rawValue] ?? []).map(ScribeMeetingRecord.TurnVoice.init)
         )
         do {
             try writeMeeting(record)

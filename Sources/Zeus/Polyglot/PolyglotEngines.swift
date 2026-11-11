@@ -148,7 +148,7 @@ struct PolyglotNLDetector: PolyglotLanguageDetecting {
 /// needs macOS 26 and installed language packs; a pack that is not installed is reported, never fetched silently.
 actor PolyglotAppleTranslator: PolyglotTranslating {
     func status(from source: String, to target: String) async -> PolyglotPackStatus {
-        guard #available(macOS 26.0, *) else { return .unsupported }
+        guard #available(macOS 26.0, *) else { return .requiresNewerSystem }
         let availability = LanguageAvailability()
         switch await availability.status(from: Locale.Language(identifier: source), to: Locale.Language(identifier: target)) {
         case .installed: return .installed

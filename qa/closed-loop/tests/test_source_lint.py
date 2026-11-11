@@ -290,6 +290,32 @@ class SettingsNeverFreezeLint(unittest.TestCase):
             offenders += [f"{relative}:{n}" for n, line in code_lines(path) if "SMAppService.mainApp" in strip_trailing_comment(line)]
         self.assertEqual(offenders, [])
 
+    def test_every_settings_card_and_page_is_placed_on_a_page(self):
+        """A card or page that is defined but never instantiated cannot be reached (the Language packs and
+        Speaker recognition cards were once orphaned this way). Intentional exceptions are listed by name."""
+        # IntegrationsPage is the superseded integrations page (AIConnectionsPage is routed); left in place, reported.
+        allowed_unplaced = {"IntegrationsPage"}
+        defined = {}
+        for folder in ("Settings", "App"):
+            for path in sorted((APP / folder).glob("*.swift")):
+                for _, line in code_lines(path):
+                    match = re.match(r"\s*(?:private |fileprivate )?struct (\w+(?:Card|SettingsPage|Page))\b", line)
+                    if match and (folder == "Settings" or path.name.endswith("Pages.swift") or path.name.endswith("Settings.swift")):
+                        defined[match.group(1)] = path
+        self.assertIn("LanguagePacksCard", defined)
+        self.assertIn("SpeakerRecognitionCard", defined)
+        orphans = []
+        for name, home in sorted(defined.items()):
+            if name in allowed_unplaced:
+                continue
+            use = re.compile(rf"\b{name}\s*[({{]")
+            placed = any(use.search(strip_trailing_comment(line))
+                         for path in swift_files() for _, line in code_lines(path)
+                         if not re.match(r"\s*(?:private |fileprivate )?struct ", line))
+            if not placed:
+                orphans.append(f"{name} ({home.relative_to(APP).as_posix()})")
+        self.assertEqual(orphans, [], "defined but never placed on a Settings page: add it to a page or list it in allowed_unplaced")
+
     def test_blocking_lint_detects_its_failure_shapes(self):
         self.assertTrue(blocking_offenders("DispatchQueue.main.sync { work() }"))
         self.assertTrue(blocking_offenders("let r = semaphore.wait(timeout: .now() + 1)"))

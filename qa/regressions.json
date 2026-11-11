@@ -3145,6 +3145,90 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_hook_read_is_invalidated_by_connect_and_disconnect"
       }
+    },
+    {
+      "id": "REG-262",
+      "failure": "Desktop pointing shipped off with no draw-while-held setting although the owner chose Control+Option and draw while held as the defaults.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FirstRunDefaultsTests.swift",
+        "function": "pointingIsOnWithControlOptionAndDrawWhileHeld"
+      }
+    },
+    {
+      "id": "REG-263",
+      "failure": "Scribe call-window names had no first-run default and could have been read without the owner's existing Accessibility grant.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FirstRunDefaultsTests.swift",
+        "function": "callWindowNamesNeverActivateWithoutAccessibility"
+      }
+    },
+    {
+      "id": "REG-264",
+      "failure": "The alert Reply button only opened the item, the same as Open, for apps that have no reply target.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "slackTeamsAndOtherAppsHideReplyInsteadOfDuplicatingOpen"
+      }
+    },
+    {
+      "id": "REG-265",
+      "failure": "Invitee names and per-turn voices were memory only, so after a relaunch the recap had no invite names and no Remember this voice button.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerPersistenceTests.swift",
+        "function": "namesAndVoicesComeBackAfterAReload"
+      }
+    },
+    {
+      "id": "REG-266",
+      "failure": "The Dismiss button and Stop could leave a pinned Polyglot bar stuck, and the pin decision was spread over the notch with no pure contract.",
+      "features": [
+        "S03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+        "function": "explicitDismissClosesEvenWhenPinned"
+      }
+    },
+    {
+      "id": "REG-267",
+      "failure": "On macOS older than 26 Polyglot reported translation as unavailable for the language pair, hiding the real reason.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+        "function": "olderSystemShowsHeardLineWithOneNewerSystemNotice"
+      }
+    },
+    {
+      "id": "REG-268",
+      "failure": "The Language packs and Speaker recognition cards could be defined without being placed on any Settings page, so the features were unreachable.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_every_settings_card_and_page_is_placed_on_a_page"
+      }
     }
   ]
 }

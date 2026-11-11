@@ -184,7 +184,7 @@ Verdict: the plan is stronger than Clicky on grounding, staleness, cue timing, s
 | Error handling | Single catch, fixed apology | `failed` state with a visible reason, permission loss hides marks | Keep. Add: malformed point, off-crop point and unknown `targetID` each show a caption and a diagnostics count, never a silent wrong position. Clicky's misleading "out of credits" message is the anti-example: classify errors (auth, rate, network, TTS, permission). |
 | Permissions | AX poll + Screen Recording poll + Input Monitoring implied | `KeyListenAccess`, no prompt at launch | Keep. Add a first-run checklist that names each permission and what breaks without it. |
 | Drawing/3D | Absent / JS web renderer (Inferred) | Native + SceneKit behind a seam, no web view | Keep. HeyClicky evidence does not justify a web renderer for Zeus. |
-| Transient cursor | Overlay appears only during interaction | `pointing.enabled` off by default, marker on hold | Add an explicit "hide when idle" fade (Clicky: 1 s after speech and pointing finish) as a setting. |
+| Transient cursor | Overlay appears only during interaction | `pointing.enabled` on by default (owner decision 2026-11-11), marker on hold | Add an explicit "hide when idle" fade (Clicky: 1 s after speech and pointing finish) as a setting. |
 
 ### Top recommended plan changes
 1. Add a first-class `point` cue and make `start` anchored to real first-audio playback the Phase 1 sync guarantee; defer word anchors until alignment is verified.
