@@ -366,7 +366,7 @@ final class PointingSelfTestRunner {
         var rows: [[String: Any]] = []
         for target in fixture.targets.prefix(2) {
             guard let quartz = mapper.convert(target.center, from: .screen, to: .ax, context: MapContext()) else { continue }
-            let raw = await Task.detached { PointingTargetProbe.hitTest(atQuartzPoint: quartz) }.value
+            let raw = PointingTargetProbe.hitTest(atQuartzPoint: quartz) // main actor, like the app
             guard let raw else { problems.append("\(target.id): no element"); continue }
             let screenFrame = mapper.convert(raw.axFrame, from: .ax, to: .screen, context: MapContext()) ?? .zero
             let centerError = hypot(screenFrame.midX - target.frame.midX, screenFrame.midY - target.frame.midY)
@@ -457,10 +457,10 @@ final class PointingSelfTestRunner {
         metrics["clicks_pass_through"] = passesThrough
         if !passesThrough { problems.append("annotation overlay would take clicks") }
 
-        // While held, a drag is a stroke and the click does not reach the button.
+        // While held the overlay stays click-through (the pointer path is the ink); strokes come from motion.
         controller.handle(.began)
         let holdTop = topmostAccepting(at: target.center)
-        let heldCaptures = holdTop.map { !fixtureWindows.contains(ObjectIdentifier($0)) } == true
+        let heldCaptures = holdTop.map { !fixtureWindows.contains(ObjectIdentifier($0)) } ?? false
         controller.ink(.leftMouseDown, target.center)
         controller.ink(.leftMouseDragged, CGPoint(x: target.center.x + 10, y: target.center.y))
         controller.ink(.leftMouseUp, CGPoint(x: target.center.x + 10, y: target.center.y))
@@ -468,7 +468,7 @@ final class PointingSelfTestRunner {
         metrics["held_overlay_takes_mouse"] = heldCaptures
         metrics["strokes_while_held"] = strokes
         metrics["fixture_clicks_while_held"] = fixture.counter.native + fixture.counter.swiftUI
-        if !heldCaptures { problems.append("overlay did not take the mouse while held") }
+        if heldCaptures || MarkOverlay.shared.capturesMouse { problems.append("overlay took the mouse while held") }
         if strokes != 1 { problems.append("expected 1 stroke while held, got \(strokes)") }
         if fixture.counter.native + fixture.counter.swiftUI != 0 { problems.append("a click reached the fixture") }
         controller.handle(.cancelled)

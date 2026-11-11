@@ -77,14 +77,14 @@ import Testing
         let vocabulary = Vocabulary.parse("""
         Cahê
         ZEUS
-        super whisper -> Superwhisper
+        walter -> Walteur
         at sign -> @
         # comment
         """)
         #expect(vocabulary.words == ["Cahê", "ZEUS"])
         #expect(vocabulary.replacements.count == 2)
-        let out = vocabulary.apply(to: "Super Whisper and zeus, mail tony at sign example, superwhispers stay")
-        #expect(out == "Superwhisper and ZEUS, mail tony @ example, superwhispers stay")
+        let out = vocabulary.apply(to: "Walter and zeus, mail tony at sign example, walters stay")
+        #expect(out == "Walteur and ZEUS, mail tony @ example, walters stay")
         #expect(Vocabulary.parse(vocabulary.editableText) .words == vocabulary.words)
     }
 

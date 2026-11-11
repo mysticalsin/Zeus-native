@@ -1712,7 +1712,7 @@ enum ScribeWings {
     }
 }
 
-/// Superwhisper-style live waveform: the last levels scroll right to left, newest at the notch.
+/// Live waveform: the last levels scroll right to left, newest at the notch.
 struct DictationWave: View {
     let levels: [Double]
     let color: Color
@@ -1772,7 +1772,7 @@ struct EngineBadge: View {
     }
 }
 
-/// Superwhisper in one click: start talking, click again (or press the talk key) to type it
+/// Dictation in one click: start talking, click again (or press the talk key) to type it
 /// into the app you were in. The notch never takes focus, so the text lands where your cursor was.
 struct DictateButton: View {
     let topBar: TopBarModel

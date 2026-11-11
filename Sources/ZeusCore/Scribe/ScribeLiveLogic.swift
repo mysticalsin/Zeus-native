@@ -1338,6 +1338,9 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
     public var attendees: [String]?
     /// Each closed turn's voice, for speaker naming after a relaunch. Absent in older files.
     public var turnVoices: [TurnVoice]?
+    /// Who each name came from (typed, call window, invite, introduction, saved voice), how sure, names the
+    /// person declined, and folded tiny voices. Absent in older files: their names then count as typed.
+    public var speakerBook: ScribeSpeakerBook?
 
     public init(
         id: UUID,
@@ -1350,10 +1353,12 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         transcriptionNote: String? = nil,
         micExcludedDuringCall: Bool = false,
         attendees: [String] = [],
-        turnVoices: [TurnVoice] = []
+        turnVoices: [TurnVoice] = [],
+        speakerBook: ScribeSpeakerBook? = nil
     ) {
         self.attendees = attendees.isEmpty ? nil : attendees
         self.turnVoices = turnVoices.isEmpty ? nil : turnVoices
+        self.speakerBook = speakerBook
         self.transcriptionNote = transcriptionNote
         self.micExcludedDuringCall = micExcludedDuringCall ? true : nil
         self.version = Self.currentVersion

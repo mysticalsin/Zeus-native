@@ -3313,6 +3313,270 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_download_is_behind_the_explicit_prepare_path"
       }
+    },
+    {
+      "id": "REG-276",
+      "failure": "A call-window name was bound to a voice on weak evidence: two people lit about equally over one voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aCloseRunnerUpWithholdsTheName"
+      }
+    },
+    {
+      "id": "REG-277",
+      "failure": "Call-window evidence overwrote a speaker name the person had typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aTypedNameAlwaysWinsOverAutomaticEvidence"
+      }
+    },
+    {
+      "id": "REG-278",
+      "failure": "A muted participant tile could win the vote for a voice and name it.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aMutedTileNeverWinsTheVote"
+      }
+    },
+    {
+      "id": "REG-279",
+      "failure": "One call-window name landed on two different voices.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "oneNameNeverLandsOnTwoVoices"
+      }
+    },
+    {
+      "id": "REG-280",
+      "failure": "A name the person declined for a voice was offered again for that voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aDeclinedNameIsNotOfferedAgainForThatVoice"
+      }
+    },
+    {
+      "id": "REG-281",
+      "failure": "French call-window labels (parle, micro coupe, Invitee, Vous) were not understood, so no name was found.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "parserReadsSpeakingAndMutedSignalsInBothLanguages"
+      }
+    },
+    {
+      "id": "REG-282",
+      "failure": "Where a speaker name came from was lost when a meeting was reopened, so an automatic name looked typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "theBookRoundTripsThroughAMeetingRecordAndOlderFilesStillLoad"
+      }
+    },
+    {
+      "id": "REG-283",
+      "failure": "Merging two speakers could not be undone.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "undoBringsBackTheStateBeforeTheLastMerge"
+      }
+    },
+    {
+      "id": "REG-284",
+      "failure": "Pruning tiny voices folded a named speaker or the owner into someone else, or could not be reversed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aNamedVoiceYouAndShortMeetingsAreNeverPruned"
+      }
+    },
+    {
+      "id": "REG-285",
+      "failure": "Assigning selected words to another speaker lost or overlapped the block time.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "assigningSelectedWordsSplitsTheBlockAndKeepsTheTime"
+      }
+    },
+    {
+      "id": "REG-286",
+      "failure": "A circle or underline drawn around a control mapped to no target, so ink never selected what the user meant.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+        "function": "aLoopAroundAControlPicksThatControl"
+      }
+    },
+    {
+      "id": "REG-287",
+      "failure": "Spoken 'this' and 'that' reached the model with no link to what the pointer or ink showed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+        "function": "untimedWordsTakeEvidenceInOrder"
+      }
+    },
+    {
+      "id": "REG-288",
+      "failure": "A mark stayed on screen after the control it pointed at moved, changed or closed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+        "function": "driftBeyondTwoPointsHidesTheMarkAndReResolves"
+      }
+    },
+    {
+      "id": "REG-289",
+      "failure": "The Fn+Control dictation preset overwrote the dictation key with no way back, and its collisions were not reported.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+        "function": "thePresetRemembersAndRestoresTheDictationKey"
+      }
+    },
+    {
+      "id": "REG-290",
+      "failure": "Alerts for Spotify, Chrome, Notion, Dropbox, terminal and meeting apps fell back to a generic glyph because only one bundle id was tried.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AppBrandCatalogTests.swift",
+        "function": "coversTheLogosTheLedgerListed"
+      }
+    },
+    {
+      "id": "REG-291",
+      "failure": "Pointing ink only appeared while dragging, so tracing a control while the keys were held left no trail and no stroke.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+        "function": "hoveringBeginsAStrokeAndExtendsIt"
+      }
+    },
+    {
+      "id": "REG-292",
+      "failure": "Holding the pointing keys put a mouse-capturing overlay over the screen, so clicks and focus did not reach the app being asked about.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-PointingOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+        "function": "theInkPanelsNeverBecomeKeyOrMainAndIgnoreTheMouse"
+      }
+    },
+    {
+      "id": "REG-293",
+      "failure": "A modifier release that the key stream never reported left a pointing turn open indefinitely.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "aMissedReleaseIsCaughtWhenTheLiveKeysAreUp"
+      }
+    },
+    {
+      "id": "REG-294",
+      "failure": "Sleep, wake or a display change during a hold or a turn left the hold armed and marks on stale geometry.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "sleepWakeAndDisplayChangesCancelAHoldWithoutARequest"
+      }
+    },
+    {
+      "id": "REG-295",
+      "failure": "The ring could land off the candidate on a 2x display or a display with a negative origin.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+        "function": "oneXDisplayWithANegativeOrigin"
+      }
+    },
+    {
+      "id": "REG-296",
+      "failure": "The pointing Accessibility hit test ran on a detached background task, which this process's own AX rule forbids.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_probe_ax_calls_stay_on_the_main_actor"
+      }
+    },
+    {
+      "id": "REG-297",
+      "failure": "The per-turn trace line could carry free text; it must hold only mark names and millisecond offsets.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+        "function": "theLineCarriesNoFreeTextOnlyKnownTokens"
+      }
     }
   ]
 }

@@ -40,6 +40,14 @@ public struct PointingContext: Equatable, Sendable, Codable {
     public static let maxCandidates = 16
     public static let maxPathPoints = 256
     public static let maxStrokes = 8
+    public static let maxDeixis = 16
+
+    /// A spoken pointing word ("this") and the candidate it was resolved to (nil when unresolved).
+    public struct Deixis: Equatable, Sendable, Codable {
+        public var word: String
+        public var candidateID: String?
+        public init(word: String, candidateID: String?) { self.word = word; self.candidateID = candidateID }
+    }
 
     public var version = 1
     public var captureID: UUID?
@@ -49,15 +57,18 @@ public struct PointingContext: Equatable, Sendable, Codable {
     public var strokes: [[ExplanationVector3]]
     public var dwellImagePoints: [ExplanationVector3]
     public var candidates: [PointingTargetCandidate]
+    public var deixis: [Deixis]
 
     public init(captureID: UUID? = nil, imageSize: ExplanationSize2? = nil, frontmostBundleID: String? = nil,
                 pointerImagePath: [ExplanationVector3] = [], strokes: [[ExplanationVector3]] = [],
-                dwellImagePoints: [ExplanationVector3] = [], candidates: [PointingTargetCandidate] = []) {
+                dwellImagePoints: [ExplanationVector3] = [], candidates: [PointingTargetCandidate] = [],
+                deixis: [Deixis] = []) {
         self.captureID = captureID; self.imageSize = imageSize; self.frontmostBundleID = frontmostBundleID
         self.pointerImagePath = Array(pointerImagePath.prefix(Self.maxPathPoints))
         self.strokes = Array(strokes.prefix(Self.maxStrokes)).map { Array($0.prefix(Self.maxPathPoints)) }
         self.dwellImagePoints = Array(dwellImagePoints.prefix(16))
         self.candidates = Array(candidates.prefix(Self.maxCandidates))
+        self.deixis = Array(deixis.prefix(Self.maxDeixis))
     }
 
     public var candidateIDs: Set<String> { Set(candidates.map(\.id)) }
@@ -66,9 +77,9 @@ public struct PointingContext: Equatable, Sendable, Codable {
     /// never clamped.
     public static func make(trace: PointingTrace, candidates: [PointingTargetCandidate],
                             geometry: ExplanationCaptureGeometry?, display: ExplanationDisplayContext?,
-                            frontmostBundleID: String?) -> PointingContext {
+                            frontmostBundleID: String?, deixis: [Deixis] = []) -> PointingContext {
         guard let geometry, let display else {
-            return PointingContext(frontmostBundleID: frontmostBundleID, candidates: candidates)
+            return PointingContext(frontmostBundleID: frontmostBundleID, candidates: candidates, deixis: deixis)
         }
         func image(_ x: Double, _ y: Double) -> ExplanationVector3? {
             geometry.imagePoint(fromGlobal: .init(x: x, y: y), current: display)
@@ -80,7 +91,7 @@ public struct PointingContext: Equatable, Sendable, Codable {
         let dwells = trace.dwells.compactMap { image($0.at.x, $0.at.y) }
         return PointingContext(captureID: geometry.captureID, imageSize: geometry.imageSize,
                                frontmostBundleID: frontmostBundleID, pointerImagePath: path,
-                               strokes: strokes, dwellImagePoints: dwells, candidates: candidates)
+                               strokes: strokes, dwellImagePoints: dwells, candidates: candidates, deixis: deixis)
     }
 }
 
@@ -89,6 +100,22 @@ extension PointingTrace {
         guard limit > 1, samples.count > limit else { return samples }
         let step = Double(samples.count - 1) / Double(limit - 1)
         return (0..<limit).map { samples[Int((Double($0) * step).rounded())] }
+    }
+}
+
+extension PointingContext {
+    /// The trace's strokes in delivered-image pixels, with their end time relative to the first sample.
+    /// Points outside the delivered image are dropped. Strokes left empty are skipped.
+    public static func imageStrokes(trace: PointingTrace, geometry: ExplanationCaptureGeometry,
+                                    display: ExplanationDisplayContext) -> [PointingStrokeTargeting.ImageStroke] {
+        let origin = trace.samples.first?.time ?? 0
+        return trace.strokes.prefix(maxStrokes).compactMap { (stroke: PointingStroke) -> PointingStrokeTargeting.ImageStroke? in
+            let points = PointingTrace.thin(stroke.samples, limit: maxPathPoints).compactMap {
+                geometry.imagePoint(fromGlobal: .init(x: $0.x, y: $0.y), current: display)
+            }
+            guard !points.isEmpty, let end = stroke.samples.last else { return nil }
+            return PointingStrokeTargeting.ImageStroke(id: stroke.id, points: points, time: max(0, end.time - origin))
+        }
     }
 }
 

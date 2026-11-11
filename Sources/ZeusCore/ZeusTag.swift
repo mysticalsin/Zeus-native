@@ -126,7 +126,7 @@ public enum ZeusTag: Equatable, Sendable {
 }
 
 /// Parses ZEUS reply tags. Tags are expected at the start of a reply; a trailing tag
-/// (Clicky's old style) is also accepted so a model that ignores the instruction still works.
+/// (an older tag style) is also accepted so a model that ignores the instruction still works.
 public enum ZeusTagParser {
     static let prefixes = ["[POINT:", "[HIGHLIGHT:", "[ACTION:"]
 

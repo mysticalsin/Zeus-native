@@ -1,3 +1,4 @@
+import ApplicationServices
 import SwiftUI
 import ZeusCore
 
@@ -6,12 +7,17 @@ import ZeusCore
 @MainActor
 struct SpeakerRecognitionCard: View {
     private var model: SpeakerModelController { .shared }
+    private var live: StreamingDiarizerModelController { .shared }
     private var voices: SavedVoicesModel { .shared }
     @State private var confirmingDeleteAll = false
 
     var body: some View {
         GSCard("Speaker recognition") {
             modelRow
+            GSDivider()
+            liveRow
+            GSDivider()
+            callWindowRow
             GSDivider()
             voicesHeader
             if voices.voices.isEmpty {
@@ -31,6 +37,7 @@ struct SpeakerRecognitionCard: View {
         }
         .onAppear {
             model.refresh()
+            live.refresh()
             voices.reload()
         }
     }
@@ -56,6 +63,52 @@ struct SpeakerRecognitionCard: View {
                         .accessibilityLabel("Download the speaker recognition model")
                 }
             }
+        }
+    }
+
+    @ViewBuilder private var liveRow: some View {
+        GSRow(symbol: "waveform.path.ecg", title: "Follow speakers live", text: liveText) {
+            HStack(spacing: 10) {
+                switch live.state {
+                case .ready:
+                    GSStatus(ok: true, text: "Ready")
+                case .preparing:
+                    if let progress = live.progress { GSStatus(ok: false, text: "\(Int((progress * 100).rounded()))%") }
+                    Button("Cancel") { live.cancel() }
+                        .buttonStyle(GSButtonStyle())
+                        .accessibilityLabel("Cancel the live speaker model download")
+                case .failed:
+                    GSStatus(ok: false, text: "Failed")
+                    Button("Try again") { live.prepare() }
+                        .buttonStyle(GSButtonStyle(prominent: true))
+                case .idle:
+                    Button("Download") { live.prepare() }
+                        .buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityLabel("Download the live speaker model")
+                }
+            }
+        }
+    }
+
+    private var liveText: String {
+        switch live.state {
+        case .ready: "On this Mac. Scribe tells call voices apart as they speak and checks again when the meeting ends."
+        case .preparing: "Downloading. Scribe works without it meanwhile."
+        case .failed(let message): "The download failed: \(message)"
+        case .idle: "Optional extra download. Without it Scribe uses the voice model above, and tells voices apart a turn at a time."
+        }
+    }
+
+    /// Names from the call window need Accessibility. Zeus only reports whether it is already on: it never asks.
+    private var callWindowRow: some View {
+        GSRow(
+            symbol: "person.crop.rectangle",
+            title: "Names from the call window",
+            text: AXIsProcessTrusted()
+                ? "On. Scribe reads who is speaking in Zoom, Teams, Meet in a browser and Slack huddles while it records."
+                : "Off. Turn on Zeus in System Settings > Privacy & Security > Accessibility and Scribe will name voices from the call window. Zeus never asks for it by itself."
+        ) {
+            GSStatus(ok: AXIsProcessTrusted(), text: AXIsProcessTrusted() ? "On" : "Off")
         }
     }
 

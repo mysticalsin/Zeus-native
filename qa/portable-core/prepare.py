@@ -52,7 +52,7 @@ GROUPS = {
         tests("KeychainStoreTests"),
     ),
     "wiki-export": (
-        core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift",
+        core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
@@ -104,9 +104,14 @@ GROUPS = {
              "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
              "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
              "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
-             "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift"),
+             "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
+             "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",
+             "Pointing/PointingStaleTarget.swift", "Pointing/PointingShortcutConflicts.swift",
+             "Pointing/PointingInkTrail.swift", "Pointing/PointingTraceSpans.swift"),
         tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
-              "ExplanationProtocolV2Tests", "PointingProviderTests"),
+              "ExplanationProtocolV2Tests", "PointingProviderTests", "PointingStrokeTargetingTests", "PointingDeixisTests",
+              "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
+              "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests"),
     ),
     "buddy": (
         core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
@@ -114,14 +119,14 @@ GROUPS = {
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
              "Wiki/WikiStore.swift", "Wiki/SensitiveInfoScanner.swift"),
         tests("WikiTests"),
     ),
