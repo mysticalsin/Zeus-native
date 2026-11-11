@@ -290,9 +290,20 @@ class SettingsNeverFreezeLint(unittest.TestCase):
             offenders += [f"{relative}:{n}" for n, line in code_lines(path) if "SMAppService.mainApp" in strip_trailing_comment(line)]
         self.assertEqual(offenders, [])
 
+    def test_selftests_have_no_docstrings(self):
+        # unittest -v prints a test docstring on its own line, which splits "name ... ok" and makes the
+        # closed-loop gate count fewer passing cases than ran ("Python cases missing/duplicated/skipped").
+        import re
+        offenders = []
+        for path in sorted((ROOT / "qa/closed-loop/tests").glob("test_*.py")):
+            text = path.read_text()
+            for match in re.finditer(r"^\s+def (test_\w+)\(self[^)]*\):\s*\n\s+(\"\"\"|\'\'\')", text, re.MULTILINE):
+                offenders.append(f"{path.name}:{match.group(1)}")
+        self.assertEqual(offenders, [], "use a comment, not a docstring, in closed-loop selftests")
+
     def test_every_settings_card_and_page_is_placed_on_a_page(self):
-        """A card or page that is defined but never instantiated cannot be reached (the Language packs and
-        Speaker recognition cards were once orphaned this way). Intentional exceptions are listed by name."""
+        # A card or page that is defined but never instantiated cannot be reached (the Language packs and
+        # Speaker recognition cards were once orphaned this way). Intentional exceptions are listed by name.
         # IntegrationsPage is the superseded integrations page (AIConnectionsPage is routed); left in place, reported.
         allowed_unplaced = {"IntegrationsPage"}
         defined = {}
