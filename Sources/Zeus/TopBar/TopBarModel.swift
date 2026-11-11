@@ -44,9 +44,8 @@ final class TopBarModel {
         var pluggedIn: Bool
     }
 
-    enum DictationPhase: Equatable {
-        case idle, listening, transcribing, rewriting, done, failed(String)
-    }
+    /// The phases live in ZeusCore (`DictationFlow` decides them); the top bar only reads the value.
+    typealias DictationPhase = ZeusCore.DictationPhase
 
     enum Access: Equatable { case unknown, granted, denied }
 
