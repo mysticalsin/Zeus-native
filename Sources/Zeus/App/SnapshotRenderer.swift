@@ -227,7 +227,7 @@ enum SnapshotRenderer {
         do {
             let context = GSContext(services: OnboardingServices(permissions: PermissionsModel()))
             let nav = GSNavigation()
-            for section in [GSSection.appearance, .diagnostics, .privacy, .sounds, .general] {
+            for section in [GSSection.appearance, .diagnostics, .privacy, .sounds, .general, .about] {
                 nav.section = section
                 save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: section,
                      to: directory.appendingPathComponent("gs-\(section.rawValue).png"))

@@ -60,6 +60,7 @@ struct GSPageView: View {
             case .permissions: PermissionsPage(context: context)
             case .privacy: PrivacyPage(context: context)
             case .diagnostics: DiagnosticsPage(context: context)
+            case .about: AboutPage(navigation: navigation)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
