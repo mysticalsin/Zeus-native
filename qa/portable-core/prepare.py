@@ -97,6 +97,17 @@ GROUPS = {
              "Recordly/RecordlyExportSettings.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
     ),
+    "pointing": (
+        core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
+             "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
+             "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
+             "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
+             "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
+             "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift"),
+        tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
+              "ExplanationProtocolV2Tests", "PointingProviderTests"),
+    ),
     "buddy": (
         core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
@@ -210,7 +221,7 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing") and platform_name == "linux"
     extra_target = ''
     products = ''
     core_dependencies = '[]'

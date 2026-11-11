@@ -177,16 +177,11 @@ public enum PointingFailureKind: Equatable, Sendable {
         }
     }
 
-    /// `code` is a `URLError.Code` raw value.
+    /// `code` is a `URLError.Code` raw value (the NSURLError constants, written out so ZeusCore needs no
+    /// networking module): -1009 not connected, -1005 connection lost, -1003 cannot find host,
+    /// -1004 cannot connect, -1001 timed out, -1006 DNS failure, -1200 TLS failure.
     public static func classify(urlErrorCode code: Int) -> PointingFailureKind {
-        switch code {
-        case URLError.notConnectedToInternet.rawValue, URLError.networkConnectionLost.rawValue,
-             URLError.cannotFindHost.rawValue, URLError.cannotConnectToHost.rawValue,
-             URLError.timedOut.rawValue, URLError.dnsLookupFailed.rawValue,
-             URLError.secureConnectionFailed.rawValue:
-            return .network
-        default: return .unknown
-        }
+        [-1009, -1005, -1003, -1004, -1001, -1006, -1200].contains(code) ? .network : .unknown
     }
 
     public func message(provider: String) -> String {

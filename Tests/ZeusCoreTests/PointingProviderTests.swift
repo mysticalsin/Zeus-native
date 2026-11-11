@@ -200,7 +200,7 @@ struct PointingVendorWireTests {
         #expect(PointingFailureKind.classify(httpStatus: 400, body: "Your credit balance is too low") == .noCredits)
         #expect(PointingFailureKind.classify(httpStatus: 404, body: "model: x not found") == .modelUnavailable)
         #expect(PointingFailureKind.classify(httpStatus: 529) == .providerBusy)
-        #expect(PointingFailureKind.classify(urlErrorCode: URLError.notConnectedToInternet.rawValue) == .network)
+        #expect(PointingFailureKind.classify(urlErrorCode: -1009) == .network)
         #expect(PointingFailureKind.classify(anthropicErrorType: "overloaded_error") == .providerBusy)
         #expect(PointingFailureKind.classify(anthropicErrorType: "rate_limit_error") == .rateLimit)
         #expect(PointingFailureKind.classify(anthropicErrorType: "authentication_error") == .auth)
