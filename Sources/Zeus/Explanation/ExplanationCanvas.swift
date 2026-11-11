@@ -10,6 +10,9 @@ struct ExplanationCanvas: View {
     @Binding var selection: String?
     var captureContext: ExplanationCaptureContext? = nil
     var isInteractive = true
+    /// The desktop card passes false and 0: it is click-through and sizes the diagram itself.
+    var showsObjectList = true
+    var minimumHeight: CGFloat = 220
     var registry: ExplanationRegistry = .empty
     var approvedImages: [String: NSImage] = [:]
     var snapshotImage: NSImage? = nil
@@ -38,7 +41,7 @@ struct ExplanationCanvas: View {
                     if !layout.isValid {
                         Text("This scene cannot be displayed safely.").font(.callout).padding()
                     } else if !layout.hiddenLabelIDs.isEmpty {
-                        Text("\(layout.hiddenLabelIDs.count) labels available in Objects")
+                        Text(showsObjectList ? "\(layout.hiddenLabelIDs.count) labels available in Objects" : "\(layout.hiddenLabelIDs.count) labels hidden for space")
                             .font(.caption).padding(8).background(.regularMaterial).allowsHitTesting(false)
                     }
                 }
@@ -54,9 +57,11 @@ struct ExplanationCanvas: View {
                     onEdit(.remove(id: id))
                 }
             }
-            .frame(minHeight: 220)
-            ExplanationObjectList(objects: visibleObjects, selection: $selection,
-                                  isInteractive: isInteractive, onEdit: onEdit)
+            .frame(minHeight: minimumHeight)
+            if showsObjectList {
+                ExplanationObjectList(objects: visibleObjects, selection: $selection,
+                                      isInteractive: isInteractive, onEdit: onEdit)
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Explanation diagram")
@@ -474,48 +479,21 @@ enum ExplanationCanvasPainter {
         }
     }
 
+    /// All data arithmetic is in `ExplanationChartMath`; this only chooses what to draw.
     private static func drawData(_ item: ExplanationCanvasLayout.Item, context: inout GraphicsContext) {
-        let values = item.object.geometry.values ?? [], labels = item.object.geometry.labels ?? []
-        guard !values.isEmpty else { return }
-        guard let size = item.object.geometry.size else { return }
+        let geometry = item.object.geometry
+        guard let size = geometry.size else { return }
         let local = CGRect(x: 0, y: 0, width: size.x, height: size.y)
-        let bounds = local.insetBy(dx: 10, dy: 12)
-        guard bounds.width > 0, bounds.height > 28 else { return }
-        let plot = CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: bounds.height - 22)
-        let color = ExplanationRenderPalette.color(item.object.style.fill)
         var ctx = context
         ctx.concatenate(item.transform)
         ctx.clip(to: Path(CGRect(x: 0, y: 0, width: local.width * CGFloat(item.reveal), height: local.height)))
-        if item.object.geometry.kind == .chart {
-            let low = min(0, values.min() ?? 0), high = max(0, values.max() ?? 0)
-            let span = max(high - low, 0.000001)
-            let baseline = plot.maxY + CGFloat(low / span) * plot.height
-            ctx.stroke(ExplanationCanvasLayout.polyline([.init(x: plot.minX, y: baseline), .init(x: plot.maxX, y: baseline)]),
-                       with: .color(.secondary.opacity(0.5)), lineWidth: 1)
-            let step = plot.width / CGFloat(values.count)
-            for index in values.indices {
-                let y = baseline - CGFloat(values[index] / span) * plot.height
-                let rect = CGRect(x: plot.minX + CGFloat(index) * step + 2, y: min(y, baseline),
-                                  width: max(1, step - 4), height: max(1, abs(y - baseline)))
-                ctx.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(color.opacity(0.8)))
-                if step >= 30 {
-                    ctx.draw(Text(labels[index]).font(.system(size: 11)),
-                        in: CGRect(x: plot.minX + CGFloat(index) * step, y: plot.maxY + 4, width: step, height: 18))
-                }
-            }
-        } else {
-            let low = values.first ?? 0, high = values.last ?? 0, span = high - low
-            ctx.stroke(ExplanationCanvasLayout.polyline([.init(x: plot.minX, y: plot.midY), .init(x: plot.maxX, y: plot.midY)]),
-                       with: .color(color), lineWidth: 2)
-            for index in values.indices {
-                let fraction = span > 0 ? (values[index] - low) / span : 0.5
-                let x = plot.minX + plot.width * CGFloat(fraction)
-                ctx.fill(Path(ellipseIn: .init(x: x - 4, y: plot.midY - 4, width: 8, height: 8)), with: .color(color))
-                if plot.width / CGFloat(values.count) >= 50 {
-                    ctx.draw(Text(labels[index]).font(.system(size: 11)),
-                             in: CGRect(x: max(plot.minX, min(x - 35, plot.maxX - 70)), y: plot.midY + 10, width: 70, height: 30))
-                }
-            }
+        let plan = ExplanationChartMath.plan(kind: geometry.kind, values: geometry.values ?? [],
+                                             labels: geometry.labels ?? [], axis: geometry.axis)
+        switch plan {
+        case .rejected(let reason):
+            ExplanationChartPainter.drawRefusal(reason, in: local, context: &ctx)
+        case .plan(let value):
+            ExplanationChartPainter.draw(value, in: local, color: ExplanationRenderPalette.color(item.object.style.fill), context: &ctx)
         }
     }
 }

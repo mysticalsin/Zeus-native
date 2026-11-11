@@ -95,6 +95,28 @@ The [initial local verification receipt](../qa/receipts/20261110/visual-explanat
 
 The [first macOS build at `0802bf0`](../qa/receipts/20261110/mac-0802-compile.json) failed before native tests: an ambiguous cancellation tuple, mixed chart numeric types, and a SceneKit options key type. The follow-up supplies explicit SDK types and preserves the failure receipt. These corrections require a new native build; the failed run completed zero native tests. The [separate macOS feature-map result](../qa/receipts/20261110/mac-0802-feature.json) passed 14 checks/682 tests and compiled the explanation subset, where 83 individual tests passed and eight history fixtures failed with `unsafePath`. The fixture-only follow-up uses POSIX `realpath`, following the existing Recordly/Wiki test pattern; production path rejection is unchanged. Its new no-symlink scratch guard and all 21 focused History tests passed on Linux, awaiting macOS confirmation.
 
+## Desktop card and real chart scales (slice S2)
+
+A pointing turn can now show charts, timelines, cards, diagrams and 3D, which previously rendered nowhere. Capture-space marks still use the passive overlay; every non-capture object goes to `ExplanationDesktopCard`, shown on the turn's display in beat order from playback-admitted cues.
+
+Card behaviour:
+- Two non-activating panels that are never key or main: the card itself is click-through, and a 28 pt close panel is the only interactive control. Esc also closes it (the global key monitor needs the Accessibility permission pointing already uses). A short connector panel (click-through) points at the subject.
+- It hosts the existing `ExplanationCanvas` (without its object list) and `ExplanationSceneView` (compact, no camera controls), and shows the exact spoken beat text as the caption. A caption that would need more than 12 lines is never clipped: that turn is speech only.
+- Placement is pure (`ExplanationCardPlacement`, AppKit global points, negative origins and several displays supported). Protected regions: the target and mark bounds, the pointer trail bounding box and the focused text input's frame, each with a 12 pt margin; the menu bar, a hidden Dock edge and the screen edge are avoided. The card stays within 320 pt of the subject so the connector is short.
+- Fallback ladder: preferred side at full size, move elsewhere at full size, shrink (compact tier, 3D dropped when a diagram exists), split into beats (current beat's objects only), then speech only. The diagram scale never goes below 0.5 and text is never shrunk.
+- The card belongs to one turn generation token. A late callback from a cancelled or replaced turn cannot show or update it; a card the owner closed stays closed until the next turn; after a normal finish it lingers 25 seconds. A new hold dismisses it.
+
+Chart scales (`ExplanationChartMath`, pure):
+- Nice-number ticks (1, 2, 5 times a power of ten), tick labels with one shared magnitude suffix, light gridlines and a units caption.
+- Bar charts include zero unless the spec sets `includeZero:false`, which is allowed and labelled "Axis starts at N, not zero". One shared scale per chart. An explicit domain is never narrower than the data.
+- Non-finite values, mismatched data and unscalable ranges are rejected with a visible reason, never drawn as NaN pixels. Zero-span data gets a padded or unit domain with a note. y = plotBottom - normalized * plotHeight.
+- Categorical spacing is distinct from a true time axis (timeline `time` places points by value; `categorical` spaces them evenly and says so). Only observed values are drawn: no smoothing or interpolation.
+- Provenance (`userProvided`, `onScreen`, `live` with an ISO 8601 `asOf`, `example`) shows a small note; a chart without an axis spec is labelled example data.
+
+Wire v3 (pointing turns only, additive): `geometry.axis` on chart and timeline with `scale` (`linear` for charts; `time` or `categorical` for timelines), `source` (both required), and optional `domain {lower, upper}`, `units`, `tickHint` (2 to 12), `includeZero` (charts) and `asOf`. The event must say `"version":3` under the v3 profile; v1 (Chat) and v2 reject the field, unknown fields are rejected, and events without an axis are unchanged.
+
+Unverified until a Mac run: the native build, the card's real-screen placement and focus behaviour, 3D hosting inside the card, and the visual quality of the new chart drawing.
+
 Portable commands, from the repository root with Swift 6 and Python 3.11+:
 
 ```sh

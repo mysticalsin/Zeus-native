@@ -158,7 +158,7 @@ final class PointingAnthropicProvider: ExplanationModelProviding {
         let request = try Self.request(input, key: key, model: Self.model())
         let events = Self.stream(request, sessionID: input.scene.sessionID, turnID: input.turnID,
                                  sceneID: input.scene.sceneID, baseRevision: input.scene.revision,
-                                 profile: input.pointing.map { .v2(candidateIDs: $0.candidateIDs) } ?? .v1)
+                                 profile: input.pointing.map { .v3(candidateIDs: $0.candidateIDs) } ?? .v1)
         for try await event in events {
             try Task.checkCancellation()
             try await receive(event)

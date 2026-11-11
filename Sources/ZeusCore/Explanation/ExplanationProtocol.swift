@@ -84,14 +84,55 @@ public struct ExplanationGeometry: Codable, Equatable, Sendable {
     public var labels: [String]?
     public var fromID: String?
     public var toID: String?
+    /// Protocol v3 only, chart and timeline only: scale, domain, units and data provenance.
+    public var axis: ExplanationChartAxis?
     public init(kind: Kind, size: ExplanationVector3? = nil, radius: Double? = nil,
                 secondaryRadius: Double? = nil, depth: Double? = nil,
                 points: [ExplanationVector3]? = nil, vertices: [ExplanationVector3]? = nil,
                 indices: [Int]? = nil, values: [Double]? = nil, labels: [String]? = nil,
-                fromID: String? = nil, toID: String? = nil) {
+                fromID: String? = nil, toID: String? = nil, axis: ExplanationChartAxis? = nil) {
         self.kind = kind; self.size = size; self.radius = radius; self.secondaryRadius = secondaryRadius
         self.depth = depth; self.points = points; self.vertices = vertices; self.indices = indices
-        self.values = values; self.labels = labels; self.fromID = fromID; self.toID = toID
+        self.values = values; self.labels = labels; self.fromID = fromID; self.toID = toID; self.axis = axis
+    }
+}
+
+/// Where a chart's numbers came from. A chart without an axis spec is treated as `.example`.
+public enum ExplanationDataSource: String, Codable, CaseIterable, Sendable {
+    case userProvided, onScreen, live, example
+}
+
+/// How positions are spaced. A chart's value axis is `linear` (bars are always evenly spaced
+/// categories). A timeline is `time` (position proportional to its values) or `categorical`
+/// (evenly spaced, explicitly not to scale).
+public enum ExplanationScaleKind: String, Codable, CaseIterable, Sendable { case linear, categorical, time }
+
+public struct ExplanationAxisDomain: Codable, Equatable, Sendable {
+    public var lower: Double
+    public var upper: Double
+    public init(lower: Double, upper: Double) { self.lower = lower; self.upper = upper }
+}
+
+/// Protocol v3 chart axis specification. Every field is finite data; the app, not the model,
+/// computes ticks and pixel positions.
+public struct ExplanationChartAxis: Codable, Equatable, Sendable {
+    public var scale: ExplanationScaleKind
+    /// Explicit value domain. Omitted: derived from the data. Never narrower than the data.
+    public var domain: ExplanationAxisDomain?
+    public var units: String?
+    /// Approximate tick count, 2...12.
+    public var tickHint: Int?
+    /// Charts only. Omitted means true: a magnitude bar chart includes zero. False is allowed and
+    /// is labelled on the chart as a truncated axis.
+    public var includeZero: Bool?
+    public var source: ExplanationDataSource
+    /// ISO 8601 date-time. Required for `live`, forbidden otherwise.
+    public var asOf: String?
+    public init(scale: ExplanationScaleKind, domain: ExplanationAxisDomain? = nil, units: String? = nil,
+                tickHint: Int? = nil, includeZero: Bool? = nil, source: ExplanationDataSource = .example,
+                asOf: String? = nil) {
+        self.scale = scale; self.domain = domain; self.units = units; self.tickHint = tickHint
+        self.includeZero = includeZero; self.source = source; self.asOf = asOf
     }
 }
 
@@ -346,9 +387,19 @@ public struct ExplanationRegistry: Equatable, Sendable {
 
 /// Which wire version a turn may use. v1 is the Chat protocol. v2 (pointing turns only)
 /// additionally admits `targetID`, limited to the candidate IDs the app issued for this turn.
+/// v3 (pointing turns) is v2 plus the chart `axis` specification on chart/timeline geometry.
 public enum ExplanationWireProfile: Equatable, Sendable {
     case v1
     case v2(candidateIDs: Set<String>)
+    case v3(candidateIDs: Set<String>)
+
+    /// The app-issued candidate IDs, or nil for a profile that admits no `targetID`.
+    public var candidateIDs: Set<String>? {
+        switch self {
+        case .v1: nil
+        case .v2(let ids), .v3(let ids): ids
+        }
+    }
 }
 
 public enum ExplanationFailure: Error, LocalizedError, Equatable, Sendable {
@@ -390,4 +441,7 @@ public enum ExplanationLimits {
     public static let revision = 1_000_000_000
     public static let coordinate = 16_384.0
     public static let animationSeconds = 30.0
+    public static let chartUnitsBytes = 24
+    public static let chartAsOfBytes = 40
+    public static let chartTickHint = 2...12
 }

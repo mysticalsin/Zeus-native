@@ -3229,6 +3229,174 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_every_settings_card_and_page_is_placed_on_a_page"
       }
+    },
+    {
+      "id": "REG-269",
+      "failure": "A chart value axis had no ticks, units or gridlines, and a range such as 3 to 1003 gave no readable scale.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+        "function": "chartTicksStartBelowAnOffsetRange"
+      }
+    },
+    {
+      "id": "REG-270",
+      "failure": "Nice-number ticks left floating-point residue or broke on fractions and huge magnitudes.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+        "function": "chartTicksHandleFractionsWithoutFloatingPointResidue"
+      }
+    },
+    {
+      "id": "REG-271",
+      "failure": "A bar chart could start away from zero without saying so, exaggerating differences.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+        "function": "chartTruncatedAxisIsAllowedOnlyWhenRequestedAndIsLabelled"
+      }
+    },
+    {
+      "id": "REG-272",
+      "failure": "Non-finite, zero-span or overflowing chart data could reach drawing and produce NaN pixels.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+        "function": "chartEveryAcceptedPlanHasOnlyFiniteBoundedNormalizedPositions"
+      }
+    },
+    {
+      "id": "REG-273",
+      "failure": "A timeline spaced events evenly while presenting itself as a time axis.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+        "function": "chartTimeAxisSpacesPointsByValueAndCategoricalSpacesThemEvenly"
+      }
+    },
+    {
+      "id": "REG-274",
+      "failure": "Chart numbers carried no provenance, so invented values could read as measured or live.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationChartMathTests.swift",
+        "function": "chartProvenanceDefaultsToExampleAndCarriesEachSourceNote"
+      }
+    },
+    {
+      "id": "REG-275",
+      "failure": "The chart axis wire fields were not version gated, so a v1 or v2 turn could carry them, and unknown axis fields were not rejected.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+        "function": "wireV3AxisIsRejectedOutsideTheVersionThreeProfileAndNumber"
+      }
+    },
+    {
+      "id": "REG-276",
+      "failure": "An axis spec with a bad domain, tick hint, units or live timestamp was accepted.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationProtocolV3Tests.swift",
+        "function": "wireV3AxisRangesAreChecked"
+      }
+    },
+    {
+      "id": "REG-277",
+      "failure": "The desktop card could cover the pointed-at target, the pointer trail or the active input area.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+        "function": "cardPlacementNeverCoversTheTargetThePointerTrailOrTheInputArea"
+      }
+    },
+    {
+      "id": "REG-278",
+      "failure": "Card placement assumed a display at the origin and broke on negative display origins.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+        "function": "cardPlacementWorksOnADisplayWithANegativeOrigin"
+      }
+    },
+    {
+      "id": "REG-279",
+      "failure": "The card fallback shrank a diagram below a readable scale instead of splitting into beats or going speech only.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+        "function": "cardLadderNeverPlacesADiagramBelowTheReadableScale"
+      }
+    },
+    {
+      "id": "REG-280",
+      "failure": "A late callback from a replaced or cancelled turn could show or update the desktop card.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
+        "function": "cardLifecycleRejectsALateCallbackFromAReplacedTurn"
+      }
+    },
+    {
+      "id": "REG-281",
+      "failure": "The desktop card could take key or main status from the app the owner was using, or be interactive beyond its close control.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationScreenContextTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+        "function": "desktopCardPanelsAreNonActivatingNeverKeyOrMainAndOnlyTheCloseControlTakesMouse"
+      }
+    },
+    {
+      "id": "REG-282",
+      "failure": "The production card honoured a stale turn token and stayed on screen after its turn ended.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationScreenContextTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+        "function": "desktopCardIgnoresACallbackFromAReplacedOrCancelledTurn"
+      }
     }
   ]
 }
