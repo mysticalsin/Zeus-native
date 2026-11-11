@@ -3,16 +3,16 @@ import Foundation
 /// The only model-data entry point. Codable is also used for app-owned history;
 /// raw model bytes must pass this closed-schema, duplicate-key rejecting decoder.
 public enum ExplanationWire {
-    public static func decode(_ data: Data) throws -> ExplanationEvent {
+    public static func decode(_ data: Data, profile: ExplanationWireProfile = .v1) throws -> ExplanationEvent {
         guard !data.isEmpty, data.count <= ExplanationLimits.frameBytes else {
             throw ExplanationFailure.limitExceeded("event bytes")
         }
         do {
             var scanner = ExplanationJSONScanner(bytes: Array(data))
             let value = try scanner.parse()
-            try schema(value)
+            try schema(value, profile: profile)
             let event = try JSONDecoder().decode(ExplanationEvent.self, from: data)
-            try ExplanationSceneReducer.validate(event)
+            try ExplanationSceneReducer.validate(event, profile: profile)
             return event
         } catch let failure as ExplanationFailure { throw failure }
         catch { throw ExplanationFailure.invalid("malformed event JSON") }
@@ -68,17 +68,19 @@ public enum ExplanationWire {
     Unknown fields and operations are rejected. Keep the scene small and accessible.
     """
 
-    private static func schema(_ value: ExplanationJSONValue) throws {
+    private static func schema(_ value: ExplanationJSONValue, profile: ExplanationWireProfile) throws {
+        let allowTarget: Bool
+        if case .v2 = profile { allowTarget = true } else { allowTarget = false }
         let root = try object(value, required: ["version", "sessionID", "turnID", "sceneID", "sequence", "baseRevision", "revision", "beatID", "speech", "cues", "isFinal"])
         _ = try object(root["speech"]!, required: ["chunkID", "text"])
         for cue in try array(root["cues"]!, maximum: ExplanationLimits.cuesPerEvent) {
             let c = try object(cue, required: ["id", "anchor", "operations"])
             _ = try object(c["anchor"]!, required: ["kind"], optional: ["wordIndex"])
-            for operation in try array(c["operations"]!, maximum: ExplanationLimits.operationsPerEvent) { try operationSchema(operation) }
+            for operation in try array(c["operations"]!, maximum: ExplanationLimits.operationsPerEvent) { try operationSchema(operation, allowTarget: allowTarget) }
         }
     }
 
-    private static func operationSchema(_ value: ExplanationJSONValue) throws {
+    private static func operationSchema(_ value: ExplanationJSONValue, allowTarget: Bool) throws {
         guard case .object(let raw) = value, case .string(let name) = raw["op"] else { throw ExplanationFailure.invalid("operation discriminator") }
         let fields: Set<String>
         switch name {
@@ -96,7 +98,7 @@ public enum ExplanationWire {
         default: throw ExplanationFailure.invalid("unknown operation")
         }
         let op = try object(value, required: fields.union(["op"]))
-        if let v = op["object"] { try objectSchema(v) }
+        if let v = op["object"] { try objectSchema(v, allowTarget: allowTarget) }
         if let v = op["patch"] {
             let p = try object(v, required: [], optional: ["geometry", "transform", "style", "text", "accessibleDescription"])
             try components(p)
@@ -113,9 +115,10 @@ public enum ExplanationWire {
         }
     }
 
-    private static func objectSchema(_ value: ExplanationJSONValue) throws {
-        let o = try object(value, required: ["id", "geometry", "accessibleDescription"],
-                           optional: ["parentID", "space", "captureID", "transform", "style", "text", "assetID", "sourceIDs", "provenance", "highlighted", "reveal"])
+    private static func objectSchema(_ value: ExplanationJSONValue, allowTarget: Bool) throws {
+        var optionalKeys: Set<String> = ["parentID", "space", "captureID", "transform", "style", "text", "assetID", "sourceIDs", "provenance", "highlighted", "reveal"]
+        if allowTarget { optionalKeys.insert("targetID") }
+        let o = try object(value, required: ["id", "geometry", "accessibleDescription"], optional: optionalKeys)
         try components(o)
         if let v = o["sourceIDs"] { _ = try array(v, maximum: 8) }
     }
@@ -162,6 +165,7 @@ public struct ExplanationEventStream: Sendable {
     private let sessionID: UUID
     private let turnID: UUID
     private let sceneID: UUID
+    private let profile: ExplanationWireProfile
     private var expectedRevision: Int
     private var pending = Data()
     private var receivedBytes = 0
@@ -170,8 +174,10 @@ public struct ExplanationEventStream: Sendable {
     private enum State: Sendable { case active, failed, cancelled, finished }
     private var state: State = .active
 
-    public init(sessionID: UUID, turnID: UUID, sceneID: UUID, baseRevision: Int) throws {
+    public init(sessionID: UUID, turnID: UUID, sceneID: UUID, baseRevision: Int,
+                profile: ExplanationWireProfile = .v1) throws {
         guard (0..<ExplanationLimits.revision).contains(baseRevision) else { throw ExplanationFailure.revisionConflict }
+        self.profile = profile
         self.sessionID = sessionID; self.turnID = turnID; self.sceneID = sceneID; expectedRevision = baseRevision
     }
 
@@ -217,7 +223,7 @@ public struct ExplanationEventStream: Sendable {
         for byte in data {
             if byte == 10 {
                 if pending.last == 13 { pending.removeLast() }
-                let event = try ExplanationWire.decode(pending)
+                let event = try ExplanationWire.decode(pending, profile: profile)
                 pending.removeAll(keepingCapacity: true)
                 guard event.sessionID == sessionID, event.turnID == turnID, event.sceneID == sceneID else { throw ExplanationFailure.staleIdentity }
                 if event.sequence < accepted.count {

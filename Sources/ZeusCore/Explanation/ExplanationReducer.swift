@@ -61,7 +61,27 @@ public enum ExplanationSceneReducer {
     /// Structural bounds independent of the current scene. Still mandatory for
     /// trusted Codable records: direct Swift construction also can contain NaN.
     public static func validate(_ event: ExplanationEvent) throws {
-        try check(event.version == 1, "unsupported event version")
+        try validate(event, profile: .v1)
+    }
+
+    /// v1 events never carry `targetID`. v2 events (pointing turns) may reference only the
+    /// candidate IDs the app issued for this turn, and only on capture-space objects.
+    public static func validate(_ event: ExplanationEvent, profile: ExplanationWireProfile) throws {
+        switch profile {
+        case .v1: try check(event.version == 1, "unsupported event version")
+        case .v2: try check(event.version == 1 || event.version == 2, "unsupported event version")
+        }
+        for cue in event.cues {
+            for operation in cue.operations {
+                guard case .create(let object) = operation else { continue }
+                guard let target = object.targetID else { continue }
+                guard case .v2(let candidates) = profile, event.version == 2 else {
+                    throw ExplanationFailure.invalid("targetID requires protocol version 2")
+                }
+                try check(isTargetID(target) && candidates.contains(target), "unknown targetID")
+                try check(object.space == .capture, "targetID needs capture space")
+            }
+        }
         try check((0..<ExplanationLimits.events).contains(event.sequence), "event sequence budget")
         try revision(event.baseRevision)
         try check(event.baseRevision < ExplanationLimits.revision && event.revision == event.baseRevision + 1,
@@ -424,6 +444,11 @@ public enum ExplanationSceneReducer {
         sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
     }
     private static func revision(_ value: Int) throws { try check((0...ExplanationLimits.revision).contains(value), "scene revision budget") }
+    /// `^t[0-9]{1,2}$`
+    public static func isTargetID(_ id: String) -> Bool {
+        let bytes = Array(id.utf8)
+        return (2...3).contains(bytes.count) && bytes[0] == 116 && bytes.dropFirst().allSatisfy { (48...57).contains($0) }
+    }
     static func identifier(_ id: String) throws {
         let bytes = Array(id.utf8)
         try check((1...64).contains(bytes.count) && bytes.allSatisfy {
