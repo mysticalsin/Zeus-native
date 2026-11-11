@@ -3049,6 +3049,18 @@
         "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
         "function": "olderSystemShowsHeardLineWithOneNewerSystemNotice"
       }
+    },
+    {
+      "id": "REG-254",
+      "failure": "The Language packs and Speaker recognition cards could be defined without being placed on any Settings page, so the features were unreachable.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_every_settings_card_and_page_is_placed_on_a_page"
+      }
     }
   ]
 }
