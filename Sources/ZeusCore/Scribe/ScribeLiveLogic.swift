@@ -1312,6 +1312,9 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
     public var transcriptionNote: String?
     /// True when the microphone was left out during a detected call. Absent in older files.
     public var micExcludedDuringCall: Bool?
+    /// Who each name came from (typed, call window, invite, introduction, saved voice), how sure, names the
+    /// person declined, and folded tiny voices. Absent in older files: their names then count as typed.
+    public var speakerBook: ScribeSpeakerBook?
 
     public init(
         id: UUID,
@@ -1322,8 +1325,10 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         transcript: [ScribeTranscriptSegment],
         dismissedAt: Date? = nil,
         transcriptionNote: String? = nil,
-        micExcludedDuringCall: Bool = false
+        micExcludedDuringCall: Bool = false,
+        speakerBook: ScribeSpeakerBook? = nil
     ) {
+        self.speakerBook = speakerBook
         self.transcriptionNote = transcriptionNote
         self.micExcludedDuringCall = micExcludedDuringCall ? true : nil
         self.version = Self.currentVersion

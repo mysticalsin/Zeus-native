@@ -2977,6 +2977,126 @@
         "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
         "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
+    },
+    {
+      "id": "REG-248",
+      "failure": "A call-window name was bound to a voice on weak evidence: two people lit about equally over one voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aCloseRunnerUpWithholdsTheName"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Call-window evidence overwrote a speaker name the person had typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aTypedNameAlwaysWinsOverAutomaticEvidence"
+      }
+    },
+    {
+      "id": "REG-250",
+      "failure": "A muted participant tile could win the vote for a voice and name it.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aMutedTileNeverWinsTheVote"
+      }
+    },
+    {
+      "id": "REG-251",
+      "failure": "One call-window name landed on two different voices.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "oneNameNeverLandsOnTwoVoices"
+      }
+    },
+    {
+      "id": "REG-252",
+      "failure": "A name the person declined for a voice was offered again for that voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aDeclinedNameIsNotOfferedAgainForThatVoice"
+      }
+    },
+    {
+      "id": "REG-253",
+      "failure": "French call-window labels (parle, micro coupe, Invitee, Vous) were not understood, so no name was found.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "parserReadsSpeakingAndMutedSignalsInBothLanguages"
+      }
+    },
+    {
+      "id": "REG-254",
+      "failure": "Where a speaker name came from was lost when a meeting was reopened, so an automatic name looked typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "theBookRoundTripsThroughAMeetingRecordAndOlderFilesStillLoad"
+      }
+    },
+    {
+      "id": "REG-255",
+      "failure": "Merging two speakers could not be undone.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "undoBringsBackTheStateBeforeTheLastMerge"
+      }
+    },
+    {
+      "id": "REG-256",
+      "failure": "Pruning tiny voices folded a named speaker or the owner into someone else, or could not be reversed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aNamedVoiceYouAndShortMeetingsAreNeverPruned"
+      }
+    },
+    {
+      "id": "REG-257",
+      "failure": "Assigning selected words to another speaker lost or overlapped the block time.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "assigningSelectedWordsSplitsTheBlockAndKeepsTheTime"
+      }
     }
   ]
 }

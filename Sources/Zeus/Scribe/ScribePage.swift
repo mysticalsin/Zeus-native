@@ -1024,10 +1024,34 @@ private enum ScribeNotesStyle {
 struct ScribeSpeakerTools {
     var suggestions: [ScribeNameSuggestion]
     var attendeeNames: [String]
+    /// Who named each speaker and how sure Zeus is (saved with the meeting).
+    var identities: [ScribeSpeakerIdentity] = []
+    /// Tiny voices were folded into other speakers at the end of the meeting and can be put back.
+    var hasPrunedVoices = false
+    /// What Undo would undo ("Undo merge"), nil when there is nothing to undo.
+    var undoTitle: String?
+    /// True while naming can still happen, so an unresolved voice reads "Identifying this speaker...".
+    var isIdentifying = false
     var canRemember: (ScribeSpeaker) -> Bool
     /// The speaker, the name typed, and whether "Remember this voice" was ticked.
     var rename: (ScribeSpeaker, String, Bool) -> Void
+    /// Accepts a suggested name (its source is kept: the invite or what was said).
+    var accept: (ScribeSpeaker, String) -> Void
+    var confirm: (ScribeSpeaker) -> Void
+    var notThem: (ScribeSpeaker) -> Void
+    /// Segment id and the name the block should go to.
+    var reassignBlock: (String, String) -> Void
+    /// Segment id, the word range, and the name those words should go to.
+    var assignWords: (String, Range<Int>, String) -> Void
+    var undo: () -> Void
+    var restorePruned: () -> Void
     var copyTranscript: () -> Void
+    /// Plays a short clip of a speaker. Nil while Zeus keeps no meeting audio, which hides the play button.
+    var playSample: ((ScribeSpeaker) -> Void)?
+
+    func identity(of speaker: ScribeSpeaker) -> ScribeSpeakerIdentity? {
+        identities.first { ScribeSpeakerNames.key($0.name) == ScribeSpeakerNames.key(speaker.displayName) }
+    }
 }
 
 /// One speaker of the meeting: colour dot, name, talk time and a thin bar for their share of the talking.
@@ -1055,8 +1079,9 @@ private struct ScribeSpeakerRow: View {
                 Circle().fill(tint).frame(width: 7, height: 7)
                 if canRename {
                     Button { startEditing() } label: {
-                        Text(entry.speaker.displayName)
+                        Text(shownName)
                             .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                            .overlay(alignment: .bottom) { unconfirmedUnderline }
                     }
                     .buttonStyle(.plain)
                     .help("Rename this speaker")
@@ -1066,7 +1091,7 @@ private struct ScribeSpeakerRow: View {
                         .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
                 }
                 if let suggestion = suggestion, !editing {
-                    Button { tools?.rename(entry.speaker, suggestion.name, false) } label: {
+                    Button { tools?.accept(entry.speaker, suggestion.name) } label: {
                         Text("\(suggestion.name)? Accept")
                             .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -1089,6 +1114,7 @@ private struct ScribeSpeakerRow: View {
                 }
             }
             .frame(height: 3)
+            identityLine
             if editing { editor }
         }
         .accessibilityElement(children: editing ? .contain : .ignore)
@@ -1100,12 +1126,53 @@ private struct ScribeSpeakerRow: View {
         tools?.suggestions.first { $0.speaker == entry.speaker }
     }
 
+    private var identity: ScribeSpeakerIdentity? { tools?.identity(of: entry.speaker) }
+
+    /// The name, or "Identifying this speaker..." for a voice still unnamed while naming can happen.
+    private var shownName: String {
+        ScribeSpeakerCaption.name(for: entry.speaker, identifying: tools?.isIdentifying ?? false).text
+    }
+
+    /// A dotted line under a name Zeus chose and the person has not confirmed.
+    @ViewBuilder private var unconfirmedUnderline: some View {
+        if identity?.needsConfirmation == true {
+            Rectangle().fill(Color.clear).frame(height: 1)
+                .overlay(Rectangle().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [2, 2])).foregroundStyle(ScribeNotesStyle.accent))
+        }
+    }
+
+    /// Where the name came from, and Confirm / Not them for one that is not confirmed yet.
+    @ViewBuilder private var identityLine: some View {
+        if let identity, !editing {
+            HStack(spacing: 8) {
+                Text(identity.confirmed ? identity.source.caption : "\(identity.source.caption), not confirmed")
+                    .font(TopBarStyle.label(9)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                if !identity.confirmed {
+                    Button("Confirm") { tools?.confirm(entry.speaker) }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(9, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityLabel("Confirm the name \(identity.name)")
+                    Button("Not them") { tools?.notThem(entry.speaker) }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(9, .semibold)).foregroundStyle(Theme.cloudSecondary)
+                        .accessibilityLabel("\(identity.name) is not this speaker")
+                }
+            }
+        }
+    }
+
     @ViewBuilder private var editor: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 Text("\u{201C}\(line)\u{201D}")
                     .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if let play = tools?.playSample {
+                Button("Play 3 seconds") { play(entry.speaker) }
+                    .buttonStyle(.plain)
+                    .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                    .accessibilityLabel("Play a short sample of \(entry.speaker.displayName)")
             }
             TextField("Name", text: $draft)
                 .textFieldStyle(.plain)
@@ -1236,6 +1303,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                         card("Decisions") { bullets(notes.decisions, empty: "None found.") }
                         if stats.isWorthShowing {
                             card("Speakers") {
+                                speakerHistoryControls
                                 ForEach(Array(stats.speakers.enumerated()), id: \.offset) { _, entry in
                                     ScribeSpeakerRow(
                                         entry: entry, tools: speakerTools,
@@ -1284,6 +1352,38 @@ private struct ScribeMeetingBody<Actions: View>: View {
         guard let speakerTools else { return [] }
         let taken = Set(stats.speakers.map { ScribeSpeakerNames.key($0.speaker.displayName) })
         return speakerTools.attendeeNames.filter { !taken.contains(ScribeSpeakerNames.key($0)) }
+    }
+
+    /// Names a block can be reassigned to: the meeting's speakers (not "You" twice), then the invite.
+    private var blockNames: [String] {
+        var seen: Set<String> = []
+        var names: [String] = []
+        for entry in ScribeSpeakerStats(segments: transcript).speakers {
+            let name = entry.speaker.displayName
+            if entry.speaker != .unknown, seen.insert(ScribeSpeakerNames.key(name)).inserted { names.append(name) }
+        }
+        for name in speakerTools?.attendeeNames ?? [] where seen.insert(ScribeSpeakerNames.key(name)).inserted { names.append(name) }
+        return names
+    }
+
+    /// Undo for the last speaker change, and a way to put folded tiny voices back.
+    @ViewBuilder private var speakerHistoryControls: some View {
+        if let tools = speakerTools, tools.undoTitle != nil || tools.hasPrunedVoices {
+            HStack(spacing: 10) {
+                if let title = tools.undoTitle {
+                    Button(title) { tools.undo() }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityHint("Brings back the speakers as they were before the last change.")
+                }
+                if tools.hasPrunedVoices {
+                    Button("Restore small voices") { tools.restorePruned() }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityHint("Puts back the very short voices Zeus folded into other speakers.")
+                }
+            }
+        }
     }
 
     /// The date it ended (when known) and how long it ran.
@@ -1377,20 +1477,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(segments, id: \.id) { segment in
-                            VStack(alignment: .leading, spacing: 1) {
-                                // The same colour the speaker had on the live page.
-                                HStack(spacing: 4) {
-                                    Text(segment.speaker.displayName)
-                                        .font(TopBarStyle.label(9, .semibold))
-                                        .foregroundStyle(scribeColor(ScribeSpeakerPalette.color(for: segment.speaker)))
-                                    Text("· \(RecordlyElapsed.format(segment.start))")
-                                        .font(TopBarStyle.label(9).monospacedDigit()).foregroundStyle(Theme.cloudSecondary)
-                                }
-                                Text(segment.text).font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityElement(children: .combine)
+                            ScribeTranscriptBlock(segment: segment, tools: speakerTools, names: blockNames)
                         }
                     }
                 }
