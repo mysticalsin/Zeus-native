@@ -54,6 +54,27 @@ class SourceLint(unittest.TestCase):
                      for n, line in code_lines(p) if AUDIO_CALLBACK_APIS.search(line)]
         self.assertEqual(offenders, [], "use OffMainAudioCallbacks from @MainActor code")
 
+    def test_every_requested_permission_has_its_info_plist_usage_string(self):
+        # macOS terminates an app that requests a protected resource without the matching key.
+        # Live QA found Location and Focus requests with no usage string (2026-11-10).
+        import plistlib
+        info = plistlib.loads((ROOT / "Resources/Info.plist").read_bytes())
+        required = {
+            r"requestWhenInUseAuthorization|requestAlwaysAuthorization": "NSLocationWhenInUseUsageDescription",
+            r"INFocusStatusCenter\.default\.requestAuthorization": "NSFocusStatusUsageDescription",
+            r"AVCaptureDevice\.requestAccess\(for: *\.audio": "NSMicrophoneUsageDescription",
+            r"AVCaptureDevice\.requestAccess\(for: *\.video|requestCamera": "NSCameraUsageDescription",
+            r"SFSpeechRecognizer\.requestAuthorization": "NSSpeechRecognitionUsageDescription",
+            r"requestFullAccessToEvents": "NSCalendarsFullAccessUsageDescription",
+            r"requestFullAccessToReminders": "NSRemindersFullAccessUsageDescription",
+        }
+        missing = []
+        for pattern, key in required.items():
+            used = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p) if re.search(pattern, line)]
+            if used and not str(info.get(key, "")).strip():
+                missing.append(f"{key} (used at {used[0]})")
+        self.assertEqual(missing, [])
+
     def test_helper_is_nonisolated_and_covers_each_api(self):
         text = "\n".join(line for _, line in code_lines(HELPER))
         self.assertNotIn("@MainActor", text)

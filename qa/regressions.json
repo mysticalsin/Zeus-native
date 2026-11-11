@@ -2615,6 +2615,18 @@
         "file": "qa/release-scripts/test_release_scripts.py",
         "function": "test_bundle_ships_product_resources_but_never_test_resource_bundles"
       }
+    },
+    {
+      "id": "REG-217",
+      "failure": "Zeus requested Location (onboarding weather row) and Focus status (Proactive) with no NSLocationWhenInUseUsageDescription or NSFocusStatusUsageDescription in Info.plist; macOS terminates an app that requests a protected resource without its usage string.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_every_requested_permission_has_its_info_plist_usage_string"
+      }
     }
   ]
 }
