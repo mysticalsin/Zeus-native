@@ -94,7 +94,7 @@ struct ExplanationCardPlacementTests {
         let subject = rect(-1000, 500, 80, 30)
         let layout = Placement.place(request(left, anchor: subject, protected: [subject]))
         let frame = try #require(layout.frame)
-        #expect(near(frame.x, -920))
+        #expect(near(frame.x, -900), "subject right edge -920 plus the 20 pt connector gap")
         #expect(frame.x < 0 && frame.x + frame.width < 0)
         #expect(isClear(layout, usable: left, protected: [subject]))
         let below = rect(1440, -900, 1920, 1055)

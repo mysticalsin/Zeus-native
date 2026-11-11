@@ -229,7 +229,7 @@ import Testing
         let name = RecordlyExportPlan.fileName(date: date, fileExtension: "mp4", timeZone: utc)
         #expect(name == "Zeus Recording 2026-11-07 09.05.03.mp4")
         #expect(!name.contains("/") && !name.contains(":"))
-        #expect(RecordlyExportPlan.fileName(date: date, fileExtension: "gif", timeZone: utc, collisionIndex: 2) == "Recordly 2026-11-07 09.05.03 2.gif")
+        #expect(RecordlyExportPlan.fileName(date: date, fileExtension: "gif", timeZone: utc, collisionIndex: 2) == "Zeus Recording 2026-11-07 09.05.03 2.gif")
         let hostile = RecordlyExportPlan.fileName(date: date, fileExtension: "../x:y", timeZone: utc)
         #expect(!hostile.contains("/") && !hostile.contains(":") && !hostile.contains(".."))
     }

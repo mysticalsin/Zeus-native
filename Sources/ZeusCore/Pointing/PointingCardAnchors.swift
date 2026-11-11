@@ -8,6 +8,11 @@ public struct PointingCardAnchors: Equatable, Sendable {
     public var anchor: ExplanationRect?
     /// Target bounds, pointer trail bounding box, marks and the active input area.
     public var protected: [ExplanationRect]
+
+    public init(anchor: ExplanationRect?, protected: [ExplanationRect]) {
+        self.anchor = anchor
+        self.protected = protected
+    }
 }
 
 public enum PointingCardAnchorBuilder {

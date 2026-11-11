@@ -216,7 +216,7 @@ public enum ExplanationRecipes {
         var result: [ExplanationRecipePrimitive] = [
             .init(name: "tyre", shape: .cylinder(radius: 0.33, length: 0.22, axis: .z), color: .ink, metalness: 0.0, roughness: 0.92, spin: turning),
             .init(name: "rim", shape: .cylinder(radius: 0.23, length: 0.20, axis: .z), color: .secondary, metalness: 0.85, roughness: 0.3, spin: turning),
-            .init(name: "hub", shape: .cylinder(radius: 0.06, length: 0.24, axis: .z), color: .secondary, metalness: 0.9, roughness: 0.25, spin: turning)
+            .init(name: "hub", shape: .cylinder(radius: 0.06, length: 0.22, axis: .z), color: .secondary, metalness: 0.9, roughness: 0.25, spin: turning)
         ]
         for index in 0..<5 {
             let angle = Double(index) * 2 * Double.pi / 5
