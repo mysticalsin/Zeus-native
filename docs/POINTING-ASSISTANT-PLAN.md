@@ -419,6 +419,36 @@ Acceptance:
 - Packaged app (M3) launches with the feature off and has no new prompts.
 - With the feature on and permissions granted by the owner: holding the keys over the Finder toolbar "Share" and asking "what is this" draws an orange ring at the AX frame within 2 pt and speaks; pressing the keys again mid-speech stops speech and animation within one frame of the stop call.
 
+### Phase 2 status (2026-11-11, branch `codex/pointing-phase2-20261111`)
+
+M1 code written. M2 tests are written; CI is the only compile and test proof (the authoring sandbox cannot run `swift build`). M3 and M4 not done: nothing here has been launched.
+
+| Item | State |
+|---|---|
+| Strokes on the overlay, `drawing` state | Done in Phase 1 (`PointingController.ink`). |
+| Stroke targeting (circle, underline, dot to best element, else region) | Done: `ZeusCore/Pointing/PointingStrokeTargeting.swift`, wired in `buildTurn`. Region candidates use `source: .strokeBounds`, role `region`. |
+| Deixis ("this", "that", "here", "these", French forms) | Done with a gap: `PointingDeixis` resolves against stroke, dwell and release evidence and is applied to the final transcript in `ExplanationController.submit()`. The on-device recognizer returns text only, so words are matched in order, not by `SFTranscriptionSegment` time. The timed path exists and is tested; feeding segment times is open. |
+| Stale detection | Done: `PointingStaleTarget` (pure) and `PointingTargetWatcher` (AXObserver on the target and its window, main-actor hop, per-beat frame re-read, 2 pt tolerance). A stale mark is hidden and the target is looked up once more. A control found at a new spot is reported ("hold the keys and ask again"), not re-ringed. |
+| Double-Control text entry | Done behind `pointing.textEntry`, default off, because macOS Dictation can use "Press Control key twice". `PointingTextEntry` panel, `submitText`. |
+| Fn+Control dictation preset | Done behind `pointing.dictationFnControl`, default off. Remembers and restores the previous dictation key (`DictationFnControlPreset`). |
+| Conflict warnings | Done in Core: `ShortcutConflicts.pointingWarnings` (talk, dictation, chat, show-me, double Control). Not yet shown in a Settings row. |
+| Reduce Motion and Reduce Transparency ink variants | Not done. |
+| TTS marker word alignment | Not done. |
+| Off-main SSE reader | Not done. |
+| `PointingOverlayTests` (app, owned windows) | Not done. |
+
+### Slice S1 additions (2026-11-11, same branch)
+
+| Item | State |
+|---|---|
+| Trail while hovering | Done: `PointingInkTrail` (Core). The pointer path is the ink; near-duplicates (under 2.5 pt) are dropped, a 0.6 s pause starts a new shape, smoothing keeps corners (turns over 55 degrees) and both endpoints. Bounded at 512 points per stroke and 16 strokes. Colour: the macOS pointer fill colour when the user set one, else the Zeus accent. |
+| Holding the keys must not swallow clicks | Done: the pointing overlay is shown with `capturingMouse: false`, so it is click-through and the app underneath keeps focus. The key tap was already listen-only. `capturingMouse` remains for show-me only. |
+| AX hit test on the main actor | Done: `PointingTargetProbe.hitTest` is `@MainActor`; the controller hops with `MainActor.run`. Worst case on a hung target app is the 0.1 s messaging timeout per probe, up to four probes. |
+| Stuck-modifier timeout | Done: `PointingKeyGesture.tick` compares tracked keys with the live modifiers four times a second and ends the hold after 95 s regardless; it resyncs and blocks a restart until all keys are up (`holdTimedOut`). |
+| Sleep, wake, display change | Done: `PointingKeyGesture.interrupt`, session events `systemSleep`, `systemWake`, `displaysChanged`, and controller observers. A hold is cancelled without a request; a turn in flight is stopped; marks are hidden. |
+| Overlay tests | Done: `PointingOverlayTests` (app panels never key or main, ignore the mouse, excluded from capture) and `PointingOverlayGeometryTests` (ring on the candidate on 2x, 1x negative origin, and a display above main). |
+| Trace spans | Done: `PointingTraceSpans` in `PointingController.Metrics`, one `[ZEUS] pointing-trace` line per turn with offsets in ms and no text or image data. "First mic buffer" is the first sample tick with the microphone in the listening state. |
+
 ### Phase 2: full input surface and sync (3 to 4 days)
 
 - Strokes on `MarkOverlay`, the `drawing` state, stroke bounds as candidates, multiple dwells.
