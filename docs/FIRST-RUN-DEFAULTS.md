@@ -15,7 +15,7 @@ those ship as a ticked, visible choice in onboarding instead.
 | Scribe saved voices | Off; per person, opt-in | Biometric data of other people |
 | Scribe "When a meeting starts" (`scribe.autoStart`, Settings > Features > Scribe) | "Ask me" (choices: Off, Ask me, Start automatically) | Recording people without asking needs the owner's explicit choice. "Start automatically" shows a 5 second countdown with Cancel and starts only when Microphone is already allowed and after a one-time consent (asked on the first automatic start, stored as a timestamp); the detector never triggers a permission prompt, it asks instead. Call end (mic released 8 s, or call window gone) offers stop and save with Keep recording; a next meeting while recording asks before switching |
 | Record | Main display selected | Owner request |
-| Dictation sound | Airy start and stop blip at volume 70, changeable in Settings > Dictation (Soft click, Glass, Pop, Airy, None) | Owner request. Zeus's own synthesized tones, no copied sounds |
+| Dictation sound | Crystal: a soft two-note glass chime rising on start and falling on stop, a low blip on cancel or error, at volume 70. Changeable in Settings > Dictation (Crystal, Soft click, Glass, Pop, Airy, None). Start plays on key down before the mic opens; stop plays on release | Owner request. Original sounds made by scripts/gen-dictation-sounds.py, no copied sounds |
 | Dictation speed | Speech model loads on key down and stays loaded 10 minutes after last use; audio is transcribed in chunks while the key is held | Owner request, target under 300 ms from release to text |
 
 Tests: `Tests/ZeusCoreTests/FirstRunDefaultsTests.swift` proves each row above (except Jev, owned by another branch) against a

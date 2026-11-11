@@ -189,7 +189,7 @@ enum ZeusSound {
     /// The bundled file for a slot and style; nil for "Off" or when the resource is missing.
     static func url(slot: SoundSlot, style: String?) -> URL? {
         guard let spec = SoundCatalog.spec(slot, style: style) else { return nil }
-        let name = "\(spec.file).\(SoundCatalog.fileExtension)"
+        let name = spec.fileName
         return ZeusResources.bundle?.resourceURL?.appendingPathComponent("Sounds/\(name)")
             ?? Bundle.main.resourceURL?.appendingPathComponent("Sounds/\(name)")
     }

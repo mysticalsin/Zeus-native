@@ -167,6 +167,7 @@ struct DictationSettingsPage: View {
 
     private static func cueDetail(_ style: DictationCueStyle) -> String {
         switch style {
+        case .crystal: "Two soft glass notes, rising when you start and falling when you stop."
         case .softClick: "The classic Zeus click."
         case .glass: "A bright, clear tone."
         case .pop: "A short, soft bubble."

@@ -78,6 +78,7 @@ Identifiers the driver prefers: `notch.more`, `notch.tab.*`, `settings.sidebar.<
 - [ ] Ultron voice sounds right and starts fast after you finish speaking (first word near 1.5 s).
 - [ ] Dictation release-to-text feels instant.
 - [ ] Dictation Start/Stop sounds: Soft click, Glass, Pop, Airy and None each sound distinct; Airy is pleasant.
+- [ ] Dictation cues with the default Crystal style: the rising chime plays the instant the dictation key goes down (hold, double-tap, press to toggle, top bar button), the falling chime the instant you release or press again (not after the words are pasted), and Escape or "No speech heard" plays one low blip. Repeat with the wake word listening and with a call app open but idle: the cues still play.
 - [ ] Speaker names are right in a real call with 2 or 3 people (Zoom, Teams or Meet).
 - [ ] Starting a Teams or Zoom call shows the meeting auto-start prompt ("Ask me").
 - [ ] A real alert (calendar, agent approval) peeks out of the notch and clears.

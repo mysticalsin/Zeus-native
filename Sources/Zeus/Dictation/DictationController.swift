@@ -366,6 +366,7 @@ final class DictationController {
         hotkey.onRelease = { [weak self] in self?.handleDictationKeyRelease() }
         hotkey.onCancel = { [weak self] in self?.cancel() }
         hotkey.start()
+        DictationCuePlayer.prepare()
         speech.onLevel = { [weak self] level in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.topBar.pushDictationLevel(level) } }
         }
@@ -502,6 +503,7 @@ final class DictationController {
     private func apply(_ event: DictationFlow.Event) -> Bool {
         let before = flow
         let (next, effects) = DictationFlow.reduce(before, event)
+        let sound = DictationCueRule.cue(for: event, before: before)
         flow = next
         for effect in effects {
             switch effect {
@@ -514,6 +516,8 @@ final class DictationController {
                 topBar.show(.dictation("Finish the current dictation first"))
             }
         }
+        // After the effects, so a cancel blip plays once the microphone is already released.
+        if let sound { cue(sound) }
         return next != before || !effects.isEmpty
     }
 
@@ -579,7 +583,10 @@ final class DictationController {
         }
         let turnGeneration = ownership.beginTurn()
         do {
-            let sessionID = try speech.start(controllerGeneration: turnGeneration)
+            // The start cue sounds first: on key down, before the microphone warms up.
+            let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
+                try speech.start(controllerGeneration: turnGeneration)
+            }
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
             turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
                                                selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
@@ -602,7 +609,6 @@ final class DictationController {
             topBar.musicCommand(.playPause)
             pausedMedia = true
         }
-        cue(.dictationBegin)
         guard AccessibilityGate.trusted else { return }
         escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
@@ -790,7 +796,6 @@ final class DictationController {
                 VoiceLog.log("dictation", "transcript empty")
                 apply(.failed(turn: generation, reason: "No speech was heard."))
                 topBar.show(.dictation("No speech heard"))
-                cue(.failure)
             },
             onDiscarded: { [self] in
                 insertionTracker.invalidate()
@@ -820,7 +825,6 @@ final class DictationController {
                 let written = deliveryMessage ?? (outcome == .pasted ? "\(record.wordCount) words written" : "Copied. Press ⌘V to paste.")
                 let base = heard.note.map { "\($0) \(written)." } ?? written
                 topBar.show(.dictation(saveFailed ? "\(base) Couldn't save to history." : base))
-                cue(.dictationEnd)
             })
         Task { @MainActor in _ = await flow.run() }
     }
@@ -1065,13 +1069,11 @@ final class DictationController {
         topBar.musicCommand(.playPause)
     }
 
-    private func cue(_ event: ZeusSound.Event) {
+    /// Start, stop and cancel sounds (DictationCueRule says when). Played on the key press and release
+    /// themselves, not after transcription, so they mark the moment the microphone opens and closes.
+    private func cue(_ phase: DictationCuePhase) {
         guard settings.sounds else { return }
-        switch event {
-        case .dictationBegin: DictationCuePlayer.play(.start)
-        case .dictationEnd: DictationCuePlayer.play(.stop)
-        default: ZeusSound.play(event)
-        }
+        DictationCuePlayer.play(phase)
     }
 
     // MARK: History: reprocess and corrections
