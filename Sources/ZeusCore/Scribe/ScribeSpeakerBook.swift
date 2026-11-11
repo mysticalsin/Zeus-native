@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Live naming
 
 /// What the live page needs to say about whoever spoke last.
-public struct ScribeNowSpeaking: Equatable, Sendable {
+public struct ScribeSpeakerClaim: Equatable, Sendable {
     public let speaker: ScribeSpeaker
     /// The best name known right now, or "Identifying this speaker…" while there is none.
     public let displayName: String
@@ -101,20 +101,20 @@ public struct ScribeLiveNaming: Equatable, Sendable {
     }
 
     /// The live "Now speaking" claim for the newest line.
-    public func nowSpeaking(_ segment: ScribeTranscriptSegment?) -> ScribeNowSpeaking? {
+    public func nowSpeaking(_ segment: ScribeTranscriptSegment?) -> ScribeSpeakerClaim? {
         guard let segment else { return nil }
         let speaker = displayed(segment.speaker, segmentID: segment.id)
         switch speaker {
         case .you:
-            return ScribeNowSpeaking(speaker: .you, displayName: "You", isResolved: true, source: nil)
+            return ScribeSpeakerClaim(speaker: .you, displayName: "You", isResolved: true, source: nil)
         case .unknown:
-            return ScribeNowSpeaking(speaker: .unknown, displayName: Self.identifying, isResolved: false, source: nil)
+            return ScribeSpeakerClaim(speaker: .unknown, displayName: Self.identifying, isResolved: false, source: nil)
         case .participant(let label):
             if Self.anonymousLabel(label) {
-                return ScribeNowSpeaking(speaker: speaker, displayName: Self.identifying, isResolved: false, source: nil)
+                return ScribeSpeakerClaim(speaker: speaker, displayName: Self.identifying, isResolved: false, source: nil)
             }
             let identity = book.identity(named: label)
-            return ScribeNowSpeaking(speaker: speaker, displayName: label, isResolved: true, source: identity?.source)
+            return ScribeSpeakerClaim(speaker: speaker, displayName: label, isResolved: true, source: identity?.source)
         }
     }
 }

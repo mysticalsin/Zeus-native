@@ -1873,7 +1873,7 @@ final class ScribeController {
     }
 
     /// Who is speaking now, by the best name known, for the live "Now speaking" pill. Reads the newest words.
-    func nowSpeakingClaim() -> ScribeNowSpeaking? {
+    func nowSpeakingClaim() -> ScribeSpeakerClaim? {
         liveNaming.nowSpeaking(latestWordsSegment())
     }
 
