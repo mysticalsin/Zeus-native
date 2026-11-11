@@ -162,29 +162,6 @@ enum VoiceDesigner {
     }
 }
 
-extension VoiceDesigner {
-    /// Designs the original Ultron voice once, in the background, on the first ElevenLabs use with no saved
-    /// voice: keeps the first preview and stores only its voice id. The first reply uses the stock voice.
-    /// It runs at most once per Mac; Settings > Voice can design again.
-    @MainActor
-    static func designUltronVoiceOnce(defaults: UserDefaults = .standard) {
-        let triedKey = "voice.elevenlabs.autoDesignTried"
-        guard defaults.object(forKey: triedKey) == nil, ElevenLabsVoice.savedVoiceID() == nil,
-              let key = Keychain.get("elevenlabs.api-key")?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else { return }
-        defaults.set(true, forKey: triedKey)
-        Task {
-            do {
-                guard let first = try await design(apiKey: key).first else { return }
-                let id = try await create(apiKey: key, generatedVoiceID: first.id, playedNotSelected: [])
-                VoiceSettings.shared.setElevenVoice(id)
-                VoiceLog.log("voice-design", "saved the designed Ultron voice")
-            } catch {
-                VoiceLog.log("voice-design", "skipped: \((error as? Failure)?.message ?? "unavailable")")
-            }
-        }
-    }
-}
-
 /// The Settings flow behind "Design Zeus's voice": design, play the previews, keep one.
 @MainActor
 @Observable

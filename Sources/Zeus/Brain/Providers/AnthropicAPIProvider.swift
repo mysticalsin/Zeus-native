@@ -65,31 +65,33 @@ final class AnthropicAPIProvider: BrainProvider, @unchecked Sendable {
                 continuation.finish(throwing: ProviderError.noKey)
                 return
             }
-            let model = request.deep ? "claude-sonnet-4-5" : "claude-haiku-4-5"
             var messages: [[String: String]] = []
             for exchange in request.history.suffix(6) {
                 messages.append(["role": "user", "content": exchange.user])
                 messages.append(["role": "assistant", "content": exchange.assistant])
             }
             messages.append(["role": "user", "content": CLIEngineProvider.prompt(for: request)])
-            let body: [String: Any] = [
-                "model": model,
-                "max_tokens": request.deep ? 1024 : 512,
-                "stream": true,
-                "system": request.systemPrompt,
-                "messages": messages,
-            ]
-            guard JSONSerialization.isValidJSONObject(body),
-                  let payload = try? JSONSerialization.data(withJSONObject: body) else {
-                continuation.finish(throwing: ProviderError.failed("Could not build the request."))
-                return
+            let fastModel = ModelCap.httpModel(.anthropic, tier: .fast) ?? "claude-haiku-4-5"
+            let deepModel = ModelCap.httpModel(.anthropic, tier: .deep) ?? "claude-sonnet-4-5"
+            // Deep answers keep one plain try on Sonnet; spoken answers try the lean Haiku first.
+            let attempts: [(model: String, lean: Bool)] = request.deep
+                ? [(deepModel, false)]
+                : AnthropicVoiceBody.fastAttempts(current: fastModel)
+            let timeout: TimeInterval = request.deep ? 45 : (request.firstTextBudget ?? 45)
+            let maxTokens = request.deep ? 1024 : 512
+            let finalMessages = messages
+            let system = request.systemPrompt
+            func makeRequest(model: String, lean: Bool) -> URLRequest? {
+                let body = AnthropicVoiceBody.make(model: model, system: system, messages: finalMessages, maxTokens: maxTokens, lean: lean)
+                guard JSONSerialization.isValidJSONObject(body), let payload = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+                var urlRequest = URLRequest(url: Self.endpoint, timeoutInterval: timeout)
+                urlRequest.httpMethod = "POST"
+                urlRequest.httpBody = payload
+                urlRequest.setValue(key, forHTTPHeaderField: "x-api-key")
+                urlRequest.setValue(Self.version, forHTTPHeaderField: "anthropic-version")
+                urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
+                return urlRequest
             }
-            var urlRequest = URLRequest(url: Self.endpoint, timeoutInterval: request.deep ? 45 : (request.firstTextBudget ?? 45))
-            urlRequest.httpMethod = "POST"
-            urlRequest.httpBody = payload
-            urlRequest.setValue(key, forHTTPHeaderField: "x-api-key")
-            urlRequest.setValue(Self.version, forHTTPHeaderField: "anthropic-version")
-            urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
 
             let started = Date()
             let task = Task {
@@ -97,13 +99,32 @@ final class AnthropicAPIProvider: BrainProvider, @unchecked Sendable {
                 var sawText = false
                 var sawStop = false
                 var stopReason: String?
+                var model = attempts[0].model
                 do {
-                    let (bytes, response) = try await BrainHTTP.session.bytes(for: urlRequest)
-                    if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                        var data = Data()
-                        for try await byte in bytes { data.append(byte); if data.count > 4096 { break } }
-                        let message = String(decoding: data, as: UTF8.self).prefix(200)
-                        continuation.finish(throwing: ProviderError.failed("Anthropic HTTP \(http.statusCode): \(message)"))
+                    var opened: URLSession.AsyncBytes?
+                    for (index, attempt) in attempts.enumerated() {
+                        guard let urlRequest = makeRequest(model: attempt.model, lean: attempt.lean) else {
+                            continuation.finish(throwing: ProviderError.failed("Could not build the request."))
+                            return
+                        }
+                        model = attempt.model
+                        let (bytes, response) = try await BrainHTTP.session.bytes(for: urlRequest)
+                        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                            var data = Data()
+                            for try await byte in bytes { data.append(byte); if data.count > 4096 { break } }
+                            if AnthropicVoiceBody.shouldRetry(status: http.statusCode), index + 1 < attempts.count {
+                                VoiceLog.log("brain", "engine=anthropic-api model=\(attempt.model) lean=\(attempt.lean) HTTP \(http.statusCode); trying the next form")
+                                continue
+                            }
+                            let message = String(decoding: data, as: UTF8.self).prefix(200)
+                            continuation.finish(throwing: ProviderError.failed("Anthropic HTTP \(http.statusCode): \(message)"))
+                            return
+                        }
+                        opened = bytes
+                        break
+                    }
+                    guard let bytes = opened else {
+                        continuation.finish(throwing: ProviderError.failed("Anthropic gave no answer."))
                         return
                     }
                     for try await line in bytes.lines {

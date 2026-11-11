@@ -401,8 +401,74 @@ class VoiceLatencyLint(unittest.TestCase):
         # The help probe must use the located binary: a GUI app's PATH has no ~/.local/bin.
         self.assertNotIn('"/usr/bin/env"', text)
 
+    def test_nothing_warms_at_launch_and_the_talk_key_warms_the_brain(self):
+        text = self._turn_text()
+        init = text[text.index("init("):text.index("private func armAhead")]
+        for forbidden in ("prewarm", "BrainLaunchWarm", "ClaudeFlags.warm", "warmSelectedVoice"):
+            self.assertNotIn(forbidden, init, f"{forbidden} runs at launch")
+        press = text[text.index("func press()"):text.index("func release()")]
+        self.assertIn("KeyDownWarmer.talkKeyDown()", press)
+        self.assertIn("abortBusy()", press)
+
+    def test_every_turn_writes_one_voice_latency_line_without_text(self):
+        latency = (ROOT / "Sources/Zeus/Voice/VoiceLatency.swift").read_text()
+        self.assertIn('NSLog("[ZEUS] voice-latency %@"', latency)
+        self.assertNotIn("transcript:", latency)
+        text = self._turn_text()
+        for stage in (".transcriptFinal", ".requestSent", ".firstToken", ".firstSentence"):
+            self.assertIn(f"VoiceLatency.shared.mark({stage})", text)
+        speaker = (ROOT / "Sources/Zeus/Voice/Speaker.swift").read_text()
+        self.assertIn("VoiceLatency.shared.mark(.firstAudio)", speaker)
+        self.assertIn("VoiceLatency.shared.mark(.ttsRequest)", speaker)
+
+    def test_the_voice_is_never_designed_without_a_tap(self):
+        for path in (ROOT / "Sources/Zeus").rglob("*.swift"):
+            self.assertNotIn("designUltronVoiceOnce", path.read_text(), str(path))
+
     def test_latency_lint_detects_its_failure_shapes(self):
         self.assertTrue(re.search(r"while\s+cursor\s*<\s*candidates\.count", "while cursor < candidates.count {"))
+
+
+
+import importlib.util as _ilu
+
+_VL_SPEC = _ilu.spec_from_file_location("voice_latency", ROOT / "scripts/voice-latency.py")
+voice_latency = _ilu.module_from_spec(_VL_SPEC)
+_VL_SPEC.loader.exec_module(voice_latency)
+
+LINE = ('2026-11-11T14:00:01.100-05:00 voice-latency turn=a1 key_up=0 transcript=300 request=320 first_token=780 '
+        'first_sentence=1000 tts_request=1010 first_audio=1350 turn_end=4800 ttfa=1350 brain=anthropic-api '
+        'model=claude-haiku-5-5 tts=elevenlabs/eleven_flash_v2_5 voice=v effect=60 reason="auto: best, low delay"')
+
+
+class VoiceLatencyScript(unittest.TestCase):
+    def test_parses_a_log_line_with_a_quoted_reason(self):
+        row = voice_latency.parse(LINE)
+        self.assertEqual(row["turn"], "a1")
+        self.assertEqual(row["at"], "14:00:01")
+        self.assertEqual(voice_latency.number(row, "ttfa"), 1350)
+        self.assertEqual(row["reason"], "auto: best, low delay")
+
+    def test_ignores_other_lines_and_dashes(self):
+        self.assertIsNone(voice_latency.parse("2026-11-11T14:00:09.000-05:00 speak engine=x"))
+        row = voice_latency.parse(LINE.replace("ttfa=1350", "ttfa=-"))
+        self.assertIsNone(voice_latency.number(row, "ttfa"))
+
+    def test_percentiles_interpolate(self):
+        self.assertEqual(voice_latency.percentile([], 0.5), None)
+        self.assertEqual(voice_latency.percentile([100], 0.9), 100)
+        self.assertEqual(voice_latency.percentile([100, 200], 0.5), 150)
+        self.assertEqual(voice_latency.percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.9), 9.1)
+
+    def test_summary_reports_p50_p90_and_the_route_target(self):
+        rows = [voice_latency.parse(LINE.replace("ttfa=1350", f"ttfa={ms}")) for ms in (1000, 1100, 1200, 2000)]
+        text = voice_latency.summary(rows)
+        self.assertIn("key-up -> first audio: p50 1150 ms", text)
+        self.assertIn("target p50 for this route: 1200 ms -> PASS", text)
+
+    def test_log_line_never_needs_a_transcript(self):
+        row = voice_latency.parse(LINE)
+        self.assertNotIn("transcript_text", row)
 
 
 # Third state-machine pass (docs/STATE-MACHINES.md): wiring the pure reducers cannot see.
