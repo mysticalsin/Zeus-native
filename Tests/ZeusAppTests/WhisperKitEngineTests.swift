@@ -30,14 +30,14 @@ private func tempStore() -> WhisperKitModelStore {
     }
 
     @Test func vocabularyPromptPassesThroughToTheTokenizer() {
-        let prompt = WhisperKitEngine.prompt(for: ["Zeus", "Laya"])
-        #expect(prompt == "Names: Zeus, Laya.")
+        let prompt = WhisperKitEngine.prompt(for: ["Zeus", "Jev"])
+        #expect(prompt == "Names: Zeus, Jev.")
         var encoded = ""
         let tokens = WhisperKitEngine.promptTokens(prompt, encode: { text in
             encoded = text
             return [220, 50, 51_000, 7]
         }, specialTokenBegin: 50_257)
-        #expect(encoded == " Names: Zeus, Laya.")
+        #expect(encoded == " Names: Zeus, Jev.")
         #expect(tokens == [220, 50, 51_000, 7].filter { $0 < 50_257 })
         #expect(WhisperKitEngine.prompt(for: []) == "")
         #expect(WhisperKitEngine.promptTokens("", encode: { _ in [1] }, specialTokenBegin: 10) == nil)
