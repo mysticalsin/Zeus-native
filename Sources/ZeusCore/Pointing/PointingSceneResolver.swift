@@ -58,7 +58,7 @@ public enum PointingSceneResolver {
                     let kept = members.filter { !droppedIDs.contains($0) }
                     if kept.isEmpty { continue }
                     operations.append(.group(id: id, members: kept))
-                case .camera, .clear:
+                case .camera, .clear, .model:
                     operations.append(operation)
                 }
             }

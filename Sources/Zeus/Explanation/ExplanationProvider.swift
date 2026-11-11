@@ -77,6 +77,7 @@ final class ExplanationHTTPProvider: ExplanationModelProviding {
         let instructions = """
         You explain concepts in a native Zeus visual conversation. Produce a small, incremental diagram while speaking.
         \(baseInstructions)
+        \(ExplanationModelPrompt.instructions)
         \(pointingMode ? PointingPrompt.instructions : "")
         Use 2–6 short beats. Keep existing object IDs when editing. Explain uncertainty. World geometry is an illustrative
         3D model, not a verified reconstruction or photograph. No assets or citation sources are currently approved;

@@ -1,5 +1,6 @@
 import AppKit
 import Metal
+import QuartzCore
 import SceneKit
 import SwiftUI
 import simd
@@ -36,7 +37,7 @@ struct ExplanationSceneView: View {
             } else {
                 ExplanationSceneSurface(scene: pauseMotion ? frozenScene ?? scene : scene,
                     selection: $selection, isActive: isActive, isInteractive: isInteractive,
-                    reduceMotion: reduceMotion, registry: registry, onEdit: onEdit)
+                    reduceMotion: reduceMotion, motionPaused: pauseMotion, registry: registry, onEdit: onEdit)
                     .frame(minHeight: 260).clipShape(RoundedRectangle(cornerRadius: 12))
                     .accessibilityLabel("Interactive procedural 3D illustration")
             }
@@ -55,9 +56,12 @@ struct ExplanationSceneView: View {
             }
             .buttonStyle(.borderless).disabled(!isInteractive)
             .font(.caption)
-            Text("Procedural illustration · not a measured engineering model")
+            Text(scene.model?.caption ?? "Procedural illustration · not a measured engineering model")
                 .font(.caption2).foregroundStyle(.secondary)
-            ExplanationObjectList(objects: worldObjects, selection: $selection, isInteractive: isInteractive, onEdit: onEdit)
+            if let model = scene.model, !model.parts.isEmpty { ExplanationModelPartList(model: model) }
+            if !worldObjects.isEmpty {
+                ExplanationObjectList(objects: worldObjects, selection: $selection, isInteractive: isInteractive, onEdit: onEdit)
+            }
         }
         .onAppear { resetCamera = scene.camera }
         .onChange(of: scene.sceneID) { _, _ in resetCamera = scene.camera; frozenScene = nil; pauseMotion = false }
@@ -91,6 +95,7 @@ private struct ExplanationSceneSurface: NSViewRepresentable {
     let isActive: Bool
     let isInteractive: Bool
     let reduceMotion: Bool
+    var motionPaused = false
     let registry: ExplanationRegistry
     let onEdit: (ExplanationOperation) -> Void
     func makeNSView(context: Context) -> ExplanationSCNHostView { ExplanationSCNHostView() }
@@ -98,7 +103,7 @@ private struct ExplanationSceneSurface: NSViewRepresentable {
         view.onSelection = { selection = $0 }
         view.onEdit = onEdit
         view.apply(scene, registry: registry, selectedID: selection, active: isActive,
-                   interactive: isInteractive, reduceMotion: reduceMotion)
+                   interactive: isInteractive, reduceMotion: reduceMotion, motionPaused: motionPaused)
     }
     static func dismantleNSView(_ view: ExplanationSCNHostView, coordinator: ()) { view.dispose() }
 }
@@ -115,6 +120,20 @@ final class ExplanationSCNHostView: SCNView {
     private var entries: [String: Entry] = [:]
     private let world = SCNNode()
     private let cameraNode = SCNNode()
+    private let modelRenderer = ExplanationModelRenderer()
+    private var model: ExplanationModel3D?
+    private var clock = ExplanationModelClock()
+    private var reduceMotion = false
+    private var motionPaused = false
+    private var isActiveSurface = true
+    private var userInteracting = false
+    private var modelLink: CADisplayLink?
+    private var windowObservers: [NSObjectProtocol] = []
+    private var cameraTween: (from: ExplanationCamera, to: ExplanationCamera, startedAt: Double?)?
+    private var calloutLabels: [String: ExplanationCalloutLabel] = [:]
+    private var calloutDots: [String: ExplanationCalloutDot] = [:]
+    private var labelSlots: [String: Int] = [:]
+    static let cameraTweenSeconds = 0.8
     private var lastCamera: ExplanationCamera?
     private var sceneID: UUID?
     private var selectedID: String?
@@ -124,6 +143,11 @@ final class ExplanationSCNHostView: SCNView {
     var onSelection: ((String?) -> Void)?
     var onEdit: ((ExplanationOperation) -> Void)?
     var objectIDs: Set<String> { Set(entries.keys) }
+    var modelPartIDs: Set<String> { modelRenderer.partIDs }
+    var modelFlowIDs: Set<String> { modelRenderer.flowIDs }
+    var isRunningModelClock: Bool { modelLink != nil }
+    func modelPartNode(_ id: String) -> SCNNode? { modelRenderer.partNode(id) }
+    var visibleCalloutIDs: Set<String> { Set(calloutLabels.filter { !$0.value.isHidden }.keys) }
     func node(for id: String) -> SCNNode? { entries[id]?.node }
 
     init() {
@@ -131,6 +155,7 @@ final class ExplanationSCNHostView: SCNView {
         let owned = SCNScene()
         owned.isPaused = true
         owned.rootNode.addChildNode(world)
+        world.addChildNode(modelRenderer.root)
         cameraNode.camera = SCNCamera()
         cameraNode.camera?.zNear = 0.01
         cameraNode.camera?.zFar = 100_000
@@ -152,19 +177,28 @@ final class ExplanationSCNHostView: SCNView {
     required init?(coder: NSCoder) { nil }
 
     func apply(_ value: ExplanationScene, registry: ExplanationRegistry = .empty, selectedID: String? = nil,
-               active: Bool = true, interactive: Bool = true, reduceMotion _: Bool = false) {
+               active: Bool = true, interactive: Bool = true, reduceMotion: Bool = false, motionPaused: Bool = false) {
         guard !disposed else { return }
+        self.reduceMotion = reduceMotion; self.motionPaused = motionPaused; isActiveSurface = active
         self.interactive = interactive && active
+        if !self.interactive { userInteracting = false }
         allowsCameraControl = self.interactive
         rendersContinuously = false; isPlaying = false; scene?.isPaused = true
         guard (try? ExplanationSceneReducer.validate(value, registry: registry)) != nil else {
-            rejectedScene = true; removeObjects(); return
+            rejectedScene = true; removeObjects(); modelRenderer.apply(nil); model = nil
+            cameraTween = nil; refreshCallouts(); updateRunState(); return
         }
         rejectedScene = false
         let objects = value.objects.values.filter { $0.space == .world }.sorted { $0.id < $1.id }
         let currentIDs = Set(objects.map(\.id))
         SCNTransaction.begin(); SCNTransaction.animationDuration = 0; SCNTransaction.disableActions = true
-        if sceneID != value.sceneID { removeObjects(); sceneID = value.sceneID; lastCamera = nil }
+        if sceneID != value.sceneID {
+            removeObjects(); sceneID = value.sceneID; lastCamera = nil
+            clock.reset(); cameraTween = nil; labelSlots = [:]
+        }
+        model = value.model
+        modelRenderer.apply(value.model)
+        if let model { modelRenderer.update(model: model, clock: clock, reduceMotion: reduceMotion) }
         for object in objects {
             // The playback sampler has already removed optional motion. Static
             // reveal0 must remain hidden until its own admitted audio cue.
@@ -215,21 +249,169 @@ final class ExplanationSCNHostView: SCNView {
             if let removed = entries.removeValue(forKey: id) { Self.release(removed.node) }
         }
         if lastCamera != value.camera {
-            pointOfView = cameraNode
-            cameraNode.position = Self.vector(value.camera.position)
-            cameraNode.look(at: Self.vector(value.camera.target))
-            cameraNode.camera?.fieldOfView = CGFloat(value.camera.fieldOfView)
-            defaultCameraController.target = Self.vector(value.camera.target)
+            // A model scene turns the camera over a short, timestamped sweep; every other scene,
+            // and Reduce Motion, jumps as before. The sweep starts from the pose on screen, so a
+            // camera the user just dragged to is not swept back and forth.
+            if value.hasModel3D, !reduceMotion, active, lastCamera != nil, let from = currentCameraPose(),
+               Self.pose(from, differsFrom: value.camera) {
+                cameraTween = (from, value.camera, nil)
+            } else { cameraTween = nil; setCamera(value.camera) }
             lastCamera = value.camera
         }
         self.selectedID = selectedID
         SCNTransaction.commit()
+        refreshCallouts(); updateRunState()
         if active && !isHiddenOrHasHiddenAncestor { needsDisplay = true }
+    }
+
+    private func setCamera(_ camera: ExplanationCamera) {
+        pointOfView = cameraNode
+        cameraNode.position = Self.vector(camera.position)
+        cameraNode.look(at: Self.vector(camera.target))
+        cameraNode.camera?.fieldOfView = CGFloat(camera.fieldOfView)
+        defaultCameraController.target = Self.vector(camera.target)
+    }
+    private func currentCameraPose() -> ExplanationCamera? {
+        let node = pointOfView ?? cameraNode
+        let position = node.worldPosition, target = defaultCameraController.target
+        return .init(position: .init(x: Double(position.x), y: Double(position.y), z: Double(position.z)),
+                     target: .init(x: Double(target.x), y: Double(target.y), z: Double(target.z)),
+                     fieldOfView: Double(node.camera?.fieldOfView ?? 45))
+    }
+    private static func pose(_ a: ExplanationCamera, differsFrom b: ExplanationCamera) -> Bool {
+        let d = [a.position.x - b.position.x, a.position.y - b.position.y, a.position.z - b.position.z,
+                 a.target.x - b.target.x, a.target.y - b.target.y, a.target.z - b.target.z]
+        return d.contains { abs($0) > 0.001 }
+    }
+
+    // MARK: Model clock and callouts
+
+    private var motionActive: Bool { !motionPaused && !reduceMotion && model?.hasMotion == true }
+    private var onScreen: Bool {
+        guard let window, !isHiddenOrHasHiddenAncestor, !window.isMiniaturized else { return false }
+        return window.occlusionState.contains(.visible)
+    }
+
+    /// One display link, only while something moves and the view can be seen. Hidden, occluded,
+    /// minimised, paused and idle views run no timer at all.
+    private func updateRunState() {
+        let wanted = !disposed && isActiveSurface && onScreen && (cameraTween != nil || userInteracting || motionActive)
+        if wanted {
+            guard modelLink == nil else { return }
+            let link = displayLink(target: self, selector: #selector(modelTick(_:)))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+            link.add(to: .main, forMode: .common)
+            modelLink = link
+        } else if let link = modelLink {
+            link.invalidate(); modelLink = nil; clock.suspend()
+        }
+    }
+
+    @objc private func modelTick(_ link: CADisplayLink) {
+        guard !disposed else { updateRunState(); return }
+        let now = link.timestamp
+        if var tween = cameraTween {
+            let started = tween.startedAt ?? now
+            tween.startedAt = started
+            let progress = min(1, max(0, (now - started) / Self.cameraTweenSeconds))
+            setCamera(ExplanationCameraMath.interpolate(tween.from, tween.to, progress * progress * (3 - 2 * progress)))
+            cameraTween = progress >= 1 ? nil : tween
+        }
+        if let model, motionActive {
+            clock.advance(to: now, model: model, reduceMotion: reduceMotion)
+            modelRenderer.update(model: model, clock: clock, reduceMotion: reduceMotion)
+        }
+        refreshCallouts()
+        needsDisplay = true
+        if cameraTween == nil && !userInteracting && !motionActive { updateRunState() }
+    }
+
+    private func installWindowObservers() {
+        removeWindowObservers()
+        guard let window else { return }
+        for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+                     NSWindow.didDeminiaturizeNotification] {
+            windowObservers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateRunState(); self?.refreshCallouts() }
+            })
+        }
+    }
+    private func removeWindowObservers() {
+        for observer in windowObservers { NotificationCenter.default.removeObserver(observer) }
+        windowObservers.removeAll()
+    }
+
+    private func projectionCamera() -> ExplanationCamera {
+        let node = (pointOfView ?? cameraNode).presentation
+        let p = node.worldPosition, f = node.worldFront
+        return .init(position: .init(x: Double(p.x), y: Double(p.y), z: Double(p.z)),
+                     target: .init(x: Double(p.x + f.x), y: Double(p.y + f.y), z: Double(p.z + f.z)),
+                     fieldOfView: Double((pointOfView ?? cameraNode).camera?.fieldOfView ?? 45))
+    }
+
+    private func hideCallouts() {
+        for view in calloutLabels.values { view.isHidden = true }
+        for view in calloutDots.values { view.isHidden = true }
+    }
+
+    /// Projects every callout anchor with the camera on screen, then places the labels with the
+    /// shared 2D rule so none overlap. Labels follow their parts because the anchor is read from the
+    /// part's node every time.
+    private func refreshCallouts() {
+        guard !disposed, let model, !model.callouts.isEmpty, bounds.width >= 1, bounds.height >= 1 else {
+            hideCallouts(); return
+        }
+        let camera = projectionCamera()
+        let viewport = ExplanationSize2(width: Double(bounds.width), height: Double(bounds.height))
+        var requests: [ExplanationLabelRequest] = []
+        var anchors: [String: ExplanationProjectedPoint] = [:]
+        for callout in model.callouts.values.sorted(by: { $0.id < $1.id }) where callout.visible {
+            if let part = callout.partID, ExplanationModelAppearance.appearance(of: part, in: model)?.visible != true { continue }
+            guard let world = modelRenderer.worldAnchor(for: callout),
+                  let projected = ExplanationProjection.project(world, camera: camera, viewport: viewport) else { continue }
+            let label = calloutLabels[callout.id] ?? makeCalloutLabel(callout.id)
+            if label.stringValue != callout.text { label.stringValue = callout.text }
+            let width = ceil((callout.text as NSString).size(withAttributes: [.font: ExplanationCalloutLabel.font]).width) + 14
+            anchors[callout.id] = projected
+            requests.append(.init(id: callout.id, anchorX: projected.x, anchorY: projected.y, width: width, height: 22))
+        }
+        let layout = ExplanationLabelLayout.place(requests, bounds: .init(x: 0, y: 0, width: viewport.width, height: viewport.height),
+                                                  previousSlots: labelSlots)
+        labelSlots = layout.slots
+        func flipped(_ y: Double, _ height: Double) -> CGFloat { isFlipped ? CGFloat(y) : bounds.height - CGFloat(y + height) }
+        for (id, label) in calloutLabels {
+            guard let rect = layout.placed[id], let anchor = anchors[id] else {
+                label.isHidden = true; calloutDots[id]?.isHidden = true; continue
+            }
+            label.frame = NSRect(x: rect.x, y: flipped(rect.y, rect.height), width: rect.width, height: rect.height)
+            label.isHidden = false
+            if let dot = calloutDots[id] {
+                dot.frame = NSRect(x: anchor.x - 3, y: flipped(anchor.y, 0) - 3, width: 6, height: 6)
+                dot.isHidden = false
+            }
+        }
+        for id in Set(calloutLabels.keys).subtracting(model.callouts.keys) {
+            calloutLabels.removeValue(forKey: id)?.removeFromSuperview()
+            calloutDots.removeValue(forKey: id)?.removeFromSuperview()
+        }
+    }
+
+    private func makeCalloutLabel(_ id: String) -> ExplanationCalloutLabel {
+        let label = ExplanationCalloutLabel(frame: .zero)
+        label.isHidden = true
+        addSubview(label)
+        calloutLabels[id] = label
+        let dot = ExplanationCalloutDot(frame: .zero)
+        dot.isHidden = true
+        addSubview(dot)
+        calloutDots[id] = dot
+        return label
     }
 
     override var acceptsFirstResponder: Bool { interactive && !disposed }
     override func mouseDown(with event: NSEvent) {
         guard interactive && !disposed else { return }
+        userInteracting = true; updateRunState()
         let point = convert(event.locationInWindow, from: nil)
         let hits = hitTest(point, options: [.firstFoundOnly: false])
         var selected: String?
@@ -246,6 +428,7 @@ final class ExplanationSCNHostView: SCNView {
     }
     override func mouseUp(with event: NSEvent) {
         guard interactive && !disposed else { return }
+        userInteracting = false; updateRunState()
         super.mouseUp(with: event)
         let currentCamera = pointOfView ?? cameraNode
         let position = currentCamera.worldPosition, target = defaultCameraController.target
@@ -270,13 +453,25 @@ final class ExplanationSCNHostView: SCNView {
             if [p.x, p.y, p.z].allSatisfy({ abs($0) <= ExplanationLimits.coordinate }) { onEdit?(.move(id: id, position: p)) }
         } else { super.keyDown(with: event) }
     }
-    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); isPlaying = false; rendersContinuously = false }
-    override func viewDidHide() { super.viewDidHide(); isPlaying = false }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow(); isPlaying = false; rendersContinuously = false
+        installWindowObservers(); updateRunState(); refreshCallouts()
+    }
+    override func viewDidHide() { super.viewDidHide(); isPlaying = false; updateRunState() }
+    override func viewDidUnhide() { super.viewDidUnhide(); updateRunState(); refreshCallouts() }
+    override func layout() { super.layout(); refreshCallouts() }
+    override func scrollWheel(with event: NSEvent) { super.scrollWheel(with: event); refreshCallouts() }
+    override func magnify(with event: NSEvent) { super.magnify(with: event); refreshCallouts() }
 
     func dispose() {
         guard !disposed else { return }
         disposed = true; isPlaying = false; rendersContinuously = false; allowsCameraControl = false
         onSelection = nil; onEdit = nil
+        modelLink?.invalidate(); modelLink = nil; removeWindowObservers(); cameraTween = nil
+        modelRenderer.dispose(); model = nil
+        for view in calloutLabels.values { view.removeFromSuperview() }
+        for view in calloutDots.values { view.removeFromSuperview() }
+        calloutLabels.removeAll(); calloutDots.removeAll()
         removeObjects(); scene?.rootNode.enumerateChildNodes { node, _ in node.removeAllActions(); node.removeAllAnimations() }
         pointOfView = nil; scene = nil; lastCamera = nil; selectedID = nil
     }
@@ -428,5 +623,48 @@ enum ExplanationSceneGeometry {
         }
         return SCNGeometry(sources: [SCNGeometrySource(vertices: vertices), SCNGeometrySource(normals: normals)],
                            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+    }
+}
+
+/// Pass-through callout chip. It never takes a click, so orbiting the camera works under it.
+@MainActor
+final class ExplanationCalloutLabel: NSTextField {
+    static let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        isEditable = false; isSelectable = false; isBordered = false; drawsBackground = true
+        backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.85)
+        textColor = .labelColor; font = Self.font; alignment = .center
+        lineBreakMode = .byTruncatingTail; maximumNumberOfLines = 1
+        wantsLayer = true; layer?.cornerRadius = 5
+    }
+    required init?(coder: NSCoder) { nil }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+@MainActor
+final class ExplanationCalloutDot: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true; layer?.cornerRadius = 3; layer?.backgroundColor = NSColor.systemYellow.cgColor
+    }
+    required init?(coder: NSCoder) { nil }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// Accessible, read-only list of the named parts in a model scene.
+@MainActor
+struct ExplanationModelPartList: View {
+    let model: ExplanationModel3D
+    var body: some View {
+        DisclosureGroup("Parts (\(model.parts.count))") {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(model.parts.values.sorted { $0.id < $1.id }) { part in
+                    Text(part.accessibleDescription).font(.callout)
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+        }
+        .font(.caption.weight(.medium))
+        .accessibilityIdentifier("explanation.model.parts")
     }
 }

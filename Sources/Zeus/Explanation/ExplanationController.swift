@@ -91,6 +91,8 @@ final class ExplanationController {
     private var diagnostics: ExplanationDiagnostics
     private var diagnosticTurn: ExplanationDiagnostics.TurnToken?
     private var visualSubmissionPending = false
+    /// Turns ended because a 3D edit named a missing part or a stale scene revision.
+    private(set) var rejectedModelEdits = 0
     private let processSample: () -> (cpuSeconds: Double?, physicalFootprintBytes: UInt64?)
 
     init(provider: any ExplanationModelProviding, speechProvider: any SpeechOutputProvider,
@@ -672,13 +674,16 @@ final class ExplanationController {
         }
     }
     private func fail(_ error: Error) {
+        var rejectedEdit = false
+        if let failure = error as? ExplanationFailure, case .editRejected = failure { rejectedEdit = true; rejectedModelEdits += 1 }
         if let diagnosticTurn {
             let category: ExplanationDiagnostics.Failure = error is ExplanationProviderError ? .provider
                 : error is ExplanationAudioError ? .audio : .invalidEvent
             diagnostics.recordFailure(category, for: diagnosticTurn)
         }
         stop()
-        if let provider = error as? ExplanationProviderError { problem = provider.localizedDescription }
+        if rejectedEdit { problem = "The explanation stopped: a change to the 3D scene named a part that is missing, or the scene had changed. Your last valid scene is retained." }
+        else if let provider = error as? ExplanationProviderError { problem = provider.localizedDescription }
         else if error is ExplanationAudioError { problem = "Narration is unavailable. Switch to Captions and try again." }
         else { problem = "The explanation stopped because its response was incomplete or invalid. Your committed scene is retained." }
         onTurnEnded?(error)

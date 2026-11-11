@@ -27,9 +27,9 @@ struct ExplanationPane: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if let scene = controller.scene {
-                        if scene.objects.isEmpty { emptyState }
+                        if scene.objects.isEmpty && !scene.hasModel3D { emptyState }
                         else {
-                            if scene.objects.values.contains(where: { $0.space == .world }) {
+                            if scene.hasModel3D || scene.objects.values.contains(where: { $0.space == .world }) {
                                 Picker("View", selection: $showing3D) {
                                     Text("Diagram").tag(false); Text("3D illustration").tag(true)
                                 }.pickerStyle(.segmented)
@@ -107,6 +107,7 @@ struct ExplanationPane: View {
         .onAppear { visible = true; controller.reduceMotion = reduceMotion; updateClock(); cacheSnapshot() }
         .onDisappear { visible = false; controller.displayClockActive(false); controller.stop() }
         .onChange(of: reduceMotion) { controller.reduceMotion = reduceMotion; updateClock() }
+        .onChange(of: controller.scene?.hasModel3D == true) { _, has in if has { showing3D = true } }
         .onChange(of: controller.wantsDisplayClock) { updateClock() }
         .onChange(of: controller.screenContext.snapshot?.geometry.captureID) { cacheSnapshot() }
         .onChange(of: controller.scene?.objects.values.contains(where: { $0.space == .world })) {
