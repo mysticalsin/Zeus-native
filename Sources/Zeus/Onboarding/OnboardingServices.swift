@@ -60,11 +60,13 @@ final class OnboardingServices: OnboardingServing {
     private(set) var notificationsAllowed = false
     private(set) var fullDiskAccess = false
     private(set) var locationAllowed = false
-    private(set) var codexConnected = AgentHookInstaller.isInstalled(.codex)
+    private(set) var codexConnected = false
     var connectMessage: String?
     @ObservationIgnored private let location = CLLocationManager()
     /// Only asked `isDownloaded`; the dictation controller owns the engine that downloads and loads.
     @ObservationIgnored private let modelProbe = ParakeetEngine()
+    @ObservationIgnored private var diskProbe: Task<Void, Never>?
+    @ObservationIgnored private var diskProbeStale = false
     @ObservationIgnored private var polling: Task<Void, Never>?
     @ObservationIgnored private var notificationRefresh: Task<Void, Never>?
     @ObservationIgnored private var refreshGeneration: UInt64 = 0
@@ -99,11 +101,9 @@ final class OnboardingServices: OnboardingServing {
     }
 
     func refresh() {
-        // Reads the files on disk, so the row is right at launch and after a failed download. Never downloads.
-        if !Self.fresh, !TopBarStyle.isSnapshot { SpeechEngineStatus.shared.refresh(modelProbe) }
+        // Reads the files on disk (off the main thread), so the row is right at launch and after a failed download. Never downloads.
+        probeDisk()
         permissions.refresh()
-        codexConnected = AgentHookInstaller.isInstalled(.codex)
-        fullDiskAccess = !Self.fresh && Self.hasFullDiskAccess()
         let status = location.authorizationStatus
         locationAllowed = !Self.fresh && (status == .authorizedAlways || status == .authorized)
         guard Self.hasBundle, notificationRefresh == nil else { return }
@@ -115,6 +115,30 @@ final class OnboardingServices: OnboardingServing {
             self.notificationRefresh = nil
             guard !Task.isCancelled, generation == self.refreshGeneration else { return }
             self.notificationsAllowed = !Self.fresh && (settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+        }
+    }
+
+    /// The disk and TCC-protected probes behind `refresh`: the Parakeet model folder, Codex's hook file and the
+    /// notification store (a listing that can wait on tccd). They run on a background thread and publish once;
+    /// a request that arrives while one is running runs again right after, so the newest state always lands.
+    private func probeDisk() {
+        guard diskProbe == nil else { diskProbeStale = true; return }
+        let fresh = Self.fresh
+        let readModel = !fresh && !TopBarStyle.isSnapshot
+        let engine = modelProbe
+        diskProbe = Task { [weak self] in
+            let found = await Task.detached(priority: .userInitiated) { () -> (model: Bool?, codex: Bool, fullDisk: Bool) in
+                (readModel ? engine.isDownloaded : nil, AgentHookInstaller.isInstalled(.codex), !fresh && Self.hasFullDiskAccess())
+            }.value
+            guard let self else { return }
+            self.diskProbe = nil
+            if let model = found.model, SpeechEngineStatus.shared.downloaded != model { SpeechEngineStatus.shared.downloaded = model }
+            if codexConnected != found.codex { codexConnected = found.codex }
+            if fullDiskAccess != found.fullDisk { fullDiskAccess = found.fullDisk }
+            if diskProbeStale {
+                diskProbeStale = false
+                probeDisk()
+            }
         }
     }
 
@@ -180,6 +204,7 @@ final class OnboardingServices: OnboardingServing {
         case .codex:
             do {
                 try AgentHookInstaller.install(.codex)
+                codexConnected = true
                 connectMessage = "Connected."
             } catch {
                 connectMessage = error.localizedDescription
@@ -196,7 +221,7 @@ final class OnboardingServices: OnboardingServing {
     static var hasBundle: Bool { Bundle.main.bundleIdentifier != nil }
 
     /// Reading the notification store needs Full Disk Access; the check opens nothing.
-    static func hasFullDiskAccess() -> Bool {
+    nonisolated static func hasFullDiskAccess() -> Bool {
         let probe = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Group Containers/group.com.apple.usernoted")
         return (try? FileManager.default.contentsOfDirectory(atPath: probe.path)) != nil

@@ -118,6 +118,7 @@ extension AIConnections {
 
     /// Checks every installed CLI's sign-in (all free), for the page's first look.
     func checkAllSignIns() async {
+        if !detected { await detect() }
         for provider in AIProvider.allCases where provider.kind == .hooked && installed(provider) {
             await checkSignIn(provider)
         }
@@ -224,30 +225,20 @@ extension AIConnections {
 
     /// Runs a short status command with a time limit; output is stdout and stderr together.
     nonisolated static func run(_ path: String, _ arguments: [String], timeout: TimeInterval) async -> (status: Int32, output: String) {
-        await Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: path)
-            process.arguments = arguments
-            var environment = ProcessInfo.processInfo.environment
-            environment["PATH"] = CLILocator.searchDirectories.joined(separator: ":")
-            environment["ZEUS_INTERNAL"] = "1"
-            environment["NO_COLOR"] = "1"
-            environment["NO_OPEN_BROWSER"] = "1"
-            process.environment = environment
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = pipe
-            process.standardInput = FileHandle.nullDevice
-            do { try process.run() } catch { return (-1, error.localizedDescription) }
-            let deadline = Date().addingTimeInterval(timeout)
-            let watchdog = Task.detached {
-                while process.isRunning, Date() < deadline { try? await Task.sleep(for: .milliseconds(100)) }
-                if process.isRunning { process.terminate() }
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = CLILocator.searchDirectories.joined(separator: ":")
+        environment["ZEUS_INTERNAL"] = "1"
+        environment["NO_COLOR"] = "1"
+        environment["NO_OPEN_BROWSER"] = "1"
+        let childEnvironment = environment
+        // A dispatch queue thread waits for the helper, never the cooperative pool: a CLI that hangs
+        // must not hold a Swift concurrency thread (and BoundedSubprocess bounds every pipe by the deadline).
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                let result = BoundedSubprocess.run(path, arguments, environment: childEnvironment,
+                                                   timeout: timeout, maxOutputBytes: 256 * 1024)
+                continuation.resume(returning: (result.status, result.output + result.error))
             }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            watchdog.cancel()
-            return (process.terminationStatus, String(decoding: data, as: UTF8.self))
-        }.value
+        }
     }
 }

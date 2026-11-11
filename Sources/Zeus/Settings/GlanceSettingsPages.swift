@@ -27,6 +27,7 @@ final class GSContext {
     func refresh() {
         services.refresh()
         LicenseManager.shared.refresh()
+        SettingsStore.shared.refreshLaunchAtLogin()
     }
 }
 

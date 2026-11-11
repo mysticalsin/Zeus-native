@@ -253,7 +253,8 @@ struct ScribeSpeakerIdentificationTests {
 
     @Test func aVoiceIsSavedMatchedAndDeleted() throws {
         var library = ScribeVoiceLibrary()
-        let saved = try #require(library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 5))
+        let savedResult = library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 5)
+        let saved = try #require(savedResult)
         #expect(library.match(voice(again(axis(0), seed: 1)))?.id == saved.id)
         #expect(library.match(voice(axis(1))) == nil)
         // A voice of another kind never matches.
@@ -266,7 +267,8 @@ struct ScribeSpeakerIdentificationTests {
     @Test func rememberingTheSameNameFoldsIntoOneVoice() throws {
         var library = ScribeVoiceLibrary()
         library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 3)
-        let folded = try #require(library.remember(name: " MARIE ", embedding: voice(again(axis(0), seed: 2)), sampleCount: 2))
+        let foldedResult = library.remember(name: " MARIE ", embedding: voice(again(axis(0), seed: 2)), sampleCount: 2)
+        let folded = try #require(foldedResult)
         #expect(library.voices.count == 1)
         #expect(folded.sampleCount == 5)
         library.remember(name: "Paul", embedding: voice(axis(1)), sampleCount: 1)
@@ -284,7 +286,8 @@ struct ScribeSpeakerIdentificationTests {
 
     @Test func theSampleCountIsCapped() throws {
         var library = ScribeVoiceLibrary()
-        let saved = try #require(library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 500))
+        let savedResult = library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 500)
+        let saved = try #require(savedResult)
         #expect(saved.sampleCount == ScribeVoiceLibrary.sampleCap)
     }
 
@@ -306,7 +309,8 @@ struct ScribeSpeakerIdentificationTests {
         defer { try? FileManager.default.removeItem(at: store.directory) }
         #expect(try store.load().isEmpty)
         var library = ScribeVoiceLibrary()
-        let marie = try #require(library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 4))
+        let marieResult = library.remember(name: "Marie", embedding: voice(axis(0)), sampleCount: 4)
+        let marie = try #require(marieResult)
         library.remember(name: "Paul", embedding: voice(axis(1)), sampleCount: 2)
         try store.save(library)
         let attributes = try FileManager.default.attributesOfItem(atPath: store.fileURL.path)

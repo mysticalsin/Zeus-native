@@ -30,7 +30,7 @@ struct DictationExtrasSection: View {
                 Text(message).font(.callout).foregroundStyle(.secondary)
             }
         }
-        .onAppear { tester.devices = Microphones.all() }
+        .onAppear { Task { tester.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } } // CoreAudio queries can stall: never on main
         .onDisappear { tester.stop() }
 
         Section("Typing") {

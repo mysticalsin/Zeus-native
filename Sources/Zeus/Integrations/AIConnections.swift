@@ -18,6 +18,12 @@ final class AIConnections {
     typealias TestState = AnyLLMEndpointValidation.State
 
     private(set) var detections: [AIProvider: AIProviderDetection] = [:]
+    /// False until the first background look at this Mac finishes: rows say "Checking" instead of "not found".
+    private(set) var detected = false
+    /// Hook files and config folders, read off the main thread by `detect()`. `status` runs in view
+    /// bodies, so it never touches the disk.
+    private(set) var hookInstalled: [AgentHookConfig.Agent: Bool] = [:]
+    private(set) var hookAvailable: [AgentHookConfig.Agent: Bool] = [:]
     private(set) var serverModels: [AIProvider: Int] = [:]
     private(set) var checking = false
     var messages: [AIProvider: String] = [:]
@@ -46,7 +52,6 @@ final class AIConnections {
         anyLLM = UserDefaults.standard.data(forKey: AnyLLMConfig.defaultsKey)
             .flatMap { try? JSONDecoder().decode(AnyLLMConfig.self, from: $0) } ?? AnyLLMConfig()
         anyLLMKeySaved = Keychain.get(AnyLLMConfig.keyAccount) != nil
-        detections = AIProviderDetector.detectAll()
         // Remove credential-bearing URL values saved by earlier builds without using them.
         Self.save(anyLLM)
     }
@@ -65,8 +70,8 @@ final class AIConnections {
             return services.isConnected(.codex) ? .connected("Hooks installed. Approvals reach the notch.") : (installed(provider) ? .ready : .notInstalled)
         case .cursor, .gemini:
             guard let agent = provider.hookAgent else { return .notInstalled }
-            if AgentHookInstaller.isInstalled(agent) { return .connected("Hooks installed. Runs show in the notch.") }
-            return installed(provider) || AgentHookInstaller.isAvailable(agent) ? .ready : .notInstalled
+            if hookInstalled[agent] == true { return .connected("Hooks installed. Runs show in the notch.") }
+            return installed(provider) || hookAvailable[agent] == true ? .ready : .notInstalled
         case .grok, .chatgpt:
             guard installed(provider) else { return .notInstalled }
             return defaults.bool(forKey: enabledKey(provider)) ? .connected("Opens the app. Prompt handoff is not supported.") : .ready
@@ -87,6 +92,7 @@ final class AIConnections {
     /// What the row says under the name.
     func detail(_ provider: AIProvider, services: OnboardingServices) -> String {
         if let message = messages[provider] { return message }
+        if !detected, provider.kind != .endpoint { return "Checking this Mac\u{2026}" }
         if provider.kind == .hooked, installed(provider), signedIn[provider] == false {
             return "Found on this Mac, not signed in. Sign in opens Terminal with its own login."
         }
@@ -116,7 +122,11 @@ final class AIConnections {
         case .codex: services.connect(.codex); messages[provider] = services.connectMessage
         case .cursor, .gemini:
             guard let agent = provider.hookAgent else { return }
-            do { try AgentHookInstaller.install(agent); messages[provider] = "Connected." } catch { messages[provider] = error.localizedDescription }
+            do {
+                try AgentHookInstaller.install(agent)
+                hookInstalled[agent] = true
+                messages[provider] = "Connected."
+            } catch { messages[provider] = error.localizedDescription }
         case .grok, .chatgpt, .ollama, .lmStudio:
             defaults.set(true, forKey: enabledKey(provider))
             Task { await refresh(only: provider) }
@@ -131,7 +141,10 @@ final class AIConnections {
         switch provider {
         case .claudeCode: services.permissions.disconnectClaudeCode()
         case .codex, .cursor, .gemini:
-            if let agent = provider.hookAgent { try? AgentHookInstaller.uninstall(agent) }
+            if let agent = provider.hookAgent {
+                try? AgentHookInstaller.uninstall(agent)
+                hookInstalled[agent] = AgentHookInstaller.isInstalled(agent)
+            }
         default:
             defaults.set(false, forKey: enabledKey(provider))
             if provider == .anyLLM { endpointEdited() }
@@ -147,10 +160,26 @@ final class AIConnections {
     func refresh(only provider: AIProvider? = nil) async {
         checking = true
         defer { checking = false }
-        detections = AIProviderDetector.detectAll()
+        await detect()
         for local in AIProvider.allCases where local.localPort != nil && (provider == nil || provider == local) {
             serverModels[local] = await Self.probe(local)
         }
+    }
+
+    /// Looks for the CLIs, apps and hook files on a background thread, then publishes the answer once.
+    func detect() async {
+        let snapshot = await Task.detached(priority: .userInitiated) { () -> ([AIProvider: AIProviderDetection], [AgentHookConfig.Agent: Bool], [AgentHookConfig.Agent: Bool]) in
+            var installed: [AgentHookConfig.Agent: Bool] = [:], available: [AgentHookConfig.Agent: Bool] = [:]
+            for agent in AgentHookConfig.Agent.allCases {
+                installed[agent] = AgentHookInstaller.isInstalled(agent)
+                available[agent] = AgentHookInstaller.isAvailable(agent)
+            }
+            return (AIProviderDetector.detectAll(), installed, available)
+        }.value
+        detections = snapshot.0
+        hookInstalled = snapshot.1
+        hookAvailable = snapshot.2
+        detected = true
     }
 
     private static func probe(_ provider: AIProvider) async -> Int? {

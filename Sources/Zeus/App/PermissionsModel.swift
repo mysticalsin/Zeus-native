@@ -43,9 +43,9 @@ final class PermissionsModel {
     private(set) var automationAsking = false
     /// Why the last Automation Allow could not ask (no target app was running); nil otherwise.
     var automationMessage: String?
-    private(set) var claudeHooksInstalled = ClaudeHookInstaller.isInstalled()
+    private(set) var claudeHooksInstalled = false
     var hookMessage: String?
-    private(set) var chromeHostInstalled = ChromeInstaller.isInstalled()
+    private(set) var chromeHostInstalled = false
     private(set) var chromeConnected = false
     var chromeMessage: String?
 
@@ -91,6 +91,31 @@ final class PermissionsModel {
     init(captureAccess: CaptureAccess = .live) {
         self.captureAccess = captureAccess
         Automation.onCacheUpdated = { [weak self] in self?.refreshAutomationOnly() }
+        refreshInstallFlagsInBackground()
+    }
+
+    @ObservationIgnored private var installFlagsGeneration: UInt64 = 0
+
+    /// The hook and Chrome host files are read on a background thread: `refresh` runs when Settings
+    /// opens and must never wait on the disk. A newer read (or a synchronous one after a click) wins.
+    private func refreshInstallFlagsInBackground() {
+        installFlagsGeneration &+= 1
+        let generation = installFlagsGeneration
+        Task { [weak self] in
+            let flags = await Task.detached(priority: .userInitiated) {
+                (ClaudeHookInstaller.isInstalled(), ChromeInstaller.isInstalled())
+            }.value
+            guard let self, generation == self.installFlagsGeneration else { return }
+            if self.claudeHooksInstalled != flags.0 { self.claudeHooksInstalled = flags.0 }
+            if self.chromeHostInstalled != flags.1 { self.chromeHostInstalled = flags.1 }
+        }
+    }
+
+    /// After Connect or Disconnect (a click that just wrote these files): read them now.
+    private func refreshInstallFlagsNow() {
+        installFlagsGeneration &+= 1
+        claudeHooksInstalled = ClaudeHookInstaller.isInstalled()
+        chromeHostInstalled = ChromeInstaller.isInstalled()
     }
 
     func refresh() {
@@ -102,8 +127,7 @@ final class PermissionsModel {
         granted[.calendar] = EKEventStore.authorizationStatus(for: .event) == .fullAccess
         granted[.reminders] = EKEventStore.authorizationStatus(for: .reminder) == .fullAccess
         refreshAutomationOnly()
-        claudeHooksInstalled = ClaudeHookInstaller.isInstalled()
-        chromeHostInstalled = ChromeInstaller.isInstalled()
+        refreshInstallFlagsInBackground()
         Task { chromeConnected = await ChromeBridge.isConnected() }
     }
 
@@ -238,6 +262,7 @@ final class PermissionsModel {
         } catch {
             hookMessage = error.localizedDescription
         }
+        refreshInstallFlagsNow()
         refresh()
     }
 
@@ -248,6 +273,7 @@ final class PermissionsModel {
         } catch {
             hookMessage = error.localizedDescription
         }
+        refreshInstallFlagsNow()
         refresh()
     }
 
@@ -259,6 +285,7 @@ final class PermissionsModel {
         } catch {
             chromeMessage = error.localizedDescription
         }
+        refreshInstallFlagsNow()
         refresh()
     }
 
@@ -269,6 +296,7 @@ final class PermissionsModel {
         } catch {
             chromeMessage = error.localizedDescription
         }
+        refreshInstallFlagsNow()
         refresh()
     }
 }

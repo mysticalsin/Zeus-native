@@ -2713,15 +2713,15 @@
       }
     },
     {
-      "id": "REG-231",
-      "failure": "Instant commands depended on a Laya local decision server that is not installed by default: a probe and a 20 second start wait sat in front of the model stage. Laya is removed and Jev (key plus a monthly limit, 600 ms budget) is the only model stage; a saved Laya or Auto choice now maps to Jev.",
+      "id": "REG-226",
+      "failure": "Opening Settings froze the window: Settings drew rows from calls that wait on the system (the Launch at login switch asked SMAppService on every render, Integrations rows read hook files on every render, and window open read the disk, the microphone list and a TCC-protected folder on the main thread), and a subprocess wait held a Swift concurrency thread.",
       "features": [
         "F13"
       ],
       "check": "closed-loop-selftests",
       "guard": {
         "file": "qa/closed-loop/tests/test_source_lint.py",
-        "function": "test_sources_never_mention_laya"
+        "function": "test_no_blocking_waits_outside_audited_files"
       }
     }
   ]

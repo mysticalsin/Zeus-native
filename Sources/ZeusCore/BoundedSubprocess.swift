@@ -17,6 +17,7 @@ public enum BoundedSubprocess {
     }
 
     public static func run(_ executable: String, _ arguments: [String], input: Data? = nil,
+                           environment: [String: String]? = nil,
                            timeout: TimeInterval = 600, maxOutputBytes: Int = 8 * 1024 * 1024) -> Result {
         guard timeout.isFinite, timeout > 0, maxOutputBytes > 0 else {
             return Result(status: 125, output: "", error: "Invalid helper limits.")
@@ -25,6 +26,7 @@ public enum BoundedSubprocess {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        if let environment { process.environment = environment }
         launchLock.lock()
         var launching = true
         defer { if launching { launchLock.unlock() } }
