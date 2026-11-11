@@ -2980,6 +2980,30 @@
     },
     {
       "id": "REG-248",
+      "failure": "UltronEffectGraph connected its effect nodes to the engine's main mixer before the engine had a usable output. On a Mac with no audio device, an unusual format or a changed device AVFAudio raised an uncatchable Objective-C exception (setFormat error -10868) and ended the app, or the whole test process on CI. Connection now validates the format and output first, offline rendering enables manual mode before connecting, the live chain connects lazily and a refusal falls back to passthrough or no audio with a logged reason.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Onboarding footer: the Languages step had its own Set up later and Continue buttons in a separate switch branch, so while a step animated the outgoing and incoming pairs existed together (duplicate controls, a tap could reach the previous step's action), and Set up later on Languages bypassed the skip event of the progress state machine. One shared footer now serves every middle step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
+    },
+    {
+      "id": "REG-250",
       "failure": "A call-window name was bound to a voice on weak evidence: two people lit about equally over one voice.",
       "features": [
         "F02"
@@ -2991,7 +3015,7 @@
       }
     },
     {
-      "id": "REG-249",
+      "id": "REG-251",
       "failure": "Call-window evidence overwrote a speaker name the person had typed.",
       "features": [
         "F02"
@@ -3003,7 +3027,7 @@
       }
     },
     {
-      "id": "REG-250",
+      "id": "REG-252",
       "failure": "A muted participant tile could win the vote for a voice and name it.",
       "features": [
         "F02"
@@ -3015,7 +3039,7 @@
       }
     },
     {
-      "id": "REG-251",
+      "id": "REG-253",
       "failure": "One call-window name landed on two different voices.",
       "features": [
         "F02"
@@ -3027,7 +3051,7 @@
       }
     },
     {
-      "id": "REG-252",
+      "id": "REG-254",
       "failure": "A name the person declined for a voice was offered again for that voice.",
       "features": [
         "F02"
@@ -3039,7 +3063,7 @@
       }
     },
     {
-      "id": "REG-253",
+      "id": "REG-255",
       "failure": "French call-window labels (parle, micro coupe, Invitee, Vous) were not understood, so no name was found.",
       "features": [
         "F02"
@@ -3051,7 +3075,7 @@
       }
     },
     {
-      "id": "REG-254",
+      "id": "REG-256",
       "failure": "Where a speaker name came from was lost when a meeting was reopened, so an automatic name looked typed.",
       "features": [
         "F02"
@@ -3063,7 +3087,7 @@
       }
     },
     {
-      "id": "REG-255",
+      "id": "REG-257",
       "failure": "Merging two speakers could not be undone.",
       "features": [
         "F02"
@@ -3075,7 +3099,7 @@
       }
     },
     {
-      "id": "REG-256",
+      "id": "REG-258",
       "failure": "Pruning tiny voices folded a named speaker or the owner into someone else, or could not be reversed.",
       "features": [
         "F02"
@@ -3087,7 +3111,7 @@
       }
     },
     {
-      "id": "REG-257",
+      "id": "REG-259",
       "failure": "Assigning selected words to another speaker lost or overlapped the block time.",
       "features": [
         "F02"
