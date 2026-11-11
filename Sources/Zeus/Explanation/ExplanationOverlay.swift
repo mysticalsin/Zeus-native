@@ -10,6 +10,8 @@ final class ExplanationOverlay {
     private var invalidationObservation: ExplanationScreenObservation?
     private var captureID: UUID?
     private var visibleInShare = false
+    /// Chat annotations sit at `.floating`. The pointing overlay must stay above open menus.
+    var windowLevel: NSWindow.Level = .floating
 
     var isVisible: Bool { panels.values.contains(where: \.isVisible) }
     var displayIDs: Set<UInt32> { Set(panels.keys) }
@@ -56,7 +58,7 @@ final class ExplanationOverlay {
         panel.isReleasedWhenClosed = false
         panel.ignoresMouseEvents = true
         panel.hidesOnDeactivate = false
-        panel.level = .floating
+        panel.level = windowLevel
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         ZeusWindowSharing.apply(to: panel, visibleInShare: visibleInShare, surface: .zeusStandard)
         let host = NSHostingView(rootView: surface)
