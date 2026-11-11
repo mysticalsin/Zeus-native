@@ -271,7 +271,8 @@ struct OnboardingIsolationTests {
         try await settle(flow, at: .sounds)
         #expect(flow.complete())
         #expect(!flow.complete())
-        #expect(memory.finishes == 2)
+        // Completion is terminal and recorded once (OnboardingProgress); the second finish still closes the guide.
+        #expect(memory.finishes == 1 && flow.completed)
     }
 
     @Test func explicitMotionPolicyNeverOverridesSystemReduction() {

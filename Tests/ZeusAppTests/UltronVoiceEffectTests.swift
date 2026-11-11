@@ -4,7 +4,9 @@ import Testing
 import ZeusCore
 @testable import Zeus
 
-@Suite struct UltronVoiceEffectTests {
+// Serialized: several AVAudioEngine graphs built at once on a host without an audio device is
+// exactly the condition these tests probe; one at a time keeps a failure attributable.
+@Suite(.serialized) struct UltronVoiceEffectTests {
     private func tone(seconds: Double = 0.4, amplitude: Float = 0.4) -> AVAudioPCMBuffer {
         let format = UltronAudioChain.format
         let frames = AVAudioFrameCount(seconds * format.sampleRate)
@@ -31,7 +33,26 @@ import ZeusCore
         let original = samples(input)
         let overlap = min(original.count, processed.count)
         let difference = (0..<overlap).reduce(Float(0)) { $0 + abs(original[$1] - processed[$1]) }
-        #expect(difference > 1)
+        if let refusal = Self.hostRefusesChain() {
+            // This host's AVFAudio refuses the chain (CI runners have no audio device): the render must
+            // then be the untouched voice, never a crash or silence.
+            #expect(difference < 0.001, "host refused the chain: \(refusal)")
+        } else {
+            #expect(difference > 1)
+        }
+    }
+
+    /// Why this host's AVFAudio refuses the offline effect chain, or nil when it accepts it.
+    private static func hostRefusesChain() -> String? {
+        let engine = AVAudioEngine()
+        let player = AVAudioPlayerNode()
+        let graph = UltronEffectGraph()
+        engine.attach(player)
+        graph.attach(to: engine)
+        do {
+            try engine.enableManualRenderingMode(.offline, format: UltronAudioChain.format, maximumFrameCount: 4_096)
+        } catch { return "manual rendering unavailable: \(error.localizedDescription)" }
+        return graph.connect(from: player, format: UltronAudioChain.format, engine: engine)
     }
 
     @Test func graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing() {

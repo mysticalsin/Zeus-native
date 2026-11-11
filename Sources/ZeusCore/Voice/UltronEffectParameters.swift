@@ -52,8 +52,9 @@ public struct UltronEffectParameters: Equatable, Sendable {
             outputGainDB: -2 * t)
     }
 
-    /// Intensity as stored (0 to 1) to the slider percent.
+    /// Intensity as stored (0 to 1) to the whole slider percent. Rounded: a Float 0.6 is 0.6000000238,
+    /// and `Int(...)` of the unrounded product could read 59 for a value saved as 59.99999.
     public static func percent(fromIntensity intensity: Float) -> Double {
-        intensity.isFinite ? Double(min(max(intensity, 0), 1)) * 100 : Double(defaultPercent)
+        intensity.isFinite ? (Double(min(max(intensity, 0), 1)) * 100).rounded() : Double(defaultPercent)
     }
 }

@@ -75,7 +75,7 @@ import Testing
 
     @Test func situationNamesMatchTheSpec() {
         #expect(Set(Situation.allCases.map(\.rawValue)) == ["ack.open", "ack.play", "ack.done", "ack.todoAdded", "failed", "approval",
-                                                           "agentDone", "greeting.morning", "greeting.evening", "greeting.lateNight", "wakeWord.heard", "identity", "joke", "smallTalk", "comparison", "metaphysical", "welcomeBack"])
+                                                           "agentDone", "greeting.morning", "greeting.evening", "greeting.lateNight", "wakeWord.heard", "identity", "joke", "smallTalk", "comparison", "metaphysical", "welcomeBack", "thinking", "errorSpoken"])
         #expect(Situation.greeting(hour: 8) == .greetingMorning)
         #expect(Situation.greeting(hour: 19) == .greetingEvening)
         #expect(Situation.greeting(hour: 1) == .greetingLateNight)

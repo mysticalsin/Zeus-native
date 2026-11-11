@@ -2,6 +2,7 @@ import AudioToolbox
 import AVFoundation
 import Foundation
 import ZeusCore
+import ZeusObjCGuard
 
 /// The effect nodes for one AVAudioEngine: pitch down, EQ, a little radio-tower distortion, a short
 /// comb for the metallic sheen, and a small room. All wet amounts come from `UltronEffectParameters`.
@@ -67,13 +68,21 @@ final class UltronEffectGraph {
     func connect(from source: AVAudioNode, format: AVAudioFormat, engine: AVAudioEngine) -> String? {
         if let reason = Self.unavailableReason(engine: engine, format: format) { return reason }
         let destination = engine.mainMixerNode
-        var previous = source
-        for node in nodes {
-            engine.connect(previous, to: node, format: format)
-            previous = node
+        let chain = nodes
+        // AVFAudio raises (not throws) when a unit refuses the format, for example -10868 on a Mac
+        // whose output device vanished. Caught here, the partial wiring is undone and the caller
+        // falls back to passthrough instead of the process ending.
+        let failure = ZeusCatchObjCException {
+            var previous = source
+            for node in chain {
+                engine.connect(previous, to: node, format: format)
+                previous = node
+            }
+            engine.connect(previous, to: destination, format: format)
         }
-        engine.connect(previous, to: destination, format: format)
-        return nil
+        guard let failure else { return nil }
+        for node in [source] + chain { engine.disconnectNodeOutput(node) }
+        return "audio engine refused the chain (\(failure))"
     }
 
     func apply(_ p: UltronEffectParameters) {

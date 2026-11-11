@@ -250,7 +250,8 @@ struct ExplanationRendererTests {
         input.model?.parts["wheels"]?.material.opacity = 0.3
         input.model?.flows["energy"]?.direction = .reverse
         view.apply(input)
-        #expect(view.modelPartNode("wheels") === node && node.opacity == 0.3 && view.modelPartIDs == ["wheels"])
+        // SceneKit stores opacity as a Float: 0.3 reads back as 0.30000001.
+        #expect(view.modelPartNode("wheels") === node && abs(node.opacity - 0.3) < 0.0001 && view.modelPartIDs == ["wheels"])
         input.model?.cutaway = .init(style: .none, partIDs: [])
         input.model?.parts["wheels"]?.visible = false
         view.apply(input)

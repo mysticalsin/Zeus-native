@@ -953,8 +953,9 @@ struct RecordlyCheckpointStoreTests {
         try sourceText("Sources/Zeus/Recordly/RecordlyController.swift")
     }
 
+    /// The Record page and the glass surfaces it is composed of (the preview moved there).
     private func pageSource() throws -> String {
-        try sourceText("Sources/Zeus/Recordly/RecordlyPage.swift")
+        try sourceText("Sources/Zeus/Recordly/RecordlyPage.swift") + "\n" + sourceText("Sources/Zeus/Recordly/RecordlyGlass.swift")
     }
 
     private func sourceText(_ relative: String) throws -> String {

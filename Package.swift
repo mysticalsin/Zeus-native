@@ -21,8 +21,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "ZeusCore"),
+        // Catches Objective-C exceptions from Apple frameworks that Swift cannot catch (see header).
+        .target(name: "ZeusObjCGuard"),
         .executableTarget(name: "Zeus", dependencies: [
             "ZeusCore",
+            "ZeusObjCGuard",
             .product(name: "FluidAudio", package: "FluidAudio"),
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
         ], resources: [

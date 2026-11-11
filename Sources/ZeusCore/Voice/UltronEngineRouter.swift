@@ -83,6 +83,10 @@ public enum UltronEngineRouter {
             guard seen.insert(engine).inserted else { return }
             decisions.append(UltronRouteDecision(engine: engine, reason: reason))
         }
+        // The Mac voice chosen on purpose is the whole chain: no cloud voice speaks ahead of it.
+        if case .fixed(.system) = choice {
+            return [UltronRouteDecision(engine: .system, reason: "chosen in Settings")]
+        }
         var skipped: [String] = []
         if case .fixed(let chosen) = choice {
             if let why = availability.skipReason(chosen) {
