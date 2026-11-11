@@ -69,6 +69,7 @@ struct FeaturesSettingsPage: View {
                         options: ["Automatic"] + TerminalApp.allCases.map(\.title))
             }
         }
+        scribeCard
         SpeakerRecognitionCard()
         GSCard("Research") {
             GSRow(symbol: "magnifyingglass", title: "Depth", text: "Quick takes a few searches. Deep reads many sources and takes minutes. You can always say \u{201C}deep research\u{201D}.") {
@@ -93,6 +94,16 @@ struct FeaturesSettingsPage: View {
             }
             GSInfo(text: "Zeus acts with Haiku, or Sonnet at most, and the same size on every other engine. Your own coding sessions keep their own models.")
             GSDetails(text: modelDetails)
+        }
+    }
+
+    private var scribeCard: some View {
+        let mode = ScribeAutoStartMode.parse(store.string(ScribeAutoStartMode.settingID))
+        return GSCard("Scribe") {
+            GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts", text: ScribeAutoStartText.settingNote(mode)) {
+                GSPopup(selection: store.stringBinding(ScribeAutoStartMode.settingID), options: ScribeAutoStartMode.choices)
+            }
+            GSInfo(text: ScribeAutoStartText.settingEndNote)
         }
     }
 

@@ -8,8 +8,17 @@ must change together. The fix pattern used here: a pure `State` / `Event` / `Eff
 a controller that holds one `state` value and performs the effects, a token on every async completion, and
 Swift Testing tests in `Tests/ZeusCoreTests`.
 
-Summary: 20 machines inventoried. 6 were fixed (5 commits, Chrome consent shares the consent commit). 5 were already
+Summary: 20 machines inventoried (item 21 was added later, already explicit). 6 were fixed (5 commits, Chrome consent shares the consent commit). 5 were already
 explicit or mostly explicit (skipped). 9 remain: 8 ranked at the end, plus KeepAwake which needs no change.
+
+## Added after the audit
+
+### 21. Scribe meeting start and call end. EXPLICIT from the start (2026-11-11)
+- Where: `ZeusCore/Scribe/ScribeAutoStart.swift` (`ScribeAutoStartMachine`), driven by `Zeus/Scribe/ScribeAutoStartController.swift`, fed by `ScribeCallWatcher` (poll plus Core Audio wake-ups in `ScribeMicActivity.swift`), banner in `ScribeMeetingBanner.swift`. Setting `scribe.autoStart`: Off, Ask me (default), Start automatically.
+- States: idle, armed (seen, debouncing 3 s), prompting (20 s), countingDown (5 s, Cancel), recording, endingSuggested, cooldown.
+- Signals: calendar event with a call link within 2 min before to 5 min after its start and its call app open; or a known call app holding the microphone (`kAudioProcessPropertyIsRunningInput`, Zeus excluded). An open app alone is not a meeting.
+- Rules: one trigger per meeting (key = calendar event id, else call app; same key stays quiet until it was gone 30 s and 60 s passed); automatic start only when Microphone is already granted (otherwise it asks, and a permission lost during the countdown falls back to asking); call end = the call app released the microphone for 30 s after holding it, then Scribe's own end window opens (9 s, Keep recording); Keep returns to recording and waits for the microphone to come back before suggesting again; a recording started by hand is never prompted over; ticks only move banner deadlines.
+- Tests: `ScribeAutoStartTests.swift` (every transition, debounce, single trigger, permission fallback, call-ended path, keep, cooldown re-arm).
 
 ## Fixed
 

@@ -7,13 +7,17 @@ public struct ScribeCalendarSlot: Equatable, Sendable {
     public var end: Date?
     /// Display names of the invitees. Never email addresses: `ScribeAttendeeNames.clean` drops those.
     public var attendeeNames: [String]
+    /// The event carries a call link (Teams, Zoom, Meet, Webex...). Only the meeting-start detector reads it.
+    public var hasCallLink: Bool
 
-    public init(id: String, title: String, start: Date, end: Date? = nil, attendeeNames: [String] = []) {
+    public init(id: String, title: String, start: Date, end: Date? = nil, attendeeNames: [String] = [],
+                hasCallLink: Bool = false) {
         self.id = id
         self.title = title
         self.start = start
         self.end = end
         self.attendeeNames = ScribeAttendeeNames.clean(attendeeNames)
+        self.hasCallLink = hasCallLink
     }
 }
 

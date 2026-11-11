@@ -4,9 +4,9 @@ Source: Glance 0.3.1 (build 26) from app-71mb.dmg, studied on the box: the fr an
 
 Sidebar (Glance order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 169 of 169 Glance options are in Zeus Settings with a matching control (100% of all, 100% of the 169 in scope). 158 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 170 of 170 Glance options are in Zeus Settings with a matching control (100% of all, 100% of the 170 in scope). 159 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 118.
+**Before this round:** has 19, partial 27, missing 119.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -272,6 +272,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Browser agent | Always ask before | text | - | Extra words that always show an approval card. | missing | live | `browserAgent.alwaysAsk` | Zeus addition. Added to the built-in list (buy, send, delete, post...). |
 | Browser agent | Browser for the agent | menu | - | Your own Chrome through the ZEUS extension, or a separate browser (browser-use) with its own profile. | missing | live | `browserAgent.backend` | Zeus addition. The separate one needs the Set up button once; `zeus browse --separate` forces it for one task. |
 | Browser agent | Allowed sites (separate browser) | text | - | Sites the separate browser may open, separated by commas. Empty means any site. | missing | live | `browserAgent.allowedDomains` | Zeus addition. Passed to browser-use as BROWSER_USE_ALLOWED_DOMAINS and checked before every open. |
+| Scribe | When a meeting starts | menu | - | Off, ask first, or start notes on its own when a call or calendar meeting begins. | missing | live | `scribe.autoStart` | Zeus addition. Settings > Features > Scribe. Start automatically needs Microphone to be allowed already; otherwise Zeus asks. Never prompts for permission. |
 | Coding | Default coding agent | menu | - | Claude Code, Codex, Gemini or Cursor Agent. | missing | custom | `code.tool` | Zeus addition. Stored under the code.tool key. |
 | Coding | Terminal app | menu | - | Automatic, Ghostty, iTerm, Warp or Terminal. | missing | custom | `code.terminal` | Zeus addition. Stored under the code.terminal key. |
 | Research | Research depth | menu | - | Quick or Deep when you do not say deep research. | missing | live | `research.depth` | Zeus addition. |
