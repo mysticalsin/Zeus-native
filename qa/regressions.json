@@ -2980,6 +2980,30 @@
     },
     {
       "id": "REG-248",
+      "failure": "UltronEffectGraph connected its effect nodes to the engine's main mixer before the engine had a usable output. On a Mac with no audio device, an unusual format or a changed device AVFAudio raised an uncatchable Objective-C exception (setFormat error -10868) and ended the app, or the whole test process on CI. Connection now validates the format and output first, offline rendering enables manual mode before connecting, the live chain connects lazily and a refusal falls back to passthrough or no audio with a logged reason.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Onboarding footer: the Languages step had its own Set up later and Continue buttons in a separate switch branch, so while a step animated the outgoing and incoming pairs existed together (duplicate controls, a tap could reach the previous step's action), and Set up later on Languages bypassed the skip event of the progress state machine. One shared footer now serves every middle step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
+    },
+    {
+      "id": "REG-250",
       "failure": "A process of another user, or a program other than the Zeus app on the browser bridge socket, could connect to the agent and browser sockets: the files were only mode 0600.",
       "features": [
         "F13"
@@ -2991,7 +3015,7 @@
       }
     },
     {
-      "id": "REG-249",
+      "id": "REG-251",
       "failure": "A hook client could send a bundle ID of its own choosing and have Zeus launch that app, or label a risky command low risk.",
       "features": [
         "F13"
@@ -3003,7 +3027,7 @@
       }
     },
     {
-      "id": "REG-250",
+      "id": "REG-252",
       "failure": "A model-written action could start a coding agent, or send a prompt to ChatGPT, Claude or Dust, without an approval card.",
       "features": [
         "F13"
@@ -3015,7 +3039,7 @@
       }
     },
     {
-      "id": "REG-251",
+      "id": "REG-253",
       "failure": "The update feed accepted http, file and app-scheme addresses, and its download link was opened whatever its scheme.",
       "features": [
         "F13"
@@ -3027,7 +3051,7 @@
       }
     },
     {
-      "id": "REG-252",
+      "id": "REG-254",
       "failure": "The system HUD monitor woke ten times a second for as long as the app ran, whether or not a HUD was shown.",
       "features": [
         "F13"
@@ -3039,7 +3063,7 @@
       }
     },
     {
-      "id": "REG-253",
+      "id": "REG-255",
       "failure": "Zeus pinged Ollama and the cloud API at launch and at every wake from sleep, before anyone used voice.",
       "features": [
         "F13"
@@ -3051,7 +3075,7 @@
       }
     },
     {
-      "id": "REG-254",
+      "id": "REG-256",
       "failure": "Transcribing with Parakeet when its model was missing started the model download without any click.",
       "features": [
         "F13"

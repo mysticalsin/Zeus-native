@@ -40,4 +40,4 @@ Not done: the feed format has no signature or hash. Zeus never installs the down
 
 ## Tests and regressions
 
-ZeusCoreTests: `PeerCredentialsTests`, `ClientInputPolicyTests`, `UpdateFeedPolicyTests`, `SystemHUDPollPolicyTests`, `BrainWarmPlanTests`. ZeusAppTests: `BrainWarmSchedulerTests`. Registry rows REG-248 to REG-254.
+ZeusCoreTests: `PeerCredentialsTests`, `ClientInputPolicyTests`, `UpdateFeedPolicyTests`, `SystemHUDPollPolicyTests`, `BrainWarmPlanTests`. ZeusAppTests: `BrainWarmSchedulerTests`. Registry rows REG-250 to REG-256.

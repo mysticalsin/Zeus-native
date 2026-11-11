@@ -350,28 +350,30 @@ struct OnboardingRoot: View {
                     .buttonStyle(OBPrimaryButtonStyle(width: 87))
                     .ownedJourneyControl("onboarding.start")
                     .keyboardShortcut(.defaultAction)
-            case .languages:
-                Button("Set up later") { LanguagePackController.shared.declineOnboardingChoice(); flow.next() }
-                    .buttonStyle(OBTextButtonStyle())
-                    .ownedJourneyControl("onboarding.skip")
-                    .padding(.trailing, 18.5)
-                    .accessibilityHint("Installs no language packs. You can add them later in Settings.")
-                Button("Continue") { LanguagePackController.shared.confirmOnboardingChoice(); flow.next() }
-                    .buttonStyle(OBPrimaryButtonStyle(width: 117.5))
-                    .ownedJourneyControl("onboarding.next")
-                    .keyboardShortcut(.defaultAction)
             case .sounds:
                 Button("Finish", action: finish)
                     .buttonStyle(OBPrimaryButtonStyle(width: 93.5))
                     .ownedJourneyControl("onboarding.finish")
                     .keyboardShortcut(.defaultAction)
             default:
-                Button("Set up later") { flow.skipStep() }
+                // One footer for every middle step, Languages included. Two branches that each held a
+                // "Set up later" and a "Continue" made SwiftUI keep the outgoing pair next to the incoming
+                // pair while the step animated, so for half a second a tap could reach the old step's
+                // action and the controls were duplicated.
+                Button("Set up later") {
+                    if flow.step == .languages { LanguagePackController.shared.declineOnboardingChoice() }
+                    flow.skipStep()
+                }
                     .buttonStyle(OBTextButtonStyle())
                     .ownedJourneyControl("onboarding.skip")
                     .padding(.trailing, 18.5)
-                    .accessibilityHint("Skips this step. You can finish it later in Settings.")
-                Button("Continue") { flow.next() }
+                    .accessibilityHint(flow.step == .languages
+                        ? "Installs no language packs. You can add them later in Settings."
+                        : "Skips this step. You can finish it later in Settings.")
+                Button("Continue") {
+                    if flow.step == .languages { LanguagePackController.shared.confirmOnboardingChoice() }
+                    flow.next()
+                }
                     .buttonStyle(OBPrimaryButtonStyle(width: 117.5))
                     .ownedJourneyControl("onboarding.next")
                     .keyboardShortcut(.defaultAction)
