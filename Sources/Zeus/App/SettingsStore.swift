@@ -341,7 +341,11 @@ enum MeetingState {
 
     static func refresh(ownMicInUse: Bool) {
         guard SettingsStore.shared.bool("general.meetingMode"), !TopBarStyle.isSnapshot else { active = false; return }
-        active = (!ownMicInUse && micInUseSomewhere()) || displayMirrored()
+        // Zeus's own microphone (wake word, Scribe, a dictation still closing) is not a meeting: ask Core
+        // Audio which process is recording. Only when that list is unavailable, fall back to the device
+        // view, which cannot tell Zeus from a call app and so is skipped while Zeus knows it records.
+        let otherApp = micInUseByAnotherProcess() ?? (!ownMicInUse && micInUseSomewhere())
+        active = otherApp || displayMirrored()
     }
 
     /// Hide commands and project names on cards when asked, or while a meeting is on.
@@ -358,6 +362,31 @@ enum MeetingState {
         address.mSelector = kAudioDevicePropertyDeviceIsRunningSomewhere
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &running) == noErr else { return false }
         return running != 0
+    }
+
+    /// Whether a process other than Zeus is recording from any input; nil when Core Audio cannot say.
+    private static func micInUseByAnotherProcess() -> Bool? {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size = UInt32(0)
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr else { return nil }
+        var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard !objects.isEmpty, AudioObjectGetPropertyData(system, &address, 0, nil, &size, &objects) == noErr else { return nil }
+        let processes = objects.prefix(Int(size) / MemoryLayout<AudioObjectID>.size).compactMap { object -> MeetingMicPolicy.InputProcess? in
+            var pid = pid_t(0)
+            var pidSize = UInt32(MemoryLayout<pid_t>.size)
+            var pidAddress = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyPID,
+                                                        mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            guard AudioObjectGetPropertyData(object, &pidAddress, 0, nil, &pidSize, &pid) == noErr else { return nil }
+            var running = UInt32(0)
+            var runningSize = UInt32(MemoryLayout<UInt32>.size)
+            var runningAddress = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyIsRunningInput,
+                                                            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            guard AudioObjectGetPropertyData(object, &runningAddress, 0, nil, &runningSize, &running) == noErr else { return nil }
+            return MeetingMicPolicy.InputProcess(pid: pid, recording: running != 0)
+        }
+        return MeetingMicPolicy.anotherProcessRecords(processes, ownPID: ProcessInfo.processInfo.processIdentifier)
     }
 
     private static func displayMirrored() -> Bool {
