@@ -12,7 +12,7 @@ public enum StartupService: String, CaseIterable, Sendable {
     case usage, proactive, stickiesRestore, routines, helperRefresh, voiceTurn
     case appIndex, projectScanner, macControl, avatarFeed, shortcuts, todo
     case sleepWatch, notificationPeeker, settingsCatalog, updates, agentServer
-    case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord
+    case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord, pointingHotkey
     case connectionsRefresh, autoOnboarding, demoArg, motionOpenArg, deepLinks
     case settingsWindow, onboardingWindow, chatWindow, demoPlayback
 }
@@ -73,7 +73,7 @@ public struct StartupPolicy: Equatable, Sendable {
         "--onboarding-step", "--onboarding-agent", "--onboarding-fresh", "--settings-section", "--tts-sample",
         "--jev-smoke", "--require-keys", "--drive-dryrun", "--drive-snapshot", "--screen-awareness-dryrun",
         "--annotate-dryrun", "--agent-dryrun", "--codex-replay", "--microphones", "--transcribe", "--chrome",
-        "--snapshot-scales", "--snapshot-match",
+        "--snapshot-scales", "--snapshot-match", "--pointing-selftest",
     ]
 
     /// Variables that must be absent in QA: they point Zeus at a brain fixture or the login keychain.

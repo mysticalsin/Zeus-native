@@ -53,7 +53,7 @@ enum DebugForward {
 /// the one already running (and quit itself) unless this launch needs its own process image
 /// (snapshots, the settings/onboarding parity harnesses, the offline voice self-test).
 enum InstanceGuard {
-    static let exemptFlags: Set<String> = ["--snapshots", "--settings-only", "--onboarding-only", "--voice-selftest", "--engine-logos", "--render-film"]
+    static let exemptFlags: Set<String> = ["--snapshots", "--settings-only", "--onboarding-only", "--voice-selftest", "--engine-logos", "--render-film", "--pointing-selftest"]
 
     /// `argv` excludes the executable path. `others` are pids of other running instances of this
     /// app (excluding our own pid).
