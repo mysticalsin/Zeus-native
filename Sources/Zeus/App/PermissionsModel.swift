@@ -354,12 +354,15 @@ enum Automation {
     static var allowedAny: Bool { !allowedTargets.isEmpty }
 
     /// Keeps a grant for an app that is not running, and forgets it once macOS reports it revoked (or never given).
-    private static func remember(_ bundleID: String, _ code: OSStatus) {
+    /// The cache model decides which (see `AutomationConsentCache`); a stale check never reaches here.
+    private static func perform(_ effects: [AutomationConsentCache.Effect], for bundleID: String) {
         let defaults = UserDefaults.standard
-        if code == noErr {
-            defaults.set(true, forKey: grantKey(bundleID))
-        } else if code == OSStatus(errAEEventNotPermitted) || code == OSStatus(errAEEventWouldRequireUserConsent) {
-            defaults.removeObject(forKey: grantKey(bundleID))
+        for effect in effects {
+            switch effect {
+            case .rememberGrant: defaults.set(true, forKey: grantKey(bundleID))
+            case .forgetGrant: defaults.removeObject(forKey: grantKey(bundleID))
+            case .startCheck: break
+            }
         }
     }
 
@@ -373,8 +376,9 @@ enum Automation {
         let running = players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
         guard !running.isEmpty else { return nil }
         var codes: [String: OSStatus] = [:]
+        for id in running { promptBegan(id) }
         for id in running { codes[id] = promptStatus(id) }
-        for (id, code) in codes { storeResolved(id, code) }
+        for (id, code) in codes { promptAnswered(id, code) }
         return codes.values.contains(noErr)
     }
 
@@ -382,12 +386,13 @@ enum Automation {
     static func askAsync() async -> Bool? {
         let running = players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
         guard !running.isEmpty else { return nil }
+        for id in running { promptBegan(id) }
         let codes = await Task.detached(priority: .userInitiated) { () -> [String: OSStatus] in
             var codes: [String: OSStatus] = [:]
             for id in running { codes[id] = promptStatus(id) }
             return codes
         }.value
-        for (id, code) in codes { storeResolved(id, code) }
+        for (id, code) in codes { promptAnswered(id, code) }
         return codes.values.contains(noErr)
     }
 
@@ -410,60 +415,46 @@ enum Automation {
         case pending
     }
 
-    private struct Entry {
-        enum State { case resolved(OSStatus), pending }
-        var state: State
-        var updatedAt: Date
-    }
-
-    nonisolated(unsafe) private static var cache: [String: Entry] = [:]
-    nonisolated(unsafe) private static var inFlight: Set<String> = []
+    /// One model per target app, all under `cacheLock`. Every change goes through `apply`.
+    nonisolated(unsafe) private static var states: [String: AutomationConsentCache.State] = [:]
     private static let cacheLock = NSLock()
     /// Status checks are bounded: macOS can block AEDeterminePermission... when a consent sheet is up.
     static let checkTimeout: TimeInterval = 1.0
-    private static let resolvedTTL: TimeInterval = 20
-    private static let pendingRecheck: TimeInterval = 5
+
+    private static var now: Double { Date().timeIntervalSinceReferenceDate }
+
+    /// Runs one event through the consent model for `bundleID` and returns its effects (performed by the caller).
+    private static func apply(_ bundleID: String, _ event: AutomationConsentCache.Event) -> [AutomationConsentCache.Effect] {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        let (next, effects) = AutomationConsentCache.reduce(states[bundleID] ?? AutomationConsentCache.State(), event)
+        states[bundleID] = next
+        return effects
+    }
 
     private static func cachedStatus(_ bundleID: String) -> Cached {
         scheduleCheck(bundleID)
         cacheLock.lock()
         defer { cacheLock.unlock() }
-        guard let entry = cache[bundleID] else { return .pending }
-        switch entry.state {
-        case .resolved(let code):
-            guard Date().timeIntervalSince(entry.updatedAt) < resolvedTTL else { return .pending }
-            return code == noErr ? .granted : .denied(code)
-        case .pending:
-            return .pending
+        switch (states[bundleID] ?? AutomationConsentCache.State()).status(now: now) {
+        case .granted: return .granted
+        case .denied(let code): return .denied(OSStatus(code))
+        case .pending: return .pending
         }
     }
 
-    private static func storeResolved(_ bundleID: String, _ code: OSStatus) {
-        cacheLock.lock()
-        cache[bundleID] = Entry(state: .resolved(code), updatedAt: Date())
-        cacheLock.unlock()
-        remember(bundleID, code)
+    /// The consent sheet is about to be raised: any check already running is now older than the answer.
+    private static func promptBegan(_ bundleID: String) {
+        _ = apply(bundleID, .promptBegan)
     }
 
-    private static func storePending(_ bundleID: String) {
-        cacheLock.lock()
-        cache[bundleID] = Entry(state: .pending, updatedAt: Date())
-        cacheLock.unlock()
+    /// The person answered. This is newer than every check that started before the prompt.
+    static func promptAnswered(_ bundleID: String, _ code: OSStatus) {
+        perform(apply(bundleID, .promptAnswered(code: Int32(code), now: now)), for: bundleID)
     }
 
     private static func scheduleCheck(_ bundleID: String) {
-        cacheLock.lock()
-        if inFlight.contains(bundleID) { cacheLock.unlock(); return }
-        if let entry = cache[bundleID] {
-            let age = Date().timeIntervalSince(entry.updatedAt)
-            switch entry.state {
-            case .resolved where age < resolvedTTL: cacheLock.unlock(); return
-            case .pending where age < pendingRecheck: cacheLock.unlock(); return
-            default: break
-            }
-        }
-        inFlight.insert(bundleID)
-        cacheLock.unlock()
+        guard case .startCheck(let generation)? = apply(bundleID, .checkWanted(now: now)).first else { return }
 
         DispatchQueue.global(qos: .utility).async {
             let box = StatusBox()
@@ -472,16 +463,13 @@ enum Automation {
                 box.value = performStatus(bundleID, ask: false)
                 done.signal()
             }
-            let finishedInTime = done.wait(timeout: .now() + checkTimeout) == .success
-            if !finishedInTime {
-                storePending(bundleID)
-                _ = done.wait(timeout: .now() + 30)
-            } else {
-                storeResolved(bundleID, box.value)
+            var answered = done.wait(timeout: .now() + checkTimeout) == .success
+            if !answered {
+                _ = apply(bundleID, .checkSlow(generation: generation, now: now))
+                answered = done.wait(timeout: .now() + 30) == .success
             }
-            cacheLock.lock()
-            inFlight.remove(bundleID)
-            cacheLock.unlock()
+            let effects = apply(bundleID, .checkEnded(generation: generation, code: answered ? Int32(box.value) : nil, now: now))
+            perform(effects, for: bundleID)
             if let onCacheUpdated { DispatchQueue.main.async { onCacheUpdated() } }
         }
     }
@@ -508,20 +496,28 @@ enum Automation {
 
     /// Test hook: reset cache and in-flight state between tests.
     static func resetCacheForTesting() {
-        let deadline = Date().addingTimeInterval(4)
+        waitForChecksToEndForTesting()
+        cacheLock.lock()
+        states.removeAll()
+        cacheLock.unlock()
+        testStatusProvider = nil
+        for id in players { UserDefaults.standard.removeObject(forKey: grantKey(id)) }
+    }
+
+    /// Test hook: blocks until no background check is running (bounded).
+    static func waitForChecksToEndForTesting(seconds: TimeInterval = 4) {
+        let deadline = Date().addingTimeInterval(seconds)
         while Date() < deadline {
             cacheLock.lock()
-            let busy = !inFlight.isEmpty
+            let busy = states.values.contains { $0.checking }
             cacheLock.unlock()
             if !busy { break }
             Thread.sleep(forTimeInterval: 0.05)
         }
-        cacheLock.lock()
-        cache.removeAll()
-        inFlight.removeAll()
-        cacheLock.unlock()
-        testStatusProvider = nil
     }
+
+    /// Test hook: the persisted grant for a target.
+    static func grantIsRemembered(_ bundleID: String) -> Bool { UserDefaults.standard.bool(forKey: grantKey(bundleID)) }
 }
 
 /// Global key and mouse-posting features wait for Accessibility instead of triggering a macOS
