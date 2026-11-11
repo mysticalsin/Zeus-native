@@ -91,3 +91,56 @@ when the meeting is deleted. Older files without these keys load as before. Save
 (`ScribeVoiceLibrary`) stay opt-in per person.
 
 Rules: no em dashes in UI text, no `Task.sleep`, no network except the clicked model download, no audio stored.
+
+## 5. Slices S7 to S9 and speaker parity (2026-11-11)
+
+Spec: `SUPERWHISPER-PLAUD-REA.md` sections 3 to 5. Status below is what is built; "needs a live call" means the code
+exists and is covered by synthetic tests, but only a real call on the owner's Mac can show what each app exposes.
+
+| Slice | Status | Notes |
+|---|---|---|
+| S7 Auto-start | Not in this change | Separate builder. |
+| S8 Call-window names | Built, needs a live call | Pure logic in ZeusCore (`MeetingSpeakerLabels`, `MeetingSpeakerBinding`, `MeetingSpeakerWindows`, `ScribeSpeakerBook`); Accessibility reader in `Sources/Zeus/Scribe/MeetingSpeakerSources.swift`. |
+| S9 Nemotron streaming diarizer | Built, needs a live call | FluidAudio 0.18.0 (the version in `Package.resolved`) ships `Nemotron3Diarizer` with `appendAudio`, `processBufferedAudio` and `finishStream`, so it is wired. No dependency bump. |
+
+### S8, how it works
+- `MeetingSpeakerSource` per app: Zoom, Teams, Meet (Chrome, Safari, Arc, Edge) and Slack huddles. Each lists its
+  bundle ids and which window titles may be a call; `MeetingTileExtractor` reads tiles out of a bounded copy of the
+  window's Accessibility tree. Generic signals work everywhere: " is speaking", ", active speaker", "muted", and French
+  ("parle", "est en train de parler", "micro coupe", "en sourdine"). Meet and Slack also use DOM class markers
+  (`video-frame--active`, `huddle_peer_tile`, `overlay--active_speaker`, `name_overlay--muted`). Suffixes
+  " (Guest)", " (External)", " (You)", " (Invite)", " (Externe)", " (Vous)" are stripped.
+- Only read when `AXIsProcessTrusted()` is already true; Zeus never prompts. Polls run on the main actor (own-process
+  Accessibility off the main thread traps), at most every 0.7 s, with an 80 ms node and time budget, and only while a
+  Scribe session is recording. For Chromium and Electron apps the reader may switch on `AXManualAccessibility` and puts
+  it back when the session ends.
+- Polls fold into spans (gap over 1.5 s closes one), spans into votes per diarizer cluster, votes into a timeline
+  winner. A name binds only when audio and tile agree: at least 4 s of overlap, at least 60 % of the voice's overlapped
+  time, a 2x lead over the runner-up, the voice is also that person's best voice, and no ambiguous poll overlaps the
+  turns (two meeting windows, or more than one call app). Muted tiles and the "(You)" tile never vote. The microphone
+  channel is always "You".
+- Manual names always win. A declined automatic name is remembered per voice. Later evidence can correct an automatic
+  name only with a stronger source or 0.1 more confidence, never a typed or accepted one.
+- Unknown until a live call: the exact Accessibility structure of each app. Run `scripts/call-ax-probe.swift` per app
+  (section 4 of the REA) and compare with the extractor; Zoom and Teams use the generic signals only until then.
+
+### S9, how it works
+- Settings > Scribe > Speaker recognition has a second row, "Follow speakers live", with an explicit Download button
+  (the only caller of `Nemotron3Models.loadFromHuggingFace`). Preset `fast32`. Meetings load the model from disk only.
+- Live, each closed system-audio turn is fed to the streaming diarizer followed by silence for its latency, and the
+  slot with the most active frames in the turn is its voice ("Speaker N" by first arrival). A matching saved voice
+  keeps its own name. WeSpeaker stays the fallback when the model is not on disk, then the hand-built voiceprint. A
+  second voice on the microphone is "Room voice N" in this mode so numbers never collide.
+- At stop the stream is flushed and every turn is read again against the whole timeline (the batch relabel);
+  turns that moved are relabelled, and call-window names are worked out again on the corrected voices. This reads the
+  recorded speaker timeline, not stored audio: Zeus still keeps no meeting audio.
+
+### Naming parity and beyond
+Per speaker the meeting file stores name, source (typed, call window, invite, introduction, saved voice), confidence,
+declined names and folded tiny voices (`speakerBook`; older files load unchanged). The recap shows the source, a dotted
+underline and Confirm / Not them for an unconfirmed automatic name, "Reassign this block to" and "Assign selected words
+to" per transcript block, Undo for every speaker change (this session), and "Restore small voices". Voices under 3 %
+of the talk time and under 3 blocks are folded into the nearest speaker at stop (not when a name is known, not the
+owner, not in a meeting under 30 s of talk). `ScribeController.nowSpeakingClaim()` gives the live pill the best
+current name or "Identifying this speaker..." and lines relabel in place when a name binds. The play button for a 3 s
+voice sample is hidden because Zeus keeps no meeting audio (`ScribeVoiceSample.clip` picks the clip for when it does).
