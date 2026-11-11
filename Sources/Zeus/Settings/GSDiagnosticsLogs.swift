@@ -35,7 +35,7 @@ final class DiagnosticsLogModel: ObservableObject {
         let settings = (try? SettingsStore.shared.exportJSON()) ?? Data("{}".utf8)
         let logs = [VoiceLog.url, VoiceLog.url.deletingPathExtension().appendingPathExtension("old.log")]
             .filter { FileManager.default.fileExists(atPath: $0.path) }
-        nonisolated(unsafe) let input = DiagnosticsExporter.Input(version: Self.version, build: Self.build, settingsJSON: settings, logFiles: logs)
+        let input = DiagnosticsExporter.Input(version: Self.version, build: Self.build, settingsJSON: settings, logFiles: logs)
         message = "Exporting\u{2026}"
         // The zip is built by `ditto`: wait for it on a background thread so the window stays live.
         Task { [weak self] in

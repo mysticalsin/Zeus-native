@@ -411,7 +411,7 @@ struct ScribeSpeakerParityTests {
         history.push("a", before: state)
         history.push("b", before: state)
         history.push("c", before: state)
-        #expect(history.entries.map { $0.title } ==["b", "c"])
+        #expect(history.entries.map { $0.title } == ["b", "c"])
     }
 
     private func meetingWithATinyVoice() -> [ScribeTranscriptSegment] {
