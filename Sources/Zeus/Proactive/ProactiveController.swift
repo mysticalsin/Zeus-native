@@ -65,7 +65,7 @@ final class ProactiveController {
             }
             // So the card can stay away during Focus. If macOS declines, full screen is still respected.
             if INFocusStatusCenter.default.authorizationStatus == .notDetermined {
-                INFocusStatusCenter.default.requestAuthorization { _ in }
+                Task { _ = await SystemAuthorization.requestFocusStatus() }
             }
         }
     }

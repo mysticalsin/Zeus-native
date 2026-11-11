@@ -528,12 +528,8 @@ extension PolyglotController: PolyglotCaptionSharing {
 /// Speech Recognition permission for Apple's recognizer (asked once, when Polyglot first needs it).
 enum SpeechAuthorization {
     static func ensure() async {
-        await withCheckedContinuation { continuation in
-            if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-                SFSpeechRecognizer.requestAuthorization { _ in continuation.resume() }
-            } else {
-                continuation.resume()
-            }
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            _ = await SystemAuthorization.requestSpeechRecognition()
         }
     }
 }

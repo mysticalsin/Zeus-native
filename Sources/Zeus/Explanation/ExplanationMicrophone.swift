@@ -44,9 +44,7 @@ private final class NativeExplanationInputPermissions: ExplanationInputPermissio
     }
     func speechRecognition() async -> Bool {
         if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-            return await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { status in continuation.resume(returning: status == .authorized) }
-            }
+            return await SystemAuthorization.requestSpeechRecognition() == .authorized
         }
         return SFSpeechRecognizer.authorizationStatus() == .authorized
     }

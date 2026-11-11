@@ -137,9 +137,7 @@ final class PermissionsModel {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
         }
         if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                SFSpeechRecognizer.requestAuthorization { _ in continuation.resume() }
-            }
+            _ = await SystemAuthorization.requestSpeechRecognition()
         }
         refresh()
     }

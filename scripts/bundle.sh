@@ -44,8 +44,11 @@ cp "$BIN/Zeus" "$APP/Contents/MacOS/Zeus"
 cp "$BIN/zeus-hook" "$BIN/zeus-bridge" "$APP/Contents/Helpers/"
 cp "$BIN/zeus-cli" "$APP/Contents/Helpers/zeus"
 # SwiftPM resource bundles (Zeus avatar art + dependencies like FluidAudio) live under Resources so the app signature stays sealed.
+# Test-target resource bundles (*Tests.bundle) hold fixtures only and never ship in the app.
 for bundle in "$BIN"/*.bundle; do
-  [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
+  [[ -e "$bundle" ]] || continue
+  [[ "$(basename "$bundle")" == *Tests.bundle ]] && continue
+  cp -R "$bundle" "$APP/Contents/Resources/"
 done
 
 # The Chrome extension ships inside the app; "Connect Chrome" copies it out for Load unpacked.

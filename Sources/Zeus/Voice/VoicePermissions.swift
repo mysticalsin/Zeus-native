@@ -40,11 +40,7 @@ enum VoicePermissions {
             asking = true
             VoiceLog.log("permission", "asking (mic \(mic), speech \(speech), explicit \(explicit))")
             if mic == .notDetermined { _ = await AVCaptureDevice.requestAccess(for: .audio) }
-            if speech == .notDetermined {
-                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                    SFSpeechRecognizer.requestAuthorization { _ in continuation.resume() }
-                }
-            }
+            if speech == .notDetermined { _ = await SystemAuthorization.requestSpeechRecognition() }
             asking = false
             current = access
             VoiceLog.log("permission", "result: mic \(mic), speech \(speech)")

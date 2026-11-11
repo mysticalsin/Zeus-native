@@ -7,8 +7,11 @@ import ZeusCore
 enum EngineBrandImage {
     @MainActor private static var images: [EngineBrandMark: NSImage] = [:]
     /// This deliberately excludes the source-tree fallback so native tests prove packaging.
+    /// Never `Bundle.module`: its generated accessor only looks beside Zeus.app, not in
+    /// Contents/Resources where scripts/bundle.sh seals the resource bundle, and traps when it
+    /// misses (fatal on first logo render in the packaged app). `ZeusResources` covers both layouts.
     static func bundledURL(for mark: EngineBrandMark) -> URL? {
-        Bundle.module.url(forResource: mark.assetName, withExtension: mark.assetExtension, subdirectory: "Brands")
+        ZeusResources.bundle?.url(forResource: mark.assetName, withExtension: mark.assetExtension, subdirectory: "Brands")
     }
 
     static func url(for mark: EngineBrandMark) -> URL? {

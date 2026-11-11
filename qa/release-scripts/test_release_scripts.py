@@ -135,6 +135,19 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(len(signatures), 4)
         self.assertTrue(all("--timestamp=none" in c for c in signatures))
 
+    def test_bundle_ships_product_resources_but_never_test_resource_bundles(self):
+        # A local QA launch of the CI preview found Zeus_ZeusCoreTests.bundle (test fixtures) inside the app.
+        self.bundle_fixture()
+        output = Path(self.env["ZEUS_TEST_BIN"])
+        for name in ("Zeus_Zeus.bundle", "Zeus_ZeusCoreTests.bundle", "Zeus_ZeusAppTests.bundle"):
+            (output / name).mkdir()
+            (output / name / "resource.txt").write_text("fixture")
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        resources = self.root / "build/Zeus.app/Contents/Resources"
+        self.assertTrue((resources / "Zeus_Zeus.bundle/resource.txt").is_file())
+        self.assertEqual(sorted(p.name for p in resources.glob("*Tests.bundle")), [])
+
     def test_release_requires_identity_and_profile_before_build(self):
         self.package_fixture()
         result = self.run_script("package.sh", RELEASE="1")
