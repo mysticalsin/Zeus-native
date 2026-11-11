@@ -1267,11 +1267,16 @@ private struct ScribeMeetingBody<Actions: View>: View {
 
     /// The speaker's three longest lines, shortened: what the rename editor shows instead of an audio clip.
     private static func longestLines(of speaker: ScribeSpeaker, in transcript: [ScribeTranscriptSegment]) -> [String] {
-        transcript.filter { $0.speaker == speaker }
-            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .sorted { $0.count > $1.count }
-            .prefix(3)
-            .map { $0.count > 90 ? String($0.prefix(90)) + "\u{2026}" : $0 }
+        var lines: [String] = []
+        for segment in transcript where segment.speaker == speaker {
+            lines.append(segment.text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        lines.sort { (a: String, b: String) -> Bool in a.count > b.count }
+        var shortened: [String] = []
+        for line in lines.prefix(3) {
+            shortened.append(line.count > 90 ? String(line.prefix(90)) + "\u{2026}" : line)
+        }
+        return shortened
     }
 
     /// Invitee names not yet taken by a speaker, then the other speakers' names (naming one the same merges them).
