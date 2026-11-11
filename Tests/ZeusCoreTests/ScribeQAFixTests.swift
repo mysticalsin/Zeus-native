@@ -97,7 +97,7 @@ struct ScribeQAFixTests {
     // MARK: Wording
 
     @Test func micCopyDescribesActualMicrophoneUse() {
-        #expect(ScribeMicCallText.excludedNotice.contains("stays excluded after another app uses it"))
+        #expect(ScribeMicCallText.sharedNotice.contains("Zeus keeps recording it"))
         #expect(ScribeMicCallText.recapLine.contains("excluded after another app used it"))
     }
 

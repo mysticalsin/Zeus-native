@@ -6,7 +6,6 @@ import Foundation
 public final class ScribeMicrophoneIngress: @unchecked Sendable {
     public struct Report: Equatable, Sendable {
         public let state: ScribeMuteState
-        public let externalInputLatched: Bool
         public let withheldSeconds: TimeInterval
     }
 
@@ -17,7 +16,6 @@ public final class ScribeMicrophoneIngress: @unchecked Sendable {
     private var state: ScribeMuteState = .unknown
     private var readStart: TimeInterval = -.infinity
     private var readEnd: TimeInterval = .infinity
-    private var externalInputLatched = false
     private var withheldSeconds: TimeInterval = 0
     private var withheldState: ScribeMuteState?
 
@@ -29,8 +27,6 @@ public final class ScribeMicrophoneIngress: @unchecked Sendable {
             acknowledgedAt = nil
             withheldSeconds = 0
             withheldState = nil
-            // The external-owner latch deliberately survives recording restarts. A call releasing its
-            // input when muted, a stale scan, or Stop/Start is not evidence that the call ended.
         }
     }
 
@@ -51,11 +47,10 @@ public final class ScribeMicrophoneIngress: @unchecked Sendable {
         }
     }
 
-    public func record(state: ScribeMuteState, readStart: TimeInterval, readEnd: TimeInterval,
-                       externalInputDetected: Bool) {
+    /// Another app using the microphone is not part of the evidence: it never withholds the microphone,
+    /// so nothing here can stay set after that app lets go of it.
+    public func record(state: ScribeMuteState, readStart: TimeInterval, readEnd: TimeInterval) {
         lock.withLock {
-            // Even a late read can establish an external owner. No absence-based event clears this latch.
-            externalInputLatched = externalInputLatched || externalInputDetected
             guard readStart.isFinite, readEnd.isFinite, readEnd >= readStart else {
                 self.state = .unknown
                 return
@@ -70,8 +65,6 @@ public final class ScribeMicrophoneIngress: @unchecked Sendable {
     public func currentState(now: TimeInterval) -> ScribeMuteState {
         lock.withLock { effectiveState(now: now) }
     }
-
-    public var hasExternalInput: Bool { lock.withLock { externalInputLatched } }
 
     /// `copy` must be synchronous/nonblocking. Holding the permit through the write gives revocation a
     /// defined boundary: after revoke/record returns, no earlier permitted copy can still be running.
@@ -100,15 +93,13 @@ public final class ScribeMicrophoneIngress: @unchecked Sendable {
     public func takeReport(now: TimeInterval) -> Report {
         lock.withLock {
             defer { withheldSeconds = 0; withheldState = nil }
-            return Report(state: withheldState ?? effectiveState(now: now), externalInputLatched: externalInputLatched,
-                          withheldSeconds: withheldSeconds)
+            return Report(state: withheldState ?? effectiveState(now: now), withheldSeconds: withheldSeconds)
         }
     }
 
     private func effectiveState(now: TimeInterval) -> ScribeMuteState {
         guard now.isFinite, timeToLive.isFinite, timeToLive > 0,
               now >= readEnd, now <= readStart + timeToLive else { return .unknown }
-        if state == .muted { return .muted }
-        return externalInputLatched ? .unknown : state
+        return state
     }
 }

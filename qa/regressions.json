@@ -77,7 +77,7 @@
     },
     {
       "id": "REG-007",
-      "failure": "Unknown external microphone owner was silently ignored.",
+      "failure": "Unknown external microphone owner was silently ignored. Superseded on 2026-11-11 by the owner decision in REG-360: another app using the microphone never withholds it, so the guard now proves the microphone still gets through.",
       "features": [
         "F03",
         "S01"
@@ -85,7 +85,7 @@
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-        "function": "anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition"
+        "function": "anUnsupportedMicrophoneOwnerStillLetsTheMicrophoneThrough"
       }
     },
     {
@@ -420,7 +420,7 @@
     },
     {
       "id": "REG-035",
-      "failure": "Positively active microphone input with unresolved PID or bundle identity was discarded, allowing a later empty scan to restore capture.",
+      "failure": "Positively active microphone input with unresolved PID or bundle identity was discarded, allowing a later empty scan to restore capture. Superseded on 2026-11-11 by REG-361: such an owner is still noticed but never excludes the microphone.",
       "features": [
         "F03",
         "S01"
@@ -428,7 +428,7 @@
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
-        "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
+        "function": "anUnidentifiedMicrophoneOwnerNeverExcludesTheMicrophone"
       }
     },
     {
@@ -3989,6 +3989,45 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
         "function": "hintAppearsOnlyWhenNoEnhancedOrPremiumVoiceIsUsable"
+      }
+    },
+    {
+      "id": "REG-360",
+      "failure": "Scribe dropped the person's microphone for the whole meeting whenever another app (a call app, a browser or an unknown app) was using it, and recorded only system audio.",
+      "features": [
+        "F03",
+        "S01"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
+        "function": "anotherAppUsingTheMicrophoneNeverExcludesIt"
+      }
+    },
+    {
+      "id": "REG-361",
+      "failure": "Once any other app had used the microphone, a latch kept Zeus's microphone excluded for the rest of the app's life, across recordings, even after that app let go.",
+      "features": [
+        "F03",
+        "S01"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
+        "function": "anotherAppUsingTheMicrophoneNeverWithholdsItAndARestartStartsClean"
+      }
+    },
+    {
+      "id": "REG-362",
+      "failure": "The shared-microphone state could stay set after the other app stopped using the microphone; it now clears on the next reading and on stop.",
+      "features": [
+        "F03",
+        "S01"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MicInputOwnershipTests.swift",
+        "function": "sharingClearsWhenTheOtherAppLetsGoAndNothingLatches"
       }
     }
   ]
