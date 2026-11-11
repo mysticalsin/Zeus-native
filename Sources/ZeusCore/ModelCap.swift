@@ -18,6 +18,11 @@ public enum ModelCap {
         .gemini: [.fast: "gemini-3.7-flash", .deep: "gemini-3.7-flash"],
         .cursorAgent: [.fast: "gemini-3.7-flash-high", .deep: "claude-sonnet-5-thinking-high"],
     ]
+    /// The smallest GPT model in Codex's own model list (`gpt-6-luna`, seen in `~/.codex/models_cache.json`).
+    /// A spoken turn pins it so the account default (a larger model on priority tier) is never used.
+    /// Override with `modelCap.codex.fast` when a provider renames it.
+    public static let codexVoiceModel = "gpt-6-luna"
+
     static let codexEffort: [ModelTier: String] = [.fast: "low", .deep: "medium"]
 
     public static func model(for engine: RouterEngine, tier: ModelTier, defaults store: UserDefaults = .standard) -> String? {

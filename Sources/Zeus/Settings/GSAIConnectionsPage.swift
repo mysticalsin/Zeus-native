@@ -34,18 +34,35 @@ struct AIConnectionsPage: View {
         AnyLLMCard(services: services)
         GSCard("Available apps") {
             let shown = AIProvider.allCases.filter { provider in
-                // Any LLM is offered only once its endpoint passed a test.
-                if provider == .anyLLM, case .connected = model.status(provider, services: services) { return true }
-                if provider == .anyLLM { return false }
+                guard provider.supportsNewChats else { return false }
                 return model.installed(provider) || model.status(provider, services: services) != .notInstalled
             }
             ForEach(Array(shown.enumerated()), id: \.element) { index, provider in
                 if index > 0 { GSDivider() }
-                GSToggleRow(symbol: "plus.bubble", title: "Offer \(provider.title) for new chats",
-                            isOn: Binding(get: { model.offers(provider) }, set: { model.setOffers(provider, $0) }))
+                HStack(spacing: 0) {
+                    BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                    // A tool that is not on this Mac cannot be offered: the switch waits and says why.
+                    let missing = model.step(provider, services: services) == .install
+                    GSToggleRow(title: "Offer \(provider.title) for new chats",
+                                text: missing ? "Install \(provider.title) first, then you can offer it." : "Shows \(provider.title) as a choice when you start a new chat from the notch.",
+                                isOn: Binding(get: { model.offers(provider) && !missing }, set: { model.setOffers(provider, $0) }))
+                        .disabled(missing)
+                        .opacity(missing ? 0.55 : 1)
+                }
             }
         }
         .task { await model.refresh(); await model.checkAllSignIns() }
+    }
+
+    /// The row's sentence must agree with its status pill and button. The two are computed separately
+    /// (Gemini can have a config folder without the tool), so the primary step decides: a row that says
+    /// "Not found" never also says "Found on this Mac".
+    private func detail(_ provider: AIProvider, step: AIConnectStep) -> String {
+        let base = model.detail(provider, services: services)
+        if step == .install, base.hasPrefix("Found on this Mac") {
+            return "Not found on this Mac. Install shows the official command."
+        }
+        return base
     }
 
     private func connection(_ provider: AIProvider) -> some View {
@@ -53,10 +70,10 @@ struct AIConnectionsPage: View {
         let connected = step == .connected
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
-                BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading)
-                GSRow(title: provider.title, text: model.detail(provider, services: services)) {
+                BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                GSRow(title: provider.title, text: detail(provider, step: step)) {
                     HStack(spacing: 10) {
-                        if connected { GSStatus(ok: true, text: "Connected") }
+                        if connected { GSStatus(ok: true, text: provider.kind == .app ? "Available" : "Connected") }
                         else if step == .install { GSStatus(ok: false, text: "Not found") }
                         if model.busy.contains(provider) {
                             ProgressView().controlSize(.small)
@@ -65,6 +82,10 @@ struct AIConnectionsPage: View {
                             Button(step.buttonTitle) { model.primary(provider, services: services) }
                                 .buttonStyle(GSButtonStyle(prominent: true))
                                 .accessibilityLabel("\(step.buttonTitle) \(provider.title)")
+                        } else if provider.kind == .app {
+                            Button("Open") { model.openApp(provider, services: services) }
+                                .buttonStyle(GSButtonStyle())
+                                .accessibilityLabel("Open \(provider.title)")
                         } else if provider.kind == .hooked {
                             Button("Repair") { Task { await model.connectAndCheck(provider, services: services) } }
                                 .buttonStyle(GSButtonStyle())
@@ -126,7 +147,7 @@ private struct AnyLLMCard: View {
     var body: some View {
         GSCard("Any LLM") {
             HStack(spacing: 0) {
-                BrandMark(provider: .anyLLM, side: 26).frame(width: 42, alignment: .leading)
+                BrandMark(provider: .anyLLM, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
                 GSRow(title: "OpenAI compatible endpoint", text: "OpenRouter, vLLM, a company gateway or any server that speaks the same API.") {
                     statusView
                 }
@@ -142,9 +163,9 @@ private struct AnyLLMCard: View {
                 }
             }
             GSDivider()
-            field("Base URL", "https://api.example.com/v1", Binding(get: { model.anyLLM.baseURL }, set: { model.anyLLM.baseURL = $0; model.endpointEdited() }))
+            field("Base URL", "https://api.example.com/v1", Binding(get: { model.anyLLM.baseURL }, set: { model.anyLLM.baseURL = $0 }))
             GSDivider()
-            field("Model", "model name", Binding(get: { model.anyLLM.model }, set: { model.anyLLM.model = $0; model.endpointEdited() }))
+            field("Model", "model name", Binding(get: { model.anyLLM.model }, set: { model.anyLLM.model = $0 }))
             GSDivider()
             GSRow(title: "API key", text: model.anyLLMKeySaved ? "Saved in your Keychain. Zeus reads it once." : "Kept in your Keychain. Leave empty for a local server.") {
                 HStack(spacing: 10) {

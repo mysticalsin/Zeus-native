@@ -161,13 +161,15 @@ final class ChromeActions {
     private func consent(for what: String, target: ChromeBridge.ActionTarget) async -> Bool {
         let host = target.host
         if allowedHosts.contains(host) { return true }
-        let ok = await ask(site: host, what: what, risk: .medium)
-        if ok { allowedHosts.insert(host) }
-        return ok
+        // Two steps on the same site at once share one card: the second waits for the first answer.
+        await PermissionPrompts.shared.run("chrome:" + host) { [self] in
+            if await ask(site: host, what: what, risk: .medium) { allowedHosts.insert(host) }
+        }
+        return allowedHosts.contains(host)
     }
 
     private func ask(site: String, what: String, risk: HookEvent.Risk) async -> Bool {
-        await notch.requestApproval(agent: "ZEUS", project: site, tool: "Chrome", command: what, risk: risk,
+        await notch.requestApproval(agent: "Zeus", project: site, tool: "Chrome", command: what, risk: risk,
                                     timeout: .seconds(30), onTimeout: .deny) == .allow
     }
 }

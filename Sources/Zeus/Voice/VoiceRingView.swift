@@ -127,10 +127,10 @@ struct VoiceRingView: View {
 
     static func label(for state: VoiceRingState) -> String {
         switch state {
-        case .idle: "ZEUS voice, ready"
-        case .listening: "ZEUS voice, listening"
-        case .speaking: "ZEUS voice, speaking"
-        case .processing: "ZEUS voice, thinking"
+        case .idle: "Zeus voice, ready"
+        case .listening: "Zeus voice, listening"
+        case .speaking: "Zeus voice, speaking"
+        case .processing: "Zeus voice, thinking"
         }
     }
 

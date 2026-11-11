@@ -2,11 +2,12 @@ import SwiftUI
 import ZeusCore
 
 /// Scribe's tab. The stage (idle, recording, writing, notes ...) changes only on session-machine events;
-/// the TimelineView only supplies a clock for drawing the glow and wash from the stage's start time.
+/// The view clock only draws the beam, transcript reveal and wash; it never advances a recording.
 struct ScribePage: View {
     let topBar: TopBarModel
     let scribe: ScribeController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(spacing: 6) {
@@ -23,17 +24,19 @@ struct ScribePage: View {
                 }
             }
             HStack(spacing: 8) {
-                Tile {
-                    // While recording only the word reveal needs the clock, so it ticks at 20 Hz; the glow
-                    // stages (writing, reveal) draw at the display rate.
-                    let pacing: Double? = { if case .recording = scribe.phase { return 1.0 / 20 }; return nil }()
-                    TimelineView(.animation(minimumInterval: pacing, paused: !scribe.needsFrameClock)) { context in
-                        ScribeStage(topBar: topBar, scribe: scribe, date: context.date, reduceMotion: reduceMotion)
+                Tile(padding: 0) {
+                    ZStack(alignment: .topLeading) {
+                        ScribeCardBeam(scribe: scribe,
+                            reduceMotion: reduceMotion, reduceTransparency: reduceTransparency)
+                        ScribeStage(topBar: topBar, scribe: scribe,
+                            reduceMotion: reduceMotion, reduceTransparency: reduceTransparency)
+                            .padding(CardFinish.inset)
                     }
                 }
             }
         }
     }
+
 }
 
 extension ScribePage {
@@ -159,20 +162,18 @@ private func scribeColor(_ rgb: ScribeGlow.RGB) -> Color {
 private struct ScribeStage: View {
     let topBar: TopBarModel
     let scribe: ScribeController
-    let date: Date
     let reduceMotion: Bool
+    let reduceTransparency: Bool
 
     var body: some View {
-        let state = scribe.presentation(at: date, reduceMotion: reduceMotion)
-        let stage = state.glowStage
-        let glowTime = stage == .reveal ? scribe.revealElapsed(at: date) : scribe.stageElapsed(at: date)
-        ZStack(alignment: .bottom) {
-            content(state)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            if stage != .off {
-                ScribeGlowLayer(stage: stage, t: glowTime, reduceMotion: reduceMotion)
+        Group {
+            if case .complete = scribe.phase {
+                ScribeCompletedStage(scribe: scribe, reduceMotion: reduceMotion, reduceTransparency: reduceTransparency)
+            } else {
+                content(scribe.presentation(at: Date(), reduceMotion: reduceMotion))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -187,19 +188,108 @@ private struct ScribeStage: View {
         case .connecting:
             ScribeConnecting(scribe: scribe, state: state)
         case .recording:
-            ScribeRecording(scribe: scribe, state: state, date: date, reduceMotion: reduceMotion)
+            ScribeRecording(scribe: scribe, state: state, reduceMotion: reduceMotion)
         case .confirmingEnd:
             ScribeConfirmEnd(topBar: topBar, scribe: scribe, state: state)
         case .writing:
             ScribeWriting(scribe: scribe, state: state)
         case .revealing:
             ScribeNotesView(scribe: scribe)
-                .opacity(ScribeGlow.contentOpacity(t: scribe.revealElapsed(at: date), reduceMotion: reduceMotion))
         case .complete:
             ScribeNotesView(scribe: scribe)
         case .failed(let reason):
             ScribeFailed(scribe: scribe, reason: reason, state: state)
         }
+    }
+}
+
+/// A finite clock for the existing completion wash only. Settled notes never share the beam's clock.
+private struct ScribeCompletedStage: View {
+    let scribe: ScribeController
+    let reduceMotion: Bool
+    let reduceTransparency: Bool
+
+    var body: some View {
+        if reduceMotion || scribe.revealStart == nil {
+            // Reduced Motion pauses display links: completed content must be immediately readable.
+            ScribeNotesView(scribe: scribe)
+        } else {
+            DisplaySynchronizedView(preferredFramesPerSecond: 240,
+                until: scribe.revealStart?.addingTimeInterval(ScribeGlow.revealDuration(reduceMotion: false))) { context in
+                let elapsed = scribe.revealElapsed(at: context.date)
+                ZStack(alignment: .bottom) {
+                    ScribeNotesView(scribe: scribe)
+                        .opacity(ScribeGlow.contentOpacity(t: elapsed, reduceMotion: false))
+                    if !reduceTransparency {
+                        ScribeGlowLayer(stage: .reveal, t: elapsed, reduceMotion: false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A view-local drawing origin survives recording → countdown → writing → completion.
+/// The meter is the existing capture-side envelope, not a second audio analyser.
+private struct ScribeCardBeam: View {
+    let scribe: ScribeController
+    let reduceMotion: Bool
+    let reduceTransparency: Bool
+    @State private var session: ScribeSessionID?
+    @State private var origin: Date?
+    @State private var processingOrigin: Date?
+
+    private var visible: Bool {
+        if scribe.isRecording { return true }
+        switch scribe.phase {
+        case .processing: return true
+        case .complete: return scribe.completedNoticeID != nil
+        default: return false
+        }
+    }
+
+    private var processing: Bool {
+        switch scribe.phase {
+        case .processing, .complete: return true
+        default: return false
+        }
+    }
+
+    private func opacity(at date: Date) -> Double {
+        guard case .complete = scribe.phase else { return 1 }
+        if reduceMotion || reduceTransparency { return 1 }
+        return ScribeGlow.glowOpacity(stage: .reveal, t: scribe.revealElapsed(at: date), reduceMotion: false)
+    }
+
+    var body: some View {
+        DisplaySynchronizedView(paused: !visible || reduceMotion || reduceTransparency,
+            preferredFramesPerSecond: 240, until: completionDeadline) { context in
+            if visible {
+                AssistantBeamView(frame: AssistantBeam.frame(
+                    elapsed: max(0, context.date.timeIntervalSince(origin ?? scribe.stageStart)),
+                    level: scribe.isRecording ? (scribe.levelHistory.last ?? 0) : 0,
+                    processing: processing,
+                    processingElapsed: max(0, context.date.timeIntervalSince(processingOrigin ?? scribe.stageStart)),
+                    reduceMotion: reduceMotion || reduceTransparency),
+                    reduceTransparency: reduceTransparency, cornerRadius: CardFinish.radius)
+                    .opacity(opacity(at: context.date))
+            }
+        }
+        .onChange(of: scribe.phase, initial: true) { _, phase in
+            guard let next = phase.sessionID else { session = nil; origin = nil; processingOrigin = nil; return }
+            if session != next || origin == nil {
+                session = next
+                origin = scribe.stageStart
+                processingOrigin = nil
+            }
+            if case .processing = phase, processingOrigin == nil { processingOrigin = scribe.stageStart }
+            if case .failed = phase { origin = nil; processingOrigin = nil }
+        }
+    }
+
+    private var completionDeadline: Date? {
+        guard case .complete = scribe.phase else { return nil }
+        return scribe.revealStart?.addingTimeInterval(ScribeGlow.revealDuration(reduceMotion: false))
     }
 }
 
@@ -340,6 +430,7 @@ private struct ScribeIdle: View {
                 Spacer(minLength: 0)
                 NotchActionButton(title: "Start", tint: TopBarStyle.rec) { scribe.start() }
                     .accessibilityHint("Starts listening to a meeting.")
+                    .ownedJourneyControl("scribe.start")
             }
             .frame(width: 270, alignment: .topLeading)
             ScribeRecapList(scribe: scribe)
@@ -465,6 +556,7 @@ private struct ScribeRecapDetail: View {
                 warnings: [recap.transcriptionNote, recap.micExcludedDuringCall ? ScribeMicCallText.recapLine : nil].compactMap { $0 },
                 focusToken: scribe.focusToken,
                 closeTitle: "Back",
+                speakerTools: scribe.speakerTools(for: recap.id),
                 setPrivateNotes: { scribe.setPrivateNotes($0, for: recap.id) },
                 setActionItem: { scribe.setActionItem($0, done: $1, for: recap.id) },
                 close: { scribe.closeRecap() },
@@ -575,7 +667,6 @@ private struct ScribeCircleButton: View {
 private struct ScribeRecording: View {
     let scribe: ScribeController
     let state: ScribePresentation
-    let date: Date
     let reduceMotion: Bool
 
     var body: some View {
@@ -594,7 +685,7 @@ private struct ScribeRecording: View {
             if let issue = scribe.transcriptionIssue {
                 ScribeIssueLine(text: issue, lineLimit: 2)
             }
-            ScribeLiveTranscript(scribe: scribe, date: date, reduceMotion: reduceMotion)
+            ScribeLiveTranscript(scribe: scribe, reduceMotion: reduceMotion)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
@@ -624,6 +715,7 @@ private struct ScribeRecording: View {
                     ScribeCircleButton(symbol: "stop.fill", label: "Stop recording", hint: "Asks whether to end the meeting.") {
                         scribe.requestEnd()
                     }
+                    .ownedJourneyControl("scribe.stop")
                     ScribeCircleButton(symbol: "trash", label: "Discard recording", hint: "Asks before throwing this meeting away.") {
                         scribe.requestDiscard()
                     }
@@ -670,6 +762,18 @@ private struct ScribeInputStatus: View {
 /// line reveals a few words at a time.
 private struct ScribeLiveTranscript: View {
     let scribe: ScribeController
+    let reduceMotion: Bool
+
+    var body: some View {
+        DisplaySynchronizedView(paused: reduceMotion || scribe.incomingWordsRevealUntil == nil,
+            preferredFramesPerSecond: 240, until: scribe.incomingWordsRevealUntil) { context in
+            ScribeLiveTranscriptContent(scribe: scribe, date: context.date, reduceMotion: reduceMotion)
+        }
+    }
+}
+
+private struct ScribeLiveTranscriptContent: View {
+    let scribe: ScribeController
     let date: Date
     let reduceMotion: Bool
 
@@ -711,10 +815,15 @@ private struct ScribeLiveTranscript: View {
     private func lines(_ segments: [ScribeTranscriptSegment]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(segments, id: \.id) { segment in
+                let shown = scribe.visibleWordCount(for: segment, at: date, reduceMotion: reduceMotion)
+                let layout = scribe.incomingWordLayout(for: segment)
+                let settling = !reduceMotion && layout?.isSettled(at: date.timeIntervalSinceReferenceDate, shownWords: shown) == false
                 ScribeLiveLine(
                     segment: segment,
-                    shownWords: scribe.visibleWordCount(for: segment, at: date, reduceMotion: reduceMotion)
+                    shownWords: shown, wordLayout: settling ? layout : nil,
+                    date: settling ? date : .distantPast, reduceMotion: reduceMotion
                 )
+                .equatable()
             }
         }
     }
@@ -735,9 +844,18 @@ private struct ScribeLiveTranscript: View {
 }
 
 /// One transcript line: speaker and time on top, the text beneath.
-private struct ScribeLiveLine: View {
+private struct ScribeLiveLine: View, Equatable {
     let segment: ScribeTranscriptSegment
     let shownWords: Int
+    let wordLayout: ScribeIncomingWordLayout?
+    let date: Date
+    let reduceMotion: Bool
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.segment == rhs.segment && lhs.shownWords == rhs.shownWords
+            && lhs.wordLayout?.revision == rhs.wordLayout?.revision
+            && lhs.date == rhs.date && lhs.reduceMotion == rhs.reduceMotion
+    }
 
     var body: some View {
         let tint = scribeColor(ScribeSpeakerPalette.color(for: segment.speaker))
@@ -756,7 +874,13 @@ private struct ScribeLiveLine: View {
                 Text(time)
                     .font(TopBarStyle.label(9).monospacedDigit()).foregroundStyle(Theme.cloudQuiet)
             }
-            Text(ScribeWordText.prefix(segment.text, words: shownWords))
+            Group {
+                if #available(macOS 15.0, *), let wordLayout {
+                    ScribeIncomingWords(layout: wordLayout, shownWords: shownWords, date: date, reduceMotion: reduceMotion)
+                } else {
+                    Text(ScribeWordText.prefix(segment.text, words: shownWords))
+                }
+            }
                 .font(TopBarStyle.label(12))
                 .foregroundStyle(segment.isFinal ? Theme.cloudPrimary : Theme.cloudPrimary.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
@@ -800,8 +924,10 @@ private struct ScribeConfirmEnd: View {
                         topBar.onOpenTab(.scribe)
                     }
                     .disabled(scribe.endStopRequested)
+                    .accessibilityIdentifier("scribe.endNow")
                     NotchActionButton(title: "Keep recording", tint: Theme.cloudSecondary, filled: false) { scribe.keepRecording() }
                         .disabled(scribe.endStopRequested)
+                        .accessibilityIdentifier("scribe.keep")
                 }
                 .padding(.top, 4)
             }
@@ -844,6 +970,12 @@ private struct ScribeWriting: View {
 private struct ScribeNotesView: View {
     let scribe: ScribeController
 
+    /// Speaker naming once the meeting is saved as a recap; until then there is nothing to rename.
+    private func namingTools(_ id: ScribeSessionID?) -> ScribeSpeakerTools? {
+        guard let id, scribe.recaps.contains(where: { $0.id == id }) else { return nil }
+        return scribe.speakerTools(for: id)
+    }
+
     var body: some View {
         let id = scribe.phase.sessionID
         let note = ScribeRecapNote.compose(
@@ -860,6 +992,7 @@ private struct ScribeNotesView: View {
             warnings: [note, scribe.micExcludedDuringCall ? ScribeMicCallText.excludedNotice : nil].compactMap { $0 },
             focusToken: scribe.focusToken,
             closeTitle: "Done",
+            speakerTools: namingTools(id),
             setPrivateNotes: { text in
                 if let id { scribe.setPrivateNotes(text, for: id) }
             },
@@ -887,9 +1020,31 @@ private enum ScribeNotesStyle {
     }
 }
 
+/// What a finished meeting offers for naming its speakers; nil where naming is not possible.
+struct ScribeSpeakerTools {
+    var suggestions: [ScribeNameSuggestion]
+    var attendeeNames: [String]
+    var canRemember: (ScribeSpeaker) -> Bool
+    /// The speaker, the name typed, and whether "Remember this voice" was ticked.
+    var rename: (ScribeSpeaker, String, Bool) -> Void
+    var copyTranscript: () -> Void
+}
+
 /// One speaker of the meeting: colour dot, name, talk time and a thin bar for their share of the talking.
+/// With tools, the name is a button: tap it, type a name, press Return. A suggestion shows as "Name?" with Accept.
 private struct ScribeSpeakerRow: View {
     let entry: ScribeSpeakerStats.Entry
+    var tools: ScribeSpeakerTools?
+    /// This speaker's longest lines, so the person can tell who it was (audio is never kept).
+    var lines: [String] = []
+    /// Names already used by other speakers or on the invite, offered as one-tap answers.
+    var quickNames: [String] = []
+
+    @State private var editing = false
+    @State private var draft = ""
+    @State private var remember = false
+
+    private var canRename: Bool { tools != nil && entry.speaker != .you }
 
     var body: some View {
         let tint = scribeColor(ScribeSpeakerPalette.color(for: entry.speaker))
@@ -898,8 +1053,28 @@ private struct ScribeSpeakerRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Circle().fill(tint).frame(width: 7, height: 7)
-                Text(entry.speaker.displayName)
-                    .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                if canRename {
+                    Button { startEditing() } label: {
+                        Text(entry.speaker.displayName)
+                            .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Rename this speaker")
+                    .accessibilityLabel("\(entry.speaker.displayName), rename")
+                } else {
+                    Text(entry.speaker.displayName)
+                        .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                }
+                if let suggestion = suggestion, !editing {
+                    Button { tools?.rename(entry.speaker, suggestion.name, false) } label: {
+                        Text("\(suggestion.name)? Accept")
+                            .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().strokeBorder(ScribeNotesStyle.accent.opacity(0.5), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Accept the name \(suggestion.name) for \(entry.speaker.displayName)")
+                }
                 Spacer(minLength: 0)
                 Text(time).font(TopBarStyle.label(10).monospacedDigit()).foregroundStyle(Theme.cloudSecondary)
                 Text("\(percent)%")
@@ -914,10 +1089,70 @@ private struct ScribeSpeakerRow: View {
                 }
             }
             .frame(height: 3)
+            if editing { editor }
         }
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: editing ? .contain : .ignore)
         .accessibilityLabel(entry.speaker.displayName)
         .accessibilityValue("\(time), \(percent) percent of the talking")
+    }
+
+    private var suggestion: ScribeNameSuggestion? {
+        tools?.suggestions.first { $0.speaker == entry.speaker }
+    }
+
+    @ViewBuilder private var editor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text("\u{201C}\(line)\u{201D}")
+                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            TextField("Name", text: $draft)
+                .textFieldStyle(.plain)
+                .font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudPrimary)
+                .padding(5)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.18)))
+                .onSubmit { commit() }
+                .accessibilityLabel("Name for \(entry.speaker.displayName)")
+            if !quickNames.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(quickNames.prefix(4), id: \.self) { name in
+                        Button(name) { draft = name }
+                            .buttonStyle(.plain)
+                            .font(TopBarStyle.label(10)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().strokeBorder(ScribeNotesStyle.accent.opacity(0.4), lineWidth: 1))
+                    }
+                }
+            }
+            if tools?.canRemember(entry.speaker) == true {
+                Toggle(isOn: $remember) {
+                    Text("Remember this voice on this Mac").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary)
+                }
+                .toggleStyle(.checkbox)
+                Text("Only save voices of people who agreed.")
+                    .font(TopBarStyle.label(9)).foregroundStyle(Theme.cloudSecondary)
+            }
+            HStack(spacing: 6) {
+                NotchActionButton(title: "Save name", tint: TopBarStyle.rec) { commit() }
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                NotchActionButton(title: "Cancel", tint: Theme.cloudSecondary, filled: false) { editing = false }
+            }
+        }
+        .padding(.top, 3)
+    }
+
+    private func startEditing() {
+        draft = ""
+        remember = false
+        editing = true
+    }
+
+    private func commit() {
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        tools?.rename(entry.speaker, name, remember && tools?.canRemember(entry.speaker) == true)
+        editing = false
     }
 }
 
@@ -931,6 +1166,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
     let warnings: [String]
     let focusToken: Int
     let closeTitle: String
+    let speakerTools: ScribeSpeakerTools?
     let setPrivateNotes: (String) -> Void
     let setActionItem: (Int, Bool) -> Void
     let close: () -> Void
@@ -945,6 +1181,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
         warnings: [String],
         focusToken: Int,
         closeTitle: String,
+        speakerTools: ScribeSpeakerTools? = nil,
         setPrivateNotes: @escaping (String) -> Void,
         setActionItem: @escaping (Int, Bool) -> Void,
         close: @escaping () -> Void,
@@ -958,6 +1195,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
         self.warnings = warnings
         self.focusToken = focusToken
         self.closeTitle = closeTitle
+        self.speakerTools = speakerTools
         self.setPrivateNotes = setPrivateNotes
         self.setActionItem = setActionItem
         self.close = close
@@ -980,6 +1218,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                 Spacer()
                 actions
                 NotchActionButton(title: closeTitle, tint: Theme.cloudSecondary, filled: false) { close() }
+                    .ownedJourneyControl("scribe.notes.close")
             }
             HStack(alignment: .top, spacing: 12) {
                 ScrollView {
@@ -998,7 +1237,11 @@ private struct ScribeMeetingBody<Actions: View>: View {
                         if stats.isWorthShowing {
                             card("Speakers") {
                                 ForEach(Array(stats.speakers.enumerated()), id: \.offset) { _, entry in
-                                    ScribeSpeakerRow(entry: entry)
+                                    ScribeSpeakerRow(
+                                        entry: entry, tools: speakerTools,
+                                        lines: Self.longestLines(of: entry.speaker, in: transcript),
+                                        quickNames: quickNames(excluding: entry.speaker, stats: stats)
+                                    )
                                 }
                             }
                         }
@@ -1020,6 +1263,27 @@ private struct ScribeMeetingBody<Actions: View>: View {
                     .frame(width: 300, alignment: .topLeading)
             }
         }
+    }
+
+    /// The speaker's three longest lines, shortened: what the rename editor shows instead of an audio clip.
+    private static func longestLines(of speaker: ScribeSpeaker, in transcript: [ScribeTranscriptSegment]) -> [String] {
+        var lines: [String] = []
+        for segment in transcript where segment.speaker == speaker {
+            lines.append(segment.text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        lines.sort { (a: String, b: String) -> Bool in a.count > b.count }
+        var shortened: [String] = []
+        for line in lines.prefix(3) {
+            shortened.append(line.count > 90 ? String(line.prefix(90)) + "\u{2026}" : line)
+        }
+        return shortened
+    }
+
+    /// Invitee names not yet taken by a speaker, then the other speakers' names (naming one the same merges them).
+    private func quickNames(excluding speaker: ScribeSpeaker, stats: ScribeSpeakerStats) -> [String] {
+        guard let speakerTools else { return [] }
+        let taken = Set(stats.speakers.map { ScribeSpeakerNames.key($0.speaker.displayName) })
+        return speakerTools.attendeeNames.filter { !taken.contains(ScribeSpeakerNames.key($0)) }
     }
 
     /// The date it ended (when known) and how long it ran.
@@ -1096,8 +1360,17 @@ private struct ScribeMeetingBody<Actions: View>: View {
     private var transcriptList: some View {
         let segments = transcript
         return VStack(alignment: .leading, spacing: 4) {
-            Text("Transcript").font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
-                .accessibilityAddTraits(.isHeader)
+            HStack {
+                Text("Transcript").font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if let speakerTools, !segments.isEmpty {
+                    Button("Copy") { speakerTools.copyTranscript() }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityLabel("Copy the transcript with speaker names")
+                }
+            }
             if segments.isEmpty {
                 Text("No transcript was captured.").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary)
             } else {

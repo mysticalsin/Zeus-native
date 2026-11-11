@@ -19,9 +19,24 @@ struct ZeusScreenSharePolicyTests {
         #expect(ZeusScreenSharePolicy.showInScreenSharing(from: defaults) == true)
     }
 
-    @Test func meetingForcesHide() {
-        #expect(ZeusScreenSharePolicy.zeusSurfacesVisible(showInScreenSharing: true, meetingActive: true, teleprompterSessionHidden: false) == false)
-        #expect(ZeusScreenSharePolicy.zeusSurfacesVisible(showInScreenSharing: true, meetingActive: false, teleprompterSessionHidden: false) == true)
+    /// The matrix: the default (nothing chosen, switch off) is hidden in and out of a meeting; an explicit
+    /// "show" is visible in a meeting too (it used to be forced hidden, so the switch looked broken); the
+    /// teleprompter's private session always hides.
+    @Test func explicitShowWinsOverMeetingAutoHide() {
+        func visible(show: Bool, meeting: Bool, prompter: Bool) -> Bool {
+            ZeusScreenSharePolicy.zeusSurfacesVisible(showInScreenSharing: show, meetingActive: meeting, teleprompterSessionHidden: prompter)
+        }
+        #expect(visible(show: true, meeting: true, prompter: false))
+        #expect(visible(show: true, meeting: false, prompter: false))
+        #expect(!visible(show: false, meeting: true, prompter: false))
+        #expect(!visible(show: false, meeting: false, prompter: false))
+        #expect(!visible(show: true, meeting: true, prompter: true))
+        #expect(!visible(show: true, meeting: false, prompter: true))
+    }
+
+    @Test func captureKindFollowsVisibility() {
+        #expect(ZeusScreenSharePolicy.captureKind(visible: true) == .visibleInShare)
+        #expect(ZeusScreenSharePolicy.captureKind(visible: false) == .hidden)
     }
 }
 

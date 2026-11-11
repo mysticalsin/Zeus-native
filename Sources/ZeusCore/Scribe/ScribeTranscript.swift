@@ -102,6 +102,12 @@ public struct ScribeTranscript: Equatable, Sendable {
         isFinalized = true
     }
 
+    /// Changes who spoke some segments (a speaker correction or a rename). Words and finality are untouched,
+    /// so this is allowed after `finalize()`.
+    public mutating func relabelSpeakers(_ speaker: (ScribeTranscriptSegment) -> ScribeSpeaker) {
+        for index in segments.indices { segments[index].speaker = speaker(segments[index]) }
+    }
+
     /// Compatibility export for the existing `MeetingTranscript` consumers.
     public func meetingTranscript(includeProvisional: Bool = false) -> MeetingTranscript {
         let lines = segments

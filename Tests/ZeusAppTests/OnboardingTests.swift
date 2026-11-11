@@ -20,8 +20,8 @@ struct OnboardingTests {
     // MARK: Steps and films
 
     @Test func stepOrderIsTheNineStepFlow() {
-        #expect(OnboardingStep.allCases == [.welcome, .murmure, .agents, .control, .reach, .day, .theme, .halo, .sounds])
-        #expect((7...9).contains(OnboardingStep.allCases.count))
+        #expect(OnboardingStep.allCases == [.welcome, .murmure, .agents, .control, .reach, .day, .theme, .halo, .languages, .sounds])
+        #expect((7...10).contains(OnboardingStep.allCases.count))
         #expect(OnboardingStep.allCases.map(\.rawValue) == Array(0..<OnboardingStep.allCases.count))
     }
 
@@ -31,7 +31,7 @@ struct OnboardingTests {
         #expect(OnboardingStep.agents.films == [.running])
         #expect(OnboardingStep.control.films == [.approve, .previews])
         #expect(OnboardingStep.reach.films == [.shortcuts, .everywhere])
-        for step in [OnboardingStep.day, .theme, .halo, .sounds] { #expect(step.films.isEmpty) }
+        for step in [OnboardingStep.day, .theme, .halo, .languages, .sounds] { #expect(step.films.isEmpty) }
     }
 
     @Test func everyFilmBelongsToExactlyOneStep() {

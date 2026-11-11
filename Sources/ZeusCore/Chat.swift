@@ -34,14 +34,19 @@ public struct ChatConversation: Codable, Equatable, Identifiable, Sendable {
     public var updatedAt: Date
     public var messages: [ChatMessage]
     public var pinned: Bool
+    /// A real local explanation record linked from this sidebar entry. Optional
+    /// decoding keeps existing Chat JSON compatible without inventing messages.
+    public var visualExplanationID: UUID?
 
-    public init(id: UUID = UUID(), title: String = "", createdAt: Date = Date(), messages: [ChatMessage] = [], pinned: Bool = false) {
+    public init(id: UUID = UUID(), title: String = "", createdAt: Date = Date(), messages: [ChatMessage] = [], pinned: Bool = false,
+                visualExplanationID: UUID? = nil) {
         self.id = id
         self.title = title
         self.createdAt = createdAt
         self.updatedAt = messages.last?.date ?? createdAt
         self.messages = messages
         self.pinned = pinned
+        self.visualExplanationID = visualExplanationID
     }
 
     public static let untitled = "New chat"
@@ -168,9 +173,10 @@ public struct ChatStore: Sendable {
         return decoder
     }
 
-    /// Empty conversations are never written, so opening the window doesn't litter history.
+    /// Empty, unlinked conversations are never written, so opening the window
+    /// doesn't litter history. Visual-only conversations retain their actual record link.
     public func save(_ conversation: ChatConversation) throws {
-        guard !conversation.isEmpty else { return }
+        guard !conversation.isEmpty || conversation.visualExplanationID != nil else { return }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Self.encoder().encode(conversation).write(to: url(for: conversation.id), options: .atomic)
     }

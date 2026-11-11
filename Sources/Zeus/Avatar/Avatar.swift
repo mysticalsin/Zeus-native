@@ -179,7 +179,7 @@ struct AvatarView: View {
         .frame(width: size, height: size)
         .animation(.spring(response: 0.32, dampingFraction: 0.78), value: state)
         .accessibilityElement()
-        .accessibilityLabel("ZEUS: \(state.title)")
+        .accessibilityLabel("Zeus: \(state.title)")
     }
 
     @ViewBuilder

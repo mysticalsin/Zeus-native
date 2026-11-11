@@ -98,7 +98,7 @@ struct SpeechEngineCatalogTests {
     @Test func termsPutTheUsersWordsFirstThenTheBuiltInNames() {
         let terms = DictationVocabularyPrompt.terms(Vocabulary(words: ["Superwhisper", "zeus"]))
         #expect(terms.first == "Superwhisper")
-        #expect(terms.contains("Claude") && terms.contains("Codex") && terms.contains("Murmure") && terms.contains("Laya") && terms.contains("Jev"))
+        #expect(terms.contains("Claude") && terms.contains("Codex") && terms.contains("Murmure") && !terms.contains("Laya") && terms.contains("Jev"))
         // "zeus" from the person counts as Zeus: no duplicate.
         #expect(terms.filter { $0.lowercased() == "zeus" }.count == 1)
         #expect(terms.contains("Soul"))

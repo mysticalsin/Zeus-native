@@ -500,8 +500,8 @@ public enum ScribeRecapNote {
     /// The short line a recap row shows for a saved note.
     public static func badge(for note: String?) -> String? {
         guard let note else { return nil }
-        if note.hasPrefix(stoppedEarlyPrefix) { return "Recording stopped early — saved what was captured." }
-        return "Transcription incomplete — notes may be missing speech."
+        if note.hasPrefix(stoppedEarlyPrefix) { return "Recording stopped early. Saved what was captured." }
+        return "Transcription incomplete. Notes may be missing speech."
     }
 }
 
@@ -551,14 +551,14 @@ public enum ScribeCallPromptText {
         case .none:
             return nil
         case .callDetected(let app):
-            return "Meeting detected — \(ScribeCallDetection.displayName(app))"
+            return "Meeting detected: \(ScribeCallDetection.displayName(app))"
         case .upcoming(let slot):
             let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let name = title.isEmpty ? "Meeting" : title
             let until = slot.start.timeIntervalSince(now)
-            if until <= 0 { return "Started — \(name)" }
+            if until <= 0 { return "Started: \(name)" }
             let minutes = max(1, Int((until / 60).rounded(.up)))
-            return "Starts in \(minutes) min — \(name)"
+            return "Starts in \(minutes) min: \(name)"
         }
     }
 

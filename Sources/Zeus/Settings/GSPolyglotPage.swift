@@ -5,6 +5,7 @@ import ZeusCore
 /// Settings > Polyglot: live translated captions, native to Zeus.
 @MainActor
 struct PolyglotSettingsPage: View {
+    let navigation: GSNavigation
     private var settings: PolyglotSettings { .shared }
     private var polyglot: PolyglotController { .shared }
 
@@ -51,7 +52,8 @@ struct PolyglotSettingsPage: View {
                                 text: "Click, then press any key or chord. It works from any app.",
                                 shortcut: settings.hotkey, defaultValue: PolyglotSettings.defaultHotkey, allowsOff: true,
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) { settings.hotkey = $0 }
-            KeyAccessRow()
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
             GSInfo(text: "You can also say \u{201C}Hey Zeus, translate\u{201D} or \u{201C}start Polyglot\u{201D}.")
         }
         GSCard("Engine") {

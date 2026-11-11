@@ -60,6 +60,10 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         case metaphysical
         /// Tony is back after a while away; `{summary}` is the recap in a few words.
         case welcomeBack
+        /// A short filler while the answer is prepared: "A moment.", "Let me look."
+        case thinking
+        /// What is spoken instead of a raw error. Plain, exact, nothing technical.
+        case errorSpoken
 
         /// The greeting for an hour of the day (0 to 23).
         public static func greeting(hour: Int) -> Situation {
@@ -238,6 +242,13 @@ public final class ZeusVoiceLines: @unchecked Sendable {
             "Welcome back. Nothing burned down.",
             "You're back. The agents held steady.",
         ],
+        .thinking: ["A moment.", "Let me look.", "One moment.", "Looking now.", "Give me a moment."],
+        .errorSpoken: [
+            "That did not work. Nothing was changed.",
+            "I could not finish that. Nothing was lost.",
+            "No answer came back. Ask me again.",
+            "I hit a wall. Nothing changed; ask me again.",
+        ],
     ]
 
     static let plain: [Situation: [String]] = [
@@ -268,5 +279,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         .comparison: ["Faster at some things; you set the direction.", "Different strengths, and they fit well together."],
         .metaphysical: ["I'm software, not a person.", "No, I'm not conscious. I still help."],
         .welcomeBack: ["Welcome back. {summary}.", "You're back. {summary}.", "Welcome back.", "Good to see you again."],
+        .thinking: ["One moment.", "Let me check.", "Looking.", "Just a moment."],
+        .errorSpoken: ["I couldn't finish that.", "That didn't work; nothing changed.", "No answer came back; try again?"],
     ]
 }

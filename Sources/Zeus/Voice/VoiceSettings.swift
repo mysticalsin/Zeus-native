@@ -43,8 +43,15 @@ final class VoiceSettings {
         }
     }
     var ttsProvider: VoiceTTSProvider {
-        didSet { defaults.set(ttsProvider.rawValue, forKey: "voice.ttsProvider") }
+        // Only a person picking an engine in Settings reaches this (init assignments do not): that is an explicit choice.
+        didSet {
+            defaults.set(ttsProvider.rawValue, forKey: "voice.ttsProvider")
+            engineAuto = false
+        }
     }
+    /// Automatic (the default): the best working engine with low latency, chosen by `UltronEngineRouter`.
+    /// Off only after the owner picks one engine; an install that never changed it stays automatic.
+    var engineAuto: Bool { didSet { defaults.set(engineAuto, forKey: "voice.engine.auto") } }
     /// How Zeus talks: the prompt's persona section, the instant voice lines and the ElevenLabs delivery.
     var personality: ZeusPersonality { didSet { defaults.set(personality.rawValue, forKey: ZeusPersonality.defaultsKey) } }
     var kokoroVoice: String { didSet { defaults.set(kokoroVoice, forKey: "voice.kokoro.voice") } }
@@ -107,6 +114,8 @@ final class VoiceSettings {
             ttsProvider = .elevenLabs
         }
         personality = ZeusPersonality.current()
+        engineAuto = UserDefaults.standard.object(forKey: "voice.engine.auto") as? Bool
+            ?? (UserDefaults.standard.string(forKey: "voice.ttsProvider") == nil)
         kokoroVoice = UserDefaults.standard.string(forKey: "voice.kokoro.voice") ?? ElevenLabsVoice.offlineKokoroVoice
         kokoroSpeed = UserDefaults.standard.object(forKey: "voice.kokoro.speed") as? Double ?? ElevenLabsVoice.offlineKokoroSpeed
         elevenKeySaved = Keychain.get("elevenlabs.api-key") != nil
@@ -131,6 +140,47 @@ final class VoiceSettings {
             elevenLabsConfigured: elevenKeySaved && !elevenLabsPaused,
             openAIConfigured: openAIKeySaved
         )
+    }
+
+    // MARK: Routing (UltronEngineRouter)
+
+    static func engine(for provider: VoiceTTSProvider) -> UltronEngine {
+        switch provider {
+        case .kokoro: .kokoro
+        case .chatterbox: .chatterbox
+        case .elevenLabs: .elevenLabs
+        case .openAICompatible: .openAI
+        }
+    }
+
+    func ultronAvailability(now: Date = Date()) -> UltronEngineAvailability {
+        UltronEngineAvailability(
+            elevenLabsConfigured: ElevenLabsVoice.hasRoute, elevenLabsPaused: isProviderPaused(.elevenLabs, now: now),
+            openAIConfigured: openAIKeySaved, openAIPaused: isProviderPaused(.openAICompatible, now: now),
+            kokoroReady: kokoroReady, kokoroPaused: isProviderPaused(.kokoro, now: now),
+            chatterboxReady: ChatterboxVoice.isReady, chatterboxPaused: isProviderPaused(.chatterbox, now: now))
+    }
+
+    var engineChoice: UltronEngineChoice { engineAuto ? .auto : .fixed(Self.engine(for: ttsProvider)) }
+
+    /// Engines to try for the next reply, best first, each with the reason it is in the chain.
+    func routeDecisions() -> [UltronRouteDecision] {
+        UltronEngineRouter.chain(choice: engineChoice, availability: ultronAvailability(), observedFirstAudioMs: observedFirstAudio())
+    }
+
+    /// Smoothed time to first audio per engine, so a slow engine stops leading in automatic mode.
+    func observedFirstAudio() -> [UltronEngine: Int] {
+        var out: [UltronEngine: Int] = [:]
+        for engine in UltronEngine.allCases {
+            if let ms = defaults.object(forKey: "voice.firstAudioMs.\(engine.rawValue)") as? Int { out[engine] = ms }
+        }
+        return out
+    }
+
+    func recordFirstAudio(_ engine: UltronEngine, ms: Int) {
+        let key = "voice.firstAudioMs.\(engine.rawValue)"
+        let previous = defaults.object(forKey: key) as? Int
+        defaults.set(previous.map { ($0 * 2 + ms) / 3 } ?? ms, forKey: key)
     }
 
     func isProviderPaused(_ provider: VoiceTTSProvider, now: Date = Date()) -> Bool {
@@ -185,8 +235,13 @@ final class VoiceSettings {
     }
 
     func removeOpenAIKey() {
-        Keychain.remove("openai-tts.api-key")
+        guard Keychain.remove("openai-tts.api-key") else {
+            keyMessage = "Couldn't remove the OpenAI TTS key. Check Keychain access and try again."
+            return
+        }
         openAIKeySaved = false
+        openAIKeyDraft = ""
+        keyMessage = nil
         defaults.removeObject(forKey: "voice.provider.pause.openAICompatible")
     }
 
@@ -196,7 +251,8 @@ final class VoiceSettings {
 
     func setElevenVoice(_ id: String) {
         let clean = id.filter { $0.isLetter || $0.isNumber }
-        if clean.isEmpty { Keychain.remove("elevenlabs.voice-id") } else { Keychain.set(clean, for: "elevenlabs.voice-id") }
+        let saved = clean.isEmpty ? Keychain.remove("elevenlabs.voice-id") : Keychain.set(clean, for: "elevenlabs.voice-id")
+        keyMessage = saved ? nil : "Couldn't update the saved voice. Check Keychain access and try again."
     }
 
     func saveElevenKey() {
@@ -215,8 +271,13 @@ final class VoiceSettings {
     }
 
     func removeElevenKey() {
-        Keychain.remove("elevenlabs.api-key")
+        guard Keychain.remove("elevenlabs.api-key") else {
+            keyMessage = "Couldn't remove the ElevenLabs key. Check Keychain access and try again."
+            return
+        }
         elevenKeySaved = false
+        elevenKeyDraft = ""
+        keyMessage = nil
         library = []
         elevenLabsStatusMessage = nil
         elevenLabsPausedUntil = nil
@@ -359,8 +420,6 @@ final class VoiceSettings {
 
 /// Kokoro text to speech via kokoro_onnx resident worker (read-only model dir on disk).
 enum KokoroVoice {
-    static var isSetUp: Bool { KokoroWorker.isSetUp() }
-
     /// The WAV for `text`, or nil when Kokoro could not make it.
     static func render(_ text: String, voice: String, speed: Double) async -> URL? {
         await KokoroWorkerSession.shared.render(text, voice: voice, speed: speed)

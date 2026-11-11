@@ -8,11 +8,11 @@ public enum StartupService: String, CaseIterable, Sendable {
     // panel (non-interactive startup).
     case permissionStatusRead, notchUI, panelUI, intelligence, windowSharing, systemNotifications
     case buddy, topBarServices, beamer, dictation, teleprompter, prompterWatcher
-    case insomniaLaunch, insomniaShutdown, layaShutdown, chatBrain, chatHotkey
+    case insomniaLaunch, insomniaShutdown, chatBrain, chatHotkey
     case usage, proactive, stickiesRestore, routines, helperRefresh, voiceTurn
     case appIndex, projectScanner, macControl, avatarFeed, shortcuts, todo
     case sleepWatch, notificationPeeker, settingsCatalog, updates, agentServer
-    case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord
+    case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord, pointingHotkey
     case connectionsRefresh, autoOnboarding, demoArg, motionOpenArg, deepLinks
     case settingsWindow, onboardingWindow, chatWindow, demoPlayback
 }
@@ -69,11 +69,11 @@ public struct StartupPolicy: Equatable, Sendable {
     public static let conflictingFlags: Set<String> = [
         "debug", "--jev-settings-test", "--snapshots", "--keychain-import", "--keychain-selftest",
         "--ask", "--install-hooks", "--uninstall-hooks", "--browseruse-smoke", "--demo", "--motion-open",
-        "--settings-only", "--onboarding-only", "--voice-selftest", "--engine-logos", "--render-film",
+        "--settings-only", "--onboarding-only", "--voice-selftest", "--voice-engine-selftest", "--engine-logos", "--render-film",
         "--onboarding-step", "--onboarding-agent", "--onboarding-fresh", "--settings-section", "--tts-sample",
         "--jev-smoke", "--require-keys", "--drive-dryrun", "--drive-snapshot", "--screen-awareness-dryrun",
         "--annotate-dryrun", "--agent-dryrun", "--codex-replay", "--microphones", "--transcribe", "--chrome",
-        "--snapshot-scales", "--snapshot-match",
+        "--snapshot-scales", "--snapshot-match", "--pointing-selftest",
     ]
 
     /// Variables that must be absent in QA: they point Zeus at a brain fixture or the login keychain.

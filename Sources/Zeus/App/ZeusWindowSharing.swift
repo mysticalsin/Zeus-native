@@ -68,6 +68,28 @@ enum ZeusWindowSharing {
     }
 }
 
+/// The quick "Show Zeus in screen shares" / "Hide Zeus from screen shares" row used by the top bar's
+/// "..." menu and the menu bar menu. It writes the same setting as Settings (General and Appearance),
+/// whose change handler re-applies the policy to every Zeus window at once, no restart.
+@MainActor
+enum ScreenShareQuickToggle {
+    static var isShown: Bool { SettingsStore.shared.bool(ZeusScreenSharePolicy.showInSharingKey) }
+
+    /// The row names the action; the checkmark says Zeus is visible to people you share with right now.
+    static func menuItem(target: AnyObject, action: Selector) -> NSMenuItem {
+        let shown = isShown
+        let item = NSMenuItem(title: shown ? "Hide Zeus from screen shares" : "Show Zeus in screen shares", action: action, keyEquivalent: "")
+        item.target = target
+        item.image = NSImage(systemSymbolName: shown ? "eye.slash" : "eye", accessibilityDescription: nil)
+        item.state = shown ? .on : .off
+        return item
+    }
+
+    static func toggle() {
+        SettingsStore.shared.set(ZeusScreenSharePolicy.showInSharingKey, isShown ? "false" : "true")
+    }
+}
+
 @MainActor
 enum BuddyControllerBridge {
     static weak var shared: BuddyController?

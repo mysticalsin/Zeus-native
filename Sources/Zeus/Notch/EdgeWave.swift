@@ -43,8 +43,10 @@ final class EdgeWaveController {
         let started = Date()
         for (panel, screen) in zip(panels, screens) {
             panel.setFrame(screen.frame, display: false)
+            // The wave leaves the top bar where it now sits (Settings > Appearance > Top bar position).
+            let drop = TopBarPositionModel.shared.offset(forNotchHeight: Double(screen.safeAreaInsets.top))
             panel.contentView = NSHostingView(
-                rootView: EdgeWaveView(tint: tint, started: started, duration: Self.duration, reduceMotion: Motion.reduced))
+                rootView: EdgeWaveView(tint: tint, started: started, duration: Self.duration, reduceMotion: Motion.reduced, topOffset: CGFloat(drop)))
             panel.orderFrontRegardless()
         }
         closing = Task { [weak self] in
@@ -74,12 +76,14 @@ struct EdgeWaveView: View {
     let started: Date
     let duration: TimeInterval
     let reduceMotion: Bool
+    /// How far below the screen top the wave's top run starts (the top bar's own drop).
+    var topOffset: CGFloat = 0
 
     var body: some View {
         TickingView(interval: reduceMotion ? 0.1 : 1 / 60, paused: false) { context in
             let p = max(0, min(1, context.date.timeIntervalSince(started) / duration))
             Canvas { ctx, size in
-                EdgeWaveView.draw(&ctx, size: size, progress: p, color: tint.color, reduceMotion: reduceMotion)
+                EdgeWaveView.draw(&ctx, size: size, progress: p, color: tint.color, reduceMotion: reduceMotion, topOffset: topOffset)
             }
         }
         .allowsHitTesting(false)
@@ -87,8 +91,8 @@ struct EdgeWaveView: View {
     }
 
     /// The right half of the screen edge, from the top centre round to the bottom centre.
-    static func halfPerimeter(_ size: CGSize, inset: CGFloat = 2, radius: CGFloat = 12) -> Path {
-        let r = size.width - inset, t = inset, b = size.height - inset
+    static func halfPerimeter(_ size: CGSize, inset: CGFloat = 2, radius: CGFloat = 12, topOffset: CGFloat = 0) -> Path {
+        let r = size.width - inset, t = inset + topOffset, b = size.height - inset
         var p = Path()
         p.move(to: CGPoint(x: size.width / 2, y: t))
         p.addLine(to: CGPoint(x: r - radius, y: t))
@@ -99,10 +103,10 @@ struct EdgeWaveView: View {
         return p
     }
 
-    static func draw(_ ctx: inout GraphicsContext, size: CGSize, progress p: Double, color: Color, reduceMotion: Bool) {
+    static func draw(_ ctx: inout GraphicsContext, size: CGSize, progress p: Double, color: Color, reduceMotion: Bool, topOffset: CGFloat = 0) {
         let fronts = EdgeWaveMath.fronts(progress: p)
         guard fronts.opacity > 0.01 else { return }
-        let outline = Polyline(path: halfPerimeter(size))
+        let outline = Polyline(path: halfPerimeter(size, topOffset: topOffset))
         // Reduce Motion: the whole edge fades in and out together instead of travelling.
         let lit = reduceMotion ? outline : outline.slice(from: fronts.tail, to: fronts.head)
         var paint = HaloPaint(color: color, opacity: fronts.opacity * (reduceMotion ? 0.7 : 1), line: 3, bloom: 2.4, scale: 1)

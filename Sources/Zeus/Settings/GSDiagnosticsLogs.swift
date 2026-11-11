@@ -35,13 +35,20 @@ final class DiagnosticsLogModel: ObservableObject {
         let settings = (try? SettingsStore.shared.exportJSON()) ?? Data("{}".utf8)
         let logs = [VoiceLog.url, VoiceLog.url.deletingPathExtension().appendingPathExtension("old.log")]
             .filter { FileManager.default.fileExists(atPath: $0.path) }
-        do {
-            let zip = try DiagnosticsExporter.export(.init(version: Self.version, build: Self.build, settingsJSON: settings, logFiles: logs), to: folder)
-            exported = zip
-            message = "Saved \(zip.lastPathComponent) to \(folder.lastPathComponent)."
-        } catch {
-            exported = nil
-            message = "Could not export: \(error.localizedDescription)"
+        nonisolated(unsafe) let input = DiagnosticsExporter.Input(version: Self.version, build: Self.build, settingsJSON: settings, logFiles: logs)
+        message = "Exporting\u{2026}"
+        // The zip is built by `ditto`: wait for it on a background thread so the window stays live.
+        Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) { Result { try DiagnosticsExporter.export(input, to: folder) } }.value
+            guard let self else { return }
+            switch result {
+            case .success(let zip):
+                exported = zip
+                message = "Saved \(zip.lastPathComponent) to \(folder.lastPathComponent)."
+            case .failure(let error):
+                exported = nil
+                message = "Could not export: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -105,7 +112,8 @@ struct DiagnosticsLogsCard: View {
     private func logList(_ rows: [RecordedEvent]) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             if rows.isEmpty {
-                Text("Nothing recorded yet.").font(GS.rowText).foregroundStyle(GS.secondary)
+                GSEmptyState(symbol: "text.append", title: "No log entries yet",
+                             text: "Voice, agent and sound events show here as they happen. Nothing is recorded while you are idle.")
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, event in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {

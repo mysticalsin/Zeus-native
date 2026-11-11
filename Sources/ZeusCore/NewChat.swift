@@ -27,14 +27,16 @@ public struct NewChatRequest: Equatable, Sendable {
 }
 
 public enum NewChatAgents {
-    /// Claude Code and Codex follow their Settings > Integrations toggles; Gemini and Cursor show
-    /// when their CLI is installed. Never empty: Claude Code is the fallback.
-    public static func offered(claude: Bool, codex: Bool, installed: Set<CodingTool>) -> [CodingTool] {
+    /// Every supported agent follows its setting. Gemini and Cursor additionally require an
+    /// installed CLI. An empty selection stays empty; turning everything off must be respected.
+    public static func offered(claude: Bool, codex: Bool, gemini: Bool = true, cursor: Bool = true,
+                               installed: Set<CodingTool>) -> [CodingTool] {
         var list: [CodingTool] = []
         if claude { list.append(.claude) }
         if codex { list.append(.codex) }
-        for tool in [CodingTool.gemini, .cursorAgent] where installed.contains(tool) { list.append(tool) }
-        return list.isEmpty ? [.claude] : list
+        if gemini, installed.contains(.gemini) { list.append(.gemini) }
+        if cursor, installed.contains(.cursorAgent) { list.append(.cursorAgent) }
+        return list
     }
 
     /// The `general.defaultAgent` label ("Claude Code", "Codex") if it is offered, else the first offered.

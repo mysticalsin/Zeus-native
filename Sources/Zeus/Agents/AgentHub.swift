@@ -85,11 +85,12 @@ final class AgentHub {
 
     /// Agents offered in New chat, from Settings > Integrations and the CLIs on this Mac.
     var offeredTools: [CodingTool] {
-        let store = SettingsStore.shared
+        let connections = AIConnections.shared
         let installed = Set([CodingTool.gemini, .cursorAgent].filter { tool in
             CLILocator.tools.first(where: { $0.name == tool.binary }).flatMap(CLILocator.locate) != nil
         })
-        return NewChatAgents.offered(claude: store.bool("integrations.offerClaude"), codex: store.bool("integrations.offerCodex"), installed: installed)
+        return NewChatAgents.offered(claude: connections.offers(.claudeCode), codex: connections.offers(.codex),
+                                     gemini: connections.offers(.gemini), cursor: connections.offers(.cursor), installed: installed)
     }
 
     var projects: [ProjectEntry] { Array(ProjectScanner.shared.entries.sorted { $0.name.lowercased() < $1.name.lowercased() }.prefix(60)) }
@@ -104,9 +105,10 @@ final class AgentHub {
     }
 
     var request: NewChatRequest { NewChatRequest(tool: newTool, directory: newDirectory, instruction: newInstruction) }
+    var canLaunch: Bool { request.isValid && offeredTools.contains(newTool) && !launching }
 
     func launch() async {
-        guard let command = request.command, !launching else { return }
+        guard canLaunch, let command = request.command else { return }
         launching = true
         defer { launching = false }
         let result = await CodeActions.shared.perform(command, speak: false)

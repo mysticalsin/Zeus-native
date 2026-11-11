@@ -72,9 +72,19 @@ final class SettingsStore {
         for option in SettingsCatalog.all where option.state != .custom {
             values[option.id] = defaults.string(forKey: Self.key(option.id)) ?? option.defaultValue
         }
-        // Show what macOS has registered, not the stored default. Nothing is registered here.
-        if !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled {
-            values[Self.launchAtLoginID] = LaunchAtLogin.isOn ? "true" : "false"
+        refreshLaunchAtLogin()
+    }
+
+    /// Shows what macOS has registered, not the stored default. `SMAppService.status` is a synchronous
+    /// round trip to the login-items daemon and can take seconds, so it is read off the main thread
+    /// (once per call) and the switch draws from `values`, never from the service. Nothing is registered here.
+    func refreshLaunchAtLogin() {
+        guard !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled else { return }
+        Task { [weak self] in
+            let on = await Task.detached(priority: .userInitiated) { LaunchAtLogin.currentStatus() }.value
+            guard let self else { return }
+            let text = on ? "true" : "false"
+            if self.values[Self.launchAtLoginID] != text { self.values[Self.launchAtLoginID] = text }
         }
     }
 
@@ -100,8 +110,9 @@ final class SettingsStore {
 
     func boolBinding(_ id: String) -> Binding<Bool> {
         if id == Self.launchAtLoginID, !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled {
-            // Reads the real SMAppService state and drives it; a refused change shows an alert and the switch stays put.
-            return Binding(get: { LaunchAtLogin.isOn }, set: { on in self.applyLaunchAtLogin(on) })
+            // Drives the real SMAppService state; a refused change shows an alert and the switch stays put.
+            // The getter reads the cached value (see `refreshLaunchAtLogin`), never the service.
+            return Binding(get: { self.bool(id) }, set: { on in self.applyLaunchAtLogin(on) })
         }
         return Binding(get: { self.bool(id) }, set: { self.set(id, $0 ? "true" : "false") })
     }
@@ -356,7 +367,11 @@ enum MeetingState {
 @MainActor
 enum LaunchAtLogin {
     static var isBundled: Bool { Bundle.main.bundleURL.pathExtension == "app" }
-    static var isOn: Bool { isBundled && SMAppService.mainApp.status == .enabled }
+    /// Synchronous XPC to the login-items daemon: call it only from a background thread (never from a view body).
+    nonisolated static func currentStatus() -> Bool {
+        Bundle.main.bundleURL.pathExtension == "app" && SMAppService.mainApp.status == .enabled
+    }
+    static var isOn: Bool { isBundled && currentStatus() }
 
     /// Why the last register or unregister did not end as asked; nil when it did.
     private(set) static var lastError: String?
@@ -409,7 +424,7 @@ enum SettingStatus {
         case "integrations.antigravity":
             let found = ["/Applications/Antigravity.app", NSHomeDirectory() + "/Applications/Antigravity.app"].contains { FileManager.default.fileExists(atPath: $0) }
             return found ? (true, "App found") : (false, "Not installed")
-        case "privacy.analytics": return (true, "Off · ZEUS sends nothing")
+        case "privacy.analytics": return (true, "Off · Zeus sends nothing")
         case "interview.key": return (true, "Not needed")
         case "perm.trustedChats": return (false, "None")
         default: return (false, "Coming")
@@ -441,7 +456,7 @@ enum SettingStatus {
         case "dictation.model": (true, "Apple on-device · no download")
         case "integrations.codex": codexConnectionStatus(cliFound: true, hookInstalled: false)
         case "integrations.antigravity": (false, "Not installed")
-        case "privacy.analytics": (true, "Off · ZEUS sends nothing")
+        case "privacy.analytics": (true, "Off · Zeus sends nothing")
         case "interview.key": (true, "Not needed")
         case "diag.agents": (true, "Claude Code · 2 sessions")
         case "perm.trustedChats": (false, "None")

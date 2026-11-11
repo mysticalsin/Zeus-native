@@ -3,19 +3,9 @@
 ZEUS ships or downloads the following third-party work. Attribution lives here and in About,
 never in the product UI.
 
-## Laya (decision engine)
-- Code: https://github.com/NandhaKishorM/laya, Apache License 2.0. Pinned commit
-  55a19f7b7b56787e1a3e41063def9bb9a8737351 (used at build time to export ONNX graphs; the
-  System One request shape ZEUS sends is the public wire format, no Laya code is compiled in).
-- Weights: https://huggingface.co/convaiinnovations/laya-multilingual (default, mmBERT-base,
-  322M) and https://huggingface.co/convaiinnovations/laya (English, ModernBERT-large, 421M),
-  Apache License 2.0. Fetched only from the official convaiinnovations Hugging Face org.
-- Upstream encoders: mmBERT (JHU CLSP, MIT) and ModernBERT (Answer.AI and LightOn, Apache 2.0),
-  as declared by the checkpoints.
-
 ## Qwen 2.5 (last-resort fallback through Ollama, optional, not bundled)
 - qwen2.5:7b by the Qwen team, Alibaba Cloud, Apache License 2.0, run only through a separately
-  installed Ollama and only when Laya is unavailable.
+  installed Ollama and only when Jev gave no answer.
 
 ## Jev (TypeSafe System One API)
 - Cloud service at api.typesafe.ai, used under TypeSafe's terms with the owner's own key. No
@@ -94,26 +84,53 @@ were not present in that folder, so no code was copied.
 Marks identify which AI engine a session uses (nominative use only; each mark belongs to its owner).
 
 ### Simple Icons (CC0 1.0)
-- Package: Simple Icons **16.36.0**, https://github.com/simple-icons/simple-icons, CC0 1.0
-- Fetched 2026-11-03 into `Design/brand-logos-src/`:
-  - Cursor: https://cdn.simpleicons.org/cursor
-  - OpenAI: https://cdn.simpleicons.org/openai (ChatGPT, Codex, `gpt-*`)
-  - Claude: https://cdn.simpleicons.org/claude
-  - Anthropic: https://cdn.simpleicons.org/anthropic
-  - Google Gemini: https://cdn.simpleicons.org/googlegemini
-  - Kimi: https://cdn.simpleicons.org/kimi
-  - Moonshot AI: https://cdn.simpleicons.org/moonshotai
+Simple Icons source files are provided under CC0-1.0. Brand names and trademarks
+remain the property of their owners; this does not imply provider endorsement.
 
-Shipped as template PDFs in `Sources/Zeus/Integrations/Brands/engine-*.pdf`. Mapping lives in
+- Existing OpenAI mark: Simple Icons **15.0.0**,
+  https://cdn.jsdelivr.net/npm/simple-icons@15.0.0/icons/openai.svg.
+  Used as the OpenAI provider identity for ChatGPT, Codex and GPT models.
+  SHA-256: `2b4a04ddc2395b20d168694d3850ce2050a702c4a0cdeb4d8b31b9a970481a8c`.
+- Existing Cursor, Claude, Anthropic, Google Gemini, Kimi and Moonshot AI sources:
+  Simple Icons **16.36.0**, https://github.com/simple-icons/simple-icons.
+  The files originally retrieved on 2026-11-03 were compared byte-for-byte with
+  those pinned package versions on 2026-11-10.
+- Ollama: Simple Icons **16.36.0**, retrieved 2026-11-10,
+  https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/ollama.svg.
+  SHA-256: `9c62bf0159ee96c8b58c86a732f33b002b4b3bb165ec86e8ecca51ad6a82dab6`.
+- LM Studio: Simple Icons **16.36.0**, retrieved 2026-11-10,
+  https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/lmstudio.svg.
+  SHA-256: `16e14708a6ecd687e33700b6e9d47e2e60800407d7f995610871603ddbe3816c`.
+
+Original SVGs and exact provenance are in `Design/brand-logos-src/`. Existing
+marks use template PDFs; the new Ollama and LM Studio marks retain original SVG
+bytes under `Sources/Zeus/Integrations/Brands/`. Mapping is centralized in
 `Sources/ZeusCore/Integrations/EngineBrand.swift`.
 
-The five copied PNG files `chatgpt.png`, `claude.png`, `cursor.png`, `gemini.png`, and `grok.png`
-are separate image assets from the documented Simple Icons template PDFs. Their individual source,
-creator, license, and rights or clearance status are unknown from the inspected project evidence.
-Their presence does not establish permission to use the associated names or marks. In particular,
-`grok.png` is present; the evidence does not establish that it is an xAI-provided brand kit or grant
-rights to it. No trademark, service-mark, endorsement, or commercial-use permission is granted or
-claimed by this notice.
+### Grok / xAI (official original SVG; proprietary trademark)
+
+- Source: https://x.ai/legal/brand-guidelines, corroborated by https://x.ai/grok.
+- Retrieved 2026-11-10. The identical inline Grok SVG appears in the official footer's
+  “Built with Grok” link on both pages. It was copied byte-for-byte, without redrawing or editing.
+- Original and bundled source: `Design/brand-logos-src/grok.svg` and
+  `Sources/Zeus/Integrations/Brands/engine-grok.svg`.
+- SHA-256: `8157a9b2e3ff94a690000ee9327156eb28539efe176fcb06cadcc7688fb4df90`.
+- The original 34×32 dimensions, paths and `currentColor` attributes are retained. The native
+  view preserves proportions and uses the label color for the original mark's template rendering.
+  Exact retrieval and page hashes are recorded in `Design/brand-logos-src/grok.provenance.json`.
+
+The published guidelines allow accurate references to the provider or services and prohibit
+misrepresenting a relationship or implying endorsement, approval or sponsorship. The logo section
+also requires logos exactly as supplied at its download link, without alteration or adjustment.
+That ZIP link returned HTTP 403 during review; this asset is the verified official inline SVG,
+not a claimed copy of the inaccessible ZIP. No correspondence to that pack is asserted.
+
+This proprietary mark is not covered by Simple Icons' CC0 license. Zeus uses it solely to identify
+Grok / xAI as the selected provider; no endorsement or broader trademark permission is claimed.
+
+The five unused PNG files formerly named `chatgpt.png`, `claude.png`, `cursor.png`, `gemini.png`
+and `grok.png` had unknown individual provenance and have been removed from this source/resource
+directory. They are not distributed with the native app.
 
 **Trademark:** All third-party marks remain the property of their owners. Zeus uses them only to
 identify the corresponding engine or product.
@@ -684,6 +701,39 @@ cloud service, fonts, or model weights.
 MIT License
 
 Copyright (c) 2024 OpenWhispr Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## voice-glow: native assistant beam adaptation
+
+Source: https://github.com/Jakubantalik/Libraries.dev/tree/main/packages/voice-glow
+Package: voice-glow 0.2.1, by Jakub Antalik (MIT).
+
+The native assistant beam adapts the package’s bottom-origin layered glow and
+processing motion. Zeus supplies actual producer state and approved level data;
+the React runtime, microphone helpers and the reference’s simulated speech are
+not part of the native app. The user-supplied Voice Assistant Card timing reference
+is https://transitions.dev/studio.html?id=c85AR0dBjUE.
+
+MIT License
+
+Copyright (c) 2026 Jakub Antalik
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

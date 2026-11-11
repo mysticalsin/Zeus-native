@@ -30,10 +30,15 @@ enum OB {
         fieldFill: Color.white, fieldStroke: Color(rgb: 212, 215, 222), track: Color(rgb: 228, 230, 235),
         popup: Color(rgb: 226, 228, 233), tile: Color(rgb: 222, 233, 252), tileStroke: Color(rgb: 212, 215, 222))
 
-    static let blue = Color(rgb: 41, 98, 210)
+    /// The one accent for controls: toggles, selection rings and primary buttons. Semantic colours
+    /// (record red, warning amber, allowed green) stay separate and only appear where they carry meaning.
+    static let controlAccent = Color(rgb: 61, 126, 246)
+    /// The accent as a fill behind white text (6:1 contrast).
+    static let controlAccentFill = Color(rgb: 41, 98, 210)
+    static let blue = controlAccentFill
     static let blueLight = Color(rgb: 128, 178, 249)
     static let blueText = Color(rgb: 121, 169, 237)
-    static let toggleOn = Color(rgb: 61, 126, 246)
+    static let toggleOn = controlAccent
     static let allowed = Color(rgb: 136, 219, 161)
 
     // MARK: Layout (window coordinates, top-left origin)
@@ -62,13 +67,13 @@ enum OB {
         if let name = PoppinsFont.name(weight) { return .custom(name, size: size) }
         return Glass.font(size * 0.88, weight)
     }
-    static let title = display(34)
-    static let subtitle = font(16)
-    static let rowTitle = font(14.5, .semibold)
-    static let rowText = font(13.5)
-    static let button = font(15.5, .semibold)
-    static let footer = font(15.5, .medium)
-    static let progress = font(12, .medium)
+    static var title: Font { display(34) }
+    static var subtitle: Font { font(16) }
+    static var rowTitle: Font { font(14.5, .semibold) }
+    static var rowText: Font { font(13.5) }
+    static var button: Font { font(15.5, .semibold) }
+    static var footer: Font { font(15.5, .medium) }
+    static var progress: Font { font(12, .medium) }
     static let titleTracking: CGFloat = -1.5
 }
 
@@ -218,7 +223,7 @@ struct OnboardingBrand: View {
 }
 
 /// A small, readable progress landmark; a permission step remains optional and can be set up later.
-struct OnboardingProgress: View {
+struct OnboardingProgressBar: View {
     let step: OnboardingStep
     @Environment(\.ob) private var ob
 
@@ -231,6 +236,7 @@ struct OnboardingProgress: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Setup progress")
+        .accessibilityIdentifier("onboarding.progress")
         .accessibilityValue("Step \(step.rawValue + 1) of \(OnboardingStep.allCases.count). \(step.title)")
     }
 }
@@ -241,7 +247,9 @@ struct StepDashes: View {
     let current: Int
     let count: Int
     @Environment(\.ob) private var ob
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.onboardingReduceMotion) private var motionOverride
+    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     var body: some View {
         HStack(spacing: 5) {
             ForEach(0..<count, id: \.self) { index in
@@ -268,7 +276,9 @@ struct StepDashes: View {
 private struct OBButtonFeedback: ViewModifier {
     let pressed: Bool
     var scales = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.onboardingReduceMotion) private var motionOverride
+    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     @Environment(\.isEnabled) private var isEnabled
 
     func body(content: Content) -> some View {
@@ -320,7 +330,7 @@ struct OBOutlineButtonStyle: ButtonStyle {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(filled ? ob.fieldFill : Color.clear).opacity(configuration.isPressed ? 0.7 : 1))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(filled ? ob.fieldStroke : ob.hairline, lineWidth: 1))
+                .strokeBorder(filled ? ob.secondary.opacity(0.55) : ob.hairline, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .modifier(OBButtonFeedback(pressed: configuration.isPressed))
     }
@@ -377,7 +387,10 @@ struct OBAllowButton: View {
     let granted: Bool
     let name: String
     let action: () -> Void
+    var recovery = false
+    var identifier: String? = nil
     var body: some View {
+        let access: OnboardingAccess = granted ? .allowed : (recovery ? .denied : .notGranted)
         if granted {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill").font(.system(size: 14))
@@ -385,11 +398,32 @@ struct OBAllowButton: View {
             }
             .foregroundStyle(OB.allowed)
             .accessibilityLabel("\(name) allowed")
+            .accessibilityIdentifier(identifier ?? "onboarding.allowed.\(name)")
         } else {
-            Button("Allow", action: action)
+            Button(access.actionTitle ?? "Allowed", action: action)
                 .buttonStyle(OBOutlineButtonStyle())
-                .frame(width: 68)
-                .accessibilityLabel("Allow \(name)")
+                // A minimum width, not a fixed one: "Open Settings" must never truncate to "Open Setti...".
+                .fixedSize()
+                .frame(minWidth: recovery ? 112 : 68)
+                .accessibilityLabel(recovery ? "Open Settings for \(name)" : "Allow \(name)")
+                .ownedJourneyControl(identifier ?? "onboarding.allow.\(name)")
+        }
+    }
+}
+
+/// Permission purpose stays visible; a denied state offers recovery without blocking navigation.
+struct OBPermissionRow: View {
+    let symbol: String
+    let title: String
+    let reason: String
+    let capability: OnboardingCapability
+    let services: any OnboardingServing
+
+    var body: some View {
+        let state = services.access(capability)
+        OBRow(symbol: symbol, title: title, text: state.recovery ?? reason, textWidth: 218) {
+            OBAllowButton(granted: state == .allowed, name: title, action: { services.request(capability) },
+                          recovery: state == .denied, identifier: "onboarding.permission.\(capability.rawValue)")
         }
     }
 }
@@ -420,7 +454,9 @@ struct OBToggleStyle: ToggleStyle {
     enum Size { case small, large }
     var size: Size = .small
     @Environment(\.ob) private var ob
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.onboardingReduceMotion) private var motionOverride
+    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     func makeBody(configuration: Configuration) -> some View {
         let track = size == .small ? CGSize(width: 44, height: 20) : CGSize(width: 64, height: 24)
         return Button { configuration.isOn.toggle() } label: {

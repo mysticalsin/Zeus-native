@@ -49,7 +49,7 @@ struct BeamerSettingsPage: View {
             if status.availability == .needsPermission {
                 GSDivider()
                 GSRow(symbol: "accessibility", title: "Accessibility", text: "Beamer has no remote control, so Zeus presses its menu bar menu. macOS also asks once to let Zeus control System Events.") {
-                    Button("Allow") { context.permissions.request(.accessibility) }.buttonStyle(GSButtonStyle(prominent: true))
+                    Button("Allow") { context.permissions.request(.accessibility) }.buttonStyle(GSButtonStyle())
                 }
             }
         }

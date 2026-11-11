@@ -18,6 +18,7 @@ final class WakeWordController {
     var enabled: Bool {
         didSet {
             guard enabled != oldValue else { return }
+            retry = .ready
             if !TopBarStyle.isSnapshot { UserDefaults.standard.set(enabled, forKey: Self.defaultsKey) }
             if enabled, !TopBarStyle.isSnapshot { Task { await VoicePermissions.ensure(explicit: true); evaluate() } }
             evaluate()
@@ -40,7 +41,8 @@ final class WakeWordController {
     @ObservationIgnored private var micCheckRunning = false
     @ObservationIgnored private var lastReason: String?
     @ObservationIgnored private var cpuMark: (ProcessEnergy, Date)?
-    @ObservationIgnored private var retryStartAt = Date.distantPast
+    /// Whether a failed listener start may be tried again (see `WakeRetry`): backs off, then needs attention.
+    @ObservationIgnored private var retry = WakeRetry.State.ready
     @ObservationIgnored private var lastGate = WakeGate()
     @ObservationIgnored private var lastLoggedStatus = ""
     /// The `zeus status` line: "listening", "paused (dictation)", "no permission", "off".
@@ -100,7 +102,9 @@ final class WakeWordController {
             setStatus(reason == "off" ? "Off" : needsPermissions ? "Needs permissions" : "Paused: \(reason)")
             if reason != lastReason, listener == nil, reason != "off" { VoiceLog.log("wake", "paused (\(reason))") }
             lastReason = reason
-        } else if listener == nil, Date() >= retryStartAt {
+            // Something else is in charge for now (a permission, a call, the lock): a later start is a fresh try.
+            retry = WakeRetry.reduce(retry, .reset).0
+        } else if listener == nil, WakeRetry.canTry(retry, now: Date().timeIntervalSinceReferenceDate) {
             startListener()
             lastReason = nil
         }
@@ -151,8 +155,7 @@ final class WakeWordController {
         let listener = WakeWordListener(localeIdentifier: voice.speechLocale)
         guard listener.onDeviceSupported else {
             setStatus("Paused: on-device recognition isn't available for \(voice.speechLocale)")
-            if lastLoggedStatus != status { lastLoggedStatus = status; VoiceLog.log("error", status) }
-            retryStartAt = Date().addingTimeInterval(30)
+            noteFailure(.onDeviceRecognition, detail: status)
             return
         }
         listener.onWake = { request in
@@ -161,14 +164,29 @@ final class WakeWordController {
         do {
             try listener.start()
             self.listener = listener
+            retry = WakeRetry.reduce(retry, .started).0
             if !listening { listening = true }
             setStatus("Listening")
             cpuMark = (ProcessEnergy.sample(), Date())
             VoiceLog.log("wake", "listening on this Mac (recogniser locale \(listener.localeIdentifier))")
         } catch {
             setStatus("Paused: the microphone didn't start")
-            VoiceLog.log("error", "wake mic start failed: \(error.localizedDescription)")
-            retryStartAt = Date().addingTimeInterval(10)
+            noteFailure(.microphone, detail: error.localizedDescription)
+        }
+    }
+
+    /// Records a failed start: one log line per streak, a bounded backoff, then "needs attention".
+    private func noteFailure(_ failure: WakeRetry.Failure, detail: String) {
+        let (next, effects) = WakeRetry.reduce(retry, .failed(failure, now: Date().timeIntervalSinceReferenceDate))
+        retry = next
+        for effect in effects {
+            switch effect {
+            case .logFailure(.microphone): VoiceLog.logContent("error", detail, prefix: "wake mic start failed: ")
+            case .logFailure(.onDeviceRecognition): VoiceLog.log("error", detail)
+            case .gaveUp:
+                setStatus("Needs attention: turn Hey Zeus off and on to try again")
+                VoiceLog.log("wake", "gave up restarting the listener until something changes")
+            }
         }
     }
 

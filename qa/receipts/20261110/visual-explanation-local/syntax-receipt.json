@@ -1,0 +1,261 @@
+{
+  "scope": "Swift syntax only on Linux; not native SDK typecheck/build/execution",
+  "command": [
+    "/workspace/toolchains/swift-6.2.1-RELEASE-ubuntu24.04/usr/bin/swiftc",
+    "-frontend",
+    "-parse",
+    "Sources/Zeus/App/AppDelegate.swift",
+    "Sources/Zeus/App/SettingsCatalog.swift",
+    "Sources/Zeus/App/VoiceTurnController.swift",
+    "Sources/Zeus/Chat/ChatModel.swift",
+    "Sources/Zeus/Chat/ChatWindow.swift",
+    "Sources/Zeus/Dictation/DictationController.swift",
+    "Sources/Zeus/Dictation/WhisperKitEngine.swift",
+    "Sources/Zeus/Explanation/ExplanationAudio.swift",
+    "Sources/Zeus/Explanation/ExplanationAudioArbitration.swift",
+    "Sources/Zeus/Explanation/ExplanationCanvas.swift",
+    "Sources/Zeus/Explanation/ExplanationController.swift",
+    "Sources/Zeus/Explanation/ExplanationMicrophone.swift",
+    "Sources/Zeus/Explanation/ExplanationOverlay.swift",
+    "Sources/Zeus/Explanation/ExplanationPane.swift",
+    "Sources/Zeus/Explanation/ExplanationProvider.swift",
+    "Sources/Zeus/Explanation/ExplanationSceneView.swift",
+    "Sources/Zeus/Explanation/ExplanationScreenContext.swift",
+    "Sources/Zeus/Explanation/ExplanationTalkButton.swift",
+    "Sources/Zeus/Recordly/RecordlyController.swift",
+    "Sources/Zeus/Scribe/ScribeController.swift",
+    "Sources/Zeus/Voice/Speaker.swift",
+    "Sources/Zeus/Voice/SpeechInput.swift",
+    "Sources/ZeusCore/Chat.swift",
+    "Sources/ZeusCore/Explanation/ExplanationCompletionStream.swift",
+    "Sources/ZeusCore/Explanation/ExplanationCoordinates.swift",
+    "Sources/ZeusCore/Explanation/ExplanationDiagnostics.swift",
+    "Sources/ZeusCore/Explanation/ExplanationHistory.swift",
+    "Sources/ZeusCore/Explanation/ExplanationPlayback.swift",
+    "Sources/ZeusCore/Explanation/ExplanationProtocol.swift",
+    "Sources/ZeusCore/Explanation/ExplanationReducer.swift",
+    "Sources/ZeusCore/Explanation/ExplanationStream.swift",
+    "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+    "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+    "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+    "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+    "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+    "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+    "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+    "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+    "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+    "Tests/ZeusCoreTests/ChatTests.swift",
+    "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+    "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+    "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+    "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+    "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+    "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+    "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+    "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+    "qa/native-app-host/NativeAppTestHost.swift"
+  ],
+  "exit_code": 0,
+  "files": [
+    {
+      "path": "Sources/Zeus/App/AppDelegate.swift",
+      "sha256": "ba36afd8b2c273bc1de935294b67797aef9111b9be1cf3f1787f7c3f71379542"
+    },
+    {
+      "path": "Sources/Zeus/App/SettingsCatalog.swift",
+      "sha256": "8b14016fd768472821de0874ae7ae690b5fc80fc7d54b6118d5567abdaaf2f1d"
+    },
+    {
+      "path": "Sources/Zeus/App/VoiceTurnController.swift",
+      "sha256": "acfd79f02183b7933bd104ade0cf847f3e2d49613dfba1d3e7537795cc2050b2"
+    },
+    {
+      "path": "Sources/Zeus/Chat/ChatModel.swift",
+      "sha256": "ea7f253c83a2692491577e72ebb40def1e19b5075763c96365dedbbe60e6bb14"
+    },
+    {
+      "path": "Sources/Zeus/Chat/ChatWindow.swift",
+      "sha256": "dfaf83c988391e7cf7c9aeee7dd9ec59b6296655ab57074394723b0d0b0386a6"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/DictationController.swift",
+      "sha256": "5ca166c475196f94f7cc55cb84df15ebc1f02bcee7f69b0e03fbcc67fc2b13f3"
+    },
+    {
+      "path": "Sources/Zeus/Dictation/WhisperKitEngine.swift",
+      "sha256": "53e5d99a228016393c6b9d2954e071fb02d22e230735252652f7ee945859db32"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationAudio.swift",
+      "sha256": "24619d41a0ba13a636ae8f5486eaffa1f92fa1e69f9eccdf237b0bddc7a57e12"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationAudioArbitration.swift",
+      "sha256": "0d04edb64286d8dd4a9b1775d19a11255a6c0cb77999165801b669506e649c1e"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationCanvas.swift",
+      "sha256": "efe96135dfb8c51df21a960bc3c2c183b3b2b13ae379c733767029a940d56d5b"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationController.swift",
+      "sha256": "c8bd8bcce3c66ad230a4180d71684709a3e67d58876df2b4935bf13c7c39245c"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationMicrophone.swift",
+      "sha256": "ff0a3a379663092c88ef59f8af316c05961b88d5a2132a6b23f3a75fd388aaea"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationOverlay.swift",
+      "sha256": "84c2c6835b06d80ce3d9943e3a1fb94837d2f1333f22623eec433c74fb0e8a4c"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationPane.swift",
+      "sha256": "ff686b222f54ab58c45c12f0540b272491c16fea0bc6215d85ebb53998c3916a"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationProvider.swift",
+      "sha256": "48252f2a1703b8c7a844fe7460c3a703915679dbd9a292af2f4c6f714a094c33"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationSceneView.swift",
+      "sha256": "9392d964bb1ee49ff3b6f1e0f7de297d996fc1b8d2d86e347ba92a777471fdb7"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationScreenContext.swift",
+      "sha256": "f634cb55e185f13ad62a319be8518d5793a592955603a5c2305ac9f922706d97"
+    },
+    {
+      "path": "Sources/Zeus/Explanation/ExplanationTalkButton.swift",
+      "sha256": "21d9de8785926d966f87369fbc8ebbb21dbb0e6af71a405440d7b697ee0acff4"
+    },
+    {
+      "path": "Sources/Zeus/Recordly/RecordlyController.swift",
+      "sha256": "fb781a346a52de724c58301768159eaa41a6eb9578a7cd711645919378638bfa"
+    },
+    {
+      "path": "Sources/Zeus/Scribe/ScribeController.swift",
+      "sha256": "ca2f37be2d05eb6635c7d918f691fc0153f8913a9509ee5cfa5d0c9f4b31f349"
+    },
+    {
+      "path": "Sources/Zeus/Voice/Speaker.swift",
+      "sha256": "db9044fa2b53f727e64439c7b501039d1721039a1d19adef08c1dfac693b4099"
+    },
+    {
+      "path": "Sources/Zeus/Voice/SpeechInput.swift",
+      "sha256": "ccf9c4f3f03b32a51ddfc28d40bec00794e1825990c92b29c5680e43e8d9dd3f"
+    },
+    {
+      "path": "Sources/ZeusCore/Chat.swift",
+      "sha256": "04c335dfad0012d8a81640cea84866471154490d8dce4e61a7223599328d8c64"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationCompletionStream.swift",
+      "sha256": "7a97f83d6e4253a5f0e44e7c786305cc04659855cc59fce03ace0bceca48426e"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationCoordinates.swift",
+      "sha256": "da597f3cbd9e4b011ad87f974378c9508213d20b0d14147ee8d12924e722eb66"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationDiagnostics.swift",
+      "sha256": "e343841619390623bc96136d0bb6b2df04198630d73fca93eeae5296a57cc8de"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationHistory.swift",
+      "sha256": "9a2d1ef34ead7957a2baf5e5621d9a229700c8425dd6b219da1955982491f43f"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationPlayback.swift",
+      "sha256": "50f67bf3668c3e9d788971c146c7e7af34d46dc894aaffe4a0a8d16ba60edb06"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationProtocol.swift",
+      "sha256": "f2333d36b7220c65aa6ca6a7543940088c8ec56e2fc7f529461982493dc7caae"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationReducer.swift",
+      "sha256": "771344da89e09d585c29e194a619c0dc36bec401a5abe63880909332ad76a1d7"
+    },
+    {
+      "path": "Sources/ZeusCore/Explanation/ExplanationStream.swift",
+      "sha256": "172d06ec37f64c6b24d213fe44ad18c792927dc8a327c06a19e265144bd7a071"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+      "sha256": "4317d955696a5f199c2f18be6aaff73dbf325348b8888f6908709f817d3fac82"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+      "sha256": "09abd8a7e918eee476006f92f560ae158d1098407a4ed4f277487cd64bc20e0f"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+      "sha256": "564d790d50eb08e2265aebed85719227ec78e439aa49b69254d8f334a706bf9e"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+      "sha256": "8175083541628444d5cb453288e103893f73b35c6c27fb3ad864bc309f04de50"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+      "sha256": "34f0e5ce5ebc6208df6eafc894008940458441daa72ad2bd78c8ce8f7328ec07"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+      "sha256": "d04feeb50f69d7cf17b0269a295c2977fd2c92cd6125feb66c54cfb0147209e9"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationScreenContextTests.swift",
+      "sha256": "b7e259db41911e68b2f9b0e494ca46da45188d84a9f5285297ac12d5ade5e78b"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+      "sha256": "1437e74cb67540d9607083b5d9578360553915f721833b1e33086db5502f615d"
+    },
+    {
+      "path": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+      "sha256": "de4cba5ae9cffee2984f56eb288bdba5507ce2275186c090897501cb7c720916"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ChatTests.swift",
+      "sha256": "31380fd59f18a46d69ae45361c4c18f25bf3f3a4cafddd1c3f641193e71b7ed0"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+      "sha256": "f1cde5947922937e11192fd37e19cae6a2d02e3c0225cdc77e5cf22c4a9a6f2b"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+      "sha256": "5799ddc0d885260f5799a95b738a4c307f81bdc939d5667dacc88077c47c5c72"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+      "sha256": "87b6c0756c54f031b93923b7e583e1e99358c1fe612ebf42a72bdb0848f7bb7c"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+      "sha256": "5e4d483f0ccad6ac2c58b15fe54fce06f7e9da9d3b7cf10c5723b65235dd4f46"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+      "sha256": "8549aa7f24407099f67e54cac1b16a19d8e2df8a36759b2cd94e35b07a3e4c68"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+      "sha256": "1b30d196c69a9532252c637983bc0319137b510cee5c12f6120faa21d8c45dba"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+      "sha256": "a54edbc9978f8f4d7337e392815bb457b8460a88ce54be060705c4d9784cf796"
+    },
+    {
+      "path": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+      "sha256": "e9817e4342bbf3c510fdfdc33b00fb5b5c0d049cd1deb5978cc73c44c73285eb"
+    },
+    {
+      "path": "qa/native-app-host/NativeAppTestHost.swift",
+      "sha256": "85f7e82f7b495458c2a2f5deaa98e0b9c176397880465bfcdd10eaa9be4ffafd"
+    }
+  ]
+}

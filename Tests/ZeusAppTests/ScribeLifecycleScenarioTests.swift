@@ -25,6 +25,10 @@ struct ScribeLifecycleScenarioTests {
     }
 
     private enum Failure: Error { case eventTimedOut }
+    private func preferences() throws -> (String, UserDefaults) {
+        let name = "scribe-lifecycle-\(UUID().uuidString)"
+        return (name, try #require(UserDefaults(suiteName: name)))
+    }
     private func waitUntil(_ condition: () -> Bool) async throws {
         for _ in 0..<200 {
             if condition() { return }
@@ -42,8 +46,10 @@ struct ScribeLifecycleScenarioTests {
     }
 
     @Test func manualCountdownKeepAndRepeatedTicksStopExactlyOnceAfterNineSeconds() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
         let clock = Clock(), capture = Capture()
-        let controller = ScribeController(provider: capture, monotonicClock: { clock.time })
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
         let id = try await start(controller, provider: capture)
         defer { controller.cancel() }
         controller.requestEnd()
@@ -73,6 +79,8 @@ struct ScribeLifecycleScenarioTests {
     }
 
     @Test func failedFinalSaveDoesNotCompleteAndRetryKeepsNewerPrivateNotes() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-lifecycle-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -80,7 +88,7 @@ struct ScribeLifecycleScenarioTests {
         try Data([0]).write(to: blocked) // deterministic directory-write failure, independent of chmod/root.
         let store = ScribeMeetingStore(directory: blocked)
         let capture = Capture()
-        let controller = ScribeController(provider: capture, store: store)
+        let controller = ScribeController(provider: capture, store: store, cancellationDefaults: defaults)
         let id = try await start(controller, provider: capture)
         controller.receive(ScribeTranscriptSegment(id: "synthetic", session: id, speaker: .participant("Fixture"),
             start: 0, end: 1, text: "We decided to test durable notes.", isFinal: true))
@@ -115,8 +123,10 @@ struct ScribeLifecycleScenarioTests {
     }
 
     @Test func boundAppExitDuringManualCountdownCannotRearmAfterKeep() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
         let clock = Clock(), capture = Capture()
-        let controller = ScribeController(provider: capture, monotonicClock: { clock.time })
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
         let app = ScribeCallProcessIdentity(pid: 1234, bundleID: "synthetic.call", launchedAt: 10)
         controller.meetingCallHint = app
         let id = try await start(controller, provider: capture)
@@ -134,6 +144,8 @@ struct ScribeLifecycleScenarioTests {
     }
 
     @Test func discardingAFailedFinalSaveAlsoDeletesItsEarlierTranscriptCheckpoint() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-discard-\(UUID().uuidString)")
         let store = ScribeMeetingStore(directory: root)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -142,7 +154,7 @@ struct ScribeLifecycleScenarioTests {
         let controller = ScribeController(provider: capture, store: store, writeMeeting: { record in
             if rejectFinal { throw Failure.eventTimedOut }
             try store.save(record)
-        })
+        }, cancellationDefaults: defaults)
         let id = try await start(controller, provider: capture)
         controller.receive(ScribeTranscriptSegment(id: "checkpoint", session: id, speaker: .participant("Fixture"),
             start: 0, end: 1, text: "Synthetic checkpoint to discard.", isFinal: true))
@@ -160,6 +172,6 @@ struct ScribeLifecycleScenarioTests {
         #expect(controller.phase == .idle)
         #expect(controller.completedNoticeID == nil)
         #expect(!store.loadAll().records.contains(where: { $0.id == id.rawValue }))
-        #expect(!ScribeCancelTombstones.ids.contains(id.rawValue))
+        #expect(!ScribeCancelTombstones.ids(in: defaults).contains(id.rawValue))
     }
 }

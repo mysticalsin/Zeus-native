@@ -1,7 +1,10 @@
 import copy
+import contextlib
+import io
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 import tempfile
@@ -31,6 +34,12 @@ class RequiredGateTests(unittest.TestCase):
         source_provider = patch.object(policy[1], "source_snapshot", return_value=self.source_snapshot)
         source_provider.start()
         self.addCleanup(source_provider.stop)
+        # Native stream parsing has its own real-parser suite. Aggregate fixtures
+        # isolate that boundary but retain receipt identity, artifact and guard checks.
+        self.native_validator = gate.native_evidence_module()
+        native_provider = patch.object(self.native_validator, "validate_receipt", side_effect=self.verify_native_fixture, create=True)
+        self.native_receipt_mock = native_provider.start()
+        self.addCleanup(native_provider.stop)
         self.needs = {job: {"result": "success"} for job in gate.REQUIRED}
         for job, checks in gate.REQUIRED.items():
             root = self.inputs / f"zeus-check-{job}"
@@ -43,20 +52,51 @@ class RequiredGateTests(unittest.TestCase):
                     (root / f"{check}.log").write_text("command passed\n")
                 lines = {"app": "Test run with 2 tests in 1 suite passed", "extension": "# tests 3\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0",
                          "release-scripts": "Ran 13 tests in 1.0s\nOK"}
-                if job == "app":
-                    _, contracts, _, _, definitions, _ = gate.load_policy()
-                    names = sorted({name for row in definitions.values() if row["kind"] == "native-fixture"
-                                    for name in contracts.runnable_functions((policy[0] / row["file"]).read_text())})
-                    lines[job] = "".join(f"✔ Test {name}() passed after 0.001 seconds.\n" for name in names)
-                    lines[job] += f"✔ Test run with {len(names)} tests in 1 suite passed after 0.1 seconds."
                 (root / "test.log").write_text(lines[job] + "\n")
-                files = [f"{check}.log" for check in checks]
+                if job == "app":
+                    (root / "build.log").write_text("Build complete! (1.0s)\n")
+                    (root / "bundle.log").write_text("Build complete! (1.0s)\nBuilt build/Zeus.app\n")
+                    self.make_native_fixture(root)
+                if job == "extension":
+                    policy = gate.load_object(Path(gate.__file__).resolve().parents[2] / "qa/extension-regressions.json")
+                    names = policy["required_tests"]
+                    log = "".join(f"ok {index} - {name}\n" for index, name in enumerate(names, 1))
+                    log += f"# tests {len(names)}\n# pass {len(names)}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n"
+                    (root / "test.log").write_text(log)
+                    self.write(root / "audit.log", {"auditReportVersion": 2, "metadata": {"vulnerabilities": {
+                        "info": 0, "low": 0, "moderate": 0, "high": 0, "critical": 0, "total": 0}}})
+                files = sorted(gate.job_artifacts(job))
             self.write(root / "job.json", {
                 "schema_version": 1, "job": job, "tested_sha": self.sha, "expected_sha": self.sha,
                 "head_sha": self.head, "run_id": "42", "run_attempt": "1",
                 "checks": {check: "success" for check in checks},
                 "files": {name: {"sha256": gate.digest(root / name), "bytes": (root / name).stat().st_size} for name in files},
             })
+
+    def make_native_fixture(self, root):
+        _, _, _, feature_map, definitions, registry = gate.load_policy()
+        kinds = self.native_validator.NATIVE_KINDS
+        cases = [case for feature in feature_map["features"] for obligation in feature["obligations"]
+                 if definitions[obligation["check"]]["kind"] in kinds for case in obligation["cases"]]
+        cases += [row["guard"] for row in registry if row["check"] in definitions and definitions[row["check"]]["kind"] in kinds]
+        cases = list({(case["file"], case["function"]): case for case in cases}.values())
+        folder = root / "native-evidence"
+        folder.mkdir()
+        self.write(folder / "result.json", {"tested_sha": self.sha, "head_sha": self.head,
+                                          "metrics": {"tests": len(cases), "passed_cases": cases}})
+
+    def verify_native_fixture(self, root, expected_sha, head_sha, definitions, repo):
+        value = json.loads((root / "result.json").read_text())
+        if value["tested_sha"] != expected_sha or value["head_sha"] != head_sha:
+            raise ValueError("native fixture belongs to another tested/head SHA")
+        return value["metrics"]
+
+    def update_native(self, change):
+        path = self.root("app") / "native-evidence/result.json"
+        value = json.loads(path.read_text())
+        change(value)
+        self.write(path, value)
+        self.refresh_file("app", "native-evidence/result.json")
 
     def make_feature_result(self, root):
         repo, contracts, portable, feature_map, definitions, registry = gate.load_policy()
@@ -74,7 +114,7 @@ class RequiredGateTests(unittest.TestCase):
                    "tests": 0, "suites": 0, "passed_functions": [], "artifacts": []}
             if kind == "unimplemented":
                 row.update(status="unimplemented", reason=definition["reason"])
-            elif kind != "native-fixture":
+            elif kind not in self.native_validator.NATIVE_KINDS and kind != "trusted-native-fixture":
                 folder = root / ident
                 folder.mkdir()
                 names = sorted(functions[ident])
@@ -141,6 +181,109 @@ class RequiredGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "passed", result)
         self.assertGreater(result["jobs"]["feature-map"]["tests"], 0)
 
+    def trusted_check(self):
+        result = json.loads((self.root("feature-map") / "result.json").read_text())
+        row = next(row for row in result["checks"] if row["kind"] == "trusted-native-fixture")
+        self.assertEqual(row["status"], "not-run")
+        return row["id"]
+
+    def test_trusted_check_is_not_run_in_development_and_cannot_claim_evidence(self):
+        ident = self.trusted_check()
+        self.assertEqual(self.evaluate()["status"], "passed")
+        claims = (dict(status="passed"), dict(exit_code=0), dict(tests=1), dict(command=["swift", "test"]),
+                  dict(artifacts=[{"path": "test.log", "sha256": "0" * 64}]))
+        for claim in claims:
+            with self.subTest(claim=claim):
+                self.update_map(lambda value: next(row for row in value["checks"] if row["id"] == ident).update(claim))
+                self.assert_blocked()
+                self.update_map(lambda value: next(row for row in value["checks"] if row["id"] == ident).update(
+                    status="not-run", exit_code=None, tests=0, command=[], artifacts=[]))
+
+    def test_trusted_check_fails_closed_in_full_mode_without_a_receipt(self):
+        # An unexecuted check set fails on its first required row; the trusted row's own exact
+        # reason is asserted in test_trusted_receipt.
+        self.trusted_check()
+        self.update_map(lambda value: value.update(mode="full"))
+        result = self.evaluate("full")
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(result["errors"], result)
+
+    def test_production_compiler_diagnostics_block_despite_successful_steps_and_tests(self):
+        path = self.root("app") / "build.log"
+        for diagnostic in (
+            'Internal Error: dataCorrupted(Swift.DecodingError.Context(debugDescription: "Corrupted JSON"))',
+            "/source/Zeus.swift:375:7: error: unresolved identifier",
+        ):
+            with self.subTest(diagnostic=diagnostic):
+                path.write_text(diagnostic + "\nBuild complete! (1.0s)\n")
+                self.refresh_file("app", "build.log")
+                result = self.evaluate()
+                self.assertEqual(result["status"], "failed", result)
+                self.assertTrue(any("compiler log contains failure" in error for error in result["errors"]), result)
+
+    def test_bundle_compiler_diagnostics_block_despite_successful_packaging(self):
+        path = self.root("app") / "bundle.log"
+        path.write_text('Internal Error: dataCorrupted("Corrupted JSON")\nBuild complete! (1.0s)\nBuilt build/Zeus.app\n')
+        self.refresh_file("app", "bundle.log")
+        result = self.evaluate()
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("compiler log contains failure" in error for error in result["errors"]), result)
+
+    def test_extension_requires_named_regressions_despite_positive_summary(self):
+        path = self.root("extension") / "test.log"
+        original = path.read_text()
+        for changed in [re.sub(r"^ok 1 - .+$", "ok 1 - an unrelated test", original, flags=re.MULTILINE),
+                        original + original.splitlines()[0] + "\n"]:
+            path.write_text(changed)
+            self.refresh_file("extension", "test.log")
+            self.assert_blocked()
+
+    def test_extension_audit_cannot_be_missing_forged_or_contain_blocking_findings(self):
+        path = self.root("extension") / "audit.log"
+        baseline = json.loads(path.read_text())
+        for change in [{}, {"auditReportVersion": 2, "error": {"message": "registry unavailable"}},
+                       {"auditReportVersion": 2, "metadata": {"vulnerabilities": {
+                           "info": 0, "low": 0, "moderate": 1, "high": 0, "critical": 0, "total": 1}}}]:
+            self.write(path, change)
+            self.refresh_file("extension", "audit.log")
+            self.assert_blocked()
+        self.write(path, baseline)
+        self.refresh_file("extension", "audit.log")
+        path.unlink()
+        self.assert_blocked()
+
+    def use_ancestor_alias(self):
+        alias_directory = tempfile.TemporaryDirectory(prefix="zeus-gate-ancestor-")
+        self.addCleanup(alias_directory.cleanup)
+        alias = Path(alias_directory.name) / "var"
+        alias.symlink_to(self.inputs.parent.resolve(), target_is_directory=True)
+        self.inputs = alias / self.inputs.name
+        self.assertNotEqual(self.inputs.absolute(), self.inputs.resolve())
+
+    def test_trusted_output_ancestor_alias_accepts_valid_packages(self):
+        # Models macOS /var -> /private/var without editing the host filesystem.
+        self.use_ancestor_alias()
+        result = self.evaluate()
+        self.assertEqual(result["status"], "passed", result)
+
+    def test_ancestor_alias_does_not_allow_child_package_symlinks_or_escape(self):
+        self.use_ancestor_alias()
+        result = json.loads((self.root("feature-map") / "result.json").read_text())
+        package = next(row["package"] for row in result["checks"] if row["kind"] == "portable")
+        source = self.root("feature-map") / package / "Package.swift"
+        outside = self.inputs.parent / (self.inputs.name + "-redirected.swift")
+        outside.write_bytes(source.read_bytes())
+        self.addCleanup(outside.unlink)
+        source.unlink()
+        source.symlink_to(outside)
+        blocked = self.evaluate()
+        self.assertEqual(blocked["status"], "failed", blocked)
+        self.assertTrue(any("source package is redirected" in error for error in blocked["errors"]), blocked)
+        source.unlink()
+        source.write_bytes(outside.read_bytes())
+        self.update_map(lambda value: next(row for row in value["checks"] if row["kind"] == "portable").update(package="../outside"))
+        self.assert_blocked()
+
     def test_any_non_success_prerequisite_blocks(self):
         for job in gate.REQUIRED:
             for result in ("failure", "cancelled", "skipped", "timed_out", "neutral", "", "SUCCESS", "true", True, False, None, {"result": "success"}):
@@ -192,12 +335,23 @@ class RequiredGateTests(unittest.TestCase):
         self.assert_blocked()
 
     def test_zero_tests_is_not_green(self):
-        for job, line in (("app", "Test run with 0 tests passed\n"), ("extension", "# tests 0\n"),
-                          ("release-scripts", "Ran 0 tests in 1.0s\nOK\n")):
+        native_path = self.root("app") / "native-evidence/result.json"
+        original_native = native_path.read_text()
+        self.update_native(lambda value: value["metrics"].update(tests=0))
+        self.assert_blocked()
+        native_path.write_text(original_native)
+        self.refresh_file("app", "native-evidence/result.json")
+        for job, line in (("extension", "# tests 0\n"), ("release-scripts", "Ran 0 tests in 1.0s\nOK\n")):
             with self.subTest(job=job):
-                (self.root(job) / "test.log").write_text(line)
+                log = self.root(job) / "test.log"
+                original = log.read_text()
+                log.write_text(line)
                 self.refresh_file(job, "test.log")
-                self.assert_blocked()
+                try:
+                    self.assert_blocked()
+                finally:
+                    log.write_text(original)
+                    self.refresh_file(job, "test.log")
 
     def test_real_swift_testing_and_node_summary_formats(self):
         path = self.root("app") / "test.log"
@@ -207,14 +361,19 @@ class RequiredGateTests(unittest.TestCase):
         self.assertEqual(gate.positive_test_count("extension", path), 12)
 
     def test_failed_or_skipped_test_summaries_do_not_pass(self):
-        cases = (("app", "Executed 4 tests, with 0 failures\nTest run with 2 tests in 1 suite failed\n"),
-                 ("extension", "# tests 3\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n"),
+        cases = (("extension", "# tests 3\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n"),
                  ("release-scripts", "Ran 3 tests in 1.0s\nFAILED (failures=1)\n"))
         for job, text in cases:
             with self.subTest(job=job):
-                (self.root(job) / "test.log").write_text(text)
+                log = self.root(job) / "test.log"
+                original = log.read_text()
+                log.write_text(text)
                 self.refresh_file(job, "test.log")
-                self.assert_blocked()
+                try:
+                    self.assert_blocked()
+                finally:
+                    log.write_text(original)
+                    self.refresh_file(job, "test.log")
 
     def test_duplicate_json_keys_and_nonfinite_numbers_are_rejected(self):
         for text in ('{"status":"failed","status":"passed"}', '{"tests":NaN}', '{"tests":Infinity}'):
@@ -243,13 +402,35 @@ class RequiredGateTests(unittest.TestCase):
     def test_missing_native_guard_blocks_despite_other_passing_tests(self):
         _, _, _, feature_map, definitions, _ = gate.load_policy()
         case = next(case for feature in feature_map["features"] for obligation in feature["obligations"]
-                    if definitions[obligation["check"]]["kind"] == "native-fixture" for case in obligation["cases"])
-        log = self.root("app") / "test.log"
-        log.write_text("\n".join(line for line in log.read_text().splitlines() if f"Test {case['function']}()" not in line))
-        self.refresh_file("app", "test.log")
+                    if definitions[obligation["check"]]["kind"] in self.native_validator.NATIVE_KINDS for case in obligation["cases"])
+        self.update_native(lambda value: value["metrics"].update(passed_cases=[row for row in value["metrics"]["passed_cases"]
+                                                                             if row != case]))
         result = self.evaluate()
         self.assertEqual(result["status"], "failed", result)
-        self.assertTrue(any(case["function"] in error for error in result["errors"]), result)
+        self.assertTrue(any("qualified executed identity" in error for error in result["errors"]), result)
+
+    def test_native_receipt_missing_stale_or_changed_cannot_use_console_totals(self):
+        path = self.root("app") / "native-evidence/result.json"
+        original = path.read_text()
+        self.update_native(lambda value: value.update(tested_sha="d" * 40))
+        self.assert_blocked()
+        path.write_text(original)
+        self.refresh_file("app", "native-evidence/result.json")
+        path.write_text(original + " ")
+        self.assert_blocked()
+        path.unlink()
+        self.assert_blocked()
+
+    def test_native_stream_validation_failure_propagates_to_aggregate(self):
+        self.native_receipt_mock.side_effect = ValueError("compiled selected cases were omitted from native events")
+        result = self.evaluate()
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("omitted from native events" in error for error in result["errors"]), result)
+        self.native_receipt_mock.assert_called_once()
+        args, kwargs = self.native_receipt_mock.call_args
+        self.assertEqual(args[1:3], (self.sha, self.head))
+        self.assertIn("repo", kwargs)
+        self.assertTrue(any(row["kind"] == "native-module" and row["module"] == "ZeusCoreTests" for row in args[3]))
 
     def test_missing_or_changed_feature_obligation_blocks(self):
         original = (self.root("feature-map") / "result.json").read_text()
@@ -262,6 +443,18 @@ class RequiredGateTests(unittest.TestCase):
     def test_source_manifest_must_match_current_bytes(self):
         self.update_map(lambda r: r.update(source_snapshot_sha256="d" * 64))
         self.assert_blocked()
+
+    def test_development_receipt_cannot_smuggle_a_native_compiler_barrier(self):
+        self.update_map(lambda r: r.update(native_build={"status": "passed"}))
+        result = self.evaluate()
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("only valid for full macOS" in error for error in result["errors"]), result)
+
+    def test_development_receipt_cannot_smuggle_compiler_discovery(self):
+        self.update_map(lambda r: r.update(native_discovery={"status": "passed"}))
+        result = self.evaluate()
+        self.assertEqual(result["status"], "failed", result)
+        self.assertTrue(any("discovery is only valid" in error for error in result["errors"]), result)
 
     def test_full_run_requires_full_mode_and_completed_obligations(self):
         self.assertEqual(self.evaluate("full")["status"], "failed")
@@ -280,6 +473,243 @@ class RequiredGateTests(unittest.TestCase):
         path.unlink()
         self.update_map(lambda r: r["checks"][0]["artifacts"][0].update(path="../outside.log"))
         self.assert_blocked()
+
+
+class NativeAppReceiptIntegrationTests(unittest.TestCase):
+    """Synthetic file-backed receipts through the real parser; no native execution claim."""
+    def setUp(self):
+        fixture_module = importlib.import_module("test_native_evidence")
+        self.fixture = fixture_module.NativeEventEvidenceTests()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+
+    def prepare(self, parameterized=False):
+        if parameterized:
+            self.fixture.parameterize()
+        output, self.result = self.fixture.receipt()
+        self.app = self.fixture.repo / "app"
+        self.app.mkdir()
+        self.output = self.app / "native-evidence"
+        output.rename(self.output)
+        _, contracts, portable = gate.policy_modules()
+        definitions = {"native-ZeusCoreTests": {"id": "native-ZeusCoreTests", "kind": "native-module", "module": "ZeusCoreTests"}}
+        feature_map = {"features": [{"obligations": [{"check": "native-ZeusCoreTests", "cases": [
+            {"file": "Tests/ZeusCoreTests/SampleTests.swift", "function": "example"}]}]}]}
+        policy = patch.object(gate, "load_policy", return_value=(self.fixture.repo, contracts, portable, feature_map, definitions, []))
+        policy.start()
+        self.addCleanup(policy.stop)
+
+    def rewrite_events(self, keep):
+        run = self.result["native_runs"][0]
+        relative = run["id"] + "/events.jsonl"
+        path = self.output / relative
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        path.write_text("".join(json.dumps(row) + "\n" for row in rows if keep(row)))
+        next(item for item in run["artifacts"] if item["path"] == relative)["sha256"] = gate.digest(path)
+        (self.output / "result.json").write_text(json.dumps(self.result))
+
+    def test_app_gate_recomputes_file_backed_qualified_receipt(self):
+        self.prepare()
+        self.assertEqual(gate.validate_native(self.app, "a" * 40, "b" * 40), 1)
+
+    def test_app_gate_rejects_omitted_events_even_with_updated_hash_and_positive_summary(self):
+        self.prepare()
+        self.rewrite_events(lambda row: not (row["payload"].get("kind") == "testEnded" and row["payload"].get("testID") == self.fixture.ident))
+        with self.assertRaisesRegex(ValueError, "omitted or did not complete"):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_missing_parameter_case_even_with_positive_summary(self):
+        self.prepare(parameterized=True)
+        self.rewrite_events(lambda row: row["payload"].get("_testCase", {}).get("id") != "argument-two")
+        with self.assertRaisesRegex(ValueError, "omitted a declared argument case"):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_legacy_native_schema_version(self):
+        self.prepare()
+        self.result["schema_version"] = 1
+        (self.output / "result.json").write_text(json.dumps(self.result))
+        with self.assertRaisesRegex(ValueError, "unsupported native receipt"):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_missing_process_terminal_event_even_with_positive_summary(self):
+        self.prepare()
+        self.rewrite_events(lambda row: row["payload"].get("kind") != "runEnded")
+        with self.assertRaises(ValueError):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+    def test_app_gate_rejects_nonzero_process_exit_even_with_passing_summary(self):
+        self.prepare()
+        self.result["native_runs"][0]["exit_code"] = 1
+        (self.output / "result.json").write_text(json.dumps(self.result))
+        with self.assertRaisesRegex(ValueError, "native execution did not succeed"):
+            gate.validate_native(self.app, "a" * 40, "b" * 40)
+
+
+
+class NativeBuildGateTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="zeus-native-build-gate-")
+        self.addCleanup(self.temporary.cleanup)
+        self.output = Path(self.temporary.name)
+        self.contracts = gate.policy_modules()[1]
+        folder = self.output / "native-build"
+        folder.mkdir()
+        self.log = folder / "build.log"
+        self.log.write_text("Building for debugging...\nBuild complete! (0.1s)\n")
+        self.result = {"platform": "darwin", "source_snapshot_sha256": "a" * 64,
+                       "native_build": {"status": "passed", "command": ["swift", "build", "--build-tests", "--jobs", "2"],
+                                        "exit_code": 0, "source_snapshot_sha256": "a" * 64, "duration_seconds": 0.1,
+                                        "artifacts": [{"path": "native-build/build.log", "sha256": gate.digest(self.log)}]}}
+        self.definition = {"kind": "native-fixture", "suite": "SelectedTests", "file": "Tests/ZeusAppTests/SelectedTests.swift"}
+        self.recorded_output = "/recorded/output"
+        self.command = gate.native_evidence_module().run_command([self.definition], "2", self.recorded_output, "native-selected")
+
+    def validate(self, mode="full"):
+        return gate.validate_native_compilation(self.result, self.output, mode, self.contracts)
+
+    def test_verified_native_build_allows_only_its_exact_fixture_command(self):
+        jobs = self.validate()
+        self.assertEqual(jobs, "2")
+        gate.validate_native_command(self.command, self.definition, jobs, self.recorded_output, "native-selected")
+        core = {"kind": "native-module", "module": "ZeusCoreTests"}
+        core_command = gate.native_evidence_module().run_command([core], jobs, self.recorded_output, "native-core")
+        gate.validate_native_command(core_command, core, jobs, self.recorded_output, "native-core")
+
+    def test_missing_failed_or_stale_compilation_cannot_authorize_native_reuse(self):
+        original = copy.deepcopy(self.result)
+        changes = [lambda r: r.pop("native_build"), lambda r: r.update(native_build=None),
+                   lambda r: r["native_build"].update(status="failed"),
+                   lambda r: r["native_build"].update(exit_code=1),
+                   lambda r: r["native_build"].update(exit_code=False),
+                   lambda r: r["native_build"].update(source_snapshot_sha256="b" * 64),
+                   lambda r: r["native_build"].update(command=["swift", "build"]),
+                   lambda r: r["native_build"]["command"].append("--skip-build")]
+        for change in changes:
+            with self.subTest(change=change):
+                self.result = copy.deepcopy(original)
+                change(self.result)
+                with self.assertRaises(ValueError):
+                    self.validate()
+
+    def test_missing_or_forged_compiler_log_cannot_authorize_native_reuse(self):
+        for text in ("Build complete! (0.1s)\nerror: native compile failed\n", "Building for debugging...\n",
+                     'Internal Error: dataCorrupted(Swift.DecodingError.Context(codingPath: [], debugDescription: "Corrupted JSON", underlyingError: Optional(unexpected end of file)))\nBuild complete! (164.43s)\n',
+                     "Build complete! (0.1s)\nCHECK TIMEOUT after 10 seconds\n"):
+            with self.subTest(text=text):
+                self.log.write_text(text)
+                self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+                with self.assertRaises(ValueError):
+                    self.validate()
+        self.log.unlink()
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_warning_source_argument_named_error_is_not_a_compiler_error(self):
+        self.log.write_text(
+            "/source/Zeus.swift:375:7: warning: result of call is unused\n"
+            "373 | // Error handling\n"
+            "375 | converter.convert(to: converted, error: &convertError) { _, _ in input }\n"
+            "    |                                    ^ warning: result is unused\n"
+            "Build complete! (1.0s)\n")
+        self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+        self.assertEqual(self.validate(), "2")
+
+    def test_compiler_diagnostic_headers_remain_blocking_with_source_context_and_color(self):
+        for diagnostic in (
+            "error: build failed",
+            "fatal error: compiler stopped",
+            "Internal Error: dataCorrupted",
+            "/source/File.swift:7: error: missing declaration",
+            "/source/File.swift:7:12: error: missing declaration",
+            "swift-frontend: error: compiler stopped",
+            "LLVM ERROR: broken module found",
+            "/swift-frontend: error: compiler stopped",
+            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend: error: compiler stopped",
+            "/path with spaces/clang++: fatal error: header not found",
+            "swift-driver: error: compiler stopped",
+            "lld-link: error: undefined symbol",
+            "clang++: fatal error: header not found",
+            "ld: error: undefined symbol",
+            "<unknown>:0: error: compiler failure",
+            "\x1b[31merror:\x1b[0m build failed",
+            "CHECK TIMEOUT after 10 seconds",
+            "CHECK COULD NOT START compiler",
+        ):
+            with self.subTest(diagnostic=diagnostic):
+                self.log.write_text(
+                    "375 | converter.convert(to: converted, error: &convertError)\n"
+                    + diagnostic + "\nBuild complete! (1.0s)\n")
+                self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+                with self.assertRaisesRegex(ValueError, "compiler log contains failure"):
+                    self.validate()
+
+    def test_compiler_log_command_returns_failure_for_missing_or_failed_evidence(self):
+        for contents, expected in (("Build complete! (1.0s)\n", 0),
+                                   ("Build complete! (1.0s)\nInternal Error: dataCorrupted\n", 1),
+                                   ("Building for debugging...\n", 1), (None, 1)):
+            with self.subTest(contents=contents):
+                if contents is None:
+                    self.log.unlink()
+                else:
+                    self.log.write_text(contents)
+                captured = io.StringIO()
+                with patch.object(sys, "argv", ["gate.py", "compiler-log", "--path", str(self.log)]), contextlib.redirect_stderr(captured):
+                    self.assertEqual(gate.main(), expected)
+                if expected:
+                    self.assertIn("Compiler evidence rejected:", captured.getvalue())
+                else:
+                    self.assertEqual(captured.getvalue(), "")
+
+    def test_compiler_cli_test_retains_complete_python_execution_receipt(self):
+        # This test intentionally invokes only the CLI case, never itself.
+        result = subprocess.run(
+            [sys.executable, "-m", "unittest", "-v",
+             "test_gate.NativeBuildGateTests.test_compiler_log_command_returns_failure_for_missing_or_failed_evidence"],
+            cwd=Path(__file__).resolve().parent, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, timeout=30)
+        runner = importlib.import_module("run")
+        count, suites, functions = runner.python_summary(result.stdout, result.returncode)
+        self.assertEqual((count, suites), (1, 1))
+        self.assertEqual(functions, ["test_compiler_log_command_returns_failure_for_missing_or_failed_evidence"])
+
+    def test_compiler_log_hash_and_containment_are_required(self):
+        self.log.write_text("Build complete! (changed bytes)\n")
+        with self.assertRaises(ValueError):
+            self.validate()
+        self.result["native_build"]["artifacts"][0]["sha256"] = gate.digest(self.log)
+        outside = self.output / "outside.log"
+        outside.write_bytes(self.log.read_bytes())
+        self.log.unlink()
+        self.log.symlink_to(outside)
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_barrier_is_for_full_macos_only(self):
+        for mode, platform in (("development", "darwin"), ("development", "linux"), ("full", "linux")):
+            with self.subTest(mode=mode, platform=platform):
+                self.result["platform"] = platform
+                with self.assertRaises(ValueError):
+                    self.validate(mode)
+        self.result.pop("native_build")
+        self.assertIsNone(self.validate("full"))
+        with self.assertRaises(ValueError):
+            gate.validate_native_command(self.command, self.definition, None, self.recorded_output, "native-selected")
+
+    def test_native_reuse_rejects_changed_jobs_flags_module_or_suite(self):
+        jobs = self.validate()
+        mutations = [lambda c: c.remove("--skip-build"), lambda c: c.__setitem__(4, "3"),
+                     lambda c: c.__setitem__(6, "SelectedTests"),
+                     lambda c: c.__setitem__(6, r"^ZeusCoreTests\.SelectedTests/"),
+                     lambda c: c.__setitem__(6, r"^ZeusAppTests\.UnreviewedTests/"),
+                     lambda c: c.__setitem__(-1, "unknown-event-version"),
+                     lambda c: c.__setitem__(8, "/other/events.jsonl"),
+                     lambda c: c.append("--parallel")]
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                command = self.command.copy()
+                mutate(command)
+                with self.assertRaises(ValueError):
+                    gate.validate_native_command(command, self.definition, jobs, self.recorded_output, "native-selected")
 
 
 class WorkflowContractTests(unittest.TestCase):
@@ -303,18 +733,39 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(workflow.count("ref: ${{ github.sha }}"), len(gate.REQUIRED) + 1)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event_name == 'schedule'", workflow)
-        self.assertIn('native_filter="$(python3 qa/closed-loop/gate.py native-filter)"', workflow)
-        self.assertIn('scripts/test.sh --filter "$native_filter"', workflow)
+        self.assertIn('python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence"', workflow)
+        self.assertIn("native-evidence/result.json", gate.job_artifacts("app"))
         self.assertGreaterEqual(workflow.count("if-no-files-found: error"), len(gate.REQUIRED) + 1)
+
+    def test_every_ci_app_compilation_has_a_diagnostic_barrier_before_upload(self):
+        workflow = (Path(__file__).resolve().parents[3] / ".github/workflows/build.yml").read_text()
+        app = workflow.split("  app:\n", 1)[1].split("\n  extension:", 1)[0]
+        build = app.index('swift build; }')
+        build_check = app.index('gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/build.log"')
+        tests = app.index("python3 qa/closed-loop/ci_motion_profile.py")
+        bundle = app.index("scripts/bundle.sh")
+        bundle_check = app.index('gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/bundle.log"')
+        archive = app.index("ditto -c -k")
+        upload = app.index("name: Upload local preview")
+        self.assertLess(build, build_check)
+        self.assertLess(build_check, tests)
+        self.assertLess(tests, bundle)
+        self.assertLess(bundle, bundle_check)
+        self.assertLess(bundle_check, archive)
+        self.assertLess(archive, upload)
 
     def test_native_filter_is_anchored_to_only_reviewed_map_suites(self):
         _, _, _, _, definitions, _ = gate.load_policy()
         pattern = gate.native_filter()
-        rows = [row for row in definitions.values() if row["kind"] == "native-fixture"]
-        self.assertEqual(len(pattern.split("|")), len(rows))
+        rows = [row for row in definitions.values() if row["kind"] in gate.native_evidence_module().NATIVE_KINDS]
+        self.assertEqual(pattern.count("^"), len(rows))
+        self.assertEqual([row["module"] for row in rows if row["kind"] == "native-module"], ["ZeusCoreTests"])
         for row in rows:
-            module = "ZeusAppTests" if row["file"].startswith("Tests/ZeusAppTests/") else "ZeusCoreTests"
-            self.assertRegex(module + "." + row["suite"] + "/fixture", pattern)
+            if row["kind"] == "native-module":
+                self.assertRegex("ZeusCoreTests.AnyReviewedCoreSuite/fixture", pattern)
+                self.assertRegex("ZeusCoreTests/topLevelFixture()", pattern)
+            else:
+                self.assertRegex("ZeusAppTests." + row["suite"] + "/fixture", pattern)
         for unsafe in ("ZeusAppTests.UnreviewedCameraTests/fixture", "ZeusAppTests.PrefixPermissionsCaptureTests/fixture",
                        "OtherModule.PermissionsCaptureTests/fixture", "ZeusAppTests.PermissionsCaptureTestsExtra/fixture"):
             self.assertNotRegex(unsafe, pattern)

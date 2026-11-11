@@ -422,10 +422,10 @@ import Testing
     }
 
     @Test func personaLinesNameTheThing() {
-        let line = AckLines.persona.line(.opening("Spotify")) ?? ""
+        let line = AckLines.persona(personality: .ultron).line(.opening("Spotify")) ?? ""
         #expect(!line.isEmpty)
-        #expect(AckLines.persona.line(.volume(.up)) == nil)
-        #expect(AckLines.persona.line(.timer(seconds: 300)) == "Timer set for 5 minutes.")
+        #expect(AckLines.persona(personality: .ultron).line(.volume(.up)) == nil)
+        #expect(AckLines.persona(personality: .ultron).line(.timer(seconds: 300)) == "Timer set for 5 minutes.")
     }
 
     @Test func plainTimerEndsWithoutABreakAndRestoresFocusLength() {

@@ -1,98 +1,158 @@
 import Foundation
 import ZeusCore
 
-// zeus-bridge: Chrome native-messaging host (registered as com.zeus.bridge).
-// Chrome starts it when the ZEUS extension calls chrome.runtime.connectNative and talks to it
-// over stdin/stdout with length-prefixed JSON frames.
-//
-// While it runs it serves ~/Library/Application Support/Zeus/chrome.sock. The app sends one
-// BridgeRequest per connection there; the bridge forwards it to the extension and writes the
-// matching BridgeResponse back. "ping" is answered here so the extension can confirm the link.
-
-/// Longest any extension command may take (opening an AI site and waiting for its message box
-/// is the slowest). The app applies its own, usually shorter, timeout per request.
+// Chrome owns stdin/stdout with four-byte length-prefixed JSON frames. The only local app
+// surface is ZeusPaths.chromeSocket; no browser, provider or capture API is invoked here.
 let requestTimeout: TimeInterval = 60
 
-final class Relay: @unchecked Sendable {
+/// Coordinates a terminal stream failure with the cancelable stdin reader. Socket peers receive
+/// a failure reply or a transport EOF, never an indefinitely retained reservation.
+final class HostLifetime: @unchecked Sendable {
     private let lock = NSLock()
-    private var pending: [String: UnixSocketServer.Reply] = [:]
-    private let output = FileHandle.standardOutput
+    private var stopped = false
+    private var input: NativeMessageInput?
+    private var server: UnixSocketServer?
 
-    func toChrome(_ json: Data) -> Bool {
-        guard let frame = try? NativeMessagingFrame.encode(json) else { return false }
-        lock.withLock { output.write(frame) }
-        return true
+    func attach(input: NativeMessageInput, server: UnixSocketServer) {
+        lock.withLock { self.input = input; self.server = server }
     }
 
-    func send(_ response: BridgeResponse) {
-        if let json = try? JSONEncoder().encode(response) { _ = toChrome(json) }
+    func finish(code: Int32) {
+        let resources = lock.withLock { () -> (NativeMessageInput?, UnixSocketServer?)? in
+            guard !stopped else { return nil }
+            stopped = true
+            return (input, server)
+        }
+        guard let resources else { return }
+        resources.0?.stop()
+        resources.1?.stop()
+        // A failed framed stream cannot be reused. Exit also closes original stdio descriptors;
+        // a stalled Chrome reader cannot keep this host's input loop alive after output failure.
+        exit(code)
+    }
+}
+
+final class Relay: @unchecked Sendable {
+    private enum ProtocolFailure: Error { case invalidMessage }
+    private let lock = NSLock()
+    private var stopped = false
+    private let pending = BridgePendingReplies()
+    private let output: NativeMessageOutput
+    private let lifetime: HostLifetime
+    // Only the serial input consumer accesses this decoder.
+    private var decoder = NativeMessagingFrame.Decoder()
+
+    init(lifetime: HostLifetime) throws {
+        self.lifetime = lifetime
+        output = try NativeMessageOutput(handle: .standardOutput)
     }
 
-    /// A request from the app: remember who asked, then pass it to the extension.
+    func consume(_ chunk: Data) throws {
+        try decoder.consume(chunk) { [self] in try fromChrome($0) }
+    }
+
+    func inputEnded(_ end: NativeMessageInput.End) {
+        if end == .eof {
+            do {
+                try decoder.finish()
+                pending.failAll(BridgeError(code: BridgeError.notConnected, message: "Chrome's connection ended"))
+                let draining = output.finish { [self] result in
+                    switch result {
+                    case .success: terminate(code: 0)
+                    case .failure: terminate(code: 2)
+                    }
+                }
+                if !draining { terminate(code: 2) }
+            } catch { terminate(code: 2) }
+        } else { terminate(code: 2) }
+    }
+
+    private func terminate(code: Int32) {
+        let first = lock.withLock { () -> Bool in
+            guard !stopped else { return false }
+            stopped = true
+            return true
+        }
+        guard first else { return }
+        output.stop()
+        pending.failAll(BridgeError(code: BridgeError.notConnected, message: "Chrome's connection ended"))
+        lifetime.finish(code: code)
+    }
+
+    private func enqueue(_ json: Data) -> NativeMessageOutput.Admission {
+        guard let frame = try? NativeMessagingFrame.encode(json) else { return .tooLarge }
+        return output.enqueue(frame) { [weak self] result in
+            if case .failure = result { self?.terminate(code: 2) }
+        }
+    }
+
+    /// A request from the app: reserve once, then admit its complete frame before scheduling I/O.
     func forward(_ line: Data, reply: @escaping UnixSocketServer.Reply) {
         guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: line) else {
             reply(Self.encode(.failure("unknown", BridgeError(code: "bad_request", message: "Could not decode request"))))
+            return
+        }
+        guard output.isOpen else {
+            reply(Self.encode(.failure(request.id, BridgeError(code: BridgeError.notConnected))))
             return
         }
         if request.type == "bridge.status" {
             reply(Self.encode(.success(request.id, .object(["bridge": .bool(true), "version": .string(ZeusCoreVersion.string)]))))
             return
         }
-        lock.withLock { pending[request.id] = reply }
-        guard toChrome(line) else {
-            complete(.failure(request.id, BridgeError(code: "too_large", message: "Request is over Chrome's 1 MB limit")))
-            return
-        }
-        DispatchQueue.global().asyncAfter(deadline: .now() + requestTimeout) { [weak self] in
-            self?.complete(.failure(request.id, BridgeError(code: "timeout", message: "Chrome did not answer in time")))
+        guard let token = pending.reserve(id: request.id, reply: reply) else { return }
+        switch enqueue(line) {
+        case .accepted:
+            pending.armTimeout(id: request.id, token: token, after: requestTimeout)
+        case .tooLarge:
+            pending.complete(.failure(request.id, BridgeError(code: "too_large", message: "Request is over Chrome's 1 MB limit")), token: token)
+        case .full:
+            pending.complete(.failure(request.id, BridgeError(code: "busy", message: "Chrome's connection is busy. Try again.")), token: token)
+        case .closed:
+            pending.complete(.failure(request.id, BridgeError(code: BridgeError.notConnected)), token: token)
         }
     }
 
-    /// A message from the extension: either an answer for the app, or a request for the bridge.
-    func fromChrome(_ message: Data) {
-        if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message),
-           lock.withLock({ pending[response.id] != nil }) {
-            complete(response)
+    /// Valid late responses are ignored. Invalid framed JSON or oversized correlation IDs close
+    /// the transport; stdout cannot be used for diagnostic text or a resynchronization guess.
+    private func fromChrome(_ message: Data) throws {
+        if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message) {
+            guard response.id.utf8.count <= 256 else { throw ProtocolFailure.invalidMessage }
+            pending.complete(response)
             return
         }
-        guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message) else { return }
+        guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message),
+              request.id.utf8.count <= 256 else { throw ProtocolFailure.invalidMessage }
+        let response: BridgeResponse
         switch request.type {
         case "ping":
-            send(.success(request.id, .object([
-                "pong": .bool(true),
-                "host": .string(ZeusPaths.nativeHostName),
+            response = .success(request.id, .object([
+                "pong": .bool(true), "host": .string(ZeusPaths.nativeHostName),
                 "version": .string(ZeusCoreVersion.string),
-            ])))
+            ]))
         default:
-            send(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
+            response = .failure(request.id, BridgeError(code: "unknown_type", message: request.type))
+        }
+        guard let json = Self.encode(response), enqueue(json) == .accepted else {
+            throw ProtocolFailure.invalidMessage
         }
     }
 
-    private func complete(_ response: BridgeResponse) {
-        guard let reply = lock.withLock({ pending.removeValue(forKey: response.id) }) else { return }
-        reply(Self.encode(response))
-    }
-
-    private static func encode(_ response: BridgeResponse) -> Data? {
-        try? JSONEncoder().encode(response)
-    }
+    private static func encode(_ response: BridgeResponse) -> Data? { try? JSONEncoder().encode(response) }
 }
 
-let relay = Relay()
-let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path) { line, reply in
-    relay.forward(line, reply: reply)
-}
-// Without the socket the extension still connects; the app just reports Chrome as unreachable.
-try? server.start()
-
-var buffer = Data()
-let input = FileHandle.standardInput
-while true {
-    let chunk = input.availableData
-    if chunk.isEmpty { break } // Chrome closed the port
-    buffer.append(chunk)
-    for message in NativeMessagingFrame.decode(&buffer) {
-        relay.fromChrome(message)
+let lifetime = HostLifetime()
+do {
+    let relay = try Relay(lifetime: lifetime)
+    let input = try NativeMessageInput(handle: .standardInput)
+    let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path) { [relay] line, reply in
+        relay.forward(line, reply: reply)
     }
+    lifetime.attach(input: input, server: server)
+    // Without a socket the extension still connects; the app reports Chrome as unreachable.
+    try? server.start()
+    input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
+    dispatchMain()
+} catch {
+    exit(2)
 }
-server.stop()

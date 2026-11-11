@@ -74,68 +74,75 @@ final class MicrophoneTester {
     static let shared = MicrophoneTester()
     /// Inputs listed in Settings, refreshed when the section appears.
     var devices: [MicrophoneDevice] = []
-    private(set) var level: Double = 0
-    private(set) var peak: Double = 0
-    private(set) var running = false
-    private(set) var problem: String?
-    private var engine: AVAudioEngine?
-    private var stopTask: Task<Void, Never>?
+    /// The whole test as one state (`MicTest`); the values below are read from it.
+    private(set) var state = MicTest.State.idle
+    @ObservationIgnored private var lastSession: UInt64 = 0
+    @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var stopTask: Task<Void, Never>?
 
-    var verdict: String? { running || peak == 0 ? nil : MicLevel.verdict(peak: peak) }
+    var level: Double { state.level }
+    var peak: Double { state.peak }
+    var running: Bool { state.isRunning }
+    var problem: String? { state.problem }
+    var verdict: String? { state.verdict }
 
     func start(uid: String?, seconds: Double = 5) {
         stop()
+        lastSession &+= 1
+        let session = lastSession
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            problem = "Allow the microphone for ZEUS first."
+            send(.failed(session: session, problem: "Allow the microphone for Zeus first."))
             return
         }
         let engine = AVAudioEngine()
+        var note: String?
         if uid != nil, !Microphones.use(uid: uid, on: engine) {
-            problem = "That microphone is not connected. Using the system input."
-        } else {
-            problem = nil
+            note = "That microphone is not connected. Using the system input."
         }
         let input = engine.inputNode
         // With no input device the format has no sample rate or channels, and installTap would raise.
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
-            problem = "No microphone is connected."
+            send(.failed(session: session, problem: "No microphone is connected."))
             return
         }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            guard let channel = buffer.floatChannelData?[0] else { return }
-            let value = MicLevel.level(samples: UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self, self.running else { return }
-                    self.level = value
-                    self.peak = max(self.peak, value)
-                }
-            }
+        OffMainAudioCallbacks.installLevelTap(on: input, format: format,
+                                              measure: { MicLevel.level(samples: $0) }) { [weak self] value in
+            // Only this test's own levels count: one measured in an earlier test is dropped.
+            self?.send(.level(session: session, value: value))
         }
         do {
             try engine.start()
         } catch {
-            problem = error.localizedDescription
             input.removeTap(onBus: 0)
+            send(.failed(session: session, problem: error.localizedDescription))
             return
         }
         self.engine = engine
-        peak = 0
-        running = true
+        send(.opened(session: session, note: note))
         stopTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
-            self?.stop()
+            self?.send(.timedOut(session: session))
         }
     }
 
-    func stop() {
+    func stop() { send(.stopRequested) }
+
+    private func send(_ event: MicTest.Event) {
+        let (next, effects) = MicTest.reduce(state, event)
+        if next != state { state = next }
+        for effect in effects {
+            switch effect {
+            case .stopCapture, .discardCapture: releaseCapture()
+            }
+        }
+    }
+
+    private func releaseCapture() {
         stopTask?.cancel()
         stopTask = nil
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
-        running = false
-        level = 0
     }
 }

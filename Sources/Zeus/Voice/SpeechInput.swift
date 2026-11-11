@@ -1,5 +1,6 @@
 import AVFoundation
 import Speech
+import ZeusCore
 
 /// Microphone → Apple speech recognition (on-device when the language supports it).
 /// Free, no API key. Deepgram / AssemblyAI streaming can slot in later behind the same calls.
@@ -7,12 +8,18 @@ final class SpeechInput: @unchecked Sendable {
     enum InputError: LocalizedError {
         case recognizerUnavailable
         case onDeviceUnavailable
+        case inputUnavailable
+        case invalidCapturePolicy
         var errorDescription: String? {
             switch self {
             case .recognizerUnavailable:
                 "Speech recognition isn't available for this language right now."
             case .onDeviceUnavailable:
                 "On-device speech recognition isn't available for this language. Nothing was recorded. Pick another language or engine, or allow Apple server recognition in settings."
+            case .inputUnavailable:
+                "The selected microphone is unavailable or has an invalid audio format."
+            case .invalidCapturePolicy:
+                "The recording limit is invalid."
             }
         }
     }
@@ -25,6 +32,37 @@ final class SpeechInput: @unchecked Sendable {
     private var samplesHandler: (@Sendable ([Float]) -> Void)?
     private var recognizesFlag = true
     private var serverAllowed = false
+    private var captureFailureHandler: (@Sendable (Int, UInt64, CaptureFailure) -> Void)?
+    private var configurationObserver: (any NSObjectProtocol)?
+
+    enum CaptureFailure: Equatable, Sendable { case durationLimit, sampleLimit, configurationChanged }
+    struct CapturePolicy: Equatable, Sendable {
+        var strictDeviceSelection = false
+        var maximumSeconds: Double?
+        var maximumSamples: Int?
+        var cancelOnConfigurationChange = false
+
+        static let explanation = Self(strictDeviceSelection: true, maximumSeconds: 90,
+                                      maximumSamples: 90 * 16_000, cancelOnConfigurationChange: true)
+        var isValid: Bool {
+            (maximumSeconds.map { $0.isFinite && $0 > 0 && $0 <= 90 } ?? true)
+                && (maximumSamples.map { $0 > 0 && $0 <= 90 * 16_000 } ?? true)
+        }
+        func failure(elapsed: Double, storedSamples: Int, incomingSamples: Int) -> CaptureFailure? {
+            if let maximumSeconds, !elapsed.isFinite || elapsed >= maximumSeconds { return .durationLimit }
+            if let maximumSamples, incomingSamples > maximumSamples - min(storedSamples, maximumSamples) { return .sampleLimit }
+            return nil
+        }
+    }
+
+    var onCaptureFailure: (@Sendable (Int, UInt64, CaptureFailure) -> Void)? {
+        get { lock.withLock { captureFailureHandler } }
+        set { lock.withLock { captureFailureHandler = newValue } }
+    }
+
+    static func validInputFormat(sampleRate: Double, channels: UInt32) -> Bool {
+        sampleRate.isFinite && sampleRate >= 8_000 && sampleRate <= 384_000 && channels > 0 && channels <= 32
+    }
 
     /// Mic level 0…1, called on the audio thread.
     var onLevel: (@Sendable (Double) -> Void)? {
@@ -101,9 +139,14 @@ final class SpeechInput: @unchecked Sendable {
     // and opens a fresh request/task to keep listening, so a mid-hold pause never truncates the
     // dictation. Only a real `stop()`/`cancel()` is allowed to end things for good.
     private var finalizedText = ""
-    private var stopRequested = false
-    /// Recognition errors since the last result (guarded by `lock`), bounding error restarts.
-    private var consecutiveErrors = 0
+    /// The recorder's phase (guarded by `lock`): recording, restarting after an early final or an error,
+    /// or stopping. The restart decisions and the bound on error restarts live in `SpeechRecorder`.
+    private var recorder = SpeechRecorder.State.idle
+    /// No more audio is wanted for the current session. Read and written only while holding `lock`.
+    private var stopRequested: Bool {
+        get { recorder.isStopping }
+        set { if newValue { recorder = SpeechRecorder.reduce(recorder, .stopRequested(session: generation)).0 } }
+    }
     // PLAN-QA7 P0 item J (Tony 04:15 BRT, woken by test audio): quiet-hours E2E proves dictation
     // without ever playing a sound. While this is true the live tap's (silent-room) buffers are
     // dropped so they never interleave with `injectFile`'s file-sourced buffers on the same
@@ -149,7 +192,8 @@ final class SpeechInput: @unchecked Sendable {
 
     /// Returns the speech session ID of this turn.
     @discardableResult
-    func start(controllerGeneration: UInt64 = 0) throws -> Int {
+    func start(controllerGeneration: UInt64 = 0, capturePolicy: CapturePolicy = .init()) throws -> Int {
+        guard capturePolicy.isValid else { throw InputError.invalidCapturePolicy }
         let activeRecognizer = lock.withLock { recognizer }
         if recognizes {
             guard let activeRecognizer, activeRecognizer.isAvailable else { throw InputError.recognizerUnavailable }
@@ -164,22 +208,41 @@ final class SpeechInput: @unchecked Sendable {
 
         let request = makeRequest(recognizer: activeRecognizer)
 
-        if deviceUID != nil || usedDevice { usedDevice = Microphones.use(uid: deviceUID, on: engine) && deviceUID != nil }
+        if capturePolicy.strictDeviceSelection {
+            guard Microphones.use(uid: deviceUID, on: engine) else { throw InputError.inputUnavailable }
+            usedDevice = deviceUID != nil
+        } else if deviceUID != nil || usedDevice {
+            usedDevice = Microphones.use(uid: deviceUID, on: engine) && deviceUID != nil
+        }
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
+        guard Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount)
+        else { throw InputError.inputUnavailable }
         lock.lock()
         self.request = request
         latest = ""
         finalizedText = ""
-        stopRequested = false
-        consecutiveErrors = 0
         finished = false
         Self.resetLiveTapSuppression(suppress: &suppressLiveTap)
         generation += 1
+        recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
         samples = []
         resampler = recordsSamples ? AudioSamples.Resampler(from: format) : nil
         let current = generation
+        let turnResampler = resampler // A stale tap must never mutate a replacement turn's converter.
         lock.unlock()
+        let startedAt = ProcessInfo.processInfo.systemUptime
+
+        if capturePolicy.cancelOnConfigurationChange {
+            configurationObserver = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
+            ) { [weak self] _ in
+                guard let self, self.lock.withLock({ self.generation == current && !self.stopRequested }) else { return }
+                let handler = self.onCaptureFailure
+                self.cancel()
+                handler?(current, controllerGeneration, .configurationChanged)
+            }
+        }
 
         if recognizes, let activeRecognizer {
             beginRecognition(request: request, recognizer: activeRecognizer,
@@ -189,13 +252,39 @@ final class SpeechInput: @unchecked Sendable {
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self else { return }
+            if capturePolicy.maximumSeconds != nil {
+                let failure = self.lock.withLock { () -> CaptureFailure? in
+                    guard self.generation == current, !self.stopRequested else { return nil }
+                    let result = capturePolicy.failure(elapsed: ProcessInfo.processInfo.systemUptime - startedAt,
+                                                       storedSamples: self.samples.count, incomingSamples: 0)
+                    if result != nil { self.stopRequested = true }
+                    return result
+                }
+                if let failure {
+                    self.reportCaptureFailure(failure, session: current, origin: controllerGeneration)
+                    return
+                }
+                guard self.lock.withLock({ self.generation == current && !self.stopRequested }) else { return }
+            }
             if self.recognizes, !self.lock.withLock({ self.suppressLiveTap }) {
                 let currentRequest = self.lock.withLock { self.request }
                 currentRequest?.append(buffer)
             }
-            if let resampler = self.lock.withLock({ self.resampler }) {
+            if let resampler = turnResampler {
                 let converted = resampler.convert(buffer)
-                self.lock.withLock { self.samples += converted }
+                let (admitted, failure) = self.lock.withLock { () -> (Bool, CaptureFailure?) in
+                    if capturePolicy.maximumSamples != nil,
+                       (self.generation != current || self.stopRequested) { return (false, nil) }
+                    let failure = capturePolicy.failure(elapsed: ProcessInfo.processInfo.systemUptime - startedAt,
+                                                        storedSamples: self.samples.count, incomingSamples: converted.count)
+                    if failure != nil { self.stopRequested = true } else { self.samples += converted }
+                    return (failure == nil, failure)
+                }
+                if let failure {
+                    self.reportCaptureFailure(failure, session: current, origin: controllerGeneration)
+                    return
+                }
+                guard admitted else { return }
                 if !converted.isEmpty { self.onSamples?(converted) }
             }
             if let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 {
@@ -206,7 +295,7 @@ final class SpeechInput: @unchecked Sendable {
             }
         }
         engine.prepare()
-        try engine.start()
+        do { try engine.start() } catch { cancel(); throw error }
         return current
     }
 
@@ -228,11 +317,10 @@ final class SpeechInput: @unchecked Sendable {
         self.request = request
         latest = ""
         finalizedText = ""
-        stopRequested = false
-        consecutiveErrors = 0
         finished = false
         suppressLiveTap = true
         generation += 1
+        recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
         samples = []
         resampler = nil
         let current = generation
@@ -280,24 +368,25 @@ final class SpeechInput: @unchecked Sendable {
                     guard self.generation == turn.sessionID else { return nil }
                     let joined = self.finalizedText.isEmpty ? text : self.finalizedText + " " + text
                     self.latest = joined
-                    self.consecutiveErrors = 0
+                    self.recorder = SpeechRecorder.reduce(self.recorder, .resultArrived(session: turn.sessionID)).0
                     return joined
                 }
                 guard let combined else { return }
                 turn.emit(combined, legacy: self.onPartial, identified: self.onIdentifiedPartial)
                 if result.isFinal {
                     let nextRequest = self.makeRequest(recognizer: recognizer)
-                    let step = self.lock.withLock { () -> RestartStep in
-                        guard self.generation == turn.sessionID else { return .stale }
-                        guard !self.stopRequested else { return .finish }
-                        self.finalizedText = combined.trimmingCharacters(in: .whitespaces)
-                        self.request = nextRequest
-                        return .restart
+                    let effects = self.lock.withLock { () -> [SpeechRecorder.Effect] in
+                        let (next, effects) = SpeechRecorder.reduce(self.recorder, .utteranceEnded(session: turn.sessionID))
+                        self.recorder = next
+                        if effects.contains(.restart) {
+                            self.finalizedText = combined.trimmingCharacters(in: .whitespaces)
+                            self.request = nextRequest
+                        }
+                        return effects
                     }
-                    switch step {
-                    case .stale: break
-                    case .finish: self.finish(ifSession: turn.sessionID)
-                    case .restart:
+                    if effects.contains(.finishTurn) {
+                        self.finish(ifSession: turn.sessionID)
+                    } else if effects.contains(.restart) {
                         self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
                     }
                 }
@@ -308,18 +397,19 @@ final class SpeechInput: @unchecked Sendable {
             // them, or once the person released, the turn ends instead of retrying forever.
             if error != nil, result?.isFinal != true {
                 let nextRequest = self.makeRequest(recognizer: recognizer)
-                let step = self.lock.withLock { () -> RestartStep in
-                    guard self.generation == turn.sessionID else { return .stale }
-                    guard !self.stopRequested, self.consecutiveErrors < Self.maxErrorRestarts else { return .finish }
-                    self.consecutiveErrors += 1
-                    self.finalizedText = self.latest.trimmingCharacters(in: .whitespaces)
-                    self.request = nextRequest
-                    return .restart
+                let effects = self.lock.withLock { () -> [SpeechRecorder.Effect] in
+                    let (next, effects) = SpeechRecorder.reduce(
+                        self.recorder, .recognitionFailed(session: turn.sessionID, maxRestarts: Self.maxErrorRestarts))
+                    self.recorder = next
+                    if effects.contains(.restart) {
+                        self.finalizedText = self.latest.trimmingCharacters(in: .whitespaces)
+                        self.request = nextRequest
+                    }
+                    return effects
                 }
-                switch step {
-                case .stale: break
-                case .finish: self.finish(ifSession: turn.sessionID)
-                case .restart:
+                if effects.contains(.finishTurn) {
+                    self.finish(ifSession: turn.sessionID)
+                } else if effects.contains(.restart) {
                     self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
                 }
             }
@@ -329,12 +419,11 @@ final class SpeechInput: @unchecked Sendable {
         let owned = lock.withLock { () -> Bool in
             guard generation == turn.sessionID else { return false }
             task = newTask
+            recorder = SpeechRecorder.reduce(recorder, .taskInstalled(session: turn.sessionID)).0
             return true
         }
         if !owned { newTask.cancel() }
     }
-
-    private enum RestartStep { case stale, finish, restart }
 
     private static let maxErrorRestarts = 3
 
@@ -370,13 +459,10 @@ final class SpeechInput: @unchecked Sendable {
         let ratio = targetFormat.sampleRate / file.processingFormat.sampleRate
         let capacity = AVAudioFrameCount(Double(source.frameLength) * ratio) + 64
         guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { throw InputError.recognizerUnavailable }
-        var fed = false
+        let conversionInput = PCMConversionInput(buffer: source, final: true)
         var convertError: NSError?
         converter.convert(to: converted, error: &convertError) { _, status in
-            if fed { status.pointee = .endOfStream; return nil }
-            fed = true
-            status.pointee = .haveData
-            return source
+            conversionInput.take(status: status)
         }
         VoiceLog.log("inject", "convert error \(String(describing: convertError)) convertedFrames \(converted.frameLength)")
         guard convertError == nil, converted.frameLength > 0 else { throw InputError.recognizerUnavailable }
@@ -502,9 +588,19 @@ final class SpeechInput: @unchecked Sendable {
     }
 
     private func stopAudio() {
+        if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver) }
+        configurationObserver = nil
         let current = lock.withLock { engine }
         if current.isRunning { current.stop() }
         current.inputNode.removeTap(onBus: 0)
+    }
+
+    private func reportCaptureFailure(_ failure: CaptureFailure, session: Int, origin: UInt64) {
+        onCaptureFailure?(session, origin, failure)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.lock.withLock({ self.generation == session }) else { return }
+            self.cancel()
+        }
     }
 
     /// Marks the stop-timeout finish only if `session` is still current. The ownership check and

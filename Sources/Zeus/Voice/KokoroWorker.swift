@@ -1,8 +1,12 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Resident Kokoro-onnx worker (PLAN-QA7 §2). One Python process, JSON lines on stdin.
 enum KokoroWorker {
     struct Line: Codable, Equatable {
+        var id: String = UUID().uuidString
         var text: String
         var voice: String
         var speed: Double
@@ -24,7 +28,7 @@ enum KokoroWorker {
     static func pythonExecutable() -> String {
         let jarvis = jarvisPython.path
         if FileManager.default.isExecutableFile(atPath: jarvis),
-           LocalPython.run(jarvis, ["-I", "-c", "import kokoro_onnx"]).status == 0 {
+           LocalPython.run(jarvis, ["-I", "-c", "import kokoro_onnx"], timeout: 10).status == 0 {
             return jarvis
         }
         return LocalPython.python.path
@@ -42,7 +46,7 @@ enum KokoroWorker {
         defer { probeLock.unlock() }
         if let cached = importProbePassed { return cached }
         let ok = FileManager.default.isExecutableFile(atPath: python)
-            && LocalPython.run(python, ["-I", "-c", "import kokoro_onnx"]).status == 0
+            && LocalPython.run(python, ["-I", "-c", "import kokoro_onnx"], timeout: 10).status == 0
         importProbePassed = ok
         return ok
     }
@@ -126,19 +130,26 @@ enum KokoroWorker {
 
     static func workerScript(modelDir: URL) -> String {
         """
-        import sys, json, soundfile as sf
-        from kokoro_onnx import Kokoro
-        model = "\(modelDir.path)/kokoro-v1.0.onnx"
-        voices = "\(modelDir.path)/voices-v1.0.bin"
-        engine = Kokoro(model, voices)
+        import sys, json, os, contextlib
+        os.umask(0o077)
+        with contextlib.redirect_stdout(sys.stderr):
+            import soundfile as sf
+            from kokoro_onnx import Kokoro
+            engine = Kokoro(sys.argv[1], sys.argv[2])
         for line in sys.stdin:
-            line = line.strip()
-            if not line: continue
             req = json.loads(line)
-            audio, sr = engine.create(req["text"], voice=req["voice"], speed=float(req["speed"]), lang="en-us")
-            out = req["out"]
-            sf.write(out, audio, sr)
-            print(out, flush=True)
+            temporary = req["out"] + ".partial"
+            ok = False
+            try:
+                with contextlib.redirect_stdout(sys.stderr):
+                    audio, sr = engine.create(req["text"], voice=req["voice"], speed=float(req["speed"]), lang="en-us")
+                    sf.write(temporary, audio, sr, format="WAV")
+                os.replace(temporary, req["out"])
+                ok = True
+            except Exception:
+                try: os.unlink(temporary)
+                except OSError: pass
+            print(json.dumps({"id": req["id"], "out": req["out"], "ok": ok}), flush=True)
         """
     }
 
@@ -149,6 +160,6 @@ enum KokoroWorker {
     }
 
     static func argv(python: String, modelDir: URL) -> [String] {
-        ["-I", "-c", workerScript(modelDir: modelDir)]
+        ["-I", "-c", workerScript(modelDir: modelDir), modelFiles(in: modelDir).onnx.path, modelFiles(in: modelDir).voices.path]
     }
 }

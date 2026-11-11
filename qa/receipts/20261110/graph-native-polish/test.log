@@ -1,0 +1,125 @@
+Building for debugging...
+[0/13] Write sources
+[2/13] Write swift-version-457096A79D733C59.txt
+[4/23] Emitting module ZeusCore
+[5/26] Compiling ZeusCore WikiGraph.swift
+[6/26] Compiling ZeusCore WikiPage.swift
+[7/26] Compiling ZeusCore WikiRelationships.swift
+[8/26] Compiling ZeusCore ScribeTranscript.swift
+[9/26] Compiling ZeusCore SensitiveInfoScanner.swift
+[10/26] Compiling ZeusCore WikiCompiler.swift
+[11/26] Compiling ZeusCore ScribeNotes.swift
+[12/26] Compiling ZeusCore ScribeRecapNavigation.swift
+[13/26] Compiling ZeusCore ScribeSession.swift
+[14/26] Compiling ZeusCore MeetingCopilot.swift
+/workspace/zeus-validation/public-graph-final/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[15/26] Compiling ZeusCore PortableExcerpts.swift
+/workspace/zeus-validation/public-graph-final/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[16/26] Compiling ZeusCore ScribeCapture.swift
+/workspace/zeus-validation/public-graph-final/wiki-relationships/Sources/ZeusCore/MeetingCopilot.swift:76:33: warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+74 |         let line = try encoder.encode(event) + Data("\n".utf8)
+75 |         if !FileManager.default.fileExists(atPath: url.path) {
+76 |             FileManager.default.createFile(atPath: url.path, contents: nil)
+   |                                 `- warning: result of call to 'createFile(atPath:contents:attributes:)' is unused [#no-usage]
+77 |             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+78 |         }
+[17/30] Wrapping AST for ZeusCore for debugging
+[19/31] Compiling ZeusCoreTests ScribeRecapNavigationTests.swift
+[20/31] Compiling ZeusCoreTests WikiRelationshipsTests.swift
+[21/31] Emitting module ZeusCoreTests
+[22/31] Compiling ZeusCoreTests WikiGraphTests.swift
+[23/32] /workspace/zeus-validation/public-graph-final/wiki-relationships/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageDiscoveredTests.derived/all-discovered-tests.swift
+[24/32] Write sources
+[25/35] Wrapping AST for ZeusCoreTests for debugging
+[27/35] Compiling ZeusPortableValidationPackageDiscoveredTests all-discovered-tests.swift
+[28/35] Compiling ZeusPortableValidationPackageDiscoveredTests ZeusCoreTests.swift
+[29/35] Emitting module ZeusPortableValidationPackageDiscoveredTests
+[30/36] /workspace/zeus-validation/public-graph-final/wiki-relationships/.build/x86_64-unknown-linux-gnu/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[31/36] Write sources
+[32/38] Wrapping AST for ZeusPortableValidationPackageDiscoveredTests for debugging
+[34/38] Emitting module ZeusPortableValidationPackageTests
+[35/38] Compiling ZeusPortableValidationPackageTests runner.swift
+[36/39] Wrapping AST for ZeusPortableValidationPackageTests for debugging
+[37/39] Write Objects.LinkFileList
+[38/39] Linking ZeusPortableValidationPackageTests.xctest
+Build complete! (20.61s)
+Test Suite 'All tests' started at 2026-11-10 00:58:11.308
+Test Suite 'debug.xctest' started at 2026-11-10 00:58:11.315
+Test Suite 'debug.xctest' passed at 2026-11-10 00:58:11.315
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-11-10 00:58:11.315
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.1 (c9d57c83568b06d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite "Scribe saved-source navigation" started.
+◇ Suite "Memory focus graph" started.
+◇ Suite "Wiki relationships" started.
+◇ Test missingOrCancelledSourcesNeverCloseTheCurrentNotes() started.
+◇ Test identicalRelationshipSetsHaveStableLayoutAndIDs() started.
+◇ Test duplicateConflictingAndEvidenceFreeRowsFailClosed() started.
+◇ Test visualBoundsDoNotRemoveAccessibleOverflow() started.
+◇ Test authoredLinksProduceInspectableDirectionsThroughTheExistingPipeline() started.
+◇ Test noFocusedPageProducesNoOrphanNodes() started.
+◇ Test largeProjectionKeepsTheDrawingBoundedAndAllResultsReachable() started.
+◇ Test everyActivePhaseRefusesSavedSourceNavigation() started.
+◇ Test sourceKindsAndHistoricalContributorsDoNotInventConnections() started.
+◇ Test positionsRemainFiniteAndInsideTheCanvasForEverySupportedCount() started.
+◇ Test searchFindsConnectedTitlesAndIDsWithoutCreatingNewEdges() started.
+◇ Test relationFiltersPreserveDualEvidenceAndDirections() started.
+◇ Test forgettingAndDeletingRemoveGraphEdgesWithoutClearingReview() started.
+◇ Test missingCancelledAndForgottenMeetingEvidenceDisappears() started.
+◇ Test existingSourcesLeaveOnlyTerminalStagesBeforeOpening() started.
+◇ Test deletingAnExplicitTargetRemovesBothDirectionsWithoutChangingTheDraft() started.
+◇ Test aSourceOfAnotherKindIsNotTheSameEvidence() started.
+◇ Test forgettingRemovesEdgesAndPreservesReviewRequirements() started.
+◇ Test compiledPagesBecomeConnectedByAnExplicitEditedLink() started.
+◇ Test relationshipsHaveStableEvidenceAndPageOrdering() started.
+◇ Test duplicateSourcesAndPagesDoNotInflateConnections() started.
+◇ Test sharedCurrentSourceIDsAreTheOnlyEvidence() started.
+◇ Test generatedMeetingTextAndUnreviewedForgottenTextCannotCreateLinks() started.
+◇ Test missingAndForgottenEvidenceNeverResurrectsEditedSources() started.
+◇ Test exactIDsDisambiguateTitlesAndReciprocalLinksKeepTheirDirection() started.
+✔ Test noFocusedPageProducesNoOrphanNodes() passed after 0.002 seconds.
+✔ Test missingOrCancelledSourcesNeverCloseTheCurrentNotes() passed after 0.002 seconds.
+✔ Test duplicateConflictingAndEvidenceFreeRowsFailClosed() passed after 0.002 seconds.
+✔ Test positionsRemainFiniteAndInsideTheCanvasForEverySupportedCount() passed after 0.002 seconds.
+✔ Test sourceKindsAndHistoricalContributorsDoNotInventConnections() passed after 0.002 seconds.
+✔ Test everyActivePhaseRefusesSavedSourceNavigation() passed after 0.002 seconds.
+◇ Test ambiguousMissingSelfAndUnsupportedLinksAreNotConnections() started.
+✔ Test authoredLinksProduceInspectableDirectionsThroughTheExistingPipeline() passed after 0.002 seconds.
+✔ Test identicalRelationshipSetsHaveStableLayoutAndIDs() passed after 0.003 seconds.
+✔ Test visualBoundsDoNotRemoveAccessibleOverflow() passed after 0.003 seconds.
+✔ Test relationFiltersPreserveDualEvidenceAndDirections() passed after 0.003 seconds.
+✔ Test searchFindsConnectedTitlesAndIDsWithoutCreatingNewEdges() passed after 0.003 seconds.
+✔ Test existingSourcesLeaveOnlyTerminalStagesBeforeOpening() passed after 0.003 seconds.
+✔ Test missingCancelledAndForgottenMeetingEvidenceDisappears() passed after 0.003 seconds.
+✔ Test deletingAnExplicitTargetRemovesBothDirectionsWithoutChangingTheDraft() passed after 0.002 seconds.
+✔ Test forgettingAndDeletingRemoveGraphEdgesWithoutClearingReview() passed after 0.003 seconds.
+✔ Test aSourceOfAnotherKindIsNotTheSameEvidence() passed after 0.002 seconds.
+✔ Test forgettingRemovesEdgesAndPreservesReviewRequirements() passed after 0.002 seconds.
+✔ Test duplicateSourcesAndPagesDoNotInflateConnections() passed after 0.002 seconds.
+✔ Test relationshipsHaveStableEvidenceAndPageOrdering() passed after 0.002 seconds.
+✔ Test generatedMeetingTextAndUnreviewedForgottenTextCannotCreateLinks() passed after 0.002 seconds.
+✔ Test sharedCurrentSourceIDsAreTheOnlyEvidence() passed after 0.002 seconds.
+✔ Test missingAndForgottenEvidenceNeverResurrectsEditedSources() passed after 0.002 seconds.
+✔ Suite "Scribe saved-source navigation" passed after 0.005 seconds.
+✔ Test exactIDsDisambiguateTitlesAndReciprocalLinksKeepTheirDirection() passed after 0.002 seconds.
+✔ Test ambiguousMissingSelfAndUnsupportedLinksAreNotConnections() passed after 0.002 seconds.
+✔ Test compiledPagesBecomeConnectedByAnExplicitEditedLink() passed after 0.003 seconds.
+✔ Suite "Wiki relationships" passed after 0.005 seconds.
+✔ Test largeProjectionKeepsTheDrawingBoundedAndAllResultsReachable() passed after 0.149 seconds.
+✔ Suite "Memory focus graph" passed after 0.150 seconds.
+✔ Test run with 26 tests in 3 suites passed after 0.151 seconds.

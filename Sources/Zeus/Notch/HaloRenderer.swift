@@ -24,27 +24,50 @@ struct Polyline {
     init(path: Path) {
         var pts: [CGPoint] = []
         var current = CGPoint.zero
-        path.forEach { element in
+        path.forEach { (element: Path.Element) in
             switch element {
             case .move(let p): pts.append(p); current = p
             case .line(let p): pts.append(p); current = p
             case .quadCurve(let p, let c):
                 for i in 1...8 {
-                    let t = CGFloat(i) / 8, u = 1 - t
-                    pts.append(CGPoint(x: u * u * current.x + 2 * u * t * c.x + t * t * p.x, y: u * u * current.y + 2 * u * t * c.y + t * t * p.y))
+                    let t = CGFloat(i) / 8
+                    pts.append(Self.quadraticPoint(from: current, control: c, to: p, at: t))
                 }
                 current = p
             case .curve(let p, let c1, let c2):
                 for i in 1...10 {
-                    let t = CGFloat(i) / 10, u = 1 - t
-                    pts.append(CGPoint(x: u * u * u * current.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p.x,
-                                       y: u * u * u * current.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p.y))
+                    let t = CGFloat(i) / 10
+                    pts.append(Self.cubicPoint(from: current, control1: c1, control2: c2, to: p, at: t))
                 }
                 current = p
             case .closeSubpath: break
             }
         }
         self.init(points: pts)
+    }
+
+    // Explicit scalar types keep SwiftUI's CGFloat/Double overloads out of the path visitor.
+    private static func quadraticPoint(from start: CGPoint, control: CGPoint, to end: CGPoint, at t: CGFloat) -> CGPoint {
+        let u: CGFloat = 1 - t
+        let a: CGFloat = u * u
+        let b: CGFloat = 2 * u * t
+        let c: CGFloat = t * t
+        let x: CGFloat = a * start.x + b * control.x + c * end.x
+        let y: CGFloat = a * start.y + b * control.y + c * end.y
+        return CGPoint(x: x, y: y)
+    }
+
+    private static func cubicPoint(from start: CGPoint, control1: CGPoint, control2: CGPoint, to end: CGPoint, at t: CGFloat) -> CGPoint {
+        let u: CGFloat = 1 - t
+        let a: CGFloat = u * u * u
+        let b: CGFloat = 3 * u * u * t
+        let c: CGFloat = 3 * u * t * t
+        let d: CGFloat = t * t * t
+        let firstX: CGFloat = a * start.x + b * control1.x
+        let firstY: CGFloat = a * start.y + b * control1.y
+        let x: CGFloat = (firstX + c * control2.x) + d * end.x
+        let y: CGFloat = (firstY + c * control2.y) + d * end.y
+        return CGPoint(x: x, y: y)
     }
 
     /// The part from fraction `a` to `b` of this polyline's length.

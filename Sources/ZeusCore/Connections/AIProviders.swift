@@ -115,8 +115,8 @@ public enum AIProvider: String, CaseIterable, Identifiable, Sendable {
         case .codex: "Activity and approvals reach the notch."
         case .cursor: "Cursor Agent runs are followed from the notch."
         case .gemini: "Gemini CLI sessions are followed from the notch."
-        case .grok: "Hand a question to Grok Bot from the notch."
-        case .chatgpt: "Hand a question to the ChatGPT app from the notch."
+        case .grok: "Open the Grok app. Prompt handoff is not supported."
+        case .chatgpt: "Open the ChatGPT app. Prompt handoff is not supported."
         case .ollama: "Models that run on this Mac. Nothing leaves it."
         case .lmStudio: "Models served by LM Studio on this Mac."
         case .anyLLM: "Any OpenAI compatible endpoint, with your own key."
@@ -124,6 +124,14 @@ public enum AIProvider: String, CaseIterable, Identifiable, Sendable {
     }
 
     public var offerKey: String { "ai.offer.\(rawValue)" }
+
+    /// Only these agents have an implemented New chat launch path.
+    public var supportsNewChats: Bool {
+        switch self {
+        case .claudeCode, .codex, .cursor, .gemini: true
+        default: false
+        }
+    }
 }
 
 /// What Zeus found for one provider on this Mac.
@@ -176,6 +184,15 @@ public struct AnyLLMConfig: Codable, Equatable, Sendable {
 
     public init(baseURL: String = "", model: String = "") { self.baseURL = baseURL; self.model = model }
 
+    /// Invalid credential-bearing URL drafts stay visible for correction but are never written
+    /// to preferences. The separate Keychain field is the only supported credential input.
+    public var configurationForPreferences: AnyLLMConfig {
+        var text = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.contains("://") { text = "https://" + text }
+        guard let url = URLComponents(string: text), url.user != nil || url.password != nil else { return self }
+        return AnyLLMConfig(baseURL: "", model: model)
+    }
+
     /// Where chat requests go: the base URL plus `/chat/completions`, tolerating a trailing
     /// slash or a pasted full path.
     public var chatURL: URL? {
@@ -198,11 +215,11 @@ public struct AnyLLMConfig: Codable, Equatable, Sendable {
     /// A plain `http` endpoint is only acceptable on this Mac.
     public var isInsecureRemote: Bool {
         guard let url = chatURL, url.scheme == "http" else { return false }
-        return !["127.0.0.1", "localhost", "::1"].contains(url.host ?? "")
+        return !AnyLLMEndpointPolicy.isLoopback(url.host ?? "")
     }
 
     public func request(prompt: String, key: String?, system: String? = nil) -> URLRequest? {
-        guard isComplete, let url = chatURL else { return nil }
+        guard isComplete, let url = chatURL, AnyLLMEndpointPolicy.permits(url) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 60)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -217,7 +234,7 @@ public struct AnyLLMConfig: Codable, Equatable, Sendable {
 
     /// The same request with `stream: true`, for a live answer. `keepAlive` is the Ollama hint (`30m`).
     public func streamingRequest(prompt: String, key: String?, system: String? = nil, keepAlive: String? = nil) -> URLRequest? {
-        guard isComplete, let url = chatURL else { return nil }
+        guard isComplete, let url = chatURL, AnyLLMEndpointPolicy.permits(url) else { return nil }
         guard let model = ModelCap.gatedHTTPModel(model.trimmingCharacters(in: .whitespaces)) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.httpMethod = "POST"

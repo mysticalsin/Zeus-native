@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/mysticalsin/software-factory.git",
+  "commit": "9e53e4aedec5706e13c6d336482c3035e67f1c7b",
+  "purpose": "Pinned workflow reference and command-interface adaptation for existing native Zeus; not an imported execution or readiness engine.",
+  "reference_files": [
+    {
+      "path": "README.md",
+      "sha256": "c194ca8cbcf202104cd5eb0ba9be9c86e8604661e199c724f60cb7de008cc1ee"
+    },
+    {
+      "path": "docs/verification.md",
+      "sha256": "e938fd345c5d63abb91535ca148475f64612efd488c86bdf84c26dfb42439c2c"
+    },
+    {
+      "path": "docs/SOFTWARE-FACTORY.md",
+      "sha256": "b1c434681b63fe185eef5aca81858fbb925cc0e26f6c4e77ed58fb3bd1ec847f"
+    },
+    {
+      "path": "code/process.py",
+      "sha256": "1b563eab782e4db2a111024d564f187a84d67a1449cddf0d85a22ba7db5e0eb5"
+    },
+    {
+      "path": "code/autopilot.py",
+      "sha256": "15dbc1a3638ba855d7fcafdc5ca697441482a3e6e70f0a9122d6cd4fdc214bed"
+    },
+    {
+      "path": "code/factory.py",
+      "sha256": "747e7f7a68b591919eb9b8631c0b39f640359767b4c3345c2afc24a301ccb160"
+    }
+  ],
+  "license": {
+    "tracked_license_file": null,
+    "note": "No LICENSE or COPYING file in the pinned tree; no upstream implementation or assets copied."
+  },
+  "runtime": {
+    "standalone": false,
+    "missing_dependency": "toto_brain",
+    "installed_or_executed": false,
+    "factory_enrollment_claimed": false
+  },
+  "native_compatibility_gaps": [
+    "Upstream case-sensitive test-path audit misses Swift Tests/.",
+    "Upstream test-command discovery does not recognize Package.swift."
+  ],
+  "zeus": {
+    "entrypoint": "tools/check.sh",
+    "runner": "qa/closed-loop/run.py",
+    "feature_map": "qa/feature-map.json",
+    "regressions": "qa/regressions.json",
+    "design_direction": "docs/DESIGN-DIRECTION.md",
+    "integration_notes": "docs/SOFTWARE-FACTORY-INTEGRATION.md",
+    "tests": "qa/closed-loop/tests/test_factory_entrypoint.py",
+    "readiness_authority": "Existing current-source, executed-guard and artifact-hash gates; no imported text verdicts."
+  },
+  "upstream_command_interface": {
+    "detector": "code/factory.py app_standard checks tools/check.sh existence; no configured argv.",
+    "execution": "code/autopilot.py actual phases allow Bash with sandbox/DENY rules. TEST_CMDS lists ./tools/check.sh but is unused; it does not deny Swift.",
+    "zeus_default": "./tools/check.sh: development, fresh external parent and nonexistent result child, printed retained evidence path.",
+    "zeus_full": "./tools/check.sh --mode full [--output NEW_DIRECTORY]"
+  }
+}

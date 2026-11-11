@@ -63,8 +63,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - run: mkdir -p "$RUNNER_TEMP/zeus-results/app"
-      - name: Select Xcode 26.1.1
-        run: sudo xcode-select --switch /Applications/Xcode_26.1.1.app/Contents/Developer
+      - name: Select Xcode 26.3
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -74,18 +74,85 @@ jobs:
         id: build
         run: |
           { xcodebuild -version && swift --version && swift build; } 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/build.log"
-      - name: Native integration fixtures (no OS consent requests or capture)
+          python3 qa/closed-loop/gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/build.log"
+      - name: All Core tests and reviewed app fixtures (no consent requests or capture)
         id: test
         env:
-          ZEUS_QA_ARTIFACT_DIR: ${{ runner.temp }}/zeus-results/app/recording-feedback
-        # This reviewed allowlist is deliberate. Full mode reports the unimplemented device obligations.
-        # Every selected test uses injected ports, generated buffers, offscreen rendering or temporary files.
+          # One owned fixture child only; sanitized diagnostics are not latency evidence.
+          ZEUS_NATIVE_PYTHON_STARTUP_DIAGNOSTIC: "1"
+          # Synthetic worker fixtures bypass Apple's developer-tool launcher only.
+          ZEUS_TEST_PYTHON_EXECUTABLE: /Applications/Xcode_26.3.app/Contents/Developer/usr/bin/python3
+        # Compiler discovery and qualified event streams must prove every selected case ran.
+        # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
-          native_filter="$(python3 qa/closed-loop/gate.py native-filter)"
-          scripts/test.sh --filter "$native_filter" 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+          printf 'Synthetic voice fixture interpreter: %s\n' "$ZEUS_TEST_PYTHON_EXECUTABLE" | tee "$RUNNER_TEMP/zeus-results/app/fixture-python.log"
+          python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+      - name: Record Python launcher metadata after cold fixtures
+        if: always() && steps.test.outcome != 'skipped'
+        timeout-minutes: 1
+        # Run after tests: resolving the launcher before fixtures could warm its cache.
+        # This diagnostic cannot replace or change the native test result.
+        run: |
+          python3 - <<'PY' | tee "$RUNNER_TEMP/zeus-results/app/python-launcher.log"
+          import subprocess
+          import tempfile
+          commands = [
+              ["/usr/bin/otool", "-L", "/usr/bin/python3"],
+              ["/usr/bin/nm", "-u", "/usr/bin/python3"],
+              ["/usr/bin/xcrun", "--find", "python3"],
+          ]
+          for command in commands:
+              with tempfile.TemporaryFile() as output:
+                  try:
+                      code = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT,
+                                            timeout=5, check=False).returncode
+                  except subprocess.TimeoutExpired:
+                      code = "timeout"
+                  except OSError as error:
+                      code = type(error).__name__
+                  output.seek(0)
+                  data = output.read(8193)
+              text = data[:8192].decode("utf-8", errors="replace")
+              if command[0] == "/usr/bin/nm":
+                  text = "\n".join(line for line in text.splitlines() if "xcselect" in line.lower())
+              print(f"command={command!r} exit={code} truncated={len(data) > 8192}")
+              print(text)
+          PY
+      - name: Read the original owned-host crash report
+        if: failure() && steps.test.outcome == 'failure'
+        timeout-minutes: 1
+        # Read-only: no debugger, relaunch, permission prompt or extra UI action.
+        # Missing/unsupported evidence cannot clear the original native failure.
+        run: |
+          python3 qa/closed-loop/ax_crash_report.py --evidence "$RUNNER_TEMP/zeus-results/app/native-evidence" --output "$RUNNER_TEMP/zeus-results/app/ax-crash-report"
+      - name: Show bounded native failure diagnostics
+        if: failure() && steps.test.outcome == 'failure'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          root = Path(os.environ["RUNNER_TEMP"]) / "zeus-results/app/native-evidence"
+          receipt = root / "result.json"
+          if receipt.is_file() and not receipt.is_symlink():
+              value = json.loads(receipt.read_text())
+              for row in value.get("native_runs", []):
+                  ident = row.get("id", "")
+                  if row.get("status") == "passed" or not re.fullmatch(r"native-[A-Za-z0-9]+", ident):
+                      continue
+                  path = root / ident / "test.log"
+                  if path.is_file() and not path.is_symlink() and not path.parent.is_symlink():
+                      print(f"Native failure: {ident}: {row.get('reason', 'unknown')}")
+                      with path.open("rb") as stream:
+                          stream.seek(max(0, path.stat().st_size - 16384))
+                          print(stream.read(16384).decode("utf-8", errors="replace"))
+          PY
       - name: Bundle local preview (ad-hoc only; no credentials)
         id: bundle
-        run: CONFIG=debug SIGN_IDENTITY=- RELEASE=0 scripts/bundle.sh 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/bundle.log"
+        run: |
+          CONFIG=debug SIGN_IDENTITY=- RELEASE=0 scripts/bundle.sh 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/bundle.log"
+          python3 qa/closed-loop/gate.py compiler-log --path "$RUNNER_TEMP/zeus-results/app/bundle.log"
       - name: Preserve preview bundle metadata
         id: archive
         run: ditto -c -k --keepParent build/Zeus.app "$RUNNER_TEMP/Zeus-preview.zip" 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/archive.log"
@@ -122,10 +189,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: extension/package-lock.json
-      - name: Install locked dependencies
+      - name: Install and audit locked dependencies
         id: install
         working-directory: extension
-        run: npm ci 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/install.log"
+        run: |
+          npm ci --include=dev --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/install.log"
+          npm audit --include=dev --audit-level=moderate --json 2>&1 | tee "$RUNNER_TEMP/zeus-results/extension/audit.log"
       - name: Typecheck
         id: typecheck
         working-directory: extension
@@ -158,17 +227,42 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Select Xcode 26.1.1
-        run: sudo xcode-select --switch /Applications/Xcode_26.1.1.app/Contents/Developer
+      - name: Select Xcode 26.3
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
       - name: Run current-source feature map
         id: map
+        env:
+          # Full mode uses the same explicit synthetic-fixture interpreter.
+          ZEUS_TEST_PYTHON_EXECUTABLE: /Applications/Xcode_26.3.app/Contents/Developer/usr/bin/python3
         run: |
+          printf 'Synthetic voice fixture interpreter: %s\n' "$ZEUS_TEST_PYTHON_EXECUTABLE" | tee "$RUNNER_TEMP/zeus-fixture-python.log"
           python3 qa/closed-loop/run.py --mode "$ZEUS_FEATURE_MODE" --output "$RUNNER_TEMP/zeus-results/feature-map" 2>&1 | tee "$RUNNER_TEMP/zeus-feature-map.log"
       - name: Preserve runner diagnostics
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/zeus-results/feature-map"
           if [ -f "$RUNNER_TEMP/zeus-feature-map.log" ]; then cp "$RUNNER_TEMP/zeus-feature-map.log" "$RUNNER_TEMP/zeus-results/feature-map/runner.log"; fi
+          if [ -f "$RUNNER_TEMP/zeus-fixture-python.log" ]; then cp "$RUNNER_TEMP/zeus-fixture-python.log" "$RUNNER_TEMP/zeus-results/feature-map/fixture-python.log"; fi
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          root = Path(os.environ["RUNNER_TEMP"]) / "zeus-results/feature-map"
+          receipt = root / "result.json"
+          if receipt.is_file() and not receipt.is_symlink():
+              value = json.loads(receipt.read_text())
+              for row in value.get("checks", []):
+                  ident = row.get("id", "")
+                  if row.get("status") != "failed" or not re.fullmatch(r"[A-Za-z0-9_-]+", ident):
+                      continue
+                  path = root / ident / "test.log"
+                  print(f"Development failure: {ident}: {row.get('reason', 'unknown')}")
+                  if path.is_file() and not path.is_symlink() and not path.parent.is_symlink():
+                      with path.open("rb") as stream:
+                          stream.seek(max(0, path.stat().st_size - 32768))
+                          print(stream.read(32768).decode("utf-8", errors="replace"))
+          PY
       - name: Record exact revision and step outcomes
         if: always()
         env:

@@ -4,213 +4,555 @@ import ZeusCore
 struct RecordlyPage: View {
     let topBar: TopBarModel
     let recordly: RecordlyController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var isEditor: Bool { if case .editor = recordly.phase { true } else { false } }
 
     var body: some View {
         HStack(spacing: 8) {
-            Tile {
-                if recordly.showsRunning {
-                    RecordlyRunning(recordly: recordly)
-                } else if case .editor = recordly.phase {
-                    RecordlyEditor(recordly: recordly)
-                } else {
-                    RecordlyIdle(recordly: recordly, topBar: topBar)
+            Tile(padding: 0) {
+                ZStack(alignment: .topLeading) {
+                    RecordlyCardBeam(recordly: recordly)
+                    Group {
+                        if isEditor {
+                            RecordlyEditor(recordly: recordly).transition(.opacity)
+                        } else {
+                            RecordlyCapture(recordly: recordly, topBar: topBar).transition(.opacity)
+                        }
+                    }
+                    .padding(CardFinish.inset)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
+        .animation(reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : TopBarStyle.pageSpring, value: isEditor)
+        // Lists the displays and selects the main one with no click and no Screen Recording permission.
+        .onAppear { recordly.pageAppeared() }
     }
 }
 
-private struct RecordlyIdle: View {
+/// Decorative recording/export activity only. Recordly has no microphone meter, so level stays zero.
+/// Export percentages, controls and success/failure still come exclusively from its controller.
+private struct RecordlyCardBeam: View {
+    let recordly: RecordlyController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var timeline: RecordingFeedback.BeamTimeline?
+    @State private var workSnapshot: RecordingFeedback.Snapshot?
+    @State private var recordingOrigin: Date?
+
+    var body: some View {
+        let feedback = recordly.topBarFeedback()
+        let active = recordly.showsRunning || recordly.isExporting || feedback?.phase == .completed
+        let completionEnd = feedback.flatMap { snapshot in
+            snapshot.phase == .completed
+                ? Date(timeIntervalSinceReferenceDate: snapshot.beganAt + RecordingFeedback.Motion.revealDuration) : nil
+        }
+        DisplaySynchronizedView(paused: !active || reduceMotion || reduceTransparency,
+                                preferredFramesPerSecond: 240, until: completionEnd) { context in
+            if active {
+                let now = context.date.timeIntervalSinceReferenceDate
+                let elapsed = (recordly.startedAt ?? recordingOrigin).map { max(0, context.date.timeIntervalSince($0)) }
+                    ?? timeline?.elapsed(at: now) ?? 0
+                let processing = recordly.isStopping || recordly.isExporting
+                    || (feedback?.phase == .completed && workSnapshot != nil)
+                AssistantBeamView(frame: AssistantBeam.frame(elapsed: elapsed, level: 0,
+                    processing: processing,
+                    processingElapsed: workSnapshot.map { max(0, now - $0.beganAt) } ?? 0,
+                    reduceMotion: reduceMotion || reduceTransparency),
+                    reduceTransparency: reduceTransparency, cornerRadius: CardFinish.radius)
+                    .opacity(beamOpacity(feedback, at: now))
+            }
+        }
+        .onChange(of: feedback, initial: true) { _, snapshot in
+            guard let snapshot, snapshot.phase != .failed else {
+                timeline = nil
+                workSnapshot = nil
+                if snapshot?.phase == .failed { recordingOrigin = nil }
+                return
+            }
+            if timeline == nil { timeline = RecordingFeedback.BeamTimeline(snapshot) }
+            else { timeline?.update(snapshot) }
+            // Completion fades the same processing shape. A new export gets its own gather clock.
+            if snapshot.phase != .completed { workSnapshot = snapshot }
+        }
+        .onChange(of: recordly.startedAt, initial: true) { _, start in
+            // The controller clears startedAt when the saved project replaces the running capture.
+            // Keep this drawing origin through that completion fade, including the new media-path key.
+            if let start { recordingOrigin = start }
+        }
+        .onChange(of: recordly.phase) { _, phase in
+            switch phase {
+            case .idle, .starting, .failed: recordingOrigin = nil
+            default: break
+            }
+        }
+        .onChange(of: recordly.project?.rawMediaPath) { previous, next in
+            // nil → first saved project is the capture above; replacing/removing it starts a new lifetime.
+            if previous != nil && previous != next { recordingOrigin = nil }
+        }
+    }
+
+    private func beamOpacity(_ snapshot: RecordingFeedback.Snapshot?, at now: TimeInterval) -> Double {
+        guard let snapshot, snapshot.phase == .completed else { return 1 }
+        if reduceMotion || reduceTransparency { return 0 }
+        return RecordingFeedback.frame(snapshot, at: now, reduceMotion: false, reduceTransparency: false).beamOpacity / 0.6
+    }
+}
+
+// MARK: Capture page (idle, countdown, starting, recording, stopping)
+
+/// One stable layout for every capture state: the preview stage on the left, options and the capture control on the
+/// right. Only the content of the right column changes, so nothing jumps when the state does.
+private struct RecordlyCapture: View {
     let recordly: RecordlyController
     let topBar: TopBarModel
 
     var body: some View {
-        // The source list and status scroll inside a bounded height; the action footer is pinned below it, inside
-        // the page frame, so Record is always within the notch's hit shape (see RecordlyPageLayout).
-        VStack(alignment: .leading, spacing: RecordlyPageLayout.footerGap) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "record.circle").font(.system(size: 12, weight: .bold)).foregroundStyle(TopBarStyle.rec)
-                        Text("Record").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                        Spacer()
-                        ForEach(RecordlyCaptureSource.Kind.allCases, id: \.self) { kind in
-                            RecordlyChip(
-                                title: kind.rawValue.capitalized,
-                                selected: recordly.sourceKind == kind,
-                                enabled: kind != .region && recordly.canChooseSource,
-                                disabledHelp: kind == .region
-                                    ? "Region recording isn't available yet."
-                                    : "Sources can't change while a recording is starting, running or stopping."
-                            ) {
-                                recordly.selectSourceKind(kind)
-                                if kind != .region {
-                                    Task { await recordly.loadSourceCatalog() }
-                                }
-                            }
-                        }
+        HStack(alignment: .top, spacing: 16) {
+            RecordlyStage(recordly: recordly)
+                .frame(width: 330)
+            VStack(alignment: .leading, spacing: 10) {
+                RecordlyScroll {
+                    if recordly.showsRunning {
+                        RecordlyLiveStrip(recordly: recordly)
+                    } else {
+                        RecordlyIdleColumn(recordly: recordly)
                     }
-                    HStack(spacing: 12) {
-                        ToggleChip(
-                            title: "Mic",
-                            on: false,
-                            enabled: false,
-                            help: "Microphone in recordings is coming soon",
-                            accessibilityText: "Microphone, unavailable. Microphone in recordings is coming soon"
-                        ) { }
-                        ToggleChip(title: "Mac audio", on: recordly.audio.systemAudio) { recordly.audio.systemAudio.toggle() }
-                        ToggleChip(
-                            title: "Camera",
-                            on: false,
-                            enabled: false,
-                            help: "Camera in recordings is coming soon",
-                            accessibilityText: "Camera, unavailable. Camera in recordings is coming soon"
-                        ) { }
-                    }
-                    Text("Region recording isn't available yet.")
-                        .font(TopBarStyle.label(9)).foregroundStyle(Theme.cloudSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let notice = recordly.actionNotice {
-                        Text(notice).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let reason = recordly.failureReason {
-                        Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).fixedSize(horizontal: false, vertical: true)
-                        Button("Try again") { recordly.retry() }.buttonStyle(.plain)
-                    }
-                    pickerContent
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
+                RecordlyControlRow(recordly: recordly, topBar: topBar)
             }
-            .frame(maxHeight: RecordlyPageLayout.scrollMaxHeight)
-            .layoutPriority(1)
-            footer
-                .frame(height: RecordlyPageLayout.footerHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
+}
 
-    @ViewBuilder
-    private var footer: some View {
-        if recordly.isStarting || recordly.isStopping {
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text(recordly.isStopping ? "Stopping…" : "Starting… revalidating the selected source")
-                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                NotchActionButton(title: "Cancel", tint: Theme.cloudSecondary) {
-                    Task { await recordly.cancelStart() }
-                }
-                .disabled(recordly.isStopping)
-                .accessibilityLabel(recordly.isStopping ? "Cancel, unavailable while stopping" : "Cancel starting the recording")
-            }
+/// ImageRenderer cannot draw scroll views, so the offscreen snapshots lay the content out flat.
+private struct RecordlyScroll<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if TopBarStyle.isSnapshot {
+            content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
-            HStack(spacing: 0) {
-                NotchActionButton(title: "Record", tint: TopBarStyle.rec) {
-                    Task { await recordly.start(topBar: topBar) }
-                }
-                .disabled(!recordly.canStart)
-                Spacer(minLength: 0)
+            ScrollView(showsIndicators: false) {
+                content.frame(maxWidth: .infinity, alignment: .topLeading)
             }
+        }
+    }
+}
+
+private enum RecordlySurface {
+    static func soft(_ reduceTransparency: Bool) -> Color {
+        reduceTransparency ? Color(hex: 0x242933) : Color.white.opacity(0.07)
+    }
+    static func stage(_ reduceTransparency: Bool) -> Color {
+        reduceTransparency ? Color(hex: 0x171A21) : Color.black.opacity(0.28)
+    }
+}
+
+private struct RecordlyIdleColumn: View {
+    let recordly: RecordlyController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RecordlySourceSwitcher(recordly: recordly)
+            sourceDetail
+            RecordlyNotices(recordly: recordly)
+            RecordlyOptionChips(recordly: recordly)
         }
     }
 
     @ViewBuilder
-    private var pickerContent: some View {
+    private var sourceDetail: some View {
+        switch recordly.sourceKind {
+        case .display:
+            RecordlyDisplayLegend(recordly: recordly)
+        case .window:
+            RecordlyWindowList(recordly: recordly)
+        case .region:
+            Text("Area recording isn't available yet.")
+                .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
+        }
+    }
+}
+
+// MARK: Source switcher
+
+private struct RecordlySourceSwitcher: View {
+    let recordly: RecordlyController
+    @Namespace private var selection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private static func symbol(_ kind: RecordlyCaptureSource.Kind) -> String {
+        switch kind {
+        case .display: "display"
+        case .window: "macwindow"
+        case .region: "rectangle.dashed"
+        }
+    }
+
+    private static func title(_ kind: RecordlyCaptureSource.Kind) -> String {
+        switch kind {
+        case .display: "Display"
+        case .window: "Window"
+        case .region: "Area"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(RecordlyCaptureSource.Kind.allCases, id: \.self) { kind in
+                segment(kind)
+            }
+        }
+        .padding(2)
+        .background(Capsule().fill(RecordlySurface.soft(reduceTransparency)))
+        .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85), value: recordly.sourceKind)
+        .fixedSize()
+    }
+
+    private func segment(_ kind: RecordlyCaptureSource.Kind) -> some View {
+        let selected = recordly.sourceKind == kind
+        let available = kind != .region
+        let enabled = available && recordly.canChooseSource
+        return Button {
+            recordly.selectSourceKind(kind)
+            Task { await recordly.loadSourceCatalog() }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: Self.symbol(kind)).font(.system(size: 11, weight: .semibold))
+                Text(Self.title(kind)).font(TopBarStyle.label(11, .semibold))
+            }
+            .foregroundStyle(selected ? Theme.cloudPrimary : Theme.cloudSecondary)
+            .padding(.horizontal, 11)
+            .frame(height: 26)
+            .background {
+                if selected {
+                    Capsule().fill(reduceTransparency ? Color(hex: 0x3A4150) : Color.white.opacity(0.16))
+                        .matchedGeometryEffect(id: "segment", in: selection)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(available ? (enabled || selected ? 1 : 0.6) : 0.4)
+        .help(available ? "" : "Area recording isn't available yet.")
+        .accessibilityLabel(Self.title(kind))
+        .accessibilityHint(available ? "" : "Not available yet")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+// MARK: Display legend
+
+private struct RecordlyDisplayLegend: View {
+    let recordly: RecordlyController
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        let displays = recordly.displays
+        if displays.isEmpty {
+            Text("No displays found.").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
+        } else if displays.count == 1, let only = displays.first {
+            compactRow(only)
+        } else {
+            HStack(spacing: 6) {
+                ForEach(Array(displays.enumerated()), id: \.element.id) { index, display in
+                    chip(display, position: index)
+                }
+            }
+        }
+    }
+
+    private func isSelected(_ display: RecordlySourceSelection.CatalogSnapshot.Display) -> Bool {
+        recordly.isSelected(.display(id: display.id))
+    }
+
+    /// One display: a single selected row, "Built-in Retina Display, Main".
+    private func compactRow(_ display: RecordlySourceSelection.CatalogSnapshot.Display) -> some View {
+        let selected = isSelected(display)
+        return HStack(spacing: 7) {
+            Image(systemName: "display").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.cloudPrimary)
+            Text(RecordlyDisplayChoice.compactLine(display, position: 0))
+                .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+            Text(RecordlyDisplayChoice.size(display))
+                .font(TopBarStyle.label(10).monospacedDigit()).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+            if selected {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 11)).foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 10).frame(height: 26)
+        .background(Capsule().fill(selected ? Theme.accent.opacity(reduceTransparency ? 0.4 : 0.18) : RecordlySurface.soft(reduceTransparency)))
+        .overlay(Capsule().strokeBorder(selected ? Theme.accent : Color.clear, lineWidth: 1))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(RecordlyDisplayChoice.spokenLabel(display, position: 0))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func chip(_ display: RecordlySourceSelection.CatalogSnapshot.Display, position: Int) -> some View {
+        let selected = isSelected(display)
+        return Button {
+            recordly.selectSource(.display(id: display.id))
+        } label: {
+            HStack(spacing: 5) {
+                Text("\(position + 1)")
+                    .font(TopBarStyle.label(9, .bold).monospacedDigit())
+                    .foregroundStyle(selected ? Theme.storm : Theme.cloudPrimary)
+                    .frame(width: 15, height: 15)
+                    .background(Circle().fill(selected ? Theme.accent : Color.white.opacity(0.14)))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(RecordlyDisplayChoice.title(display, position: position))
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                    Text(display.isMain ? "Main, \(RecordlyDisplayChoice.size(display))" : RecordlyDisplayChoice.size(display))
+                        .font(TopBarStyle.label(9).monospacedDigit()).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(selected ? Theme.accent.opacity(reduceTransparency ? 0.4 : 0.18) : RecordlySurface.soft(reduceTransparency)))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(selected ? Theme.accent : Color.clear, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!recordly.canChooseSource)
+        .accessibilityLabel(RecordlyDisplayChoice.spokenLabel(display, position: position))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+// MARK: Window list (Screen Recording permission is needed to list windows)
+
+private struct RecordlyWindowList: View {
+    let recordly: RecordlyController
+
+    var body: some View {
         switch recordly.pickerState {
         case .notLoaded:
-            Text("Choose a source to load.")
-                .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-            Button(recordly.sourceKind == .window ? "Load windows" : "Load displays") {
-                Task { await recordly.loadSourceCatalog() }
-            }
-            .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
+            quietButton("Load windows") { Task { await recordly.loadSourceCatalog() } }
         case .loading:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Loading \(recordly.sourceKind.rawValue)…")
-                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                Button("Cancel") { recordly.cancelLoading() }
-                    .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
+                Text("Loading windows").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
+                quietButton("Cancel") { recordly.cancelLoading() }
                     .accessibilityLabel("Cancel loading sources")
             }
         case .loaded(let snapshot, _):
-            if let notice = recordly.selectionNotice {
-                Text(notice).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            catalogRows(snapshot)
-            Button("Refresh") { Task { await recordly.loadSourceCatalog() } }
-                .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
+            rows(snapshot)
         case .stale(let snapshot, _, let reason):
-            Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Refresh") { Task { await recordly.loadSourceCatalog() } }
-                .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
-            if let snapshot { catalogRows(snapshot) }
+            Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).fixedSize(horizontal: false, vertical: true)
+            quietButton("Refresh") { Task { await recordly.loadSourceCatalog() } }
+            if let snapshot { rows(snapshot) }
         case .denied(let reason):
-            Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Open Settings") { recordly.openScreenRecordingSettings() }
-            .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
-            Button("Check again") { Task { await recordly.loadSourceCatalog() } }
-                .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
+            if recordly.screenRecordingGranted {
+                Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).fixedSize(horizontal: false, vertical: true)
+                quietButton("Check again") { Task { await recordly.loadSourceCatalog() } }
+            }
         case .failed(let reason):
-            Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Refresh") { Task { await recordly.loadSourceCatalog() } }
-                .buttonStyle(.plain).font(TopBarStyle.label(9, .semibold))
+            Text(reason).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).fixedSize(horizontal: false, vertical: true)
+            quietButton("Refresh") { Task { await recordly.loadSourceCatalog() } }
         }
     }
 
+    private func quietButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action).buttonStyle(.plain).font(TopBarStyle.label(9, .semibold)).foregroundStyle(Theme.cloudPrimary)
+    }
+
     @ViewBuilder
-    private func catalogRows(_ snapshot: RecordlySourcePicker.CatalogSnapshot) -> some View {
-        // No nested scroll: the page's own scroll area bounds the list.
+    private func rows(_ snapshot: RecordlySourcePicker.CatalogSnapshot) -> some View {
         VStack(alignment: .leading, spacing: RecordlyPageLayout.rowSpacing) {
-            VStack(alignment: .leading, spacing: RecordlyPageLayout.rowSpacing) {
-                if recordly.sourceKind == .display {
-                    if snapshot.displays.isEmpty {
-                        Text("No displays available.").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                    }
-                    ForEach(snapshot.displays, id: \.id) { display in
-                        let intent = RecordlySourceSelection.SelectionIntent.display(id: display.id)
-                        Button { recordly.selectSource(intent) } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: recordly.isSelected(intent) ? "checkmark.circle.fill" : "display")
-                                Text("Display \(display.id)").font(TopBarStyle.label(10))
-                            }
-                            .foregroundStyle(recordly.isSelected(intent) ? TopBarStyle.rec : Theme.cloudSecondary)
+            if snapshot.windows.isEmpty {
+                Text("No eligible owned windows available.").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
+            }
+            ForEach(snapshot.windows, id: \.identityToken) { window in
+                let intent = RecordlySourceSelection.SelectionIntent.window(number: window.number, identityToken: window.identityToken)
+                let title = window.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let owner = window.ownerName?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let displayTitle = title.flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled window"
+                let ownerLabel = owner.flatMap { $0.isEmpty ? nil : $0 } ?? "Owned app"
+                let selected = recordly.isSelected(intent)
+                Button { recordly.selectSource(intent) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: selected ? "checkmark.circle.fill" : "macwindow")
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(displayTitle).font(TopBarStyle.label(10)).lineLimit(1)
+                            Text("\(ownerLabel) \u{00B7} Window \(window.number)").font(TopBarStyle.label(9)).lineLimit(1)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(display.id == 0 || !recordly.canChooseSource)
                     }
-                } else if recordly.sourceKind == .window {
-                    if snapshot.windows.isEmpty {
-                        Text("No eligible owned windows available.").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                    }
-                    ForEach(snapshot.windows, id: \.identityToken) { window in
-                        let intent = RecordlySourceSelection.SelectionIntent.window(
-                            number: window.number,
-                            identityToken: window.identityToken
-                        )
-                        let title = window.title?.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let owner = window.ownerName?.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let displayTitle = title.flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled window"
-                        let ownerLabel = owner.flatMap { $0.isEmpty ? nil : $0 } ?? "Owned app"
-                        Button { recordly.selectSource(intent) } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: recordly.isSelected(intent) ? "checkmark.circle.fill" : "macwindow")
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(displayTitle)
-                                        .font(TopBarStyle.label(10)).lineLimit(1)
-                                    Text("\(ownerLabel) · Window \(window.number)")
-                                        .font(TopBarStyle.label(9)).lineLimit(1)
-                                }
-                            }
-                            .foregroundStyle(recordly.isSelected(intent) ? TopBarStyle.rec : Theme.cloudSecondary)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(window.number <= 0 || !window.isPresent || !recordly.canChooseSource)
+                    .foregroundStyle(selected ? Theme.accent : Theme.cloudSecondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(window.number <= 0 || !window.isPresent || !recordly.canChooseSource)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+// MARK: Banner, notices
+
+private struct RecordlyNotices: View {
+    let recordly: RecordlyController
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !recordly.screenRecordingGranted {
+                banner
+            }
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if recordly.failureReason != nil {
+                Button("Try again") { recordly.retry() }.buttonStyle(.plain)
+                    .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary)
+            }
+        }
+    }
+
+    private var lines: [String] {
+        [recordly.displayNotice, recordly.actionNotice, recordly.selectionNotice, recordly.failureReason].compactMap { $0 }
+    }
+
+    /// Inline permission banner: icon, one sentence, one button. Never prompts; the button opens System Settings.
+    private var banner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.shield").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.bolt)
+            Text("Screen Recording is off for Zeus.")
+                .font(TopBarStyle.label(10, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(2)
+            Spacer(minLength: 4)
+            Button { recordly.openScreenRecordingSettings() } label: {
+                Text("Open Screen Recording settings")
+                    .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.storm)
+                    .padding(.horizontal, 10).frame(height: 24)
+                    .background(Capsule().fill(Theme.cloudPrimary))
+            }
+            .buttonStyle(PressableStyle())
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(RecordlySurface.soft(reduceTransparency)))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+// MARK: Option chips
+
+private struct RecordlyOptionChips: View {
+    let recordly: RecordlyController
+
+    var body: some View {
+        HStack(spacing: 6) {
+            RecordlyOptionChip(symbol: "mic", title: "Microphone", on: false, available: false,
+                               help: "Microphone in recordings is coming soon") { }
+            RecordlyOptionChip(symbol: "speaker.wave.2", title: "System audio", on: recordly.audio.systemAudio, available: recordly.canChooseSource,
+                               help: "Record the sound your Mac plays") { recordly.audio.systemAudio.toggle() }
+            RecordlyOptionChip(symbol: "camera", title: "Camera bubble", on: false, available: false,
+                               help: "Camera in recordings is coming soon") { }
+            RecordlyOptionChip(symbol: "cursorarrow.rays", title: "Cursor zoom", on: recordly.exportSettings.followCursor, available: recordly.canChooseSource,
+                               help: "Smoothly follows the cursor during zooms on a verified display recording.") {
+                recordly.exportSettings.followCursor.toggle()
+            }
+        }
+    }
+}
+
+private struct RecordlyOptionChip: View {
+    let symbol: String
+    let title: String
+    let on: Bool
+    let available: Bool
+    let help: String
+    let action: () -> Void
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
+                Text(title).font(TopBarStyle.label(10, .semibold)).lineLimit(1)
+                Circle().fill(on ? Theme.accent : Color.white.opacity(0.18)).frame(width: 5, height: 5)
+            }
+            .foregroundStyle(on ? Theme.cloudPrimary : Theme.cloudSecondary)
+            .padding(.horizontal, 8).frame(height: 24)
+            .background(Capsule().fill(on ? Theme.accent.opacity(reduceTransparency ? 0.4 : 0.2) : RecordlySurface.soft(reduceTransparency)))
+            .overlay(Capsule().strokeBorder(on ? Theme.accent.opacity(0.7) : Color.clear, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .opacity(available || on ? 1 : 0.45)
+        .help(help)
+        .accessibilityLabel(title)
+        .accessibilityValue(available || on ? (on ? "On" : "Off") : "Unavailable. \(help)")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+// MARK: Preview stage
+
+private struct RecordlyStage: View {
+    let recordly: RecordlyController
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        ZStack {
+            shape.fill(RecordlySurface.stage(reduceTransparency))
+            content
+            if recordly.isCountingDown { shape.fill(Color.black.opacity(0.3)) }
+            shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+        }
+        .overlay {
+            // Recording a window: the red frame goes around the whole stage. For a display it is on the tile.
+            shape.strokeBorder(TopBarStyle.rec, lineWidth: 2)
+                .opacity(recordly.showsRunning && recordly.sourceKind != .display ? 1 : 0)
+        }
+        .clipShape(shape)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch recordly.sourceKind {
+        case .display:
+            RecordlyDisplayDiagram(recordly: recordly)
+        case .window, .region:
+            VStack(spacing: 8) {
+                Image(systemName: recordly.sourceKind == .window ? "macwindow" : "rectangle.dashed")
+                    .font(.system(size: 34, weight: .light)).foregroundStyle(Theme.cloudSecondary)
+                Text(recordly.sourceKind == .window ? (recordly.selectedSourceName ?? "Choose a window") : "Area recording isn't available yet.")
+                    .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                    .multilineTextAlignment(.center).padding(.horizontal, 16)
+            }
+        }
+    }
+}
+
+/// The connected displays as rectangles to scale, placed like System Settings > Displays.
+private struct RecordlyDisplayDiagram: View {
+    let recordly: RecordlyController
+
+    var body: some View {
+        GeometryReader { proxy in
+            let inset: CGFloat = 16
+            let bounds = CGSize(width: max(1, proxy.size.width - inset * 2), height: max(1, proxy.size.height - inset * 2))
+            let displays = recordly.displays
+            let tiles = RecordlyDisplayChoice.arrangement(displays, in: bounds, gap: displays.count > 1 ? 6 : 0)
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(displays.enumerated()), id: \.element.id) { index, display in
+                    if let tile = tiles.first(where: { $0.id == display.id }) {
+                        RecordlyDisplayTile(
+                            display: display, position: index, size: tile.rect.size,
+                            selected: recordly.isSelected(.display(id: display.id)),
+                            live: recordly.showsRunning,
+                            selectable: displays.count > 1 && recordly.canChooseSource,
+                            thumbnail: recordly.thumbnail
+                        ) { recordly.selectSource(.display(id: display.id)) }
+                        .position(x: inset + tile.rect.midX, y: inset + tile.rect.midY)
                     }
                 }
             }
@@ -218,32 +560,341 @@ private struct RecordlyIdle: View {
     }
 }
 
-private struct RecordlyRunning: View {
+private struct RecordlyDisplayTile: View {
+    let display: RecordlySourceSelection.CatalogSnapshot.Display
+    let position: Int
+    let size: CGSize
+    let selected: Bool
+    let live: Bool
+    let selectable: Bool
+    let thumbnail: CGImage?
+    let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if selectable {
+            Button(action: action) { tile }
+                .buttonStyle(.plain)
+                .accessibilityLabel(RecordlyDisplayChoice.spokenLabel(display, position: position))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+        } else {
+            tile
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(RecordlyDisplayChoice.spokenLabel(display, position: position))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+    }
+
+    private var tile: some View {
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        let outline = selected ? (live ? TopBarStyle.rec : Theme.accent) : Color.white.opacity(0.2)
+        return ZStack {
+            shape.fill(selected ? Theme.accent.opacity(0.30) : Color.white.opacity(0.07))
+            if selected, let thumbnail {
+                Image(decorative: thumbnail, scale: 1).resizable().scaledToFill()
+                    .frame(width: size.width, height: size.height).clipShape(shape).opacity(0.85)
+            }
+            label
+            shape.strokeBorder(outline, lineWidth: selected ? 2 : 1)
+        }
+        .frame(width: size.width, height: size.height)
+        .contentShape(shape)
+        .animation(reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : .spring(response: 0.3, dampingFraction: 0.85), value: selected)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if size.width > 70, size.height > 34 {
+            VStack(spacing: 1) {
+                Text(RecordlyDisplayChoice.title(display, position: position))
+                    .font(TopBarStyle.label(9, .semibold)).lineLimit(1)
+                Text(display.isMain ? "Main, \(RecordlyDisplayChoice.size(display))" : RecordlyDisplayChoice.size(display))
+                    .font(TopBarStyle.label(8).monospacedDigit()).lineLimit(1)
+            }
+            .foregroundStyle(Theme.cloudPrimary)
+            .padding(.horizontal, 6).padding(.vertical, 3)
+            .background(Capsule().fill(Color.black.opacity(selected && thumbnail != nil ? 0.5 : 0)))
+        } else {
+            Text("\(position + 1)").font(TopBarStyle.label(11, .bold).monospacedDigit()).foregroundStyle(Theme.cloudPrimary)
+        }
+    }
+}
+
+// MARK: Recording strip
+
+private struct RecordlyLiveStrip: View {
     let recordly: RecordlyController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Circle().fill(TopBarStyle.rec).frame(width: 8, height: 8)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Recording")
-                Text(RecordlyElapsed.format(recordly.elapsed))
-                    .font(TopBarStyle.label(28, .bold).monospacedDigit())
-                    .foregroundStyle(Theme.cloudPrimary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                RecordlyPulseDot()
+                Text(recordly.isStopping ? "Saving" : "Recording")
+                    .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                if recordly.isStopping { ProgressView().controlSize(.small) }
+            }
+            // A TimelineView only ticks while it is on screen, once a second, and not at all when nothing shows it.
+            TimelineView(.periodic(from: recordly.startedAt ?? Date(), by: 1)) { context in
+                let seconds = recordly.startedAt.map { max(0, context.date.timeIntervalSince($0)) } ?? recordly.elapsed
+                Text(RecordlyElapsed.format(seconds))
+                    .font(TopBarStyle.label(38, .bold).monospacedDigit())
+                    .foregroundStyle(TopBarStyle.rec)
+                    .contentTransition(.numericText())
                     .accessibilityLabel("Elapsed time")
-                    .accessibilityValue(RecordlyElapsed.spoken(recordly.elapsed))
-                Spacer()
-                if recordly.isStopping {
-                    ProgressView().controlSize(.small)
-                    Text("Stopping…").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                }
-                NotchActionButton(title: "Stop", tint: TopBarStyle.rec) {
-                    Task { await recordly.stop() }
-                }
-                .disabled(recordly.isStopping)
-                .accessibilityLabel(recordly.isStopping ? "Stop recording, unavailable while stopping" : "Stop recording")
+                    .accessibilityValue(RecordlyElapsed.spoken(seconds))
+            }
+            if let name = recordly.selectedSourceName {
+                Text(name).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
             }
         }
+    }
+}
+
+/// The live dot: a slow halo while capturing. Standing still under Reduce Motion.
+private struct RecordlyPulseDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulsing = false
+
+    var body: some View {
+        Circle().fill(TopBarStyle.rec).frame(width: 9, height: 9)
+            .overlay {
+                Circle().strokeBorder(TopBarStyle.rec.opacity(0.6), lineWidth: 1.5)
+                    .scaleEffect(pulsing ? 2.4 : 1).opacity(pulsing ? 0 : 0.8)
+            }
+            .frame(width: 20, height: 20)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 1.5).repeatForever(autoreverses: false)) { pulsing = true }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Recording")
+    }
+}
+
+// MARK: Capture control
+
+enum RecordlyControlVisual: Equatable {
+    case idle
+    case countdown(Int)
+    case starting
+    case recording
+    case stopping
+}
+
+private extension RecordlyController {
+    var controlVisual: RecordlyControlVisual {
+        if let remaining = countdownRemaining { return .countdown(remaining) }
+        if isStopping { return .stopping }
+        if isRecording { return .recording }
+        if isStarting { return .starting }
+        return .idle
+    }
+}
+
+private struct RecordlyControlRow: View {
+    let recordly: RecordlyController
+    let topBar: TopBarModel
+
+    var body: some View {
+        let visual = recordly.controlVisual
+        HStack(spacing: 14) {
+            RecordlyCaptureControl(
+                visual: visual, enabled: enabled(visual), countdownBeganAt: recordly.countdownBeganAt,
+                help: disabledReason ?? "", spokenSource: recordly.selectedSourceName
+            ) { activate(visual) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(headline(visual)).font(TopBarStyle.label(13, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                Text(caption(visual)).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(height: 56)
+        .background {
+            if recordly.isCountingDown {
+                // Escape cancels the countdown.
+                Button("Cancel countdown") { recordly.cancelCountdown() }
+                    .keyboardShortcut(.cancelAction).opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var disabledReason: String? {
+        if !recordly.screenRecordingGranted { return "Allow Screen Recording in System Settings to record." }
+        if recordly.canStart { return nil }
+        return "Choose a display or window first."
+    }
+
+    private func enabled(_ visual: RecordlyControlVisual) -> Bool {
+        switch visual {
+        case .idle: recordly.canRecord
+        case .countdown, .starting, .recording: true
+        case .stopping: false
+        }
+    }
+
+    private func activate(_ visual: RecordlyControlVisual) {
+        switch visual {
+        case .idle: recordly.pressRecord(topBar: topBar)
+        case .countdown: recordly.cancelCountdown()
+        case .starting: Task { await recordly.cancelStart() }
+        case .recording: Task { await recordly.stop() }
+        case .stopping: break
+        }
+    }
+
+    private func headline(_ visual: RecordlyControlVisual) -> String {
+        switch visual {
+        case .idle: "Record"
+        case .countdown(let n): "Starting in \(n)"
+        case .starting: "Starting"
+        case .recording: "Stop"
+        case .stopping: "Saving"
+        }
+    }
+
+    private func caption(_ visual: RecordlyControlVisual) -> String {
+        switch visual {
+        case .idle:
+            if let reason = disabledReason { return reason }
+            return "Records \(recordly.selectedSourceName ?? "the selected source")"
+        case .countdown: return "Press Esc or the button to cancel"
+        case .starting: return "Checking the source"
+        case .recording: return "Saves when you stop"
+        case .stopping: return "Finishing the file"
+        }
+    }
+}
+
+/// The round glass capture control. Idle: white ring and a filled dot. Countdown: a ring draws around the digits.
+/// Recording: the dot morphs into a rounded square. Red only appears while capturing.
+private struct RecordlyCaptureControl: View {
+    let visual: RecordlyControlVisual
+    let enabled: Bool
+    let countdownBeganAt: Date?
+    let help: String
+    let spokenSource: String?
+    let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var hovering = false
+
+    private var motion: Animation {
+        reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : .spring(response: 0.38, dampingFraction: 0.74)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(reduceTransparency ? Color(hex: 0x2A2F3A) : Color.white.opacity(0.10))
+                Circle().strokeBorder(Color.white.opacity(visual == .idle && !enabled ? 0.28 : 0.9), lineWidth: 2.5)
+                countdownRing
+                glyph
+            }
+            .frame(width: 56, height: 56)
+            .shadow(color: reduceTransparency ? .clear : Color.black.opacity(0.35), radius: 8, y: 3)
+            .contentShape(Circle())
+        }
+        .buttonStyle(RecordlyControlStyle(hovering: hovering, reduceMotion: reduceMotion))
+        .disabled(!enabled)
+        .onHover { hovering = $0 }
+        .animation(motion, value: visual)
+        .help(help)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(spokenSource ?? "")
+        .accessibilityHint(enabled || help.isEmpty ? "" : help)
+    }
+
+    private var accessibilityLabel: String {
+        switch visual {
+        case .idle: "Record"
+        case .countdown(let n): "Cancel countdown, \(n)"
+        case .starting: "Cancel starting the recording"
+        case .recording: "Stop recording"
+        case .stopping: "Stopping, unavailable"
+        }
+    }
+
+    // MARK: Glyph
+
+    private var isCountdown: Bool { if case .countdown = visual { true } else { false } }
+
+    private var shapeSide: CGFloat {
+        switch visual {
+        case .idle, .starting: 30
+        case .countdown: 12
+        case .recording, .stopping: 20
+        }
+    }
+
+    private var shapeRadius: CGFloat {
+        switch visual {
+        case .idle, .starting, .countdown: 15
+        case .recording, .stopping: 6
+        }
+    }
+
+    private var shapeColor: Color {
+        switch visual {
+        case .idle: enabled ? Theme.cloudPrimary : Color.white.opacity(0.3)
+        case .starting, .countdown: Theme.cloudPrimary.opacity(0.5)
+        case .recording: TopBarStyle.rec
+        case .stopping: TopBarStyle.rec.opacity(0.5)
+        }
+    }
+
+    @ViewBuilder
+    private var glyph: some View {
+        ZStack {
+            if reduceMotion {
+                // Cross-fades only: each glyph keeps its own geometry and fades in or out.
+                Circle().fill(Theme.cloudPrimary).frame(width: 30, height: 30).opacity(visual == .idle ? (enabled ? 1 : 0.3) : 0)
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(TopBarStyle.rec).frame(width: 20, height: 20)
+                    .opacity(visual == .recording ? 1 : (visual == .stopping ? 0.5 : 0))
+            } else {
+                RoundedRectangle(cornerRadius: shapeRadius, style: .continuous)
+                    .fill(shapeColor).frame(width: shapeSide, height: shapeSide)
+                    .opacity(isCountdown ? 0 : 1)
+            }
+            if case .countdown(let n) = visual {
+                Text("\(n)").font(TopBarStyle.label(24, .bold).monospacedDigit()).foregroundStyle(Theme.cloudPrimary)
+                    .contentTransition(.numericText(countsDown: true))
+            }
+            if visual == .starting || visual == .stopping { ProgressView().controlSize(.small) }
+        }
+    }
+
+    @ViewBuilder
+    private var countdownRing: some View {
+        if case .countdown(let remaining) = visual {
+            if reduceMotion {
+                ring(progress: Double(RecordlyCountdown.seconds - remaining + 1) / Double(RecordlyCountdown.seconds))
+            } else {
+                // Exists only during the countdown, so nothing redraws while idle.
+                TimelineView(.animation) { context in
+                    let began = countdownBeganAt ?? context.date
+                    ring(progress: min(1, max(0, context.date.timeIntervalSince(began) / Double(RecordlyCountdown.seconds))))
+                }
+            }
+        }
+    }
+
+    private func ring(progress: Double) -> some View {
+        Circle().trim(from: 0, to: progress)
+            .stroke(Theme.accent, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+            .padding(1)
+    }
+}
+
+private struct RecordlyControlStyle: ButtonStyle {
+    let hovering: Bool
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : (hovering ? 1.02 : 1)))
+            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.8), value: hovering)
     }
 }
 
@@ -251,9 +902,19 @@ private struct RecordlyEditor: View {
     let recordly: RecordlyController
 
     var body: some View {
-        ScrollView {
+        RecordlyScroll {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Recording captured").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(Theme.accent)
+                        .transition(.scale.combined(with: .opacity))
+                    Text("Recording saved").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                    Spacer(minLength: 0)
+                    if let url = recordly.lastMediaURL {
+                        Button("Show in Finder") { recordly.revealInFinder(url) }
+                            .buttonStyle(.plain).font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                            .accessibilityLabel("Show \(url.lastPathComponent) in Finder")
+                    }
+                }
                 if let project = recordly.project {
                     Text("\(project.zoomRegions.count) zoom regions")
                         .font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary)
@@ -434,31 +1095,6 @@ private struct RecordlyChip: View {
         .help(enabled ? "" : disabledHelp)
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-private struct ToggleChip: View {
-    let title: String
-    let on: Bool
-    var enabled = true
-    var help = ""
-    var accessibilityText: String?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title).font(TopBarStyle.label(10, .semibold))
-                .foregroundStyle(on ? Theme.cloudPrimary : Theme.cloudSecondary)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(on ? Color.white.opacity(0.14) : Color.white.opacity(0.06))
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.45)
-        .help(help)
-        .accessibilityLabel(accessibilityText ?? title)
-        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

@@ -275,6 +275,14 @@ final class DictationController {
     /// The chosen engine hears this turn (ready and chosen); Apple otherwise.
     private var useLocal = false
     private var pausedMedia = false
+    /// Every dictation job (live turn, file, history re-run) as one state; `topBar.dictationPhase` only mirrors it.
+    private(set) var flow: DictationFlow.State = .idle {
+        didSet { topBar.dictationPhase = flow.phase }
+    }
+    /// The local model's download and load: one state, mirrored into `SpeechEngineStatus` for the views.
+    private var modelState = ModelPreparation.State.idle
+    private var modelTask: Task<Void, Never>?
+    private var lastModelToken: UInt64 = 0
     let parakeet = ParakeetEngine()
     let parakeetUltra = ParakeetEngine(.parakeetUltra)
     let whisperKit = WhisperKitEngine()
@@ -326,7 +334,7 @@ final class DictationController {
         settings.engine == .apple || !isReadyNow(settings.engine) ? nil : engine(settings.engine)
     }
 
-    /// The person's vocabulary with the built-in names (Zeus, Laya, Jev, Claude, Codex, Murmure…).
+    /// The person's vocabulary with the built-in names (Zeus, Jev, Claude, Codex, Murmure…).
     private var fullVocabulary: Vocabulary { DictationVocabularyPrompt.merged(store.vocabulary()) }
     private var hints: [String] { DictationVocabularyPrompt.terms(store.vocabulary()) }
     /// Rewrites text for AI modes. Injected so tests and snapshots never call a model.
@@ -365,7 +373,7 @@ final class DictationController {
         topBar.chooseFileToTranscribe = { [weak self] in self?.chooseFile() }
         topBar.insertText = { text in Task { _ = await TextInserter.insert(text) } }
         // Load the model early so the first dictation is as quick as the rest.
-        if settings.engine == .parakeet, parakeet.isDownloaded { prepareModel(announce: false) }
+        if settings.engine == .parakeet, parakeet.isDownloaded { prepareModel(announce: false, explicit: false) }
         if settings.engine == .parakeetUltra, parakeetUltra.isDownloaded { Task { try? await parakeetUltra.prepare(progress: nil) } }
         Task { await SpeechEngineBoard.shared.refresh() }
     }
@@ -385,30 +393,56 @@ final class DictationController {
         if effectiveBehavior.finishesOnRelease { finish() }
     }
 
-    /// Downloads (first time) and loads Parakeet in the background.
-    func prepareModel(announce: Bool = true) {
+    /// Downloads (first time) and loads Parakeet in the background. `explicit` is a click on Download;
+    /// a key press or launch passes false, so a failed download is not retried on every dictation.
+    func prepareModel(announce: Bool = true, explicit: Bool = true) {
+        lastModelToken &+= 1
+        modelEvent(.startRequested(token: lastModelToken, trigger: explicit ? .explicit : .automatic,
+                                   downloaded: parakeet.isDownloaded, announce: announce))
+    }
+
+    /// Stops a Parakeet download or load that is running; the state returns to idle.
+    func cancelModelPreparation() { modelEvent(.cancelRequested) }
+
+    private func modelEvent(_ event: ModelPreparation.Event) {
+        let (next, effects) = ModelPreparation.reduce(modelState, event)
+        guard next != modelState || !effects.isEmpty else { return }
+        modelState = next
+        // Settings and onboarding read SpeechEngineStatus; it only mirrors the state.
         let status = SpeechEngineStatus.shared
-        guard status.progress == nil else { return }
-        let downloading = !parakeet.isDownloaded
-        if announce, downloading { topBar.show(.dictation("Downloading Parakeet, Apple speech meanwhile")) }
-        status.progress = 0
-        status.problem = nil
-        Task { @MainActor in
-            do {
-                try await parakeet.prepare { fraction in
-                    DispatchQueue.main.async { MainActor.assumeIsolated { status.progress = fraction } }
+        status.progress = ModelPreparation.progress(of: next)
+        status.problem = ModelPreparation.problem(of: next)
+        if case .ready = next { status.refresh(parakeet) }
+        for effect in effects { perform(effect) }
+    }
+
+    private func perform(_ effect: ModelPreparation.Effect) {
+        switch effect {
+        case .startWork(let token, _):
+            modelTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    try await parakeet.prepare { fraction in
+                        DispatchQueue.main.async { MainActor.assumeIsolated { self.modelEvent(.progress(token: token, fraction: fraction)) } }
+                    }
+                    modelEvent(.succeeded(token: token))
+                    await SpeechEngineBoard.shared.refresh()
+                } catch {
+                    modelEvent(.failed(token: token, message: error.localizedDescription))
                 }
-                status.progress = nil
-                status.refresh(parakeet)
-                await SpeechEngineBoard.shared.refresh()
-                if announce, downloading { topBar.show(.dictation("Parakeet is ready")) }
-            } catch {
-                status.progress = nil
-                status.problem = error.localizedDescription
-                // The live Settings card reads the board's message, so the reason stays on screen.
-                SpeechEngineBoard.shared.message = "Parakeet download failed: \(error.localizedDescription)"
-                topBar.show(.dictation("Parakeet download failed, using Apple speech"))
             }
+        case .cancelWork:
+            modelTask?.cancel()
+            modelTask = nil
+            parakeet.cancelPreparation()
+        case .announce(.downloading):
+            topBar.show(.dictation("Downloading Parakeet, Apple speech meanwhile"))
+        case .announce(.ready):
+            topBar.show(.dictation("Parakeet is ready"))
+        case .announce(.failed(let message)):
+            // The live Settings card reads the board's message, so the reason stays on screen.
+            SpeechEngineBoard.shared.message = "Parakeet download failed: \(message)"
+            topBar.show(.dictation("Parakeet download failed, using Apple speech"))
         }
     }
 
@@ -457,8 +491,43 @@ final class DictationController {
 
     // MARK: Microphone dictation
 
+    /// Runs one event through `DictationFlow`, performs its effects, and says whether anything changed.
+    @discardableResult
+    private func apply(_ event: DictationFlow.Event) -> Bool {
+        let before = flow
+        let (next, effects) = DictationFlow.reduce(before, event)
+        flow = next
+        for effect in effects {
+            switch effect {
+            case .invalidateTurn:
+                ownership.invalidate()
+                insertionTracker.invalidate()
+            case .releaseCapture:
+                releaseCapture()
+            case .busy:
+                topBar.show(.dictation("Finish the current dictation first"))
+            }
+        }
+        return next != before || !effects.isEmpty
+    }
+
+    /// Everything a running turn holds: the Escape monitor, the preview card, the recorder, the streaming
+    /// session and the paused media.
+    private func releaseCapture() {
+        removeEscape()
+        // A cancelled turn must not leave its preview card waiting on screen.
+        Self.dismissPreviewCard()
+        speech.cancel()
+        speech.onSamples = nil
+        turnStream?.cancel()
+        turnStream = nil
+        resumeMedia()
+        topBar.dictationPartial = ""
+    }
+
     func begin() {
-        guard !topBar.isDictating else { return }
+        guard flow.canStartJob else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         fallbackNote = nil
         let speechAllowed = SFSpeechRecognizer.authorizationStatus() == .authorized
         let languageAvailable = speech.configure(localeIdentifier: settings.language.localeIdentifier)
@@ -471,15 +540,15 @@ final class DictationController {
         let appleOnDevice = speechAllowed && languageAvailable && speech.supportsOnDevice
         guard microphoneAllowed, appleOnDevice || local else {
             let reason = !speechAllowed
-                ? "Allow Microphone and Speech Recognition in ZEUS setup first."
+                ? "Allow Microphone and Speech Recognition in Zeus setup first."
                 : languageAvailable
                     ? "On-device speech recognition isn't available for this language. Nothing was recorded. Choose another language or a local engine."
                     : "Apple Speech is unavailable for the selected language on this Mac."
-            topBar.dictationPhase = .failed(reason)
+            apply(.startFailed(reason: reason))
             topBar.show(.dictation(microphoneAllowed ? "Speech recognition is unavailable" : "Dictation needs the microphone"))
             return
         }
-        if settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel() }
+        if settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel(explicit: false) }
         // Apple runs alongside a local model for the live words in the notch. The audio is
         // always kept so the dictation can be reprocessed later with another engine.
         speech.recognizes = appleOnDevice
@@ -511,7 +580,7 @@ final class DictationController {
             insertionTracker.invalidate()
             turnStream?.cancel()
             turnStream = nil
-            topBar.dictationPhase = .failed(error.localizedDescription)
+            apply(.startFailed(reason: error.localizedDescription))
             topBar.show(.dictation("Dictation could not start"))
             return
         }
@@ -520,7 +589,7 @@ final class DictationController {
         topBar.dictationModeName = mode.name
         topBar.dictationModeSymbol = mode.symbol
         topBar.dictationPartial = ""
-        topBar.dictationPhase = .listening
+        apply(.micOpened(turn: turnGeneration))
         if settings.pauseMedia, topBar.nowPlaying?.isPlaying == true {
             topBar.musicCommand(.playPause)
             pausedMedia = true
@@ -541,7 +610,7 @@ final class DictationController {
     func injectDictationFile(_ url: URL) async -> String {
         if topBar.isDictating { cancel() }
         for _ in 0..<60 {
-            if topBar.dictationPhase == .idle { break }
+            if flow == .idle { break }
             try? await Task.sleep(for: .milliseconds(50))
         }
         fallbackNote = nil
@@ -579,8 +648,8 @@ final class DictationController {
         topBar.dictationModeName = mode.name
         topBar.dictationModeSymbol = mode.symbol
         topBar.dictationPartial = ""
-        topBar.dictationPhase = .listening
-        guard topBar.dictationPhase == .listening else {
+        apply(.micOpened(turn: turnGeneration))
+        guard flow.isListening else {
             _ = speech.configure(localeIdentifier: savedLocale)
             return "ERROR not listening (hold the dictation key first)"
         }
@@ -598,7 +667,7 @@ final class DictationController {
             guard try await completion.run() else { return "ERROR dictate-file superseded" }
             loop: for _ in 0..<240 {
                 guard ownership.owns(generation: context.generation) else { break loop }
-                switch topBar.dictationPhase {
+                switch flow {
                 case .done, .failed, .idle: break loop
                 default: try? await Task.sleep(for: .milliseconds(50))
                 }
@@ -606,7 +675,7 @@ final class DictationController {
             // Restoring the locale cancels the speech session: never do that to a newer turn's.
             guard ownership.owns(generation: context.generation) else { return "ERROR dictate-file superseded" }
             _ = speech.configure(localeIdentifier: savedLocale)
-            let failure: String? = if case .failed(let message) = topBar.dictationPhase { message } else { nil }
+            let failure: String? = if case .failed(let message) = flow { message } else { nil }
             let history = topBar.dictationHistory.map {
                 DictationFileInject.TurnSnapshot(inserted: $0.inserted, resultText: $0.result)
             }
@@ -638,28 +707,17 @@ final class DictationController {
     }
 
     func cancel() {
-        guard topBar.isDictating else { return }
-        ownership.invalidate()
-        insertionTracker.invalidate()
-        removeEscape()
-        // A cancelled turn must not leave its preview card waiting on screen.
-        Self.dismissPreviewCard()
-        speech.cancel()
-        speech.onSamples = nil
-        turnStream?.cancel()
-        turnStream = nil
-        resumeMedia()
-        topBar.dictationPhase = .idle
-        topBar.dictationPartial = ""
+        guard flow.isActive else { return }
+        apply(.cancelRequested)
         topBar.show(.dictation("Dictation cancelled"))
     }
 
     func finish() {
-        guard topBar.dictationPhase == .listening else { return }
+        guard flow.isListening else { return }
         // Everything below reads this turn's context, never the shared vars a replacement rewrites.
         guard let context = turnContext, ownership.owns(generation: context.generation) else { return }
         removeEscape()
-        topBar.dictationPhase = .transcribing
+        apply(.finishRequested)
         let audioMs = Int(Date().timeIntervalSince(startedAt) * 1000)
         let released = Date()
         let generation = context.generation
@@ -696,7 +754,8 @@ final class DictationController {
                     return TranscriptPolish.prepareForInsert(fullVocabulary.apply(to: replacement))
                 }
                 return await process(raw, mode: context.mode, selection: context.selection,
-                                     appName: context.targetApp?.localizedName, isCurrent: isCurrent)
+                                     appName: context.targetApp?.localizedName, turn: generation, source: .live,
+                                     isCurrent: isCurrent)
             },
             review: review,
             deliver: { [self] text in
@@ -709,13 +768,13 @@ final class DictationController {
             },
             onEmpty: { [self] in
                 VoiceLog.log("dictation", "transcript empty")
-                topBar.dictationPhase = .failed("No speech was heard.")
+                apply(.failed(turn: generation, reason: "No speech was heard."))
                 topBar.show(.dictation("No speech heard"))
                 cue(.failure)
             },
             onDiscarded: { [self] in
                 insertionTracker.invalidate()
-                topBar.dictationPhase = .idle
+                apply(.dismissed(turn: generation))
                 topBar.show(.dictation(reviewTimedOut ? "No answer in 5 minutes. Text copied, press ⌘V to paste" : "Dictation discarded"))
                 reviewTimedOut = false
             },
@@ -737,7 +796,7 @@ final class DictationController {
                     do { try store.saveAudio(heard.samples, for: record.id) } catch { saveFailed = true }
                 }
                 topBar.dictationHistory.insert(record, at: 0)
-                topBar.dictationPhase = .done
+                apply(.succeeded(turn: generation))
                 let written = deliveryMessage ?? (outcome == .pasted ? "\(record.wordCount) words written" : "Copied. Press ⌘V to paste.")
                 let base = heard.note.map { "\($0) \(written)." } ?? written
                 topBar.show(.dictation(saveFailed ? "\(base) Couldn't save to history." : base))
@@ -852,6 +911,7 @@ final class DictationController {
 
     /// Vocabulary fixes, then the mode's AI rewrite if it has one. A failed rewrite keeps your words.
     private func process(_ raw: String, mode: DictationMode, selection: String?, appName: String?,
+                         turn: UInt64, source: DictationFlow.Source,
                          isCurrent: () -> Bool = { true }, didEnterRewriting: () -> Void = {}) async -> String {
         // P0 item D, QA7: fix a self-correction ("no wait", "actually", "sorry", "scratch that"
         // ...) before anything else touches the text, so only the corrected version gets to AI
@@ -859,7 +919,8 @@ final class DictationController {
         let fixed = TranscriptPolish.prepareForInsert(fullVocabulary.apply(to: raw))
         guard mode.usesAI else { return fixed }
         guard isCurrent() else { return fixed }
-        topBar.dictationPhase = .rewriting
+        // The flow refuses when another job owns the phase: the words go in as they were heard.
+        guard apply(.rewriteStarted(turn: turn, source: source)) else { return fixed }
         didEnterRewriting()
         let prompt = mode.buildPrompt(transcript: fixed, selectedText: selection,
                                       clipboard: mode.useClipboard ? NSPasteboard.general.string(forType: .string) : nil,
@@ -1000,20 +1061,19 @@ final class DictationController {
             return nil
         }
         let started = Date()
-        // This call owns the phase only if it set `.rewriting` itself and no dictation turn has
-        // begun since (every turn bumps the generation).
-        let turn = ownership.generation
+        // This call owns the phase only once the flow accepted its `.rewriting`, and only while no
+        // dictation turn has begun since (every turn bumps the generation).
+        let turn = ownership.beginTurn()
         var enteredRewriting = false
         var raw: String?
         if let engine, let samples = store.audio(for: id) {
             raw = try? await router.transcribe(samples: samples, preferred: engine, hints: hints, language: settings.language.localeIdentifier).text
         }
         let text = await process(raw ?? record.rawResult, mode: newMode, selection: nil, appName: record.appName,
+                                 turn: turn, source: .history,
                                  isCurrent: { [topBar] in !topBar.isDictating },
                                  didEnterRewriting: { enteredRewriting = true })
-        if enteredRewriting, ownership.owns(generation: turn), topBar.dictationPhase == .rewriting {
-            topBar.dictationPhase = .idle
-        }
+        if enteredRewriting { apply(.dismissed(turn: turn)) }
         let updated = record.reprocessed(mode: newMode, rawResult: raw, result: text,
                                          engine: raw == nil ? nil : engine?.rawValue,
                                          processingTime: Int(Date().timeIntervalSince(started) * 1000))
@@ -1064,7 +1124,7 @@ final class DictationController {
 
     /// For links and shortcuts: start, or finish if already listening (hands-free style).
     func toggle() {
-        if topBar.dictationPhase == .listening { finish() } else { begin() }
+        if flow.isListening { finish() } else { begin() }
     }
 
     // MARK: File transcription
@@ -1078,22 +1138,31 @@ final class DictationController {
     }
 
     func transcribe(file url: URL) {
-        if let engine = readyEngine {
-            transcribeLocally(file: url, with: engine)
+        // A file never starts beside a live turn or another file: it would take the phase from a
+        // microphone that is still recording.
+        guard flow.canStartJob else {
+            topBar.show(.dictation("Finish the current dictation first"))
             return
         }
-        transcribeWithApple(file: url)
-    }
-
-    private func transcribeLocally(file url: URL, with engine: any TranscriptionEngine) {
+        let turn = ownership.beginTurn()
         topBar.dictationModeName = "File"
         topBar.dictationModeSymbol = "doc.text"
-        topBar.dictationPhase = .transcribing
+        apply(.fileRequested(turn: turn))
+        if let engine = readyEngine {
+            transcribeLocally(file: url, with: engine, turn: turn)
+            return
+        }
+        transcribeWithApple(file: url, turn: turn)
+    }
+
+    private func transcribeLocally(file url: URL, with engine: any TranscriptionEngine, turn: UInt64) {
         let started = Date()
         let vocabulary = fullVocabulary
         let hints = hints
         Task { @MainActor in
             let loaded = await Task.detached { Result { try AudioSamples.load(url) } }.value
+            // Cancelled (or replaced) while the file was read: leave the phase and clipboard alone.
+            guard flow.turn == turn else { return }
             let samples: [Float]
             switch loaded {
             case .success(let read): samples = read
@@ -1102,9 +1171,10 @@ final class DictationController {
                 topBar.show(.dictation("Couldn't read the file here: \(error.localizedDescription)"))
                 samples = []
             }
-            guard let text = try? await engine.transcribe(samples: samples, hints: hints, language: settings.language.localeIdentifier),
-                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                transcribeWithApple(file: url)
+            let heard = try? await engine.transcribe(samples: samples, hints: hints, language: settings.language.localeIdentifier)
+            guard flow.turn == turn else { return }
+            guard let text = heard, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                transcribeWithApple(file: url, turn: turn)
                 return
             }
             let fixed = vocabulary.apply(to: TranscriptPolish.tidy(text))
@@ -1115,57 +1185,47 @@ final class DictationController {
             do { try store.save(record) } catch { saved = false }
             topBar.dictationHistory.insert(record, at: 0)
             topBar.copyText(fixed)
-            topBar.dictationPhase = .done
+            apply(.succeeded(turn: turn))
             topBar.show(.dictation(saved ? "File transcribed and copied" : "File transcribed and copied. Couldn't save to history."))
         }
     }
 
-    private func transcribeWithApple(file url: URL) {
+    /// Also the fallback when the local engine heard nothing: it keeps the same `turn`.
+    private func transcribeWithApple(file url: URL, turn: UInt64) {
         let locale = settings.language.localeIdentifier.map(Locale.init(identifier:)) ?? .current
         guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
-            // Also reached from the local-engine fallback, which already set `.transcribing`.
-            topBar.dictationPhase = .failed("Speech recognition is unavailable for the selected language.")
+            apply(.failed(turn: turn, reason: "Speech recognition is unavailable for the selected language."))
             topBar.show(.dictation("Speech recognition is unavailable for the selected language"))
             return
         }
         guard recognizer.supportsOnDeviceRecognition else {
-            topBar.dictationPhase = .failed("On-device speech recognition isn't available for this language, so the file was not sent to Apple.")
+            apply(.failed(turn: turn, reason: "On-device speech recognition isn't available for this language, so the file was not sent to Apple."))
             topBar.show(.dictation("On-device recognition unavailable for this language"))
             return
         }
-        topBar.dictationModeName = "File"
-        topBar.dictationModeSymbol = "doc.text"
-        topBar.dictationPhase = .transcribing
         let request = SFSpeechURLRecognitionRequest(url: url)
         request.addsPunctuation = true
         request.contextualStrings = hints
         request.requiresOnDeviceRecognition = true
         let started = Date()
         let vocabulary = fullVocabulary
-        recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard result?.isFinal == true || error != nil else { return }
-            let text = result?.bestTranscription.formattedString ?? ""
-            let message = error?.localizedDescription
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    guard !text.isEmpty else {
-                        self.topBar.dictationPhase = .failed(message ?? "No speech found in the file.")
-                        self.topBar.show(.dictation("No speech found in the file"))
-                        return
-                    }
-                    let fixed = vocabulary.apply(to: text)
-                    let record = DictationRecord(duration: 0, processingTime: Int(Date().timeIntervalSince(started) * 1000),
-                                                 modeKey: "file", modeName: url.lastPathComponent, rawResult: text, result: fixed,
-                                                 source: "file", engine: TranscriptionEngineKind.apple.rawValue)
-                    var saved = true
-                    do { try self.store.save(record) } catch { saved = false }
-                    self.topBar.dictationHistory.insert(record, at: 0)
-                    self.topBar.copyText(fixed)
-                    self.topBar.dictationPhase = .done
-                    self.topBar.show(.dictation(saved ? "File transcribed and copied" : "File transcribed and copied. Couldn't save to history."))
-                }
+        OffMainAudioCallbacks.recognizeFinal(recognizer, request: request) { [weak self] text, message in
+            guard let self, self.flow.turn == turn else { return }
+            guard !text.isEmpty else {
+                self.apply(.failed(turn: turn, reason: message ?? "No speech found in the file."))
+                self.topBar.show(.dictation("No speech found in the file"))
+                return
             }
+            let fixed = vocabulary.apply(to: text)
+            let record = DictationRecord(duration: 0, processingTime: Int(Date().timeIntervalSince(started) * 1000),
+                                         modeKey: "file", modeName: url.lastPathComponent, rawResult: text, result: fixed,
+                                         source: "file", engine: TranscriptionEngineKind.apple.rawValue)
+            var saved = true
+            do { try self.store.save(record) } catch { saved = false }
+            self.topBar.dictationHistory.insert(record, at: 0)
+            self.topBar.copyText(fixed)
+            self.apply(.succeeded(turn: turn))
+            self.topBar.show(.dictation(saved ? "File transcribed and copied" : "File transcribed and copied. Couldn't save to history."))
         }
     }
 }

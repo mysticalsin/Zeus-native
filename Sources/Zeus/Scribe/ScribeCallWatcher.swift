@@ -209,11 +209,14 @@ final class ScribeCallWatcher {
         terminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
         ) { [weak self] notification in
+            // Notification/userInfo are not Sendable. Read the OS object on its callback queue and
+            // carry only immutable identity values into actor isolation, as for the music observers.
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier > 0, let bundle = app.bundleIdentifier, let launched = app.launchDate else { return }
+            let identity = ScribeCallProcessIdentity(pid: app.processIdentifier, bundleID: bundle,
+                                                    launchedAt: launched.timeIntervalSince1970)
             MainActor.assumeIsolated {
-                guard let self,
-                      let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      let identity = Self.identity(of: app) else { return }
-                self.applicationTerminated(identity)
+                self?.applicationTerminated(identity)
             }
         }
         timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { [weak self] _ in
@@ -337,7 +340,9 @@ final class ScribeCallWatcher {
                 id: "\(base)@\(Int(start.timeIntervalSince1970))",
                 title: event.title ?? "Meeting",
                 start: start,
-                end: event.endDate
+                end: event.endDate,
+                // Display names only; the slot drops anything that looks like an address.
+                attendeeNames: (event.attendees ?? []).filter { !$0.isCurrentUser }.compactMap(\.name)
             )
         }
     }

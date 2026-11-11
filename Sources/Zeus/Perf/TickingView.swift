@@ -53,6 +53,12 @@ final class TickClock: ObservableObject {
     /// Asked on every tick, so a window that was ordered out or in without a notification is still noticed.
     var windowProbe: (() -> Bool)?
 
+    isolated deinit {
+        // The run loop retains a repeating timer even though its callback only weakly owns us.
+        // SwiftUI teardown must not depend on onDisappear being delivered first.
+        timer?.invalidate()
+    }
+
     var isRunning: Bool { timer != nil }
 
     func configure(interval: TimeInterval, paused: Bool) {

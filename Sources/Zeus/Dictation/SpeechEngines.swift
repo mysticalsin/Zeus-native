@@ -68,17 +68,25 @@ final class ParakeetEngine: TranscriptionEngine, @unchecked Sendable {
             let manager = try await task.value
             lock.withLock {
                 self.manager = manager
-                loading = nil
-                progress = nil
+                // A cancelled load must not clear the newer load that replaced it.
+                if loading == task { loading = nil; progress = nil }
             }
             return manager
         } catch {
             lock.withLock {
-                loading = nil
-                progress = nil
+                if loading == task { loading = nil; progress = nil }
             }
             throw error
         }
+    }
+
+    /// Stops a download or load in flight (Settings, onboarding). The next `prepare` starts fresh.
+    func cancelPreparation() {
+        let running = lock.withLock { () -> Task<AsrManager, Error>? in
+            defer { loading = nil; progress = nil }
+            return loading
+        }
+        running?.cancel()
     }
 }
 
@@ -236,10 +244,14 @@ enum AudioSamples {
     final class Resampler: @unchecked Sendable {
         private let converter: AVAudioConverter?
         private let ratio: Double
+        // Converter state belongs to one ordered stream. Never make a live audio callback wait
+        // on an overlapping conversion; convert drops that failure, convertChecked reports it.
+        private let conversionLock: NSLock
 
-        init(from input: AVAudioFormat) {
+        init(from input: AVAudioFormat, conversionLock: NSLock = NSLock()) {
             converter = AVAudioConverter(from: input, to: AudioSamples.format)
             ratio = AudioSamples.format.sampleRate / input.sampleRate
+            self.conversionLock = conversionLock
         }
 
         /// `final` flushes the converter; leave it off between microphone buffers. A failed buffer
@@ -252,21 +264,19 @@ enum AudioSamples {
         /// file transcript is never built from a partial conversion.
         func convertChecked(_ buffer: AVAudioPCMBuffer, final: Bool = false) throws -> [Float] {
             guard buffer.frameLength > 0 else { return [] }
+            guard conversionLock.try() else {
+                throw LoadError(errorDescription: "Audio conversion is already in progress. Nothing was transcribed.")
+            }
+            defer { conversionLock.unlock() }
             guard let converter else { throw LoadError(errorDescription: "That audio format can't be converted.") }
             let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
             guard let output = AVAudioPCMBuffer(pcmFormat: AudioSamples.format, frameCapacity: capacity) else {
                 throw LoadError(errorDescription: "Not enough memory to convert the file.")
             }
-            var fed = false
+            let input = PCMConversionInput(buffer: buffer, final: final)
             var error: NSError?
             let status = converter.convert(to: output, error: &error) { _, inputStatus in
-                if fed {
-                    inputStatus.pointee = final ? .endOfStream : .noDataNow
-                    return nil
-                }
-                fed = true
-                inputStatus.pointee = .haveData
-                return buffer
+                input.take(status: inputStatus)
             }
             if status == .error || error != nil {
                 throw LoadError(errorDescription: "Converting the audio failed: \(error?.localizedDescription ?? "unknown error"). Nothing was transcribed.")

@@ -5,12 +5,15 @@ public struct ScribeCalendarSlot: Equatable, Sendable {
     public var title: String
     public var start: Date
     public var end: Date?
+    /// Display names of the invitees. Never email addresses: `ScribeAttendeeNames.clean` drops those.
+    public var attendeeNames: [String]
 
-    public init(id: String, title: String, start: Date, end: Date? = nil) {
+    public init(id: String, title: String, start: Date, end: Date? = nil, attendeeNames: [String] = []) {
         self.id = id
         self.title = title
         self.start = start
         self.end = end
+        self.attendeeNames = ScribeAttendeeNames.clean(attendeeNames)
     }
 }
 
@@ -56,5 +59,29 @@ public enum ScribeCallPrompt {
             return .callDetected(app)
         }
         return .none
+    }
+}
+
+/// Names of the people on a calendar invite, as display names only.
+public enum ScribeAttendeeNames {
+    /// Trimmed, deduplicated, in order. An entry that is an email address (or holds an `@`) is dropped: an
+    /// address never reaches a transcript, a suggestion or a saved file.
+    public static func clean(_ names: [String], limit: Int = 50) -> [String] {
+        var seen: Set<String> = []
+        var kept: [String] = []
+        for raw in names {
+            let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, !name.contains("@"), !name.contains("://"), name.count <= 80 else { continue }
+            guard seen.insert(key(name)).inserted else { continue }
+            kept.append(name)
+            if kept.count >= limit { break }
+        }
+        return kept
+    }
+
+    /// Case, accent and spacing differences do not make two names two people.
+    public static func key(_ name: String) -> String {
+        name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }

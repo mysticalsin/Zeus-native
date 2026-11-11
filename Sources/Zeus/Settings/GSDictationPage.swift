@@ -44,6 +44,7 @@ final class DictationPageState {
 /// custom vocabulary and history.
 struct DictationSettingsPage: View {
     let context: GSContext
+    let navigation: GSNavigation
     private var settings: DictationSettings { DictationSettings.shared }
     private var page: DictationPageState { DictationPageState.shared }
     private var controller: DictationController? { DictationHub.shared.controller }
@@ -57,11 +58,9 @@ struct DictationSettingsPage: View {
             GSToggleRow(symbol: "mic", title: "Dictation", text: "Hold the key to speak. Release to write it where your cursor is.",
                         isOn: Binding(get: { settings.enabled }, set: { settings.enabled = $0 }))
             GSDivider()
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation shortcut",
-                                text: "",
-                                shortcut: settings.key, defaultValue: .rightCommand, allowsOff: true,
-                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) { settings.key = $0 }
-            KeyAccessRow()
+            ShortcutLinkRow(symbol: "keyboard", title: "Dictation shortcut", current: settings.key, navigation: navigation)
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
             GSDivider()
             let behaviors = settings.availableBehaviors
             GSRow(symbol: "hand.tap", title: "Shortcut behavior",
@@ -130,10 +129,11 @@ struct DictationSettingsPage: View {
                 }
             }
         }
-        .onAppear { tester.devices = Microphones.all() }
+        .onAppear { Task { tester.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } } // CoreAudio queries can stall: never on main
         .onDisappear { tester.stop() }
         modesCard
         engineCard
+        LanguagePacksCard()
         vocabularyCard
         historyCard
     }

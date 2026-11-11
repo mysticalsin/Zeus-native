@@ -430,6 +430,2577 @@
         "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
         "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
       }
+    },
+    {
+      "id": "REG-036",
+      "failure": "Native Path flattening failed Apple Swift type-checking; the typed refactor must preserve actual Bezier endpoints and midpoint geometry.",
+      "features": [
+        "F05"
+      ],
+      "check": "native-HaloRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/HaloRendererTests.swift",
+        "function": "flattenedBezierCurvesKeepEndpointsAndMidpoints"
+      }
+    },
+    {
+      "id": "REG-037",
+      "failure": "Cloud finish closures captured shadowing locals before declaration; completion must retain the actual missing-key failure.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-DictationOwnershipIntegrationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DictationOwnershipIntegrationTests.swift",
+        "function": "missingCloudKeyRetainsFailureDuringFinish"
+      }
+    },
+    {
+      "id": "REG-038",
+      "failure": "Native feedback attempted to set read-only accessibility environment values; explicit render/style inputs must retain reduced-motion frame stability.",
+      "features": [
+        "F07"
+      ],
+      "check": "native-RecordingFeedbackRenderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+        "function": "reducedMotionFramesStayStableWithinPhase"
+      }
+    },
+    {
+      "id": "REG-039",
+      "failure": "Generated portable packages omitted the production macOS deployment floor, so real Mac CI rejected otherwise available concurrency and Foundation APIs.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_portable_package_uses_the_production_macos_floor"
+      }
+    },
+    {
+      "id": "REG-040",
+      "failure": "macOS /var temporary-path aliases caused the input snapshot to include its own output receipt and falsely report changed source.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_output_root_alias_does_not_make_receipt_an_input"
+      }
+    },
+    {
+      "id": "REG-041",
+      "failure": "The aggregate gate rejected a valid generated source package when the trusted output ancestor used the macOS /var to /private/var alias.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_trusted_output_ancestor_alias_accepts_valid_packages"
+      }
+    },
+    {
+      "id": "REG-042",
+      "failure": "A single native compiler failure repeatedly rebuilt the identical failing target for every fixture suite; the shared barrier must block all native test execution while keeping each obligation unmet.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_failed_common_build_blocks_every_native_suite_without_executing_tests"
+      }
+    },
+    {
+      "id": "REG-043",
+      "failure": "Native --skip-build results could be accepted without a successful compiler barrier for the exact current source snapshot.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_missing_failed_or_stale_compilation_cannot_authorize_native_reuse"
+      }
+    },
+    {
+      "id": "REG-044",
+      "failure": "Portable exact-declaration excerpts omitted the original CoreGraphics import, so native Mac compilation rejected CGRect.zero, default geometry arguments and Equatable synthesis.",
+      "features": [
+        "F08",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_mac_geometry_excerpts_preserve_their_required_framework_import"
+      }
+    },
+    {
+      "id": "REG-045",
+      "failure": "The native Scribe control journey attempted activation before its owned button became enabled; waiting must stay bounded and must not bypass a permanently disabled control.",
+      "features": [
+        "F06",
+        "F13",
+        "S05"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+      }
+    },
+    {
+      "id": "REG-046",
+      "failure": "Actual Mac component QA could not find the production scribe.start control in the owned accessibility tree; the real button journey must execute successfully rather than treating controller calls or a positive suite total as equivalent.",
+      "features": [
+        "F06",
+        "F13",
+        "S05"
+      ],
+      "check": "device-ScribeTrustedAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+      }
+    },
+    {
+      "id": "REG-047",
+      "failure": "ScreenshotDetector ignored its injected defaults and read host preferences instead.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenshotDetectorTests.swift",
+        "function": "configuredScreenshotLocationUsesTheExpandedExistingPath"
+      }
+    },
+    {
+      "id": "REG-048",
+      "failure": "BrowserAgentBrainLaunch discarded injected model preferences for non-Claude engines.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserAgentLoopTests.swift",
+        "function": "brainLaunchUsesOnlyInjectedModelPreferences"
+      }
+    },
+    {
+      "id": "REG-049",
+      "failure": "Successful console totals could mask a missing, stale or changed app-native receipt.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_native_receipt_missing_stale_or_changed_cannot_use_console_totals"
+      }
+    },
+    {
+      "id": "REG-050",
+      "failure": "Swift Testing human summaries can report a passing positive total even when disabled or empty-argument tests were skipped.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_positive_summary_cannot_hide_skipped_or_issue_events"
+      }
+    },
+    {
+      "id": "REG-051",
+      "failure": "A parameterized function-level pass could hide an omitted compiled argument identity.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_parameterized_execution_requires_every_discovered_argument_identity"
+      }
+    },
+    {
+      "id": "REG-052",
+      "failure": "Compiled discovery could omit current Core declarations while a smaller selected test set still produced a positive total.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_compiled_core_discovery_must_include_every_current_declaration"
+      }
+    },
+    {
+      "id": "REG-053",
+      "failure": "An unselected app suite could execute without selected child tests while every required function still passed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_unselected_suite_execution_cannot_hide_behind_complete_selected_tests"
+      }
+    },
+    {
+      "id": "REG-054",
+      "failure": "A passing native function stream could omit selected suite lifecycles or include declarations after the terminal run event.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_terminal_run_rejects_late_declarations_and_missing_suite_lifecycle"
+      }
+    },
+    {
+      "id": "REG-055",
+      "failure": "An injected onboarding animation preference could negate the system Reduce Motion setting.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingIsolationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+        "function": "explicitMotionPolicyNeverOverridesSystemReduction"
+      }
+    },
+    {
+      "id": "REG-056",
+      "failure": "Native artifact collection rejected macOS temporary output roots entered through /var when resolved children lived under /private/var.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_native_artifacts_allow_an_aliased_output_root_but_reject_redirected_children"
+      }
+    },
+    {
+      "id": "REG-057",
+      "failure": "Source review found Memory cancellation policy reading host preferences instead of the injected fixture cancellation IDs.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-WikiGraphNavigationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+        "function": "changingInjectedCancellationBlocksSourcesAndPreventsRelearning"
+      }
+    },
+    {
+      "id": "REG-058",
+      "failure": "Source review found Memory source navigation initializing the live Scribe singleton, including its call watcher, instead of using an isolated navigation port.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-WikiGraphNavigationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/WikiGraphNavigationTests.swift",
+        "function": "validSourceFlushesDraftBeforeInjectedNavigationAndClosesGraph"
+      }
+    },
+    {
+      "id": "REG-059",
+      "failure": "Source review of the first native reference adaptation found the beam clock restarting on processing and completion label changes.",
+      "features": [
+        "F07"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordingFeedbackTests.swift",
+        "function": "beamPhaseClockContinuesAcrossWorkAndCompletionWithoutRestarting"
+      }
+    },
+    {
+      "id": "REG-060",
+      "failure": "Actual Swift Testing list output omits argument expansion, so requiring argument IDs during function discovery blocked all parameterized native execution.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_list_discovery_without_argument_expansion_requires_a_complete_prerun_case_plan"
+      }
+    },
+    {
+      "id": "REG-061",
+      "failure": "Actual Swift Testing list output omits implicit suite declarations that execution emits for compiler-discovered function containers.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_evidence.py",
+        "function": "test_implicit_suite_must_be_the_selected_compiled_function_container"
+      }
+    },
+    {
+      "id": "REG-062",
+      "failure": "Source review found completed feedback could keep requesting high-refresh frames until the five-second notice expiry after its visible transition had finished.",
+      "features": [
+        "F07"
+      ],
+      "check": "native-RecordingFeedbackRenderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RecordingFeedbackRenderTests.swift",
+        "function": "completionDriverStopsFrameRequestsBeforeTheNoticeExpires"
+      }
+    },
+    {
+      "id": "REG-063",
+      "failure": "Source review found a paused or Reduce Motion display clock could reuse an old timestamp and hide a later completed state.",
+      "features": [
+        "F05"
+      ],
+      "check": "native-DisplaySynchronizedViewTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DisplaySynchronizedViewTests.swift",
+        "function": "pausedAndReducedClockUsesFreshTimeForNewCompletionWithoutStartingALink"
+      }
+    },
+    {
+      "id": "REG-064",
+      "failure": "Independent source review found fixed wall/media epochs could hide newly completed states after a system wall-clock correction.",
+      "features": [
+        "F05"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DisplayAnimationPolicyTests.swift",
+        "function": "wallClockCorrectionsKeepNewCompletionsInTheProducersTimeDomain"
+      }
+    },
+    {
+      "id": "REG-065",
+      "failure": "Source review found a provider asset test could pass using the source-tree file even if the actual app bundle omitted that asset.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-EngineBrandLogoTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EngineBrandLogoTests.swift",
+        "function": "vectorAssetsExistInBundle"
+      }
+    },
+    {
+      "id": "REG-066",
+      "failure": "Source review found failed Keychain deletion could clear cached state and let settings report removal even though the backend retained the secret.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "deniedRemovalRetainsSavedStateAndSurvivesRelaunchUntilConfirmedRetry"
+      }
+    },
+    {
+      "id": "REG-067",
+      "failure": "Actual macOS execution and an exact-source resolver fixture found normalized x.ai and Ollama (local) aliases incorrectly falling back instead of using provider marks.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EngineBrandTests.swift",
+        "function": "aliasSamplesResolve"
+      }
+    },
+    {
+      "id": "REG-068",
+      "failure": "A synchronous local-socket reply to a non-reading peer blocked MainActor; the deliberate synchronous-writer regression control exceeded the 250 ms budget.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-socket-safety",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+        "function": "nonReadingPeerDoesNotBlockMainActorAndReplyTimesOut"
+      }
+    },
+    {
+      "id": "REG-069",
+      "failure": "The full macOS test run failed before either router contention sink entered while deliberately blocking workers depended on the shared global dispatch pool.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
+        "function": "finishDrainsInFlightDeliveryBeforeTranscriberFinishAndClosesAdmission"
+      }
+    },
+    {
+      "id": "REG-070",
+      "failure": "Independent source review found invisible future transcript text still reserving layout height and scrolling the eligible prefix away.",
+      "features": [
+        "F07"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeIncomingWordLayoutTests.swift",
+        "function": "eligiblePrefixDoesNotReserveUnarrivedTailOrItsWhitespace"
+      }
+    },
+    {
+      "id": "REG-071",
+      "failure": "The original MCP codec trapped with signal 4 when an untrusted response ID was a finite numeric value outside Int range.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+        "function": "responseIDsOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping"
+      }
+    },
+    {
+      "id": "REG-072",
+      "failure": "The original MCP codec trapped with signal 4 when an untrusted error code was a finite numeric value outside Int range.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserUseTests.swift",
+        "function": "errorCodesOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping"
+      }
+    },
+    {
+      "id": "REG-073",
+      "failure": "Source review found repeated mute watchdog replacement could accumulate blocked synchronous readers without a global bound.",
+      "features": [
+        "F03"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+        "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
+      }
+    },
+    {
+      "id": "REG-074",
+      "failure": "Source review found partial license credential deletion could lose cleanup state across relaunch and restore activation from retained credentials.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LicenseCredentialCleanupTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+        "function": "partialDeletionKeepsRetryAcrossRelaunchAndDoesNotReactivateRetainedCredentials"
+      }
+    },
+    {
+      "id": "REG-075",
+      "failure": "Actual macOS onboarding fixture could not find packaged app resources when SwiftPM placed the resource bundle beside the loaded XCTest bundle.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingIsolationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+        "function": "bundledTypographyAndMascotAreRequiredForNativePresentation"
+      }
+    },
+    {
+      "id": "REG-076",
+      "failure": "Source review found a blocked child stdin write could monopolize the MCP actor and prevent deadline or cancellation from closing the transport.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-MemoryMCPTransportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "blockedPipeWriteKeepsActorResponsiveAndDeadlineClosesTransport"
+      }
+    },
+    {
+      "id": "REG-077",
+      "failure": "Parallel stdio fixtures exposed inherited pipe descriptors that kept EOF open after the owning child exited.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-MemoryMCPTransportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "partialFinalMessageIsRejectedAndChildIsClosed"
+      }
+    },
+    {
+      "id": "REG-078",
+      "failure": "Independent source review found an in-flight background license activation response could restore credentials after explicit deactivation.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LicenseCredentialCleanupTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+        "function": "delayedBackgroundActivationCannotRestoreCredentialsAfterExplicitDeactivation"
+      }
+    },
+    {
+      "id": "REG-079",
+      "failure": "Source review found malformed complete MCP output could be ignored until request timeout instead of closing the invalid transport.",
+      "features": [
+        "F10"
+      ],
+      "check": "native-MemoryMCPTransportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "malformedCompleteMessagesCloseTheTransportWithoutWaitingForTimeout"
+      }
+    },
+    {
+      "id": "REG-080",
+      "failure": "Source review found a duplicate Chrome bridge request ID could replace the original pending reply instead of rejecting only the duplicate.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete"
+      }
+    },
+    {
+      "id": "REG-081",
+      "failure": "Independent event-driver review found that a native control beneath an alpha-zero ancestor could pass readiness checks and receive a click despite being invisible.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "nativeButtonUsesFreshGeometryAndDisabledControlCannotFire"
+      }
+    },
+    {
+      "id": "REG-082",
+      "failure": "Combined app test execution shared process-global snapshot/window state across unrelated suites; actual macOS fixtures observed stalled readiness while another suite changed global presentation policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_processes.py",
+        "function": "test_every_native_selector_gets_its_own_sequential_process_core_first"
+      }
+    },
+    {
+      "id": "REG-083",
+      "failure": "The actual combined native process exited zero without a Swift Testing summary or runEnded, leaving selected cases incomplete after unrelated suites had passed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_processes.py",
+        "function": "test_exit_zero_with_incomplete_partition_events_fails_despite_other_success"
+      }
+    },
+    {
+      "id": "REG-084",
+      "failure": "Exact-source local-helper probes reproduced stdin writes blocking before the timeout watchdog could run.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+        "function": "timeoutIncludesAChildThatNeverReadsStdin"
+      }
+    },
+    {
+      "id": "REG-085",
+      "failure": "Exact-source local-helper probes reproduced a SIGTERM-ignoring child exceeding its deadline and still returning a successful status.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BoundedSubprocessTests.swift",
+        "function": "ignoresTermIsKilledAndNeverReportedAsSuccess"
+      }
+    },
+    {
+      "id": "REG-086",
+      "failure": "Source review found wake and research diagnostics could record conversation text without explicit content logging being enabled.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+        "function": "conversationIsMetadataUnlessContentWasExplicitlyEnabled"
+      }
+    },
+    {
+      "id": "REG-087",
+      "failure": "Source review found provider errors could reach voice diagnostic sinks before a single shared credential and home-path redaction step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+        "function": "providerErrorsAreRedactedBeforeAnySinkCanReadThem"
+      }
+    },
+    {
+      "id": "REG-088",
+      "failure": "Independent diagnostic review found character-based truncation could retain unbounded bytes in one grapheme and could split a credential before redaction.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceLogPrivacyTests.swift",
+        "function": "longUntrustedDiagnosticsHaveBoundedStoredFields"
+      }
+    },
+    {
+      "id": "REG-089",
+      "failure": "The original native bridge executable accepted an oversized UInt32 frame length and waited for the declared body instead of promptly settling the pending local request.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled"
+      }
+    },
+    {
+      "id": "REG-090",
+      "failure": "The original native bridge executable blocked writing stdout before registering its request timeout, stranding pending local sockets while stdin remained open.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "nonReadingChromeCannotStrandPendingRequestsOrKeepOpenStdinAlive"
+      }
+    },
+    {
+      "id": "REG-091",
+      "failure": "A deliberate clean-EOF probe caught the first asynchronous bridge repair cancelling an already accepted response instead of flushing it before exit.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "cleanEOFFlushesAnAlreadyAcceptedCompleteResponseBeforeExit"
+      }
+    },
+    {
+      "id": "REG-092",
+      "failure": "Independent source review found stopping native input before dispatch-source setup could omit its terminal callback or notify before closing the owned descriptor.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "immediateStopAndStopBeforeStartAlwaysSettleTheAcceptedStartOnce"
+      }
+    },
+    {
+      "id": "REG-093",
+      "failure": "Source review found a rejected or untested remote cleartext endpoint could remain enabled and send the prompt and key; restoring unguarded request construction reproduces the leak in synthetic fixtures.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "remoteCleartextAndEmbeddedCredentialsNeverProduceRequests"
+      }
+    },
+    {
+      "id": "REG-094",
+      "failure": "A deliberate redirect-following mutation delivered a synthetic prompt and key to the redirect destination instead of preserving the original endpoint boundary.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "actualHTTPRedirectNeverReceivesPromptOrKeyAtItsDestination"
+      }
+    },
+    {
+      "id": "REG-095",
+      "failure": "Source review found edits and preset changes could retain approval from a previous endpoint and stale validation results could restore that approval.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "staleResultsCannotCompleteOrDisableTheReplacementCheck"
+      }
+    },
+    {
+      "id": "REG-096",
+      "failure": "Source review found an unknown provider authentication result was displayed as signed in.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "unknownAuthNeverClaimsTheProviderIsSignedIn"
+      }
+    },
+    {
+      "id": "REG-097",
+      "failure": "Source review found disabling every offered agent silently restored Claude as a fallback.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "disablingEveryOfferDoesNotSilentlyRestoreClaude"
+      }
+    },
+    {
+      "id": "REG-098",
+      "failure": "Source review found installed Cursor and Gemini offers did not consistently follow their individual integration switches.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "installedCursorAndGeminiRespectTheirOwnOfferSwitches"
+      }
+    },
+    {
+      "id": "REG-099",
+      "failure": "Source review found opening a chat provider app was described as handing off the prompt even though that handoff was unsupported.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "appOpenDescriptionsDoNotPromiseUnsupportedPromptHandoff"
+      }
+    },
+    {
+      "id": "REG-100",
+      "failure": "Source review found the Anthropic Messages API listed as an OpenAI-compatible endpoint preset.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderConnectionTruthTests.swift",
+        "function": "anthropicMessagesAPIIsNotOfferedAsAnOpenAICompatiblePreset"
+      }
+    },
+    {
+      "id": "REG-101",
+      "failure": "The original local voice worker probe returned a WAV path while its producer was still writing incomplete audio bytes.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "productionWorkerPublishesOnlyACompleteAcknowledgedWAV"
+      }
+    },
+    {
+      "id": "REG-102",
+      "failure": "The original local voice worker probe ignored task cancellation and kept synthesis running instead of promptly returning no artifact.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "cancellingSynthesisReturnsNoArtifactAndStopsItsWorker"
+      }
+    },
+    {
+      "id": "REG-103",
+      "failure": "Independent review of the voice-worker repair found a validated file descriptor could be replaced by moving the subsequently reopened pathname.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "descriptorPublicationCannotBeSubstitutedByAReplacedPath"
+      }
+    },
+    {
+      "id": "REG-104",
+      "failure": "Independent review of the voice-worker repair found a RIFF prefix alone could be accepted without complete PCM format, chunk bounds and alignment.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "invalidPCMChunkBoundsAndAlignmentCannotBePublished"
+      }
+    },
+    {
+      "id": "REG-105",
+      "failure": "Independent review of the voice-worker repair found cancellation was checked before artifact copying but not during the copy or before final handoff.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "cancellationDuringArtifactCopyRemovesTheUnpublishedTarget"
+      }
+    },
+    {
+      "id": "REG-106",
+      "failure": "A generated 44-byte WAV with a declared format body beyond the available bytes crashed the original decoder with SIGILL instead of returning failure.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WAVSafetyTests.swift",
+        "function": "truncatedFormatBodyAtEndOfAValidSizeContainerReturnsNil"
+      }
+    },
+    {
+      "id": "REG-107",
+      "failure": "An original-source timer probe showed releasing TickClock without disappear left its scheduled run-loop timer valid.",
+      "features": [
+        "F05"
+      ],
+      "check": "native-TickingTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TickingTests.swift",
+        "function": "releasingRunningClockInvalidatesItsRunLoopTimer"
+      }
+    },
+    {
+      "id": "REG-108",
+      "failure": "Source review found cloud-only warm work could inspect local voice settings and render Kokoro; an unconditional-warm mutation reproduces the unwanted action.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-BrainWarmSchedulerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+        "function": "cloudOnlyWarmDoesNotInspectVoiceSettingsOrRenderLocalVoice"
+      }
+    },
+    {
+      "id": "REG-109",
+      "failure": "Source review found local voice warm-up could run a ready Kokoro model even when another voice provider was selected or the provider was paused.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-BrainWarmSchedulerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
+        "function": "unselectedUnreadyAndPausedVoicesNeverWarmAsFallbacks"
+      }
+    },
+    {
+      "id": "REG-110",
+      "failure": "Source review found onboarding polling ownership was not tied to visible-window intervals and teardown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingIsolationTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+        "function": "pollingOwnerStartsOncePerVisibleIntervalAndResumesWithoutActions"
+      }
+    },
+    {
+      "id": "REG-111",
+      "failure": "Actual macOS bridge fixtures rejected closed readers because the test assumed Linux writer-POLLERR readiness semantics on Darwin.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "immediateStopAndStopBeforeStartAlwaysSettleTheAcceptedStartOnce"
+      }
+    },
+    {
+      "id": "REG-112",
+      "failure": "The native pipe-stop fixture measured observer resumption rather than the worker callback, so its observed delay could not distinguish actual transport latency from delayed test-executor scheduling; the guard now measures callback completion with the unchanged 500 ms bound.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "stopSettlesQueuedWritesWithoutWaitingForTheirLongDeadline"
+      }
+    },
+    {
+      "id": "REG-113",
+      "failure": "Independent mutation review showed stop-before-start fixtures did not establish descriptor-closure ordering for an already active native input source.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
+      }
+    },
+    {
+      "id": "REG-114",
+      "failure": "Actual macOS test compilation printed an internal corrupted-JSON error, then exited zero with Build complete; compiler diagnostics must remain blocking despite that exit status.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_missing_or_forged_compiler_log_cannot_authorize_native_reuse"
+      }
+    },
+    {
+      "id": "REG-115",
+      "failure": "Adding a valid WAV native obligation exposed a selftest that assumed the final obligation was device proof; the test must remove each actual evidence tier independently of map order.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_every_feature_keeps_all_three_evidence_tiers"
+      }
+    },
+    {
+      "id": "REG-116",
+      "failure": "Actual concurrent Core execution outlasted the mute fixture's five-second automatic semaphore release, invalidating its still-blocked-reader premise before the observer resumed; the same failure was reproduced with a delayed continuation.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
+        "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
+      }
+    },
+    {
+      "id": "REG-117",
+      "failure": "The macOS endpoint fixture failed before obtaining its Python port file; the precise startup cause is unproved. Owned bind/listen readiness and explicit cleanup replace competing startup/helper lifetimes without extending the HTTP deadline.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AnyLLMEndpointSafetyTests.swift",
+        "function": "ownedLoopbackReadinessAndRepeatedCleanupDoNotDependOnAChildStartupFile"
+      }
+    },
+    {
+      "id": "REG-118",
+      "failure": "Native event dispatch removed and rejected an unrelated queued mouse-up after AppKit had already consumed its own release.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
+      }
+    },
+    {
+      "id": "REG-119",
+      "failure": "The AX readiness fixture rejected a transient unknown role immediately, before its existing readiness budget could resolve a valid button; persistent wrong roles must still never receive a press.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
+      }
+    },
+    {
+      "id": "REG-120",
+      "failure": "Actual production compilation exited zero after internal compiler errors, but the app build step and aggregate gate accepted the command outcome without inspecting its compiler diagnostics.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_production_compiler_diagnostics_block_despite_successful_steps_and_tests"
+      }
+    },
+    {
+      "id": "REG-121",
+      "failure": "The original compiler matcher classified a Swift warning's source excerpt containing an error: argument as a compiler error.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_warning_source_argument_named_error_is_not_a_compiler_error"
+      }
+    },
+    {
+      "id": "REG-122",
+      "failure": "Independent review reproduced a passing aggregate receipt after inserting an internal compiler error into the final bundle compilation log and refreshing its hash.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_bundle_compiler_diagnostics_block_despite_successful_packaging"
+      }
+    },
+    {
+      "id": "REG-123",
+      "failure": "Independent static review found the diagnostic header parser no longer rejected LLVM ERROR and absolute compiler-path headers that the previous matcher blocked.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_compiler_diagnostic_headers_remain_blocking_with_source_context_and_color"
+      }
+    },
+    {
+      "id": "REG-124",
+      "failure": "The new CLI regression printed expected error diagnostics into unittest's result line, preventing the strict runner from identifying every reported test. Capture and assert those diagnostics inside the fixture.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_gate.py",
+        "function": "test_compiler_cli_test_retains_complete_python_execution_receipt"
+      }
+    },
+    {
+      "id": "REG-125",
+      "failure": "Actual AppKit queue insertion narrowed a synthetic event number and rounded its timestamp, so the native journey driver rejected its own queued release as unrelated.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "nonTrackingResponderReceivesItsCanonicalQueuedRelease"
+      }
+    },
+    {
+      "id": "REG-126",
+      "failure": "The wrong-ID and wrong-path worker fixtures also used invalid WAV data, allowing unrelated WAV rejection or startup failure to stand in for the intended protocol guard.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "wrongIdentityWrongPathAndSymlinkCannotPublish"
+      }
+    },
+    {
+      "id": "REG-127",
+      "failure": "A throwing worker fixture removed its directory before cancelling and joining the render task and closing its worker; failed assertions could discard diagnostics while work was still using them.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "thrownFixtureFailureJoinsRenderAndClosesWorkerBeforeRemoval"
+      }
+    },
+    {
+      "id": "REG-128",
+      "failure": "The closed-pipe fixture accepted a write after local read closure during concurrent Mac process tests. Its bare Pipe could be inherited by another child; a later FIFO poll readiness check was invalid on Darwin. The guard opens a private FIFO with atomic CLOEXEC, proves positive byte transfer, requires ENXIO from a nonblocking writer-open to establish no readers, unlinks it, and requires the exact unavailable error from one tested write.",
+      "features": [
+        "F10",
+        "F13"
+      ],
+      "check": "portable-wiki-export",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MemoryMCPTransportTests.swift",
+        "function": "writingToAClosedPipeThrowsWithoutRaisingSIGPIPE"
+      }
+    },
+    {
+      "id": "REG-129",
+      "failure": "The SwiftPM async-main drain exited during owned AppKit event dispatch with exit zero and no terminal Swift Testing event. A synchronous AppKit host now owns the three UI processes; the gate still requires their complete qualified execution and exact host/bundle command.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_app_host.py",
+        "function": "test_host_receipt_cannot_replace_complete_qualified_execution"
+      }
+    },
+    {
+      "id": "REG-130",
+      "failure": "Synchronous Process.run held the voice session actor, delaying cancellation and request deadlines during launch. The guard stalls a real launch, requires prompt cancellation and immediate replacement rejection, then proves late-child cleanup.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "cancellationDuringLaunchReturnsBeforeRunnerAndReapsLateChild"
+      }
+    },
+    {
+      "id": "REG-131",
+      "failure": "An expired request could still spawn after waiting for the launch executor. The guard keeps launch queued until the request expires and requires that the process runner is never invoked.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "expiredQueuedLaunchNeverInvokesTheProcessRunner"
+      }
+    },
+    {
+      "id": "REG-132",
+      "failure": "Polling Process.isRunning after termination did not finalize Foundation run-loop ownership; controlled Linux processes remained retained until post-exit waitUntilExit. The guard requires owned process release after confirmed child exit.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "terminatedWorkerReleasesItsProcessAfterClose"
+      }
+    },
+    {
+      "id": "REG-133",
+      "failure": "The foreign-event ownership fixture queued its release before an async layout wait; the normal AppKit loop legitimately consumed it during that yield. The guard now settles through the public click path, then inserts the foreign event and invokes the same synchronous dispatcher without yielding, requiring the exact foreign release to remain queued.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
+      }
+    },
+    {
+      "id": "REG-134",
+      "failure": "AppKit native mouseDown tracking consumed a preexisting foreign release despite the driver never dequeuing it directly. Admission now refuses any preexisting release before posting or dispatching a gesture, preserving exact identity and action count; a clean subsequent click remains required.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OwnedWindowEventDriverTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift",
+        "function": "preexistingReleasePreventsDispatchAndRemainsUntouched"
+      }
+    },
+    {
+      "id": "REG-135",
+      "failure": "Onboarding film playback was only gated by window attachment, leaving hide, minimize and occlusion without explicit pause. Real-player lifecycle guards require positive advancement before native visibility transitions and paused media afterward.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow"
+      }
+    },
+    {
+      "id": "REG-136",
+      "failure": "A multi-film preview accepted completion from any AVPlayerItem with the same asset URL, allowing another player to grow its queue. Completion now requires an exact owned item and is consumed once; a foreign same-URL item cannot requeue.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "onlyOwnedNaturalCompletionsCanRequeueBundledFilms"
+      }
+    },
+    {
+      "id": "REG-137",
+      "failure": "A nested private observable fixture failed native test compilation because the observation macro emits a file-scope conformance extension. The fixture uses file-visible scope; the required native compiler barrier and actual onboarding journey remain mandatory.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
+    },
+    {
+      "id": "REG-138",
+      "failure": "A synthetic accessibility fixture annotated the ignored NSButton wrapper and changed its role while the exposed NSButtonCell remained unmarked. The fixture now annotates the actual cell with natural positive role and rejects an explicit wrong role on that same exposed element.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "persistentWrongAccessibilityRoleNeverReceivesAPress"
+      }
+    },
+    {
+      "id": "REG-139",
+      "failure": "Mac Swift concurrency checking rejected Notification values captured across MainActor.assumeIsolated in decorative-player callbacks. Observers now extract only Sendable item identity and notification-kind values, while owned player access stays on MainActor; the native compiler barrier and real lifecycle guard remain required.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow"
+      }
+    },
+    {
+      "id": "REG-140",
+      "failure": "A failure-only native accessibility diagnostic treated NSWindow.accessibilityIdentifier() as Optional although its AppKit declaration returns String, preventing the test target from compiling. It now uses the declared type and retains the exact synthetic-window prefix check; the native compiler barrier and accessibility journey stay mandatory.",
+      "features": [
+        "F13"
+      ],
+      "check": "device-ScribeTrustedAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose"
+      }
+    },
+    {
+      "id": "REG-141",
+      "failure": "Native Sendable conversion callbacks captured a mutable fed flag and a borrowed non-Sendable PCM buffer without an explicit owner. A per-conversion read-only buffer owner now serializes consume-once state and distinguishes live input starvation from final end-of-stream.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-AudioSamplesConversionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+        "function": "inputOwnerSuppliesExactlyOnceAcrossConcurrentRequests"
+      }
+    },
+    {
+      "id": "REG-142",
+      "failure": "The Sendable resampler held a mutable AVAudioConverter without a conversion ownership boundary. A nonblocking guard now rejects overlap: live conversion drops that failed chunk and checked file conversion throws, while a later uncontested conversion still succeeds.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-AudioSamplesConversionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
+        "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
+      }
+    },
+    {
+      "id": "REG-143",
+      "failure": "The hosted Mac image enables Reduce Motion, so real decorative-film tests incorrectly required movement in a profile where the app correctly pauses. A wrapper now configures normal motion only in the disposable GitHub-hosted profile, restores the existing boolean, preserves test failures, and requires fresh native NSWorkspace verification before owned-window tests. Product accessibility policy is unchanged.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_original_boolean_marker_and_native_exit_are_preserved"
+      }
+    },
+    {
+      "id": "REG-144",
+      "failure": "A managed-runner motion setup must never report native success if restoring the original accessibility preference fails. The wrapper fails closed on restore errors and refuses local, self-hosted, unknown or non-Mac environments before touching preferences.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_failed_restore_never_turns_native_success_into_job_success"
+      }
+    },
+    {
+      "id": "REG-145",
+      "failure": "A real onboarding film could be ready, visible and eligible yet remain paused at its first presentation after attachment. FilmView now resynchronizes through the existing playback policy at the AppKit drawing boundary, retaining all visibility, Reduce Motion and disposal gates. The original real-playing guard remains mandatory.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingFilmLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
+        "function": "reattachmentIgnoresOldWindowAndDisposalCannotRestartPlayback"
+      }
+    },
+    {
+      "id": "REG-146",
+      "failure": "A timed-out verification command was killed only at its direct driver, leaving an inherited process group able to keep working or retain output. The executor now owns a fresh group, signals it without reaping the identity between TERM and KILL, and bounds direct-child cleanup; an unrelated control group must remain alive.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_timeout_stops_owned_grandchild_and_preserves_other_process_group"
+      }
+    },
+    {
+      "id": "REG-147",
+      "failure": "Interrupted polling or external child reaping can make a process-group identity unsafe to signal and can lose the real exit status. The verifier refuses nondefault SIGCHLD before launching and does not signal a reaped or uncertain child group.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_nondefault_child_reaping_policy_cannot_launch_or_forge_success"
+      }
+    },
+    {
+      "id": "REG-148",
+      "failure": "Accepting an exit result without checking the monotonic clock after poll can classify completion beyond the deadline as a passing check. Late observed completion now remains timeout124 and cannot trigger a signal to a reaped group.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_exit_observed_after_deadline_cannot_pass_or_signal_a_reaped_group"
+      }
+    },
+    {
+      "id": "REG-149",
+      "failure": "Synthetic Kokoro fixtures hardcoded the Apple developer-tool Python launcher, which did not enter Python before the original deadline on either fresh runner. CI now selects the exact Xcode interpreter for synthetic fixtures only. The real production worker script must still publish only a complete acknowledged WAV within the unchanged fixture deadlines.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "productionWorkerPublishesOnlyACompleteAcknowledgedWAV"
+      }
+    },
+    {
+      "id": "REG-150",
+      "failure": "An invalid explicitly configured test interpreter must not silently fall back to another executable or create a fixture. Selection now rejects missing, nonexecutable, directory, relative, empty and NUL paths; the validated choice is shared by both fixture launch sites.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-KokoroWorkerSessionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KokoroWorkerSessionTests.swift",
+        "function": "fixturePythonRejectsMissingNonexecutableAndDirectoryWithoutFallback"
+      }
+    },
+    {
+      "id": "REG-151",
+      "failure": "The outer cleanup-test supervisor raised PermissionError during its back-to-back TERM/KILL teardown on macOS after the runner behavior assertions. The fixture now sends one SIGKILL to its unreaped owned group before a bounded reap; no production runner assertion is relaxed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_outer_supervisor_signals_once_before_reaping_and_closes_handles"
+      }
+    },
+    {
+      "id": "REG-152",
+      "failure": "A cleanup fixture must not hide unexpected signal denial or reap failure while closing its pipe handles. These errors remain test failures rather than becoming successful cleanup.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_execution_cleanup.py",
+        "function": "test_outer_supervisor_signal_or_reap_error_stays_visible_after_handle_cleanup"
+      }
+    },
+    {
+      "id": "REG-153",
+      "failure": "Native host artifacts identified the host but omitted the dynamically loaded test-bundle bytes. A prelaunch input sidecar now records that digest so crash evidence can reject changed or redirected compiled input.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_native_app_host.py",
+        "function": "test_provenance_rejects_outside_build_bundle_and_tracks_compiled_bytes"
+      }
+    },
+    {
+      "id": "REG-154",
+      "failure": "A crash from another process, another launch or an ambiguous crashed thread must not be used to diagnose the original native failure. Only exact owned-host identity and bounded sanitized frames can be emitted.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_pid_path_launch_time_bundle_and_thread_identity_are_mandatory"
+      }
+    },
+    {
+      "id": "REG-155",
+      "failure": "A collector refusal with a pre-existing output directory could overwrite its result during finalization. Existing output and original failed test evidence must never be overwritten.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_existing_output_and_original_failure_are_never_overwritten"
+      }
+    },
+    {
+      "id": "REG-156",
+      "failure": "Malformed or nonfinite crash JSON, including exponent overflow, must not enter a diagnostic or weaken its identity bounds. Unsupported report content remains unavailable evidence.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_unknown_duplicate_nonfinite_and_trailing_report_formats_are_rejected"
+      }
+    },
+    {
+      "id": "REG-157",
+      "failure": "ISO-only parsing rejected the documented Apple IPS date form with a space before the numeric UTC offset. Exact Apple report timestamps and ISO host telemetry now match with explicit timezones; timezone-less input stays invalid.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ax_crash_report.py",
+        "function": "test_apple_ips_times_and_iso_host_telemetry_match_with_explicit_timezones"
+      }
+    },
+    {
+      "id": "REG-158",
+      "failure": "Valid SSE completion finalized the inner scene stream twice and rejected every complete response.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+        "function": "validBytewiseStreamRequiresStopDoneAndEOF"
+      }
+    },
+    {
+      "id": "REG-159",
+      "failure": "A projected later cue could repair an invalid earlier visible checkpoint before validation.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+        "function": "projectedEventsValidateEveryVisibleCueBoundary"
+      }
+    },
+    {
+      "id": "REG-160",
+      "failure": "Applying individual operations instead of the whole cue rejected valid forward references and violated cue atomicity.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "atomicCueForwardReferencesRenderAndInvalidCueLeavesPresentationUntouched"
+      }
+    },
+    {
+      "id": "REG-161",
+      "failure": "Replay omitted spoken-only revision reservations, causing later valid scene cues to fail or skip revisions.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "replayRetainsSpokenOnlyRevisionsAndNeverEmitsCanonicalAdmissions"
+      }
+    },
+    {
+      "id": "REG-162",
+      "failure": "Freezing an interrupted animation as an ordinary edit pushed a never-displayed future target into undo history.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+        "function": "interruptedAnimationUndoReturnsPreBeatSceneInsteadOfNeverShownFutureTarget"
+      }
+    },
+    {
+      "id": "REG-163",
+      "failure": "Switching partial audible playback to manual captions could rewind elapsed media time.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "captionCompletionPreservesActualPartiallyPlayedTimeAndLateSynthesisCannotRewriteIt"
+      }
+    },
+    {
+      "id": "REG-164",
+      "failure": "Manual caption replay included end cues with an earlier media position.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "manualCaptionReplayUsesActualChunkEndForEndCuesWithoutCanonicalAdmission"
+      }
+    },
+    {
+      "id": "REG-165",
+      "failure": "Individually finite nested group scales could overflow native rendering transforms.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+        "function": "individuallyFiniteNestedTransformsCannotOverflowNativeMatrices"
+      }
+    },
+    {
+      "id": "REG-166",
+      "failure": "Safe animation endpoints could interpolate an unsafe composed parent/child transform.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "validAnimationEndpointsCannotExposeUnsafeComposedMidpoint"
+      }
+    },
+    {
+      "id": "REG-167",
+      "failure": "An admitted animation longer than its actual audio beat could stop at a partial pose while history held its unseen target.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "actualShortAudioBoundsLongAnimationWithoutFabricatingCompletionTime"
+      }
+    },
+    {
+      "id": "REG-168",
+      "failure": "Reduced Motion exposed intentionally hidden static objects before their later reveal cue.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+        "function": "reducedMotionAndManualCaptionsPreserveStaticRevealWhileSnappingAdmittedMotion"
+      }
+    },
+    {
+      "id": "REG-169",
+      "failure": "Settings generation drifted from the checked-in production catalog, removing existing options and changing behavior.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_catalog_and_inventory_match_the_generator"
+      }
+    },
+    {
+      "id": "REG-170",
+      "failure": "Stale settings generation re-enabled voice capture opt-ins by default.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_capture_and_input_default_regressions_fail_before_any_output"
+      }
+    },
+    {
+      "id": "REG-171",
+      "failure": "Settings generation could expose or drop the intentionally hidden debug microphone-conflict bypass.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_debug_mic_bypass_cannot_be_exposed_or_silently_removed"
+      }
+    },
+    {
+      "id": "REG-172",
+      "failure": "A duplicate settings row could conceal an earlier unsafe capture default.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_settings_catalog.py",
+        "function": "test_later_duplicate_cannot_conceal_the_emitted_unsafe_default"
+      }
+    },
+    {
+      "id": "REG-173",
+      "failure": "Renderer group visibility and connector bounds ignored transformed descendant state.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "groupVisibilityAndConnectorBoundsFollowTheSameTransformedDescendants"
+      }
+    },
+    {
+      "id": "REG-174",
+      "failure": "Renderer Reduced Motion forced static reveal to one, exposing objects before admitted cues.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "invalidSceneCannotRenderAndReducedMotionPreservesSuppliedPresentation"
+      }
+    },
+    {
+      "id": "REG-175",
+      "failure": "An old push-to-talk release could finish a replacement capture without an attempt identity.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationTalkButtonTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+        "function": "failedStartingAttemptThenReplacementIgnoresOldMouseAndKeyboardReleases"
+      }
+    },
+    {
+      "id": "REG-176",
+      "failure": "A shortcut-started pending microphone attempt could survive control disable or window loss.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationTalkButtonTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationTalkButtonTests.swift",
+        "function": "externalStartupCancelsOnWindowLossAndDisableButCompletedCaptureDoesNot"
+      }
+    },
+    {
+      "id": "REG-177",
+      "failure": "Immediate press/release before the asynchronous start task ran could start microphone capture after release.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "sameRunLoopPressReleaseCannotStartCaptureOrAskPermissionAfterRelease"
+      }
+    },
+    {
+      "id": "REG-178",
+      "failure": "An occluded window could pause its display link while narration continued, leaving visual cues stalled until completion.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "missingDisplayTicksUseActualMediaClockAfterFiftyMillisecondWatchdog"
+      }
+    },
+    {
+      "id": "REG-179",
+      "failure": "Synthesized PCM could carry nonfinite sample values to native playback.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "nonfinitePCMIsRejectedBeforeNativePlaybackForPlanarAndInterleavedBuffers"
+      }
+    },
+    {
+      "id": "REG-180",
+      "failure": "Independent callback tasks did not formally preserve start-before-finish for short clips and could accumulate unbounded clock samples.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "shortClipCompletionCannotOvertakePlayingAndClockSamplesStayBounded"
+      }
+    },
+    {
+      "id": "REG-181",
+      "failure": "Queued old playback observations needed epoch invalidation and bounded control-message overflow behavior.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "replacementPurgesQueuedOldObservationsAndControlOverflowFailsVisibly"
+      }
+    },
+    {
+      "id": "REG-182",
+      "failure": "WhisperKit download:false could still fetch tokenizer resources; installed-file readiness was not a no-download capability.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationMicrophoneTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationMicrophoneTests.swift",
+        "function": "realWhisperKitCacheOnlyEntryRefusesUnloadedInstanceWithoutPreparation"
+      }
+    },
+    {
+      "id": "REG-183",
+      "failure": "A whitespace/newline-only model passed the existing completeness predicate before being trimmed to an empty request model.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationProviderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+        "function": "configuredModelsRemainInsideTheExistingCap"
+      }
+    },
+    {
+      "id": "REG-184",
+      "failure": "Credential header construction needed bounded keys and rejection of all C0/DEL controls.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationProviderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+        "function": "headerInjectionAndOversizedKeysAreRejectedWithoutChangingTheBody"
+      }
+    },
+    {
+      "id": "REG-185",
+      "failure": "Request construction needed independent snapshot identity, nonempty-byte and delivered-dimension bounds.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationProviderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationProviderTests.swift",
+        "function": "mismatchedUnboundOrOversizedSnapshotNeverConstructsARequest"
+      }
+    },
+    {
+      "id": "REG-186",
+      "failure": "A global sidebar-save error could be cleared by another conversation while the failed link remained unsaved.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationChatLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+        "function": "aSuccessfulOtherLinkCannotHideAFailedLinkAndRetryUsesCurrentConversation"
+      }
+    },
+    {
+      "id": "REG-187",
+      "failure": "Retained AppKit panels could hide without SwiftUI onDisappear, so narration needed an explicit owned-window stop hook.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationChatLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+        "function": "ownedPanelHideCloseMiniaturizeAndEscapeSynchronouslyNotifyStop"
+      }
+    },
+    {
+      "id": "REG-188",
+      "failure": "ChatStore skipped visual-only conversations because they had no messages, orphaning scene history after restart.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ChatTests.swift",
+        "function": "visualOnlyLinkSurvivesStoreReloadWithoutInventingChatMessages"
+      }
+    },
+    {
+      "id": "REG-189",
+      "failure": "Replay could include accepted future beats that were never presented before interruption.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "stoppedCaptionReplayContainsOnlyCompletedPrefixAndStaysReadOnly"
+      }
+    },
+    {
+      "id": "REG-190",
+      "failure": "A failed explanation write could lose its only retained snapshot when switching conversations or reopening while disk remained unreadable.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "failedSaveSurvivesConversationSwitchAndRetriesItsOwnedRecord"
+      }
+    },
+    {
+      "id": "REG-191",
+      "failure": "Retry could enqueue an older failed checkpoint behind a newer in-flight save, producing a persistent stale replacement conflict.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "retryCannotRequeueFailedCheckpointBehindNewerInflightSave"
+      }
+    },
+    {
+      "id": "REG-192",
+      "failure": "A different record saving successfully could hide an unresolved save failure.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "anotherRecordSavingCannotClearTheRemainingFailureNotice"
+      }
+    },
+    {
+      "id": "REG-193",
+      "failure": "Switching back before a debounced save completed could create a second history record for one Chat; blank opens must remain unsaved.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "switchingAwaitsPendingSaveAndDoesNotWriteBlankConversation"
+      }
+    },
+    {
+      "id": "REG-194",
+      "failure": "A rejected Chat switch could leave another conversation’s private history active for submission under the newly selected Chat.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "memoryOnlyHistoryRefusesSwitchUntilExplicitStorageRecovery"
+      }
+    },
+    {
+      "id": "REG-195",
+      "failure": "A failed initial load left its conversation ID selected and prevented retrying the same conversation after recovery.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "failedOpenCanRetryTheSameConversationAfterStorageReturns"
+      }
+    },
+    {
+      "id": "REG-196",
+      "failure": "New explanation work could be admitted during asynchronous quit saving and be lost after the quit decision.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "closingRejectsNewWorkAndStaleDeliveryUntilQuitIsCancelled"
+      }
+    },
+    {
+      "id": "REG-197",
+      "failure": "The unsaved-record cap blocked recovery of already-owned failures as well as new record creation.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "fullFailedSaveCapacityStillAllowsRecoveringAnOwnedConversation"
+      }
+    },
+    {
+      "id": "REG-198",
+      "failure": "Listing only decodable histories could falsely report that a corrupt linked record was deleted; exact typed absence must be idempotent.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "knownCorruptRecordDeletionIsSafeAndRetryIsIdempotent"
+      }
+    },
+    {
+      "id": "REG-199",
+      "failure": "Unreadable records with unknown ownership cannot be declared deleted or removed indiscriminately.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "deletionWithoutOwnedIdentityCannotClaimUnreadableRecordWasRemoved"
+      }
+    },
+    {
+      "id": "REG-200",
+      "failure": "A first meaningful visual edit while storage was unavailable could remain unlinked and be orphaned when the scratch Chat changed.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "firstMeaningfulMemoryOnlySceneLinksExactlyOnceWithoutCapture"
+      }
+    },
+    {
+      "id": "REG-201",
+      "failure": "Stopping a reopened explanation during deletion could attempt to recreate the just-deleted Chat link.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "deletingReopenedHistoryCannotRecreateItsChatLinkDuringStop"
+      }
+    },
+    {
+      "id": "REG-202",
+      "failure": "Seeking could cancel future synthesis but leave a queued future beat buffering indefinitely; current-beat previews must stop at their bound.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "currentBeatSeekEndsPreviewWithoutPlayingOrSynthesizingQueuedFuture"
+      }
+    },
+    {
+      "id": "REG-203",
+      "failure": "Deleting an ordinary Chat must not initiate explanation storage work or block quit for an unrelated storage root.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationChatLifecycleTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
+        "function": "ordinaryChatDeletionDoesNotAdmitExplanationStorageWork"
+      }
+    },
+    {
+      "id": "REG-204",
+      "failure": "Retention could evict a still-open history while the controller retained its persisted checkpoint, causing the next edit to use stale save preconditions instead of safely recreating the owned record.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "retentionEvictionInvalidatesCheckpointBeforeEditingTheStillOpenRecord"
+      }
+    },
+    {
+      "id": "REG-205",
+      "failure": "An owned NSButtonCell invoked its retained synthetic target exactly once but returned false from accessibilityPerformPress, causing the readiness fixture to reject an action it had observed. Only that fixture may acknowledge the exact single action without retry; disabled controls and the production AX driver remain strict.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl"
+      }
+    },
+    {
+      "id": "REG-206",
+      "failure": "Numeric explanation diagnostics must not report caption-only presentation as audible output or count read-only replay as a new generation; exported counters must retain their actual lifecycle and media boundaries.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "captionDiagnosticsNeverClaimAudibleOutputOrCountReplayAsNewGeneration"
+      }
+    },
+    {
+      "id": "REG-207",
+      "failure": "The diagnostics collector labeled task_vm_info.phys_footprint as resident bytes, misrepresenting the provided process-memory metric. Numeric reports must name physical footprint explicitly and must not export the old resident-byte keys.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+        "function": "physicalFootprintBytesExportNamesTheProvidedMetric"
+      }
+    },
+    {
+      "id": "REG-208",
+      "failure": "The first native build found ambiguous inference in the locked synthesis-cancellation tuple. Explicit optional tuple types and self-qualified members now enforce the cancellation snapshot at compile time; the existing cancellation fixture exercises its owned PCM cleanup after compilation.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationAudioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationAudioTests.swift",
+        "function": "cancellationDropsLateBuffersAndReleasesFileBeforeNextRender"
+      }
+    },
+    {
+      "id": "REG-209",
+      "failure": "The first native build found mixed CGFloat and Double arithmetic in chart layout. Explicit CGFloat conversion at the drawing boundary now makes chart/timeline coordinate expressions type-check; the production Canvas fixture remains bound to the compiled renderer.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "productionCanvasPixelsChangeOnlyWithSuppliedPresentationAndRespectReducedMotion"
+      }
+    },
+    {
+      "id": "REG-210",
+      "failure": "The first native build inferred a String-keyed SceneKit options dictionary, making the shorthand rendering-API key invalid. The explicit SCNView.Option rawValue now enforces the SDK key type; the owned native SceneKit fixture exercises construction after compilation.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "nativeScenePreservesStableNodesReparentsLiveChildrenAndDisposesResources"
+      }
+    },
+    {
+      "id": "REG-211",
+      "failure": "macOS history fixtures threw unsafePath under Foundation-normalized temporary roots; the original log did not identify the rejected component. Disposable fixtures now use throwing POSIX realpath, following the existing Darwin system-alias test pattern, and verify every directory component without following symlinks. Production path rejection remains strict.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+        "function": "scratchRootIsCanonicalAndHasNoSymlinkComponents"
+      }
+    },
+    {
+      "id": "REG-212",
+      "failure": "macOS renderer run at 9d7dcfa failed the group-highlight assertion because SceneKit stores emission intensity as Float, so the production 0.4 read back as 0.4000000059604645 against an exact Double comparison. Production highlight reached the child correctly; the assertion now requires the material and compares within 1e-6.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationRendererTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
+        "function": "nativeSceneReducedMotionNeverRevealsFutureObjectsAndGroupHighlightReachesChildren"
+      }
+    },
+    {
+      "id": "REG-213",
+      "failure": "The failure-only own-PID accessibility snapshot called AXUIElement from a detached background task. AppKit serves own-process AX requests on the calling thread, so SwiftUI built its accessibility tree off the main thread and trapped (Incorrect actor executor assumption, SIGTRAP exit -5), crashing the test host and erasing the original UI failure. The snapshot now runs synchronously on the main actor with the same node, depth, time and per-element timeout budgets, own PID and owned-window marker rules, and the original failure remains reported.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "ownPIDAccessibilityDiagnosticRunsOnMainActorAndKeepsOriginalFailure"
+      }
+    },
+    {
+      "id": "REG-214",
+      "failure": "Live QA of the packaged CI preview crashed on onboarding's voice step: SFSpeechRecognizer.requestAuthorization's handler, written inside @MainActor PermissionsModel, inherited main-actor isolation and Swift 6 trapped when TCC called it on a background queue. Chat microphone, voice, Polyglot and Focus requests had the same shape; all now await the nonisolated SystemAuthorization helper.",
+      "features": [
+        "F13",
+        "F01",
+        "F11",
+        "S02"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_tcc_completion_handlers_only_in_nonisolated_helper"
+      }
+    },
+    {
+      "id": "REG-215",
+      "failure": "Live QA of the packaged CI preview crashed on the first provider-logo render: Bundle.module traps in Zeus.app because SwiftPM's accessor looks beside the app while scripts/bundle.sh seals Zeus_Zeus.bundle in Contents/Resources. EngineBrandImage now uses ZeusResources.bundle.",
+      "features": [
+        "F12"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_app_target_never_uses_swiftpm_bundle_module"
+      }
+    },
+    {
+      "id": "REG-216",
+      "failure": "The packaged preview shipped a test-target resource bundle (Zeus_ZeusCoreTests.bundle with a fixture) inside Zeus.app because bundle.sh copied every SwiftPM resource bundle.",
+      "features": [
+        "S06"
+      ],
+      "check": "release-mocks",
+      "guard": {
+        "file": "qa/release-scripts/test_release_scripts.py",
+        "function": "test_bundle_ships_product_resources_but_never_test_resource_bundles"
+      }
+    },
+    {
+      "id": "REG-217",
+      "failure": "Zeus requested Location (onboarding weather row) and Focus status (Proactive) with no NSLocationWhenInUseUsageDescription or NSFocusStatusUsageDescription in Info.plist; macOS terminates an app that requests a protected resource without its usage string.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_every_requested_permission_has_its_info_plist_usage_string"
+      }
+    },
+    {
+      "id": "REG-218",
+      "failure": "Transcribing a file while the microphone was open overwrote the listening phase, so the recorder kept capturing under a phase that no longer allowed finishing it.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationFlowTests.swift",
+        "function": "fileWhileListeningCannotTakeThePhaseFromTheMicrophone"
+      }
+    },
+    {
+      "id": "REG-219",
+      "failure": "A cancelled or superseded file transcription still finished: the first of two overlapping files marked the second done and a cancelled file overwrote the clipboard.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationFlowTests.swift",
+        "function": "firstFileFinishingCannotMarkTheSecondFileDone"
+      }
+    },
+    {
+      "id": "REG-220",
+      "failure": "A late Parakeet progress callback after the download finished left the progress bar stuck and refused every later download.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ModelPreparationTests.swift",
+        "function": "lateProgressAfterFinishCannotLeaveTheBarStuck"
+      }
+    },
+    {
+      "id": "REG-221",
+      "failure": "A failed Parakeet download was retried on every dictation key press with no terminal state.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ModelPreparationTests.swift",
+        "function": "automaticRetryAfterFailureIsRefusedButExplicitRetryWorks"
+      }
+    },
+    {
+      "id": "REG-222",
+      "failure": "A double click on Turn on for Microphone and Speech Recognition (or a second talk-key press, or two Chrome steps on one site) raised the consent prompt twice.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RequestFlightTests.swift",
+        "function": "doubleClickJoinsTheLivePromptInsteadOfAskingAgain"
+      }
+    },
+    {
+      "id": "REG-223",
+      "failure": "A slow update-feed check begun before auto-update was turned off finished late and brought the update badge back.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UpdateRefreshTests.swift",
+        "function": "slowOlderCheckFinishingLateCannotBringTheBadgeBack"
+      }
+    },
+    {
+      "id": "REG-224",
+      "failure": "A microphone-test level queued from a finished test landed in the next test and inflated its peak, giving the wrong verdict.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MicTestTests.swift",
+        "function": "levelFromAnEarlierTestCannotInflateTheNewPeak"
+      }
+    },
+    {
+      "id": "REG-230",
+      "failure": "The Record page opened empty with a disabled Record button: nothing listed displays or selected one until the owner clicked Load displays, and that load needed Screen Recording permission.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+        "function": "mainDisplayIsSelectedByDefault"
+      }
+    },
+    {
+      "id": "REG-226",
+      "failure": "Opening Settings froze the window: Settings drew rows from calls that wait on the system (the Launch at login switch asked SMAppService on every render, Integrations rows read hook files on every render, and window open read the disk, the microphone list and a TCC-protected folder on the main thread), and a subprocess wait held a Swift concurrency thread.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_no_blocking_waits_outside_audited_files"
+      }
+    },
+    {
+      "id": "REG-231",
+      "failure": "Instant commands depended on a Laya local decision server that is not installed by default: a probe and a 20 second start wait sat in front of the model stage. Laya is removed and Jev (key plus a monthly limit, 600 ms budget) is the only model stage; a saved Laya or Auto choice now maps to Jev.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_sources_never_mention_laya"
+      }
+    },
+    {
+      "id": "REG-232",
+      "failure": "The Show in screen sharing switch looked broken: while a meeting was active (exactly when a screen is shared) the policy forced every Zeus window hidden even after the owner chose to show Zeus. The owner's explicit show now wins over the meeting auto-hide; the default stays hidden and the teleprompter's private session still hides. The closed notch light also sat partly behind the camera housing; Top bar position now lowers the closed bar, light, ticker, wings and screen-edge glow together.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
+        "function": "explicitShowWinsOverMeetingAutoHide"
+      }
+    },
+    {
+      "id": "REG-233",
+      "failure": "Live QA of build 0405391: with no ElevenLabs or OpenAI key and Kokoro not installed the reply was spoken with the default macOS voice Samantha and no Ultron effect. The Mac voice is now the deepest male voice, never Samantha, and plays through the effect chain.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "neverSamantha"
+      }
+    },
+    {
+      "id": "REG-234",
+      "failure": "Engine routing had no logged reason and preferred one engine regardless of availability. Auto now orders ElevenLabs, OpenAI, Kokoro, Mac voice, skips paused engines and always ends with the Mac voice.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "availabilityMatrixInAutoMode"
+      }
+    },
+    {
+      "id": "REG-235",
+      "failure": "The Ultron effect was an amplitude wobble applied only to some engines. The chain is now pitch, EQ, distortion, comb and room, scaled by intensity with 60 percent as the default and tasteful wet limits.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "everyAmountGrowsWithIntensityAndStaysTasteful"
+      }
+    },
+    {
+      "id": "REG-236",
+      "failure": "Voice replies could run to four sentences. A spoken reply is now one to three sentences.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "spokenReplyNeverExceedsThreeSentences"
+      }
+    },
+    {
+      "id": "REG-237",
+      "failure": "A technical error such as a failed brain route could be spoken. It is now replaced by an in-character plain line.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "aTechnicalErrorBecomesAnInCharacterLine"
+      }
+    },
+    {
+      "id": "REG-238",
+      "failure": "A fresh install did not guarantee the Ultron persona with the effect on at 60 percent.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "freshInstallIsUltronWithTheEffectOnAtSixtyPercent"
+      }
+    },
+    {
+      "id": "REG-239",
+      "failure": "Talk to Zeus took 85 s and said nothing (owner run of build 0405391): four engines were tried one after another with 20 to 30 s silent timeouts, the Claude CLI launched with the owner's hooks, plugins and claude.ai connectors on every call (its help probe used a GUI PATH that cannot find ~/.local/bin, so even --strict-mcp-config was dropped), Codex ran the account's large default model, and an Ollama probe plus warm-up wait sat before the first request. A turn now starts every fast engine at once (Haiku or GPT-6-Luna class), speaks the first to stream, stops the rest, says one short filler at 900 ms, fails with one spoken error inside 8 s, and runs a Sonnet deep answer behind it as a follow-up.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+        "function": "firstTextWinsAndCancelsTheLosers"
+      }
+    },
+    {
+      "id": "REG-240",
+      "failure": "The spoken-turn latency fixes could silently regress: a sequential engine loop, a network probe or warm-up wait before the first request, a first-text budget above 8 s, a voice Claude launch without --safe-mode, or a help probe through /usr/bin/env.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_engines_are_raced_in_parallel_never_tried_one_after_another"
+      }
+    },
+    {
+      "id": "REG-227",
+      "failure": "Closing the welcome guide before the last step recorded nothing, so the guide reopened by itself at the saved step on every launch.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/OnboardingProgressTests.swift",
+        "function": "closingOnStepThreeThenRelaunchingDoesNotReopen"
+      }
+    },
+    {
+      "id": "REG-228",
+      "failure": "A background Automation check that began before the person clicked Allow finished later and overwrote the new grant, deleting the saved grant until the next refresh.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AutomationConsentCacheTests.swift",
+        "function": "olderCheckReportingNeedsConsentCannotOverwriteANewerGrant"
+      }
+    },
+    {
+      "id": "REG-229",
+      "failure": "Settings Automation Allow more did nothing when the only open app was already allowed, never named the apps to open, and failed silently for an app macOS had refused.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AutomationAllowPlanTests.swift",
+        "function": "allowMoreWithOnlyAnAllowedAppOpenAsksNothingAndNamesTheOthers"
+      }
+    },
+    {
+      "id": "REG-241",
+      "failure": "A Polyglot input that ended while the run was still starting was counted as open, so the run showed Listening on a dead microphone or stopped a two-input run early.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotRunTests.swift",
+        "function": "anInputThatEndedBeforeItsStartFinishedIsNeverCountedAsOpen"
+      }
+    },
+    {
+      "id": "REG-242",
+      "failure": "Stopping Polyglot and starting it again quickly let the first run's late start stop the second run's microphone.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotRunTests.swift",
+        "function": "stopThenQuickStartKeepsTheNewRunAndIgnoresTheOldRunsLateEvents"
+      }
+    },
+    {
+      "id": "REG-243",
+      "failure": "A second final result while the speech recognizer was restarting opened a second recognition task for the same dictation turn.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechRecorderTests.swift",
+        "function": "aSecondFinalDuringARestartDoesNotOpenAnotherTask"
+      }
+    },
+    {
+      "id": "REG-244",
+      "failure": "When the Hey Zeus listener could not start it retried every 10 or 30 seconds forever and logged the same failure each time, with no needs-attention state.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WakeRetryTests.swift",
+        "function": "retriesAreBoundedThenNeedAttentionAndNothingStartsAgain"
+      }
+    },
+    {
+      "id": "REG-245",
+      "failure": "A microphone level queued just before the teleprompter ended landed after the reset and lit the meter again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PrompterRunTests.swift",
+        "function": "aLevelQueuedBeforeEndCannotLandAfterIt"
+      }
+    },
+    {
+      "id": "REG-246",
+      "failure": "A feature that asked twice for Accessibility was started twice when access arrived, and a feature turned off while waiting kept the 3 second poll running forever.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TrustWaitTests.swift",
+        "function": "askingTwiceUnderTheSameKeyStartsTheFeatureOnce"
+      }
+    },
+    {
+      "id": "REG-247",
+      "failure": "The first of two overlapping Beamer commands or connection refreshes to finish cleared the busy flag while the other was still running.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
+        "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
+      }
+    },
+    {
+      "id": "REG-248",
+      "failure": "UltronEffectGraph connected its effect nodes to the engine's main mixer before the engine had a usable output. On a Mac with no audio device, an unusual format or a changed device AVFAudio raised an uncatchable Objective-C exception (setFormat error -10868) and ended the app, or the whole test process on CI. Connection now validates the format and output first, offline rendering enables manual mode before connecting, the live chain connects lazily and a refusal falls back to passthrough or no audio with a logged reason.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Onboarding footer: the Languages step had its own Set up later and Continue buttons in a separate switch branch, so while a step animated the outgoing and incoming pairs existed together (duplicate controls, a tap could reach the previous step's action), and Set up later on Languages bypassed the skip event of the progress state machine. One shared footer now serves every middle step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
     }
   ]
 }

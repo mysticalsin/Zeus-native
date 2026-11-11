@@ -9,11 +9,11 @@ import ZeusCore
 struct ElevenLabsVoice: Sendable {
     static let service = "com.zeus.app"
     static let model = "eleven_flash_v2_5"
-    /// A stock ElevenLabs voice, used until a voice ID is saved.
+    /// A stock ElevenLabs voice, used until the designed Ultron voice id is saved.
     static let defaultVoiceID = "JBFqnCBsd6RMkjVDRZzb"
     /// Offline fallback when ElevenLabs is unavailable (matches the Obsidian orb preset).
-    static let offlineKokoroVoice = "am_michael"
-    static let offlineKokoroSpeed = 0.94
+    static let offlineKokoroVoice = UltronCloudVoice.kokoroVoice
+    static let offlineKokoroSpeed = UltronCloudVoice.kokoroSpeed
 
     /// Where the ElevenLabs key lives. Tony's setup keeps it as the worker secret
     /// `ELEVENLABS_API_KEY`, so with no key on this Mac ZEUS streams through the worker's `/tts`
@@ -30,7 +30,7 @@ struct ElevenLabsVoice: Sendable {
     var description: String {
         switch route {
         case .direct: "ElevenLabs voice (\(Self.model), streaming, system voice as fallback)"
-        case .worker: "ElevenLabs voice via your ZEUS worker (streaming, system voice as fallback)"
+        case .worker: "ElevenLabs voice via your Zeus worker (streaming, system voice as fallback)"
         }
     }
 
@@ -40,7 +40,8 @@ struct ElevenLabsVoice: Sendable {
     static func voiceSettings(for personality: ZeusPersonality) -> [String: Any] {
         switch personality {
         case .plain: ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
-        case .ultron: ["stability": 0.35, "similarity_boost": 0.8, "style": 0.3, "use_speaker_boost": true, "speed": 0.95]
+        case .ultron:
+            UltronCloudVoice.elevenLabsSettings.reduce(into: ["use_speaker_boost": true] as [String: Any]) { $0[$1.key] = $1.value }
         }
     }
 
@@ -88,6 +89,9 @@ struct ElevenLabsVoice: Sendable {
 
     /// The first route ZEUS tries.
     static func load() -> ElevenLabsVoice? { loadRoutes().first }
+
+    /// True when a key or a worker route exists. Cheap enough to ask before every reply.
+    static var hasRoute: Bool { !loadRoutes().isEmpty }
 
     /// Every ElevenLabs route on this Mac, in order: the key in the Keychain straight from the Mac
     /// (no worker needed), then the ZEUS worker `/tts`. The system voice comes after both.
@@ -139,65 +143,3 @@ struct ElevenLabsVoice: Sendable {
     }
 }
 
-
-/// Plays 16-bit little-endian mono PCM chunks as they stream in.
-@MainActor
-final class StreamingPCMPlayer {
-    private let engine = AVAudioEngine()
-    private let node = AVAudioPlayerNode()
-    private let format: AVAudioFormat
-    private var pending = 0
-    private var carry: UInt8?
-    private var started = false
-    private var sampleOffset: Double = 0
-
-    init(sampleRate: Double = 24_000) {
-        format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
-        engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: format)
-    }
-
-    var isPlaying: Bool { pending > 0 }
-
-    func enqueue(_ data: Data) {
-        var bytes = data
-        if let carry { bytes.insert(carry, at: 0); self.carry = nil }
-        if bytes.count % 2 == 1 { carry = bytes.removeLast() }
-        let frames = bytes.count / 2
-        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)),
-              let out = buffer.floatChannelData?[0] else { return }
-        buffer.frameLength = AVAudioFrameCount(frames)
-        bytes.withUnsafeBytes { raw in
-            for index in 0..<frames {
-                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self))
-                out[index] = Float(sample) / 32_768
-            }
-        }
-        if UltronVoiceEffect.enabled, let channel = buffer.floatChannelData?[0] {
-            let count = Int(buffer.frameLength)
-            var samples = (0..<count).map { channel[$0] }
-            samples = UltronVoiceEffect.process(samples, sampleRate: format.sampleRate, sampleOffset: sampleOffset)
-            for index in 0..<count { channel[index] = samples[index] }
-        }
-        if !started {
-            do { try engine.start(); started = true } catch { return }
-        }
-        sampleOffset += Double(frames)
-        pending += 1
-        node.scheduleBuffer(buffer) { [weak self] in
-            Task { @MainActor in if let self { self.pending = max(0, self.pending - 1) } }
-        }
-        if !node.isPlaying { node.play() }
-    }
-
-    func drained() async {
-        while pending > 0, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
-    }
-
-    func stop() {
-        node.stop()
-        pending = 0
-        carry = nil
-        sampleOffset = 0
-    }
-}

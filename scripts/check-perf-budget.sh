@@ -1,6 +1,6 @@
 #!/bin/bash
 # Performance budget gate: idle CPU under 1% average and memory under 150 MB for a running ZEUS,
-# and no Ollama, Kev or Laya helper processes running by default. Read-only: samples with ps/top,
+# and no Ollama or Kev helper processes running by default. Read-only: samples with ps/top,
 # never launches, quits or signals anything.
 #   PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh
 set -uo pipefail
@@ -15,7 +15,7 @@ cpu="$(top -l $((SAMPLE + 1)) -s 1 -pid "$pid" -stats cpu | awk 'f&&/^[0-9.]+$/{
 mem="$(footprint "$pid" 2>/dev/null | awk '/phys_footprint:/{print $2, $3; exit}')"
 [ -n "$mem" ] || mem="$(ps -o rss= -p "$pid" | awk '{printf "%.0f MB", $1/1024}')"
 mem_mb="$(echo "$mem" | awk '{v=$1; if ($2 ~ /GB/) v*=1024; if ($2 ~ /KB/) v/=1024; printf "%.0f", v}')"
-helpers="$(pgrep -fl 'ollama|laya-serve|kev' | grep -v pgrep || true)"
+helpers="$(pgrep -fl 'ollama|kev' | grep -v pgrep || true)"
 echo "idle CPU avg: ${cpu}% (budget < 1%)" | tee -a "$LOG"
 echo "memory footprint: ${mem_mb} MB (budget < 150 MB)" | tee -a "$LOG"
 echo "helper processes: ${helpers:-none} (budget none)" | tee -a "$LOG"

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import os
 
 /// `Zeus --tts-sample <out.wav> [--engine system] [--text "..."]`: renders one reply through the
 /// same voice route the app uses (ElevenLabs direct or via the ZEUS worker `/tts`, else the best
@@ -25,10 +26,12 @@ enum VoiceSample {
     private static func renderEleven(_ text: String, _ voice: ElevenLabsVoice, _ out: URL) -> Bool {
         let started = Date()
         let done = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var pcm = Data()
-        nonisolated(unsafe) var status = 0
-        nonisolated(unsafe) var firstByteMs = -1
+        let result = OSAllocatedUnfairLock(initialState: (pcm: Data(), status: 0, firstByteMs: -1))
         Task.detached {
+            // Streaming mutations stay within this task; publish one finished value.
+            var pcm = Data()
+            var status = 0
+            var firstByteMs = -1
             do {
                 let (bytes, response) = try await URLSession.shared.bytes(for: voice.request(for: text))
                 status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -37,9 +40,12 @@ enum VoiceSample {
                     pcm.append(byte)
                 }
             } catch {}
+            let completed = (pcm: pcm, status: status, firstByteMs: firstByteMs)
+            result.withLock { $0 = completed }
             done.signal()
         }
         done.wait()
+        let (pcm, status, firstByteMs) = result.withLock { $0 }
         let route = voice.engineName
         guard status == 200, pcm.count > 1_000 else {
             print("{\"engine\":\"\(route)\",\"ok\":false,\"status\":\(status),\"bytes\":\(pcm.count)}")

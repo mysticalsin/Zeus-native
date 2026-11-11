@@ -405,7 +405,7 @@ private func journal(end: Date? = start.addingTimeInterval(3600), changes: [Inso
         #expect(GlanceTabRow.visible(TopBarLayout.standard.tabs, selected: .home) == TopBarLayout.defaultRow)
         #expect(TopBarTab.insomnia.title == "Insomnia")
         #expect(TopBarTab.insomnia.symbol == "moon.zzz.fill")
-        #expect(TopBarTab.insomnia.help == "Insomnia — keep working with the lid closed")
+        #expect(TopBarTab.insomnia.help == "Insomnia: keep working with the lid closed")
         #expect(TopBarTab.teleprompter.help == TopBarTab.teleprompter.title)
     }
 

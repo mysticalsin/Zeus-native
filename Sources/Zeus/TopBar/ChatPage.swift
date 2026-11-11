@@ -63,7 +63,7 @@ struct ChatPage: View {
         PageScroll(.vertical) {
             VStack(spacing: 3) {
                 if zeusChatHasContent {
-                    listRow(title: "ZEUS", subtitle: chat.current.displayTitle, color: Theme.accent, picked: selected == nil) { hub.selectedSession = nil }
+                    listRow(title: "Zeus", subtitle: chat.current.displayTitle, color: Theme.accent, picked: selected == nil) { hub.selectedSession = nil }
                 }
                 ForEach(sessions) { session in
                     listRow(agent: session.agent, subtitle: MeetingState.hideDetails ? session.status.label : "\(session.project) · \(session.status.label)",
@@ -79,7 +79,10 @@ struct ChatPage: View {
                 Circle().fill(color).frame(width: 7, height: 7).shadow(color: color, radius: 3)
                 VStack(alignment: .leading, spacing: 1) {
                     if let agent {
-                        EngineBrandLogo(agentLabel: agent, size: 16)
+                        HStack(spacing: 6) {
+                            EngineBrandLogo(agentLabel: agent, size: 14).accessibilityHidden(true)
+                            Text(agent).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                        }
                     } else if let title {
                         Text(title).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
                     }
@@ -191,6 +194,7 @@ private struct AgentReplyPane: View {
         let canType = hub.canReply(to: session.id)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
+                EngineBrandLogo(agentLabel: session.agent, size: 16).accessibilityHidden(true)
                 Text(session.agent).font(TopBarStyle.label(13, .semibold)).foregroundStyle(Theme.cloudPrimary)
                 if !MeetingState.hideDetails {
                     Text(session.project).font(TopBarStyle.label(11.5)).foregroundStyle(Theme.cloudQuiet)
@@ -232,13 +236,19 @@ private struct NewChatForm: View {
                 HStack(spacing: 8) {
                     ForEach(hub.offeredTools, id: \.self) { tool in
                         Button { hub.newTool = tool } label: {
-                            Text(tool.title).font(TopBarStyle.label(12, .semibold))
+                            HStack(spacing: 6) {
+                                EngineBrandLogo(agentLabel: tool.title, size: 14,
+                                                tint: hub.newTool == tool ? Theme.storm : Theme.cloudSecondary)
+                                    .accessibilityHidden(true)
+                                Text(tool.title).font(TopBarStyle.label(12, .semibold))
+                            }
                                 .foregroundStyle(hub.newTool == tool ? Theme.storm : Theme.cloudSecondary)
                                 .padding(.horizontal, 12).frame(height: 28)
                                 .background(Capsule().fill(hub.newTool == tool ? Theme.accent : Color.white.opacity(0.09)))
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(PressableStyle())
+                        .accessibilityLabel(tool.title)
                         .accessibilityAddTraits(hub.newTool == tool ? .isSelected : [])
                     }
                     Spacer(minLength: 0)
@@ -260,14 +270,15 @@ private struct NewChatForm: View {
                     .menuStyle(.button).buttonStyle(.plain).fixedSize()
                 }
                 HStack(spacing: 8) {
-                    NotchTextField(text: $hub.newInstruction, placeholder: "What should \(hub.newTool.title) do?", onSubmit: start)
+                    NotchTextField(text: $hub.newInstruction, placeholder: hub.offeredTools.isEmpty ? "Choose an agent in Settings first" : "What should \(hub.newTool.title) do?", onSubmit: start)
                         .padding(.horizontal, 10).frame(height: 32)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     CardButton(title: hub.launching ? "Starting…" : "Start", tint: Theme.accent, filled: true, action: start)
-                        .opacity(hub.request.isValid ? 1 : 0.4)
-                        .disabled(!hub.request.isValid || hub.launching)
+                        .opacity(hub.canLaunch ? 1 : 0.4)
+                        .disabled(!hub.canLaunch)
                 }
-                Text(hub.launchMessage ?? "Opens \(hub.newTool.title) in your terminal. It shows up here and in the notch once it starts.")
+                Text(hub.offeredTools.isEmpty ? "Choose an agent in Settings → Integrations to start a new chat."
+                     : hub.launchMessage ?? "Opens \(hub.newTool.title) in your terminal. It shows up here and in the notch once it starts.")
                     .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
             }
         }

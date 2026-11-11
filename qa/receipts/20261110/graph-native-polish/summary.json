@@ -1,0 +1,23 @@
+{
+  "source_sha": "f07b1192ebdfb85f0dd9dadba397b52bbd63eebe",
+  "dirty": true,
+  "status": "passed",
+  "tests": 26,
+  "suites": 3,
+  "command": [
+    "python3",
+    "qa/portable-core/prepare.py",
+    "--group",
+    "wiki-relationships",
+    "--output",
+    "/workspace/zeus-validation/public-graph-final",
+    "--run"
+  ],
+  "scope": "Exact source core graph/relationships/navigation policies only; native WikiGraphNavigationTests added to map but not executed on Linux. No UI input/window interaction or private vault.",
+  "policy_tests": 42,
+  "artifacts": {
+    "test.log": "9b6cc86458957bee0310d39239ce6dc066c1d8ba842b1306748e936cd5961b7a",
+    "policy-tests.log": "48660400a4fab68bbf77842d5d1cf3b7061c5ede5d13825a461f33018f9d5f24",
+    "validation-manifest.json": "2bae75e59ce09379a9482ebae4b2a85cdf30117213d98e0704a9c3e3e7a2cffd"
+  }
+}
