@@ -2989,6 +2989,18 @@
         "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
         "function": "graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing"
       }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Onboarding footer: the Languages step had its own Set up later and Continue buttons in a separate switch branch, so while a step animated the outgoing and incoming pairs existed together (duplicate controls, a tap could reach the previous step's action), and Set up later on Languages bypassed the skip event of the progress state machine. One shared footer now serves every middle step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
     }
   ]
 }
