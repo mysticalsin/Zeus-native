@@ -45,7 +45,8 @@ struct RequestFlightTests {
             Issue.record("first request must begin")
             return
         }
-        #expect(flights.finish("voice", token: first))
+        let finished = flights.finish("voice", token: first)
+        #expect(finished)
         #expect(!flights.isAsking("voice"))
         guard case .begin(let second) = flights.request("voice") else {
             Issue.record("a retry after the answer must begin again")
@@ -59,8 +60,10 @@ struct RequestFlightTests {
         guard case .begin(let voice) = flights.request("voice") else { Issue.record("begin"); return }
         guard case .begin(let camera) = flights.request("camera") else { Issue.record("camera is its own prompt"); return }
         #expect(voice != camera)
-        #expect(flights.request("voice") == .join(token: voice))
-        #expect(flights.request("camera") == .join(token: camera))
+        let joinedVoice = flights.request("voice")
+        let joinedCamera = flights.request("camera")
+        #expect(joinedVoice == .join(token: voice))
+        #expect(joinedCamera == .join(token: camera))
     }
 
     @Test func staleTokenCannotFinishANewerRequest() {
@@ -68,9 +71,11 @@ struct RequestFlightTests {
         guard case .begin(let first) = flights.request("voice") else { Issue.record("begin"); return }
         flights.abandon("voice")
         guard case .begin(let second) = flights.request("voice") else { Issue.record("begin after abandon"); return }
-        #expect(!flights.finish("voice", token: first))
+        let staleFinished = flights.finish("voice", token: first)
+        #expect(!staleFinished)
         #expect(flights.isAsking("voice"))
-        #expect(flights.finish("voice", token: second))
+        let liveFinished = flights.finish("voice", token: second)
+        #expect(liveFinished)
     }
 
     @Test func abandonAllClearsEveryKey() {
