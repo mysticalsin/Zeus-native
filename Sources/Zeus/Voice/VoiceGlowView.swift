@@ -103,7 +103,8 @@ struct VoiceGlow: ViewModifier {
     }
 
     private var glow: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !active || reduceMotion)) { timeline in
+        // Display-synchronized (every refresh, 120 Hz on ProMotion): a 30 fps cap made the listening glow step.
+        DisplaySynchronizedView(paused: !active || reduceMotion) { timeline in
             let sampled = MainActor.assumeIsolated { level() }
             let model = driver.advance(now: timeline.date, level: sampled, processing: processing,
                                        reduceMotion: reduceMotion, geometry: preset)

@@ -105,7 +105,8 @@ struct VoiceRingView: View {
                 }
                 .animation(.easeInOut(duration: 0.3), value: state)
             } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused)) { timeline in
+                // Display-synchronized (every refresh, 120 Hz on ProMotion): a 30 fps cap made the ring step.
+                DisplaySynchronizedView(paused: paused) { timeline in
                     canvas(runner: runner, now: timeline.date.timeIntervalSinceReferenceDate, live: true)
                 }
             }
