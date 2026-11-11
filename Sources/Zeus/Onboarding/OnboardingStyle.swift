@@ -30,10 +30,15 @@ enum OB {
         fieldFill: Color.white, fieldStroke: Color(rgb: 212, 215, 222), track: Color(rgb: 228, 230, 235),
         popup: Color(rgb: 226, 228, 233), tile: Color(rgb: 222, 233, 252), tileStroke: Color(rgb: 212, 215, 222))
 
-    static let blue = Color(rgb: 41, 98, 210)
+    /// The one accent for controls: toggles, selection rings and primary buttons. Semantic colours
+    /// (record red, warning amber, allowed green) stay separate and only appear where they carry meaning.
+    static let controlAccent = Color(rgb: 61, 126, 246)
+    /// The accent as a fill behind white text (6:1 contrast).
+    static let controlAccentFill = Color(rgb: 41, 98, 210)
+    static let blue = controlAccentFill
     static let blueLight = Color(rgb: 128, 178, 249)
     static let blueText = Color(rgb: 121, 169, 237)
-    static let toggleOn = Color(rgb: 61, 126, 246)
+    static let toggleOn = controlAccent
     static let allowed = Color(rgb: 136, 219, 161)
 
     // MARK: Layout (window coordinates, top-left origin)
@@ -325,7 +330,7 @@ struct OBOutlineButtonStyle: ButtonStyle {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(filled ? ob.fieldFill : Color.clear).opacity(configuration.isPressed ? 0.7 : 1))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(filled ? ob.fieldStroke : ob.hairline, lineWidth: 1))
+                .strokeBorder(filled ? ob.secondary.opacity(0.55) : ob.hairline, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .modifier(OBButtonFeedback(pressed: configuration.isPressed))
     }
@@ -397,7 +402,9 @@ struct OBAllowButton: View {
         } else {
             Button(access.actionTitle ?? "Allowed", action: action)
                 .buttonStyle(OBOutlineButtonStyle())
-                .frame(width: recovery ? 112 : 68)
+                // A minimum width, not a fixed one: "Open Settings" must never truncate to "Open Setti...".
+                .fixedSize()
+                .frame(minWidth: recovery ? 112 : 68)
                 .accessibilityLabel(recovery ? "Open Settings for \(name)" : "Allow \(name)")
                 .ownedJourneyControl(identifier ?? "onboarding.allow.\(name)")
         }
