@@ -162,5 +162,61 @@ class SourceLint(unittest.TestCase):
         self.assertTrue(re.search(r"\bBundle\.module\b", "Bundle.module.url(forResource: name)"))
 
 
+# Speaker recognition (docs/SPEAKER-IDENTIFICATION.md): the WeSpeaker model downloads only from an explicit click.
+SPEAKER_MODEL_FILE = "Scribe/ScribeVoiceModel.swift"
+SPEAKER_SETTINGS_FILE = "Settings/GSSpeakerRecognitionCard.swift"
+SPEAKER_CORE = ROOT / "Sources/ZeusCore/Scribe"
+SPEAKER_CORE_FILES = ["ScribeVoiceEmbedding.swift", "ScribeDiarizer.swift", "ScribeSpeakerNames.swift", "ScribeSpeakerCorrection.swift",
+                      "ScribeVoiceLibrary.swift", "ScribeNameSuggester.swift"]
+
+
+class SpeakerRecognitionLint(unittest.TestCase):
+    def test_diarizer_models_are_named_only_in_the_model_file(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if str(p.relative_to(APP)) != SPEAKER_MODEL_FILE
+                     for n, line in code_lines(p) if re.search(r"\bDiarizerModels\b", line)]
+        self.assertEqual(offenders, [], "only ScribeVoiceModel.swift may touch DiarizerModels")
+
+    def test_download_is_reachable_only_from_the_settings_click(self):
+        # The download call lives in the model file; its controller's prepare() is called by the Settings card only.
+        download = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if str(p.relative_to(APP)) != SPEAKER_MODEL_FILE
+                    for n, line in code_lines(p) if re.search(r"SpeakerModelStore\.download\b", line)]
+        self.assertEqual(download, [])
+        prepare = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files()
+                   if str(p.relative_to(APP)) not in (SPEAKER_MODEL_FILE, SPEAKER_SETTINGS_FILE)
+                   for n, line in code_lines(p) if re.search(r"SpeakerModelController\b", line)]
+        self.assertEqual(prepare, [], "no launch or meeting path may start the model download")
+        card = "\n".join(line for _, line in code_lines(APP / SPEAKER_SETTINGS_FILE))
+        self.assertEqual(len(re.findall(r"model\.prepare\(\)", card)), 2)
+        self.assertIn('Button("Download")', card)
+        self.assertIn("Only save voices of people who agreed.", card)
+
+    def test_meeting_code_only_loads_a_model_that_is_already_on_disk(self):
+        model = "\n".join(line for _, line in code_lines(APP / SPEAKER_MODEL_FILE))
+        load = model[model.index("static func loadEmbedder"):]
+        self.assertLess(load.index("guard isDownloaded"), load.index("DiarizerModels.load"))
+
+    def test_speaker_files_do_not_sleep_and_core_stays_free_of_fluidaudio(self):
+        for name in (SPEAKER_MODEL_FILE, SPEAKER_SETTINGS_FILE):
+            offenders = [n for n, line in code_lines(APP / name) if re.search(r"\bTask\.sleep\b", line)]
+            self.assertEqual(offenders, [], name)
+        for name in SPEAKER_CORE_FILES:
+            lines = list(code_lines(SPEAKER_CORE / name))
+            self.assertEqual([n for n, line in lines if "import FluidAudio" in line], [], name)
+            self.assertEqual([n for n, line in lines if "\u2014" in strip_trailing_comment(line)], [], name)
+            self.assertEqual([n for n, line in lines if re.search(r"\bTask\.sleep\b", line)], [], name)
+
+    def test_saved_voices_never_leave_the_mac(self):
+        for name in ("ScribeVoiceLibrary.swift",):
+            text = "\n".join(line for _, line in code_lines(SPEAKER_CORE / name))
+            self.assertNotIn("URLSession", text)
+            self.assertNotIn("Second Brain", text)
+        self.assertIn('appendingPathComponent("Voices"', "\n".join(line for _, line in code_lines(SPEAKER_CORE / "ScribeVoiceLibrary.swift")))
+
+    def test_speaker_lint_detects_its_failure_shapes(self):
+        self.assertTrue(re.search(r"\bDiarizerModels\b", "let m = try await DiarizerModels.download()"))
+        self.assertTrue(re.search(r"SpeakerModelStore\.download\b", "try await SpeakerModelStore.download { _ in }"))
+        self.assertTrue(re.search(r"SpeakerModelController\b", "SpeakerModelController.shared.prepare()"))
+
+
 if __name__ == "__main__":
     unittest.main()

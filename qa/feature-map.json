@@ -807,6 +807,73 @@
           "acceptance": "Synthetic known speakers/overlap through real supported audio and recognizer adapters; measure diarization against labeled ground truth and retain trace.",
           "cases": [],
           "id": "F02.3"
+        },
+        {
+          "id": "F02.speaker-identification",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Scribe clusters trained 256-value voice embeddings with the hand-built voiceprint as an unchanged fallback, renames and merges speakers across lines, statistics and exported text, saves voices only into a private local file that can be deleted, suggests names only when an invite, a saved voice or a repeat backs them, and relabels turns the live pass split or merged. Synthetic vectors only: this does not prove WeSpeaker accuracy, the model download, or recognition of real voices.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "aTrainedEmbeddingMustBeTheRightSizeFiniteAndNotSilent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "twoCloseVoicesAndOneFarGiveTwoSpeakers"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "theHandBuiltPathIsUnchanged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "renamingASpeakerRelabelsEveryLineAndTheStatistics"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "theSameNameOnTwoSpeakersMerges"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "theExportsCarryTheNames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "aVoiceIsSavedMatchedAndDeleted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "theLibraryRoundTripsThroughAPrivateFileAndDeletingTheLastVoiceRemovesIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "savedVoicesLiveUnderApplicationSupportNeverInAVault"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "aSelfIntroductionMatchingAnAttendeeIsSuggestedWithTheFullName"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "oneStrayMentionWithNoAttendeeBehindItGivesNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "theOwnersNameIsNeverSuggestedForAnotherVoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "aLiveSplitMergesBackAndADistinctVoiceStays"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "twoVoicesTheLivePassMergedAreSplitIntoANewSpeaker"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
+              "function": "attendeeNamesAreDisplayNamesOnly"
+            }
+          ]
         }
       ]
     },
