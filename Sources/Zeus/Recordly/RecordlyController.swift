@@ -141,6 +141,8 @@ final class RecordlyController {
     @ObservationIgnored private var exportGeneration = 0
 
     private let engine: RecordlyCaptureEngine
+    /// Latest system-audio peak for the live meter, 0...1. Read on the meter's own frame clock, never observed.
+    func systemAudioPeak() -> Float { engine.currentLevel() }
     private let session: RecordlyRecordingSession
     private var tickTimer: Timer?
     /// What one attempt needs when its recording finishes, kept by attempt until that result is handled, so a finish
@@ -527,6 +529,8 @@ final class RecordlyController {
                 cursorSamples: []
             )
             projectPhase = .editor
+            self.elapsed = 74
+            lastMediaURL = URL(fileURLWithPath: "/Users/fixture/Movies/Zeus Recordly/clip.mp4")
             previewUnavailableReason = "Preview unavailable in this snapshot."
         }
     }
@@ -821,6 +825,20 @@ final class RecordlyController {
     func revealInFinder(_ url: URL) {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
+
+    func openMedia(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Puts the clip file itself on the pasteboard, so it pastes into Finder, Mail or Slack as a file.
+    func copyMedia(_ url: URL) {
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.writeObjects([url as NSURL])
+    }
+
+    /// Size of the pinned recording, for the saved clip card.
+    var mediaByteCount: Int64? { mediaAuthority.map { Int64($0.byteCount) } }
 
     private func applyExportProgress(_ value: Double, generation: Int) {
         guard generation == exportGeneration, case .exporting(let current) = exportState, value > current else { return }
