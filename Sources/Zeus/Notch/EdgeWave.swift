@@ -43,10 +43,8 @@ final class EdgeWaveController {
         let started = Date()
         for (panel, screen) in zip(panels, screens) {
             panel.setFrame(screen.frame, display: false)
-            // The wave leaves the top bar where it now sits (Settings > Appearance > Top bar position).
-            let drop = TopBarPositionModel.shared.offset(forNotchHeight: Double(screen.safeAreaInsets.top))
             panel.contentView = NSHostingView(
-                rootView: EdgeWaveView(tint: tint, started: started, duration: Self.duration, reduceMotion: Motion.reduced, topOffset: CGFloat(drop)))
+                rootView: EdgeWaveView(tint: tint, started: started, duration: Self.duration, reduceMotion: Motion.reduced))
             panel.orderFrontRegardless()
         }
         closing = Task { [weak self] in
@@ -76,37 +74,37 @@ struct EdgeWaveView: View {
     let started: Date
     let duration: TimeInterval
     let reduceMotion: Bool
-    /// How far below the screen top the wave's top run starts (the top bar's own drop).
-    var topOffset: CGFloat = 0
 
     var body: some View {
-        TickingView(interval: reduceMotion ? 0.1 : 1 / 60, paused: false) { context in
+        EdgeLightClock(reduceMotion: reduceMotion) { context in
             let p = max(0, min(1, context.date.timeIntervalSince(started) / duration))
             Canvas { ctx, size in
-                EdgeWaveView.draw(&ctx, size: size, progress: p, color: tint.color, reduceMotion: reduceMotion, topOffset: topOffset)
+                EdgeWaveView.draw(&ctx, size: size, progress: p, color: tint.color, reduceMotion: reduceMotion)
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    /// The right half of the screen edge, from the top centre round to the bottom centre.
-    static func halfPerimeter(_ size: CGSize, inset: CGFloat = 2, radius: CGFloat = 12, topOffset: CGFloat = 0) -> Path {
-        let r = size.width - inset, t = inset + topOffset, b = size.height - inset
+    /// The right half of the screen edge, from the top centre round to the bottom centre. It hugs the
+    /// physical edge; the top bar's drop never moves it (`ScreenEdgeOutline`).
+    static func halfPerimeter(_ size: CGSize) -> Path {
+        let o = ScreenEdgeOutline(width: Double(size.width), height: Double(size.height))
+        let cx = CGFloat(o.centerX), t = CGFloat(o.top), r = CGFloat(o.right), b = CGFloat(o.bottom), radius = CGFloat(o.radius)
         var p = Path()
-        p.move(to: CGPoint(x: size.width / 2, y: t))
+        p.move(to: CGPoint(x: cx, y: t))
         p.addLine(to: CGPoint(x: r - radius, y: t))
         p.addQuadCurve(to: CGPoint(x: r, y: t + radius), control: CGPoint(x: r, y: t))
         p.addLine(to: CGPoint(x: r, y: b - radius))
         p.addQuadCurve(to: CGPoint(x: r - radius, y: b), control: CGPoint(x: r, y: b))
-        p.addLine(to: CGPoint(x: size.width / 2, y: b))
+        p.addLine(to: CGPoint(x: cx, y: b))
         return p
     }
 
-    static func draw(_ ctx: inout GraphicsContext, size: CGSize, progress p: Double, color: Color, reduceMotion: Bool, topOffset: CGFloat = 0) {
+    static func draw(_ ctx: inout GraphicsContext, size: CGSize, progress p: Double, color: Color, reduceMotion: Bool) {
         let fronts = EdgeWaveMath.fronts(progress: p)
         guard fronts.opacity > 0.01 else { return }
-        let outline = Polyline(path: halfPerimeter(size, topOffset: topOffset))
+        let outline = Polyline(path: halfPerimeter(size))
         // Reduce Motion: the whole edge fades in and out together instead of travelling.
         let lit = reduceMotion ? outline : outline.slice(from: fronts.tail, to: fronts.head)
         var paint = HaloPaint(color: color, opacity: fronts.opacity * (reduceMotion ? 0.7 : 1), line: 3, bloom: 2.4, scale: 1)
@@ -119,6 +117,25 @@ struct EdgeWaveView: View {
             var wash = side
             wash.addFilter(.blur(radius: 26))
             wash.stroke(lit.path, with: .color(color.opacity(fronts.opacity * 0.22)), style: .init(lineWidth: 40, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
+
+/// The clock both screen-edge lights (this wave and `ScreenEdgeGlowController`'s level glow) draw from.
+/// In motion it follows the display (`DisplaySynchronizedView`: every refresh, 120 Hz on ProMotion, in
+/// step with vsync), so the travelling light no longer judders the way a 60 Hz run-loop timer beating
+/// against the display did. Reduce Motion keeps the slow `TickingView` fade, which needs no display link.
+struct EdgeLightClock<Content: View>: View {
+    let reduceMotion: Bool
+    /// The Reduce Motion fade's tick.
+    var reducedInterval: TimeInterval = 0.1
+    @ViewBuilder let content: (TickContext) -> Content
+
+    var body: some View {
+        if reduceMotion {
+            TickingView(interval: reducedInterval, content: content)
+        } else {
+            DisplaySynchronizedView(content: content)
         }
     }
 }

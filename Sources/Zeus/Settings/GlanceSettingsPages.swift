@@ -230,20 +230,20 @@ private struct AppearancePage: View {
         }
         GSCard("Top bar") {
             GSRow(symbol: "arrow.up.and.down", title: "Top bar position",
-                  text: "Lowers the closed notch with its light, ticker and wings so nothing hides behind the camera housing. The open panel stays flush with the top. Applies to every display.") {
+                  text: "Lowers the closed notch with its light, ticker and wings. The open panel and the screen edge light stay at the top. Applies to every display.") {
                 HStack(spacing: 10) {
                     Text("Higher").font(GS.rowText).foregroundStyle(GS.secondary)
-                    OBTickSlider(value: Binding(get: { TopBarPositionModel.shared.sliderValue }, set: { TopBarPositionModel.shared.choose($0) }),
+                    OBTickSlider(value: Binding(get: { TopBarPositionModel.shared.offset }, set: { TopBarPositionModel.shared.choose($0) }),
                                  range: TopBarPosition.minimum...TopBarPosition.maximum, step: TopBarPosition.step)
                         .frame(width: 200).environment(\.ob, OB.Palette.settings).accessibilityLabel("Top bar position")
                         .accessibilityIdentifier("settings.appearance.topBarPosition")
                     Text("Lower").font(GS.rowText).foregroundStyle(GS.secondary)
-                    Text("\(Int(TopBarPositionModel.shared.sliderValue)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
+                    Text("\(Int(TopBarPositionModel.shared.offset)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
                         .frame(width: 40, alignment: .trailing)
                 }
             }
             GSDivider()
-            GSRow(symbol: "arrow.counterclockwise", title: "Automatic position", text: "A small drop on a Mac with a notch, none on other displays.") {
+            GSRow(symbol: "arrow.counterclockwise", title: "Reset position", text: "Back to flush with the top of the screen.") {
                 Button("Reset") { TopBarPositionModel.shared.reset() }
                     .buttonStyle(GSButtonStyle())
                     .ownedJourneyControl("settings.appearance.topBarPositionReset")

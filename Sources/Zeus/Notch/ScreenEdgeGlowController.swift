@@ -14,8 +14,6 @@ final class ScreenEdgeGlowController {
     static let shared = ScreenEdgeGlowController()
 
     private var panels: [NSPanel] = []
-    /// The notch height each panel's screen had when its view was made; the view reads the top bar drop from it.
-    private var panelNotchHeights: [Double] = []
     fileprivate var state: ScreenEdgeGlowState?
     private var hideTask: Task<Void, Never>?
     private var lastVisibleInShare = false
@@ -67,15 +65,13 @@ final class ScreenEdgeGlowController {
             panels.forEach { $0.orderOut(nil) }
             panels = screens.map { _ in makePanel() }
         }
-        for (index, (panel, screen)) in zip(panels, screens).enumerated() {
+        for (panel, screen) in zip(panels, screens) {
             panel.setFrame(screen.frame, display: false)
-            let notchHeight = Double(screen.safeAreaInsets.top)
-            if panel.contentView == nil || panelNotchHeights.count != screens.count || panelNotchHeights[index] != notchHeight {
-                panel.contentView = NSHostingView(rootView: ScreenEdgeGlowView(controller: self, notchHeight: notchHeight))
+            if panel.contentView == nil {
+                panel.contentView = NSHostingView(rootView: ScreenEdgeGlowView(controller: self))
             }
             panel.orderFrontRegardless()
         }
-        panelNotchHeights = screens.map { Double($0.safeAreaInsets.top) }
     }
 
     private func scheduleHide() {
@@ -106,14 +102,12 @@ final class ScreenEdgeGlowController {
 /// reports `isActive`); `TickingView` itself stops ticking once this view is removed or hidden.
 private struct ScreenEdgeGlowView: View {
     let controller: ScreenEdgeGlowController
-    /// The screen's `safeAreaInsets.top`, for the top bar drop it shares with the notch.
-    let notchHeight: Double
 
     private var active: Bool { controller.currentFrame() != nil }
 
     var body: some View {
         if active {
-            TickingView(interval: Motion.reduced ? 1.0 / 15 : 1.0 / 60) { context in
+            EdgeLightClock(reduceMotion: Motion.reduced, reducedInterval: 1.0 / 15) { context in
                 content(at: context.date)
             }
             .allowsHitTesting(false)
@@ -125,13 +119,11 @@ private struct ScreenEdgeGlowView: View {
     private func content(at now: Date) -> some View {
         if let state = controller.state {
             let frame = ScreenEdgeGlowMath.frame(state, now: now, reduceMotion: Motion.reduced)
-            let drop = CGFloat(TopBarPositionModel.shared.offset(forNotchHeight: notchHeight))
             Canvas { ctx, size in
                 guard frame.opacity > 0.003 else { return }
                 ScreenEdgeGlowView.draw(&ctx, size: size, level: frame.level, opacity: frame.opacity,
                                         color: color(for: state.kind),
-                                        reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,
-                                        topOffset: drop)
+                                        reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
             }
         }
     }
@@ -148,9 +140,9 @@ private struct ScreenEdgeGlowView: View {
     /// The edge is lit from the top centre both ways, out to a fraction `level` of the half
     /// perimeter -- the same geometry `EdgeWaveView` already uses for its one-shot wave, reused
     /// here as a static fill instead of a travelling front.
-    static func draw(_ ctx: inout GraphicsContext, size: CGSize, level: Double, opacity: Double, color: Color, reduceTransparency: Bool, topOffset: CGFloat = 0) {
+    static func draw(_ ctx: inout GraphicsContext, size: CGSize, level: Double, opacity: Double, color: Color, reduceTransparency: Bool) {
         guard size.width > 1, size.height > 1 else { return }
-        let outline = Polyline(path: EdgeWaveView.halfPerimeter(size, topOffset: topOffset))
+        let outline = Polyline(path: EdgeWaveView.halfPerimeter(size))
         let lit = outline.slice(from: 0, to: max(0.0015, level))
         for mirrored in [false, true] {
             var side = ctx

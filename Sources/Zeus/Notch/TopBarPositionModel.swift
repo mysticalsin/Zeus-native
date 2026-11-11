@@ -3,9 +3,9 @@ import Observation
 import ZeusCore
 
 /// Settings > Appearance > Top bar position. One global choice (see `TopBarPosition`), stored in
-/// UserDefaults only after the owner moves the slider; until then every display uses its own automatic
-/// default. Observed, so one write while dragging moves the notch, its light, ticker and wings in the
-/// same pass, and the screen-edge glow and wave read the same value when they next draw.
+/// UserDefaults only after the owner moves the slider; until then the closed bar sits flush with the top.
+/// Observed, so one write while dragging moves the notch, its light, ticker and wings in the same pass.
+/// The screen-edge glow and wave never read it: they hug the physical screen edge.
 @MainActor
 @Observable
 final class TopBarPositionModel {
@@ -21,17 +21,8 @@ final class TopBarPositionModel {
         chosen = TopBarStyle.isSnapshot ? nil : defaults.object(forKey: Self.defaultsKey) as? Double
     }
 
-    /// The offset a display with this notch height uses (0 for a display without a notch until chosen).
-    func offset(forNotchHeight notchHeight: Double) -> Double {
-        TopBarPosition.resolved(chosen: chosen, notchHeight: notchHeight)
-    }
-
-    /// The value the slider shows: the primary notched display's, or the main display's.
-    var sliderValue: Double {
-        let screens = NSScreen.screens
-        let screen = screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? screens.first
-        return offset(forNotchHeight: Double(screen?.safeAreaInsets.top ?? 0))
-    }
+    /// The closed bar's drop on every display (0 until chosen). Also the value the slider shows.
+    var offset: Double { TopBarPosition.resolved(chosen: chosen) }
 
     /// One call per drag event.
     func choose(_ value: Double) {
@@ -41,7 +32,7 @@ final class TopBarPositionModel {
         if !TopBarStyle.isSnapshot { defaults.set(next, forKey: Self.defaultsKey) }
     }
 
-    /// Back to the automatic default.
+    /// Back to flush with the top.
     func reset() {
         guard chosen != nil else { return }
         chosen = nil

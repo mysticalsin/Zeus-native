@@ -76,8 +76,7 @@ struct NotchView: View {
     /// How far the closed bar and the peek card sit below the top of the screen. The open panel stays
     /// flush with the top; the notch light, ticker and wings are part of the closed bar and move with it.
     private var topOffset: CGFloat {
-        let resolved = topOffsetOverride.map(TopBarPosition.clamped)
-            ?? TopBarPositionModel.shared.offset(forNotchHeight: Double(notch.height))
+        let resolved = topOffsetOverride.map(TopBarPosition.clamped) ?? TopBarPositionModel.shared.offset
         return CGFloat(TopBarPosition.applied(resolved: resolved, panelOpen: model.presentation == .panel))
     }
 
@@ -203,7 +202,10 @@ struct NotchView: View {
             .animation(open ? TopBarStyle.openSpring : TopBarStyle.closeMotion, value: model.presentation)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, topOffset)
-            .animation(Motion.reduced ? nil : .easeOut(duration: 0.12), value: topOffset)
+            // The drop changes with the presentation (the open panel is flush with the top), so it moves with
+            // the same curve as the body. A separate easing made the bar slide on its own after every open
+            // and close.
+            .animation(Motion.reduced ? nil : (open ? TopBarStyle.openSpring : TopBarStyle.closeMotion), value: topOffset)
             .overlay(alignment: .top) {
                 if !model.alerts.isEmpty, model.presentation == .closed {
                     AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),

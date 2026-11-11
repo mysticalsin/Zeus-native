@@ -3990,6 +3990,18 @@
         "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
         "function": "hintAppearsOnlyWhenNoEnhancedOrPremiumVoiceIsUsable"
       }
+    },
+    {
+      "id": "REG-340",
+      "failure": "The light around the screen no longer hugged the screen edge and the notch felt delayed: an automatic top bar drop (30% of the notch height) applied to every notched display, lowered the volume and brightness glow and the edge wave off the real screen corners, and slid the closed bar on every open and close. The drop is now 0 until the owner moves the slider, the edge lights always follow the physical edge, and the edge lights, voice glow, voice ring and avatars draw on the display clock instead of 30 or 60 fps timers.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarPositionTests.swift",
+        "function": "noDropUntilTheOwnerMovesTheSlider"
+      }
     }
   ]
 }

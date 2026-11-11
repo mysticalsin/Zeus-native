@@ -20,9 +20,7 @@ final class NotchController {
     /// How far the closed bar and the peek card sit below the screen top on the active display
     /// (Settings > Appearance > Top bar position); 0 while the panel is open.
     private var topOffset: CGFloat {
-        CGFloat(TopBarPosition.applied(
-            resolved: TopBarPositionModel.shared.offset(forNotchHeight: Double(notchSize.height)),
-            panelOpen: model.presentation == .panel))
+        CGFloat(TopBarPosition.applied(resolved: TopBarPositionModel.shared.offset, panelOpen: model.presentation == .panel))
     }
     private(set) var displays: [DisplayDescriptor] = []
     private var stallTimer: Timer?
