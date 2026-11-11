@@ -275,6 +275,10 @@ final class DictationController {
     /// The chosen engine hears this turn (ready and chosen); Apple otherwise.
     private var useLocal = false
     private var pausedMedia = false
+    /// The local model's download and load: one state, mirrored into `SpeechEngineStatus` for the views.
+    private var modelState = ModelPreparation.State.idle
+    private var modelTask: Task<Void, Never>?
+    private var lastModelToken: UInt64 = 0
     let parakeet = ParakeetEngine()
     let parakeetUltra = ParakeetEngine(.parakeetUltra)
     let whisperKit = WhisperKitEngine()
@@ -365,7 +369,7 @@ final class DictationController {
         topBar.chooseFileToTranscribe = { [weak self] in self?.chooseFile() }
         topBar.insertText = { text in Task { _ = await TextInserter.insert(text) } }
         // Load the model early so the first dictation is as quick as the rest.
-        if settings.engine == .parakeet, parakeet.isDownloaded { prepareModel(announce: false) }
+        if settings.engine == .parakeet, parakeet.isDownloaded { prepareModel(announce: false, explicit: false) }
         if settings.engine == .parakeetUltra, parakeetUltra.isDownloaded { Task { try? await parakeetUltra.prepare(progress: nil) } }
         Task { await SpeechEngineBoard.shared.refresh() }
     }
@@ -385,30 +389,56 @@ final class DictationController {
         if effectiveBehavior.finishesOnRelease { finish() }
     }
 
-    /// Downloads (first time) and loads Parakeet in the background.
-    func prepareModel(announce: Bool = true) {
+    /// Downloads (first time) and loads Parakeet in the background. `explicit` is a click on Download;
+    /// a key press or launch passes false, so a failed download is not retried on every dictation.
+    func prepareModel(announce: Bool = true, explicit: Bool = true) {
+        lastModelToken &+= 1
+        modelEvent(.startRequested(token: lastModelToken, trigger: explicit ? .explicit : .automatic,
+                                   downloaded: parakeet.isDownloaded, announce: announce))
+    }
+
+    /// Stops a Parakeet download or load that is running; the state returns to idle.
+    func cancelModelPreparation() { modelEvent(.cancelRequested) }
+
+    private func modelEvent(_ event: ModelPreparation.Event) {
+        let (next, effects) = ModelPreparation.reduce(modelState, event)
+        guard next != modelState || !effects.isEmpty else { return }
+        modelState = next
+        // Settings and onboarding read SpeechEngineStatus; it only mirrors the state.
         let status = SpeechEngineStatus.shared
-        guard status.progress == nil else { return }
-        let downloading = !parakeet.isDownloaded
-        if announce, downloading { topBar.show(.dictation("Downloading Parakeet, Apple speech meanwhile")) }
-        status.progress = 0
-        status.problem = nil
-        Task { @MainActor in
-            do {
-                try await parakeet.prepare { fraction in
-                    DispatchQueue.main.async { MainActor.assumeIsolated { status.progress = fraction } }
+        status.progress = ModelPreparation.progress(of: next)
+        status.problem = ModelPreparation.problem(of: next)
+        if case .ready = next { status.refresh(parakeet) }
+        for effect in effects { perform(effect) }
+    }
+
+    private func perform(_ effect: ModelPreparation.Effect) {
+        switch effect {
+        case .startWork(let token, _):
+            modelTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    try await parakeet.prepare { fraction in
+                        DispatchQueue.main.async { MainActor.assumeIsolated { self.modelEvent(.progress(token: token, fraction: fraction)) } }
+                    }
+                    modelEvent(.succeeded(token: token))
+                    await SpeechEngineBoard.shared.refresh()
+                } catch {
+                    modelEvent(.failed(token: token, message: error.localizedDescription))
                 }
-                status.progress = nil
-                status.refresh(parakeet)
-                await SpeechEngineBoard.shared.refresh()
-                if announce, downloading { topBar.show(.dictation("Parakeet is ready")) }
-            } catch {
-                status.progress = nil
-                status.problem = error.localizedDescription
-                // The live Settings card reads the board's message, so the reason stays on screen.
-                SpeechEngineBoard.shared.message = "Parakeet download failed: \(error.localizedDescription)"
-                topBar.show(.dictation("Parakeet download failed, using Apple speech"))
             }
+        case .cancelWork:
+            modelTask?.cancel()
+            modelTask = nil
+            parakeet.cancelPreparation()
+        case .announce(.downloading):
+            topBar.show(.dictation("Downloading Parakeet, Apple speech meanwhile"))
+        case .announce(.ready):
+            topBar.show(.dictation("Parakeet is ready"))
+        case .announce(.failed(let message)):
+            // The live Settings card reads the board's message, so the reason stays on screen.
+            SpeechEngineBoard.shared.message = "Parakeet download failed: \(message)"
+            topBar.show(.dictation("Parakeet download failed, using Apple speech"))
         }
     }
 
@@ -480,7 +510,7 @@ final class DictationController {
             topBar.show(.dictation(microphoneAllowed ? "Speech recognition is unavailable" : "Dictation needs the microphone"))
             return
         }
-        if settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel() }
+        if settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel(explicit: false) }
         // Apple runs alongside a local model for the live words in the notch. The audio is
         // always kept so the dictation can be reprocessed later with another engine.
         speech.recognizes = appleOnDevice

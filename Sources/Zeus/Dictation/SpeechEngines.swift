@@ -68,17 +68,25 @@ final class ParakeetEngine: TranscriptionEngine, @unchecked Sendable {
             let manager = try await task.value
             lock.withLock {
                 self.manager = manager
-                loading = nil
-                progress = nil
+                // A cancelled load must not clear the newer load that replaced it.
+                if loading == task { loading = nil; progress = nil }
             }
             return manager
         } catch {
             lock.withLock {
-                loading = nil
-                progress = nil
+                if loading == task { loading = nil; progress = nil }
             }
             throw error
         }
+    }
+
+    /// Stops a download or load in flight (Settings, onboarding). The next `prepare` starts fresh.
+    func cancelPreparation() {
+        let running = lock.withLock { () -> Task<AsrManager, Error>? in
+            defer { loading = nil; progress = nil }
+            return loading
+        }
+        running?.cancel()
     }
 }
 
