@@ -31,7 +31,9 @@ final class ScribeAutoStartController {
             presentApps: scan.runningCallApps.map(\.app),
             mode: ScribeAutoStartMode.current(),
             micPermissionGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-            activity: ScribeActivity(ScribeController.shared.phase)
+            activity: ScribeActivity(ScribeController.shared.phase),
+            autoConsentGiven: ScribeAutoStartConsent.isGiven(),
+            callWindows: scan.callWindows
         )
         perform(machine.handle(.evidence(evidence, now: now)))
         syncTimer()
@@ -58,6 +60,8 @@ final class ScribeAutoStartController {
         if case .countingDown(let meeting, let deadline) = machine.state {
             ScribeMeetingBanner.shared.updateCountdown(meeting, seconds: Self.secondsLeft(deadline: deadline, now: now))
         }
+        // The end timer only advances on evidence, so while the call looks over, read the signals again each second.
+        if machine.needsFreshEvidence { ScribeCallWatcher.shared.pollNow() }
         syncTimer()
     }
 
@@ -72,6 +76,13 @@ final class ScribeAutoStartController {
                 ScribeCallPopup.shared.hide()
                 let seconds = machine.bannerDeadline.map { Self.secondsLeft(deadline: $0, now: now) } ?? 0
                 ScribeMeetingBanner.shared.showCountdown(meeting, seconds: seconds)
+            case .showConsentAsk(let meeting):
+                ScribeCallPopup.shared.hide()
+                ScribeMeetingBanner.shared.showConsent(meeting)
+            case .recordConsent:
+                ScribeAutoStartConsent.record()
+            case .showNextMeeting(let meeting):
+                ScribeMeetingBanner.shared.showNextMeeting(meeting)
             case .hideBanner:
                 ScribeMeetingBanner.shared.hide()
             case .startRecording(let meeting):
@@ -96,7 +107,7 @@ final class ScribeAutoStartController {
         max(0, Int((deadline - now).rounded(.up)))
     }
 
-    /// One second timer, only while a banner has a deadline.
+    /// One second timer, only while a banner has a deadline or the call looks over.
     private func syncTimer() {
         if machine.needsTick {
             guard timer == nil else { return }

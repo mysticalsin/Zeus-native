@@ -65,6 +65,8 @@ struct ScribeCallScan: Equatable, Sendable {
     var callPresent: Bool = false
     /// Includes unsupported owners: releasing input later must not silently restore Zeus's microphone.
     var externalInputDetected: Bool = false
+    /// Whether each running call app's call window is on screen. Unknown unless window titles are readable.
+    var callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]
 }
 
 /// Finds calls in progress: a known call app (or a browser on a Meet tab) that is capturing the microphone.
@@ -73,7 +75,8 @@ struct ScribeCallScan: Equatable, Sendable {
 enum ScribeCallProbe {
     static func scan() -> ScribeCallScan {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let running = runningApps()
+        let titles = windowTitlesByPID()
+        let running = runningApps(titles: titles)
         let reads = inputReads()
         let inputScan = reads.map { ScribeScanReducer.reduce(reads: $0, running: running, ownPID: ownPID) } ?? .incomplete
         var calls: [ScribeDetectedCall] = []
@@ -90,14 +93,35 @@ enum ScribeCallProbe {
         let callPresent = ScribeScanReducer.callPresence(reads: reads ?? [], running: running, ownPID: ownPID)
         let externalInput = (reads ?? []).contains { $0.isExternalInput(excluding: ownPID) }
         return ScribeCallScan(calls: calls, inputScan: inputScan, runningCallApps: runningCallApps(from: running),
-                              callPresent: callPresent, externalInputDetected: externalInput)
+                              callPresent: callPresent, externalInputDetected: externalInput,
+                              callWindows: callWindows(running: running, titles: titles))
+    }
+
+    /// Call window state per call app. A native app is judged by its own window titles; Meet by whether any
+    /// browser shows a Meet tab. Hidden or missing titles are "unknown", which never ends a recording.
+    private static func callWindows(
+        running: [ScribeRunningApp],
+        titles: [pid_t: (titles: [String], numbers: [Int], complete: Bool)]?
+    ) -> [ScribeCallApp: ScribeCallWindowState] {
+        var states: [ScribeCallApp: ScribeCallWindowState] = [:]
+        for app in running where !ScribeCallDetection.isBrowser(app.bundleID) {
+            guard let kind = ScribeCallDetection.identify(bundleID: app.bundleID) else { continue }
+            guard let read = titles?[app.pid] else { states[kind] = .unknown; continue }
+            states[kind] = ScribeCallWindow.state(app: kind, titles: read.titles, complete: read.complete)
+        }
+        let browsers = running.filter { ScribeCallDetection.isBrowser($0.bundleID) }
+        if browsers.contains(where: { ScribeCallDetection.identify(bundleID: $0.bundleID, windowTitles: $0.windowTitles ?? []) == .meet }) {
+            states[.meet] = .present
+        } else {
+            states[.meet] = browsers.allSatisfy { $0.windowTitles != nil && $0.titlesComplete } ? .gone : .unknown
+        }
+        return states
     }
 
     /// Running GUI apps. Browsers carry their window titles, read once for all windows (nil when the list
     /// couldn't be read; empty when titles are hidden).
-    private static func runningApps() -> [ScribeRunningApp] {
+    private static func runningApps(titles: [pid_t: (titles: [String], numbers: [Int], complete: Bool)]?) -> [ScribeRunningApp] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let titles = windowTitlesByPID()
         return NSWorkspace.shared.runningApplications.compactMap { application -> ScribeRunningApp? in
             guard !application.isTerminated, application.processIdentifier != ownPID,
                   let bundleID = application.bundleIdentifier else { return nil }
@@ -293,6 +317,9 @@ final class ScribeCallWatcher {
         }
         ScribeController.shared.boundCallApplicationDidTerminate(identity)
     }
+
+    /// Reads fresh signals now (the call-ended timer and microphone wake-ups ask for this).
+    func pollNow() { poll() }
 
     private func poll() {
         guard isRunning, !scanning else { return }

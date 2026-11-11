@@ -81,6 +81,24 @@ final class ScribeMeetingBanner {
         present(announce: "\(model.headline) Start, or Not now.")
     }
 
+    /// The first time "Start automatically" would fire: one question, and the answer is remembered.
+    func showConsent(_ meeting: ScribeMeeting) {
+        model.headline = ScribeAutoStartText.askHeadline(meeting)
+        model.detail = ScribeAutoStartText.consentDetail
+        model.primaryTitle = "Start and allow"
+        model.secondaryTitle = "Not now"
+        present(announce: "\(model.headline) Start and allow, or Not now.")
+    }
+
+    /// Another meeting is about to start while this one records.
+    func showNextMeeting(_ meeting: ScribeMeeting) {
+        model.headline = ScribeAutoStartText.nextMeetingHeadline(meeting)
+        model.detail = ScribeAutoStartText.nextMeetingDetail
+        model.primaryTitle = "Switch"
+        model.secondaryTitle = "Keep recording"
+        present(announce: "\(model.headline) Switch, or Keep recording.")
+    }
+
     func showCountdown(_ meeting: ScribeMeeting, seconds: Int) {
         model.headline = ScribeAutoStartText.countdownHeadline(meeting, seconds: seconds)
         model.detail = ScribeAutoStartText.countdownDetail

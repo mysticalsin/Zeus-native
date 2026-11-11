@@ -13,7 +13,7 @@ those ship as a ticked, visible choice in onboarding instead.
 | Language packs | English, French, Spanish, Portuguese ticked in onboarding, installed after setup | Download consent = visible ticked step |
 | Scribe speakers | Speaker recognition model ticked in onboarding with the language packs; names from call window on when Accessibility already granted | Download consent; no permission prompt |
 | Scribe saved voices | Off; per person, opt-in | Biometric data of other people |
-| Scribe "When a meeting starts" (`scribe.autoStart`, Settings > Features > Scribe) | "Ask me" (choices: Off, Ask me, Start automatically) | Recording people without asking needs the owner's explicit choice. "Start automatically" shows a 5 second countdown with Cancel and starts only when Microphone is already allowed; the detector never triggers a permission prompt, it asks instead. Call end offers stop and save with Keep recording |
+| Scribe "When a meeting starts" (`scribe.autoStart`, Settings > Features > Scribe) | "Ask me" (choices: Off, Ask me, Start automatically) | Recording people without asking needs the owner's explicit choice. "Start automatically" shows a 5 second countdown with Cancel and starts only when Microphone is already allowed and after a one-time consent (asked on the first automatic start, stored as a timestamp); the detector never triggers a permission prompt, it asks instead. Call end (mic released 8 s, or call window gone) offers stop and save with Keep recording; a next meeting while recording asks before switching |
 | Record | Main display selected | Owner request |
 
 Follow-up: once the current builders land, one pass checks every Settings default against this table and adds a
