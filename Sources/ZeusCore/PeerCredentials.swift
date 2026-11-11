@@ -76,7 +76,7 @@ public enum PeerCheck {
         var buffer = [CChar](repeating: 0, count: 4096)
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
-        return String(cString: buffer)
+        return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
     #endif
 }
@@ -85,4 +85,12 @@ public enum PeerCheck {
 /// Its only legitimate client is the Zeus app itself.
 public enum ChromeSocketPeers {
     public static let allowedExecutables: Set<String> = ["Zeus"]
+
+    /// The policy for this bridge process. A bridge started with `ZEUS_SUPPORT_DIR` set serves a
+    /// relocated socket (tests, a second build) that the installed app never talks to, so only the
+    /// same-user rule applies there. Whoever can set the bridge's environment can already move the socket.
+    public static func policy(environment: [String: String]) -> PeerPolicy {
+        if let override = environment["ZEUS_SUPPORT_DIR"], !override.isEmpty { return .sameUser }
+        return .sameUserExecutable(allowedExecutables)
+    }
 }

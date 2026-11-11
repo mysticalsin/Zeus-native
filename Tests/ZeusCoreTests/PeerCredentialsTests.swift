@@ -43,6 +43,12 @@ struct PeerCredentialsTests {
         #expect(PeerCheck.decide(policy, ownUID: 501, peer: lookalike).isAllowed == false, "only the file name counts, not a folder")
     }
 
+    @Test func aRelocatedSupportFolderIsTheOnlyWayToDropTheProgramNameRule() {
+        #expect(ChromeSocketPeers.policy(environment: [:]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
+        #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": ""]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
+        #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"]) == .sameUser)
+    }
+
     @Test func theKernelReportsThisProcessForAConnectedPair() throws {
         var pair: [Int32] = [0, 0]
         #if canImport(Darwin)
