@@ -22,7 +22,7 @@ struct PersonaReplyClampTests {
     }
 
     @Test func detailRequestsMayRunLonger() {
-        #expect(PersonaReplyClamp.maxSentences(transcript: "explain how octopus hearts work", personality: .ultron) == 4)
+        #expect(PersonaReplyClamp.maxSentences(transcript: "explain how octopus hearts work", personality: .ultron) == 3)
         #expect(PersonaReplyClamp.maxSentences(transcript: "tell me an octopus fact", personality: .ultron) == 2)
     }
 

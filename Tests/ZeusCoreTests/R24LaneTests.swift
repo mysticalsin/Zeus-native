@@ -74,7 +74,7 @@ struct R24LaneTests {
         #expect(!line.lowercased().contains("nov"))
         #expect(line.split(separator: " ").count <= 10)
         let dumped = SpokenFailure.line("HTTP 500 traceback in the provider")
-        #expect(dumped == "I couldn't finish that.")
+        #expect(Set(ZeusVoiceLines.bank(.ultron)[.errorSpoken] ?? []).union(ZeusVoiceLines.bank(.plain)[.errorSpoken] ?? []).contains(dumped))
         #expect(BrowserAgentOutcome.failed(raw).spokenText == "Every AI is out of quota.")
     }
 

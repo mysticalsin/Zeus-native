@@ -23,7 +23,7 @@ struct VoiceRestoreTests {
 
     @Test func offlineFallbackIsKokoroMichael() {
         #expect(ElevenLabsVoice.offlineKokoroVoice == "am_michael")
-        #expect(ElevenLabsVoice.offlineKokoroSpeed == 0.94)
+        #expect(ElevenLabsVoice.offlineKokoroSpeed == 0.88)
     }
 
     @Test func directRequestUsesGeorgeWhenNoSavedVoice() {

@@ -3234,7 +3234,7 @@
         },
         {
           "check": "native-UltronVoiceEffectTests",
-          "acceptance": "Actual native DSP wrapper processes synthetic buffer and bypass.",
+          "acceptance": "Actual native Ultron audio chain (pitch, EQ, distortion, comb, room) rendered offline on synthetic buffers: speech is processed, silence stays silent, neutral settings pass through.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
@@ -3243,6 +3243,18 @@
             {
               "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
               "function": "disabledEffectPassesThrough"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "silenceStaysSilent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "otherFormatsAreConvertedToTheChainFormat"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "int16StreamBecomesFloatSamples"
             }
           ],
           "id": "F11.2"
@@ -3375,6 +3387,72 @@
             {
               "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
               "function": "canceledWarmStartsNoProvidersOrVoiceRender"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-defaults",
+          "check": "native-UltronVoiceEffectTests",
+          "acceptance": "A fresh install is the Ultron persona with the effect on at 60 percent, an explicit owner choice is kept, and the first line with no keys uses the Mac voice, never Samantha.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "freshInstallIsUltronWithTheEffectOnAtSixtyPercent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "anExplicitOwnerChoiceIsKept"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+              "function": "firstSpokenLineWithNoKeysUsesTheDeepestMacVoiceNeverSamantha"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-pipeline",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Engine routing across the availability matrix with a logged reason, effect parameters by intensity, deepest-Mac-voice pick that is never Samantha, sentence streaming, OpenAI voice instructions and the in-character persona clamp, filler and error lines.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "availabilityMatrixInAutoMode"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "systemIsAlwaysLastAndAlwaysPresent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "everyAmountGrowsWithIntensityAndStaysTasteful"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "neverSamantha"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "noFemaleOrNoveltyVoiceIsEverPicked"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "chunksStreamedDeltasIntoCompleteSentences"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "instructionsAreSentOnlyToModelsThatAcceptThem"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "spokenReplyNeverExceedsThreeSentences"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "fillerAndErrorLinesAreInCharacterAndPlain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+              "function": "aTechnicalErrorBecomesAnInCharacterLine"
             }
           ]
         }

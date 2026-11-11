@@ -102,6 +102,11 @@ public struct AckLines: Sendable {
         }
     }
 
+    /// A short in-character filler ("A moment.", "Let me look.") for a slow answer.
+    public static func filler(personality: ZeusPersonality, lines: ZeusVoiceLines = ZeusVoiceLines()) -> String {
+        lines.line(for: .thinking, personality: personality)
+    }
+
     /// Truncates `text` to at most `words` words, at a word boundary, replacing any trailing
     /// punctuation with a single period so a clamp never reads as a mid-thought cut-off. `nil`
     /// passes through unchanged. Guards against unbounded spliced text (a very long app, playlist

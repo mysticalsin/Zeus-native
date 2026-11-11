@@ -2723,6 +2723,78 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_no_blocking_waits_outside_audited_files"
       }
+    },
+    {
+      "id": "REG-233",
+      "failure": "Live QA of build 0405391: with no ElevenLabs or OpenAI key and Kokoro not installed the reply was spoken with the default macOS voice Samantha and no Ultron effect. The Mac voice is now the deepest male voice, never Samantha, and plays through the effect chain.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "neverSamantha"
+      }
+    },
+    {
+      "id": "REG-234",
+      "failure": "Engine routing had no logged reason and preferred one engine regardless of availability. Auto now orders ElevenLabs, OpenAI, Kokoro, Mac voice, skips paused engines and always ends with the Mac voice.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "availabilityMatrixInAutoMode"
+      }
+    },
+    {
+      "id": "REG-235",
+      "failure": "The Ultron effect was an amplitude wobble applied only to some engines. The chain is now pitch, EQ, distortion, comb and room, scaled by intensity with 60 percent as the default and tasteful wet limits.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "everyAmountGrowsWithIntensityAndStaysTasteful"
+      }
+    },
+    {
+      "id": "REG-236",
+      "failure": "Voice replies could run to four sentences. A spoken reply is now one to three sentences.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "spokenReplyNeverExceedsThreeSentences"
+      }
+    },
+    {
+      "id": "REG-237",
+      "failure": "A technical error such as a failed brain route could be spoken. It is now replaced by an in-character plain line.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronVoicePipelineTests.swift",
+        "function": "aTechnicalErrorBecomesAnInCharacterLine"
+      }
+    },
+    {
+      "id": "REG-238",
+      "failure": "A fresh install did not guarantee the Ultron persona with the effect on at 60 percent.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "freshInstallIsUltronWithTheEffectOnAtSixtyPercent"
+      }
     }
   ]
 }

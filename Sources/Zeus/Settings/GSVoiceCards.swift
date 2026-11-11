@@ -7,6 +7,7 @@ struct ZeusVoiceCards: View {
     private var voice: VoiceSettings { VoiceSettings.shared }
     private var settings: DictationSettings { DictationSettings.shared }
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
+    static let automaticTitle = "Automatic (best working voice)"
 
     var body: some View {
         GSCard {
@@ -38,9 +39,10 @@ struct ZeusVoiceCards: View {
             }
             GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
-                GSPopup(selection: Binding(get: { voice.ttsProvider.title }, set: { title in
-                    if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
-                }), options: VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
+                GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
+                    if title == Self.automaticTitle { voice.engineAuto = true }
+                    else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
+                }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
             }
             GSDivider()
             GSRow(symbol: "waveform.badge.mic", title: "Answer voice") {

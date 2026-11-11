@@ -69,7 +69,7 @@ public struct StartupPolicy: Equatable, Sendable {
     public static let conflictingFlags: Set<String> = [
         "debug", "--jev-settings-test", "--snapshots", "--keychain-import", "--keychain-selftest",
         "--ask", "--install-hooks", "--uninstall-hooks", "--browseruse-smoke", "--demo", "--motion-open",
-        "--settings-only", "--onboarding-only", "--voice-selftest", "--engine-logos", "--render-film",
+        "--settings-only", "--onboarding-only", "--voice-selftest", "--voice-engine-selftest", "--engine-logos", "--render-film",
         "--onboarding-step", "--onboarding-agent", "--onboarding-fresh", "--settings-section", "--tts-sample",
         "--jev-smoke", "--require-keys", "--drive-dryrun", "--drive-snapshot", "--screen-awareness-dryrun",
         "--annotate-dryrun", "--agent-dryrun", "--codex-replay", "--microphones", "--transcribe", "--chrome",

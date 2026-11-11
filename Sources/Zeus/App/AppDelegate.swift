@@ -557,6 +557,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WakeWordController.shared.talkKeyHeld = true
         buddy.call()
         VoiceLog.log("key", "talk shortcut pressed (access \(VoicePermissions.access))")
+        NotificationCenter.default.post(name: Speaker.talkKeyPressed, object: nil)
         // First use asks once (macOS shows its prompt the first time only); a refusal gets the
         // notch cue with a button. While a prompt is up the key can't start a turn, so press again.
         guard VoicePermissions.access == .ready else {
