@@ -630,5 +630,47 @@ class PointingMainActorLint(unittest.TestCase):
         self.assertIn("show(capturingMouse: false)", controller)
 
 
+def mic_read(relative):
+    return (APP / relative).read_text()
+
+
+def mic_body(text, start, end):
+    first = text.index(start)
+    return text[first:text.index(end, first)]
+
+
+class MicReleaseTests(unittest.TestCase):
+    def test_quitting_restores_the_ducked_output_device(self):
+        terminate = mic_body(mic_read("App/AppDelegate.swift"), "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertIn("SystemAudioDucker.end()", terminate)
+        ducker = mic_read("Voice/SystemAudioDucker.swift")
+        end = mic_body(ducker, "static func end()", "private static func isMuted")
+        self.assertIn("duckedDevice", end)
+        self.assertNotIn("defaultOutput()", end)
+
+    def test_a_spoken_todo_releases_the_microphone_when_its_page_closes_or_after_a_minute(self):
+        self.assertIn(".onDisappear { todo.endVoice() }", mic_read("TopBar/TodoPage.swift"))
+        controller = mic_read("TopBar/TodoController.swift")
+        self.assertIn("static let voiceLimitSeconds = 60", controller)
+        self.assertIn("func endVoice()", controller)
+
+    def test_closing_the_prompter_cancels_a_recording_that_is_still_starting(self):
+        window = mic_read("Prompter/PrompterWindow.swift")
+        close = mic_body(window, "func close()", "onVisibilityChange()")
+        self.assertIn("recorder.cancel()", close)
+        recorder = mic_read("Prompter/PrompterRecorder.swift")
+        self.assertIn("if cancelRequested {", recorder)
+        self.assertIn("func cancel()", recorder)
+
+    def test_scribe_never_withholds_the_microphone_because_another_app_uses_it(self):
+        detector = mic_read("Scribe/ScribeMuteDetector.swift")
+        coverage = mic_body(detector, "func coverage(start:", "func otherAppUsingMicrophone")
+        self.assertNotIn("hasExternalInput", coverage)
+        capture = mic_read("Scribe/ScribeLiveCapture.swift")
+        self.assertNotIn("microphoneExcludedByCall", capture)
+        rebuild = mic_body(capture, "private func micConfigurationChanged()", "// MARK: System audio")
+        self.assertIn(".defaultInputChanged", rebuild)
+
+
 if __name__ == "__main__":
     unittest.main()

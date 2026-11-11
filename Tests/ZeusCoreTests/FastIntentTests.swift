@@ -298,6 +298,14 @@ import Testing
         #expect(MicConflict.counts(bundleID: "com.apple.FaceTime", pid: 600, ownPID: 100))
     }
 
+    @Test func micConflictCountsCallHelperProcessesAndOtherBrowsers() {
+        for helper in ["com.google.Chrome.helper", "com.apple.WebKit.GPU", "com.microsoft.teams2.helper",
+                       "com.microsoft.edgemac.helper", "org.mozilla.firefox", "company.thebrowser.Browser.helper"] {
+            #expect(MicConflict.counts(bundleID: helper, pid: 700, ownPID: 100), "\(helper) should pause Hey Zeus")
+        }
+        #expect(!MicConflict.counts(bundleID: "com.apple.universalaccessd", pid: 400, ownPID: 100))
+    }
+
     @Test func gateRules() {
         var gate = WakeGate()
         #expect(gate.pauseReason == "needs microphone and speech recognition")

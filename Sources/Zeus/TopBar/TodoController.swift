@@ -286,9 +286,24 @@ final class TodoController {
             try input.start()
             speech = input
             listening = true
+            // Never leave the microphone open if nobody presses stop: add what was heard after a minute.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(Self.voiceLimitSeconds))
+                guard let self, self.listening, self.speech === input else { return }
+                self.toggleVoice()
+            }
         } catch {
             voiceError = "Allow the microphone and speech recognition in Settings, Permissions."
         }
+    }
+
+    /// Longest a spoken to-do may listen before it is added on its own.
+    static let voiceLimitSeconds = 60
+
+    /// Ends a spoken to-do when its page goes away (the bar closed or another page opened): what was heard is
+    /// added and the microphone is released.
+    func endVoice() {
+        if listening { toggleVoice() }
     }
 
     // MARK: Terminal

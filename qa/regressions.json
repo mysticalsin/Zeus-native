@@ -4029,6 +4029,54 @@
         "file": "Tests/ZeusCoreTests/MicInputOwnershipTests.swift",
         "function": "sharingClearsWhenTheOtherAppLetsGoAndNothingLatches"
       }
+    },
+    {
+      "id": "REG-363",
+      "failure": "Hey Zeus kept the microphone open during calls captured by helper processes (browser audio or WebKit helpers, call-app helpers) because the conflict check only matched exact app bundle IDs.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FastIntentTests.swift",
+        "function": "micConflictCountsCallHelperProcessesAndOtherBrowsers"
+      }
+    },
+    {
+      "id": "REG-364",
+      "failure": "Output ducking restored the volume onto whatever device was default at the end, leaving the original device lowered, and quitting while ducked left the Mac's output at the lowered volume.",
+      "features": [
+        "F11"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_quitting_restores_the_ducked_output_device"
+      }
+    },
+    {
+      "id": "REG-365",
+      "failure": "A spoken to-do kept the microphone open indefinitely after its page or the bar closed, with no time limit.",
+      "features": [
+        "F11"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_a_spoken_todo_releases_the_microphone_when_its_page_closes_or_after_a_minute"
+      }
+    },
+    {
+      "id": "REG-366",
+      "failure": "Closing the prompter while its recording was still starting left the camera and microphone recording with nothing able to stop them.",
+      "features": [
+        "F11"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_closing_the_prompter_cancels_a_recording_that_is_still_starting"
+      }
     }
   ]
 }

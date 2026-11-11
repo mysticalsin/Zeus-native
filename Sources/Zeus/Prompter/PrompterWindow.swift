@@ -212,7 +212,7 @@ final class PrompterWindowController {
         if sync?.playing == true, !autoOpened { onDismissDuringShow() }
         stop()
         endFollowing()
-        if recorder.isRecording { recorder.stop() }
+        recorder.cancel()
         stopMouseTracking()
         window?.orderOut(nil)
         onVisibilityChange()
@@ -707,13 +707,13 @@ final class PrompterWindowController {
     }
 
     private func toggleRecording() {
-        if recorder.isRecording {
-            recorder.stop()
+        if recorder.isRecording || recorder.isStarting {
+            recorder.cancel()
             return
         }
         Task {
             do {
-                try await recorder.start()
+                guard try await recorder.start() else { return }
                 model.recordingSince = Date()
                 model.notice = nil
                 if model.roll.phase == .idle { start() }

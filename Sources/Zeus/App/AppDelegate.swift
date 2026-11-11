@@ -86,6 +86,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Quitting while Zeus listens or speaks must not leave the Mac's output at the lowered volume.
+        SystemAudioDucker.end()
         explanation?.stop()
         pointing?.stop()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
