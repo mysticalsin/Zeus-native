@@ -167,7 +167,7 @@ struct GSSetupCard: View {
 
     var body: some View {
         GSCard("Setup") {
-            GSRow(symbol: "sparkles", title: "Set up Zeus again", text: "Revisit the guide, connected agents and permissions.") {
+            GSRow(symbol: "sparkles", title: "Show setup guide", text: "Open the guide again, even if you closed it earlier. Revisit agents and permissions.") {
                 Button("Open guide", action: openGuide)
                     .buttonStyle(GSButtonStyle())
                     .ownedJourneyControl("settings.general.openGuide")

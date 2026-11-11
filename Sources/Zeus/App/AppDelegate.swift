@@ -310,7 +310,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // First launch: a short setup that asks for each permission with an explanation.
         // The demo never plays by itself; it's in the panel, the menu and the last setup step.
-        if on(.autoOnboarding), !OnboardingFlow.isCompleted || OnboardingParity.requestedStep != nil {
+        if on(.autoOnboarding), OnboardingProgress.opensAtLaunch(OnboardingFlow.launchProgress, explicitStepRequested: OnboardingParity.requestedStep != nil) {
             showOnboarding(restart: false)
         }
         if on(.demoArg), CommandLine.arguments.contains("--demo") { demo.play() }

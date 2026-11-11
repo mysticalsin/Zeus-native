@@ -100,6 +100,7 @@ enum OnboardingSound: CaseIterable, Sendable {
 final class OnboardingFlow {
     static let stepKey = "zeus.onboarding.currentStep"
     static let completedKey = "zeus.onboarding.completed"
+    static let dismissedKey = "zeus.onboarding.dismissed"
 
     var step: OnboardingStep {
         didSet { persistence.writeStep(step.rawValue) }
@@ -120,6 +121,8 @@ final class OnboardingFlow {
     @ObservationIgnored private let feedback: OnboardingFeedback
     @ObservationIgnored private var transitionTask: Task<Void, Never>?
     private(set) var completedThisPresentation = false
+    /// Whether the guide still opens by itself: not started, in progress, dismissed or completed.
+    private(set) var progress: OnboardingProgress.State
 
     var completed: Bool { persistence.readCompleted() }
     var reducesMotion: Bool { feedback.reduceMotion() }
@@ -130,12 +133,38 @@ final class OnboardingFlow {
         self.persistence = persistence
         self.feedback = feedback
         playSound = feedback.playSound
+        progress = OnboardingProgress.saved(completed: persistence.readCompleted(), dismissed: persistence.readDismissed())
         let start = OnboardingStep(rawValue: persistence.readStep()) ?? .welcome
         step = start
         wake = start == .welcome && !feedback.reduceMotion() && !feedback.isSnapshot() ? .asleep : .awake
     }
 
-    func beginPresentation() { completedThisPresentation = false }
+    func beginPresentation() {
+        completedThisPresentation = false
+        apply(.presented)
+    }
+
+    /// Runs one progress event and performs its effects.
+    private func apply(_ event: OnboardingProgress.Event) {
+        let (next, effects) = OnboardingProgress.reduce(progress, event)
+        progress = next
+        for effect in effects {
+            switch effect {
+            case .recordDismissed: persistence.markDismissed()
+            case .recordCompleted: persistence.markCompleted()
+            }
+        }
+    }
+
+    /// The window closed. Before the final step is finished this records a dismissal.
+    func windowClosed() { apply(.windowClosed) }
+
+    /// "Set up later": skips this step, or dismisses the guide when no step follows.
+    func skipStep() {
+        let last = OnboardingStep(rawValue: step.rawValue + 1) == nil
+        apply(.skippedStep(onLastStep: last))
+        if !last { next() }
+    }
 
     func restart() {
         cancelPendingTransition()
@@ -150,7 +179,7 @@ final class OnboardingFlow {
         guard step == .sounds, !completedThisPresentation else { return false }
         cancelPendingTransition()
         completedThisPresentation = true
-        persistence.markCompleted()
+        apply(.finished)
         finish()
         step = .welcome
         return true
@@ -158,6 +187,13 @@ final class OnboardingFlow {
 
     static var isCompleted: Bool {
         UserDefaults.standard.bool(forKey: completedKey) || UserDefaults.standard.bool(forKey: "didOnboard")
+    }
+
+    static var isDismissed: Bool { UserDefaults.standard.bool(forKey: dismissedKey) }
+
+    /// What launch reads: the guide opens by itself only when it was neither finished nor dismissed.
+    static var launchProgress: OnboardingProgress.State {
+        OnboardingProgress.saved(completed: isCompleted, dismissed: isDismissed)
     }
 
     var mascotPose: LivingPose { step.mascotPose(wake: wake) }
@@ -319,7 +355,7 @@ struct OnboardingRoot: View {
                     .ownedJourneyControl("onboarding.finish")
                     .keyboardShortcut(.defaultAction)
             default:
-                Button("Set up later") { flow.next() }
+                Button("Set up later") { flow.skipStep() }
                     .buttonStyle(OBTextButtonStyle())
                     .ownedJourneyControl("onboarding.skip")
                     .padding(.trailing, 18.5)
@@ -432,6 +468,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         presented = false
+        flow.windowClosed()
         flow.cancelPendingTransition()
         pollingLifecycle.setVisible(false)
     }
