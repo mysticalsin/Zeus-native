@@ -133,6 +133,7 @@ struct DictationSettingsPage: View {
         .onDisappear { tester.stop() }
         modesCard
         engineCard
+        LanguagePacksCard()
         vocabularyCard
         historyCard
     }

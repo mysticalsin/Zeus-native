@@ -6,7 +6,7 @@ import SwiftUI
 /// The nine welcome-guide steps. Glance's seven, with its learn films folded in: the intro plays on the
 /// welcome step, "control" shows approve and previews, and "reach" shows shortcuts and everywhere.
 enum OnboardingStep: Int, CaseIterable, Sendable {
-    case welcome, murmure, agents, control, reach, day, theme, halo, sounds
+    case welcome, murmure, agents, control, reach, day, theme, halo, languages, sounds
 
     var title: String {
         switch self {
@@ -18,6 +18,7 @@ enum OnboardingStep: Int, CaseIterable, Sendable {
         case .day: "Your day"
         case .theme: "Choose your theme."
         case .halo: "Your signature of light."
+        case .languages: "Your languages."
         case .sounds: "The sounds of Zeus."
         }
     }
@@ -30,7 +31,7 @@ enum OnboardingStep: Int, CaseIterable, Sendable {
         case .agents: [.running]
         case .control: [.approve, .previews]
         case .reach: [.shortcuts, .everywhere]
-        case .day, .theme, .halo, .sounds: []
+        case .day, .theme, .halo, .languages, .sounds: []
         }
     }
 }
@@ -313,6 +314,16 @@ struct OnboardingRoot: View {
                     .buttonStyle(OBPrimaryButtonStyle(width: 87))
                     .ownedJourneyControl("onboarding.start")
                     .keyboardShortcut(.defaultAction)
+            case .languages:
+                Button("Set up later") { LanguagePackController.shared.declineOnboardingChoice(); flow.next() }
+                    .buttonStyle(OBTextButtonStyle())
+                    .ownedJourneyControl("onboarding.skip")
+                    .padding(.trailing, 18.5)
+                    .accessibilityHint("Installs no language packs. You can add them later in Settings.")
+                Button("Continue") { LanguagePackController.shared.confirmOnboardingChoice(); flow.next() }
+                    .buttonStyle(OBPrimaryButtonStyle(width: 117.5))
+                    .ownedJourneyControl("onboarding.next")
+                    .keyboardShortcut(.defaultAction)
             case .sounds:
                 Button("Finish", action: finish)
                     .buttonStyle(OBPrimaryButtonStyle(width: 93.5))
@@ -453,6 +464,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
 
     private func finish() {
         guard flow.complete() else { return }
+        // The chosen language packs start installing only now, after setup, in the background.
+        LanguagePackController.shared.startAfterOnboarding()
         window?.close()
         onFinish?()
     }

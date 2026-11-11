@@ -150,6 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             dictation.rewrite = { prompt in try await ClaudeRewriter.rewrite(prompt) }
             dictation.start()
+            // Continue language packs the owner chose earlier. Returns at once; installs run off the main actor.
+            LanguagePackController.shared.resumeOnLaunch()
         }
         // Teleprompter under the camera, hidden from screen shares while it runs.
         if on(.teleprompter) {

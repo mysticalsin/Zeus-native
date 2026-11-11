@@ -59,6 +59,15 @@ mkdir -p "$APP/Contents/Resources/ChromeExtension"
 cp extension/manifest.json "$APP/Contents/Resources/ChromeExtension/"
 cp -R extension/dist extension/icons extension/popup.html "$APP/Contents/Resources/ChromeExtension/"
 
+# Lean install: debug info and local symbols are not needed to run. Dynamic symbols stay, so behaviour is
+# unchanged; dSYMs are never copied into the app. Done before signing, which seals the stripped files.
+# ZEUS_KEEP_SYMBOLS=1 keeps them for a profiling build.
+if [ "${ZEUS_KEEP_SYMBOLS:-0}" != 1 ]; then
+  for bin in "$APP/Contents/MacOS/Zeus" "$APP/Contents/Helpers/"*; do
+    xcrun strip -S -x "$bin"
+  done
+fi
+
 for helper in "$APP/Contents/Helpers/"*; do
   codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$helper"
 done

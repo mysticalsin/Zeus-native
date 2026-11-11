@@ -135,6 +135,24 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(len(signatures), 4)
         self.assertTrue(all("--timestamp=none" in c for c in signatures))
 
+    def test_bundle_strips_symbols_from_app_and_helpers_before_signing(self):
+        # Lean install: unstripped binaries were 62 MB of the 194 MB app (language data is not in the bundle at all).
+        self.bundle_fixture()
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.commands()
+        stripped = [c[-1] for c in commands if c[:3] == ["xcrun", "strip", "-S"] and "-x" in c]
+        self.assertEqual(sorted(Path(p).name for p in stripped), ["Zeus", "zeus", "zeus-bridge", "zeus-hook"])
+        first_sign = next(i for i, c in enumerate(commands) if c[:2] == ["codesign", "--force"])
+        last_strip = max(i for i, c in enumerate(commands) if c[:3] == ["xcrun", "strip", "-S"])
+        self.assertLess(last_strip, first_sign)
+
+    def test_symbols_can_be_kept_for_a_profiling_build(self):
+        self.bundle_fixture()
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-", ZEUS_KEEP_SYMBOLS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([c for c in self.commands() if c[:2] == ["xcrun", "strip"]], [])
+
     def test_bundle_ships_product_resources_but_never_test_resource_bundles(self):
         # A local QA launch of the CI preview found Zeus_ZeusCoreTests.bundle (test fixtures) inside the app.
         self.bundle_fixture()

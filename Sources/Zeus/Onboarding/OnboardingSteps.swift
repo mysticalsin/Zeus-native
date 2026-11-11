@@ -41,7 +41,7 @@ struct OnboardingStepView: View {
         case .sounds:
             SoundsPreviewTile(options: options, height: OnboardingChromeLayout.rowsBlock(count: SoundsStep.rowCount, pitch: SoundsStep.pitch).height)
                 .position(x: OB.visualCenterX, y: OnboardingChromeLayout.rowsMidY(count: SoundsStep.rowCount, pitch: SoundsStep.pitch))
-        case .theme:
+        case .theme, .languages:
             EmptyView()
         }
     }
@@ -67,6 +67,7 @@ struct OnboardingStepView: View {
         case .reach: ReachStep(options: options)
         case .day: DayStep(services: services)
         case .halo: HaloStep(options: options)
+        case .languages: LanguagesStep()
         case .sounds: SoundsStep(options: options)
         case .theme: EmptyView()
         }
@@ -79,7 +80,7 @@ struct OnboardingStepView: View {
         case .day: DayIcons(pitch: DayStep.pitch, count: 3)
         case .halo: HaloPreviewCard(options: options, height: OnboardingChromeLayout.rowsBlock(count: 4, pitch: HaloStep.pitch).height)
         case .sounds: SoundsPreviewTile(options: options, height: OnboardingChromeLayout.rowsBlock(count: SoundsStep.rowCount, pitch: SoundsStep.pitch).height)
-        case .theme: EmptyView()
+        case .theme, .languages: EmptyView()
         }
     }
 }

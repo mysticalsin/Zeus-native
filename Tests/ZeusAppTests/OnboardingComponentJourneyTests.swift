@@ -155,23 +155,23 @@ struct OnboardingComponentJourneyTests {
             try await fixture.navigate("onboarding.skip", to: .agents, in: window)
             try await fixture.navigate("onboarding.back", to: .murmure, in: window)
             try await fixture.navigate("onboarding.next", to: .agents, in: window)
-            for step in [OnboardingStep.control, .reach, .day, .theme, .halo, .sounds] {
+            for step in [OnboardingStep.control, .reach, .day, .theme, .halo, .languages, .sounds] {
                 try await fixture.navigate("onboarding.skip", to: step, in: window)
                 fixture.requireNoBackgroundActions()
             }
-            #expect(fixture.memory.writes == [0, 1, 2, 1, 2, 3, 4, 5, 6, 7, 8])
+            #expect(fixture.memory.writes == [0, 1, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9])
             try await fixture.driver.click("onboarding.finish", in: window)
             try await fixture.waitFor("completed guide closed") {
                 !window.isVisible && fixture.memory.completed && fixture.memory.finishCallbacks == 1
             }
             #expect(fixture.memory.completions == 1)
-            #expect(fixture.memory.writes == [0, 1, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0])
+            #expect(fixture.memory.writes == [0, 1, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0])
             #expect(fixture.flow.step == .welcome)
-            #expect(fixture.memory.cues == Array(repeating: .advance, count: 9) + [.finish])
+            #expect(fixture.memory.cues == Array(repeating: .advance, count: 10) + [.finish])
             #expect(fixture.services.pollingStops == fixture.services.pollingStarts)
             fixture.requireNoBackgroundActions()
             print("Owned onboarding pointer journey finished: requestedReduction=\(fixture.requestedReduction), " +
-                  "effectiveReduction=\(fixture.flow.reducesMotion); Setup card → nine steps with Back/defer → Finish. " +
+                  "effectiveReduction=\(fixture.flow.reducesMotion); Setup card → ten steps with Back/defer → Finish. " +
                   "No keyboard, AX, permission, temporal or full-Settings acceptance is inferred.")
         }
     }

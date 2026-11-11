@@ -3624,7 +3624,7 @@
         {
           "id": "F13.onboarding-isolation",
           "check": "native-OnboardingIsolationTests",
-          "acceptance": "All nine onboarding steps preserve injected progress, cancellation and explicit completion; deferred and denied capability presentation uses fixture services, preview preferences stay isolated, and actual bundled typography/mascot assets resolve. These are policy and resource assertions, not a user-control journey or OS-consent proof.",
+          "acceptance": "All ten onboarding steps preserve injected progress, cancellation and explicit completion; deferred and denied capability presentation uses fixture services, preview preferences stay isolated, and actual bundled typography/mascot assets resolve. These are policy and resource assertions, not a user-control journey or OS-consent proof.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",

@@ -66,12 +66,12 @@ struct OnboardingIsolationTests {
             #expect(memory.step == step.rawValue)
             #expect(!memory.completed)
         }
-        #expect(memory.writes == Array(1...8))
+        #expect(memory.writes == Array(1...9))
         #expect(flow.complete())
         #expect(!flow.complete())
         #expect(memory.completed && memory.finishes == 1)
         #expect(memory.step == OnboardingStep.welcome.rawValue)
-        #expect(memory.sounds == Array(repeating: .advance, count: 8) + [.finish])
+        #expect(memory.sounds == Array(repeating: .advance, count: 9) + [.finish])
         let relaunched = memory.flow()
         #expect(relaunched.completed && relaunched.step == .welcome)
     }
