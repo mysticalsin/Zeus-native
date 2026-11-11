@@ -44,9 +44,11 @@ struct ElevenLabsVoice: Sendable {
             return studio
         }
         switch personality {
-        case .plain: ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
+        case .plain:
+            let plain: [String: Any] = ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
+            return plain
         case .ultron:
-            UltronCloudVoice.elevenLabsSettings.reduce(into: ["use_speaker_boost": true] as [String: Any]) { $0[$1.key] = $1.value }
+            return UltronCloudVoice.elevenLabsSettings.reduce(into: ["use_speaker_boost": true] as [String: Any]) { $0[$1.key] = $1.value }
         }
     }
 
