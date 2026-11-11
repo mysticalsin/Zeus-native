@@ -101,7 +101,7 @@ struct PanelView: View {
                 .toggleStyle(.switch)
                 .font(Glass.body)
                 .foregroundStyle(Theme.cloudPrimary)
-                .tint(Theme.accent)
+                .tint(OB.controlAccent)
 
             HStack(spacing: 8) {
                 Button("Play Demo", action: playDemo)
@@ -143,6 +143,7 @@ private struct ZeusButtonBody: View {
     var body: some View {
         // The shared glass pill: white when it is the main action, smoke otherwise.
         GlassButtonStyle(kind: prominent ? .primary : .secondary, compact: true).makeBody(configuration: configuration)
+            .fixedSize(horizontal: true, vertical: false) // minimum width = the label, never "Finish Setup…"
             .frame(minHeight: 28)
             .overlay(Capsule().strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: focused ? 2 : 0))
     }
@@ -194,13 +195,17 @@ private struct StatusRow: View {
                 .foregroundStyle(ok ? Theme.leaf : Theme.ember)
                 .font(.system(size: 13, weight: .semibold))
                 .accessibilityHidden(true)
+            // The name may wrap to a second line; the status word never truncates ("Turn On…", "0 of 4").
             Text(name)
                 .font(Glass.body)
                 .foregroundStyle(Theme.cloudPrimary)
-            Spacer()
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
             Text(detail)
                 .font(Glass.font(11.5, ok ? .regular : .semibold))
                 .foregroundStyle(ok ? Theme.cloudSecondary : Theme.ember)
+                .lineLimit(1)
+                .fixedSize()
         }
         .frame(minHeight: 22)
         .contentShape(Rectangle())

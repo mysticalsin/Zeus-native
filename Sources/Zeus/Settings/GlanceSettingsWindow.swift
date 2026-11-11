@@ -250,6 +250,8 @@ struct GSPanelHost: View {
                     .clipShape(RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous))
             } else {
                 ScrollView(.vertical) { page }
+                    // Last row never sits against the panel edge: the scroll content ends 28 pt higher.
+                    .contentMargins(.bottom, 28, for: .scrollContent)
                     .scrollIndicators(.automatic)
                     .clipShape(RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous))
             }

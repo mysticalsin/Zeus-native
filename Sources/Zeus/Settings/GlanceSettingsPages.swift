@@ -997,7 +997,7 @@ private struct PermissionsPage: View {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
-                Button("Allow") { Task { await VoicePermissions.ensure(explicit: true); context.refresh() } }.buttonStyle(GSButtonStyle(prominent: true))
+                Button("Allow") { Task { await VoicePermissions.ensure(explicit: true); context.refresh() } }.buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Allow \(title)")
             case .denied:
                 HStack(spacing: 10) {
@@ -1014,7 +1014,7 @@ private struct PermissionsPage: View {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
-                Button("Allow", action: allow).buttonStyle(GSButtonStyle(prominent: true)).accessibilityLabel("Allow \(title)")
+                Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
             case .denied:
                 HStack(spacing: 10) {
                     GSStatus(ok: false, text: "Denied")
@@ -1108,7 +1108,7 @@ private struct SpectrumPermissionRow: View {
             switch service.permission {
             case .allowed: GSStatus(ok: true, text: "Allowed")
             case .notAsked:
-                Button("Allow") { service.allowPressed() }.buttonStyle(GSButtonStyle(prominent: true)).accessibilityLabel("Allow system audio")
+                Button("Allow") { service.allowPressed() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Allow system audio")
             case .refused:
                 HStack(spacing: 10) {
                     GSStatus(ok: false, text: "Denied")
