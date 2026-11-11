@@ -31,12 +31,16 @@ def tests(*names):
 GROUPS = {
     "explanation": (
         core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
+             "Explanation/ExplanationModelWire.swift", "Explanation/ExplanationRecipes.swift",
+             "Explanation/ExplanationModelMotion.swift",
              "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
              "Explanation/ExplanationPlayback.swift", "Explanation/ExplanationCoordinates.swift",
              "Explanation/ExplanationHistory.swift", "Explanation/ExplanationDiagnostics.swift"),
         tests("ExplanationProtocolTests", "ExplanationReducerTests", "ExplanationStreamTests",
               "ExplanationCompletionStreamTests", "ExplanationPlaybackTests", "ExplanationCoordinatesTests",
-              "ExplanationHistoryTests", "ExplanationDiagnosticsTests"),
+              "ExplanationHistoryTests", "ExplanationDiagnosticsTests", "ExplanationModelSchemaTests",
+              "ExplanationRecipeTests", "ExplanationModelEditTests", "ExplanationModelMotionTests"),
     ),
     "socket-safety": (
         core("UnixSocket.swift", "PeerCredentials.swift"),
@@ -99,6 +103,9 @@ GROUPS = {
     ),
     "pointing": (
         core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
+             "Explanation/ExplanationModelWire.swift", "Explanation/ExplanationRecipes.swift",
+             "Explanation/ExplanationModelMotion.swift",
              "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
              "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
              "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",

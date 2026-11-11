@@ -232,6 +232,34 @@ struct ExplanationRendererTests {
         #expect(!node.isHidden && node.opacity == 0.5)
     }
 
+    @Test func nativeModelPartsReconcileByIdAndNoClockRunsWithoutAVisibleWindow() throws {
+        _ = NSApplication.shared
+        let view = ExplanationSCNHostView()
+        defer { view.dispose() }
+        var input = scene([])
+        let wheels = ExplanationPart(id: "wheels", kind: .recipe, recipe: .wheel, repeats: .init(count: 2, offset: .init(x: 0, y: 0, z: 1.6)),
+                                     spin: .init(radiansPerSecond: -6), accessibleDescription: "Wheels")
+        input.model = ExplanationModel3D(parts: ["wheels": wheels],
+            paths: ["route": .init(id: "route", points: [.zero, .init(x: 2, y: 0, z: 0)])],
+            flows: ["energy": .init(id: "energy", pathID: "route", speed: 1, count: 3)],
+            callouts: ["tag": .init(id: "tag", text: "Wheels", partID: "wheels")])
+        view.apply(input)
+        #expect(view.modelPartIDs == ["wheels"] && view.modelFlowIDs == ["energy"])
+        #expect(!view.isRunningModelClock && !view.isPlaying && !view.rendersContinuously)
+        let node = try #require(view.modelPartNode("wheels"))
+        input.model?.parts["wheels"]?.material.opacity = 0.3
+        input.model?.flows["energy"]?.direction = .reverse
+        view.apply(input)
+        #expect(view.modelPartNode("wheels") === node && node.opacity == 0.3 && view.modelPartIDs == ["wheels"])
+        input.model?.cutaway = .init(style: .none, partIDs: [])
+        input.model?.parts["wheels"]?.visible = false
+        view.apply(input)
+        #expect(node.isHidden)
+        input.model = nil
+        view.apply(input)
+        #expect(view.modelPartIDs.isEmpty && view.modelFlowIDs.isEmpty)
+    }
+
     @Test func nativeSceneRejectsMalformedGeometryAndReadOnlyModeNeverEmitsKeyboardEdits() throws {
         _ = NSApplication.shared
         let view = ExplanationSCNHostView()
