@@ -288,7 +288,7 @@ final class TodoController {
             listening = true
             // Never leave the microphone open if nobody presses stop: add what was heard after a minute.
             Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(Self.voiceLimitSeconds))
+                try? await Task.sleep(for: .seconds(TodoController.voiceLimitSeconds))
                 guard let self, self.listening, self.speech === input else { return }
                 self.toggleVoice()
             }
