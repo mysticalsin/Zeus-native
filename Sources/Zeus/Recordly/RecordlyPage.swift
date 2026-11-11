@@ -802,6 +802,7 @@ private struct RecordlyCaptureControl: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(spokenSource ?? "")
         .accessibilityHint(enabled || help.isEmpty ? "" : help)
+        .accessibilityIdentifier("record.capture")
     }
 
     private var accessibilityLabel: String {

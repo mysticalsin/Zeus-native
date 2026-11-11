@@ -449,6 +449,7 @@ private struct ScribeRecapList: View {
                 Spacer(minLength: 0)
                 NotchActionButton(title: "Memory", tint: Theme.cloudSecondary, filled: false) { WikiController.shared.showWindow() }
                     .accessibilityHint("Opens what Zeus has learned from your meetings.")
+                    .accessibilityIdentifier("scribe.memory.open")
             }
             if scribe.recaps.isEmpty {
                 Text("Finished meetings and their notes show up here.")
