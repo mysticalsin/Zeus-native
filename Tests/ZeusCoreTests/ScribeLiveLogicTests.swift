@@ -466,9 +466,9 @@ struct ScribeLiveLogicTests {
     @Test func upcomingHeadlineCountsMinutesRoundedUp() {
         let now = Date(timeIntervalSince1970: 1_000)
         let slot = ScribeCalendarSlot(id: "a", title: "Design review", start: now.addingTimeInterval(61))
-        #expect(ScribeCallPromptText.headline(for: .upcoming(slot), now: now) == "Starts in 2 min — Design review")
+        #expect(ScribeCallPromptText.headline(for: .upcoming(slot), now: now) == "Starts in 2 min: Design review")
         let soon = ScribeCalendarSlot(id: "b", title: "Standup", start: now.addingTimeInterval(20))
-        #expect(ScribeCallPromptText.headline(for: .upcoming(soon), now: now) == "Starts in 1 min — Standup")
+        #expect(ScribeCallPromptText.headline(for: .upcoming(soon), now: now) == "Starts in 1 min: Standup")
     }
 
     @Test func startedAndUntitledMeetingsAndCallsHaveHonestHeadlines() {
