@@ -96,6 +96,8 @@ final class BeamerModel {
     private(set) var status = BeamerStatus.missing
     private(set) var busy = false
     var message: String?
+    /// Counts overlapping commands, so the first to finish cannot clear `busy` under another.
+    @ObservationIgnored private var operations = OverlapCounter()
     @ObservationIgnored var onCrossing: ((Bool) -> Void)?
     @ObservationIgnored private let client: BeamerClient
     @ObservationIgnored private var viewers = 0
@@ -119,21 +121,24 @@ final class BeamerModel {
     @discardableResult
     func perform(_ command: BeamerCommand) async -> BeamerOutcome {
         let client = self.client
-        busy = true
+        beginOperation()
         let outcome = await Task.detached { client.perform(command) }.value
-        busy = false
+        endOperation()
         message = outcome.message
         try? await Task.sleep(for: .milliseconds(command == .start ? 1500 : 400))
         await refresh()
         return outcome
     }
 
+    private func beginOperation() { operations.begin(); busy = operations.isActive }
+    private func endOperation() { operations.end(); busy = operations.isActive }
+
     func install() async {
         guard let image = downloadedImage else { message = "No Beamer disk image in Downloads. Download Beamer first."; return }
-        busy = true
+        beginOperation()
         message = "Installing Beamer…"
         let problem = await BeamerInstaller.install(from: image)
-        busy = false
+        endOperation()
         message = problem ?? "Beamer is in Applications. Open it once and allow what it asks for."
         await refresh()
     }
