@@ -204,6 +204,16 @@ def native_evidence_module():
     return module
 
 
+def trusted_ax_module():
+    sibling = Path(__file__).resolve().parent
+    if str(sibling) not in sys.path:
+        sys.path.insert(0, str(sibling))
+    module = importlib.import_module("trusted_ax")
+    if Path(module.__file__).resolve() != sibling / "trusted_ax.py":
+        raise ValueError("trusted AX validator is not from the current checkout")
+    return module
+
+
 def native_filter() -> str:
     _, _, _, _, definitions, _ = load_policy()
     native = native_evidence_module()
@@ -251,6 +261,27 @@ def validate_native_command(command, definition: dict, native_jobs: str | None, 
         raise ValueError("native fixture command differs from its verified build, events and exact reviewed selection")
 
 
+def validate_trusted_row(check: dict, ident: str, root: Path, expected_sha: str) -> int:
+    """Full mode accepts the trusted check only with a receipt this gate re-validates itself."""
+    if check.get("status") != "passed":
+        raise ValueError(f"trusted Mac evidence is required: {ident}: {check.get('reason') or 'no valid receipt'}")
+    trusted = trusted_ax_module()
+    receipt, events = (f"{ident}/receipt.json", f"{ident}/events.jsonl")
+    evidence = check.get("artifacts")
+    if not isinstance(evidence, list) or [e.get("path") if isinstance(e, dict) else None for e in evidence] != [receipt, events]:
+        raise ValueError(f"trusted check must carry exactly its receipt and events: {ident}")
+    for entry in evidence:
+        if digest(artifact(root, entry["path"])) != entry.get("sha256"):
+            raise ValueError(f"trusted check evidence hash mismatch: {ident}")
+    ids = trusted.validate_receipt(artifact(root, receipt), expected_sha)["test_ids"]
+    if (check.get("kind") != "trusted-native-fixture" or type(check.get("exit_code")) is not int or check["exit_code"] != 0
+            or type(check.get("tests")) is not int or check["tests"] != len(ids) or not ids
+            or check.get("passed_functions") != [trusted.REQUIRED_FUNCTION]
+            or not isinstance(check.get("command"), list) or not check["command"]):
+        raise ValueError(f"trusted check row contradicts its receipt: {ident}")
+    return len(ids)
+
+
 def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str) -> int:
     result_path = artifact(root, "result.json")
     # artifact() validates the boundary and rejects links below it. Normalize the
@@ -262,10 +293,6 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
         raise ValueError("feature map schema is unsupported")
     if result.get("status") != "passed" or result.get("mode") != mode:
         raise ValueError(f"feature map did not pass {mode} mode")
-    trusted = sorted(ident for ident, definition in definitions.items() if definition["kind"] == "trusted-native-fixture")
-    if mode == "full" and trusted:
-        # No trusted-Mac runner or evidence format exists yet, so full mode cannot be satisfied by CI.
-        raise ValueError(f"trusted Mac evidence is required and no runner exists yet: {', '.join(trusted)}")
     if result.get("tested_sha") != expected_sha or result.get("head_sha") != head_sha:
         raise ValueError("feature map belongs to another source/head SHA")
     if result.get("map_sha256") != digest(repo / "qa/feature-map.json") or result.get("registry_sha256") != digest(repo / "qa/regressions.json"):
@@ -320,6 +347,9 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
             continue
         if definition["kind"] == "unimplemented":
             raise ValueError(f"full mode still has an unimplemented obligation: {ident}")
+        if definition["kind"] == "trusted-native-fixture":
+            count += validate_trusted_row(check, ident, root, expected_sha)
+            continue
         if check.get("status") != "passed" or type(check.get("exit_code")) is not int or check["exit_code"] != 0 or tests <= 0:
             raise ValueError(f"required feature check did not execute and succeed: {ident}")
         if not isinstance(check.get("command"), list) or not check["command"] or not all(isinstance(x, str) and x for x in check["command"]):

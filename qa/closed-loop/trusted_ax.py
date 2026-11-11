@@ -114,6 +114,45 @@ def validate_events(path):
     return problems, sorted(ended)
 
 
+def validate_receipt(receipt_path, tested_sha):
+    """Strictly re-validate a trusted-Mac receipt for the tested source sha; return it or raise Invalid.
+
+    Used by run.py when it consumes a receipt and again by gate.py, so neither trusts the other's word.
+    The receipt and its events file must be regular files (never links). The events file is the
+    `events.jsonl` next to the receipt, so a receipt copied into a run output stays verifiable.
+    """
+    path = Path(receipt_path)
+    require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 1024 * 1024,
+            "trusted receipt is missing, redirected or oversized")
+    try:
+        value = json.loads(path.read_text())
+    except ValueError as error:
+        raise Invalid(f"trusted receipt is not valid JSON: {error}")
+    require(type(value) is dict, "trusted receipt must be an object")
+    require(type(value.get("schema_version")) is int and value["schema_version"] == 1,
+            "trusted receipt schema_version is not 1")
+    require(value.get("result") == "passed", "trusted receipt result is not passed")
+    require(type(tested_sha) is str and bool(tested_sha) and value.get("sha") == tested_sha,
+            "trusted receipt belongs to another source sha")
+    require(value.get("dirty") is False, "trusted receipt was taken on a dirty tree")
+    require(type(value.get("exit_code")) is int and value["exit_code"] == 0, "trusted receipt exit_code is not 0")
+    require(value.get("problems") == [], "trusted receipt records problems")
+    ids = value.get("test_ids")
+    require(type(ids) is list and all(type(ident) is str for ident in ids), "trusted receipt test_ids are malformed")
+    prefix = "ZeusAppTests." + SUITE + "/"
+    require(all(ident.startswith(prefix) for ident in ids), "trusted receipt lists a test outside the trusted suite")
+    require(any(ident.startswith(prefix + REQUIRED_FUNCTION + "(") for ident in ids),
+            "trusted receipt lacks the required test " + REQUIRED_FUNCTION)
+    require(type(value.get("events")) is str and Path(value["events"]).name == "events.jsonl",
+            "trusted receipt does not reference an events.jsonl file")
+    events = path.parent / "events.jsonl"
+    require(events.is_file() and not events.is_symlink(), "trusted receipt events file is missing or redirected")
+    problems, ended = validate_events(events)
+    require(not problems, "trusted receipt events do not validate: " + "; ".join(problems))
+    require(sorted(ids) == ended, "trusted receipt test_ids differ from its events")
+    return value
+
+
 def git(*args):
     return subprocess.check_output(["git", "-c", "core.fileMode=false", *args], cwd=ROOT, text=True, timeout=30).strip()
 

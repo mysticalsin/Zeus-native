@@ -7,13 +7,15 @@ import ZeusCore
 @testable import Zeus
 
 /// A failure-only diagnostic, never an action driver. AX handles are created, queried, and
-/// released on one detached task; only bounded text crosses back to the AppKit actor.
+/// released synchronously on the main actor: AppKit serves own-process AX requests on the calling
+/// thread, so a background caller makes SwiftUI build its accessibility tree off the main thread and
+/// trap (Swift 6 executor check, SIGTRAP), which erased the original failure. Same rule as TrustedAXClient.
+@MainActor
 private enum OwnedProcessAXDiagnostic {
     static let windowMarkerPrefix = "zeus.synthetic.scribe.window."
 
     private struct Failure: Error { let reason: String }
     private enum Phase: String {
-        case dispatching, detachedEntered, detachedReturned, dispatchReturned
         case typeIDBegin, typeIDReturned, trustBegin, trustReturned, createApplicationBegin, createApplicationReturned
         case timeoutBegin, timeoutReturned, getPIDBegin, getPIDReturned
         case attributeBegin, attributeReturned, countBegin, countReturned, valuesBegin, valuesReturned
@@ -25,22 +27,14 @@ private enum OwnedProcessAXDiagnostic {
         FileHandle.standardError.write(Data("Own-PID AX phase: \(phase.rawValue)\n".utf8))
     }
 
-    static func collect(pid: Int32, windowMarker: String) async -> [String] {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        record(.dispatching)
-        let result = await Task.detached(priority: .utility) {
-            record(.detachedEntered)
-            let rows = snapshot(pid: pid, windowMarker: windowMarker, deadline: deadline)
-            record(.detachedReturned)
-            return rows
-        }.value
-        record(.dispatchReturned)
-        return result
+    static func collect(pid: Int32, windowMarker: String) -> [String] {
+        snapshot(pid: pid, windowMarker: windowMarker,
+                 deadline: ContinuousClock.now.advanced(by: .seconds(2)))
     }
 
     private static func snapshot(pid: Int32, windowMarker: String,
                                  deadline: ContinuousClock.Instant) -> [String] {
-        guard !Thread.isMainThread, pid == ProcessInfo.processInfo.processIdentifier,
+        guard Thread.isMainThread, pid == ProcessInfo.processInfo.processIdentifier,
               windowMarker.hasPrefix(windowMarkerPrefix) else {
             return ["own-PID AX diagnostic withheld: invalid execution thread, PID, or window marker"]
         }
@@ -50,7 +44,7 @@ private enum OwnedProcessAXDiagnostic {
         var incompleteBranch = false
         var breadcrumbs = 0
         func breadcrumb(_ phase: Phase) {
-            // At most 64 snapshot markers, plus the four fixed dispatch markers above.
+            // At most 64 snapshot markers.
             guard breadcrumbs < 64 else { return }
             breadcrumbs += 1
             record(breadcrumbs == 64 ? .breadcrumbLimit : phase)
@@ -615,7 +609,7 @@ private struct ScribeComponentFixture {
         OwnedWindowFixtureApplication.record("original failure before own-PID AX: \(originalFailure)")
         let marker = window.accessibilityIdentifier()
         if marker.hasPrefix(OwnedProcessAXDiagnostic.windowMarkerPrefix) {
-            let snapshot = await OwnedProcessAXDiagnostic.collect(
+            let snapshot = OwnedProcessAXDiagnostic.collect(
                 pid: ProcessInfo.processInfo.processIdentifier, windowMarker: marker)
             OwnedWindowFixtureApplication.record("failure-only own-PID AX: \(snapshot.joined(separator: "; "))")
         }
@@ -759,6 +753,27 @@ private struct ScribeComponentFixture {
         }
         #expect(target.presses == 0)
         #expect(trace.isEmpty)
+    }
+
+    /// Reaches the failure-only own-PID diagnostic directly. Before it moved to the main actor it made
+    /// AppKit serve own-process AX requests on a background thread and trapped the whole host.
+    func ownPIDAccessibilityDiagnosticRunsOnMainActorAndKeepsOriginalFailure() async throws {
+        let originalPolicy = try prepareFixtureApplication()
+        defer { OwnedWindowFixtureApplication.restore(originalPolicy) }
+        let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 300, height: 90),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "Synthetic own-PID diagnostic fixture"
+        window.isReleasedWhenClosed = false
+        window.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 90))
+        let marker = OwnedProcessAXDiagnostic.windowMarkerPrefix + UUID().uuidString
+        window.setAccessibilityIdentifier(marker)
+        defer { OwnedWindowFixtureApplication.close(window) }
+        window.makeKeyAndOrderFront(nil)
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let rows = OwnedProcessAXDiagnostic.collect(pid: pid, windowMarker: marker)
+        #expect(rows.last?.hasSuffix("original UI failure remains") == true)
+        let withheld = OwnedProcessAXDiagnostic.collect(pid: pid, windowMarker: "not.owned.marker")
+        #expect(withheld.count == 1 && withheld[0].hasPrefix("own-PID AX diagnostic withheld"))
     }
 
     func runJourney(useWindowEvents: Bool, trustedAXClient: Bool = false) async throws {
@@ -951,6 +966,12 @@ struct ScribeAccessibilityJourneyTests {
     @Test func persistentWrongAccessibilityRoleNeverReceivesAPress() async throws {
         try await OwnedWindowJourneyLease.perform {
             try await ScribeComponentFixture().persistentWrongAccessibilityRoleNeverReceivesAPress()
+        }
+    }
+
+    @Test func ownPIDAccessibilityDiagnosticRunsOnMainActorAndKeepsOriginalFailure() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            try await ScribeComponentFixture().ownPIDAccessibilityDiagnosticRunsOnMainActorAndKeepsOriginalFailure()
         }
     }
 }

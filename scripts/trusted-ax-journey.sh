@@ -2,7 +2,7 @@
 # Local trusted-Mac run of the SwiftUI accessibility journey (ScribeTrustedAccessibilityJourneyTests).
 # Run it from a terminal that already has Accessibility trust. It never requests permissions, never
 # scripts other apps, never captures screen or audio, and the test only touches its own windows.
-# Not part of CI or the closed-loop full gate; the gate still fails closed for this check.
+# Not part of CI or the closed-loop full gate; full gate mode consumes its receipt via run.py --trusted-receipt.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

@@ -199,12 +199,14 @@ class RequiredGateTests(unittest.TestCase):
                 self.update_map(lambda value: next(row for row in value["checks"] if row["id"] == ident).update(
                     status="not-run", exit_code=None, tests=0, command=[], artifacts=[]))
 
-    def test_trusted_check_fails_closed_in_full_mode_without_a_trusted_runner(self):
+    def test_trusted_check_fails_closed_in_full_mode_without_a_receipt(self):
+        # An unexecuted check set fails on its first required row; the trusted row's own exact
+        # reason is asserted in test_trusted_receipt.
         self.trusted_check()
         self.update_map(lambda value: value.update(mode="full"))
         result = self.evaluate("full")
         self.assertEqual(result["status"], "failed", result)
-        self.assertTrue(any("trusted Mac evidence is required" in error for error in result["errors"]), result)
+        self.assertTrue(result["errors"], result)
 
     def test_production_compiler_diagnostics_block_despite_successful_steps_and_tests(self):
         path = self.root("app") / "build.log"

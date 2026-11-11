@@ -44,10 +44,11 @@ The `trusted-native-fixture` check kind (tier `device-proof`, same fields as
 `native-fixture`) names an app suite that only a trusted Mac can execute, for
 example SwiftUI controls reached through the accessibility tree, which SwiftUI
 does not expose inside its own process. The CI app job never selects it. In
-`development` it must be `not-run` with no evidence. Full mode fails closed with
-"trusted Mac evidence is required" because no trusted runner or evidence format
-exists yet. Its obligations stay open, and a pointer-event journey never
-substitutes for it.
+`development` it must be `not-run` with no evidence, and receipts are ignored. Full
+mode fails closed with "trusted Mac evidence is required" unless
+`run.py --mode full --trusted-receipt PATH` supplies a receipt from
+`scripts/trusted-ax-journey.sh`. Its obligations stay open without one, and a
+pointer-event journey never substitutes for it.
 
 ### Running the trusted accessibility journey locally
 
@@ -55,14 +56,25 @@ substitutes for it.
 terminal that already has Accessibility trust; it never asks for permissions. It builds with
 `swift build --build-tests --scratch-path "$HOME/AI-Brain-build/zeus-native-build"`, packages the same
 bundled test host that CI uses, and runs only that suite. The test reads its own process through the
-accessibility client API on a background thread, selects its own window by marker identifier, and presses
+accessibility client API on the main actor (AppKit serves own-process AX calls on the calling thread, so a
+background caller makes SwiftUI trap), selects its own window by marker identifier, and presses
 each real SwiftUI button with `AXPress`. It fails, never skips, when `AXIsProcessTrusted()` is false.
 
 The runner prints pass or fail by validating the Swift Testing event stream: every started test needs a
 terminal event and the run must end with zero issues. A zero exit status alone is not a pass. A receipt
 goes to `$HOME/AI-Brain-build/zeus-trusted-ax/run-<time>-<sha>/receipt.json` with the sha, timestamp, result
-and test ids. It refuses to run off macOS or when `GITHUB_ACTIONS` is set. Full gate mode still fails closed
-for this check; consuming the receipt there is a follow-up.
+and test ids. It refuses to run off macOS or when `GITHUB_ACTIONS` is set.
+
+To satisfy the check in a full run, take the receipt on a clean checkout of the exact commit under test and pass
+it in: `python3 qa/closed-loop/run.py --mode full --output NEW --trusted-receipt
+~/AI-Brain-build/zeus-trusted-ax/run-<time>-<sha>/receipt.json`. The runner accepts it only when
+`schema_version` is 1, `result` is `passed`, `sha` equals the tested HEAD, `dirty` is false, `exit_code` is 0,
+`problems` is empty, `test_ids` contains `realButtonsDriveStartKeepStopFailedSaveRetryAndClose` under
+`ZeusAppTests.ScribeTrustedAccessibilityJourneyTests/`, the `events.jsonl` next to the receipt re-validates
+with `trusted_ax.validate_events` and matches `test_ids`, and neither file is a symlink. It copies both files
+into the run output and records them as the check artifacts with a positive test count. `gate.py` re-runs the same
+validation on those copies in full mode and does not trust the row. Without a valid receipt the row stays
+`blocked` with the exact reason. CI never selects or runs this check.
 
 Both full mode on macOS and the CI app entrypoint first compile the native test
 target once with `swift build --build-tests`, then save compiled discovery once.

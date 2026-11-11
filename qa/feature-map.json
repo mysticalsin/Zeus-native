@@ -466,7 +466,7 @@
       "id": "device-ScribeTrustedAccessibilityJourneyTests",
       "kind": "trusted-native-fixture",
       "tier": "device-proof",
-      "scope": "SwiftUI button journey through accessibility. SwiftUI's NSHostingView exposes no in-process accessibility tree, so CI never selects this suite. It needs a run with a trusted assistive client on a Mac; no runner or evidence format exists yet, so it stays open.",
+      "scope": "SwiftUI button journey through accessibility. SwiftUI's NSHostingView exposes no in-process accessibility tree, so CI never selects this suite. It needs a run with a trusted assistive client on a Mac (scripts/trusted-ax-journey.sh); full mode accepts it only through a strictly re-validated receipt (run.py --trusted-receipt), otherwise it stays open.",
       "suite": "ScribeTrustedAccessibilityJourneyTests",
       "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
     },

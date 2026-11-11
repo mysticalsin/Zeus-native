@@ -14,10 +14,15 @@ import sys
 import tempfile
 import time
 import native_evidence as native
+import trusted_ax
+import shutil
 
 from contracts import (ROOT, Invalid, case_passed, digest, evaluate_features, load,
                        manifest_matches, require, source_snapshot, swift_summary, validate_map, validate_registry,
                        validate_native_build)
+
+
+TRUSTED_COMMAND = "scripts/trusted-ax-journey.sh"
 
 
 def portable_module():
@@ -277,6 +282,24 @@ def run_native_check(definition, args, output, native_build, discovery_receipt, 
     return row
 
 
+def consume_trusted_receipt(row, ident, receipt, output):
+    """Pass the trusted row only on a strictly valid receipt for the current HEAD; else keep it blocked."""
+    try:
+        sha = git("rev-parse", "HEAD")
+        ids = trusted_ax.validate_receipt(receipt, sha)["test_ids"]
+        folder = output / ident
+        folder.mkdir()
+        copies = [folder / "receipt.json", folder / "events.jsonl"]
+        shutil.copyfile(receipt, copies[0])
+        shutil.copyfile(receipt.parent / "events.jsonl", copies[1])
+        require(trusted_ax.validate_receipt(copies[0], sha)["test_ids"] == ids, "trusted receipt changed while copying")
+        row.update(status="passed", command=[TRUSTED_COMMAND], exit_code=0, tests=len(ids), suites=1,
+                   passed_functions=[trusted_ax.REQUIRED_FUNCTION], artifacts=[artifact(path, output) for path in copies])
+        row.pop("reason")
+    except (Invalid, OSError, ValueError, subprocess.SubprocessError) as error:
+        row.update(status="blocked", reason=f"trusted Mac receipt rejected: {error}")
+
+
 def run_check(definition, args, output, portable, native_build=None, discovery_receipt=None, all_definitions=None):
     ident, kind = definition["id"], definition["kind"]
     if kind in native.NATIVE_KINDS:
@@ -288,11 +311,15 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         row.update(status="unimplemented", reason=definition["reason"])
         return row
     if kind == "trusted-native-fixture":
-        # Never executed here; the CI app job does not select it and no trusted-Mac runner exists yet.
+        # Never executed here; the CI app job does not select it. Full mode only consumes a receipt
+        # from scripts/trusted-ax-journey.sh, re-validated strictly; development ignores receipts.
         row["reason"] = ("Trusted Mac evidence is required (SwiftUI exposes no in-process accessibility tree); "
-                         "no trusted runner exists yet.")
+                         "run scripts/trusted-ax-journey.sh and pass --trusted-receipt PATH to a full run.")
         if args.mode == "full":
             row["status"] = "blocked"
+            receipt = getattr(args, "trusted_receipt", None)
+            if receipt is not None:
+                consume_trusted_receipt(row, ident, Path(receipt), output)
         return row
     folder = output / ident
     folder.mkdir()
@@ -385,6 +412,8 @@ def main(argv=None):
     parser.add_argument("--output", required=True, type=Path, help="New directory; never overwrite old evidence")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=1800, help="Per-check seconds; timeout is failure")
+    parser.add_argument("--trusted-receipt", type=Path,
+                        help="Full mode only: receipt.json from scripts/trusted-ax-journey.sh for this exact clean HEAD")
     args = parser.parse_args(argv)
     if args.jobs < 1 or args.timeout < 1:
         parser.error("jobs and timeout must be positive")

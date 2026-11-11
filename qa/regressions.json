@@ -2564,6 +2564,57 @@
         "file": "Tests/ZeusAppTests/ExplanationRendererTests.swift",
         "function": "nativeSceneReducedMotionNeverRevealsFutureObjectsAndGroupHighlightReachesChildren"
       }
+    },
+    {
+      "id": "REG-213",
+      "failure": "The failure-only own-PID accessibility snapshot called AXUIElement from a detached background task. AppKit serves own-process AX requests on the calling thread, so SwiftUI built its accessibility tree off the main thread and trapped (Incorrect actor executor assumption, SIGTRAP exit -5), crashing the test host and erasing the original UI failure. The snapshot now runs synchronously on the main actor with the same node, depth, time and per-element timeout budgets, own PID and owned-window marker rules, and the original failure remains reported.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ScribeAccessibilityJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "ownPIDAccessibilityDiagnosticRunsOnMainActorAndKeepsOriginalFailure"
+      }
+    },
+    {
+      "id": "REG-214",
+      "failure": "Live QA of the packaged CI preview crashed on onboarding's voice step: SFSpeechRecognizer.requestAuthorization's handler, written inside @MainActor PermissionsModel, inherited main-actor isolation and Swift 6 trapped when TCC called it on a background queue. Chat microphone, voice, Polyglot and Focus requests had the same shape; all now await the nonisolated SystemAuthorization helper.",
+      "features": [
+        "F13",
+        "F01",
+        "F11",
+        "S02"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_tcc_completion_handlers_only_in_nonisolated_helper"
+      }
+    },
+    {
+      "id": "REG-215",
+      "failure": "Live QA of the packaged CI preview crashed on the first provider-logo render: Bundle.module traps in Zeus.app because SwiftPM's accessor looks beside the app while scripts/bundle.sh seals Zeus_Zeus.bundle in Contents/Resources. EngineBrandImage now uses ZeusResources.bundle.",
+      "features": [
+        "F12"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_app_target_never_uses_swiftpm_bundle_module"
+      }
+    },
+    {
+      "id": "REG-216",
+      "failure": "The packaged preview shipped a test-target resource bundle (Zeus_ZeusCoreTests.bundle with a fixture) inside Zeus.app because bundle.sh copied every SwiftPM resource bundle.",
+      "features": [
+        "S06"
+      ],
+      "check": "release-mocks",
+      "guard": {
+        "file": "qa/release-scripts/test_release_scripts.py",
+        "function": "test_bundle_ships_product_resources_but_never_test_resource_bundles"
+      }
     }
   ]
 }
