@@ -34,24 +34,24 @@ struct EnginePage: View {
         GSPageHeading(section: .engine, subtitle: "Which brain understands you, and what it costs.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Engine") {
-            engineChoice(.laya, "Laya", "Free and private. Runs on this Mac.")
+            engineChoice(.laya, "On this Mac", "Free and private. Answers run on this Mac.")
             GSDivider()
-            engineChoice(.jev, "Jev", "A stronger cloud model. Counts against the local usage estimate.")
+            engineChoice(.jev, "Cloud model", "A stronger model in the cloud. Counts against your monthly estimate.")
             GSDivider()
-            engineChoice(.auto, "Auto", "Laya first. Jev only when Laya is unsure.")
+            engineChoice(.auto, "Auto", "This Mac first. The cloud model only when it is unsure.")
         }
-        GSCard("Laya") {
-            GSRow(symbol: "cpu", title: "On this Mac", text: center.layaInstalled ? "Loads on first use and unloads after 5 idle minutes." : "Not installed on this Mac. Commands use the rules, then Jev if you allow it.") {
+        GSCard("On this Mac") {
+            GSRow(symbol: "cpu", title: "Local engine", text: center.layaInstalled ? "Loads on first use and unloads after 5 idle minutes." : "Not installed on this Mac. Commands use the built-in rules, then the cloud model if you allow it.") {
                 GSStatus(ok: center.layaInstalled, text: center.layaRunning ? "Loaded" : center.layaInstalled ? "Ready" : "Not installed")
             }
         }
-        GSCard("Jev") {
+        GSCard("Cloud model") {
             if testMode {
                 GSRow(symbol: "key", title: "API key", text: "Disabled in Test Mode. No Keychain item is read or written.") {
                     Text("Unavailable").font(OB.font(13.5, .semibold)).foregroundStyle(GS.secondary)
                 }
             } else {
-                GSRow(symbol: "key", title: "API key", text: center.hasJevKey ? "Saved in your Keychain. Zeus reads it once." : "Kept in your Keychain. Without a key Jev never runs.") {
+                GSRow(symbol: "key", title: "API key", text: center.hasJevKey ? "Saved in your Keychain. Zeus reads it once." : "Kept in your Keychain. Without a key the cloud model never runs.") {
                     HStack(spacing: 10) {
                         SecureField(center.hasJevKey ? "Saved" : "Paste a key", text: Binding(get: { page.jevKeyDraft }, set: { page.jevKeyDraft = $0 }))
                             .textFieldStyle(.plain)
@@ -60,7 +60,7 @@ struct EnginePage: View {
                             .padding(.horizontal, 10).frame(width: 170, height: 30)
                             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                            .accessibilityLabel("Jev API key")
+                            .accessibilityLabel("Cloud model API key")
                             .onSubmit(saveKey)
                         Button("Save key", action: saveKey).buttonStyle(GSButtonStyle()).disabled(page.jevKeyDraft.isEmpty)
                         if center.hasJevKey {
@@ -70,19 +70,19 @@ struct EnginePage: View {
                 }
             }
             GSDivider()
-            GSRow(symbol: "dollarsign.circle", title: "Monthly estimate cap", text: "Local usage estimate only; provider-side spending controls determine the actual billing limit. At this amount Jev pauses until next month.") {
+            GSRow(symbol: "dollarsign.circle", title: "Monthly estimate cap", text: "Local usage estimate only; provider-side spending controls determine the actual billing limit. At this amount the cloud model pauses until next month.") {
                 GSPopup(selection: Binding(get: { Self.capTitle(center.jevBudget.monthlyCap) }, set: { center.setJevCap(Self.cap(for: $0)) }),
                         options: Self.capOptions)
             }
             GSDivider()
-            GSRow(symbol: "chart.bar", title: "This month", text: center.budgetSummary) {
+            GSRow(symbol: "chart.bar", title: "This month", text: monthSummary) {
                 CapMeter(fraction: Self.fraction(center.jevBudget))
                     .frame(width: 120, height: 8)
-                    .accessibilityLabel("Jev spend this month").accessibilityValue(center.budgetSummary)
+                    .accessibilityLabel("Cloud model spend this month").accessibilityValue(monthSummary)
             }
             if center.jevReservationStatus == .reconciliationRequired {
                 GSDivider()
-                GSRow(symbol: "exclamationmark.triangle", title: "Jev paused", text: "Check the provider usage page before reconciling this request.")
+                GSRow(symbol: "exclamationmark.triangle", title: "Cloud model paused", text: "Check the provider usage page before reconciling this request.")
                 GSRow(title: "Billed input tokens", text: "Enter the input-token count shown by the provider.") {
                     HStack(spacing: 8) {
                         TextField("Tokens", text: Binding(get: { page.jevInputTokensDraft }, set: { page.jevInputTokensDraft = $0 }))
@@ -92,7 +92,7 @@ struct EnginePage: View {
                             .padding(.horizontal, 10).frame(width: 88, height: 30)
                             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                            .accessibilityLabel("Billed Jev input tokens")
+                            .accessibilityLabel("Billed cloud model input tokens")
                         Button("Record usage", action: reconcileBilledUsage)
                             .buttonStyle(GSButtonStyle()).disabled(parsedBilledInputTokens == nil)
                     }
@@ -122,8 +122,8 @@ struct EnginePage: View {
                     HStack(spacing: 8) {
                         EngineBadge(engine: record.engineName)
                         if !testMode, record.decision?.source != .jev, center.jevAvailable {
-                            Button("Try with Jev") { Task { await center.tryWithJev(record) } }
-                                .buttonStyle(GSButtonStyle()).accessibilityLabel("Run \(record.utterance) again with Jev")
+                            Button("Try with the cloud model") { Task { await center.tryWithJev(record) } }
+                                .buttonStyle(GSButtonStyle()).accessibilityLabel("Run \(record.utterance) again with the cloud model")
                         }
                     }
                 }
@@ -160,6 +160,15 @@ struct EnginePage: View {
         Task { await center.reconcileJevPending(.confirmedUnbilled) }
     }
 
+    /// The "This month" sentence, from the same live budget the cap pop-up reads, so the two never disagree
+    /// (the controller's cached summary starts as "no cap set" until its first refresh finishes).
+    private var monthSummary: String {
+        guard center.jevReservationStatus == .clear else { return center.budgetSummary }
+        let budget = center.jevBudget
+        guard let cap = budget.monthlyCap, cap > 0 else { return "The cloud model is off until you pick a monthly cap." }
+        return String(format: "$%.2f of $%.0f estimated this month.", budget.spent, min(cap, JevBudgetStore.maxCap))
+    }
+
     private var parsedBilledInputTokens: Int? {
         guard let tokens = Int(page.jevInputTokensDraft.trimmingCharacters(in: .whitespacesAndNewlines)), tokens >= 0 else { return nil }
         return tokens
@@ -176,7 +185,9 @@ struct EnginePage: View {
     private func engineChoice(_ engine: IntelligenceEngine, _ title: String, _ text: String) -> some View {
         let selected = center.engine == engine
         return GSRow(symbol: selected ? "checkmark.circle.fill" : "circle", title: title, text: text) {
-            if selected { GSStatus(ok: true, text: "In use") }
+            // Chosen is not the same as working: "On this Mac" cannot be in use while it is not installed.
+            if selected, engine == .laya, !center.layaInstalled { GSStatus(ok: false, text: "Not installed") }
+            else if selected { GSStatus(ok: true, text: "In use") }
             else { Button("Use") { center.engine = engine }.buttonStyle(GSButtonStyle()).accessibilityLabel("Use \(title)") }
         }
     }

@@ -41,12 +41,28 @@ struct AIConnectionsPage: View {
                 if index > 0 { GSDivider() }
                 HStack(spacing: 0) {
                     BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                    // A tool that is not on this Mac cannot be offered: the switch waits and says why.
+                    let missing = model.step(provider, services: services) == .install
                     GSToggleRow(title: "Offer \(provider.title) for new chats",
-                                isOn: Binding(get: { model.offers(provider) }, set: { model.setOffers(provider, $0) }))
+                                text: missing ? "Install \(provider.title) first, then you can offer it." : "Shows \(provider.title) as a choice when you start a new chat from the notch.",
+                                isOn: Binding(get: { model.offers(provider) && !missing }, set: { model.setOffers(provider, $0) }))
+                        .disabled(missing)
+                        .opacity(missing ? 0.55 : 1)
                 }
             }
         }
         .task { await model.refresh(); await model.checkAllSignIns() }
+    }
+
+    /// The row's sentence must agree with its status pill and button. The two are computed separately
+    /// (Gemini can have a config folder without the tool), so the primary step decides: a row that says
+    /// "Not found" never also says "Found on this Mac".
+    private func detail(_ provider: AIProvider, step: AIConnectStep) -> String {
+        let base = model.detail(provider, services: services)
+        if step == .install, base.hasPrefix("Found on this Mac") {
+            return "Not found on this Mac. Install shows the official command."
+        }
+        return base
     }
 
     private func connection(_ provider: AIProvider) -> some View {
@@ -55,7 +71,7 @@ struct AIConnectionsPage: View {
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
-                GSRow(title: provider.title, text: model.detail(provider, services: services)) {
+                GSRow(title: provider.title, text: detail(provider, step: step)) {
                     HStack(spacing: 10) {
                         if connected { GSStatus(ok: true, text: provider.kind == .app ? "Available" : "Connected") }
                         else if step == .install { GSStatus(ok: false, text: "Not found") }

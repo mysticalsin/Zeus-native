@@ -9,9 +9,9 @@ struct ZeusVoiceCards: View {
 
     var body: some View {
         GSCard {
-            GSRow(symbol: "waveform", title: UltronVoicePlan.presetTitle) { EmptyView() }
+            GSRow(symbol: "waveform", title: UltronVoicePlan.presetTitle, text: "The voice Zeus answers with unless you pick another below.")
             GSDivider()
-            GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
+            GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", text: "Zeus reads its answers aloud instead of only showing them.", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
             GSDivider()
             GSRow(symbol: "theatermasks", title: "Personality") {
                 GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
@@ -25,7 +25,7 @@ struct ZeusVoiceCards: View {
                 }), options: VoiceOrbStyle.allCases.map(\.title), label: "Voice orb style")
             }
             GSDivider()
-            GSToggleRow(symbol: "waveform.badge.plus", title: "Ultron effect",
+            GSToggleRow(symbol: "waveform.badge.plus", title: "Ultron effect", text: "Adds a layered, robotic edge to the spoken voice.",
                         isOn: Binding(get: { UltronVoiceEffect.enabled }, set: { UltronVoiceEffect.enabled = $0 }))
             GSDivider()
             GSRow(symbol: "slider.horizontal.3", title: "Effect intensity", text: String(format: "%.0f%%", UltronVoiceEffect.intensity * 100)) {
