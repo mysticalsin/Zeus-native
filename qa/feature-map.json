@@ -3366,7 +3366,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
-              "function": "wakeForcesBothTargets"
+              "function": "talkKeyDownWarmsBothTargets"
             },
             {
               "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",

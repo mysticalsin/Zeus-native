@@ -86,7 +86,7 @@ public struct ZeusAction: Equatable, Sendable {
     }
 
     /// Actions that always need the user's OK, regardless of site consent.
-    public var alwaysNeedsConsent: Bool { kind == .delegateChrome }
+    public var alwaysNeedsConsent: Bool { ModelActionApproval.alwaysNeedsConsent(self) }
 
     /// The tag a model writes for this action, e.g. `[ACTION:{"type":"browser.back"}]`.
     /// Keys are sorted and `type` always matches `kind`, so parsing it gives this action back.
@@ -325,4 +325,34 @@ public struct ZeusTagStreamParser: Sendable {
         outputs.append(contentsOf: result.tags.map(Output.tag))
         return outputs
     }
+}
+
+/// Which model-proposed actions stop for a card before they run, whatever the site or session
+/// consent. Everything else is either read-only (reading a page, research, presenting a card, a
+/// walkthrough) or has its own gate: shell lines go through `ShellRiskClassifier`, Mac driving
+/// through the drive autonomy setting, page changes through per-site consent.
+public enum ModelActionApproval {
+    /// Sending text to another service, and starting a coding agent with a model-written prompt.
+    public static func needsCard(_ action: ZeusAction) -> Bool {
+        action.kind == .terminalAgent || alwaysNeedsConsent(action)
+    }
+
+    /// The Chrome-side subset: anything that hands a prompt to ChatGPT, Claude or Dust.
+    public static func alwaysNeedsConsent(_ action: ZeusAction) -> Bool {
+        switch action.kind {
+        case .delegateChrome, .delegateDust: true
+        case .panelOpen: !(action.payload["prompt"]?.stringValue ?? "").isEmpty
+        default: false
+        }
+    }
+
+    /// A page click whose label sends, deletes or buys asks every time, even on a site already allowed.
+    public static func clickAlwaysAsks(label: String?) -> Bool {
+        guard let label, !label.isEmpty else { return false }
+        if HandsGate.intent(clicking: label) != nil { return true }
+        let words = label.lowercased().split { !$0.isLetter }.map(String.init)
+        return words.contains { sensitiveWords.contains($0) }
+    }
+
+    private static let sensitiveWords: Set<String> = ["send", "delete", "buy", "purchase", "pay", "checkout", "remove"]
 }

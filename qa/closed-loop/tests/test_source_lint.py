@@ -368,5 +368,58 @@ class VoiceLatencyLint(unittest.TestCase):
         self.assertTrue(re.search(r"while\s+cursor\s*<\s*candidates\.count", "while cursor < candidates.count {"))
 
 
+# Model downloads and launch warm-ups (docs/SECURITY-FIXES-20261111.md): a model download starts only from an
+# explicit user button, and the brains are never pinged at launch or wake.
+SPEECH_ENGINES_FILE = "Dictation/SpeechEngines.swift"
+DOWNLOAD_CALLS = re.compile(r"\bAsrModels\.(?:downloadAndLoad|download)\b|\bWhisperKit\.download\b|\bDiarizerModels\.download\b")
+
+
+def parakeet_transcribe_body(text):
+    start = text.index("func transcribe(samples")
+    return text[start:text.index("\n    }\n", start)]
+
+
+class ModelDownloadConsentLint(unittest.TestCase):
+    def test_parakeet_download_is_named_only_in_the_engine_file(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if str(p.relative_to(APP)) != SPEECH_ENGINES_FILE
+                     for n, line in code_lines(p) if re.search(r"\bAsrModels\.(?:downloadAndLoad|download)\b", line)]
+        self.assertEqual(offenders, [], "only SpeechEngines.swift may download the Parakeet model")
+
+    def test_download_is_behind_the_explicit_prepare_path(self):
+        text = "\n".join(line for _, line in code_lines(APP / SPEECH_ENGINES_FILE))
+        self.assertIn("allowDownload: true", text)
+        self.assertLess(text.index("if downloading, !allowDownload"), text.index("AsrModels.downloadAndLoad"))
+        prepare = text[text.index("func prepare(progress"):text.index("func transcribe(samples")]
+        self.assertIn("allowDownload: true", prepare)
+        self.assertNotIn("allowDownload: true", parakeet_transcribe_body(text), "transcribe must never download")
+        self.assertIn("allowDownload: false", parakeet_transcribe_body(text))
+
+    def test_no_model_download_call_runs_from_launch_or_wake(self):
+        for name in ("App/AppDelegate.swift", "App/VoiceTurnController.swift", "Brain/BrainWarmScheduler.swift"):
+            text = "\n".join(line for _, line in code_lines(APP / name))
+            self.assertIsNone(DOWNLOAD_CALLS.search(text), name)
+
+    def test_launch_and_wake_do_not_warm_the_brains(self):
+        voice = "\n".join(line for _, line in code_lines(APP / "App/VoiceTurnController.swift"))
+        self.assertNotIn("BrainLaunchWarm", voice)
+        self.assertNotIn(".prewarm()", voice)
+        self.assertIn("BrainWarmScheduler.shared.talkKeyDown()", voice)
+        scheduler = "\n".join(line for _, line in code_lines(APP / "Brain/BrainWarmScheduler.swift"))
+        self.assertNotIn("didWakeNotification", scheduler)
+        self.assertNotIn("forced", scheduler)
+
+    def test_the_hud_monitor_has_no_constant_fast_timer(self):
+        text = "\n".join(line for _, line in code_lines(APP / "TopBar/SystemHUDMonitor.swift"))
+        self.assertNotRegex(text, r"Timer\(timeInterval:\s*0\.1")
+        self.assertNotIn("repeats: true", text)
+        self.assertIn("SystemHUDPollPolicy", text)
+
+    def test_lint_detects_its_failure_shapes(self):
+        self.assertTrue(DOWNLOAD_CALLS.search("let m = try await AsrModels.downloadAndLoad(version: v)"))
+        self.assertTrue(re.search(r"Timer\(timeInterval:\s*0\.1", "pollTimer = Timer(timeInterval: 0.1, repeats: true) {"))
+        sample = "func transcribe(samples: [Float]) async throws -> String {\n        let m = try await loadedManager(progress: nil, allowDownload: true)\n    }\n"
+        self.assertIn("allowDownload: true", parakeet_transcribe_body(sample))
+
+
 if __name__ == "__main__":
     unittest.main()

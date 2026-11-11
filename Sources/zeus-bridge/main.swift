@@ -145,7 +145,7 @@ let lifetime = HostLifetime()
 do {
     let relay = try Relay(lifetime: lifetime)
     let input = try NativeMessageInput(handle: .standardInput)
-    let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path) { [relay] line, reply in
+    let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path, peerPolicy: .sameUserExecutable(ChromeSocketPeers.allowedExecutables)) { [relay] line, reply in
         relay.forward(line, reply: reply)
     }
     lifetime.attach(input: input, server: server)

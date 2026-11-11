@@ -33,29 +33,38 @@ final class ParakeetEngine: TranscriptionEngine, @unchecked Sendable {
         return isDownloaded ? .ready : .notDownloaded
     }
 
+    /// The only path that may download the model. It runs from a Download button (Settings, onboarding),
+    /// or to load a model already on disk; `transcribe` never reaches the network.
     func prepare(progress report: (@Sendable (Double) -> Void)?) async throws {
-        _ = try await loadedManager(progress: report)
+        _ = try await loadedManager(progress: report, allowDownload: true)
     }
 
     func transcribe(samples: [Float], hints: [String], language: String?) async throws -> String {
         guard !samples.isEmpty else { throw TranscriptionError.noSpeech }
-        let manager = try await loadedManager(progress: nil)
+        let manager = try await loadedManager(progress: nil, allowDownload: false)
         var state = TdtDecoderState.make()
         let code = DictationLanguage.engineLanguageCode(for: language)
         let scriptHint = code.flatMap(Language.init(rawValue:))
         return try await manager.transcribe(samples, decoderState: &state, language: scriptHint).text
     }
 
-    private func loadedManager(progress report: (@Sendable (Double) -> Void)?) async throws -> AsrManager {
+    private func loadedManager(progress report: (@Sendable (Double) -> Void)?, allowDownload: Bool) async throws -> AsrManager {
         let task: Task<AsrManager, Error> = lock.withLock {
             if let manager { return Task { manager } }
             if let loading { return loading }
             let downloading = !isDownloaded
+            // A missing model is never fetched unless the caller is the explicit download path.
+            if downloading, !allowDownload { return Task<AsrManager, Error> { throw TranscriptionError.notReady(self.kind) } }
             if downloading { progress = 0 }
             let task = Task { [self] () throws -> AsrManager in
-                let models = try await AsrModels.downloadAndLoad(version: self.version) { update in
-                    self.lock.withLock { self.progress = update.fractionCompleted }
-                    report?(update.fractionCompleted)
+                let models: AsrModels
+                if downloading {
+                    models = try await AsrModels.downloadAndLoad(version: self.version) { update in
+                        self.lock.withLock { self.progress = update.fractionCompleted }
+                        report?(update.fractionCompleted)
+                    }
+                } else {
+                    models = try await AsrModels.load(from: self.modelDirectory, version: self.version)
                 }
                 let manager = AsrManager(config: .default)
                 try await manager.loadModels(models)
