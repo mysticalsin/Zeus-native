@@ -26,6 +26,8 @@ final class AIConnections {
     private(set) var hookAvailable: [AgentHookConfig.Agent: Bool] = [:]
     private(set) var serverModels: [AIProvider: Int] = [:]
     private(set) var checking = false
+    /// Counts overlapping refreshes, so one finishing cannot clear `checking` while another still probes.
+    @ObservationIgnored private var refreshes = OverlapCounter()
     var messages: [AIProvider: String] = [:]
     var anyLLM: AnyLLMConfig {
         didSet {
@@ -158,8 +160,9 @@ final class AIConnections {
     /// Detects installed tools and probes the local servers. Only files and loopback ports are
     /// touched, so nothing paid can run.
     func refresh(only provider: AIProvider? = nil) async {
+        refreshes.begin()
         checking = true
-        defer { checking = false }
+        defer { refreshes.end(); checking = refreshes.isActive }
         await detect()
         for local in AIProvider.allCases where local.localPort != nil && (provider == nil || provider == local) {
             serverModels[local] = await Self.probe(local)

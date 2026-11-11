@@ -21,8 +21,10 @@ final class PolyglotController {
     let settings = PolyglotSettings.shared
 
     // What the card shows.
-    private(set) var isListening = false
-    private(set) var isStarting = false
+    /// The run's one state (see `PolyglotRun`): idle, starting, listening or stopping.
+    private(set) var run = PolyglotRun.State.idle
+    var isListening: Bool { run.isListening }
+    var isStarting: Bool { run.isStarting }
     private(set) var transcript = PolyglotTranscript()
     /// The line being said per input; only the current utterance's partial is ever kept.
     private(set) var live = PolyglotLivePartials()
@@ -115,22 +117,30 @@ final class PolyglotController {
 
     // MARK: Start and stop
 
-    func toggle() { isListening || isStarting ? stop() : start() }
+    func toggle() { run.isActive ? stop() : start() }
+
+    /// Runs one event through the run model and returns its effects.
+    @discardableResult
+    private func send(_ event: PolyglotRun.Event) -> [PolyglotRun.Effect] {
+        let (next, effects) = PolyglotRun.reduce(run, event)
+        run = next
+        return effects
+    }
 
     func start(source: PolyglotSource? = nil) {
         guard settings.enabled else {
             onHint("Polyglot is off. Turn it on in Settings, Polyglot.")
             return
         }
-        guard !isListening, !isStarting else { return }
+        guard !run.isActive else { return }
         let chosen = source ?? settings.source
         activeSource = chosen
-        isStarting = true
         notice = nil
         permissionPane = nil
         packNeeded = nil
         generation += 1
         let token = generation
+        send(.startRequested(token: token))
         // Captions start on the deployment target. On-device translation is checked per language
         // pair and stays unavailable below macOS 26; the heard line is still shown.
         startTask = Task { [weak self] in await self?.begin(chosen, generation: token) }
@@ -139,12 +149,12 @@ final class PolyglotController {
     func stop() {
         // Invalidate any start still waiting on a prompt or a capture: whatever it finishes is torn down.
         generation += 1
+        let stopToken = generation
         startTask?.cancel()
         startTask = nil
-        isStarting = false
         live.dropPartials()
-        let wasLive = isListening || pipeline != nil
-        isListening = false
+        let wasLive = run.isListening || pipeline != nil
+        send(.stopRequested(token: stopToken))
         mic?.stop()
         system?.stop()
         mic = nil
@@ -152,7 +162,7 @@ final class PolyglotController {
         audioIn?.finish()
         audioIn = nil
         level = 0
-        guard wasLive else { return }
+        guard wasLive else { send(.drained(token: stopToken)); return }
         let closing = pipeline
         pipeline = nil
         // Let the last utterance land: the event stream ends only once this run's audio is ingested and its
@@ -163,14 +173,15 @@ final class PolyglotController {
         let eventEnd = eventIn
         eventIn = nil
         eventTask = nil
-        Task {
+        Task { [weak self] in
             await ingesting?.value
             await closing?.finish()
             eventEnd?.finish()
+            self?.send(.drained(token: stopToken))
         }
     }
 
-    private func isCurrent(_ token: Int) -> Bool { token == generation && !Task.isCancelled }
+    private func isCurrent(_ token: Int) -> Bool { run.isStarting(token: token) && !Task.isCancelled }
 
     private func begin(_ source: PolyglotSource, generation token: Int) async {
         // Engine: Parakeet v3 when it is already on this Mac, Apple's on-device recognizer otherwise.
@@ -183,7 +194,8 @@ final class PolyglotController {
             guard isCurrent(token) else { return }
             // Fail closed: never send captions audio to Apple's servers under an on-device label.
             if let problem = PolyglotRecognizer.appleOnDeviceProblem() {
-                isStarting = false
+                send(.startFailed(token: token, message: problem))
+                startTask = nil
                 notice = problem
                 if SFSpeechRecognizer.authorizationStatus() != .authorized { permissionPane = "Privacy_SpeechRecognition" }
                 onHint(problem)
@@ -225,81 +237,74 @@ final class PolyglotController {
             }
         }
 
-        var problems: [String] = []
-        var started = false
         if source.usesMicrophone {
             let capture = PolyglotMicCapture()
             capture.onStopped = { [weak self] message in
-                Task { @MainActor in self?.micStopped(message, token: token) }
+                Task { @MainActor in self?.inputEnded(.microphone, message: message, token: token) }
             }
             do {
                 try await capture.start { [weak self] chunk in
                     audioContinuation.yield(.samples(.microphone, chunk.samples))
                     Task { @MainActor in self?.updateLevel(chunk.level) }
                 }
-                // Stop was pressed while the capture was starting: never leave the mic running.
-                guard isCurrent(token) else { capture.stop(); audioContinuation.finish(); return }
-                mic = capture
-                started = true
+                // Stop was pressed while the capture was starting, or it ended on its own: never leave the mic running.
+                let effects = send(.inputOpened(token: token, input: .microphone))
+                if effects.contains(.release(.microphone)) { capture.onStopped = nil; capture.stop() } else { mic = capture }
+                guard isCurrent(token) else { audioContinuation.finish(); return }
             } catch {
                 guard isCurrent(token) else { capture.stop(); audioContinuation.finish(); return }
-                problems.append(error.localizedDescription)
+                send(.inputFailed(token: token, input: .microphone, message: error.localizedDescription))
                 if case PolyglotAudioError.microphoneDenied = error { permissionPane = "Privacy_Microphone" }
             }
         }
         if source.usesSystemAudio {
             let capture = PolyglotSystemCapture()
             capture.onStopped = { [weak self] message in
-                Task { @MainActor in self?.systemStopped(message, token: token) }
+                Task { @MainActor in self?.inputEnded(.system, message: message, token: token) }
             }
             do {
                 try await capture.start { [weak self] chunk in
                     audioContinuation.yield(.samples(.system, chunk.samples))
                     Task { @MainActor in self?.updateLevel(chunk.level) }
                 }
-                guard isCurrent(token) else {
-                    capture.onStopped = nil
-                    capture.stop()
-                    audioContinuation.finish()
-                    return
-                }
-                system = capture
-                started = true
+                let effects = send(.inputOpened(token: token, input: .system))
+                if effects.contains(.release(.system)) { capture.onStopped = nil; capture.stop() } else { system = capture }
+                guard isCurrent(token) else { audioContinuation.finish(); return }
             } catch {
                 guard isCurrent(token) else { audioContinuation.finish(); return }
-                problems.append(error.localizedDescription)
+                send(.inputFailed(token: token, input: .system, message: error.localizedDescription))
                 if case PolyglotAudioError.screenRecordingDenied = error { permissionPane = "Privacy_ScreenCapture" }
             }
         }
-        // The mic may have started before this check: a stop in between has already torn the session down.
-        guard isCurrent(token) else {
-            mic?.stop(); mic = nil
-            system?.stop(); system = nil
-            audioContinuation.finish()
-            return
+        // A stop or a newer start in between has already torn this run down: only its own stream is left to end.
+        for effect in send(.startSettled(token: token)) {
+            switch effect {
+            case .discarded:
+                audioContinuation.finish()
+            case .aborted(let notes):
+                startTask = nil
+                notice = notes.isEmpty ? nil : notes.joined(separator: " ")
+                if let first = notes.first { onHint(first) }
+                audioContinuation.finish()
+                audioIn = nil
+                self.pipeline = nil
+                eventIn?.finish()
+                eventIn = nil
+                eventTask = nil
+            case .began(let notes):
+                startTask = nil
+                if !notes.isEmpty { notice = notes.joined(separator: " ") }
+            case .release, .endRun:
+                break
+            }
         }
-        isStarting = false
-        startTask = nil
-        guard started else {
-            notice = problems.joined(separator: " ")
-            if let first = problems.first { onHint(first) }
-            audioContinuation.finish()
-            audioIn = nil
-            self.pipeline = nil
-            eventIn?.finish()
-            eventIn = nil
-            eventTask = nil
-            return
-        }
-        isListening = true
-        if !problems.isEmpty { notice = problems.joined(separator: " ") }
     }
 
     private func ensureSpeechAuthorization() async { await SpeechAuthorization.ensure() }
 
     private func updateLevel(_ value: Double) {
         // A chunk already queued when Stop was pressed must not light the meter again.
-        guard isListening || isStarting else { return }
+        guard run.isActive else { return }
         let now = Date()
         guard now.timeIntervalSince(lastLevelAt) > 0.05 else { return }
         lastLevelAt = now
@@ -308,24 +313,29 @@ final class PolyglotController {
 
     // MARK: Events
 
-    /// Mac audio ended on its own: drop it, and end the run when it was the only source.
-    private func systemStopped(_ message: String, token: Int) {
-        guard token == generation else { return }
-        system?.onStopped = nil
-        system?.stop()
-        system = nil
+    /// An input ended on its own (the Mac's microphone changed or went away, Mac audio stopped): drop it, and
+    /// end the run when it was the last one. A stale token, or an input that is not open, changes nothing.
+    private func inputEnded(_ input: PolyglotRun.Input, message: String, token: Int) {
+        let before = run
+        let effects = send(.inputEnded(token: token, input: input, message: message))
+        guard run != before || !effects.isEmpty else { return }
+        for effect in effects {
+            switch effect {
+            case .release(.microphone):
+                mic?.onStopped = nil
+                mic?.stop()
+                mic = nil
+            case .release(.system):
+                system?.onStopped = nil
+                system?.stop()
+                system = nil
+            case .endRun:
+                stop()
+            default:
+                break
+            }
+        }
         notice = message
-        if mic == nil { stop(); notice = message }
-    }
-
-    /// The Mac's microphone changed or went away mid-run: drop it, and end the run when it was the only source.
-    private func micStopped(_ message: String, token: Int) {
-        guard token == generation else { return }
-        mic?.onStopped = nil
-        mic?.stop()
-        mic = nil
-        notice = message
-        if system == nil { stop(); notice = message }
     }
 
     private func handle(_ event: PolyglotEvent, epoch eventEpoch: Int) {
@@ -510,7 +520,7 @@ final class PolyglotController {
         ])
         live.applyPartial(side: .system, id: 5, text: "Perfeito, então podemos")
         detectedLanguage = "pt"
-        isListening = true
+        run = .listening(token: generation, open: [.microphone, .system])
         activeSource = .both
         engineName = "Parakeet v3"
         level = 0.55

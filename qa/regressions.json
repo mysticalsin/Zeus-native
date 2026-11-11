@@ -2339,7 +2339,7 @@
     },
     {
       "id": "REG-194",
-      "failure": "A rejected Chat switch could leave another conversation\u2019s private history active for submission under the newly selected Chat.",
+      "failure": "A rejected Chat switch could leave another conversation’s private history active for submission under the newly selected Chat.",
       "features": [
         "F09"
       ],
@@ -2856,6 +2856,126 @@
       "guard": {
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_engines_are_raced_in_parallel_never_tried_one_after_another"
+      }
+    },
+    {
+      "id": "REG-227",
+      "failure": "Closing the welcome guide before the last step recorded nothing, so the guide reopened by itself at the saved step on every launch.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/OnboardingProgressTests.swift",
+        "function": "closingOnStepThreeThenRelaunchingDoesNotReopen"
+      }
+    },
+    {
+      "id": "REG-228",
+      "failure": "A background Automation check that began before the person clicked Allow finished later and overwrote the new grant, deleting the saved grant until the next refresh.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AutomationConsentCacheTests.swift",
+        "function": "olderCheckReportingNeedsConsentCannotOverwriteANewerGrant"
+      }
+    },
+    {
+      "id": "REG-229",
+      "failure": "Settings Automation Allow more did nothing when the only open app was already allowed, never named the apps to open, and failed silently for an app macOS had refused.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AutomationAllowPlanTests.swift",
+        "function": "allowMoreWithOnlyAnAllowedAppOpenAsksNothingAndNamesTheOthers"
+      }
+    },
+    {
+      "id": "REG-241",
+      "failure": "A Polyglot input that ended while the run was still starting was counted as open, so the run showed Listening on a dead microphone or stopped a two-input run early.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotRunTests.swift",
+        "function": "anInputThatEndedBeforeItsStartFinishedIsNeverCountedAsOpen"
+      }
+    },
+    {
+      "id": "REG-242",
+      "failure": "Stopping Polyglot and starting it again quickly let the first run's late start stop the second run's microphone.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotRunTests.swift",
+        "function": "stopThenQuickStartKeepsTheNewRunAndIgnoresTheOldRunsLateEvents"
+      }
+    },
+    {
+      "id": "REG-243",
+      "failure": "A second final result while the speech recognizer was restarting opened a second recognition task for the same dictation turn.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechRecorderTests.swift",
+        "function": "aSecondFinalDuringARestartDoesNotOpenAnotherTask"
+      }
+    },
+    {
+      "id": "REG-244",
+      "failure": "When the Hey Zeus listener could not start it retried every 10 or 30 seconds forever and logged the same failure each time, with no needs-attention state.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WakeRetryTests.swift",
+        "function": "retriesAreBoundedThenNeedAttentionAndNothingStartsAgain"
+      }
+    },
+    {
+      "id": "REG-245",
+      "failure": "A microphone level queued just before the teleprompter ended landed after the reset and lit the meter again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PrompterRunTests.swift",
+        "function": "aLevelQueuedBeforeEndCannotLandAfterIt"
+      }
+    },
+    {
+      "id": "REG-246",
+      "failure": "A feature that asked twice for Accessibility was started twice when access arrived, and a feature turned off while waiting kept the 3 second poll running forever.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TrustWaitTests.swift",
+        "function": "askingTwiceUnderTheSameKeyStartsTheFeatureOnce"
+      }
+    },
+    {
+      "id": "REG-247",
+      "failure": "The first of two overlapping Beamer commands or connection refreshes to finish cleared the busy flag while the other was still running.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
+        "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
     }
   ]
