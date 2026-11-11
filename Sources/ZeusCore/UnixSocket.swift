@@ -150,6 +150,7 @@ public final class UnixSocketServer: @unchecked Sendable {
     static let maximumConnections = 32
 
     private let path: String
+    private let peerPolicy: PeerPolicy
     private let handler: Handler
     private let lock = NSLock()
     private let acceptQueue = DispatchQueue(label: "zeus.socket.accept")
@@ -159,7 +160,11 @@ public final class UnixSocketServer: @unchecked Sendable {
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
 
-    public init(path: String, handler: @escaping Handler) { self.path = path; self.handler = handler }
+    public init(path: String, peerPolicy: PeerPolicy = .sameUser, handler: @escaping Handler) {
+        self.path = path
+        self.peerPolicy = peerPolicy
+        self.handler = handler
+    }
 
     deinit { stop() }
 
@@ -217,6 +222,13 @@ public final class UnixSocketServer: @unchecked Sendable {
                 return
             }
             guard UnixSocket.prepare(client) else { close(client); continue }
+            // Refuse before any byte is read: only the owner (and, where set, the named program) may talk.
+            let peer = PeerCheck.identify(fd: client)
+            if case .deny(let reason) = PeerCheck.decide(peerPolicy, ownUID: UInt32(geteuid()), peer: peer) {
+                NSLog("[ZEUS] socket %@: connection refused (%@, pid %d)", (path as NSString).lastPathComponent, reason, peer?.pid ?? -1)
+                close(client)
+                continue
+            }
             let id = UUID()
             let connection = Connection(fd: client) { [weak self] in
                 guard let self else { return }

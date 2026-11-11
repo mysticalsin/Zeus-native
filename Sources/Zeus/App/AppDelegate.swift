@@ -576,8 +576,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// prompt happens until the keys are held, and a screenshot needs Screen Recording already granted.
     private func syncPointing() {
         guard on(.pointingHotkey) else { return }
+        syncDictationPreset()
         if PointingSettings.enabled { pointingController().start() }
         else if let pointing { pointing.stop(); self.pointing = nil; pointingProviders = nil }
+    }
+
+    /// The optional Fn+Control dictation key. Off by default; turning it off restores the previous key.
+    private func syncDictationPreset() {
+        let defaults = UserDefaults.standard
+        let current = Shortcut.stored(ShortcutStore.loadDictation(defaults))
+        guard let step = DictationFnControlPreset.next(wanted: PointingSettings.dictationFnControl, current: current,
+                                                       saved: defaults.string(forKey: DictationFnControlPreset.savedKey)) else { return }
+        let next: Shortcut? = Shortcut.parse(step.key)
+        guard next != nil || step.key == "off" else { return }
+        if let saved = step.saved { defaults.set(saved, forKey: DictationFnControlPreset.savedKey) }
+        else { defaults.removeObject(forKey: DictationFnControlPreset.savedKey) }
+        DictationSettings.shared.key = next
     }
 
     private func pointingController() -> PointingController {

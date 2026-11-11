@@ -22,6 +22,10 @@ public struct PointingSession: Equatable, Sendable {
         case firstPlaybackStart
         case buffering
         case guidanceAdmitted
+        /// The gesture's watchdog saw no release (stuck modifier): end the hold as if released.
+        case holdTimedOut
+        /// The Mac is going to sleep or woke, or the displays changed: capture geometry is void.
+        case systemSleep, systemWake, displaysChanged
         case clickInTarget
         case turnCompleted
         case permissionLost
@@ -69,7 +73,14 @@ public struct PointingSession: Equatable, Sendable {
             next = .listening; generation += 1; effects = [.stopOutput, .startListening]
         case (.listening, .strokeBegan): next = .drawing
         case (.drawing, .strokeEnded): next = .listening
-        case (.listening, .keyUp), (.drawing, .keyUp):
+        case (.listening, .systemSleep), (.listening, .systemWake), (.listening, .displaysChanged),
+             (.drawing, .systemSleep), (.drawing, .systemWake), (.drawing, .displaysChanged):
+            next = .cancelled; generation += 1; effects = [.discardCapture, .hideInk]
+        case (.processing, .systemSleep), (.processing, .systemWake), (.processing, .displaysChanged),
+             (.speaking, .systemSleep), (.speaking, .systemWake), (.speaking, .displaysChanged),
+             (.guiding, .systemSleep), (.guiding, .systemWake), (.guiding, .displaysChanged):
+            next = .interrupted; generation += 1; effects = [.stopOutput]
+        case (.listening, .keyUp), (.drawing, .keyUp), (.listening, .holdTimedOut), (.drawing, .holdTimedOut):
             next = .processing; generation += 1; effects = [.stopListening, .hideInk]
         case (.listening, .spoiled), (.drawing, .spoiled), (.listening, .escape), (.drawing, .escape):
             next = .cancelled; generation += 1; effects = [.discardCapture, .hideInk]

@@ -111,23 +111,67 @@ public struct BundleUpdateSource: UpdateSource {
     public init(bundleShortVersion: String) { self.bundleShortVersion = bundleShortVersion }
     public func currentVersion() -> ZeusVersion { ZeusVersion(parsing: bundleShortVersion) ?? ZeusVersion(major: 0, minor: 0, patch: 0) }
     public func latestOffer(feedEnabled: Bool, feedURL: String?) async -> UpdateOffer? {
-        guard feedEnabled, let feedURL, let url = URL(string: feedURL), !feedURL.isEmpty else { return nil }
+        guard feedEnabled, let feedURL, let url = UpdateFeedPolicy.feedURL(from: feedURL) else { return nil }
         return await FeedUpdateFetcher.fetch(from: url)
+    }
+}
+
+/// What an update feed and the link inside it may be. There is no signature or hash in the feed
+/// format, so the one guarantee is the transport: HTTPS only, no credentials in the URL, and no
+/// redirect that leaves HTTPS. The download link only opens in the browser; Zeus never installs it.
+public enum UpdateFeedPolicy {
+    public static let maximumFeedBytes = 256 * 1024
+
+    public static func isSecure(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", let host = url.host, !host.isEmpty else { return false }
+        return url.user == nil && url.password == nil
+    }
+
+    /// The feed address typed in Settings, or nil when it is empty, malformed or not HTTPS.
+    public static func feedURL(from string: String?) -> URL? {
+        guard let trimmed = string?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty,
+              let url = URL(string: trimmed), isSecure(url) else { return nil }
+        return url
+    }
+
+    /// The download link from the feed; anything but HTTPS is dropped (no file:, http: or app schemes).
+    public static func downloadURL(from string: String?) -> URL? {
+        feedURL(from: string)
+    }
+}
+
+/// Refuses any redirect that would leave HTTPS.
+final class HTTPSOnlyRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(request.url.map(UpdateFeedPolicy.isSecure) == true ? request : nil)
     }
 }
 
 public enum FeedUpdateFetcher {
     public static func fetch(from url: URL) async -> UpdateOffer? {
+        guard UpdateFeedPolicy.isSecure(url) else { return nil }
+        let session = URLSession(configuration: .ephemeral, delegate: HTTPSOnlyRedirects(), delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let versionString = json["version"] as? String,
-                  let latest = ZeusVersion(parsing: versionString) else { return nil }
-            let link = (json["downloadURL"] as? String).flatMap(URL.init(string:))
-            return UpdateOffer(latest: latest, downloadURL: link)
+            var request = URLRequest(url: url, timeoutInterval: 15)
+            request.httpShouldHandleCookies = false
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  response.url.map(UpdateFeedPolicy.isSecure) == true,
+                  data.count <= UpdateFeedPolicy.maximumFeedBytes else { return nil }
+            return offer(from: data)
         } catch {
             return nil
         }
+    }
+
+    /// Parses the feed JSON. A bad or non-HTTPS download link is dropped; the version still counts.
+    public static func offer(from data: Data) -> UpdateOffer? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let versionString = json["version"] as? String,
+              let latest = ZeusVersion(parsing: versionString) else { return nil }
+        return UpdateOffer(latest: latest, downloadURL: UpdateFeedPolicy.downloadURL(from: json["downloadURL"] as? String))
     }
 }
 

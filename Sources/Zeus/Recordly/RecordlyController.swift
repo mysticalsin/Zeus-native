@@ -532,12 +532,12 @@ final class RecordlyController {
             self.elapsed = elapsed
         case .saved:
             project = RecordlyProject(
-                source: .display(id: displays.first?.id ?? 1), audio: audio, rawMediaPath: "/Users/fixture/Movies/Zeus Recordly/clip.mp4",
+                source: .display(id: displays.first?.id ?? 1), audio: audio, rawMediaPath: "/Users/fixture/Movies/Zeus Recordings/clip.mp4",
                 cursorSamples: []
             )
             projectPhase = .editor
             self.elapsed = 74
-            lastMediaURL = URL(fileURLWithPath: "/Users/fixture/Movies/Zeus Recordly/clip.mp4")
+            lastMediaURL = URL(fileURLWithPath: "/Users/fixture/Movies/Zeus Recordings/clip.mp4")
             previewUnavailableReason = "Preview unavailable in this snapshot."
         }
     }
@@ -703,7 +703,7 @@ final class RecordlyController {
     /// authority and a visible reason; the editor still opens and nothing is copied or deleted.
     private func acquireMediaAuthority(for project: RecordlyProject) {
         guard let store = Self.checkpointStore() else {
-            setMediaAuthority(nil, reason: "Zeus's Recordly folder is unavailable, so this recording cannot be previewed.")
+            setMediaAuthority(nil, reason: "Zeus's recordings folder is unavailable, so this recording cannot be previewed.")
             return
         }
         do {
@@ -914,7 +914,7 @@ final class RecordlyController {
     func discardRecording(deleteMedia: Bool) {
         guard phase == .editor, !isExporting else { return }
         guard let store = Self.checkpointStore() else {
-            checkpointWarning = "Zeus's Recordly folder is unavailable, so the saved recording could not be discarded."
+            checkpointWarning = "Zeus's recordings folder is unavailable, so the saved recording could not be discarded."
             isConfirmingNew = false
             return
         }
@@ -995,7 +995,7 @@ final class RecordlyController {
             let gifRequested = plan.exportFormats.contains(.gif)
             var lines = ["ok=\(mp4Report.ok && !gifRequested) mp4=\(mp4.path)", mp4Report.detail]
             if plan.exportFormats.contains(.gif) {
-                lines.append("gifExport=not-run: use the Recordly editor to verify a real GIF export.")
+                lines.append("gifExport=not-run: use the Record editor to verify a real GIF export.")
             }
             // The replaced project's authority, pending save and warning must not outlive it.
             discardProjectBindings(reason: "Debug captures are not pinned for preview.")

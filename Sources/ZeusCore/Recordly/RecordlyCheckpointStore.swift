@@ -40,7 +40,7 @@ public struct RecordlyCheckpointStore: Sendable {
         public var errorDescription: String? {
             switch self {
             case .invalidRoot(let which): "The \(which) folder path is not a clean absolute path."
-            case .mediaOutsideTrustedRoot: "The recording is outside Zeus's Recordly folder, so it cannot be checkpointed."
+            case .mediaOutsideTrustedRoot: "The recording is outside Zeus's recordings folder, so it cannot be checkpointed."
             case .pathEscape: "A symbolic link or non-folder was found in the checkpoint or recording path, so it was refused."
             case .notFound: "The checkpoint folder or file does not exist."
             case .mediaMissing: "The recording file is missing."

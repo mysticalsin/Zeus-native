@@ -79,16 +79,16 @@ struct BrainWarmActions {
     }
 }
 
-/// Keeps the brains warm only while Zeus is in use (`BrainWarmPlan`): a loose 2-minute check, a free
-/// metadata call for the cloud connection, a one-token ping for the local model. Launch and wake
-/// from sleep warm both model connections; voice warms only when Kokoro is selected and ready.
-/// The loose check remains scheduled while idle, but an ordinary idle check makes no warm calls.
+/// Keeps the brains warm only while voice is in use (`BrainWarmPlan`). Nothing runs at launch or
+/// wake. The talk key going down starts the first warm-up and a loose 2-minute timer (a free
+/// metadata call for the cloud connection, a one-token ping for the local model); the timer
+/// stops itself when the active window passes, so an idle app has no timer and no calls.
 @MainActor
 final class BrainWarmScheduler {
     static let shared = BrainWarmScheduler()
 
+    private var enabled = false
     private var timer: Timer?
-    private var wakeObserver: NSObjectProtocol?
     private var lastActivity: Date?
     private var lastCloud: Date?
     private var lastLocal: Date?
@@ -100,33 +100,41 @@ final class BrainWarmScheduler {
         await BrainWarmActions.live.run(targets)
     }
 
+    /// Allows warm-ups; starts nothing.
     func start() {
-        guard timer == nil, !TopBarStyle.isSnapshot else { return }
-        // The launch warm-up (VoiceTurnController) already ran; the first check is one interval away.
+        guard !TopBarStyle.isSnapshot else { return }
+        enabled = true
+    }
+
+    /// The talk key went down: warm now, and keep warm while the conversation goes on.
+    func talkKeyDown() {
+        noteActivity()
+        Task { await tick() }
+    }
+
+    /// The person pressed the key, spoke or asked something.
+    func noteActivity() {
         lastActivity = now()
-        lastCloud = lastActivity
-        lastLocal = lastActivity
+        armTimer()
+    }
+
+    private func armTimer() {
+        guard enabled, timer == nil else { return }
         let timer = Timer.scheduledTimer(withTimeInterval: BrainWarmPlan.checkEvery, repeats: true) { _ in
             Task { @MainActor in await BrainWarmScheduler.shared.tick() }
         }
         timer.tolerance = 30
         self.timer = timer
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { _ in
-            Task { @MainActor in
-                BrainWarmScheduler.shared.noteActivity()
-                await BrainWarmScheduler.shared.tick(forced: true)
-            }
-        }
     }
 
-    /// Tony pressed the key, spoke or asked something.
-    func noteActivity() { lastActivity = now() }
-
-    func tick(forced: Bool = false) async {
+    func tick() async {
+        if BrainWarmPlan.isIdle(now: now(), lastActivity: lastActivity) {
+            timer?.invalidate()
+            timer = nil
+            return
+        }
         guard !inFlight else { return }
-        let targets = BrainWarmPlan.due(now: now(), lastActivity: lastActivity, lastCloud: lastCloud, lastLocal: lastLocal, forced: forced)
+        let targets = BrainWarmPlan.due(now: now(), lastActivity: lastActivity, lastCloud: lastCloud, lastLocal: lastLocal)
         guard !targets.isEmpty else { return }
         inFlight = true
         defer { inFlight = false }

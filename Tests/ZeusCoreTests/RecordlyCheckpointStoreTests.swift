@@ -495,7 +495,7 @@ struct RecordlyCheckpointStoreTests {
             Issue.record("Out-of-root media must not report a committed checkpoint.")
             return
         }
-        #expect(reason.contains("outside Zeus's Recordly folder"))
+        #expect(reason.contains("outside Zeus's recordings folder"))
         #expect(flow.hasPending)
         #expect(!FileManager.default.fileExists(atPath: scratch.checkpointRoot))
     }

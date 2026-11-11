@@ -124,7 +124,7 @@ struct RecordingFeedbackFrameView: View {
             .buttonStyle(RecordingFeedbackPressStyle(reduceMotion: reduceMotion))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(snapshot.label)
-            .accessibilityHint("Opens \(snapshot.producer == .meetings ? "Meetings" : "Recordly").")
+            .accessibilityHint("Opens \(snapshot.producer == .meetings ? "Meetings" : "Record").")
             .accessibilityIdentifier("recording.feedback.\(snapshot.producer.rawValue)")
             .help(snapshot.label)
         }

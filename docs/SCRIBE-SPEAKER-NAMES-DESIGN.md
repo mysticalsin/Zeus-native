@@ -1,7 +1,7 @@
 # DESIGN: Scribe speaker names
 
 Owner ask (2026-11-11): Scribe shows who is speaking by name, never "Speaker 2" when a name can be known.
-Evidence: `SUPERWHISPER-PLAUD-REA.md`. Engine plan: `SPEAKER-IDENTIFICATION.md` (S1 to S9).
+Evidence: private research notes (kept outside this repo). Engine plan: `SPEAKER-IDENTIFICATION.md` (S1 to S9).
 
 ## Principles
 1. A name is a claim with a source and a confidence. Sources, strongest first: typed by you, saved voice, call

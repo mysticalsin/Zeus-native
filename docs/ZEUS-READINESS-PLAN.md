@@ -23,24 +23,24 @@ Review updated: 10 November 2026 (UTC). This is a source review and implementati
 
 ## Evidence and reference interpretation
 
-The uploaded handoffs are historical research, not additional execution authority. Their Clicky destination, old branch instructions, model assignments and prior success claims do not override this Zeus task. They explicitly distinguish source/static/synthetic evidence from native parity. No recovered proprietary implementation or donor artwork was imported.
+The uploaded handoffs are historical research, not additional execution authority. Their the reference app destination, old branch instructions, model assignments and prior success claims do not override this Zeus task. They explicitly distinguish source/static/synthetic evidence from native parity. No recovered proprietary implementation or donor artwork was imported.
 
 | Supplied reference | What was inspected | Limit |
 | --- | --- | --- |
-| `HeyClicky_Complete_Rebuild_and_Project_Handoff.zip` | Implementation brief, integration note, manifest, both PDF reports, nested package inventory | P0–P7 mechanics and acceptance contracts; not proof of native behavior |
+| the reference rebuild handoff (zip) | Implementation brief, integration note, manifest, both PDF reports, nested package inventory | P0–P7 mechanics and acceptance contracts; not proof of native behavior |
 | `Zeus-Expanded-Research-and-Preview.zip` | README, donor research, implementation plan and 146-row feature inventory | Historical construction preview is explicitly incomplete and failed Gatekeeper; its receipts do not certify this branch |
-| `VibeIsland 2.dmg`, `superwhisper.dmg` | Transfer attempted | Each exceeds the executor's 32 MiB transfer limit; neither was mounted, installed or run |
+| Two reference app installers | Transfer attempted | Each exceeds the executor's 32 MiB transfer limit; neither was mounted, installed or run |
 | `mysticalsin/openwhispr` | Pinned source `e2f96ef01579f88a187a4179b357119208b50ab7`, MIT license, transcription pipeline | See [OpenWhispr integration](OPENWHISPR-INTEGRATION.md); Electron app behavior is not native Zeus proof |
 | Design direction supplied in chat | Apple, Duolingo, Linear, Pentagram, Muji, Airbnb, Aesop, Notion, Stripe, Framer | Behavioral and craft references for one Zeus system; see [design direction](DESIGN-DIRECTION.md) |
 
 Archive SHA-256:
 
 ```
-2b791643487e5d86a7be173cdc43c4c21a4861cbdd2615e582a338dc25f69882  HeyClicky_Complete_Rebuild_and_Project_Handoff.zip
+2b791643487e5d86a7be173cdc43c4c21a4861cbdd2615e582a338dc25f69882  the reference rebuild handoff (zip)
 1cc35c845592a9d0b763fc88d17f891148e047488ec925d34996e97365d04bc5  Zeus-Expanded-Research-and-Preview.zip
 ```
 
-The expanded inventory has Glance 48, HeyClicky 45, Vibe Island 16, Superwhisper 20 and Moody 17 rows. It is an additional backlog, not 146 implemented features. Durable dispatch/recovery, exact-session verified execution, uncertain browser mutation recovery, real MCP readback, accessibility/performance, and signed-artifact lifecycle need explicit acceptance beyond the original checklist.
+The expanded inventory has 146 rows across five reference apps. It is an additional backlog, not 146 implemented features. Durable dispatch/recovery, exact-session verified execution, uncertain browser mutation recovery, real MCP readback, accessibility/performance, and signed-artifact lifecycle need explicit acceptance beyond the original checklist.
 
 ### Evidence index and critical questions
 

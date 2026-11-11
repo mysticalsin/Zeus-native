@@ -37,6 +37,8 @@ final class ExplanationController {
         var displayID: UInt32? = nil
         var inputArea: CGRect? = nil
         var pointer: CGPoint? = nil
+        /// Maps the final transcript's pointing words to candidates. Runs once, in `submit()`.
+        var resolveDeixis: (@Sendable (String) -> [PointingContext.Deixis])?
     }
     var desktopTurn: PointingTurn?
     /// The desktop overlay's windows, for own-process window-policy checks.
@@ -57,12 +59,17 @@ final class ExplanationController {
     @ObservationIgnored var onReveal: ((ExplanationScene) -> Void)?
     /// The turn finished (nil) or failed (the error; `problem` already holds user-facing copy).
     @ObservationIgnored var onTurnEnded: ((Error?) -> Void)?
+    /// Timing hooks for the per-turn pointing trace. They carry no content.
+    @ObservationIgnored var onTranscriptFinal: (() -> Void)?
+    @ObservationIgnored var onRequestSent: (() -> Void)?
+    @ObservationIgnored var onFirstValidBeat: (() -> Void)?
     /// Listening produced no usable text, or the microphone failed.
     @ObservationIgnored var onEmptyInput: (() -> Void)?
     /// Marks the model asked for that were not grounded and were dropped before render.
     private(set) var droppedUngroundedMarks = 0
     private var activePointing: PointingTurn?
     private var pointingFirstBeatSeen = false
+    private var pointingFirstValidBeatSeen = false
     private var desktopSessionStart: Date?
     let microphone: ExplanationMicrophone
     let screenContext: ExplanationScreenContext
@@ -213,11 +220,12 @@ final class ExplanationController {
         guard canInteract else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.utf8.count <= 16_384, history != nil else { return }
-        let pointing = desktopTurn; desktopTurn = nil
+        var pointing = desktopTurn; desktopTurn = nil
+        if let resolve = pointing?.resolveDeixis { pointing?.context.deixis = resolve(text) }
         if pointing == nil { onSubmission?(text) }
         linkedHistoryIDs.insert(history!.id)
         stop(); draft = ""; problem = nil; isReplaying = false
-        activePointing = pointing; pointingFirstBeatSeen = false
+        activePointing = pointing; pointingFirstBeatSeen = false; pointingFirstValidBeatSeen = false
         beatObjectIDs = []; cardAnchors = nil
         // The card is bound to this turn's generation token (stop() above issued a new one).
         if pointing != nil { desktopCard.begin(token: generation) }
@@ -247,6 +255,7 @@ final class ExplanationController {
                                                       : (includeSnapshot ? screenContext.snapshot : nil),
                                                   pointing: pointing?.context)
             includeSnapshot = false
+            if pointing != nil { onRequestSent?() }
             let token = generation
             work = Task { [weak self] in
                 guard let self else { return }
@@ -286,6 +295,9 @@ final class ExplanationController {
             guard generation == token else { throw CancellationError() }
         }
         self.projected = future
+        if activePointing != nil, !isReplaying, !pointingFirstValidBeatSeen {
+            pointingFirstValidBeatSeen = true; onFirstValidBeat?()
+        }
         if !isReplaying { replayEvents.append(event) }
         let enqueued = try playback!.enqueue(event)
         try process(enqueued)
@@ -603,7 +615,9 @@ final class ExplanationController {
             do {
                 let text = try await self.microphone.finish()
                 guard self.generation == token else { return }
-                self.draft = text; self.submit()
+                self.draft = text
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.onTranscriptFinal?() }
+                self.submit()
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.desktopTurn = nil; self.onEmptyInput?() }
             } catch {
                 if self.generation == token, !Task.isCancelled {

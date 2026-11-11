@@ -39,7 +39,7 @@ final class DictationPageState {
     }
 }
 
-/// Settings > Dictation: the Superwhisper style tools on top of the same pipeline Murmure uses.
+/// Settings > Dictation: the dictation tools on top of the same pipeline Murmure uses.
 /// Modes, the recorder pill, the speech engine (the same picker as Settings › Murmure),
 /// custom vocabulary and history.
 struct DictationSettingsPage: View {

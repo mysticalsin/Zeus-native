@@ -57,7 +57,7 @@ enum RecordlyExportError: LocalizedError, Sendable {
     }
 }
 
-/// Renders the pinned recording to MP4 and/or GIF in ~/Movies/Zeus Recordly. Stateless: cancel by cancelling the
+/// Renders the pinned recording to MP4 and/or GIF in ~/Movies/Zeus Recordings. Stateless: cancel by cancelling the
 /// Task that awaits `export`. Output is written to a hidden temp file in the destination folder and renamed into
 /// place only on success; the temp file is removed on failure or cancel. The recording itself is never modified.
 final class RecordlyExporter: Sendable {

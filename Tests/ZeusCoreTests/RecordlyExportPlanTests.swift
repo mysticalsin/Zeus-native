@@ -227,7 +227,7 @@ import Testing
         calendar.timeZone = utc
         let date = try #require(calendar.date(from: components))
         let name = RecordlyExportPlan.fileName(date: date, fileExtension: "mp4", timeZone: utc)
-        #expect(name == "Recordly 2026-11-07 09.05.03.mp4")
+        #expect(name == "Zeus Recording 2026-11-07 09.05.03.mp4")
         #expect(!name.contains("/") && !name.contains(":"))
         #expect(RecordlyExportPlan.fileName(date: date, fileExtension: "gif", timeZone: utc, collisionIndex: 2) == "Recordly 2026-11-07 09.05.03 2.gif")
         let hostile = RecordlyExportPlan.fileName(date: date, fileExtension: "../x:y", timeZone: utc)
@@ -236,6 +236,6 @@ import Testing
 
     @Test func outputDirectoryIsUnderMovies() {
         let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
-        #expect(RecordlyExportPlan.outputDirectory(home: home).path == "/Users/someone/Movies/Zeus Recordly")
+        #expect(RecordlyExportPlan.outputDirectory(home: home).path == "/Users/someone/Movies/Zeus Recordings")
     }
 }

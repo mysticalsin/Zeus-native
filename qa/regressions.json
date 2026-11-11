@@ -3232,6 +3232,354 @@
     },
     {
       "id": "REG-269",
+      "failure": "A process of another user, or a program other than the Zeus app on the browser bridge socket, could connect to the agent and browser sockets: the files were only mode 0600.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PeerCredentialsTests.swift",
+        "function": "bridgePolicyNeedsTheSameUserAndTheNamedProgram"
+      }
+    },
+    {
+      "id": "REG-270",
+      "failure": "A hook client could send a bundle ID of its own choosing and have Zeus launch that app, or label a risky command low risk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ClientInputPolicyTests.swift",
+        "function": "aTerminalInfoWithAForgedBundleIDHasNoTarget"
+      }
+    },
+    {
+      "id": "REG-271",
+      "failure": "A model-written action could start a coding agent, or send a prompt to ChatGPT, Claude or Dust, without an approval card.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ClientInputPolicyTests.swift",
+        "function": "aModelStartedCodingAgentAndAnySendNeedACard"
+      }
+    },
+    {
+      "id": "REG-272",
+      "failure": "The update feed accepted http, file and app-scheme addresses, and its download link was opened whatever its scheme.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UpdateFeedPolicyTests.swift",
+        "function": "aFeedLinkThatIsNotHTTPSIsDropped"
+      }
+    },
+    {
+      "id": "REG-273",
+      "failure": "The system HUD monitor woke ten times a second for as long as the app ran, whether or not a HUD was shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SystemHUDTests.swift",
+        "function": "theFastRateOnlyLastsForABurstAfterAChange"
+      }
+    },
+    {
+      "id": "REG-274",
+      "failure": "Zeus pinged Ollama and the cloud API at launch and at every wake from sleep, before anyone used voice.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrainWarmPlanTests.swift",
+        "function": "launchAndWakeNeverWarmButTheTalkKeyDoes"
+      }
+    },
+    {
+      "id": "REG-275",
+      "failure": "Transcribing with Parakeet when its model was missing started the model download without any click.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_download_is_behind_the_explicit_prepare_path"
+      }
+    },
+    {
+      "id": "REG-276",
+      "failure": "A call-window name was bound to a voice on weak evidence: two people lit about equally over one voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aCloseRunnerUpWithholdsTheName"
+      }
+    },
+    {
+      "id": "REG-277",
+      "failure": "Call-window evidence overwrote a speaker name the person had typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aTypedNameAlwaysWinsOverAutomaticEvidence"
+      }
+    },
+    {
+      "id": "REG-278",
+      "failure": "A muted participant tile could win the vote for a voice and name it.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aMutedTileNeverWinsTheVote"
+      }
+    },
+    {
+      "id": "REG-279",
+      "failure": "One call-window name landed on two different voices.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "oneNameNeverLandsOnTwoVoices"
+      }
+    },
+    {
+      "id": "REG-280",
+      "failure": "A name the person declined for a voice was offered again for that voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aDeclinedNameIsNotOfferedAgainForThatVoice"
+      }
+    },
+    {
+      "id": "REG-281",
+      "failure": "French call-window labels (parle, micro coupe, Invitee, Vous) were not understood, so no name was found.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "parserReadsSpeakingAndMutedSignalsInBothLanguages"
+      }
+    },
+    {
+      "id": "REG-282",
+      "failure": "Where a speaker name came from was lost when a meeting was reopened, so an automatic name looked typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "theBookRoundTripsThroughAMeetingRecordAndOlderFilesStillLoad"
+      }
+    },
+    {
+      "id": "REG-283",
+      "failure": "Merging two speakers could not be undone.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "undoBringsBackTheStateBeforeTheLastMerge"
+      }
+    },
+    {
+      "id": "REG-284",
+      "failure": "Pruning tiny voices folded a named speaker or the owner into someone else, or could not be reversed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aNamedVoiceYouAndShortMeetingsAreNeverPruned"
+      }
+    },
+    {
+      "id": "REG-285",
+      "failure": "Assigning selected words to another speaker lost or overlapped the block time.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "assigningSelectedWordsSplitsTheBlockAndKeepsTheTime"
+      }
+    },
+    {
+      "id": "REG-286",
+      "failure": "A circle or underline drawn around a control mapped to no target, so ink never selected what the user meant.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+        "function": "aLoopAroundAControlPicksThatControl"
+      }
+    },
+    {
+      "id": "REG-287",
+      "failure": "Spoken 'this' and 'that' reached the model with no link to what the pointer or ink showed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+        "function": "untimedWordsTakeEvidenceInOrder"
+      }
+    },
+    {
+      "id": "REG-288",
+      "failure": "A mark stayed on screen after the control it pointed at moved, changed or closed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+        "function": "driftBeyondTwoPointsHidesTheMarkAndReResolves"
+      }
+    },
+    {
+      "id": "REG-289",
+      "failure": "The Fn+Control dictation preset overwrote the dictation key with no way back, and its collisions were not reported.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+        "function": "thePresetRemembersAndRestoresTheDictationKey"
+      }
+    },
+    {
+      "id": "REG-290",
+      "failure": "Alerts for Spotify, Chrome, Notion, Dropbox, terminal and meeting apps fell back to a generic glyph because only one bundle id was tried.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AppBrandCatalogTests.swift",
+        "function": "coversTheLogosTheLedgerListed"
+      }
+    },
+    {
+      "id": "REG-291",
+      "failure": "Pointing ink only appeared while dragging, so tracing a control while the keys were held left no trail and no stroke.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+        "function": "hoveringBeginsAStrokeAndExtendsIt"
+      }
+    },
+    {
+      "id": "REG-292",
+      "failure": "Holding the pointing keys put a mouse-capturing overlay over the screen, so clicks and focus did not reach the app being asked about.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-PointingOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+        "function": "theInkPanelsNeverBecomeKeyOrMainAndIgnoreTheMouse"
+      }
+    },
+    {
+      "id": "REG-293",
+      "failure": "A modifier release that the key stream never reported left a pointing turn open indefinitely.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "aMissedReleaseIsCaughtWhenTheLiveKeysAreUp"
+      }
+    },
+    {
+      "id": "REG-294",
+      "failure": "Sleep, wake or a display change during a hold or a turn left the hold armed and marks on stale geometry.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "sleepWakeAndDisplayChangesCancelAHoldWithoutARequest"
+      }
+    },
+    {
+      "id": "REG-295",
+      "failure": "The ring could land off the candidate on a 2x display or a display with a negative origin.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+        "function": "oneXDisplayWithANegativeOrigin"
+      }
+    },
+    {
+      "id": "REG-296",
+      "failure": "The pointing Accessibility hit test ran on a detached background task, which this process's own AX rule forbids.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_probe_ax_calls_stay_on_the_main_actor"
+      }
+    },
+    {
+      "id": "REG-297",
+      "failure": "The per-turn trace line could carry free text; it must hold only mark names and millisecond offsets.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+        "function": "theLineCarriesNoFreeTextOnlyKnownTokens"
+      }
+    },
+    {
+      "id": "REG-298",
       "failure": "A chart value axis had no ticks, units or gridlines, and a range such as 3 to 1003 gave no readable scale.",
       "features": [
         "F09"
@@ -3243,7 +3591,7 @@
       }
     },
     {
-      "id": "REG-270",
+      "id": "REG-299",
       "failure": "Nice-number ticks left floating-point residue or broke on fractions and huge magnitudes.",
       "features": [
         "F09"
@@ -3255,7 +3603,7 @@
       }
     },
     {
-      "id": "REG-271",
+      "id": "REG-300",
       "failure": "A bar chart could start away from zero without saying so, exaggerating differences.",
       "features": [
         "F09"
@@ -3267,7 +3615,7 @@
       }
     },
     {
-      "id": "REG-272",
+      "id": "REG-301",
       "failure": "Non-finite, zero-span or overflowing chart data could reach drawing and produce NaN pixels.",
       "features": [
         "F09"
@@ -3279,7 +3627,7 @@
       }
     },
     {
-      "id": "REG-273",
+      "id": "REG-302",
       "failure": "A timeline spaced events evenly while presenting itself as a time axis.",
       "features": [
         "F09"
@@ -3291,7 +3639,7 @@
       }
     },
     {
-      "id": "REG-274",
+      "id": "REG-303",
       "failure": "Chart numbers carried no provenance, so invented values could read as measured or live.",
       "features": [
         "F09"
@@ -3303,7 +3651,7 @@
       }
     },
     {
-      "id": "REG-275",
+      "id": "REG-304",
       "failure": "The chart axis wire fields were not version gated, so a v1 or v2 turn could carry them, and unknown axis fields were not rejected.",
       "features": [
         "F09"
@@ -3315,7 +3663,7 @@
       }
     },
     {
-      "id": "REG-276",
+      "id": "REG-305",
       "failure": "An axis spec with a bad domain, tick hint, units or live timestamp was accepted.",
       "features": [
         "F09"
@@ -3327,7 +3675,7 @@
       }
     },
     {
-      "id": "REG-277",
+      "id": "REG-306",
       "failure": "The desktop card could cover the pointed-at target, the pointer trail or the active input area.",
       "features": [
         "F09"
@@ -3339,7 +3687,7 @@
       }
     },
     {
-      "id": "REG-278",
+      "id": "REG-307",
       "failure": "Card placement assumed a display at the origin and broke on negative display origins.",
       "features": [
         "F09"
@@ -3351,7 +3699,7 @@
       }
     },
     {
-      "id": "REG-279",
+      "id": "REG-308",
       "failure": "The card fallback shrank a diagram below a readable scale instead of splitting into beats or going speech only.",
       "features": [
         "F09"
@@ -3363,7 +3711,7 @@
       }
     },
     {
-      "id": "REG-280",
+      "id": "REG-309",
       "failure": "A late callback from a replaced or cancelled turn could show or update the desktop card.",
       "features": [
         "F09"
@@ -3375,7 +3723,7 @@
       }
     },
     {
-      "id": "REG-281",
+      "id": "REG-310",
       "failure": "The desktop card could take key or main status from the app the owner was using, or be interactive beyond its close control.",
       "features": [
         "F09"
@@ -3387,7 +3735,7 @@
       }
     },
     {
-      "id": "REG-282",
+      "id": "REG-311",
       "failure": "The production card honoured a stale turn token and stayed on screen after its turn ended.",
       "features": [
         "F09"

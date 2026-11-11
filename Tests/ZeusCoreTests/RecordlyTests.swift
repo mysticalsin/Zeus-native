@@ -138,7 +138,7 @@ import Testing
 
 @Suite struct RecordlyTopBarTabTests {
     @Test func recordlyTabMetadata() {
-        #expect(TopBarTab.recordly.title == "Recordly")
+        #expect(TopBarTab.recordly.title == "Record")
         #expect(TopBarTab.recordly.symbol == "record.circle")
     }
 }

@@ -33,10 +33,19 @@ final class AppIconCache {
     /// Tests and snapshots can pre-fill an entry.
     func seed(_ entry: Entry, for bundleID: String) { entries[bundleID.lowercased()] = entry }
 
+    /// The installed app's path: its own bundle id, then the same app's other ids (beta, renamed builds),
+    /// then the usual install location. The icon is always the app's own; nothing is bundled.
+    private static func installedPath(for bundleID: String) -> String? {
+        for id in AppBrandCatalog.candidateBundleIDs(for: bundleID) {
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) { return url.path }
+        }
+        return AppBrandCatalog.fallbackPaths(for: bundleID).first { FileManager.default.fileExists(atPath: $0) }
+    }
+
     private static func build(_ bundleID: String) -> Entry {
         let fallback = Entry(image: nil, accent: Theme.accent)
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return fallback }
-        let source = NSWorkspace.shared.icon(forFile: url.path)
+        guard let path = installedPath(for: bundleID) else { return fallback }
+        let source = NSWorkspace.shared.icon(forFile: path)
         let side = pixels
         guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
