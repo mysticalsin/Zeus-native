@@ -30,6 +30,8 @@ final class NotchController {
     var now: () -> Date = { Date() }
     /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
     private var alertWake: Task<Void, Never>?
+    /// Alerts waiting out their ten minute snooze, by alert id.
+    private var snoozeTasks: [String: Task<Void, Never>] = [:]
     /// What happens when the notification line is clicked.
     var openNotificationLine: (NotchModel.NotificationLine) -> Void = { _ in }
 
@@ -132,6 +134,9 @@ final class NotchController {
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
         setIgnoresMouse(presentation == .closed)
+        // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
+        model.alerts.setSuspended(presentation != .closed, now: now())
+        alertsChanged()
         if opening { NotchHaptics.open() }
         onPresentationChange(presentation)
     }
@@ -548,8 +553,10 @@ final class NotchController {
                             title: line.title, body: line.detail, priority: .normal, postedAt: now()))
     }
 
-    func postAlert(_ item: AlertItem) {
-        guard model.presentation == .closed else { return }
+    /// `whileOpen` queues the alert even when the notch is open (a snoozed alert coming back must not be lost); it then
+    /// shows, with its full time, when the notch closes.
+    func postAlert(_ item: AlertItem, whileOpen: Bool = false) {
+        guard whileOpen || model.presentation == .closed else { return }
         let result = model.alerts.post(item, now: now())
         if case .added = result {
             // Each alert is announced once, politely; a coalesced duplicate does not repeat it.
@@ -581,12 +588,15 @@ final class NotchController {
     func snoozeAlert(_ id: String) {
         guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
         dismissAlert(id)
-        Task { @MainActor [weak self] in
+        // One snooze per alert: snoozing it again replaces the pending return instead of doubling it.
+        snoozeTasks[id]?.cancel()
+        snoozeTasks[id] = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(600))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let self else { return }
+            self.snoozeTasks[id] = nil
             var again = item
-            again.postedAt = Date()
-            self?.postAlert(again)
+            again.postedAt = self.now()
+            self.postAlert(again, whileOpen: true)
         }
     }
 

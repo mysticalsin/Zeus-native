@@ -58,6 +58,9 @@ final class SettingsStore {
     @ObservationIgnored var onChange: ((String) -> Void)?
     @ObservationIgnored var actions: [String: @MainActor () -> Void] = [:]
     @ObservationIgnored private let defaults: UserDefaults
+    /// Background reads of the login-item status. A toggle made while one is in flight invalidates it, so the
+    /// old answer cannot put the switch back.
+    @ObservationIgnored private var launchReads = LatestRun()
 
     static func key(_ id: String) -> String { "opt." + id }
 
@@ -80,9 +83,10 @@ final class SettingsStore {
     /// (once per call) and the switch draws from `values`, never from the service. Nothing is registered here.
     func refreshLaunchAtLogin() {
         guard !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled else { return }
+        let read = launchReads.begin()
         Task { [weak self] in
             let on = await Task.detached(priority: .userInitiated) { LaunchAtLogin.currentStatus() }.value
-            guard let self else { return }
+            guard let self, self.launchReads.isCurrent(read) else { return }
             let text = on ? "true" : "false"
             if self.values[Self.launchAtLoginID] != text { self.values[Self.launchAtLoginID] = text }
         }
@@ -118,6 +122,7 @@ final class SettingsStore {
     }
 
     private func applyLaunchAtLogin(_ on: Bool) {
+        launchReads.invalidate()
         let problem = LaunchAtLogin.set(on)
         // Store what macOS now says. Changing the stored value makes the switch redraw.
         let actual = LaunchAtLogin.isOn

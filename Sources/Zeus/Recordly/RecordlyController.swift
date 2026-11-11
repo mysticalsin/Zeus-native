@@ -455,7 +455,14 @@ final class RecordlyController {
             perform(countdown.send(.cancel))
             return
         }
-        perform(countdown.send(.tick(token: token)))
+        perform(countdown.send(.tick(token: token, sourceReady: canStart)))
+    }
+
+    /// The Record page went away (another page, the notch closed): a countdown must not start a capture the owner can
+    /// no longer see or cancel with Escape.
+    func pageDisappeared() {
+        perform(countdown.send(.cancel))
+        thumbnailTask?.cancel()
     }
 
     private func perform(_ effects: [RecordlyCountdown.Effect]) {

@@ -434,6 +434,90 @@ class VoiceLatencyScript(unittest.TestCase):
         self.assertNotIn("transcript_text", row)
 
 
+# Third state-machine pass (docs/STATE-MACHINES.md): wiring the pure reducers cannot see.
+
+
+def pass3_source(rel):
+    return (ROOT / rel).read_text(encoding="utf-8")
+
+
+def pass3_function_body(text, signature):
+    start = text.index(signature)
+    brace = text.index("{", start)
+    depth = 0
+    for index in range(brace, len(text)):
+        depth += {"{": 1, "}": -1}.get(text[index], 0)
+        if depth == 0:
+            return text[brace:index]
+    raise AssertionError(signature)
+
+
+class Pass3VoiceTurnWiring(unittest.TestCase):
+    TEXT = pass3_source("Sources/Zeus/App/VoiceTurnController.swift")
+
+    def test_turn_flag_is_a_latest_run_not_a_bool(self):
+        self.assertIn("private var turnRun = LatestRun()", self.TEXT)
+        self.assertNotRegex(self.TEXT, r"turnRunning\s*=\s*(true|false)")
+
+    def test_press_stops_the_hands_free_timer(self):
+        body = pass3_function_body(self.TEXT, "func press() -> Bool")
+        self.assertIn("handsFreeTask?.cancel()", body)
+        self.assertIn("turnRun.invalidate()", body)
+
+    def test_wake_turn_stops_the_previous_answer_and_its_deep_follow_up(self):
+        body = pass3_function_body(self.TEXT, "func wakeTurn(request: String)")
+        self.assertIn("fastRace?.cancel()", body)
+        self.assertIn("ahead.cancel()", body)
+
+
+class Pass3SpeakerWiring(unittest.TestCase):
+    TEXT = pass3_source("Sources/Zeus/Voice/Speaker.swift")
+
+    def test_provider_failures_are_not_recorded_for_a_cancelled_line(self):
+        notes = re.findall(r"^(.*noteProviderFailure\(.*)$", self.TEXT, re.M)
+        self.assertGreaterEqual(len(notes), 4)
+        for line in notes:
+            self.assertIn("countsAsFailure()", line, line)
+
+    def test_rendered_files_are_dropped_after_a_cancel(self):
+        for engine in ("speakKokoro", "speakChatterbox"):
+            body = pass3_function_body(self.TEXT, f"private func {engine}(")
+            self.assertIn("SpeechAttemptPolicy.mayPlay", body, engine)
+
+
+class Pass3RaceRunWiring(unittest.TestCase):
+    def test_only_live_tiers_count_as_failed(self):
+        text = pass3_source("Sources/Zeus/Brain/FastRaceRun.swift")
+        self.assertGreaterEqual(text.count("guard state.isLive(id) else { break }"), 2)
+
+
+class Pass3RecordlyWiring(unittest.TestCase):
+    def test_leaving_the_record_page_cancels_the_countdown(self):
+        self.assertIn(".onDisappear { recordly.pageDisappeared() }", pass3_source("Sources/Zeus/Recordly/RecordlyPage.swift"))
+        body = pass3_function_body(pass3_source("Sources/Zeus/Recordly/RecordlyController.swift"), "func pageDisappeared()")
+        self.assertIn("countdown.send(.cancel)", body)
+
+
+class Pass3NotchWiring(unittest.TestCase):
+    TEXT = pass3_source("Sources/Zeus/Notch/NotchController.swift")
+
+    def test_alert_timers_pause_while_the_capsule_is_covered(self):
+        self.assertIn("model.alerts.setSuspended(presentation != .closed", pass3_function_body(self.TEXT, "func show(_ presentation"))
+
+    def test_a_snoozed_alert_returns_even_when_the_notch_is_open(self):
+        self.assertIn("whileOpen: true", pass3_function_body(self.TEXT, "func snoozeAlert("))
+
+
+class Pass3StaleReadWiring(unittest.TestCase):
+    def test_launch_at_login_read_is_invalidated_by_a_toggle(self):
+        text = pass3_source("Sources/Zeus/App/SettingsStore.swift")
+        self.assertIn("launchReads.invalidate()", pass3_function_body(text, "private func applyLaunchAtLogin("))
+        self.assertIn("launchReads.isCurrent(read)", text)
+
+    def test_hook_read_is_invalidated_by_connect_and_disconnect(self):
+        text = pass3_source("Sources/Zeus/Integrations/AIConnections.swift")
+        self.assertGreaterEqual(text.count("hookReads.invalidate()"), 3)
+        self.assertIn("hookReads.isCurrent(read)", text)
 
 
 if __name__ == "__main__":

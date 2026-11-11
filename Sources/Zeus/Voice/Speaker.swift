@@ -179,32 +179,37 @@ final class Speaker: SentenceSpeaking {
                 settings.clearProviderPause(.elevenLabs)
                 return id
             }
-            if !settings.isProviderPaused(.elevenLabs) { settings.noteProviderFailure(.elevenLabs, reason: .other("no audio")) }
+            if Self.countsAsFailure(), !settings.isProviderPaused(.elevenLabs) { settings.noteProviderFailure(.elevenLabs, reason: .other("no audio")) }
             return nil
         case .openAI:
             if let voice = await speakOpenAI(text, began: began) {
                 settings.clearProviderPause(.openAICompatible)
                 return voice
             }
-            settings.noteProviderFailure(.openAICompatible, reason: .offline)
+            if Self.countsAsFailure() { settings.noteProviderFailure(.openAICompatible, reason: .offline) }
             return nil
         case .kokoro:
             if await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) {
                 settings.clearProviderPause(.kokoro)
                 return settings.kokoroVoice
             }
-            settings.noteProviderFailure(.kokoro, reason: .missingModel)
+            if Self.countsAsFailure() { settings.noteProviderFailure(.kokoro, reason: .missingModel) }
             return nil
         case .chatterbox:
             if await speakChatterbox(text, began: began) {
                 settings.clearProviderPause(.chatterbox)
                 return "reference"
             }
-            settings.noteProviderFailure(.chatterbox, reason: .missingModel)
+            if Self.countsAsFailure() { settings.noteProviderFailure(.chatterbox, reason: .missingModel) }
             return nil
         case .system:
             return await speakSystem(text)
         }
+    }
+
+    /// A line that produced nothing counts against its engine only when nobody interrupted it.
+    private static func countsAsFailure() -> Bool {
+        SpeechAttemptPolicy.shouldRecordFailure(producedAudio: false, cancelled: Task.isCancelled)
     }
 
     private func markAudioReady() {
@@ -277,8 +282,12 @@ final class Speaker: SentenceSpeaking {
                         chunk.removeAll(keepingCapacity: true)
                     }
                 }
-                feeder.push(chunk)
-                feeder.finish()
+                if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
+                    feeder.push(chunk)
+                    feeder.finish()
+                } else {
+                    feeder.discard()
+                }
             } catch {
                 if Task.isCancelled { feeder.discard() } else { feeder.finish() }
                 if feeder.scheduledAny { return Self.routeVoice(route) }
@@ -315,14 +324,19 @@ final class Speaker: SentenceSpeaking {
                         chunk.removeAll(keepingCapacity: true)
                     }
                 }
-                feeder.push(chunk)
-                feeder.finish()
+                if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
+                    feeder.push(chunk)
+                    feeder.finish()
+                } else {
+                    feeder.discard()
+                }
                 return feeder.scheduledAny ? prepared.voice : nil
             }
             var body = Data()
             for try await byte in bytes { body.append(byte) }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-openai-tts-\(UUID().uuidString).wav")
             try body.write(to: url)
+            guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return nil }
             guard chain.scheduleFile(url) else { return nil }
             markAudioReady()
             return prepared.voice
@@ -334,6 +348,8 @@ final class Speaker: SentenceSpeaking {
 
     private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> Bool {
         guard let url = await KokoroVoice.render(text, voice: voice, speed: speed) else { return false }
+        // Rendering takes seconds: if the owner interrupted meanwhile, the finished line is thrown away, never played.
+        guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return false }
         if Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
             try? FileManager.default.removeItem(at: url)
             return false
@@ -345,6 +361,7 @@ final class Speaker: SentenceSpeaking {
 
     private func speakChatterbox(_ text: String, began: Date) async -> Bool {
         guard let url = await ChatterboxVoice.render(text) else { return false }
+        guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return false }
         guard chain.scheduleFile(url) else { return false }
         markAudioReady()
         return true
