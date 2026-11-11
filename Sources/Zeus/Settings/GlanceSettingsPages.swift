@@ -988,7 +988,7 @@ private struct PermissionsPage: View {
 
     /// "Allowed: Music, Spotify": the apps macOS lets Zeus script (access is per app, so it can be partial).
     private var automationStatus: String {
-        let names = Automation.allowedTargets.map(Automation.name)
+        let names = context.permissions.automationAllowedNames
         return names.isEmpty ? "Allowed" : "Allowed: " + names.joined(separator: ", ")
     }
 

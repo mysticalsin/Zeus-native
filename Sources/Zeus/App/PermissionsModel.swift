@@ -43,6 +43,10 @@ final class PermissionsModel {
     private(set) var automationAsking = false
     /// Why the last Automation Allow could not ask (no target app was running); nil otherwise.
     var automationMessage: String?
+    /// The apps ZeusCore may script right now, by name ("Music", "Spotify"); drives the status text.
+    private(set) var automationAllowedNames: [String] = []
+    /// The allowed names when `automationMessage` was written: a change means the message is out of date.
+    private var automationMessageAllowedNames: [String] = []
     private(set) var claudeHooksInstalled = false
     var hookMessage: String?
     private(set) var chromeHostInstalled = false
@@ -135,7 +139,13 @@ final class PermissionsModel {
         Automation.scheduleChecksForRunningPlayers()
         granted[.automation] = Automation.allowedAny
         automationPending = Automation.anyPending
-        if granted[.automation] == true { automationMessage = nil }
+        automationAllowedNames = Automation.allowedTargets.map(Automation.name)
+        if automationMessage != nil, automationAllowedNames != automationMessageAllowedNames { automationMessage = nil }
+    }
+
+    private func setAutomationMessage(_ text: String?) {
+        automationMessage = text
+        automationMessageAllowedNames = automationAllowedNames
     }
 
     /// Push-to-talk works (the key is seen, ZEUS can hear and transcribe). Screen Recording only
@@ -222,19 +232,25 @@ final class PermissionsModel {
     /// otherwise the consent sheet is raised off the main actor (it stays up until the person answers).
     func requestAutomation() {
         guard !automationAsking else { return }
-        let running = Automation.players.contains { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
-        guard running else {
-            automationMessage = "Open Music or Spotify, then press Allow."
+        refreshAutomationOnly()
+        let plan = AutomationAllowPlan.plan(targets: Automation.targets, access: Automation.accessByTarget,
+                                            running: Automation.runningTargets)
+        guard !plan.ask.isEmpty else {
+            setAutomationMessage(plan.message)
+            if plan.opensAutomationPane { open(.automation) }
             refresh()
             return
         }
-        automationMessage = nil
+        setAutomationMessage(nil)
         automationAsking = true
         Task { @MainActor in
-            let result = await Automation.askAsync()
+            let granted = await Automation.askAsync(only: plan.ask)
             automationAsking = false
-            if result == false { open(.automation) }
             refresh()
+            let after = AutomationAllowPlan.afterAsking(
+                targets: Automation.targets.filter { plan.ask.contains($0.id) }, granted: granted, alreadyRefused: plan.refused)
+            setAutomationMessage(after.message)
+            if after.opensAutomationPane { open(.automation) }
         }
     }
 
@@ -382,10 +398,31 @@ enum Automation {
         return codes.values.contains(noErr)
     }
 
-    /// `ask()` without holding the caller: the consent sheet can stay up until the person answers.
-    static func askAsync() async -> Bool? {
-        let running = players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
-        guard !running.isEmpty else { return nil }
+    /// The apps Settings can ask about, with their names.
+    static var targets: [AutomationAllowPlan.Target] { players.map { .init(id: $0, name: name($0)) } }
+
+    static var runningTargets: Set<String> {
+        Set(players.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty })
+    }
+
+    /// Allowed, refused (macOS will not ask again) or not decided, per app, from the current cache.
+    static var accessByTarget: [String: AutomationAllowPlan.Access] {
+        var access: [String: AutomationAllowPlan.Access] = [:]
+        for id in players {
+            switch cachedStatus(id) {
+            case .granted: access[id] = .allowed
+            case .denied(let code) where code == OSStatus(errAEEventNotPermitted): access[id] = .refused
+            case .denied, .pending: access[id] = .undecided
+            }
+        }
+        return access
+    }
+
+    /// Asks only `ids` (running apps not yet allowed) without holding the caller: the consent sheet can stay
+    /// up until the person answers. Returns, per app, whether it is now allowed.
+    static func askAsync(only ids: [String]) async -> [String: Bool] {
+        let running = ids.filter { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }
+        guard !running.isEmpty else { return [:] }
         for id in running { promptBegan(id) }
         let codes = await Task.detached(priority: .userInitiated) { () -> [String: OSStatus] in
             var codes: [String: OSStatus] = [:]
@@ -393,7 +430,7 @@ enum Automation {
             return codes
         }.value
         for (id, code) in codes { promptAnswered(id, code) }
-        return codes.values.contains(noErr)
+        return codes.mapValues { $0 == noErr }
     }
 
     /// Starts background checks for running targets (never blocks the caller).
