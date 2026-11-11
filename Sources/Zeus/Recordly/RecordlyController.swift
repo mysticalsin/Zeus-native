@@ -320,7 +320,7 @@ final class RecordlyController {
             if let stable = displays.first(where: { $0.id == id })?.stableID {
                 defaults.set(stable, forKey: Self.rememberedDisplayKey)
             }
-            refreshThumbnail()
+            refreshThumbnail(force: false)
         }
     }
 
@@ -518,7 +518,7 @@ final class RecordlyController {
             }
             countdownBeganAt = Date().addingTimeInterval(-Double(RecordlyCountdown.seconds - remaining) - 0.4)
         case .recording(let elapsed):
-            capturePhase = .recording
+            capturePhase = .recording(RecordlyRecordingAttempt(id: 1))
             startedAt = Date().addingTimeInterval(-elapsed)
             self.elapsed = elapsed
         case .saved:
