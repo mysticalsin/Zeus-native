@@ -69,6 +69,7 @@ struct FeaturesSettingsPage: View {
                         options: ["Automatic"] + TerminalApp.allCases.map(\.title))
             }
         }
+        SpeakerRecognitionCard()
         GSCard("Research") {
             GSRow(symbol: "magnifyingglass", title: "Depth", text: "Quick takes a few searches. Deep reads many sources and takes minutes. You can always say \u{201C}deep research\u{201D}.") {
                 GSPopup(selection: store.stringBinding("research.depth"), options: FeatureSettings.researchDepthChoices)

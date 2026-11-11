@@ -556,6 +556,7 @@ private struct ScribeRecapDetail: View {
                 warnings: [recap.transcriptionNote, recap.micExcludedDuringCall ? ScribeMicCallText.recapLine : nil].compactMap { $0 },
                 focusToken: scribe.focusToken,
                 closeTitle: "Back",
+                speakerTools: scribe.speakerTools(for: recap.id),
                 setPrivateNotes: { scribe.setPrivateNotes($0, for: recap.id) },
                 setActionItem: { scribe.setActionItem($0, done: $1, for: recap.id) },
                 close: { scribe.closeRecap() },
@@ -969,6 +970,12 @@ private struct ScribeWriting: View {
 private struct ScribeNotesView: View {
     let scribe: ScribeController
 
+    /// Speaker naming once the meeting is saved as a recap; until then there is nothing to rename.
+    private func namingTools(_ id: ScribeSessionID?) -> ScribeSpeakerTools? {
+        guard let id, scribe.recaps.contains(where: { $0.id == id }) else { return nil }
+        return scribe.speakerTools(for: id)
+    }
+
     var body: some View {
         let id = scribe.phase.sessionID
         let note = ScribeRecapNote.compose(
@@ -985,6 +992,7 @@ private struct ScribeNotesView: View {
             warnings: [note, scribe.micExcludedDuringCall ? ScribeMicCallText.excludedNotice : nil].compactMap { $0 },
             focusToken: scribe.focusToken,
             closeTitle: "Done",
+            speakerTools: namingTools(id),
             setPrivateNotes: { text in
                 if let id { scribe.setPrivateNotes(text, for: id) }
             },
@@ -1012,9 +1020,31 @@ private enum ScribeNotesStyle {
     }
 }
 
+/// What a finished meeting offers for naming its speakers; nil where naming is not possible.
+struct ScribeSpeakerTools {
+    var suggestions: [ScribeNameSuggestion]
+    var attendeeNames: [String]
+    var canRemember: (ScribeSpeaker) -> Bool
+    /// The speaker, the name typed, and whether "Remember this voice" was ticked.
+    var rename: (ScribeSpeaker, String, Bool) -> Void
+    var copyTranscript: () -> Void
+}
+
 /// One speaker of the meeting: colour dot, name, talk time and a thin bar for their share of the talking.
+/// With tools, the name is a button: tap it, type a name, press Return. A suggestion shows as "Name?" with Accept.
 private struct ScribeSpeakerRow: View {
     let entry: ScribeSpeakerStats.Entry
+    var tools: ScribeSpeakerTools?
+    /// This speaker's longest lines, so the person can tell who it was (audio is never kept).
+    var lines: [String] = []
+    /// Names already used by other speakers or on the invite, offered as one-tap answers.
+    var quickNames: [String] = []
+
+    @State private var editing = false
+    @State private var draft = ""
+    @State private var remember = false
+
+    private var canRename: Bool { tools != nil && entry.speaker != .you }
 
     var body: some View {
         let tint = scribeColor(ScribeSpeakerPalette.color(for: entry.speaker))
@@ -1023,8 +1053,28 @@ private struct ScribeSpeakerRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Circle().fill(tint).frame(width: 7, height: 7)
-                Text(entry.speaker.displayName)
-                    .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                if canRename {
+                    Button { startEditing() } label: {
+                        Text(entry.speaker.displayName)
+                            .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Rename this speaker")
+                    .accessibilityLabel("\(entry.speaker.displayName), rename")
+                } else {
+                    Text(entry.speaker.displayName)
+                        .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                }
+                if let suggestion = suggestion, !editing {
+                    Button { tools?.rename(entry.speaker, suggestion.name, false) } label: {
+                        Text("\(suggestion.name)? Accept")
+                            .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().strokeBorder(ScribeNotesStyle.accent.opacity(0.5), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Accept the name \(suggestion.name) for \(entry.speaker.displayName)")
+                }
                 Spacer(minLength: 0)
                 Text(time).font(TopBarStyle.label(10).monospacedDigit()).foregroundStyle(Theme.cloudSecondary)
                 Text("\(percent)%")
@@ -1039,10 +1089,70 @@ private struct ScribeSpeakerRow: View {
                 }
             }
             .frame(height: 3)
+            if editing { editor }
         }
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: editing ? .contain : .ignore)
         .accessibilityLabel(entry.speaker.displayName)
         .accessibilityValue("\(time), \(percent) percent of the talking")
+    }
+
+    private var suggestion: ScribeNameSuggestion? {
+        tools?.suggestions.first { $0.speaker == entry.speaker }
+    }
+
+    @ViewBuilder private var editor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text("\u{201C}\(line)\u{201D}")
+                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            TextField("Name", text: $draft)
+                .textFieldStyle(.plain)
+                .font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudPrimary)
+                .padding(5)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.18)))
+                .onSubmit { commit() }
+                .accessibilityLabel("Name for \(entry.speaker.displayName)")
+            if !quickNames.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(quickNames.prefix(4), id: \.self) { name in
+                        Button(name) { draft = name }
+                            .buttonStyle(.plain)
+                            .font(TopBarStyle.label(10)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().strokeBorder(ScribeNotesStyle.accent.opacity(0.4), lineWidth: 1))
+                    }
+                }
+            }
+            if tools?.canRemember(entry.speaker) == true {
+                Toggle(isOn: $remember) {
+                    Text("Remember this voice on this Mac").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary)
+                }
+                .toggleStyle(.checkbox)
+                Text("Only save voices of people who agreed.")
+                    .font(TopBarStyle.label(9)).foregroundStyle(Theme.cloudSecondary)
+            }
+            HStack(spacing: 6) {
+                NotchActionButton(title: "Save name", tint: TopBarStyle.rec) { commit() }
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                NotchActionButton(title: "Cancel", tint: Theme.cloudSecondary, filled: false) { editing = false }
+            }
+        }
+        .padding(.top, 3)
+    }
+
+    private func startEditing() {
+        draft = ""
+        remember = false
+        editing = true
+    }
+
+    private func commit() {
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        tools?.rename(entry.speaker, name, remember && tools?.canRemember(entry.speaker) == true)
+        editing = false
     }
 }
 
@@ -1056,6 +1166,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
     let warnings: [String]
     let focusToken: Int
     let closeTitle: String
+    let speakerTools: ScribeSpeakerTools?
     let setPrivateNotes: (String) -> Void
     let setActionItem: (Int, Bool) -> Void
     let close: () -> Void
@@ -1070,6 +1181,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
         warnings: [String],
         focusToken: Int,
         closeTitle: String,
+        speakerTools: ScribeSpeakerTools? = nil,
         setPrivateNotes: @escaping (String) -> Void,
         setActionItem: @escaping (Int, Bool) -> Void,
         close: @escaping () -> Void,
@@ -1083,6 +1195,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
         self.warnings = warnings
         self.focusToken = focusToken
         self.closeTitle = closeTitle
+        self.speakerTools = speakerTools
         self.setPrivateNotes = setPrivateNotes
         self.setActionItem = setActionItem
         self.close = close
@@ -1124,7 +1237,11 @@ private struct ScribeMeetingBody<Actions: View>: View {
                         if stats.isWorthShowing {
                             card("Speakers") {
                                 ForEach(Array(stats.speakers.enumerated()), id: \.offset) { _, entry in
-                                    ScribeSpeakerRow(entry: entry)
+                                    ScribeSpeakerRow(
+                                        entry: entry, tools: speakerTools,
+                                        lines: Self.longestLines(of: entry.speaker, in: transcript),
+                                        quickNames: quickNames(excluding: entry.speaker, stats: stats)
+                                    )
                                 }
                             }
                         }
@@ -1146,6 +1263,22 @@ private struct ScribeMeetingBody<Actions: View>: View {
                     .frame(width: 300, alignment: .topLeading)
             }
         }
+    }
+
+    /// The speaker's three longest lines, shortened: what the rename editor shows instead of an audio clip.
+    private static func longestLines(of speaker: ScribeSpeaker, in transcript: [ScribeTranscriptSegment]) -> [String] {
+        transcript.filter { $0.speaker == speaker }
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .sorted { $0.count > $1.count }
+            .prefix(3)
+            .map { $0.count > 90 ? String($0.prefix(90)) + "\u{2026}" : $0 }
+    }
+
+    /// Invitee names not yet taken by a speaker, then the other speakers' names (naming one the same merges them).
+    private func quickNames(excluding speaker: ScribeSpeaker, stats: ScribeSpeakerStats) -> [String] {
+        guard let speakerTools else { return [] }
+        let taken = Set(stats.speakers.map { ScribeSpeakerNames.key($0.speaker.displayName) })
+        return speakerTools.attendeeNames.filter { !taken.contains(ScribeSpeakerNames.key($0)) }
     }
 
     /// The date it ended (when known) and how long it ran.
@@ -1222,8 +1355,17 @@ private struct ScribeMeetingBody<Actions: View>: View {
     private var transcriptList: some View {
         let segments = transcript
         return VStack(alignment: .leading, spacing: 4) {
-            Text("Transcript").font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
-                .accessibilityAddTraits(.isHeader)
+            HStack {
+                Text("Transcript").font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if let speakerTools, !segments.isEmpty {
+                    Button("Copy") { speakerTools.copyTranscript() }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityLabel("Copy the transcript with speaker names")
+                }
+            }
             if segments.isEmpty {
                 Text("No transcript was captured.").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary)
             } else {

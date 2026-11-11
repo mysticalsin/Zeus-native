@@ -118,6 +118,7 @@ final class ScribeCallPopup {
         let controller = ScribeController.shared
         guard !controller.phase.isActive else { return }
         controller.meetingTitleHint = ScribeCallPromptText.meetingTitle(for: decision)
+        if case .upcoming(let slot) = decision { controller.meetingAttendeeHint = slot.attendeeNames }
         controller.meetingCallHint = ScribeCallWatcher.shared.recordingIdentity(for: decision)
         controller.start()
     }

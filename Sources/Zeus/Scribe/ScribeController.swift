@@ -124,6 +124,7 @@ struct ScribeRecap: Identifiable, Equatable {
 /// completion can never overtake the last segment.
 enum ScribeTranscriberEvent: Sendable {
     case segment(ScribeTranscriptSegment)
+    case turns([ScribeTurnEmbedding])
     case issue(String)
     case finished(ScribeSessionID)
 }
@@ -296,6 +297,15 @@ final class ScribeController {
     /// The person pressed the trash button and hasn't confirmed throwing the recording away yet.
     private(set) var discardRequested = false
     @ObservationIgnored var meetingTitleHint: String?
+    /// Display names from the calendar invite the call popup matched; for the next recording only.
+    @ObservationIgnored var meetingAttendeeHint: [String] = []
+    /// This recording's attendee names, and each finished meeting's (memory only, display names only).
+    @ObservationIgnored private var sessionAttendees: [String] = []
+    @ObservationIgnored private var attendeesByMeeting: [UUID: [String]] = [:]
+    /// The voice of each closed turn, in memory only: from the end of a recording until the next one starts or
+    /// the meeting is dismissed or deleted. Never written to disk.
+    @ObservationIgnored private var liveTurns: [ScribeTurnEmbedding] = []
+    @ObservationIgnored private var turnVoices: [UUID: [ScribeTurnEmbedding]] = [:]
     @ObservationIgnored var meetingCallHint: ScribeCallProcessIdentity?
     private var endWorkflow = ScribeEndWorkflow()
     private(set) var endingRemaining: Int?
@@ -565,6 +575,10 @@ final class ScribeController {
         pendingDeleteID = nil
         sessionTitle = meetingTitleHint
         meetingTitleHint = nil
+        sessionAttendees = meetingAttendeeHint
+        meetingAttendeeHint = []
+        liveTurns = []
+        turnVoices = [:]
         let readout = ScribeLiveReadout()
         self.readout = readout
         // One ordered stream for everything the capture side says (see `ScribeCaptureInput`).
@@ -591,7 +605,8 @@ final class ScribeController {
                 onSegment: { segment in continuation.yield(.segment(segment)) },
                 onFinished: { session in continuation.yield(.finished(session)) },
                 onIssue: { message in continuation.yield(.issue(message)) },
-                onLevel: { source, level in levels.set(source, level) }
+                onLevel: { source, level in levels.set(source, level) },
+                onTurns: { turns in continuation.yield(.turns(turns)) }
             )
         )
         self.transcriber = transcriber
@@ -748,6 +763,7 @@ final class ScribeController {
             persist(recap, dismissedAt: clock())
         }
         recaps.removeAll { $0.id == id }
+        forgetVoices(of: id)
         if openedRecapID == id { openedRecapID = nil }
         if pendingDeleteID == id { pendingDeleteID = nil }
     }
@@ -813,6 +829,7 @@ final class ScribeController {
         }
         pendingSaves.remove(id.rawValue)
         recaps.removeAll { $0.id == id }
+        forgetVoices(of: id)
         if openedRecapID == id { openedRecapID = nil }
         if saveFailures.recordSuccess(id: id.rawValue) { refreshUnsavedMeetings() }
         if pendingDiscardID == id { pendingDiscardID = nil }
@@ -905,6 +922,10 @@ final class ScribeController {
     /// The transcriber has produced its final segments. Notes are generated from the final transcript only.
     func transcriptDidFinish(session id: ScribeSessionID) {
         guard case .processing(let current) = machine.phase, current == id, var finished = transcript else { return }
+        // The second look: with the whole meeting in hand, turns the live pass split or merged are relabelled.
+        let corrected = ScribeSpeakerCorrection.corrected(segments: finished.segments, turns: liveTurns)
+        let speakerByID = Dictionary(corrected.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+        finished.relabelSpeakers { speakerByID[$0.id] ?? $0.speaker }
         finished.finalize()
         transcript = finished
         guard run({ $0.transcriptFinalized(id) }).isApplied else { return }
@@ -950,6 +971,7 @@ final class ScribeController {
     private func handleTranscriber(_ event: ScribeTranscriberEvent, session id: ScribeSessionID) {
         switch event {
         case .segment(let segment): receive(segment)
+        case .turns(let turns): liveTurns = turns
         case .issue(let message): noteTranscriptionIssue(message, session: id)
         case .finished(let session): transcriptDidFinish(session: session)
         }
@@ -1281,6 +1303,9 @@ final class ScribeController {
         )
         if let index = recaps.firstIndex(where: { $0.id == id }) { recaps[index] = recap }
         else { recaps.insert(recap, at: 0) }
+        // Only what speaker naming needs, kept in memory: this meeting's turn voices and invitee names.
+        if !liveTurns.isEmpty { turnVoices[id.rawValue] = liveTurns }
+        if !sessionAttendees.isEmpty { attendeesByMeeting[id.rawValue] = sessionAttendees }
         let saved = persist(recap)
         // A failed final save can leave the transcript checkpoint on disk. Keep its identity so an
         // explicit discard removes that private transcript too, rather than resurrecting it at launch.
@@ -1289,6 +1314,84 @@ final class ScribeController {
             checkpointIssue = nil
         }
         return saved
+    }
+
+    // MARK: Speaker names
+
+    private func forgetVoices(of id: ScribeSessionID) {
+        turnVoices[id.rawValue] = nil
+        attendeesByMeeting[id.rawValue] = nil
+    }
+
+    /// Names Zeus suggests for this meeting's unnamed speakers. Suggestions only: nothing renames itself.
+    func speakerSuggestions(for id: ScribeSessionID) -> [ScribeNameSuggestion] {
+        guard let recap = recaps.first(where: { $0.id == id }) else { return [] }
+        let owner = UserDefaults.standard.string(forKey: "aboutYou.name") ?? NSFullUserName()
+        return ScribeNameSuggester.suggestions(
+            segments: recap.transcript, attendees: attendeesByMeeting[id.rawValue] ?? [],
+            savedNames: SavedVoicesModel.shared.names, ownerName: owner
+        )
+    }
+
+    /// Invitee display names for this meeting (empty after a relaunch: they are not saved).
+    func attendeeNames(for id: ScribeSessionID) -> [String] { attendeesByMeeting[id.rawValue] ?? [] }
+
+    /// A voice can be remembered only from this session's trained embeddings, for a speaker other than "You".
+    func canRememberVoice(_ speaker: ScribeSpeaker, in id: ScribeSessionID) -> Bool {
+        speaker != .you && voiceCentroid(of: speaker, in: id)?.embedding.kind == .wespeaker
+    }
+
+    private func voiceCentroid(of speaker: ScribeSpeaker, in id: ScribeSessionID) -> (embedding: ScribeVoiceEmbedding, turns: Int)? {
+        guard let recap = recaps.first(where: { $0.id == id }), let turns = turnVoices[id.rawValue] else { return nil }
+        let owner = Dictionary(recap.transcript.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+        let mine = turns.filter { owner[$0.segmentID] == speaker }
+        guard let centroid = ScribeEmbeddingMath.centroid(of: mine.map { (embedding: $0.embedding, weight: $0.duration) }) else { return nil }
+        return (centroid, mine.count)
+    }
+
+    /// Renames a speaker in one meeting: every line, the speaker statistics, the saved file and any copied or
+    /// exported text follow. A name another speaker already has merges the two. `rememberVoice` (off unless the
+    /// person ticked it) also saves the voice locally under that name.
+    func renameSpeaker(_ speaker: ScribeSpeaker, to name: String, in id: ScribeSessionID, rememberVoice: Bool = false) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let before = recaps[index].transcript
+        let after = ScribeSpeakerNames.rename(speaker, to: name, in: before)
+        guard after != before else { return }
+        // The voice is read before the lines change: it is the turns the speaker had under the old label.
+        if rememberVoice, let voice = voiceCentroid(of: speaker, in: id),
+           case .participant(let saveAs)? = ScribeSpeakerNames.target(for: name, in: before) {
+            if !SavedVoicesModel.shared.remember(name: saveAs, embedding: voice.embedding, sampleCount: voice.turns) {
+                announce(SavedVoicesModel.shared.problem ?? "Couldn't save the voice.")
+            }
+        }
+        recaps[index].transcript = after
+        let speakerByID = Dictionary(after.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+        if case .complete(let current) = machine.phase, current == id {
+            transcript?.relabelSpeakers { speakerByID[$0.id] ?? $0.speaker }
+        }
+        scheduleSave(id)
+    }
+
+    /// The meeting's transcript as text for the clipboard, with the current names.
+    func transcriptText(for id: ScribeSessionID, markdown: Bool) -> String {
+        guard let recap = recaps.first(where: { $0.id == id }) else { return "" }
+        return markdown
+            ? ScribeTranscriptExport.markdown(title: recap.title, segments: recap.transcript)
+            : ScribeTranscriptExport.plainText(segments: recap.transcript)
+    }
+
+    /// What the recap offers for naming this meeting's speakers. The closures run on user clicks, on the main actor.
+    func speakerTools(for id: ScribeSessionID) -> ScribeSpeakerTools {
+        ScribeSpeakerTools(
+            suggestions: speakerSuggestions(for: id),
+            attendeeNames: attendeeNames(for: id),
+            canRemember: { [unowned self] speaker in self.canRememberVoice(speaker, in: id) },
+            rename: { [unowned self] speaker, name, remember in self.renameSpeaker(speaker, to: name, in: id, rememberVoice: remember) },
+            copyTranscript: { [unowned self] in
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(self.transcriptText(for: id, markdown: false), forType: .string)
+            }
+        )
     }
 
     // MARK: Saved meetings

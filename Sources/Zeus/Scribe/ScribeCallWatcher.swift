@@ -340,7 +340,9 @@ final class ScribeCallWatcher {
                 id: "\(base)@\(Int(start.timeIntervalSince1970))",
                 title: event.title ?? "Meeting",
                 start: start,
-                end: event.endDate
+                end: event.endDate,
+                // Display names only; the slot drops anything that looks like an address.
+                attendeeNames: (event.attendees ?? []).filter { !$0.isCurrentUser }.compactMap(\.name)
             )
         }
     }
