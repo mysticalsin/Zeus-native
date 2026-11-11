@@ -12,6 +12,7 @@ public enum ExplanationSceneReducer {
         try check(registry.assetIDs.count <= 256 && registry.sourceIDs.count <= 256, "registry budget")
         for id in registry.assetIDs.union(registry.sourceIDs) { try identifier(id) }
         try camera(scene.camera)
+        if let model = scene.model { try ExplanationModelValidator.validate(model) }
         var pointCount = 0, vertexCount = 0, textBytes = 0
         for (key, object) in scene.objects {
             try check(key == object.id, "object dictionary identity")
@@ -153,7 +154,8 @@ public enum ExplanationSceneReducer {
                 try validate(object, scene: candidate, registry: registry)
             default: break
             }
-            try apply(operation, to: &candidate)
+            // The revision the model last saw: an edit's expectedRevision must equal it.
+            try apply(operation, to: &candidate, baseRevision: resultingRevision - 1)
             switch operation {
             case .update(let id, _), .move(let id, _), .animate(let id, _):
                 if let object = candidate.objects[id] { try validate(object, scene: candidate, registry: registry) }
@@ -237,10 +239,11 @@ public enum ExplanationSceneReducer {
                 try check((0...1).contains(animation.to.x) && animation.to.y == 0 && animation.to.z == 0, "scalar animation target")
             }
         case .clear: break
+        case .model(let model): try ExplanationModelValidator.validate(model)
         }
     }
 
-    private static func apply(_ operation: ExplanationOperation, to scene: inout ExplanationScene) throws {
+    private static func apply(_ operation: ExplanationOperation, to scene: inout ExplanationScene, baseRevision: Int) throws {
         switch operation {
         case .create(let object), .connect(let object):
             try check(scene.objects[object.id] == nil, "duplicate object")
@@ -293,7 +296,8 @@ public enum ExplanationSceneReducer {
             case .strokeReveal: object.reveal = animation.to.x
             }
             scene.objects[id] = object
-        case .clear: scene.objects.removeAll(); scene.camera = .init()
+        case .clear: scene.objects.removeAll(); scene.camera = .init(); scene.model = nil
+        case .model(let model): try ExplanationModelReducer.apply(model, to: &scene, baseRevision: baseRevision)
         }
     }
 

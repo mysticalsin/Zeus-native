@@ -66,10 +66,15 @@ struct ExplanationControllerTests {
         var receivers: [@MainActor (ExplanationEvent) async throws -> Void] = []
         var invalidSecond = false
         var eventCount = 2
+        var operationOverride: (@MainActor (Int, ExplanationModelRequest) -> ExplanationOperation)?
         func event(_ request: ExplanationModelRequest, index: Int) -> ExplanationEvent {
-            let operation: ExplanationOperation = index == 0
-                ? .create(.init(id: "point", geometry: .init(kind: .point, radius: 8), accessibleDescription: "Synthetic point"))
-                : .move(id: invalidSecond ? "missing" : "point", position: .init(x: 40, y: 30))
+            let operation: ExplanationOperation
+            if let operationOverride { operation = operationOverride(index, request) }
+            else {
+                operation = index == 0
+                    ? .create(.init(id: "point", geometry: .init(kind: .point, radius: 8), accessibleDescription: "Synthetic point"))
+                    : .move(id: invalidSecond ? "missing" : "point", position: .init(x: 40, y: 30))
+            }
             return .init(sessionID: request.scene.sessionID, turnID: request.turnID, sceneID: request.scene.sceneID,
                 sequence: index, baseRevision: request.scene.revision + index, revision: request.scene.revision + index + 1,
                 beatID: "beat-\(index)", speech: .init(chunkID: "chunk-\(index)", text: "Synthetic beat \(index)."),
@@ -275,6 +280,34 @@ struct ExplanationControllerTests {
         #expect(controller.phase == .idle && controller.history?.canonicalScene.objects.isEmpty == true)
         #expect(controller.history?.messages.map(\.role) == [.user])
         #expect(!controller.canReplay && fixture.calls.speech == 0 && fixture.calls.screens == 0)
+        controller.stop()
+    }
+
+    @Test func aModelEditNamingAMissingPartEndsTheTurnAndKeepsTheLastValidScene() async throws {
+        let fixture = Fixture(), controller = fixture.controller
+        fixture.provider.operationOverride = { index, request in
+            index == 0
+                ? .model(.part(.init(id: "battery", kind: .recipe, recipe: .batteryPack, accessibleDescription: "Battery")))
+                : .model(.edit(.init(id: "ghost", expectedRevision: request.scene.revision + index, change: .init(opacity: 0.4))))
+        }
+        await fixture.open(); fixture.submit()
+        try await fixture.wait { controller.problem != nil && !controller.isReceiving }
+        #expect(controller.rejectedModelEdits == 1 && controller.problem?.contains("3D scene") == true)
+        #expect(controller.phase == .idle && controller.history?.canonicalScene.model == nil)
+        #expect(!controller.canReplay)
+        controller.stop()
+    }
+
+    @Test func aModelEditWithAStaleRevisionEndsTheTurnAndKeepsTheLastValidScene() async throws {
+        let fixture = Fixture(), controller = fixture.controller
+        fixture.provider.operationOverride = { index, request in
+            index == 0
+                ? .model(.part(.init(id: "battery", kind: .recipe, recipe: .batteryPack, accessibleDescription: "Battery")))
+                : .model(.edit(.init(id: "battery", expectedRevision: request.scene.revision + 7, change: .init(opacity: 0.4))))
+        }
+        await fixture.open(); fixture.submit()
+        try await fixture.wait { controller.problem != nil && !controller.isReceiving }
+        #expect(controller.rejectedModelEdits == 1 && controller.history?.canonicalScene.model == nil)
         controller.stop()
     }
 

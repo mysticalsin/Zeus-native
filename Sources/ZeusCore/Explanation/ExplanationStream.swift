@@ -82,6 +82,7 @@ public enum ExplanationWire {
 
     private static func operationSchema(_ value: ExplanationJSONValue, allowTarget: Bool) throws {
         guard case .object(let raw) = value, case .string(let name) = raw["op"] else { throw ExplanationFailure.invalid("operation discriminator") }
+        if ExplanationModelOperation.wireNames.contains(name) { try modelOperationSchema(name, value); return }
         let fields: Set<String>
         switch name {
         case "create", "connect": fields = ["object"]
@@ -143,8 +144,8 @@ public enum ExplanationWire {
         }
     }
 
-    private static func vectorSchema(_ v: ExplanationJSONValue) throws { _ = try object(v, required: ["x", "y", "z"]) }
-    private static func object(_ v: ExplanationJSONValue, required: Set<String>, optional: Set<String> = []) throws -> [String: ExplanationJSONValue] {
+    static func vectorSchema(_ v: ExplanationJSONValue) throws { _ = try object(v, required: ["x", "y", "z"]) }
+    static func object(_ v: ExplanationJSONValue, required: Set<String>, optional: Set<String> = []) throws -> [String: ExplanationJSONValue] {
         guard case .object(let fields) = v else { throw ExplanationFailure.invalid("expected JSON object") }
         let keys = Set(fields.keys)
         guard required.isSubset(of: keys), keys.isSubset(of: required.union(optional)) else {
@@ -152,7 +153,7 @@ public enum ExplanationWire {
         }
         return fields
     }
-    private static func array(_ v: ExplanationJSONValue, maximum: Int) throws -> [ExplanationJSONValue] {
+    static func array(_ v: ExplanationJSONValue, maximum: Int) throws -> [ExplanationJSONValue] {
         guard case .array(let values) = v, values.count <= maximum else { throw ExplanationFailure.invalid("JSON array budget") }
         return values
     }
@@ -247,7 +248,7 @@ public struct ExplanationEventStream: Sendable {
     }
 }
 
-private indirect enum ExplanationJSONValue {
+indirect enum ExplanationJSONValue {
     case object([String: ExplanationJSONValue]), array([ExplanationJSONValue]), string(String), scalar
 }
 

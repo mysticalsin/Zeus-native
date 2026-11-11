@@ -205,9 +205,14 @@ public enum ExplanationOperation: Equatable, Sendable, Codable {
     case camera(ExplanationCamera)
     case animate(id: String, animation: ExplanationAnimation)
     case clear
+    /// Slice S3: named parts, flows, callouts, camera views, cutaways and edits by part id.
+    case model(ExplanationModelOperation)
 
     private enum CodingKeys: String, CodingKey { case op, object, id, patch, position, color, highlighted, members, text, camera, animation }
-    private enum Name: String, Codable { case create, update, remove, move, recolor, highlight, group, label, connect, camera, animate, clear }
+    private enum Name: String, Codable {
+        case create, update, remove, move, recolor, highlight, group, label, connect, camera, animate, clear
+        case part, path, flow, callout, view, cutaway, model, edit
+    }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Name.self, forKey: .op) {
@@ -223,6 +228,7 @@ public enum ExplanationOperation: Equatable, Sendable, Codable {
         case .camera: self = .camera(try c.decode(ExplanationCamera.self, forKey: .camera))
         case .animate: self = .animate(id: try c.decode(String.self, forKey: .id), animation: try c.decode(ExplanationAnimation.self, forKey: .animation))
         case .clear: self = .clear
+        case .part, .path, .flow, .callout, .view, .cutaway, .model, .edit: self = .model(try ExplanationModelOperation(from: decoder))
         }
     }
     public func encode(to encoder: Encoder) throws {
@@ -240,6 +246,7 @@ public enum ExplanationOperation: Equatable, Sendable, Codable {
         case .camera(let camera): try c.encode(Name.camera, forKey: .op); try c.encode(camera, forKey: .camera)
         case .animate(let id, let animation): try c.encode(Name.animate, forKey: .op); try c.encode(id, forKey: .id); try c.encode(animation, forKey: .animation)
         case .clear: try c.encode(Name.clear, forKey: .op)
+        case .model(let operation): try operation.encode(to: encoder)
         }
     }
 }
@@ -301,11 +308,15 @@ public struct ExplanationScene: Codable, Equatable, Sendable {
     public var captureID: UUID?
     public var objects: [String: ExplanationObject]
     public var camera: ExplanationCamera
+    /// Slice S3 parts and flows. Nil for every scene that has none (all earlier saved scenes).
+    public var model: ExplanationModel3D?
     public init(version: Int = 1, sessionID: UUID, sceneID: UUID, revision: Int = 0,
                 canvasSize: ExplanationSize2 = .init(width: 1024, height: 768), captureID: UUID? = nil,
-                objects: [String: ExplanationObject] = [:], camera: ExplanationCamera = .init()) {
+                objects: [String: ExplanationObject] = [:], camera: ExplanationCamera = .init(),
+                model: ExplanationModel3D? = nil) {
         self.version = version; self.sessionID = sessionID; self.sceneID = sceneID; self.revision = revision
         self.canvasSize = canvasSize; self.captureID = captureID; self.objects = objects; self.camera = camera
+        self.model = model
     }
 }
 
@@ -360,6 +371,7 @@ public enum ExplanationFailure: Error, LocalizedError, Equatable, Sendable {
     case streamFinished
     case cancelled
     case limitExceeded(String)
+    case editRejected(ExplanationEditRejection)
 
     public var errorDescription: String? {
         switch self {
@@ -371,6 +383,7 @@ public enum ExplanationFailure: Error, LocalizedError, Equatable, Sendable {
         case .streamFinished: "This explanation has already finished."
         case .cancelled: "Explanation stopped."
         case .limitExceeded: "This explanation is too large. Try a smaller step."
+        case .editRejected: "A change to the 3D scene named a part that is missing, or the scene had changed. The last valid scene is kept."
         }
     }
 }

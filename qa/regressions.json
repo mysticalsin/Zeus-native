@@ -3577,6 +3577,102 @@
         "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
         "function": "theLineCarriesNoFreeTextOnlyKnownTokens"
       }
+    },
+    {
+      "id": "REG-310",
+      "failure": "A 3D edit written for an older scene revision was applied to the current scene instead of being rejected, so a follow-up could change parts the model had not seen.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelEditTests.swift",
+        "function": "staleRevisionIsRejectedAndTheLastValidSceneIsKept"
+      }
+    },
+    {
+      "id": "REG-311",
+      "failure": "A 3D edit naming a part that does not exist could create a second copy or half-apply with its neighbours instead of rejecting the whole change.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelEditTests.swift",
+        "function": "missingTargetIsRejectedAndTheLastValidSceneIsKept"
+      }
+    },
+    {
+      "id": "REG-312",
+      "failure": "3D spins and flows advanced per rendered frame, so speed changed with the display rate and a stalled display jumped the animation.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelMotionTests.swift",
+        "function": "animationIsDrivenByElapsedTimeNotFrameCount"
+      }
+    },
+    {
+      "id": "REG-313",
+      "failure": "An energy marker's direction could depend on the camera angle, so an orbit could reverse what an arrow meant.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelMotionTests.swift",
+        "function": "flowMarkersTravelInWorldPathOrderRegardlessOfCamera"
+      }
+    },
+    {
+      "id": "REG-314",
+      "failure": "World-anchored 3D labels could overlap each other or cover another label's anchor as the camera orbited.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelMotionTests.swift",
+        "function": "labelsNeverOverlapOrCoverAnAnchor"
+      }
+    },
+    {
+      "id": "REG-315",
+      "failure": "Malformed 3D operations (unknown commands, out-of-range numbers, bad references, extra fields) were not all refused before reaching a renderer.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelSchemaTests.swift",
+        "function": "badPayloadsAreRejected"
+      }
+    },
+    {
+      "id": "REG-316",
+      "failure": "Drivetrain wheels turned against the direction of travel in the demonstration, so the car appeared to roll backwards.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplanationModelMotionTests.swift",
+        "function": "wheelsTurnInTheTravelDirection"
+      }
+    },
+    {
+      "id": "REG-317",
+      "failure": "A rejected 3D edit left the turn running with a half-built scene instead of ending it with the last valid scene kept.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ExplanationControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+        "function": "aModelEditNamingAMissingPartEndsTheTurnAndKeepsTheLastValidScene"
+      }
     }
   ]
 }
