@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Zeus
+import ZeusCore
 
 /// Settings must open instantly and stay fluid: whatever a page asks while it draws (and whatever
 /// runs when the window opens) answers from memory and never waits on the disk, a daemon or the OS.
