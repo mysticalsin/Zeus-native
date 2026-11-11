@@ -165,6 +165,18 @@ public enum PointingFailureKind: Equatable, Sendable {
         }
     }
 
+    /// The `error.type` of an Anthropic API error event or body.
+    public static func classify(anthropicErrorType type: String) -> PointingFailureKind {
+        switch type {
+        case "authentication_error", "permission_error": return .auth
+        case "rate_limit_error": return .rateLimit
+        case "overloaded_error", "api_error", "timeout_error": return .providerBusy
+        case "not_found_error": return .modelUnavailable
+        case "billing_error": return .noCredits
+        default: return .unknown
+        }
+    }
+
     /// `code` is a `URLError.Code` raw value.
     public static func classify(urlErrorCode code: Int) -> PointingFailureKind {
         switch code {

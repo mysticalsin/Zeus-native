@@ -46,20 +46,9 @@ final class ExplanationHTTPProvider: ExplanationModelProviding {
         self.configuration = configuration; self.localOnly = localOnly; self.displayName = displayName
     }
 
-    static func request(_ input: ExplanationModelRequest, config: AnyLLMConfig, key: String?, requireLocal: Bool = false) throws -> URLRequest {
-        try ExplanationSceneReducer.validate(input.scene)
-        guard input.scene.revision < ExplanationLimits.revision else { throw ExplanationProviderError.invalidRequest }
-        guard input.prompt.utf8.count <= 16_384, !input.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              input.history.count <= ExplanationHistory.maxMessages,
-              config.isComplete, let url = config.chatURL, AnyLLMEndpointPolicy.permits(url),
-              url.query == nil, url.fragment == nil,
-              let model = ModelCap.gatedHTTPModel(config.model.trimmingCharacters(in: .whitespacesAndNewlines)),
-              !model.isEmpty else {
-            throw ExplanationProviderError.notConfigured
-        }
-        guard !requireLocal || AnyLLMEndpointPolicy.isLoopback(url.host ?? "") else {
-            throw ExplanationProviderError.localEndpointRequired
-        }
+    /// The system instructions and the untrusted-data user message, shared by every vision provider.
+    /// The system text never contains screen, AX or history content.
+    static func prompt(for input: ExplanationModelRequest) throws -> (instructions: String, reference: String) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let sceneData = try encoder.encode(input.scene)
         guard sceneData.count <= ExplanationHistory.maxSceneBytes else { throw ExplanationProviderError.invalidRequest }
@@ -98,12 +87,30 @@ final class ExplanationHTTPProvider: ExplanationModelProviding {
         Exact example envelope (replace speech/cues and use sequential revisions):
         \(example)
         """
-        var messages: [[String: Any]] = [["role": "system", "content": instructions]]
         // History is data inside one user message, not a new privileged system instruction.
         let conversation = try encoder.encode(input.history)
         guard conversation.count <= 131_072 else { throw ExplanationProviderError.invalidRequest }
         let reference = "Current scene JSON:\n\(String(decoding: sceneData, as: UTF8.self))\nConversation JSON:\n\(String(decoding: conversation, as: UTF8.self))\nRequest:\n\(input.prompt)"
             + (input.pointing.map { "\n" + PointingPrompt.contextBlock($0) } ?? "")
+        return (instructions, reference)
+    }
+
+    static func request(_ input: ExplanationModelRequest, config: AnyLLMConfig, key: String?, requireLocal: Bool = false) throws -> URLRequest {
+        try ExplanationSceneReducer.validate(input.scene)
+        guard input.scene.revision < ExplanationLimits.revision else { throw ExplanationProviderError.invalidRequest }
+        guard input.prompt.utf8.count <= 16_384, !input.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              input.history.count <= ExplanationHistory.maxMessages,
+              config.isComplete, let url = config.chatURL, AnyLLMEndpointPolicy.permits(url),
+              url.query == nil, url.fragment == nil,
+              let model = ModelCap.gatedHTTPModel(config.model.trimmingCharacters(in: .whitespacesAndNewlines)),
+              !model.isEmpty else {
+            throw ExplanationProviderError.notConfigured
+        }
+        guard !requireLocal || AnyLLMEndpointPolicy.isLoopback(url.host ?? "") else {
+            throw ExplanationProviderError.localEndpointRequired
+        }
+        let (instructions, reference) = try Self.prompt(for: input)
+        var messages: [[String: Any]] = [["role": "system", "content": instructions]]
         if let snapshot = input.snapshot {
             messages.append(["role": "user", "content": [
                 ["type": "text", "text": reference],

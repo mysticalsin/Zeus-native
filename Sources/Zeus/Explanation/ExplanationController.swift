@@ -34,6 +34,11 @@ final class ExplanationController {
         var snapshot: ExplanationScreenSnapshot?
     }
     var desktopTurn: PointingTurn?
+    /// Window level of the desktop overlay. Chat keeps `.floating`; pointing sits above menus.
+    var overlayLevel: NSWindow.Level {
+        get { overlay.windowLevel }
+        set { overlay.windowLevel = newValue }
+    }
     /// Real first audio start of a pointing turn (not the request, not the first token).
     @ObservationIgnored var onSpeechStart: (() -> Void)?
     /// A cue was admitted by real playback; the argument is the admitted target scene.
