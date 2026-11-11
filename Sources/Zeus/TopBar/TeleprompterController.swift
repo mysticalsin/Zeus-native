@@ -91,18 +91,14 @@ final class TeleprompterController {
             voiceUnavailable()
             return
         }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+        OffMainAudioCallbacks.installLevelTap(on: input, format: format, measure: { samples in
             var sum: Float = 0
-            for index in 0..<Int(buffer.frameLength) { sum += samples[index] * samples[index] }
-            let level = Double(min(max((sqrt(sum / Float(buffer.frameLength)) - 0.008) * 10.2, 0), 1))
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.topBar.prompterLevel = level
-                    self.topBar.roll.hear(level: level)
-                }
-            }
+            for sample in samples { sum += sample * sample }
+            return Double(min(max((sqrt(sum / Float(samples.count)) - 0.008) * 10.2, 0), 1))
+        }) { [weak self] level in
+            guard let self else { return }
+            self.topBar.prompterLevel = level
+            self.topBar.roll.hear(level: level)
         }
         do {
             engine.prepare()

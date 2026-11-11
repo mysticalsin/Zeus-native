@@ -1143,30 +1143,23 @@ final class DictationController {
         request.requiresOnDeviceRecognition = true
         let started = Date()
         let vocabulary = fullVocabulary
-        recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard result?.isFinal == true || error != nil else { return }
-            let text = result?.bestTranscription.formattedString ?? ""
-            let message = error?.localizedDescription
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    guard !text.isEmpty else {
-                        self.topBar.dictationPhase = .failed(message ?? "No speech found in the file.")
-                        self.topBar.show(.dictation("No speech found in the file"))
-                        return
-                    }
-                    let fixed = vocabulary.apply(to: text)
-                    let record = DictationRecord(duration: 0, processingTime: Int(Date().timeIntervalSince(started) * 1000),
-                                                 modeKey: "file", modeName: url.lastPathComponent, rawResult: text, result: fixed,
-                                                 source: "file", engine: TranscriptionEngineKind.apple.rawValue)
-                    var saved = true
-                    do { try self.store.save(record) } catch { saved = false }
-                    self.topBar.dictationHistory.insert(record, at: 0)
-                    self.topBar.copyText(fixed)
-                    self.topBar.dictationPhase = .done
-                    self.topBar.show(.dictation(saved ? "File transcribed and copied" : "File transcribed and copied. Couldn't save to history."))
-                }
+        OffMainAudioCallbacks.recognizeFinal(recognizer, request: request) { [weak self] text, message in
+            guard let self else { return }
+            guard !text.isEmpty else {
+                self.topBar.dictationPhase = .failed(message ?? "No speech found in the file.")
+                self.topBar.show(.dictation("No speech found in the file"))
+                return
             }
+            let fixed = vocabulary.apply(to: text)
+            let record = DictationRecord(duration: 0, processingTime: Int(Date().timeIntervalSince(started) * 1000),
+                                         modeKey: "file", modeName: url.lastPathComponent, rawResult: text, result: fixed,
+                                         source: "file", engine: TranscriptionEngineKind.apple.rawValue)
+            var saved = true
+            do { try self.store.save(record) } catch { saved = false }
+            self.topBar.dictationHistory.insert(record, at: 0)
+            self.topBar.copyText(fixed)
+            self.topBar.dictationPhase = .done
+            self.topBar.show(.dictation(saved ? "File transcribed and copied" : "File transcribed and copied. Couldn't save to history."))
         }
     }
 }

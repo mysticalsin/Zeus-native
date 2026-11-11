@@ -13,6 +13,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 APP = ROOT / "Sources/Zeus"
 HELPER = APP / "App/SystemAuthorization.swift"
+AUDIO_CALLBACK_APIS = re.compile(r"\.(?:installTap\(|recognitionTask\(with)")
+# Enclosing types audited as not main-actor isolated (2026-11-10), plus the nonisolated helper.
+AUDITED_AUDIO_FILES = {
+    "Audio/OffMainAudioCallbacks.swift", "Dictation/SpeechEngines.swift", "Polyglot/PolyglotAudio.swift",
+    "Polyglot/PolyglotEngines.swift", "Scribe/ScribeLiveCapture.swift", "Voice/SpeechInput.swift",
+    "Voice/WakeWordListener.swift",
+}
 HANDLER_APIS = re.compile(r"\b(?:SFSpeechRecognizer\.requestAuthorization|INFocusStatusCenter\.default\.requestAuthorization)\s*[({]")
 
 
@@ -37,6 +44,15 @@ class SourceLint(unittest.TestCase):
         offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if p != HELPER
                      for n, line in code_lines(p) if HANDLER_APIS.search(line)]
         self.assertEqual(offenders, [], "await SystemAuthorization instead of passing a TCC handler")
+
+    def test_audio_taps_and_recognition_handlers_only_in_audited_files(self):
+        # Same trap as the TCC handler: a tap block or recognition handler written in a @MainActor
+        # type fails the executor check on the first buffer. New sites go through
+        # OffMainAudioCallbacks, or are added here only after their enclosing type is audited.
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files()
+                     if str(p.relative_to(APP)) not in AUDITED_AUDIO_FILES
+                     for n, line in code_lines(p) if AUDIO_CALLBACK_APIS.search(line)]
+        self.assertEqual(offenders, [], "use OffMainAudioCallbacks from @MainActor code")
 
     def test_helper_is_nonisolated_and_covers_each_api(self):
         text = "\n".join(line for _, line in code_lines(HELPER))

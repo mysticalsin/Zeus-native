@@ -102,16 +102,11 @@ final class MicrophoneTester {
             problem = "No microphone is connected."
             return
         }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            guard let channel = buffer.floatChannelData?[0] else { return }
-            let value = MicLevel.level(samples: UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self, self.running else { return }
-                    self.level = value
-                    self.peak = max(self.peak, value)
-                }
-            }
+        OffMainAudioCallbacks.installLevelTap(on: input, format: format,
+                                              measure: { MicLevel.level(samples: $0) }) { [weak self] value in
+            guard let self, self.running else { return }
+            self.level = value
+            self.peak = max(self.peak, value)
         }
         do {
             try engine.start()
