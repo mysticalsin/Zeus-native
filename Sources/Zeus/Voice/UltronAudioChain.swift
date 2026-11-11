@@ -39,13 +39,41 @@ final class UltronEffectGraph {
         for node in nodes { engine.attach(node) }
     }
 
-    func connect(from source: AVAudioNode, to destination: AVAudioNode, format: AVAudioFormat, engine: AVAudioEngine) {
+    /// Whether `format` can be handed to AVAudioEngine.connect. An invalid format makes AVFAudio raise an
+    /// Objective-C exception (error -10868), which Swift cannot catch and which ends the process.
+    nonisolated static func isConnectable(_ format: AVAudioFormat) -> Bool {
+        format.sampleRate >= 8_000 && format.sampleRate <= 384_000
+            && format.channelCount >= 1 && format.channelCount <= 8
+            && format.commonFormat == .pcmFormatFloat32
+    }
+
+    /// Why the engine cannot take this chain right now, or nil when it can. Live engines need an output
+    /// device with a sane format (a Mac without one, or mid device change, reports 0 Hz); manual
+    /// (offline) rendering mode never touches hardware.
+    static func unavailableReason(engine: AVAudioEngine, format: AVAudioFormat) -> String? {
+        guard isConnectable(format) else {
+            return "chain format \(format.sampleRate) Hz x \(format.channelCount) is not connectable"
+        }
+        if engine.isInManualRenderingMode { return nil }
+        let output = engine.outputNode.outputFormat(forBus: 0)
+        guard output.sampleRate > 0, output.channelCount > 0 else { return "no usable audio output device" }
+        return nil
+    }
+
+    /// Wires source -> effects -> main mixer. Returns the reason it did not (nothing is connected then
+    /// and the caller falls back to passthrough); it never reaches AVAudioEngine.connect with a format
+    /// or device AVFAudio would reject. For offline use call `enableManualRenderingMode` first.
+    @discardableResult
+    func connect(from source: AVAudioNode, format: AVAudioFormat, engine: AVAudioEngine) -> String? {
+        if let reason = Self.unavailableReason(engine: engine, format: format) { return reason }
+        let destination = engine.mainMixerNode
         var previous = source
         for node in nodes {
             engine.connect(previous, to: node, format: format)
             previous = node
         }
         engine.connect(previous, to: destination, format: format)
+        return nil
     }
 
     func apply(_ p: UltronEffectParameters) {
@@ -91,6 +119,8 @@ final class UltronAudioChain {
     private let graph = UltronEffectGraph()
     private let pending = PendingBuffers()
     private var carry: UInt8?
+    private var wired = false
+    private var configObserver: NSObjectProtocol?
 
     /// Silent runs (the owner's quiet mode, tests) go through the whole chain with the volume at zero.
     var muted = false { didSet { player.volume = muted ? 0 : 1 } }
@@ -99,16 +129,39 @@ final class UltronAudioChain {
     init() {
         engine.attach(player)
         graph.attach(to: engine)
-        graph.connect(from: player, to: engine.mainMixerNode, format: Self.format, engine: engine)
         graph.apply(UltronVoiceEffect.parameters)
+        // A device change stops the engine and can change the output format; the next prepare()
+        // re-validates the output and restarts. The wiring uses the fixed chain format, so it stays.
+        configObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.player.stop(); self?.pending.reset() }
+        }
+    }
+
+    isolated deinit {
+        if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
     }
 
     var isPlaying: Bool { pending.value > 0 }
+
+    /// Connects the graph on first use, once an output device exists (never at construction, so a Mac
+    /// without one cannot crash the app). False, with a logged reason, when nothing can be wired; the
+    /// caller then reports no audio output and the spoken line falls back to its other paths.
+    private func wire() -> Bool {
+        if wired { return true }
+        if let reason = graph.connect(from: player, format: Self.format, engine: engine) {
+            NSLog("[ZEUS] voice: effect graph not connected (%@); no audio output", reason)
+            return false
+        }
+        wired = true
+        return true
+    }
 
     /// Applies the current Settings values and starts the engine. False when no output is available.
     @discardableResult
     func prepare() -> Bool {
         graph.apply(UltronVoiceEffect.parameters)
+        guard wire() else { return false }
         if !engine.isRunning {
             engine.prepare()
             do { try engine.start() } catch { return false }
@@ -228,13 +281,23 @@ enum UltronOfflineRender {
         let graph = UltronEffectGraph()
         engine.attach(player)
         graph.attach(to: engine)
-        graph.connect(from: player, to: engine.mainMixerNode, format: format, engine: engine)
-        graph.apply(parameters)
         let chunk: AVAudioFrameCount = 4_096
-        do {
-            try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: chunk)
-            try engine.start()
-        } catch { return nil }
+        // Manual mode first: the engine then renders on its own clock and never asks for hardware, so
+        // this runs on a machine with no audio device. Connecting before it would bind the mixer to
+        // the (absent) output device's format.
+        do { try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: chunk) } catch {
+            NSLog("[ZEUS] voice: offline render unavailable (%@); passthrough", error.localizedDescription)
+            return source
+        }
+        if let reason = graph.connect(from: player, format: format, engine: engine) {
+            NSLog("[ZEUS] voice: offline effect graph not connected (%@); passthrough", reason)
+            return source
+        }
+        graph.apply(parameters)
+        do { try engine.start() } catch {
+            NSLog("[ZEUS] voice: offline engine did not start (%@); passthrough", error.localizedDescription)
+            return source
+        }
         defer { engine.stop() }
         player.scheduleBuffer(source)
         player.play()
