@@ -808,6 +808,7 @@ struct RecordlyCaptureControl: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(spokenSource ?? "")
         .accessibilityHint(enabled || help.isEmpty ? "" : help)
+        .accessibilityIdentifier("record.capture")
     }
 
     /// A calm, static halo behind the button. No animation, so it costs nothing at rest.

@@ -305,6 +305,7 @@ struct ChatComposer: View {
                 .foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(1...6)
                 .focused($focused)
+                .accessibilityIdentifier("chat.message")
                 .onSubmit { chat.send() }
             if chat.isSendingHere {
                 GlyphButton(symbol: "stop.fill", size: 11, tint: Theme.cloudPrimary, label: "Stop") { chat.stop() }

@@ -399,6 +399,7 @@ private struct ScribeRecentMeetings: View {
                     ScribeMemoryWindowController.shared.show()
                 }
                 .accessibilityHint("Opens all your meetings with search, notes and who spoke.")
+                .accessibilityIdentifier("scribe.memory.open")
             }
             if scribe.recaps.isEmpty {
                 ScribeNoRecentMeetings()
