@@ -562,22 +562,48 @@ enum Automation {
 /// from setup or Settings > Permissions.
 @MainActor
 enum AccessibilityGate {
-    private static var waiting: [() -> Void] = []
+    /// The closure for each waiting feature, by key (see `TrustWait`).
+    private static var work: [String: () -> Void] = [:]
+    private static var wait = TrustWait.State()
     private static var timer: Timer?
 
     static var trusted: Bool { AXIsProcessTrusted() }
 
-    static func whenTrusted(_ work: @escaping () -> Void) {
-        if trusted { work(); return }
-        waiting.append(work)
-        guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            MainActor.assumeIsolated {
-                guard trusted else { return }
-                timer?.invalidate(); timer = nil
-                let ready = waiting; waiting.removeAll()
-                NSLog("[ZEUS] permissions: Accessibility granted, starting %d key features", ready.count)
-                ready.forEach { $0() }
+    /// Runs `work` once Accessibility is on. Asking again under the same key replaces the earlier closure,
+    /// so a feature that restarts is started once. The default key names the call site.
+    static func whenTrusted(key: String = "\(#fileID):\(#line)", _ work: @escaping () -> Void) {
+        self.work[key] = work
+        perform(apply(.wanted(key: key, trusted: trusted)))
+    }
+
+    /// The feature behind `key` was turned off: it must not start later, and the poll stops with the last waiter.
+    static func cancelWaiting(key: String) {
+        work[key] = nil
+        perform(apply(.cancelled(key: key)))
+    }
+
+    private static func apply(_ event: TrustWait.Event) -> [TrustWait.Effect] {
+        let (next, effects) = TrustWait.reduce(wait, event)
+        wait = next
+        return effects
+    }
+
+    private static func perform(_ effects: [TrustWait.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .run(let key):
+                work.removeValue(forKey: key)?()
+            case .startPolling:
+                timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+                    MainActor.assumeIsolated {
+                        guard trusted else { return }
+                        NSLog("[ZEUS] permissions: Accessibility granted, starting %d key features", wait.waiting.count)
+                        perform(apply(.becameTrusted))
+                    }
+                }
+            case .stopPolling:
+                timer?.invalidate()
+                timer = nil
             }
         }
     }
