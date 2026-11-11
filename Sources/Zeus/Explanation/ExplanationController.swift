@@ -34,6 +34,9 @@ final class ExplanationController {
         var snapshot: ExplanationScreenSnapshot?
     }
     var desktopTurn: PointingTurn?
+    /// The desktop overlay's windows, for own-process window-policy checks.
+    var overlayWindows: [NSWindow] { overlay.ownedWindows }
+    var overlayVisible: Bool { overlay.isVisible }
     /// Window level of the desktop overlay. Chat keeps `.floating`; pointing sits above menus.
     var overlayLevel: NSWindow.Level {
         get { overlay.windowLevel }

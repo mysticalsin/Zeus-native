@@ -9,6 +9,8 @@ struct PointingRawTarget: Sendable, Equatable {
     var role: String
     var subrole: String?
     var label: String?
+    /// `AXIdentifier`, used only by the self-test. It is never sent to a model.
+    var identifier: String? = nil
     /// Quartz global points (top-left origin), the Accessibility coordinate space.
     var axFrame: CGRect
     var isSecure: Bool
@@ -48,7 +50,9 @@ enum PointingTargetProbe {
                 .lazy.compactMap { string(element, $0) }.first { !$0.isEmpty }
         }
         guard let frame = frame(of: element), frame.width > 0, frame.height > 0 else { return nil }
-        return PointingRawTarget(role: role, subrole: subrole, label: label, axFrame: frame, isSecure: secure)
+        let identifier = secure ? nil : string(element, "AXIdentifier")
+        return PointingRawTarget(role: role, subrole: subrole, label: label, identifier: identifier,
+                                 axFrame: frame, isSecure: secure)
     }
 
     private nonisolated static func string(_ element: AXUIElement, _ attribute: String) -> String? {

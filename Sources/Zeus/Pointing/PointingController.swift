@@ -24,6 +24,13 @@ enum PointingNotice: Equatable {
 /// Timers are system callbacks too: this one is created in nonisolated code and only hops to the
 /// main actor, so no closure written inside a `@MainActor` type is ever called by the system.
 enum PointingTimers {
+    /// A real-time wait that is not `Task.sleep`: used only by the self-test to poll for events.
+    nonisolated static func wait(_ seconds: TimeInterval) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { continuation.resume() }
+        }
+    }
+
     nonisolated static func repeating(every interval: TimeInterval,
                                       _ tick: @escaping @MainActor @Sendable () -> Void) -> Timer {
         let timer = Timer(timeInterval: interval, repeats: true) { _ in MainActor.assumeIsolated { tick() } }
@@ -128,6 +135,18 @@ final class PointingController {
     }
 
     var state: PointingSession.State { session.state }
+    /// Anything still running that should not be once the session is idle. Empty means clean.
+    var leaks: [String] {
+        var found: [String] = []
+        if sampler != nil { found.append("sampler timer") }
+        if inkOwner || MarkOverlay.shared.capturesMouse { found.append("ink overlay") }
+        if prepareTask != nil || captureTask != nil || work != nil { found.append("pending task") }
+        if !dwellProbes.isEmpty { found.append("dwell probe") }
+        if explanation.screenContext.isCapturing { found.append("capture in flight") }
+        if explanation.overlayVisible { found.append("annotation overlay") }
+        if explanation.microphone.state != .idle { found.append("microphone") }
+        return found
+    }
     var isEnabled: Bool { services.enabled() }
 
     func start() { guard services.enabled() else { return }; hotkey.start() }
@@ -160,6 +179,14 @@ final class PointingController {
         guard transition.changed else { return } // A second hold while holding is a no-op.
         let generation = session.generation
         ExplanationAudioArbitration.yieldToNewCapture()
+        // Barge-in: a new hold during processing or speech stops speech and pending animation first.
+        if transition.effects.contains(.stopOutput) {
+            let began = services.now()
+            halt(clearScreen: true)
+            explanation.stop()
+            metrics.stopLatency = services.now() - began
+            marker.idle()
+        }
         explanation.prepareDesktopSession()
         explanation.desktopTurn = nil
         explanation.screenContext.clear()
