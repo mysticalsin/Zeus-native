@@ -14,7 +14,8 @@ public struct RecordlyCountdown: Equatable, Sendable {
     public enum Event: Equatable, Sendable {
         /// The Record button. A second press while counting cancels.
         case press(sourceReady: Bool)
-        case tick(token: UInt64)
+        /// `sourceReady` is whether the chosen display or window still exists; a countdown never ends in a silent no-op.
+        case tick(token: UInt64, sourceReady: Bool = true)
         /// Escape, or the page going away.
         case cancel
         /// The selected display or window went away while counting.
@@ -40,6 +41,7 @@ public struct RecordlyCountdown: Equatable, Sendable {
     }
 
     public static let noSourceNotice = "Choose a display or window first."
+    public static let sourceLostNotice = "The source went away before recording started. Choose it again."
 
     public mutating func send(_ event: Event) -> [Effect] {
         switch (state, event) {
@@ -53,8 +55,12 @@ public struct RecordlyCountdown: Equatable, Sendable {
             state = .idle
             return [.cancelTick]
 
-        case (.counting(let remaining, let token), .tick(let tickToken)):
+        case (.counting(let remaining, let token), .tick(let tickToken, let sourceReady)):
             guard tickToken == token else { return [] }
+            guard sourceReady else {
+                state = .idle
+                return [.cancelTick, .notice(Self.sourceLostNotice)]
+            }
             if remaining > 1 {
                 state = .counting(remaining: remaining - 1, token: token)
                 return [.scheduleTick(token: token)]

@@ -28,6 +28,9 @@ final class AIConnections {
     private(set) var checking = false
     /// Counts overlapping refreshes, so one finishing cannot clear `checking` while another still probes.
     @ObservationIgnored private var refreshes = OverlapCounter()
+    /// Background looks at the hook files. Connect and Disconnect invalidate it, so a look that started before the
+    /// click cannot put the old "not connected" back; the newest look wins over an older one.
+    @ObservationIgnored private var hookReads = LatestRun()
     var messages: [AIProvider: String] = [:]
     var anyLLM: AnyLLMConfig {
         didSet {
@@ -121,11 +124,19 @@ final class AIConnections {
         messages[provider] = nil
         switch provider {
         case .claudeCode: services.connect(.claude); messages[provider] = services.connectMessage
-        case .codex: services.connect(.codex); messages[provider] = services.connectMessage
+        case .codex:
+            services.connect(.codex)
+            messages[provider] = services.connectMessage
+            // The row reads `hookInstalled`; without this it said "Ready" until the next background look.
+            if services.codexConnected, let agent = provider.hookAgent {
+                hookReads.invalidate()
+                hookInstalled[agent] = true
+            }
         case .cursor, .gemini:
             guard let agent = provider.hookAgent else { return }
             do {
                 try AgentHookInstaller.install(agent)
+                hookReads.invalidate()
                 hookInstalled[agent] = true
                 messages[provider] = "Connected."
             } catch { messages[provider] = error.localizedDescription }
@@ -145,6 +156,7 @@ final class AIConnections {
         case .codex, .cursor, .gemini:
             if let agent = provider.hookAgent {
                 try? AgentHookInstaller.uninstall(agent)
+                hookReads.invalidate()
                 hookInstalled[agent] = AgentHookInstaller.isInstalled(agent)
             }
         default:
@@ -171,6 +183,7 @@ final class AIConnections {
 
     /// Looks for the CLIs, apps and hook files on a background thread, then publishes the answer once.
     func detect() async {
+        let read = hookReads.begin()
         let snapshot = await Task.detached(priority: .userInitiated) { () -> ([AIProvider: AIProviderDetection], [AgentHookConfig.Agent: Bool], [AgentHookConfig.Agent: Bool]) in
             var installed: [AgentHookConfig.Agent: Bool] = [:], available: [AgentHookConfig.Agent: Bool] = [:]
             for agent in AgentHookConfig.Agent.allCases {
@@ -180,8 +193,13 @@ final class AIConnections {
             return (AIProviderDetector.detectAll(), installed, available)
         }.value
         detections = snapshot.0
-        hookInstalled = snapshot.1
         hookAvailable = snapshot.2
+        if hookReads.isCurrent(read) {
+            hookInstalled = snapshot.1
+        } else {
+            // A click changed one agent while this look ran: keep what the click set, fill in the rest.
+            for (agent, value) in snapshot.1 where hookInstalled[agent] == nil { hookInstalled[agent] = value }
+        }
         detected = true
     }
 

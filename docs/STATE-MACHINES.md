@@ -119,6 +119,35 @@ prompter, so a level queued before `end()` (or before a voice-follow off and on)
 `BeamerModel.busy` was set by `perform` and `install` with no re-entry guard, and `AIConnections.checking` by every `refresh`: the first of two
 overlapping calls to finish cleared the flag under the other. `ZeusCore/Lifecycle/OverlapCounter.swift`, tests `OverlapCounterTests.swift`.
 
+## Third pass (2026-11-11)
+
+Branch `codex/state-machines-pass3-20261111`. Scope: code added on 2026-11-11 that passes 1 and 2 never saw. Nothing could be compiled
+in the authoring sandbox; CI is the first compile. New shared primitive: `ZeusCore/Lifecycle/LatestRun.swift` (a token per run, `begin`,
+`finish`, `invalidate`; only the live token may publish or finish).
+
+| # | Area | Problem | Severity | Fix | Test | REG |
+|---|---|---|---|---|---|---|
+| 23 | Talk to Zeus fast race (`TurnRaceState`, `FastRaceRun`) | A winner that broke off mid-sentence left the deep answer running and deliverable | medium | winner failure cancels and drops the deep answer | `TurnRaceLiveTierTests` | 248 |
+| 24 | Same | Losers cancelled by the winner reported a cancellation error that was logged, ranked as a failure in `BrainLatencyBook` and could mark quota state | medium | `isLive(tier)` gate on `.failed` and `.finished` | `TurnRaceLiveTierTests` | 249 |
+| 25 | `VoiceTurnController.turnRunning` | Bool cleared by a cancelled turn under its replacement (wake gate and `isBusy` saw idle mid-answer) | medium | `LatestRun` slot | `LatestRunTests` | 250 |
+| 26 | Hands-free and wake turn | The silence timer of an earlier turn released a key the owner was holding; `wakeTurn` did not stop the previous deep follow-up or speculative run | medium | `press` cancels the timer, `wakeTurn` cancels race and ahead run | source lint | 251 |
+| 27 | `Speaker` (Ultron engines) | Barge-in counted as an engine failure and could pause a healthy route; Kokoro, Chatterbox and OpenAI audio that finished after the cancel still played | medium | `SpeechAttemptPolicy` | `SpeechAttemptPolicyTests` | 252 |
+| 28 | Alerts capsule | Timers ran while a peek or the panel covered the capsule: alerts expired unseen | medium | `AlertStack.setSuspended`, driven from `NotchController.show` | `AlertStackSuspendTests` | 253 |
+| 29 | Alerts | Dismissing the last alert left a stale hover so the next alert never auto-dismissed | low | empty stack clears hover | `AlertStackSuspendTests` | 254 |
+| 30 | Alerts snooze | A snoozed alert was dropped if the notch was open when it returned; repeated snoozes doubled | low | `postAlert(whileOpen:)`, one tracked task per id | source lint | 255 |
+| 31 | Recordly countdown | Kept counting after the owner left the page, then started a capture they could not cancel | high | `pageDisappeared` on `onDisappear` | `RecordlyCountdownSourceTests` | 256 |
+| 32 | Recordly countdown | A vanished source ended the countdown in a silent no-op | low | `tick(sourceReady:)` ends with a notice | `RecordlyCountdownSourceTests` | 257 |
+| 33 | Settings Launch at login | An older background status read overwrote the owner's toggle | medium | `LatestRun` invalidated by the toggle | `LatestRunTests` | 258 |
+| 34 | AI connections hooks | A look that began before Connect or Disconnect overwrote the click; Codex Connect never updated its row | medium | `hookReads` token, Codex row set on connect | source lint | 259 |
+
+Plain behaviour bugs found: Codex row stayed "Ready" after Connect (34); `postAlert` silently drops alerts while the notch is open (kept by design,
+snooze now bypasses it); `Speaker.speak(sentenceStream:)` and `SentenceSpeaking` have no caller (dead API, not removed).
+
+Reviewed, no change: language pack installer (`LanguagePackState` is an explicit reducer with tokens; a late probe after remove can mark a component
+installed, low, not changed); speaker model download (`ModelPreparation`, item 2); saved voices (synchronous, single owner); top bar position and
+screen-share policy (stateless math plus one stored value); Jev stage (`hasJevKey` is refreshed at the only two write sites); scribe speaker pipeline
+(covered by item 7).
+
 ## Remaining and reviewed
 
 ### 18. Insomnia. IMPLICIT, severity low, not changed

@@ -2977,6 +2977,150 @@
         "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
         "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
+    },
+    {
+      "id": "REG-248",
+      "failure": "A talk-to-Zeus fast answer that broke off mid-sentence left its background deep answer running and able to be spoken after the broken one.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TurnRaceLiveTierTests.swift",
+        "function": "theWinnerBreakingOffCancelsTheDeepAnswerBehindIt"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Engines stopped because another engine won the race reported a cancellation error that was logged, ranked as a failure in the latency book and could be counted against quota state.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TurnRaceLiveTierTests.swift",
+        "function": "aCancelledLoserIsNoLongerLiveSoItsLateErrorIsNotAFailure"
+      }
+    },
+    {
+      "id": "REG-250",
+      "failure": "A voice turn cancelled by a new key press finished later and cleared turnRunning under the turn that replaced it, so the wake word and busy checks saw an idle assistant mid-answer.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/LatestRunTests.swift",
+        "function": "aSupersededRunFinishingLateDoesNotClearTheNewerRun"
+      }
+    },
+    {
+      "id": "REG-251",
+      "failure": "A hands-free silence timer from an earlier turn released the talk key while the owner was holding it, and a wake-word turn left the previous answer's deep follow-up and speculative run alive to speak over it.",
+      "features": [
+        "F11"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_press_stops_the_hands_free_timer"
+      }
+    },
+    {
+      "id": "REG-252",
+      "failure": "Pressing the talk key or Esc while a voice engine was mid-request counted as that engine failing and could pause a healthy ElevenLabs, OpenAI, Kokoro or Chatterbox route; a line rendered after the interruption still played.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechAttemptPolicyTests.swift",
+        "function": "aBargeInIsNeverAnEngineFailure"
+      }
+    },
+    {
+      "id": "REG-253",
+      "failure": "Alert timers kept running while the notch peek or panel covered the capsule, so alerts expired without ever being seen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "aSuspendedStackNeverExpiresAnAlertUnseen"
+      }
+    },
+    {
+      "id": "REG-254",
+      "failure": "Dismissing the last alert under the pointer left the stack hovered, so the next alert never started its auto-dismiss clock.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "dismissingTheLastAlertClearsAStaleHover"
+      }
+    },
+    {
+      "id": "REG-255",
+      "failure": "A snoozed alert was dropped for good when the notch was open at the moment it came back ten minutes later.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_a_snoozed_alert_returns_even_when_the_notch_is_open"
+      }
+    },
+    {
+      "id": "REG-256",
+      "failure": "The Record countdown kept running after the owner left the Record page, then started a screen capture they could no longer see or cancel with Escape.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyCountdownSourceTests.swift",
+        "function": "leavingThePageCancelsTheCountdownAndAPendingTickDoesNothing"
+      }
+    },
+    {
+      "id": "REG-257",
+      "failure": "A Record countdown whose display or window disappeared ended in a silent no-op instead of saying the source was gone.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyCountdownSourceTests.swift",
+        "function": "theLastTickWithTheSourceGoneNoLongerEndsInASilentNoOp"
+      }
+    },
+    {
+      "id": "REG-258",
+      "failure": "A background Launch at login status read that began before the owner flipped the switch landed afterwards and put the switch back.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/LatestRunTests.swift",
+        "function": "aReadStartedBeforeAWriteCannotPublishAfterIt"
+      }
+    },
+    {
+      "id": "REG-259",
+      "failure": "A background hook-file look that began before Connect or Disconnect overwrote the click's result, and Connect for Codex never updated the AI connections row until the next look.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_hook_read_is_invalidated_by_connect_and_disconnect"
+      }
     }
   ]
 }

@@ -187,3 +187,71 @@ import Testing
         #expect(AlertMotion.stretchResponse == 0.42 && AlertMotion.stretchDamping == 0.78)
     }
 }
+
+@Suite struct AlertStackSuspendTests {
+    private let t0 = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    private func alert(_ id: String, title: String = "Anna", priority: AlertPriority = .normal) -> AlertItem {
+        AlertItem(id: id, appID: "com.apple.MobileSMS", appName: "Messages", title: title, body: "Hi", priority: priority, postedAt: t0)
+    }
+
+    @Test func aSuspendedStackNeverExpiresAnAlertUnseen() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0) // deadline t0+6
+        stack.setSuspended(true, now: t0.addingTimeInterval(2)) // the panel opened with 4 s left
+        #expect(stack.nextDeadline() == nil)
+        let expired = stack.expire(now: t0.addingTimeInterval(60))
+        #expect(expired.isEmpty)
+        #expect(stack.items.count == 1)
+    }
+
+    @Test func resumingGivesTheAlertItsRemainingTimeAgain() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.setSuspended(true, now: t0.addingTimeInterval(2))
+        stack.setSuspended(false, now: t0.addingTimeInterval(30))
+        #expect(stack.nextDeadline() == t0.addingTimeInterval(34))
+    }
+
+    @Test func anAlertPostedWhileSuspendedStartsItsClockOnResume() {
+        var stack = AlertStack()
+        stack.setSuspended(true, now: t0)
+        stack.post(alert("a"), now: t0.addingTimeInterval(1))
+        #expect(stack.nextDeadline() == nil)
+        stack.setSuspended(false, now: t0.addingTimeInterval(20))
+        #expect(stack.nextDeadline() == t0.addingTimeInterval(26))
+    }
+
+    @Test func hoverAndSuspendKeepTheClockFrozenUntilBothEnd() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.setHovered(true, now: t0.addingTimeInterval(1))
+        stack.setSuspended(true, now: t0.addingTimeInterval(2))
+        stack.setHovered(false, now: t0.addingTimeInterval(3))
+        #expect(stack.isPaused)
+        #expect(stack.nextDeadline() == nil)
+        stack.setSuspended(false, now: t0.addingTimeInterval(10))
+        #expect(!stack.isPaused)
+        #expect(stack.nextDeadline() != nil)
+    }
+
+    @Test func dismissingTheLastAlertClearsAStaleHover() {
+        // The capsule vanished under the pointer: the next alert must still count down.
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.setHovered(true, now: t0.addingTimeInterval(1))
+        stack.dismiss(id: "a", now: t0.addingTimeInterval(2))
+        #expect(!stack.isHovered)
+        stack.post(alert("b", title: "Ben"), now: t0.addingTimeInterval(3))
+        #expect(stack.nextDeadline() == t0.addingTimeInterval(9))
+    }
+
+    @Test func dismissingOneOfTwoKeepsTheHover() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.post(alert("b", title: "Ben"), now: t0)
+        stack.setHovered(true, now: t0.addingTimeInterval(1))
+        stack.dismiss(id: "a", now: t0.addingTimeInterval(2))
+        #expect(stack.isHovered)
+    }
+}

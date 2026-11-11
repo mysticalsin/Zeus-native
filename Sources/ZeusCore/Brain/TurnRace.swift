@@ -108,6 +108,10 @@ public struct TurnRaceState: Equatable, Sendable {
 
     public var winnerLatencyMs: Int? { firstTextAtMs.map { $0 - startedAtMs } }
 
+    /// True while the reducer still waits on this tier (racing or speaking). Anything a tier reports after it was
+    /// cancelled, lost the race or already failed is noise: the owner must not count it as a failure of the engine.
+    public func isLive(_ tier: String) -> Bool { tiers[tier] == .running || tiers[tier] == .won }
+
     public mutating func reduce(_ event: TurnRaceEvent) -> [TurnRaceEffect] {
         switch event {
         case let .released(ids, deep, now, budget):
@@ -157,7 +161,15 @@ public struct TurnRaceState: Equatable, Sendable {
 
         case let .tierFailed(tier, _):
             guard tiers[tier] == .running || tiers[tier] == .won else { return [] }
+            let wasWinner = tiers[tier] == .won
             tiers[tier] = .failed
+            if wasWinner {
+                // The quick answer broke off: the fuller one must not follow it, and no engine keeps working for nothing.
+                heldDeep = nil
+                guard deepRunning else { return [] }
+                deepRunning = false
+                return [.cancelDeep]
+            }
             guard phase == .racing, !tiers.values.contains(.running) else { return [] }
             phase = .failed
             failure = .allFailed
