@@ -2977,6 +2977,78 @@
         "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
         "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
+    },
+    {
+      "id": "REG-248",
+      "failure": "Desktop pointing shipped off with no draw-while-held setting although the owner chose Control+Option and draw while held as the defaults.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FirstRunDefaultsTests.swift",
+        "function": "pointingIsOnWithControlOptionAndDrawWhileHeld"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Scribe call-window names had no first-run default and could have been read without the owner's existing Accessibility grant.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FirstRunDefaultsTests.swift",
+        "function": "callWindowNamesNeverActivateWithoutAccessibility"
+      }
+    },
+    {
+      "id": "REG-250",
+      "failure": "The alert Reply button only opened the item, the same as Open, for apps that have no reply target.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "slackTeamsAndOtherAppsHideReplyInsteadOfDuplicatingOpen"
+      }
+    },
+    {
+      "id": "REG-251",
+      "failure": "Invitee names and per-turn voices were memory only, so after a relaunch the recap had no invite names and no Remember this voice button.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerPersistenceTests.swift",
+        "function": "namesAndVoicesComeBackAfterAReload"
+      }
+    },
+    {
+      "id": "REG-252",
+      "failure": "The Dismiss button and Stop could leave a pinned Polyglot bar stuck, and the pin decision was spread over the notch with no pure contract.",
+      "features": [
+        "S03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+        "function": "explicitDismissClosesEvenWhenPinned"
+      }
+    },
+    {
+      "id": "REG-253",
+      "failure": "On macOS older than 26 Polyglot reported translation as unavailable for the language pair, hiding the real reason.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+        "function": "olderSystemShowsHeardLineWithOneNewerSystemNotice"
+      }
     }
   ]
 }

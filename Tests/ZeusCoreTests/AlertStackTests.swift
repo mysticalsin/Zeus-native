@@ -172,8 +172,31 @@ import Testing
     @Test func fallbackGlyphsAndReplySupport() {
         #expect(AlertAppGlyph.symbol(for: "com.apple.mail") == "envelope.fill")
         #expect(AlertAppGlyph.symbol(for: "unknown.app") == "app.fill")
-        #expect(AlertAppGlyph.supportsReply("com.apple.MobileSMS"))
-        #expect(!AlertAppGlyph.supportsReply("com.apple.iCal"))
+    }
+
+    private func alert(_ app: String, title: String, body: String = "") -> AlertItem {
+        AlertItem(id: "1", appID: app, appName: "App", title: title, body: body, postedAt: Date(timeIntervalSince1970: 0))
+    }
+
+    @Test func messagesRepliesOpenTheChatOnlyWhenTheTitleIsAnAddress() {
+        #expect(AlertReply.url(for: alert("com.apple.MobileSMS", title: "+1 (514) 555-0100"))?.absoluteString
+                == "imessage:%2B1%20(514)%20555-0100")
+        #expect(AlertReply.url(for: alert("com.apple.MobileSMS", title: "ana@example.com"))?.absoluteString == "imessage:ana@example.com")
+        #expect(AlertReply.url(for: alert("com.apple.MobileSMS", title: "Marie Dubois")) == nil, "a name cannot address a chat")
+    }
+
+    @Test func mailRepliesOpenADraftWithReAndNeverSend() {
+        let withAddress = AlertReply.url(for: alert("com.apple.mail", title: "ana@example.com", body: "Budget\nsecond line"))
+        #expect(withAddress?.absoluteString == "mailto:ana@example.com?subject=Re:%20Budget")
+        let named = AlertReply.url(for: alert("com.apple.mail", title: "Ana Lopez", body: "Re: Budget"))
+        #expect(named?.absoluteString == "mailto:?subject=Re:%20Budget", "no double Re:")
+        #expect(AlertReply.url(for: alert("com.apple.mail", title: "Ana Lopez")) == nil, "nothing to reply to")
+    }
+
+    @Test func slackTeamsAndOtherAppsHideReplyInsteadOfDuplicatingOpen() {
+        for app in ["com.tinyspeck.slackmacgap", "com.microsoft.teams2", "com.microsoft.teams", "com.apple.iCal", "unknown.app"] {
+            #expect(!AlertReply.supportsReply(alert(app, title: "Marie", body: "hello")), "\(app)")
+        }
     }
 
     @Test func animationWindowEndsSoIdleOwnsNoClock() {

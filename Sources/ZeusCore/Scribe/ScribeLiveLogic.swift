@@ -1292,6 +1292,37 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         }
     }
 
+    /// One closed speech turn's voice, saved with the meeting so "Remember this voice" and the post-meeting
+    /// corrections still work after a relaunch. It lives only in this meeting's file (0600), is removed with
+    /// the file and is never uploaded. `vector` is little-endian Float32 (Codable stores it as base64).
+    public struct TurnVoice: Codable, Equatable, Sendable {
+        public var segmentID: String
+        /// "microphone" or "system".
+        public var source: String
+        public var kind: ScribeEmbeddingKind
+        public var vector: Data
+        public var duration: TimeInterval
+
+        public init(_ turn: ScribeTurnEmbedding) {
+            segmentID = turn.segmentID
+            source = turn.source == .microphone ? "microphone" : "system"
+            kind = turn.embedding.kind
+            vector = turn.embedding.vector.withUnsafeBufferPointer { Data(buffer: $0) }
+            duration = turn.duration
+        }
+
+        /// Nil when the saved bytes are not a whole, finite vector.
+        public var turn: ScribeTurnEmbedding? {
+            guard vector.count > 0, vector.count % 4 == 0 else { return nil }
+            let values: [Float] = vector.withUnsafeBytes { raw in
+                (0..<(vector.count / 4)).map { raw.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
+            }
+            guard values.allSatisfy(\.isFinite) else { return nil }
+            return ScribeTurnEmbedding(segmentID: segmentID, source: source == "microphone" ? .microphone : .system,
+                                       embedding: ScribeVoiceEmbedding(kind: kind, vector: values), duration: duration)
+        }
+    }
+
     public static let currentVersion = 1
 
     public var version: Int
@@ -1312,6 +1343,10 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
     public var transcriptionNote: String?
     /// True when the microphone was left out during a detected call. Absent in older files.
     public var micExcludedDuringCall: Bool?
+    /// Display names from the calendar invite (never email addresses). Absent in older files.
+    public var attendees: [String]?
+    /// Each closed turn's voice, for speaker naming after a relaunch. Absent in older files.
+    public var turnVoices: [TurnVoice]?
 
     public init(
         id: UUID,
@@ -1322,8 +1357,13 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         transcript: [ScribeTranscriptSegment],
         dismissedAt: Date? = nil,
         transcriptionNote: String? = nil,
-        micExcludedDuringCall: Bool = false
+        micExcludedDuringCall: Bool = false,
+        attendees: [String] = [],
+        turnVoices: [ScribeTurnEmbedding] = []
     ) {
+        let names = ScribeAttendeeNames.clean(attendees)
+        self.attendees = names.isEmpty ? nil : names
+        self.turnVoices = turnVoices.isEmpty ? nil : turnVoices.map(TurnVoice.init)
         self.transcriptionNote = transcriptionNote
         self.micExcludedDuringCall = micExcludedDuringCall ? true : nil
         self.version = Self.currentVersion
@@ -1351,6 +1391,12 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
             method: method == "extractive" ? .extractive : nil
         )
     }
+
+    /// The saved invitee names, cleaned.
+    public var attendeeNames: [String] { ScribeAttendeeNames.clean(attendees ?? []) }
+
+    /// The saved turn voices that are still valid vectors.
+    public var turnEmbeddings: [ScribeTurnEmbedding] { (turnVoices ?? []).compactMap(\.turn) }
 
     /// The saved lines as final segments of `session`.
     public func segments(session: ScribeSessionID) -> [ScribeTranscriptSegment] {

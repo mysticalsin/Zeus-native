@@ -84,4 +84,10 @@ Accessibility. It works only with Accessibility granted and changes with every a
 | S6 post-meeting re-cluster | Core test: a live split (A, A', B) merges back to (A, B); a live merge stays when distances are clear |
 | Live QA (owner Mac) | Two-voice YouTube interview through system audio + owner on mic: owner labelled You, two guests distinct; rename one, tick Remember, rerun a second clip of the same guest: named automatically |
 
+Persistence (2026-11-11): invitee names, speaker labels and each turn's voice vector are saved inside the meeting's
+own JSON file (`ScribeMeetingRecord.attendees`, `.turnVoices`; 0600 in a 0700 folder), so after a relaunch the recap
+still offers invite names and "Remember this voice". The vectors are never uploaded, never in the vault and are removed
+when the meeting is deleted. Older files without these keys load as before. Saved voices of people across meetings
+(`ScribeVoiceLibrary`) stay opt-in per person.
+
 Rules: no em dashes in UI text, no `Task.sleep`, no network except the clicked model download, no audio stored.

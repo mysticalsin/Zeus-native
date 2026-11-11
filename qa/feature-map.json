@@ -292,13 +292,6 @@
       "reason": "No supported-device/model/pack acceptance receipt."
     },
     {
-      "id": "missing-S03-contract",
-      "kind": "unimplemented",
-      "tier": "contract",
-      "scope": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
-      "reason": "No isolated portable pin contract; native dismissal model is separately executable."
-    },
-    {
       "id": "missing-S03-device",
       "kind": "unimplemented",
       "tier": "device-proof",
@@ -4399,6 +4392,22 @@
             {
               "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
               "function": "targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "olderSystemShowsHeardLineWithOneNewerSystemNotice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "olderSystemNeverRequestsPack"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "olderSystemNoticeReturnsAfterClearAndAfterTargetChange"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "unsupportedPairStillNamesThePair"
             }
           ],
           "id": "S02.1"
@@ -4422,9 +4431,34 @@
       "title": "Polyglot pin, Stop, dismiss and unpinned auto-hide",
       "obligations": [
         {
-          "check": "missing-S03-contract",
-          "acceptance": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
-          "cases": [],
+          "check": "portable-polyglot",
+          "acceptance": "Pure pin policy used by the notch for pointer exit, outside click and the Dismiss button: pin holds only on the Polyglot page, explicit dismiss always closes, unpin or tab switch restores automatic hiding, auto-hide off never schedules a close.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "pinnedSurvivesPointerExitAndClickOutside"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "explicitDismissClosesEvenWhenPinned"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "unpinRestoresAutoHide"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "tabSwitchAwayFromPinnedPolyglotRestoresAutoHide"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "autoHideDisabledNeverSchedulesClose"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "pinOnlyAppliesOnPolyglotTab"
+            }
+          ],
           "id": "S03.1"
         },
         {
@@ -4438,6 +4472,18 @@
             {
               "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
               "function": "unpinAndOtherTabsUseNormalDismissal"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "stopKeepsPinAndBarVisible"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "explicitDismissClosesPinnedBar"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "unpinRestoresAutomaticDismissal"
             }
           ],
           "id": "S03.2"

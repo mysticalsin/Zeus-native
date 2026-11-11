@@ -48,8 +48,11 @@ One view modifier used by every alert surface.
    different view, so a true `matchedGeometryEffect` pair is not possible without restructuring it.
 6. Hover: pauses auto-dismiss, lifts the capsule 2 pt (shadow grows), and reveals the action row
    Reply / Open / Snooze / Clear (capsule grows to height 100 with the same spring). Leaving restarts the timer
-   with at least 1.5 s left. Reply and Snooze are shown only when the source supports them (Reply: Messages,
-   Mail, Slack, Teams; Snooze: all, 10 minutes, re-posts the alert).
+   with at least 1.5 s left. Reply is shown only when a real reply target exists (`AlertReply.url`): Messages opens
+   the chat when the alert title is a phone number or email, Mail opens a draft ("Re:" plus the subject line, to the
+   sender when the title is an address), always in the alert's own app and never sent. Slack and Teams hide Reply
+   (their deep links need workspace and channel ids an alert does not carry), so it never duplicates Open.
+   Snooze: all, 10 minutes, re-posts the alert.
 7. Stack: up to three cards fan behind the front one (each 8 pt lower, 0.94 scale step, 0.55 opacity step);
    beyond three a "+2" chip. Newest in front. Duplicates within 5 s coalesce into one card with a "x2" count.
 
@@ -104,5 +107,5 @@ Single alert (landed), stack of three with "+2", hover with actions, page groupe
 rest (post-landing). Motion claims need a screen recording on a Mac; stills do not prove them.
 
 ## Not in this change
-Replying inline from the notch (Reply opens the source app), a notification action API for other apps' own
+Replying inline from the notch (Reply opens a draft or chat in the source app), a notification action API for other apps' own
 buttons, and a global Esc shortcut.

@@ -461,6 +461,9 @@ final class PolyglotController {
                 if status == .unsupported {
                     notice = "\(PolyglotLanguage.name(for: batch.language)) to \(PolyglotLanguage.name(for: target)) is not available for translation."
                 }
+                if status == .requiresNewerSystem {
+                    notice = "Translation needs macOS 26 or later. Heard lines still show."
+                }
                 continue
             }
             let answers: [String]

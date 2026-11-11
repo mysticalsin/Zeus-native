@@ -114,10 +114,58 @@ public enum AlertAppGlyph {
         }
     }
 
-    /// Whether the source app can take a reply (the Reply action is shown only then).
-    public static func supportsReply(_ bundleID: String) -> Bool {
-        ["com.apple.mobilesms", "com.apple.mail", "com.tinyspeck.slackmacgap", "com.microsoft.teams2", "com.microsoft.teams"]
-            .contains(bundleID.lowercased())
+}
+
+// MARK: Reply
+
+/// Where "Reply" goes. Only apps with a URL that opens a reply surface get one; for every other app the
+/// button is hidden, because a Reply that only opens the item would duplicate Open.
+/// Zeus never sends anything: the URL opens a compose box the owner finishes.
+public enum AlertReply {
+    /// The URL that opens the source app focused on a reply to `item`, or nil when none is known.
+    /// Messages needs a phone number or email as the alert title (a display name cannot address a chat).
+    /// Mail opens a draft: to the sender when the title is an address, with "Re:" and the subject line.
+    /// Slack and Teams deep links need workspace and channel ids an alert does not carry, so they return nil.
+    public static func url(for item: AlertItem) -> URL? {
+        let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch item.appID.lowercased() {
+        case "com.apple.mobilesms":
+            guard isAddress(title) else { return nil }
+            return URL(string: "imessage:" + encode(title))
+        case "com.apple.mail":
+            let subject = firstLine(item.body)
+            let recipient = title.contains("@") && isAddress(title) ? title : ""
+            guard !recipient.isEmpty || !subject.isEmpty else { return nil }
+            var text = "mailto:" + encode(recipient)
+            if !subject.isEmpty { text += "?subject=" + encode(subject.lowercased().hasPrefix("re:") ? subject : "Re: " + subject) }
+            return URL(string: text)
+        default:
+            return nil
+        }
+    }
+
+    public static func supportsReply(_ item: AlertItem) -> Bool { url(for: item) != nil }
+
+    static func isAddress(_ text: String) -> Bool {
+        if text.contains("@") {
+            let parts = text.split(separator: "@", omittingEmptySubsequences: false)
+            return parts.count == 2 && !parts[0].isEmpty && parts[1].contains(".") && !text.contains(" ")
+        }
+        let digits = text.filter(\.isNumber)
+        let allowed = text.allSatisfy { $0.isNumber || "+-() ".contains($0) }
+        return allowed && (7...15).contains(digits.count)
+    }
+
+    private static func firstLine(_ text: String) -> String {
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        return String(line.trimmingCharacters(in: .whitespaces).prefix(120))
+    }
+
+    private static func encode(_ text: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=?#+")
+        let plain = text.hasPrefix("+") ? String(text.dropFirst()) : text
+        return (text.hasPrefix("+") ? "%2B" : "") + (plain.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")
     }
 }
 
