@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import ZeusCore
 
 /// Wakes the call watcher the moment a call app starts or stops using the microphone, so a meeting (or its end)
 /// is noticed at once instead of at the next five second poll. Two Core Audio flags, no audio:
