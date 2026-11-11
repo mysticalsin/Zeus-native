@@ -37,7 +37,9 @@ final class VoiceTurnController {
     private var lastAnswerAt: Date?
     private var history: [Exchange] = []
     /// True from release (or a wake phrase) until the turn's work is done.
-    private(set) var turnRunning = false
+    var turnRunning: Bool { turnRun.isActive }
+    /// One slot for the turn in flight: a turn cancelled by a new press finishes later and must not clear the newer turn's flag.
+    private var turnRun = LatestRun()
     /// When the recogniser last changed its live transcript (hands-free turns end on silence).
     private var lastPartialAt: ContinuousClock.Instant?
     private var liveWords = LiveWordsHUD()
@@ -118,6 +120,7 @@ final class VoiceTurnController {
     /// Menu › Stop Speaking (pressing the talk key also interrupts).
     func stopSpeaking() {
         fastRace?.cancel()
+        turnRun.invalidate()
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -134,6 +137,10 @@ final class VoiceTurnController {
         // A new press always interrupts whatever ZEUS was doing.
         BrainWarmScheduler.shared.noteActivity()
         fastRace?.cancel()
+        // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
+        handsFreeTask?.cancel()
+        handsFreeTask = nil
+        turnRun.invalidate()
         // Off the critical path: the local-model check is read from this cache when the answer starts.
         Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
         turnTask?.cancel()
@@ -186,11 +193,11 @@ final class VoiceTurnController {
         handsFreeTask?.cancel()
         handsFreeTask = nil
         buddy.think()
-        turnRunning = true
+        let run = turnRun.begin()
         turnTask = Task {
             let result = await finishTurn()
-            turnRunning = false
-            if wakeConversationActive, result.error == nil, !result.cancelled {
+            let live = turnRun.finish(run)
+            if live, wakeConversationActive, result.error == nil, !result.cancelled {
                 handsFree()
             }
             return result
@@ -206,6 +213,9 @@ final class VoiceTurnController {
         let request = Self.dropWakeEchoes(request.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !request.isEmpty else { VoiceLog.log("wake", "no request after the phrase: listening hands-free"); handsFree(); return }
         VoiceLog.logContent("wake", request, prefix: "same-breath request: ")
+        // The same interruption a key press makes: the previous answer, its deep follow-up and any speculative run stop.
+        fastRace?.cancel()
+        ahead.cancel()
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         speaker.stop()
@@ -216,11 +226,11 @@ final class VoiceTurnController {
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
-        turnRunning = true
+        let run = turnRun.begin()
         turnTask = Task {
             let result = await complete(transcript: request, finalAt: heardAt)
-            turnRunning = false
-            if wakeConversationActive, result.error == nil, !result.cancelled {
+            let live = turnRun.finish(run)
+            if live, wakeConversationActive, result.error == nil, !result.cancelled {
                 handsFree()
             }
             return result
@@ -230,6 +240,7 @@ final class VoiceTurnController {
     /// A voice turn without the key: starts listening and stops after quiet once you have spoken.
     func handsFree() {
         guard press() else { return }
+        handsFreeTask?.cancel()
         let opened = ContinuousClock.now
         let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(1000)
         let idleLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceWhenEmpty) : .seconds(4)

@@ -130,10 +130,15 @@ final class FastRaceRun {
                     apply(.fastFinished(atMs: elapsedMs()))
                     return
                 }
-                // An engine that ends with no text is a failure, not a win.
+                // An engine that ends with no text is a failure, not a win. One that was already stopped (it lost the
+                // race) ends quietly: that is our own cancel, not an engine fault.
+                guard state.isLive(id) else { break }
                 apply(.tierFailed(tier: id, atMs: elapsedMs()))
                 errors.append("\(id) gave no answer")
             case .failed(let id, let text):
+                // A loser stopped by the winner reports a cancellation error here; it must not be logged, ranked
+                // as a failure or counted against the engine's quota state.
+                guard state.isLive(id) else { break }
                 let wasWinner = state.winner == id
                 errors.append(text)
                 callbacks.tierFailed(id, text)

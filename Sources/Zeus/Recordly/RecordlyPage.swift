@@ -28,6 +28,7 @@ struct RecordlyPage: View {
         .animation(reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : TopBarStyle.pageSpring, value: isEditor)
         // Lists the displays and selects the main one with no click and no Screen Recording permission.
         .onAppear { recordly.pageAppeared() }
+        .onDisappear { recordly.pageDisappeared() }
     }
 }
 
