@@ -112,11 +112,11 @@ private struct RecordlyCapture: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             RecordlyStage(recordly: recordly)
-                .frame(width: 330)
+                .frame(width: 340)
             VStack(alignment: .leading, spacing: 10) {
                 RecordlyScroll {
                     if recordly.showsRunning {
-                        RecordlyLiveStrip(recordly: recordly)
+                        RecordlyLiveCapsule(recordly: recordly).transition(.opacity)
                     } else {
                         RecordlyIdleColumn(recordly: recordly)
                     }
@@ -158,10 +158,14 @@ private struct RecordlyIdleColumn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            RecordlySourceSwitcher(recordly: recordly)
-            sourceDetail
+            VStack(alignment: .leading, spacing: 8) {
+                RecordlySourceSwitcher(recordly: recordly)
+                sourceDetail
+            }
+            .recordlyEntrance(.picker)
             RecordlyNotices(recordly: recordly)
             RecordlyOptionChips(recordly: recordly)
+                .recordlyEntrance(.chips)
         }
     }
 
@@ -294,6 +298,12 @@ private struct RecordlyDisplayLegend: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    private func mainTag(_ selected: Bool) -> some View {
+        Text("Main").font(TopBarStyle.label(8, .bold)).foregroundStyle(selected ? Theme.storm : Theme.cloudSecondary)
+            .padding(.horizontal, 5).padding(.vertical, 1.5)
+            .background(Capsule().fill(selected ? Theme.accent : Color.white.opacity(0.12)))
+    }
+
     private func chip(_ display: RecordlySourceSelection.CatalogSnapshot.Display, position: Int) -> some View {
         let selected = isSelected(display)
         return Button {
@@ -308,11 +318,13 @@ private struct RecordlyDisplayLegend: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(RecordlyDisplayChoice.title(display, position: position))
                         .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
-                    Text(display.isMain ? "Main, \(RecordlyDisplayChoice.size(display))" : RecordlyDisplayChoice.size(display))
+                    Text(RecordlyDisplayChoice.size(display))
                         .font(TopBarStyle.label(9).monospacedDigit()).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
                 }
+                if display.isMain { mainTag(selected) }
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
+            .shadow(color: Theme.accent.opacity(selected && !reduceTransparency ? 0.4 : 0), radius: 7)
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(selected ? Theme.accent.opacity(reduceTransparency ? 0.4 : 0.18) : RecordlySurface.soft(reduceTransparency)))
             .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -446,51 +458,44 @@ private struct RecordlyNotices: View {
 private struct RecordlyOptionChips: View {
     let recordly: RecordlyController
 
+    private var systemState: RecordlySourceChipState {
+        .resolve(on: recordly.audio.systemAudio, available: true, needsPermission: !recordly.screenRecordingGranted)
+    }
+
     var body: some View {
-        HStack(spacing: 6) {
-            RecordlyOptionChip(symbol: "mic", title: "Microphone", on: false, available: false,
-                               help: "Microphone in recordings is coming soon") { }
-            RecordlyOptionChip(symbol: "speaker.wave.2", title: "System audio", on: recordly.audio.systemAudio, available: recordly.canChooseSource,
-                               help: "Record the sound your Mac plays") { recordly.audio.systemAudio.toggle() }
-            RecordlyOptionChip(symbol: "camera", title: "Camera bubble", on: false, available: false,
-                               help: "Camera in recordings is coming soon") { }
-            RecordlyOptionChip(symbol: "cursorarrow.rays", title: "Cursor zoom", on: recordly.exportSettings.followCursor, available: recordly.canChooseSource,
-                               help: "Smoothly follows the cursor during zooms on a verified display recording.") {
-                recordly.exportSettings.followCursor.toggle()
+        Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+            GridRow {
+                RecordlySourceChip(symbol: "mic", title: "Microphone", state: .unavailable,
+                                   help: "Microphone in recordings is coming soon") { }
+                    .frame(maxWidth: .infinity)
+                RecordlySourceChip(symbol: "speaker.wave.2", title: "System audio", state: systemState,
+                                   help: systemState == .needsPermission
+                                       ? "Allow Screen Recording to record the sound your Mac plays"
+                                       : "Record the sound your Mac plays") { toggleSystemAudio() }
+                    .frame(maxWidth: .infinity)
+            }
+            GridRow {
+                RecordlySourceChip(symbol: "camera", title: "Camera bubble", state: .unavailable,
+                                   help: "Camera in recordings is coming soon") { }
+                    .frame(maxWidth: .infinity)
+                RecordlySourceChip(symbol: "cursorarrow.rays", title: "Cursor zoom",
+                                   state: .resolve(on: recordly.exportSettings.followCursor, available: true, needsPermission: false),
+                                   help: "Smoothly follows the cursor during zooms on a verified display recording.") {
+                    guard recordly.canChooseSource else { return }
+                    recordly.exportSettings.followCursor.toggle()
+                }
+                .frame(maxWidth: .infinity)
             }
         }
     }
-}
 
-private struct RecordlyOptionChip: View {
-    let symbol: String
-    let title: String
-    let on: Bool
-    let available: Bool
-    let help: String
-    let action: () -> Void
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
-                Text(title).font(TopBarStyle.label(10, .semibold)).lineLimit(1)
-                Circle().fill(on ? Theme.accent : Color.white.opacity(0.18)).frame(width: 5, height: 5)
-            }
-            .foregroundStyle(on ? Theme.cloudPrimary : Theme.cloudSecondary)
-            .padding(.horizontal, 8).frame(height: 24)
-            .background(Capsule().fill(on ? Theme.accent.opacity(reduceTransparency ? 0.4 : 0.2) : RecordlySurface.soft(reduceTransparency)))
-            .overlay(Capsule().strokeBorder(on ? Theme.accent.opacity(0.7) : Color.clear, lineWidth: 1))
-            .contentShape(Capsule())
+    private func toggleSystemAudio() {
+        if !recordly.screenRecordingGranted {
+            recordly.openScreenRecordingSettings()
+            return
         }
-        .buttonStyle(.plain)
-        .disabled(!available)
-        .opacity(available || on ? 1 : 0.45)
-        .help(help)
-        .accessibilityLabel(title)
-        .accessibilityValue(available || on ? (on ? "On" : "Off") : "Unavailable. \(help)")
-        .accessibilityAddTraits(on ? .isSelected : [])
+        guard recordly.canChooseSource else { return }
+        recordly.audio.systemAudio.toggle()
     }
 }
 
@@ -498,22 +503,29 @@ private struct RecordlyOptionChip: View {
 
 private struct RecordlyStage: View {
     let recordly: RecordlyController
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let tokens = RecordlyVisualTokens.tokens(for: recordly.visualPhase)
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         ZStack {
-            shape.fill(RecordlySurface.stage(reduceTransparency))
             content
-            if recordly.isCountingDown { shape.fill(Color.black.opacity(0.3)) }
-            shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-        }
-        .overlay {
-            // Recording a window: the red frame goes around the whole stage. For a display it is on the tile.
-            shape.strokeBorder(TopBarStyle.rec, lineWidth: 2)
-                .opacity(recordly.showsRunning && recordly.sourceKind != .display ? 1 : 0)
+            shape.fill(Color.black.opacity(tokens.previewDim)).allowsHitTesting(false)
+            if tokens.showsCountdownNumeral, let remaining = recordly.countdownRemaining {
+                RecordlyCountdownNumeral(remaining: remaining, beganAt: recordly.countdownBeganAt)
+            }
         }
         .clipShape(shape)
+        .overlay {
+            if tokens.liveFrameOpacity > 0 {
+                RecordlyLiveFrame(opacity: tokens.liveFrameOpacity).transition(.opacity)
+            }
+        }
+        .recordlyGlassFrame(radius: 16, glow: recordly.showsRunning ? TopBarStyle.rec : Theme.accent,
+                            glowOpacity: recordly.showsRunning ? 0.14 : 0.18)
+        .animation(reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : .easeInOut(duration: 0.25),
+                   value: recordly.visualPhase)
+        .recordlyEntrance(.preview)
     }
 
     @ViewBuilder
@@ -587,18 +599,19 @@ private struct RecordlyDisplayTile: View {
     }
 
     private var tile: some View {
-        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
-        let outline = selected ? (live ? TopBarStyle.rec : Theme.accent) : Color.white.opacity(0.2)
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        let outline = selected ? (live ? Color.white.opacity(0.35) : Theme.accent) : Color.white.opacity(0.2)
         return ZStack {
             shape.fill(selected ? Theme.accent.opacity(0.30) : Color.white.opacity(0.07))
             if selected, let thumbnail {
                 Image(decorative: thumbnail, scale: 1).resizable().scaledToFill()
-                    .frame(width: size.width, height: size.height).clipShape(shape).opacity(0.85)
+                    .frame(width: size.width, height: size.height).clipShape(shape)
             }
             label
             shape.strokeBorder(outline, lineWidth: selected ? 2 : 1)
         }
         .frame(width: size.width, height: size.height)
+        .shadow(color: Theme.accent.opacity(selected && !live ? 0.55 : 0), radius: 10)
         .contentShape(shape)
         .animation(reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : .spring(response: 0.3, dampingFraction: 0.85), value: selected)
     }
@@ -613,62 +626,13 @@ private struct RecordlyDisplayTile: View {
                     .font(TopBarStyle.label(8).monospacedDigit()).lineLimit(1)
             }
             .foregroundStyle(Theme.cloudPrimary)
-            .padding(.horizontal, 6).padding(.vertical, 3)
-            .background(Capsule().fill(Color.black.opacity(selected && thumbnail != nil ? 0.5 : 0)))
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Capsule().fill(Color.black.opacity(selected && thumbnail != nil ? 0.55 : 0)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 6)
         } else {
             Text("\(position + 1)").font(TopBarStyle.label(11, .bold).monospacedDigit()).foregroundStyle(Theme.cloudPrimary)
         }
-    }
-}
-
-// MARK: Recording strip
-
-private struct RecordlyLiveStrip: View {
-    let recordly: RecordlyController
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                RecordlyPulseDot()
-                Text(recordly.isStopping ? "Saving" : "Recording")
-                    .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                if recordly.isStopping { ProgressView().controlSize(.small) }
-            }
-            // A TimelineView only ticks while it is on screen, once a second, and not at all when nothing shows it.
-            TimelineView(.periodic(from: recordly.startedAt ?? Date(), by: 1)) { context in
-                let seconds = recordly.startedAt.map { max(0, context.date.timeIntervalSince($0)) } ?? recordly.elapsed
-                Text(RecordlyElapsed.format(seconds))
-                    .font(TopBarStyle.label(38, .bold).monospacedDigit())
-                    .foregroundStyle(TopBarStyle.rec)
-                    .contentTransition(.numericText())
-                    .accessibilityLabel("Elapsed time")
-                    .accessibilityValue(RecordlyElapsed.spoken(seconds))
-            }
-            if let name = recordly.selectedSourceName {
-                Text(name).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
-            }
-        }
-    }
-}
-
-/// The live dot: a slow halo while capturing. Standing still under Reduce Motion.
-private struct RecordlyPulseDot: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulsing = false
-
-    var body: some View {
-        Circle().fill(TopBarStyle.rec).frame(width: 9, height: 9)
-            .overlay {
-                Circle().strokeBorder(TopBarStyle.rec.opacity(0.6), lineWidth: 1.5)
-                    .scaleEffect(pulsing ? 2.4 : 1).opacity(pulsing ? 0 : 0.8)
-            }
-            .frame(width: 20, height: 20)
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeOut(duration: 1.5).repeatForever(autoreverses: false)) { pulsing = true }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Recording")
     }
 }
 
@@ -682,7 +646,25 @@ enum RecordlyControlVisual: Equatable {
     case stopping
 }
 
+extension RecordlyControlVisual {
+    var visualPhase: RecordlyVisualPhase {
+        switch self {
+        case .idle: .idle
+        case .countdown(let n): .countdown(n)
+        case .starting: .starting
+        case .recording: .recording
+        case .stopping: .stopping
+        }
+    }
+}
+
 private extension RecordlyController {
+    /// The whole page's visual phase: the control's phase, or saved once a clip is open.
+    var visualPhase: RecordlyVisualPhase {
+        if case .editor = phase { return .saved }
+        return controlVisual.visualPhase
+    }
+
     var controlVisual: RecordlyControlVisual {
         if let remaining = countdownRemaining { return .countdown(remaining) }
         if isStopping { return .stopping }
@@ -709,7 +691,8 @@ private struct RecordlyControlRow: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(height: 56)
+        .frame(height: 64)
+        .recordlyEntrance(.button)
         .background {
             if recordly.isCountingDown {
                 // Escape cancels the countdown.
@@ -792,6 +775,7 @@ private struct RecordlyCaptureControl: View {
                 glyph
             }
             .frame(width: 56, height: 56)
+            .background { ambientGlow }
             .shadow(color: reduceTransparency ? .clear : Color.black.opacity(0.35), radius: 8, y: 3)
             .contentShape(Circle())
         }
@@ -803,6 +787,15 @@ private struct RecordlyCaptureControl: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(spokenSource ?? "")
         .accessibilityHint(enabled || help.isEmpty ? "" : help)
+    }
+
+    /// A calm, static halo behind the button. No animation, so it costs nothing at rest.
+    @ViewBuilder
+    private var ambientGlow: some View {
+        let glow = RecordlyVisualTokens.tokens(for: visual.visualPhase).ambientGlow
+        if !reduceTransparency, enabled || visual != .idle {
+            Circle().fill(Theme.accent.opacity(glow)).frame(width: 64, height: 64).blur(radius: 14)
+        }
     }
 
     private var accessibilityLabel: String {
@@ -856,9 +849,8 @@ private struct RecordlyCaptureControl: View {
                     .fill(shapeColor).frame(width: shapeSide, height: shapeSide)
                     .opacity(isCountdown ? 0 : 1)
             }
-            if case .countdown(let n) = visual {
-                Text("\(n)").font(TopBarStyle.label(24, .bold).monospacedDigit()).foregroundStyle(Theme.cloudPrimary)
-                    .contentTransition(.numericText(countsDown: true))
+            if isCountdown {
+                Image(systemName: "xmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.cloudPrimary)
             }
             if visual == .starting || visual == .stopping { ProgressView().controlSize(.small) }
         }
@@ -901,35 +893,21 @@ private struct RecordlyControlStyle: ButtonStyle {
 
 private struct RecordlyEditor: View {
     let recordly: RecordlyController
+    @State private var showsEditing = false
 
     var body: some View {
         RecordlyScroll {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(Theme.accent)
-                        .transition(.scale.combined(with: .opacity))
-                    Text("Recording saved").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                    Spacer(minLength: 0)
-                    if let url = recordly.lastMediaURL {
-                        Button("Show in Finder") { recordly.revealInFinder(url) }
-                            .buttonStyle(.plain).font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                            .accessibilityLabel("Show \(url.lastPathComponent) in Finder")
-                    }
-                }
-                if let project = recordly.project {
-                    Text("\(project.zoomRegions.count) zoom regions")
-                        .font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary)
-                }
+                RecordlyClipCard(recordly: recordly, showsEditing: $showsEditing)
                 if let notice = recordly.recoveryNotice {
                     Text(notice).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                RecordlyMediaPreview(media: recordly.mediaAuthority, unavailableReason: recordly.previewUnavailableReason)
                 if let warning = recordly.checkpointWarning {
                     Text(warning).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                RecordlyExportPanel(recordly: recordly)
+                RecordlyExportPanel(recordly: recordly, showsOptions: showsEditing)
                 if recordly.isConfirmingNew {
                     Text("This recording is saved and will reopen next time unless you discard it. Discarding keeps the video file unless you also delete it.")
                         .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
@@ -963,10 +941,20 @@ private struct RecordlyEditor: View {
 
 private struct RecordlyExportPanel: View {
     let recordly: RecordlyController
+    let showsOptions: Bool
 
     private static let qualityOrder: [RecordlyExportQuality] = [.light, .balanced, .high]
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if showsOptions { options }
+            controls
+            result
+        }
+    }
+
+    @ViewBuilder
+    private var options: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("Format").font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudSecondary)
@@ -1010,9 +998,8 @@ private struct RecordlyExportPanel: View {
                 .accessibilityLabel("Follow cursor while zoomed")
                 .help("Smoothly follows the cursor during zooms on a verified display recording.")
             }
-            controls
-            result
         }
+        .transition(.opacity)
     }
 
     @ViewBuilder
