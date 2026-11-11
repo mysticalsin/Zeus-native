@@ -1,5 +1,6 @@
 import AVFoundation
 import Speech
+import ZeusCore
 
 /// Microphone → Apple speech recognition (on-device when the language supports it).
 /// Free, no API key. Deepgram / AssemblyAI streaming can slot in later behind the same calls.

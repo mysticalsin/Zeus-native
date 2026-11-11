@@ -278,7 +278,7 @@ struct OnboardingRoot: View {
                 .accessibilityValue(theme)
                 .accessibilityHint("Switches between System, Light and Dark.")
             }
-            OnboardingProgress(step: flow.step)
+            OnboardingProgressBar(step: flow.step)
                 .frame(width: OB.size.width).offset(y: OB.dotsY)
 
             ZStack {
