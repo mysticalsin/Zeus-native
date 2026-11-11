@@ -9,6 +9,8 @@ final class MarkModel {
     var strokes: [[CGPoint]] = []
     var trail: [CGPoint] = []
     var caption = ""
+    /// Ink colour for the pointing trail. nil uses the Zeus accent.
+    var inkColor: Color?
 }
 
 /// One transparent, click-through panel per screen, above everything, excluded from capture.
@@ -17,6 +19,8 @@ final class MarkOverlay {
     static let shared = MarkOverlay()
     private var panels: [NSPanel] = []
     private(set) var capturesMouse = false
+    /// The panels, for own-process window-policy checks.
+    var ownedWindows: [NSWindow] { panels }
     private var lastVisibleInShare = false
 
     func applyScreenSharePolicy(visibleInShare: Bool) {
@@ -72,6 +76,7 @@ final class MarkOverlay {
 
 private final class MarkPanel: NSPanel {
     override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }
 
 private final class MarkCaptureView: NSView {
@@ -93,8 +98,9 @@ private struct MarkCanvas: View {
             for stroke in model.strokes where stroke.count > 1 {
                 var path = Path()
                 path.addLines(stroke.map(local))
-                context.stroke(path, with: .color(Theme.bolt.opacity(0.35)), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
-                context.stroke(path, with: .color(Theme.bolt), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                let ink = model.inkColor ?? Theme.bolt
+                context.stroke(path, with: .color(ink.opacity(0.35)), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
+                context.stroke(path, with: .color(ink), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
             }
             let trail = model.trail
             if trail.count > 1 {

@@ -41,6 +41,10 @@ final class DictationSettings {
     var autoSwitch: Bool { didSet { defaults.set(autoSwitch, forKey: "dictation.autoSwitch") } }
     var restoreClipboard: Bool { didSet { defaults.set(restoreClipboard, forKey: "dictation.restoreClipboard") } }
     var sounds: Bool { didSet { defaults.set(sounds, forKey: "dictation.sounds") } }
+    /// The start and stop sound. Airy (a short warm blip, rising then falling) unless chosen otherwise.
+    var cueStyle: DictationCueStyle { didSet { defaults.set(cueStyle.rawValue, forKey: "dictation.cueStyle") } }
+    /// Volume of that sound, 0 to 100.
+    var cueVolume: Int { didSet { defaults.set(cueVolume, forKey: "dictation.cueVolume") } }
     /// Pause Music or Spotify while you dictate, then carry on.
     var pauseMedia: Bool { didSet { defaults.set(pauseMedia, forKey: "dictation.pauseMedia") } }
     /// 0 keeps history forever.
@@ -72,6 +76,8 @@ final class DictationSettings {
         autoSwitch = defaults.object(forKey: "dictation.autoSwitch") as? Bool ?? false
         restoreClipboard = defaults.object(forKey: "dictation.restoreClipboard") as? Bool ?? true
         sounds = defaults.object(forKey: "dictation.sounds") as? Bool ?? true
+        cueStyle = DictationCueStyle(saved: defaults.string(forKey: "dictation.cueStyle"))
+        cueVolume = DictationCueSynth.clampedVolume(defaults.object(forKey: "dictation.cueVolume") as? Int ?? DictationCueSynth.defaultVolume)
         pauseMedia = defaults.object(forKey: "dictation.pauseMedia") as? Bool ?? true
         keepDays = defaults.object(forKey: "dictation.keepDays") as? Int ?? 30
         engine = defaults.string(forKey: "dictation.engine").flatMap(TranscriptionEngineKind.init(rawValue:)) ?? .parakeet
@@ -532,6 +538,8 @@ final class DictationController {
         let speechAllowed = SFSpeechRecognizer.authorizationStatus() == .authorized
         let languageAvailable = speech.configure(localeIdentifier: settings.language.localeIdentifier)
         turnEngine = readyEngine
+        // Key down: start loading the speech model now so it is ready when the first chunk is.
+        (turnEngine as? ParakeetEngine)?.prewarm()
         let local = turnEngine != nil
         // A local model only needs the microphone; Apple also needs Speech Recognition.
         let microphoneAllowed = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
@@ -725,6 +733,14 @@ final class DictationController {
         // These values belong to this finish flow, never to a later controller turn.
         var correctionRequested = false
         var deliveryMessage: String?
+        var transcribeMs = 0
+        // The speed log: release until the words are on their way into the app (ZeusCore.DictationLatency).
+        let engineName = context.engine?.kind.rawValue ?? TranscriptionEngineKind.apple.rawValue
+        let logTextReady: @MainActor (String) -> Void = { insertion in
+            let latency = DictationLatency(releaseToTextMs: DictationLatency.milliseconds(from: released, to: Date()),
+                                           transcribeMs: transcribeMs, audioMs: audioMs, engine: engineName, insertion: insertion)
+            NSLog("[ZEUS] %@", latency.logLine)
+        }
         let isCurrent: () -> Bool = { [ownership] in ownership.owns(generation: generation) }
         let review: ((String) async -> String?)? = settings.previewBeforeInsert
             ? { [self] text in
@@ -741,7 +757,11 @@ final class DictationController {
             : nil
         let flow = DictationFinishFlow(
             isCurrent: isCurrent,
-            transcribe: { [self] in await transcribeTurn(context: context, stream: stream) },
+            transcribe: { [self] in
+                let heard = await transcribeTurn(context: context, stream: stream)
+                transcribeMs = DictationLatency.milliseconds(from: released, to: Date())
+                return heard
+            },
             closePartials: { [self] in
                 ownership.retire(generation: generation)
                 resumeMedia()
@@ -764,7 +784,7 @@ final class DictationController {
                     deliveryMessage = result.message
                     return result.outcome
                 }
-                return await deliver(text, context: context, allowClipboardFallback: true)
+                return await deliver(text, context: context, allowClipboardFallback: true, onTextReady: logTextReady)
             },
             onEmpty: { [self] in
                 VoiceLog.log("dictation", "transcript empty")
@@ -850,7 +870,8 @@ final class DictationController {
     private func transcribeTurn(context: DictationTurnContext,
                                 stream: (any TranscriptionStream)?) async -> DictationFinishFlow.Heard {
         let isCurrent: () -> Bool = { [ownership] in ownership.owns(generation: context.generation) }
-        let live = await speech.stop()
+        // A ready local engine makes the final text, so release does not wait for Apple's second pass.
+        let live = await speech.stop(waitForFinal: !(context.useLocal && context.engine != nil))
         guard isCurrent() else { return .init(text: "", engine: .apple, samples: []) }
         let samples = speech.takeSamples()
         speech.onSamples = nil
@@ -945,7 +966,8 @@ final class DictationController {
         return TextInserter.DeliveryGate.action(for: state, allowClipboardFallback: allowClipboardFallback)
     }
 
-    private func deliver(_ text: String, context: DictationTurnContext, allowClipboardFallback: Bool) async -> TextInserter.Outcome {
+    private func deliver(_ text: String, context: DictationTurnContext, allowClipboardFallback: Bool,
+                         onTextReady: (@MainActor (String) -> Void)? = nil) async -> TextInserter.Outcome {
         // A new ordinary turn supersedes any older replacement receipt, even on clipboard fallback.
         insertionTracker.invalidate()
         // Hold Shift while releasing to press Return after pasting.
@@ -988,10 +1010,11 @@ final class DictationController {
         }
         let outcome: TextInserter.Outcome
         if KeystrokeTyping.shouldType(bundleID: context.targetApp?.bundleIdentifier, alwaysType: settings.alwaysType, typedApps: settings.typedApps) {
+            onTextReady?("type")
             outcome = await TextInserter.type(text, pressReturn: pressReturn, deliveryCheck: check)
         } else {
             outcome = await TextInserter.insert(text, pressReturn: pressReturn, restoreClipboard: settings.restoreClipboard,
-                                                deliveryCheck: check)
+                                                deliveryCheck: check, onPasteKey: { onTextReady?("paste") })
         }
         if outcome == .pasted, check() == .paste {
             await insertionTracker.acknowledge(text, before: before, target: context.insertionField,
@@ -1044,7 +1067,11 @@ final class DictationController {
 
     private func cue(_ event: ZeusSound.Event) {
         guard settings.sounds else { return }
-        ZeusSound.play(event)
+        switch event {
+        case .dictationBegin: DictationCuePlayer.play(.start)
+        case .dictationEnd: DictationCuePlayer.play(.stop)
+        default: ZeusSound.play(event)
+        }
     }
 
     // MARK: History: reprocess and corrections

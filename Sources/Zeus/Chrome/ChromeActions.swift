@@ -44,7 +44,7 @@ final class ChromeActions {
             case .browserClick:
                 guard let text = Self.targetText(payload) ?? payload["text"]?.stringValue else { return nil }
                 let target = try await ChromeBridge.actionTarget()
-                guard await consent(for: "Click “\(text)”", target: target) else { return "Okay, I left it." }
+                guard await consent(for: "Click “\(text)”", target: target, always: ModelActionApproval.clickAlwaysAsks(label: text)) else { return "Okay, I left it." }
                 _ = try await ChromeBridge.call("page.click", ["text": .string(text), "pageTarget": target.value])
 
             case .browserType:
@@ -94,7 +94,9 @@ final class ChromeActions {
             params = ["pageTarget": target.value]
         } else if command.changesPage {
             let target = try await ChromeBridge.actionTarget()
-            guard await consent(for: command.summary(label: label(for: command)), target: target) else { return "Okay, I left it." }
+            let name = label(for: command)
+            guard await consent(for: command.summary(label: name), target: target,
+                                always: ModelActionApproval.clickAlwaysAsks(label: name)) else { return "Okay, I left it." }
             params["pageTarget"] = target.value
         }
         let result = try await ChromeBridge.call(command.bridgeType, params)
@@ -158,8 +160,10 @@ final class ChromeActions {
         payload["target"]?["text"]?.stringValue ?? payload["target"]?.stringValue
     }
 
-    private func consent(for what: String, target: ChromeBridge.ActionTarget) async -> Bool {
+    /// `always`: a send, delete or buy click asks even when the site was allowed earlier, and does not widen that allowance.
+    private func consent(for what: String, target: ChromeBridge.ActionTarget, always: Bool = false) async -> Bool {
         let host = target.host
+        if always { return await ask(site: host, what: what, risk: .high) }
         if allowedHosts.contains(host) { return true }
         // Two steps on the same site at once share one card: the second waits for the first answer.
         await PermissionPrompts.shared.run("chrome:" + host) { [self] in

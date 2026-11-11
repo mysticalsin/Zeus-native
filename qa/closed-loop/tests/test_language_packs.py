@@ -54,8 +54,10 @@ class LanguagePackLint(unittest.TestCase):
 
     def test_skipping_the_step_records_no_consent(self):
         flow = (APP / "Onboarding/OnboardingFlow.swift").read_text()
-        self.assertRegex(flow, r'Button\("Set up later"\) \{ LanguagePackController\.shared\.declineOnboardingChoice\(\)')
-        self.assertRegex(flow, r'Button\("Continue"\) \{ LanguagePackController\.shared\.confirmOnboardingChoice\(\)')
+        # One shared footer: on the Languages step "Set up later" declines (installs nothing) and "Continue" confirms.
+        self.assertRegex(flow, r'Button\("Set up later"\) \{\s*if flow\.step == \.languages \{ LanguagePackController\.shared\.declineOnboardingChoice\(\) \}\s*flow\.skipStep\(\)')
+        self.assertRegex(flow, r'Button\("Continue"\) \{\s*if flow\.step == \.languages \{ LanguagePackController\.shared\.confirmOnboardingChoice\(\) \}\s*flow\.next\(\)')
+        self.assertNotIn("confirmOnboardingChoice", flow.split('Button("Set up later")')[1].split('Button("Continue")')[0])
 
     def test_launch_resume_is_called_without_awaiting(self):
         delegate = (APP / "App/AppDelegate.swift").read_text()

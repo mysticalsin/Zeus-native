@@ -37,10 +37,20 @@ import ZeusCore
         #expect(log.calls.last == [.cloudConnection])
     }
 
-    @Test func wakeForcesBothTargets() async {
+    @Test func launchAndWakeStyleTicksWithoutActivityWarmNothing() async {
         let clock = Box()
         let (scheduler, log) = scheduler(clock: clock)
-        await scheduler.tick(forced: true)
+        await scheduler.tick()
+        clock.date.addTimeInterval(BrainWarmPlan.checkEvery * 3)
+        await scheduler.tick()
+        #expect(log.calls.isEmpty)
+    }
+
+    @Test func talkKeyDownWarmsBothTargets() async {
+        let clock = Box()
+        let (scheduler, log) = scheduler(clock: clock)
+        scheduler.noteActivity()
+        await scheduler.tick()
         #expect(log.calls == [[.localModel, .cloudConnection]])
     }
 

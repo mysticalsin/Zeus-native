@@ -292,13 +292,6 @@
       "reason": "No supported-device/model/pack acceptance receipt."
     },
     {
-      "id": "missing-S03-contract",
-      "kind": "unimplemented",
-      "tier": "contract",
-      "scope": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
-      "reason": "No isolated portable pin contract; native dismissal model is separately executable."
-    },
-    {
       "id": "missing-S03-device",
       "kind": "unimplemented",
       "tier": "device-proof",
@@ -643,6 +636,14 @@
       "scope": "Production pointing controller with synthetic services, inputs, marker and provider: spoil sends no request, double hold, denied Screen Recording notice without capture, disabled setting. No microphone, capture, key tap or sound."
     },
     {
+      "id": "native-PointingOverlayTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "PointingOverlayTests",
+      "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+      "scope": "Production ink overlay panels in this process: never key or main, ignore the mouse, nonactivating, excluded from capture, removed on hide. No capture, key tap or permission."
+    },
+    {
       "id": "missing-pointing-device",
       "kind": "unimplemented",
       "tier": "device-proof",
@@ -872,6 +873,169 @@
             {
               "file": "Tests/ZeusCoreTests/ScribeSpeakerIdentificationTests.swift",
               "function": "attendeeNamesAreDisplayNamesOnly"
+            }
+          ]
+        },
+        {
+          "id": "F02.speaker-parity",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Call-window labels (English and French), participant tiles and active-speaker spans fold into votes and a per-voice timeline winner; a name binds only when audio and tile agree (enough overlap, clear majority and lead, mutual best, unambiguous window, muted tiles never win); typed names always win, declined names are not offered again, later evidence corrects only automatic names; live names relabel earlier lines; block and word reassignment, undoable edits, pruning of tiny voices and the voice sample clip are pure and tested. Synthetic timelines only: this does not prove what Zoom, Teams, Meet or Slack actually expose through Accessibility, nor the Nemotron streaming path on real audio.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "parserStripsEnglishAndFrenchSuffixes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "parserReadsSpeakingAndMutedSignalsInBothLanguages"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "unmutedIsNotMutedAndAMutedTileNeverCountsAsSpeaking"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "parserRejectsWindowControlsAndEmptyNames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "pollsFoldIntoSpansAndAGapClosesOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "mutedSelfAndAmbiguousPollsNeverLight"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "audioAndTileThatAgreeBindTwoNames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "tooLittleOverlapWithholdsTheName"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aCloseRunnerUpWithholdsTheName"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "anAmbiguousWindowWithholdsEveryName"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aSoloRosterNamesNobody"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "oneNameNeverLandsOnTwoVoices"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aMutedTileNeverWinsTheVote"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aNameAlreadyTakenIsNotBoundAgain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aTypedNameAlwaysWinsOverAutomaticEvidence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aDeclinedNameIsNotOfferedAgainForThatVoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "laterEvidenceCorrectsAnAutomaticNameOnlyWhenClearlyStronger"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "anAcceptedSuggestionIsConfirmedAndKeepsItsSource"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aLowConfidenceAutomaticNameNeedsConfirmation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "theBookRoundTripsThroughAMeetingRecordAndOlderFilesStillLoad"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aNameThatBindsRelabelsEarlierLinesAndLaterOnes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "theMicrophoneChannelIsAlwaysYouAndNeverBound"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "nowSpeakingUsesTheBestNameAndAPlaceholderUntilOneBinds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aTypedNameDuringTheCallIsNeverOverwrittenByTheWindow"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "genericSignalsGiveTheRosterAndTheActiveSpeaker"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "meetTilesComeFromTheirClassNames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "slackHuddleTilesCarryActiveAndMutedMarkers"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "twoMeetingWindowsMakeTheReadingAmbiguous"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "reassigningABlockMovesOnlyThatBlock"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "assigningSelectedWordsSplitsTheBlockAndKeepsTheTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "undoBringsBackTheStateBeforeTheLastMerge"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "theHistoryKeepsOnlyItsCapacity"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aTinyVoiceFoldsIntoTheNearestSpeakerAndCanBeRestored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "restoringSkipsABlockThePersonChangedSince"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aNamedVoiceYouAndShortMeetingsAreNeverPruned"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "aTinyVoiceOnTheMicrophoneFoldsOnlyIntoAMicrophoneSpeaker"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "theVoiceSampleIsThreeSecondsFromTheMiddleOfTheLongestBlock"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "theIdentifyingPlaceholderShowsOnlyForAnUnresolvedVoiceWhileNamingCanStillHappen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+              "function": "theSourceCaptionsAreShortAndHaveNoDashes"
             }
           ]
         }
@@ -2590,7 +2754,7 @@
         {
           "id": "F09.pointing-contracts",
           "check": "portable-pointing",
-          "acceptance": "Holding the pointing keys begins at once, release ends, any extra key cancels with no request; sessions drop late callbacks; coordinates round-trip within tolerance on Retina, negative-origin and mixed-scale displays and out-of-image points are rejected, never clamped; v2 targetID is accepted only for app-issued candidates and ungrounded marks are dropped before render; vendor streams are strict and bounded.",
+          "acceptance": "Holding the pointing keys begins at once, release ends, any extra key cancels with no request; sessions drop late callbacks; coordinates round-trip within tolerance on Retina, negative-origin and mixed-scale displays and out-of-image points are rejected, never clamped; v2 targetID is accepted only for app-issued candidates and ungrounded marks are dropped before render; vendor streams are strict and bounded. Phase 2: a drawn circle or underline maps to the control it encloses or crosses, else to its region; pointing words resolve to a candidate; a mark whose target moved, resized, changed or closed is hidden and re-resolved or the user is asked; the Fn+Control dictation preset and double-Control text entry warn about collisions and are off by default. Slice S1: the pointer path while the keys are held is the ink (near-duplicates dropped, pauses split shapes, corners kept); a missed key release, sleep, wake and a display change each end or cancel a hold through an explicit transition; the ring lands on the candidate on 1x, 2x and negative-origin displays; the per-turn trace line carries offsets only.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
@@ -2883,6 +3047,274 @@
             {
               "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
               "function": "contextBlockIsLabelledUntrustedAndKeepsCandidateTextAsData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aLoopAroundAControlPicksThatControl"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "anUnderlinePicksTheControlItPassesThrough"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aDotPicksTheControlUnderIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aLoopAroundSeveralControlsRanksTheTighterFitFirst"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aSecureFieldIsNeverATarget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aStrokeOverEmptyScreenBecomesARegionCandidate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aRegionIsClippedToTheImageAndDroppedWhenOutside"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "theCandidateListStaysBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "nonFinitePointsProduceNoBounds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "recognisesPointingWordsIgnoringCaseAndPunctuation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "splitsATranscriptIntoUntimedWords"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "untimedWordsTakeEvidenceInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "extraWordsReuseTheLastEvidence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "timedWordsTakeTheNearestEvidenceInsideTheWindow"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "evidenceForAnUnknownCandidateIsIgnored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "noPointingWordsMeansNothingToResolve"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "nonFiniteEvidenceTimeIsIgnored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "theResultIsBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "driftWithinTwoPointsIsStillFresh"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "driftBeyondTwoPointsHidesTheMarkAndReResolves"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aMoveNotificationAloneIsEnough"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aFailedReResolveAsksInsteadOfGuessing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aDestroyedTargetAsksAndStaysGone"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "eventsWhileResolvingDoNotRestartTheLookup"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "nonFiniteReadsCountAsStale"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aResizeBeyondToleranceIsReportedAsResizedDrift"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "mapsAccessibilityNotificationNames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "shippedDefaultsOnlyWarnAboutVoiceOver"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "theChatShortcutSharingTheModifiersIsExplained"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "theSameKeyAsTalkIsFlagged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "anOverlappingShowMeKeyIsFlagged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "aDictationChordThatExtendsThePointingKeyWarnsAboutTheFlash"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "doubleControlWarnsAboutMacOSDictation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "doubleControlOverlapsAControlOnlyTalkKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "theFnControlPresetIsAValidModifierChord"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "thePresetRemembersAndRestoresTheDictationKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "hoveringBeginsAStrokeAndExtendsIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "nearDuplicateSamplesAreDropped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "aPauseThenMovementStartsANewStroke"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "endStrokeMakesTheNextPointBeginANewOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "memoryIsBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "nonFinitePointsAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "smoothingKeepsEndpointsAndSharpCorners"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "smoothingRoundsAGentleBend"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "shortPathsAreReturnedAsIs"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+              "function": "turnAngleMeasuresDeviation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "theLineHasOffsetsInMillisecondsAndDashesForMissingMarks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "everyMarkAppearsOnce"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "theFirstWriteOfAMarkWins"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "nonFiniteTimesAreIgnoredAndEarlierThanKeyDownClampsToZero"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "theLineCarriesNoFreeTextOnlyKnownTokens"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "aNeverWrittenTraceIsEmpty"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+              "function": "pointerFillColourIgnoresTheDefaultWhiteAndBadValues"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "aMissedReleaseIsCaughtWhenTheLiveKeysAreUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "aHoldPastTheBoundEndsEvenWhenTheLiveKeysAreUnknown"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "afterATimeoutANewHoldNeedsEveryKeyUpFirst"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "theWatchdogDoesNothingWhenNoHoldIsActive"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "sleepOrADisplayChangeCancelsAHoldAndBlocksRestartUntilKeysAreUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "interruptingWithNoHoldReportsNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "aTimedOutHoldProcessesTheTurnLikeARelease"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "sleepWakeAndDisplayChangesCancelAHoldWithoutARequest"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "sleepWakeAndDisplayChangesStopATurnInFlight"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+              "function": "systemEventsWhileIdleDoNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+              "function": "twoXDisplayDeliveredAtHalfTheBackingPixels"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+              "function": "twoXDisplayDeliveredAtFullBackingPixels"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+              "function": "oneXDisplayWithANegativeOrigin"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+              "function": "displayAboveTheMainOne"
             }
           ]
         },
@@ -2941,6 +3373,45 @@
             {
               "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
               "function": "noticesNeverUseAnEmDash"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "holdingTheKeysNeverTakesTheMouseAndHoveringDrawsAStroke"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "sleepCancelsAHoldWithoutARequestAndLogsOneTraceLine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "aDisplayChangeDropsTheHoldAndANewHoldStartsClean"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "aTimedOutHoldSendsTheTurnAndExplainsWhy"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "aCancelledTurnLogsExactlyOneTraceLine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "systemEventsWhileIdleChangeNothing"
+            }
+          ]
+        },
+        {
+          "id": "F09.PointingOverlayTests",
+          "check": "native-PointingOverlayTests",
+          "acceptance": "The pointing ink overlay never becomes key or main, ignores mouse events so clicks and focus stay with the app underneath, is excluded from capture, and is gone after hide.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+              "function": "theInkPanelsNeverBecomeKeyOrMainAndIgnoreTheMouse"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+              "function": "hidingRemovesEveryPanel"
             }
           ]
         },
@@ -3366,7 +3837,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
-              "function": "wakeForcesBothTargets"
+              "function": "talkKeyDownWarmsBothTargets"
             },
             {
               "file": "Tests/ZeusAppTests/BrainWarmSchedulerTests.swift",
@@ -4399,6 +4870,22 @@
             {
               "file": "Tests/ZeusCoreTests/PolyglotTargetChangeTests.swift",
               "function": "targetRecoverySeesEveryLateCaptionAfterTheProducerFinishes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "olderSystemShowsHeardLineWithOneNewerSystemNotice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "olderSystemNeverRequestsPack"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "olderSystemNoticeReturnsAfterClearAndAfterTargetChange"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+              "function": "unsupportedPairStillNamesThePair"
             }
           ],
           "id": "S02.1"
@@ -4422,9 +4909,34 @@
       "title": "Polyglot pin, Stop, dismiss and unpinned auto-hide",
       "obligations": [
         {
-          "check": "missing-S03-contract",
-          "acceptance": "Pin behavior must preserve available Stop/explicit dismiss and restore automatic hiding after unpin.",
-          "cases": [],
+          "check": "portable-polyglot",
+          "acceptance": "Pure pin policy used by the notch for pointer exit, outside click and the Dismiss button: pin holds only on the Polyglot page, explicit dismiss always closes, unpin or tab switch restores automatic hiding, auto-hide off never schedules a close.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "pinnedSurvivesPointerExitAndClickOutside"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "explicitDismissClosesEvenWhenPinned"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "unpinRestoresAutoHide"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "tabSwitchAwayFromPinnedPolyglotRestoresAutoHide"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "autoHideDisabledNeverSchedulesClose"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+              "function": "pinOnlyAppliesOnPolyglotTab"
+            }
+          ],
           "id": "S03.1"
         },
         {
@@ -4438,6 +4950,18 @@
             {
               "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
               "function": "unpinAndOtherTabsUseNormalDismissal"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "stopKeepsPinAndBarVisible"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "explicitDismissClosesPinnedBar"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PolyglotPinTests.swift",
+              "function": "unpinRestoresAutomaticDismissal"
             }
           ],
           "id": "S03.2"

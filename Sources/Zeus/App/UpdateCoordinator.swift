@@ -117,7 +117,8 @@ final class UpdateCoordinator {
 
     func performUpdate() {
         guard case .available(let offer, _) = badgeState else { return }
-        if let url = offer.downloadURL {
+        // The offer's link is re-checked here: only HTTPS ever reaches the browser.
+        if let url = offer.downloadURL, UpdateFeedPolicy.isSecure(url) {
             NSWorkspace.shared.open(url)
         } else if let url = URL(string: "https://zeus.app") {
             NSWorkspace.shared.open(url)

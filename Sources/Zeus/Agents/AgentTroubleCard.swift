@@ -9,7 +9,7 @@ enum NotchControllerBridge {
     static func dismissFailure() { controller?.dismissFailure() }
     static func clickNotificationLine() { controller?.clickNotificationLine() }
     static func alertActions() -> AlertActions {
-        AlertActions(open: { controller?.openAlert($0) }, dismiss: { controller?.dismissAlert($0) },
+        AlertActions(open: { controller?.openAlert($0) }, reply: { controller?.replyAlert($0) }, dismiss: { controller?.dismissAlert($0) },
                      snooze: { controller?.snoozeAlert($0) })
     }
     static func alertHover(_ hovered: Bool) { controller?.setAlertHovered(hovered) }

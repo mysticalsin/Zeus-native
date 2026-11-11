@@ -9,7 +9,8 @@ struct LatestRunTests {
         let token = run.begin()
         #expect(run.isActive)
         #expect(run.isCurrent(token))
-        #expect(run.finish(token))
+        let finished1 = run.finish(token)
+        #expect(finished1)
         #expect(!run.isActive)
     }
 
@@ -19,9 +20,11 @@ struct LatestRunTests {
         let old = run.begin()
         let new = run.begin()
         #expect(!run.isCurrent(old))
-        #expect(!run.finish(old))
+        let finished2 = run.finish(old)
+        #expect(!finished2)
         #expect(run.isActive)
-        #expect(run.finish(new))
+        let finished3 = run.finish(new)
+        #expect(finished3)
         #expect(!run.isActive)
     }
 
@@ -31,7 +34,8 @@ struct LatestRunTests {
         run.invalidate()
         #expect(!run.isActive)
         #expect(!run.isCurrent(token))
-        #expect(!run.finish(token))
+        let finished4 = run.finish(token)
+        #expect(!finished4)
     }
 
     @Test func aReadStartedBeforeAWriteCannotPublishAfterIt() {
@@ -46,12 +50,16 @@ struct LatestRunTests {
     @Test func finishingTwiceIsHarmless() {
         var run = LatestRun()
         let token = run.begin()
-        #expect(run.finish(token))
-        #expect(run.finish(token))
+        let finished5 = run.finish(token)
+        #expect(finished5)
+        let finished6 = run.finish(token)
+        #expect(finished6)
         #expect(!run.isActive)
         let next = run.begin()
-        #expect(!run.finish(token))
+        let finished7 = run.finish(token)
+        #expect(!finished7)
         #expect(run.isActive)
-        #expect(run.finish(next))
+        let finished8 = run.finish(next)
+        #expect(finished8)
     }
 }

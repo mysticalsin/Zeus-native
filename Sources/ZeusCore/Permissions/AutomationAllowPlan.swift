@@ -27,6 +27,8 @@ public enum AutomationAllowPlan {
         public var refused: [Target] = []
         public var message: String?
         public var opensAutomationPane = false
+
+        public init() {}
     }
 
     public static func plan(targets: [Target], access: [String: Access], running: Set<String>) -> Plan {

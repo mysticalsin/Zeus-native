@@ -128,7 +128,7 @@ final class VoiceTurnController {
     func press() -> Bool {
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
-        BrainWarmScheduler.shared.noteActivity()
+        BrainWarmScheduler.shared.talkKeyDown()
         fastRace?.cancel()
         // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
         handsFreeTask?.cancel()
@@ -763,7 +763,7 @@ final class VoiceTurnController {
                     let command = CodeCommand(action)
                     task = Task { @MainActor in
                         guard let command else { return "I couldn't tell what to run, so I left it." }
-                        let outcome = await CodeActions.shared.perform(command, speak: speak)
+                        let outcome = await CodeActions.shared.perform(command, speak: speak, fromModel: true)
                         return outcome.ok ? nil : outcome.message
                     }
                 case .macWalkthrough:

@@ -27,11 +27,10 @@ enum PointingTargetProbe {
     /// Overall budget for one probe, including the attribute reads.
     static let budget: TimeInterval = 0.05
 
-    /// Runs off the main actor. `quartzPoint` is already in Quartz global space.
-    /// Verify: AX client calls off the main thread are not documented as thread-safe by Apple.
-    /// They are used this way by many tools, and the timeout bounds a stall; if a target app
-    /// misbehaves, move this call to the main thread behind the same timeout.
-    nonisolated static func hitTest(atQuartzPoint point: CGPoint) -> PointingRawTarget? {
+    /// Main actor only: AX calls from this process stay on the main thread (repo rule). Each call is
+    /// bounded by the 0.1 s messaging timeout and the attribute reads by `budget`.
+    /// `quartzPoint` is already in Quartz global space.
+    @MainActor static func hitTest(atQuartzPoint point: CGPoint) -> PointingRawTarget? {
         guard AXIsProcessTrusted(), point.x.isFinite, point.y.isFinite else { return nil }
         let started = ProcessInfo.processInfo.systemUptime
         let system = AXUIElementCreateSystemWide()
@@ -62,7 +61,7 @@ enum PointingTargetProbe {
         return text
     }
 
-    private nonisolated static func frame(of element: AXUIElement) -> CGRect? {
+    nonisolated static func frame(of element: AXUIElement) -> CGRect? {
         var positionValue: CFTypeRef?, sizeValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
               AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
