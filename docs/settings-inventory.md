@@ -4,9 +4,9 @@ Source: Glance 0.3.1 (build 26) from app-71mb.dmg, studied on the box: the fr an
 
 Sidebar (Glance order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 169 of 169 Glance options are in Zeus Settings with a matching control (100% of all, 100% of the 169 in scope). 158 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 171 of 171 Glance options are in Zeus Settings with a matching control (100% of all, 100% of the 171 in scope). 160 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 118.
+**Before this round:** has 19, partial 27, missing 120.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -228,6 +228,8 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Desktop pointing | Pointing keys | menu | Control-Option | Hold to talk and draw, let go to send. Pressing any other key while holding cancels. | missing | live | `pointing.shortcut` | Control and Option is VoiceOver's modifier and is blocked while VoiceOver is on. |
 | Desktop pointing | Send a screenshot with each question | toggle | off | Off: Zeus asks the model using only what is under your pointer. On: the display under your pointer is sent to the provider you picked, once per question, and never saved. | missing | live | `pointing.sendScreenshot` | Separate consent from the macOS Screen Recording permission. |
 | Desktop pointing | Provider | menu | Auto | Auto uses the first provider with a saved key that responds, preferring the fastest it has measured this session. | missing | live | `pointing.provider` | Keys come from the Keychain only. Latency numbers stay in memory. |
+| Desktop pointing | Double-tap Control to type a question | toggle | off | Two quick taps on Control open a small box to type a question about what is under your pointer. Off by default. | missing | live | `pointing.textEntry` | macOS Dictation can also use "Press Control key twice" (System Settings, Keyboard). If both are on, both fire. Turn one off. |
+| Desktop pointing | Use Fn+Control for dictation | toggle | off | Sets the dictation key to Fn+Control. Turning it off puts your previous dictation key back. | missing | live | `pointing.dictationFnControl` | Off by default. Fn (Globe) alone is used by macOS for emoji and Dictation; check System Settings, Keyboard. |
 | Account | ChatGPT account, model, reasoning effort, speed | sign-in + menus | - | Assistant on your ChatGPT plan. | missing | custom | `assistant.provider` | Bring your own key (OpenAI, Anthropic, ElevenLabs) in the Keychain, model picker. ChatGPT sign-in is Coming: needs an OAuth backend. |
 | Model | Model | menu | - | Selected chat model for the chosen provider. | missing | custom | `assistant.model` | Provider-specific model picker on the Assistant settings page. |
 | Behaviour | Double Command replies, Right Command hold to speak | toggles | - | Drafts a reply from the conversation. | partial | stub | `assistant.doubleCommand` | Hold-to-speak is the ZEUS talk key. Reply drafting TODO with the chat on devon/claude. |

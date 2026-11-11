@@ -2590,7 +2590,7 @@
         {
           "id": "F09.pointing-contracts",
           "check": "portable-pointing",
-          "acceptance": "Holding the pointing keys begins at once, release ends, any extra key cancels with no request; sessions drop late callbacks; coordinates round-trip within tolerance on Retina, negative-origin and mixed-scale displays and out-of-image points are rejected, never clamped; v2 targetID is accepted only for app-issued candidates and ungrounded marks are dropped before render; vendor streams are strict and bounded.",
+          "acceptance": "Holding the pointing keys begins at once, release ends, any extra key cancels with no request; sessions drop late callbacks; coordinates round-trip within tolerance on Retina, negative-origin and mixed-scale displays and out-of-image points are rejected, never clamped; v2 targetID is accepted only for app-issued candidates and ungrounded marks are dropped before render; vendor streams are strict and bounded. Phase 2: a drawn circle or underline maps to the control it encloses or crosses, else to its region; pointing words resolve to a candidate; a mark whose target moved, resized, changed or closed is hidden and re-resolved or the user is asked; the Fn+Control dictation preset and double-Control text entry warn about collisions and are off by default.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
@@ -2883,6 +2883,150 @@
             {
               "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
               "function": "contextBlockIsLabelledUntrustedAndKeepsCandidateTextAsData"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aLoopAroundAControlPicksThatControl"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "anUnderlinePicksTheControlItPassesThrough"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aDotPicksTheControlUnderIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aLoopAroundSeveralControlsRanksTheTighterFitFirst"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aSecureFieldIsNeverATarget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aStrokeOverEmptyScreenBecomesARegionCandidate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "aRegionIsClippedToTheImageAndDroppedWhenOutside"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "theCandidateListStaysBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+              "function": "nonFinitePointsProduceNoBounds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "recognisesPointingWordsIgnoringCaseAndPunctuation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "splitsATranscriptIntoUntimedWords"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "untimedWordsTakeEvidenceInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "extraWordsReuseTheLastEvidence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "timedWordsTakeTheNearestEvidenceInsideTheWindow"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "evidenceForAnUnknownCandidateIsIgnored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "noPointingWordsMeansNothingToResolve"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "nonFiniteEvidenceTimeIsIgnored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+              "function": "theResultIsBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "driftWithinTwoPointsIsStillFresh"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "driftBeyondTwoPointsHidesTheMarkAndReResolves"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aMoveNotificationAloneIsEnough"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aFailedReResolveAsksInsteadOfGuessing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aDestroyedTargetAsksAndStaysGone"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "eventsWhileResolvingDoNotRestartTheLookup"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "nonFiniteReadsCountAsStale"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "aResizeBeyondToleranceIsReportedAsResizedDrift"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+              "function": "mapsAccessibilityNotificationNames"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "shippedDefaultsOnlyWarnAboutVoiceOver"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "theChatShortcutSharingTheModifiersIsExplained"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "theSameKeyAsTalkIsFlagged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "anOverlappingShowMeKeyIsFlagged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "aDictationChordThatExtendsThePointingKeyWarnsAboutTheFlash"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "doubleControlWarnsAboutMacOSDictation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "doubleControlOverlapsAControlOnlyTalkKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "theFnControlPresetIsAValidModifierChord"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+              "function": "thePresetRemembersAndRestoresTheDictationKey"
             }
           ]
         },

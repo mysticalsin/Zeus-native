@@ -62,7 +62,7 @@ enum PointingTargetProbe {
         return text
     }
 
-    private nonisolated static func frame(of element: AXUIElement) -> CGRect? {
+    nonisolated static func frame(of element: AXUIElement) -> CGRect? {
         var positionValue: CFTypeRef?, sizeValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
               AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,

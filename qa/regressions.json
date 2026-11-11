@@ -2977,6 +2977,66 @@
         "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
         "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
+    },
+    {
+      "id": "REG-248",
+      "failure": "A circle or underline drawn around a control mapped to no target, so ink never selected what the user meant.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+        "function": "aLoopAroundAControlPicksThatControl"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Spoken 'this' and 'that' reached the model with no link to what the pointer or ink showed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+        "function": "untimedWordsTakeEvidenceInOrder"
+      }
+    },
+    {
+      "id": "REG-250",
+      "failure": "A mark stayed on screen after the control it pointed at moved, changed or closed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+        "function": "driftBeyondTwoPointsHidesTheMarkAndReResolves"
+      }
+    },
+    {
+      "id": "REG-251",
+      "failure": "The Fn+Control dictation preset overwrote the dictation key with no way back, and its collisions were not reported.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+        "function": "thePresetRemembersAndRestoresTheDictationKey"
+      }
+    },
+    {
+      "id": "REG-252",
+      "failure": "Alerts for Spotify, Chrome, Notion, Dropbox, terminal and meeting apps fell back to a generic glyph because only one bundle id was tried.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AppBrandCatalogTests.swift",
+        "function": "coversTheLogosTheLedgerListed"
+      }
     }
   ]
 }

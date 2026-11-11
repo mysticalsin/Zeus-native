@@ -419,6 +419,24 @@ Acceptance:
 - Packaged app (M3) launches with the feature off and has no new prompts.
 - With the feature on and permissions granted by the owner: holding the keys over the Finder toolbar "Share" and asking "what is this" draws an orange ring at the AX frame within 2 pt and speaks; pressing the keys again mid-speech stops speech and animation within one frame of the stop call.
 
+### Phase 2 status (2026-11-11, branch `codex/pointing-phase2-20261111`)
+
+M1 code written. M2 tests are written; CI is the only compile and test proof (the authoring sandbox cannot run `swift build`). M3 and M4 not done: nothing here has been launched.
+
+| Item | State |
+|---|---|
+| Strokes on the overlay, `drawing` state | Done in Phase 1 (`PointingController.ink`). |
+| Stroke targeting (circle, underline, dot to best element, else region) | Done: `ZeusCore/Pointing/PointingStrokeTargeting.swift`, wired in `buildTurn`. Region candidates use `source: .strokeBounds`, role `region`. |
+| Deixis ("this", "that", "here", "these", French forms) | Done with a gap: `PointingDeixis` resolves against stroke, dwell and release evidence and is applied to the final transcript in `ExplanationController.submit()`. The on-device recognizer returns text only, so words are matched in order, not by `SFTranscriptionSegment` time. The timed path exists and is tested; feeding segment times is open. |
+| Stale detection | Done: `PointingStaleTarget` (pure) and `PointingTargetWatcher` (AXObserver on the target and its window, main-actor hop, per-beat frame re-read, 2 pt tolerance). A stale mark is hidden and the target is looked up once more. A control found at a new spot is reported ("hold the keys and ask again"), not re-ringed. |
+| Double-Control text entry | Done behind `pointing.textEntry`, default off, because macOS Dictation can use "Press Control key twice". `PointingTextEntry` panel, `submitText`. |
+| Fn+Control dictation preset | Done behind `pointing.dictationFnControl`, default off. Remembers and restores the previous dictation key (`DictationFnControlPreset`). |
+| Conflict warnings | Done in Core: `ShortcutConflicts.pointingWarnings` (talk, dictation, chat, show-me, double Control). Not yet shown in a Settings row. |
+| Reduce Motion and Reduce Transparency ink variants | Not done. |
+| TTS marker word alignment | Not done. |
+| Off-main SSE reader | Not done. |
+| `PointingOverlayTests` (app, owned windows) | Not done. |
+
 ### Phase 2: full input surface and sync (3 to 4 days)
 
 - Strokes on `MarkOverlay`, the `drawing` state, stroke bounds as candidates, multiple dwells.

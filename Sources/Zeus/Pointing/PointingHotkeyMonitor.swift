@@ -6,6 +6,10 @@ import ZeusCore
 enum PointingSettings {
     static var enabled: Bool { FeatureSettings.bool("pointing.enabled", default: false) }
     static var sendScreenshot: Bool { FeatureSettings.bool("pointing.sendScreenshot", default: false) }
+    /// Double-tap Control opens a typed-question box. Off by default: macOS Dictation can also use
+    /// "Press Control key twice", and both would fire.
+    static var textEntry: Bool { FeatureSettings.bool("pointing.textEntry", default: false) }
+    static var dictationFnControl: Bool { FeatureSettings.bool("pointing.dictationFnControl", default: false) }
     static var providerChoice: PointingProviderChoice {
         PointingProviderChoice(setting: FeatureSettings.string("pointing.provider", default: "Auto"))
     }

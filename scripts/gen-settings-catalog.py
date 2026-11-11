@@ -183,6 +183,8 @@ o(S,'Desktop pointing','Enable desktop pointing','toggle','off','Hold the pointi
 o(S,'Desktop pointing','Pointing keys','menu','Control-Option','Hold to talk and draw, let go to send. Pressing any other key while holding cancels.','missing','pointing.shortcut','choice',['Control-Option','Right Option','Fn (Globe)'],'Control-Option','live','Control and Option is VoiceOver\'s modifier and is blocked while VoiceOver is on.')
 o(S,'Desktop pointing','Send a screenshot with each question','toggle','off','Off: Zeus asks the model using only what is under your pointer. On: the display under your pointer is sent to the provider you picked, once per question, and never saved.','missing','pointing.sendScreenshot','toggle',[],'false','live','Separate consent from the macOS Screen Recording permission.')
 o(S,'Desktop pointing','Provider','menu','Auto','Auto uses the first provider with a saved key that responds, preferring the fastest it has measured this session.','missing','pointing.provider','choice',['Auto','Anthropic + ElevenLabs','OpenAI','Zeus setup'],'Auto','live','Keys come from the Keychain only. Latency numbers stay in memory.')
+o(S,'Desktop pointing','Double-tap Control to type a question','toggle','off','Two quick taps on Control open a small box to type a question about what is under your pointer. Off by default.','missing','pointing.textEntry','toggle',[],'false','live','macOS Dictation can also use "Press Control key twice" (System Settings, Keyboard). If both are on, both fire. Turn one off.')
+o(S,'Desktop pointing','Use Fn+Control for dictation','toggle','off','Sets the dictation key to Fn+Control. Turning it off puts your previous dictation key back.','missing','pointing.dictationFnControl','toggle',[],'false','live','Off by default. Fn (Globe) alone is used by macOS for emoji and Dictation; check System Settings, Keyboard.')
 o(S,'Account','ChatGPT account, model, reasoning effort, speed','sign-in + menus','-','Assistant on your ChatGPT plan.','missing','assistant.provider','choice',['Claude CLI','OpenAI','Anthropic'],'Claude CLI','custom','Bring your own key (OpenAI, Anthropic, ElevenLabs) in the Keychain, model picker. ChatGPT sign-in is Coming: needs an OAuth backend.')
 o(S,'Model','Model','menu','-','Selected chat model for the chosen provider.','missing','assistant.model','choice',[],'Claude Code default','custom','Provider-specific model picker on the Assistant settings page.')
 o(S,'Behaviour','Double Command replies, Right Command hold to speak','toggles','-','Drafts a reply from the conversation.','partial','assistant.doubleCommand','toggle',[],'false','stub','Hold-to-speak is the ZEUS talk key. Reply drafting TODO with the chat on devon/claude.')
@@ -234,7 +236,8 @@ def validate_table():
     opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
               'lights.liveSpectrum', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
-              'pointing.enabled', 'pointing.sendScreenshot')
+              'pointing.enabled', 'pointing.sendScreenshot',
+              'pointing.textEntry', 'pointing.dictationFnControl')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':

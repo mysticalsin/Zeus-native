@@ -58,6 +58,7 @@ final class PointingController {
         }
         var enabled: () -> Bool = { PointingSettings.enabled }
         var sendScreenshot: () -> Bool = { PointingSettings.sendScreenshot }
+        var textEntryEnabled: () -> Bool = { PointingSettings.textEntry }
     }
 
     /// Speech input. Live: the explanation microphone. The self-test injects a fixed transcript.
@@ -95,6 +96,8 @@ final class PointingController {
 
     let explanation: ExplanationController
     let hotkey = PointingHotkeyMonitor()
+    let textEntry = PointingTextEntry()
+    let watcher = PointingTargetWatcher()
     private(set) var session = PointingSession()
     private(set) var metrics = Metrics()
     private(set) var trace = PointingTrace()
@@ -117,6 +120,9 @@ final class PointingController {
     private var strokeCount = 0
     private var flightLaunched = false
     private var screenNoticeShown = false
+    private var stale: PointingStaleTarget?
+    private var watchedQuartzPoint: CGPoint?
+    private var staleWork: Task<Void, Never>?
 
     init(explanation: ExplanationController, services: Services = Services(), inputs: Inputs? = nil, marker: Marker,
          prepare: @escaping () async -> [PointingProviderPath], recordAudio: @escaping (Double) -> Void = { _ in }) {
@@ -132,6 +138,7 @@ final class PointingController {
         explanation.onTurnEnded = { [weak self] error in self?.turnEnded(error) }
         explanation.onEmptyInput = { [weak self] in self?.emptyInput() }
         hotkey.onSignal = { [weak self] signal in self?.handle(signal) }
+        textEntry.onSubmit = { [weak self] text in self?.submitText(text) }
     }
 
     var state: PointingSession.State { session.state }
@@ -152,6 +159,7 @@ final class PointingController {
     func start() { guard services.enabled() else { return }; hotkey.start() }
     func stop() {
         hotkey.stop()
+        textEntry.hide()
         halt(clearScreen: true)
         _ = session.send(.failure("stopped")); _ = session.send(.cleanedUp)
     }
@@ -164,7 +172,7 @@ final class PointingController {
         case .ended: end()
         case .cancelled: cancelHold()
         case .escape: interrupt()
-        case .doubleTapControl: break // Detected; text entry arrives in a later phase.
+        case .doubleTapControl: openTextEntry()
         case .blocked(let message): onNotice?(.hint(message))
         }
     }
@@ -191,6 +199,7 @@ final class PointingController {
         explanation.desktopTurn = nil
         explanation.screenContext.clear()
         cancelTasks()
+        textEntry.hide(); stopWatching()
         trace = PointingTrace(); candidatesForTest = []; strokeCount = 0
         metrics.releaseAt = nil; metrics.firstAudioAt = nil; metrics.flightStartAt = nil
         metrics.flightUsedFallback = false; metrics.stopLatency = nil; metrics.lastFailure = nil
@@ -255,7 +264,7 @@ final class PointingController {
     }
 
     private func halt(clearScreen: Bool) {
-        stopSampling(); stopInk(); cancelTasks()
+        stopSampling(); stopInk(); cancelTasks(); stopWatching()
         explanation.desktopTurn = nil
         if clearScreen { explanation.screenContext.cancel(); explanation.screenContext.clear() }
     }
@@ -328,15 +337,19 @@ final class PointingController {
         let mapper = ScreenCoordinateMapper(displays: displays.map { DisplayMap(id: Int($0.id), frame: $0.frame, scale: $0.scale) })
         let release = services.mouseLocation()
 
-        var points: [(CGPoint, PointingTargetCandidate.Source)] = []
-        if let first = trace.samples.first { points.append((CGPoint(x: first.x, y: first.y), .axHitTest)) }
-        for dwell in trace.dwells.prefix(3) { points.append((CGPoint(x: dwell.at.x, y: dwell.at.y), .axDwell)) }
-        points.append((release, .axHitTest))
+        // Every probed point with where it came from and when (seconds from the first sample).
+        let origin = trace.samples.first?.time ?? 0
+        var points: [(point: CGPoint, source: PointingTargetCandidate.Source, time: Double)] = []
+        if let first = trace.samples.first { points.append((CGPoint(x: first.x, y: first.y), .axHitTest, 0)) }
+        for dwell in trace.dwells.prefix(3) {
+            points.append((CGPoint(x: dwell.at.x, y: dwell.at.y), .axDwell, max(0, dwell.at.time - origin)))
+        }
+        points.append((release, .axHitTest, max(0, (trace.samples.last?.time ?? origin) - origin)))
 
         let probe = services.probe
         let raws: [PointingRawTarget?] = await withTaskGroup(of: (Int, PointingRawTarget?).self) { group in
             for (index, entry) in points.enumerated() {
-                guard let quartz = mapper.convert(entry.0, from: .screen, to: .ax, context: MapContext()) else { continue }
+                guard let quartz = mapper.convert(entry.point, from: .screen, to: .ax, context: MapContext()) else { continue }
                 group.addTask { (index, await probe(quartz)) }
             }
             var out = [PointingRawTarget?](repeating: nil, count: points.count)
@@ -345,19 +358,34 @@ final class PointingController {
         }
 
         var candidates: [PointingTargetCandidate] = []
-        func add(_ candidate: PointingTargetCandidate) {
-            guard candidates.count < PointingContext.maxCandidates,
-                  !candidates.contains(where: { $0.role == candidate.role && $0.label == candidate.label && $0.imageRect == candidate.imageRect })
-            else { return }
+        /// The id of `candidate`, or of the identical one already listed. nil when the list is full.
+        func add(_ candidate: PointingTargetCandidate) -> String? {
+            if let same = candidates.first(where: { $0.role == candidate.role && $0.label == candidate.label && $0.imageRect == candidate.imageRect }) {
+                return same.id
+            }
+            guard candidates.count < PointingContext.maxCandidates else { return nil }
             candidates.append(candidate)
+            return candidate.id
         }
+        var evidence: [PointingDeixis.Evidence] = []
         for (index, raw) in raws.enumerated() {
             guard let raw else { continue }
             let rect = capture.flatMap {
                 PointingGeometry.imageRect(fromAX: raw.axFrame, mapper: mapper, geometry: $0.geometry, display: $0.currentDisplay)
             }
-            add(PointingTargetCandidate(id: "t\(candidates.count)", role: raw.role, subrole: raw.subrole, label: raw.label,
-                                        imageRect: rect, isSecure: raw.isSecure, source: points[index].1))
+            let id = add(PointingTargetCandidate(id: "t\(candidates.count)", role: raw.role, subrole: raw.subrole, label: raw.label,
+                                                 imageRect: rect, isSecure: raw.isSecure, source: points[index].source))
+            if let id, !raw.isSecure { evidence.append(.init(time: points[index].time, candidateID: id)) }
+        }
+        // Drawn strokes: the best element a stroke circles or underlines, else the region it encloses.
+        if let capture {
+            let strokes = PointingContext.imageStrokes(trace: trace, geometry: capture.geometry, display: capture.currentDisplay)
+            let resolution = PointingStrokeTargeting.resolve(strokes: strokes, candidates: candidates,
+                                                             imageSize: capture.geometry.imageSize)
+            candidates = resolution.candidates
+            for stroke in strokes {
+                if let id = resolution.assignments[stroke.id] { evidence.append(.init(time: stroke.time, candidateID: id)) }
+            }
         }
         // Apps with no Accessibility tree (canvas, games): a small pointer-centered target still lets
         // the model ring what the user pointed at.
@@ -366,13 +394,21 @@ final class PointingController {
             let size = capture.geometry.imageSize
             let half = 24.0
             let x = max(0, min(size.width - 2 * half, center.x - half)), y = max(0, min(size.height - 2 * half, center.y - half))
-            add(PointingTargetCandidate(id: "t\(candidates.count)", role: "pointer", imageRect: .init(x: x, y: y, width: 2 * half, height: 2 * half),
-                                        source: .pointerOnly))
+            if let id = add(PointingTargetCandidate(id: "t\(candidates.count)", role: "pointer",
+                                                    imageRect: .init(x: x, y: y, width: 2 * half, height: 2 * half),
+                                                    source: .pointerOnly)) {
+                evidence.append(.init(time: points.last?.time ?? 0, candidateID: id))
+            }
         }
         candidatesForTest = candidates
         let context = PointingContext.make(trace: trace, candidates: candidates, geometry: capture?.geometry,
                                            display: capture?.currentDisplay, frontmostBundleID: services.frontmostBundleID())
-        return .init(context: context, snapshot: services.sendScreenshot() ? snapshot : nil)
+        // The words are not known yet (speech is transcribed after release). `submit()` runs this on them.
+        let known = Set(candidates.map(\.id)), seen = evidence
+        let resolver: @Sendable (String) -> [PointingContext.Deixis] = { transcript in
+            PointingDeixis.resolve(words: PointingDeixis.words(in: transcript), evidence: seen, validIDs: known)
+        }
+        return .init(context: context, snapshot: services.sendScreenshot() ? snapshot : nil, resolveDeixis: resolver)
     }
 
     // MARK: Pointer samples and ink
@@ -432,6 +468,142 @@ final class PointingController {
         }
     }
 
+    // MARK: Typed question (double Control)
+
+    /// Opens the typed-question box near the pointer. Only when the owner turned it on and no hold is active.
+    private func openTextEntry() {
+        guard services.enabled(), services.textEntryEnabled() else { return }
+        guard session.state != .listening, session.state != .drawing else { return }
+        textEntry.show(near: services.mouseLocation())
+    }
+
+    /// A typed question: the same turn as a spoken one, with no microphone and no ink. Also the test seam.
+    func submitText(_ raw: String) {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard services.enabled(), !text.isEmpty, text.utf8.count <= 4096 else { return }
+        let transition = session.send(.keyDown)
+        guard transition.changed else { return }
+        if transition.effects.contains(.stopOutput) {
+            let began = services.now()
+            halt(clearScreen: true)
+            explanation.stop()
+            metrics.stopLatency = services.now() - began
+            marker.idle()
+        }
+        explanation.prepareDesktopSession()
+        explanation.desktopTurn = nil
+        explanation.screenContext.clear()
+        cancelTasks()
+        textEntry.hide(); stopWatching()
+        trace = PointingTrace(); candidatesForTest = []; strokeCount = 0
+        metrics.releaseAt = nil; metrics.firstAudioAt = nil; metrics.flightStartAt = nil
+        metrics.flightUsedFallback = false; metrics.stopLatency = nil; metrics.lastFailure = nil
+        flightLaunched = false; attempt = nil
+        // Nothing was spoken: go straight from the key-down to processing.
+        let processing = session.send(.keyUp)
+        guard processing.to == .processing else { return }
+        let generation = session.generation
+        metrics.releaseAt = services.now()
+        marker.think()
+        prepareTask = Task { [prepare] in await prepare() }
+        captureTask = Task { [weak self] in await self?.captureAtPointer(generation: generation) }
+        work = Task { [weak self] in await self?.finishTextTurn(generation: generation, text: text) }
+    }
+
+    private func finishTextTurn(generation: Int, text: String) async {
+        let order = await prepareTask?.value ?? []
+        guard session.isCurrent(generation) else { return }
+        guard !order.isEmpty else {
+            fail("Add an Anthropic, OpenAI or Any LLM key in Settings to use pointing.")
+            return
+        }
+        await captureTask?.value
+        guard session.isCurrent(generation) else { return }
+        let turn = await buildTurn()
+        guard session.isCurrent(generation) else { return }
+        explanation.desktopTurn = turn
+        explanation.draft = text
+        metrics.turns += 1; metrics.requestsSent += 1
+        explanation.submit()
+        // `submit()` consumes the turn only when it can run; a leftover means it did not.
+        if explanation.desktopTurn != nil {
+            explanation.desktopTurn = nil
+            fail("Zeus could not start that question. Try again.")
+        }
+    }
+
+    // MARK: Stale targets
+
+    private func quartzPoint(fromScreen point: CGPoint) -> CGPoint? {
+        let mapper = ScreenCoordinateMapper(displays: services.displays().map { DisplayMap(id: Int($0.id), frame: $0.frame, scale: $0.scale) })
+        return mapper.convert(point, from: .screen, to: .ax, context: MapContext())
+    }
+
+    /// Starts watching the control a mark was placed on. `global` is the ring centre in AppKit points.
+    private func startWatching(atGlobal global: CGPoint) {
+        guard !watcher.isWatching, let quartz = quartzPoint(fromScreen: global) else { return }
+        let frame = watcher.start(atQuartzPoint: quartz) { [weak self] event in self?.targetEvent(event) }
+        guard let frame else { return }
+        watchedQuartzPoint = quartz
+        stale = PointingStaleTarget(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height)
+    }
+
+    private func stopWatching() {
+        staleWork?.cancel(); staleWork = nil
+        watcher.stop(); stale = nil; watchedQuartzPoint = nil
+    }
+
+    /// Per-beat drift check: a re-read of the target frame, more than 2 pt of drift marks it stale.
+    private func beatTick() {
+        guard stale?.isFresh == true else { return }
+        guard let frame = watcher.currentFrame() else { targetEvent(.destroyed); return }
+        targetEvent(.observed(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height))
+    }
+
+    /// An AXObserver notification or a beat read. Also the injection point for tests.
+    func targetEvent(_ event: PointingStaleTarget.Event) {
+        guard var current = stale else { return }
+        let action = current.send(event)
+        stale = current
+        switch action {
+        case .none, .showMark: break
+        case .hideAndReResolve:
+            hideMarks()
+            reResolve()
+        case .ask(let message):
+            hideMarks()
+            onNotice?(.hint(message))
+        }
+    }
+
+    /// Hides every capture-space mark. The overlay needs the capture identity, so dropping it hides them.
+    private func hideMarks() {
+        explanation.screenContext.cancel()
+        explanation.screenContext.clear()
+    }
+
+    /// One more hit test at the original point. A control still there at a new spot is reported, not
+    /// re-ringed: the old scene is gone, so the user asks again and gets a fresh mark.
+    private func reResolve() {
+        guard let quartz = watchedQuartzPoint else { return }
+        let probe = services.probe
+        staleWork?.cancel()
+        staleWork = Task { [weak self] in
+            let raw = await probe(quartz)
+            guard !Task.isCancelled, let self, var current = self.stale else { return }
+            if let raw {
+                _ = current.send(.resolved(x: raw.axFrame.minX, y: raw.axFrame.minY, width: raw.axFrame.width, height: raw.axFrame.height))
+                self.stale = current
+                self.onNotice?(.hint("That moved. Hold the keys and ask again to point at its new spot."))
+            } else {
+                let action = current.send(.resolveFailed)
+                self.stale = current
+                if case .ask(let message) = action { self.onNotice?(.hint(message)) }
+            }
+            self.staleWork = nil
+        }
+    }
+
     // MARK: Turn hooks
 
     private func speechStarted() {
@@ -443,12 +615,14 @@ final class PointingController {
 
     /// The flight starts when a ring is admitted by real playback, which is never before first audio.
     private func revealed(_ scene: ExplanationScene, fallback: Bool) {
+        beatTick()
         guard !flightLaunched, let capture = explanation.screenContext.annotationContext else { return }
         let marks = scene.objects.values.filter { $0.space == .capture && $0.captureID == capture.geometry.captureID }
         guard let ring = marks.filter({ $0.geometry.kind == .ring }).min(by: { $0.id < $1.id }),
               let global = capture.geometry.globalPoint(fromImage: .init(x: ring.transform.position.x, y: ring.transform.position.y),
                                                         current: capture.currentDisplay) else { return }
         let text = marks.filter { $0.geometry.kind == .label }.min(by: { $0.id < $1.id })?.text ?? "Here"
+        startWatching(atGlobal: CGPoint(x: global.x, y: global.y))
         if marker.flight(CGPoint(x: global.x, y: global.y), String(text.prefix(40))) {
             flightLaunched = true
             metrics.flightStartAt = services.now()

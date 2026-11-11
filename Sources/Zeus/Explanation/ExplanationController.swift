@@ -32,6 +32,8 @@ final class ExplanationController {
     struct PointingTurn: Sendable {
         var context: PointingContext
         var snapshot: ExplanationScreenSnapshot?
+        /// Maps the final transcript's pointing words to candidates. Runs once, in `submit()`.
+        var resolveDeixis: (@Sendable (String) -> [PointingContext.Deixis])?
     }
     var desktopTurn: PointingTurn?
     /// The desktop overlay's windows, for own-process window-policy checks.
@@ -198,7 +200,8 @@ final class ExplanationController {
         guard canInteract else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.utf8.count <= 16_384, history != nil else { return }
-        let pointing = desktopTurn; desktopTurn = nil
+        var pointing = desktopTurn; desktopTurn = nil
+        if let resolve = pointing?.resolveDeixis { pointing?.context.deixis = resolve(text) }
         if pointing == nil { onSubmission?(text) }
         linkedHistoryIDs.insert(history!.id)
         stop(); draft = ""; problem = nil; isReplaying = false

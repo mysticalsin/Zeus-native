@@ -110,7 +110,7 @@ public enum AlertAppGlyph {
         case "com.tinyspeck.slackmacgap": "number"
         case "com.microsoft.teams2", "com.microsoft.teams": "person.2.fill"
         case "com.github.githubclient": "chevron.left.forwardslash.chevron.right"
-        default: "app.fill"
+        default: AppBrandCatalog.glyph(for: bundleID) ?? "app.fill"
         }
     }
 
