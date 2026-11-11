@@ -120,7 +120,7 @@ final class PointingAnthropicProvider: ExplanationModelProviding {
         // Sonnet at most (the owner's model cap). An override is still gated by the cap.
         if let override = defaults.string(forKey: "pointing.anthropic.model")?.trimmingCharacters(in: .whitespaces),
            !override.isEmpty, ModelCap.isAllowed(override) { return override }
-        return ModelCap.httpModel(.anthropic, .deep) ?? "claude-sonnet-4-5"
+        return ModelCap.httpModel(.anthropic, tier: .deep) ?? "claude-sonnet-4-5"
     }
 
     static func request(_ input: ExplanationModelRequest, key: String, model: String) throws -> URLRequest {
@@ -233,7 +233,7 @@ final class PointingModelRouter: ExplanationModelProviding {
             .anthropicElevenLabs: PointingAnthropicProvider(),
             .openAI: ExplanationHTTPProvider(configuration: {
                 let model = UserDefaults.standard.string(forKey: "pointing.openai.model")
-                let chosen = (model?.isEmpty == false && ModelCap.isAllowed(model!)) ? model! : (ModelCap.httpModel(.openAI, .deep) ?? "gpt-4o")
+                let chosen = (model?.isEmpty == false && ModelCap.isAllowed(model!)) ? model! : (ModelCap.httpModel(.openAI, tier: .deep) ?? "gpt-4o")
                 // Verify: Chat Completions image_url content parts; the vision guide shows only the Responses format.
                 return (AnyLLMConfig(baseURL: "https://api.openai.com/v1", model: chosen), PointingCredentials.openAIKey)
             }, displayName: "OpenAI"),

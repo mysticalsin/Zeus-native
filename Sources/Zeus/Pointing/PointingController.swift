@@ -45,7 +45,7 @@ enum PointingTimers {
 /// code the real hotkey drives.
 @MainActor
 final class PointingController {
-    struct Services {
+    @MainActor struct Services {
         var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
         var mouseLocation: () -> CGPoint = { NSEvent.mouseLocation }
         var displays: () -> [PointingDisplay] = { PointingDisplay.live() }

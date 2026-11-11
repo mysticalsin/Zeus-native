@@ -76,7 +76,7 @@ struct PointingCoordinateTests {
 
     @Test func degenerateAndNonFiniteFramesAreRejected() throws {
         let (geometry, display) = try capture(Self.main, full: .init(width: 2880, height: 1800), delivered: .init(width: 1440, height: 900))
-        for frame in [CGRect(x: 10, y: 10, width: 0, height: 20), CGRect(x: .nan, y: 0, width: 5, height: 5)] {
+        for frame in [CGRect(x: 10, y: 10, width: 0, height: 20), CGRect(x: CGFloat.nan, y: 0, width: 5, height: 5)] {
             #expect(PointingGeometry.imageRect(fromAX: frame, mapper: mapper, geometry: geometry, display: display) == nil)
         }
     }
