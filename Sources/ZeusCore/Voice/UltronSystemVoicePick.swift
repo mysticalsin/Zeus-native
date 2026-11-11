@@ -50,6 +50,22 @@ public enum UltronSystemVoicePick {
         return pool.max { score($0) < score($1) }
     }
 
+    /// True when the best usable Mac voice is only the default tier, so Settings can suggest installing an
+    /// Enhanced or Premium voice. Nothing is downloaded automatically.
+    public static func suggestsBetterVoice(from candidates: [Candidate], languageCode: String) -> Bool {
+        guard let best = pick(from: candidates, languageCode: languageCode) else { return true }
+        return best.quality < 2
+    }
+
+    /// The word for a quality tier, as shown in Settings.
+    public static func tierName(_ quality: Int) -> String {
+        switch quality {
+        case 3...: "Premium"
+        case 2: "Enhanced"
+        default: "Default"
+        }
+    }
+
     /// Slower than normal speech, never fast: the measured pacing of the persona.
     public static func rate(defaultRate: Float) -> Float { max(0.1, defaultRate * 0.92) }
     public static let pitchMultiplier: Float = 0.82

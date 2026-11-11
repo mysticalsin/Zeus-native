@@ -49,7 +49,8 @@ struct ModelCapTests {
     @Test func httpModelNamesStayInsideTheCap() {
         let defaults = store()
         _ = defaults
-        #expect(ModelCap.httpModel(.anthropic, tier: .fast) == "claude-haiku-4-5")
+        #expect(ModelCap.httpModel(.anthropic, tier: .fast) == "claude-haiku-5-5")
+        #expect(ModelCap.httpModel(.anthropic, tier: .deep) == "claude-sonnet-4-5")
         #expect(ModelCap.httpModel(.ollama, tier: .fast) == "llama3.2")
         #expect(ModelCap.httpModel(.openAI, tier: .fast) == "gpt-4o-mini")
         #expect(ModelCap.gatedHTTPModel("claude-opus-4-5") == nil)

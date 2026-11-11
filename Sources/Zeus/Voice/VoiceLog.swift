@@ -36,11 +36,12 @@ enum VoiceLog {
         log(stage, prefix + described(text))
     }
 
-    static func log(_ stage: String, _ detail: String = "") {
+    /// `mirror: false` skips the `[ZEUS] voice:` system-log line for callers that write their own (`voice-latency`).
+    static func log(_ stage: String, _ detail: String = "", mirror: Bool = true) {
         let record = VoiceLogRecord(stage: stage, detail: detail)
         let line = record.line(at: Date())
         FlightRecorder.shared.record(record.stage == "error" ? "error" : "voice", record.stage, record.detail)
-        NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail)
+        if mirror { NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail) }
         if echo { print(line) }
         queue.async {
             let fm = FileManager.default
