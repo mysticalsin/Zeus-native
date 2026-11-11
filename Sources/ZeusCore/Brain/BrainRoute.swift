@@ -158,6 +158,11 @@ public enum ClaudeLaunch {
     public static func supportsStrictMCP(_ help: String) -> Bool {
         help.contains("--strict-mcp-config")
     }
+
+    /// `--safe-mode` starts with every customization (hooks, plugins, MCP, CLAUDE.md) off. A spoken turn uses it.
+    public static func supportsSafeMode(_ help: String) -> Bool {
+        help.contains("--safe-mode")
+    }
 }
 
 /// Whether a warm ping is due. The ping itself stays on the local server.

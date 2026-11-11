@@ -3391,6 +3391,81 @@
           ]
         },
         {
+          "id": "F11.spoken-turn-race",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The pure turn-race reducer starts every fast tier together, lets the first streamed text win and cancels the losers, speaks one filler at 900 ms only while nothing streamed, fails with one spoken error inside the 8 s budget, runs the deep answer behind the fast one and delivers it only after it, and cancels everything on a new press. Fast-tier and deep-engine choice and the deep trigger are checked on synthetic engine lists. Real engine latency, CLI launches and speech playback are not proved; live QA reads the timing log lines.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "everyFastTierStartsTogetherOnRelease"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "firstTextWinsAndCancelsTheLosers"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "aLateLoserIsCancelledAndNeverReplacesTheWinner"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "fillerAtNineHundredMillisecondsOnceWhenNothingStreamed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "noFillerWhenAnAnswerAlreadyStreamed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "allTiersFailingGivesOneSpokenErrorImmediately"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "silenceFailsWithinEightSecondsAndStopsEveryTier"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "noReachableTierIsOneClearError"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "deepStartsInTheBackgroundWithoutBlockingTheFastAnswer"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "aDeepAnswerThatBeatsTheFastOneWaitsForIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "noDeepWhenNotWanted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "aFailedDeepNeverSpeaksAnError"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "aNewPressCancelsRacersAndDeep"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "winnerFailingAfterSpeakingKeepsThePartialAnswer"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "fastRaceSkipsSlowEnginesAndColdOllama"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "deepEnginePrefersSonnetOverApiThenCli"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+              "function": "deepTriggerHeuristic"
+            }
+          ]
+        },
+        {
           "id": "F11.ultron-defaults",
           "check": "native-UltronVoiceEffectTests",
           "acceptance": "A fresh install is the Ultron persona with the effect on at 60 percent, an explicit owner choice is kept, and the first line with no keys uses the Mac voice, never Samantha.",

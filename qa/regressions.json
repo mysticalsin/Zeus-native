@@ -2713,6 +2713,18 @@
       }
     },
     {
+      "id": "REG-230",
+      "failure": "The Record page opened empty with a disabled Record button: nothing listed displays or selected one until the owner clicked Load displays, and that load needed Screen Recording permission.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+        "function": "mainDisplayIsSelectedByDefault"
+      }
+    },
+    {
       "id": "REG-226",
       "failure": "Opening Settings froze the window: Settings drew rows from calls that wait on the system (the Launch at login switch asked SMAppService on every render, Integrations rows read hook files on every render, and window open read the disk, the microphone list and a TCC-protected folder on the main thread), and a subprocess wait held a Swift concurrency thread.",
       "features": [
@@ -2722,6 +2734,30 @@
       "guard": {
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_no_blocking_waits_outside_audited_files"
+      }
+    },
+    {
+      "id": "REG-231",
+      "failure": "Instant commands depended on a Laya local decision server that is not installed by default: a probe and a 20 second start wait sat in front of the model stage. Laya is removed and Jev (key plus a monthly limit, 600 ms budget) is the only model stage; a saved Laya or Auto choice now maps to Jev.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_sources_never_mention_laya"
+      }
+    },
+    {
+      "id": "REG-232",
+      "failure": "The Show in screen sharing switch looked broken: while a meeting was active (exactly when a screen is shared) the policy forced every Zeus window hidden even after the owner chose to show Zeus. The owner's explicit show now wins over the meeting auto-hide; the default stays hidden and the teleprompter's private session still hides. The closed notch light also sat partly behind the camera housing; Top bar position now lowers the closed bar, light, ticker, wings and screen-edge glow together.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
+        "function": "explicitShowWinsOverMeetingAutoHide"
       }
     },
     {
@@ -2794,6 +2830,32 @@
       "guard": {
         "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
         "function": "freshInstallIsUltronWithTheEffectOnAtSixtyPercent"
+      }
+    },
+    {
+      "id": "REG-239",
+      "failure": "Talk to Zeus took 85 s and said nothing (owner run of build 0405391): four engines were tried one after another with 20 to 30 s silent timeouts, the Claude CLI launched with the owner's hooks, plugins and claude.ai connectors on every call (its help probe used a GUI PATH that cannot find ~/.local/bin, so even --strict-mcp-config was dropped), Codex ran the account's large default model, and an Ollama probe plus warm-up wait sat before the first request. A turn now starts every fast engine at once (Haiku or GPT-6-Luna class), speaks the first to stream, stops the rest, says one short filler at 900 ms, fails with one spoken error inside 8 s, and runs a Sonnet deep answer behind it as a follow-up.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
+        "function": "firstTextWinsAndCancelsTheLosers"
+      }
+    },
+    {
+      "id": "REG-240",
+      "failure": "The spoken-turn latency fixes could silently regress: a sequential engine loop, a network probe or warm-up wait before the first request, a first-text budget above 8 s, a voice Claude launch without --safe-mode, or a help probe through /usr/bin/env.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_engines_are_raced_in_parallel_never_tried_one_after_another"
       }
     }
   ]

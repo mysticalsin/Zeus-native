@@ -84,7 +84,7 @@ final class AnthropicAPIProvider: BrainProvider, @unchecked Sendable {
                 continuation.finish(throwing: ProviderError.failed("Could not build the request."))
                 return
             }
-            var urlRequest = URLRequest(url: Self.endpoint, timeoutInterval: 45)
+            var urlRequest = URLRequest(url: Self.endpoint, timeoutInterval: request.deep ? 45 : (request.firstTextBudget ?? 45))
             urlRequest.httpMethod = "POST"
             urlRequest.httpBody = payload
             urlRequest.setValue(key, forHTTPHeaderField: "x-api-key")

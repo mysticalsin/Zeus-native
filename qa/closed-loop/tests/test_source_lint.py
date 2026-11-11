@@ -329,5 +329,44 @@ class LayaRemovedLint(unittest.TestCase):
         self.assertFalse(laya_offenders('path("AI-Brain-build/jarvis-laya-backend/models")'))
 
 
+# "Talk to Zeus" latency (owner run of build 0405391: four engines tried one after another, 85 s of silence).
+VOICE_TURN = APP / "App/VoiceTurnController.swift"
+CLAUDE_PROVIDER = APP / "Brain/Providers/ClaudeCLIProvider.swift"
+TURN_RACE_CORE = ROOT / "Sources/ZeusCore/Brain/TurnRace.swift"
+
+
+class VoiceLatencyLint(unittest.TestCase):
+    def _turn_text(self):
+        return "\n".join(line for _, line in code_lines(VOICE_TURN))
+
+    def test_engines_are_raced_in_parallel_never_tried_one_after_another(self):
+        text = self._turn_text()
+        self.assertIn("FastRaceRun(", text)
+        self.assertNotRegex(text, r"while\s+cursor\s*<\s*candidates\.count", "sequential fallback loop is back")
+
+    def test_no_network_probe_or_warm_wait_before_the_engines_start(self):
+        text = self._turn_text()
+        run_turn = text[text.index("private func runTurn"):text.index("VoiceAnswerLatency.beginTurn()")]
+        self.assertNotIn("OllamaHTTPProbe", run_turn)
+        self.assertNotIn("awaitIfNeeded", run_turn)
+
+    def test_first_text_budget_is_at_most_eight_seconds(self):
+        core = "\n".join(line for _, line in code_lines(TURN_RACE_CORE))
+        budget = int(re.search(r"firstTextBudgetMs\s*=\s*([0-9_]+)", core).group(1).replace("_", ""))
+        self.assertLessEqual(budget, 8000)
+        filler = int(re.search(r"fillerMs\s*=\s*([0-9_]+)", core).group(1).replace("_", ""))
+        self.assertLessEqual(filler, 900)
+
+    def test_spoken_claude_launch_is_lean(self):
+        text = "\n".join(line for _, line in code_lines(CLAUDE_PROVIDER))
+        self.assertIn('"--safe-mode"', text)
+        self.assertIn('"--tools", ""', text)
+        # The help probe must use the located binary: a GUI app's PATH has no ~/.local/bin.
+        self.assertNotIn('"/usr/bin/env"', text)
+
+    def test_latency_lint_detects_its_failure_shapes(self):
+        self.assertTrue(re.search(r"while\s+cursor\s*<\s*candidates\.count", "while cursor < candidates.count {"))
+
+
 if __name__ == "__main__":
     unittest.main()

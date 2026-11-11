@@ -58,7 +58,7 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
                 "--system-prompt", split.argument,
             ] + ModelCap.arguments(for: .claude, tier: request.deep ? .deep : .fast)
               + (request.deep ? ["--effort", "medium"] : [])
-              + (ClaudeFlags.enabled ? ["--strict-mcp-config"] : [])
+              + Self.leanArguments(voice: request.firstTextBudget != nil)
             var environment = ProcessInfo.processInfo.environment
             environment["PATH"] = CLILocator.searchDirectories.joined(separator: ":")
             environment["ZEUS_INTERNAL"] = "1"
@@ -92,7 +92,7 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
                 errorTail.append(data)
             }
             // No deadline used to apply: stop a claude that is silent for 90 s at the start or 120 s mid-stream.
-            CLIEngineProvider.watch(process, state: state, firstByte: 90) {
+            CLIEngineProvider.watch(process, state: state, firstByte: request.firstTextBudget ?? 90) {
                 parser.fail("Claude gave no answer in time")
             }
 
@@ -128,6 +128,18 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
             let message = Self.userMessage(for: request, context: split.context)
             StdinFeeder.feed(message + Data([0x0A]), to: stdin.fileHandleForWriting)
         }
+    }
+
+    /// Flags for a launch. A spoken turn runs `--safe-mode`: no hooks, plugins, skills, CLAUDE.md or MCP
+    /// servers and no tools (login and model selection still work). The owner's setup loaded SessionStart
+    /// hooks and claude.ai connectors on every call, and a 1-line prompt took over 45 s with no output.
+    /// Measured here with Claude Code 2.1.322 and Haiku: first streamed text in about 1.4 s. Other jobs
+    /// (chat, routines) keep the person's full setup, minus MCP servers when the CLI supports that.
+    static func leanArguments(voice: Bool) -> [String] {
+        if voice, ClaudeFlags.supportsSafeMode {
+            return ["--safe-mode", "--strict-mcp-config", "--tools", "", "--no-session-persistence"]
+        }
+        return ClaudeFlags.enabled ? ["--strict-mcp-config"] : []
     }
 
     /// The part of the system prompt that may go in argv, and the rest (personal context) that
@@ -273,6 +285,7 @@ enum StdinFeeder {
 enum ClaudeFlags {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cached: Bool?
+    nonisolated(unsafe) private static var cachedSafeMode: Bool?
 
     static func warm() {
         Task.detached { _ = enabled }
@@ -281,27 +294,38 @@ enum ClaudeFlags {
     static var enabled: Bool {
         if let cached = lock.withLock({ cached }) { return cached }
         let value = probe()
-        lock.withLock { cached = value }
-        return value
+        return lock.withLock { cached = value.strictMCP; cachedSafeMode = value.safeMode; return value.strictMCP }
     }
 
-    private static func probe() -> Bool {
+    /// `claude --help` lists `--safe-mode` (Claude Code 2.1.x). Read off the same cached probe.
+    static var supportsSafeMode: Bool {
+        _ = enabled
+        return lock.withLock { cachedSafeMode ?? false }
+    }
+
+    private static func probe() -> (strictMCP: Bool, safeMode: Bool) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["claude", "--help"]
+        // A GUI app's PATH has no ~/.local/bin, so `env claude` failed here and the probe wrongly said
+        // "no --strict-mcp-config": every claude.ai connector then loaded on each voice turn.
+        guard let path = CLILocator.tools.first(where: { $0.name == "claude" }).flatMap(CLILocator.locate) else { return (false, false) }
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--help"]
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = CLILocator.searchDirectories.joined(separator: ":")
+        process.environment = environment
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
-        do { try process.run() } catch { return false }
+        do { try process.run() } catch { return (false, false) }
         let deadline = Date().addingTimeInterval(2)
         while process.isRunning, Date() < deadline {
             Thread.sleep(forTimeInterval: 0.05)
         }
         if process.isRunning {
             process.terminate()
-            return false
+            return (false, false)
         }
         let text = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        return ClaudeLaunch.supportsStrictMCP(text)
+        return (ClaudeLaunch.supportsStrictMCP(text), ClaudeLaunch.supportsSafeMode(text))
     }
 }

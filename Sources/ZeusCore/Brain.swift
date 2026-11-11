@@ -110,6 +110,9 @@ public struct BrainRequest: Sendable {
     public let systemPrompt: String
     /// More thinking for this turn (`zeus --deep`).
     public let deep: Bool
+    /// Set for a spoken turn: seconds an engine may stay silent before it is stopped, and the signal to
+    /// launch a CLI lean (no hooks, plugins, MCP or tools). Nil for chat, routines and other long jobs.
+    public let firstTextBudget: TimeInterval?
 
     public init(
         turn: UUID = UUID(),
@@ -119,7 +122,8 @@ public struct BrainRequest: Sendable {
         activeTab: TabContext? = nil,
         history: [Exchange] = [],
         systemPrompt: String,
-        deep: Bool = false
+        deep: Bool = false,
+        firstTextBudget: TimeInterval? = nil
     ) {
         self.turn = turn
         self.transcript = transcript
@@ -129,14 +133,17 @@ public struct BrainRequest: Sendable {
         self.history = history
         self.systemPrompt = systemPrompt
         self.deep = deep
+        self.firstTextBudget = firstTextBudget
     }
 
     /// A copy with one field changed. Used when a turn retries deeper, or a racer needs its own id so cancelling the loser leaves the winner running.
     public func with(turn: UUID? = nil, transcript: String? = nil, screenshots: [ScreenShot]? = nil,
-                     systemPrompt: String? = nil, deep: Bool? = nil) -> BrainRequest {
+                     systemPrompt: String? = nil, deep: Bool? = nil,
+                     firstTextBudget: TimeInterval? = nil) -> BrainRequest {
         BrainRequest(turn: turn ?? self.turn, transcript: transcript ?? self.transcript,
                      screenshots: screenshots ?? self.screenshots, axSummary: axSummary, activeTab: activeTab,
-                     history: history, systemPrompt: systemPrompt ?? self.systemPrompt, deep: deep ?? self.deep)
+                     history: history, systemPrompt: systemPrompt ?? self.systemPrompt, deep: deep ?? self.deep,
+                     firstTextBudget: firstTextBudget ?? self.firstTextBudget)
     }
 }
 
