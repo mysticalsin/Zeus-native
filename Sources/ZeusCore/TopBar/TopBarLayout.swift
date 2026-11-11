@@ -32,7 +32,7 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .continuity: "Continuity"
         case .waves: "Waves"
         case .polyglot: "Polyglot"
-        case .recordly: "Recordly"
+        case .recordly: "Record"
         case .scribe: "Scribe"
         }
     }

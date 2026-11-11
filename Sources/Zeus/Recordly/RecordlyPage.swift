@@ -1066,7 +1066,7 @@ private struct RecordlyExportPanel: View {
         case .idle, .exporting:
             EmptyView()
         case .exported(let urls):
-            Text(urls.count == 1 ? "Exported 1 file to Movies/Zeus Recordly." : "Exported \(urls.count) files to Movies/Zeus Recordly.")
+            Text(urls.count == 1 ? "Exported 1 file to Movies/Zeus Recordings." : "Exported \(urls.count) files to Movies/Zeus Recordings.")
                 .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary)
             ForEach(urls, id: \.self) { url in
                 HStack(spacing: 6) {
