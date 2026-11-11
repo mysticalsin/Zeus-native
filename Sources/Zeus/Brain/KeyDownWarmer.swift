@@ -19,7 +19,7 @@ enum KeyDownWarmer {
         }
     }
 
-    static func keys() -> VoiceTurnKeys {
+    static func currentKeys() -> VoiceTurnKeys {
         func hasKey(_ name: String) -> Bool { Keychain.get(name)?.isEmpty == false }
         func installed(_ tool: String) -> Bool {
             CLILocator.tools.first { $0.name == tool }.flatMap(CLILocator.locate) != nil
@@ -30,7 +30,7 @@ enum KeyDownWarmer {
 
     static func talkKeyDown() {
         Task.detached(priority: .userInitiated) {
-            let keys = keys()
+            let keys = currentKeys()
             for target in VoiceTurnRoute.brain(keys).warm {
                 switch target {
                 case .anthropicAPI:
