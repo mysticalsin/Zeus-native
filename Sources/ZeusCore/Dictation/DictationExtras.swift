@@ -117,7 +117,7 @@ extension DictationRecord {
 // MARK: Vocabulary capture
 
 /// Learns from a correction: compares what ZEUS wrote with what the person fixed it to and
-/// proposes replacements ("vibe is" → "Vibe Island") and new words for the vocabulary.
+/// proposes replacements ("mount roil" → "Mount Royal") and new words for the vocabulary.
 public enum VocabularyCapture {
     public struct Suggestion: Equatable, Sendable {
         public var replacements: [Replacement]

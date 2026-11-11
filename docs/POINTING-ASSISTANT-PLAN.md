@@ -1,8 +1,8 @@
 # Zeus Pointing Assistant: Implementation Plan (v1)
 
-Labels used throughout: **[Observed]** means behavior the owner reports seeing in HeyClicky. We have not verified it, and we know nothing about its implementation. **[Verified]** means read in this repo (file:line) or confirmed in a public source cited here. **[Rec]** means our recommendation. **[Verify]** means a fact that must be checked against current vendor docs before anyone relies on it.
+Labels used throughout: **[Observed]** means behavior the owner reports seeing in the reference app. We have not verified it, and we know nothing about its implementation. **[Verified]** means read in this repo (file:line) or confirmed in a public source cited here. **[Rec]** means our recommendation. **[Verify]** means a fact that must be checked against current vendor docs before anyone relies on it.
 
-This design is independent of HeyClicky. It uses no HeyClicky names, assets, prompts, voices or branding. We do not know its source, backend, models, voice provider or prompts.
+This design is independent of the reference app. It uses no the reference app names, assets, prompts, voices or branding. We do not know its source, backend, models, voice provider or prompts.
 
 ---
 
@@ -60,9 +60,9 @@ This design is independent of HeyClicky. It uses no HeyClicky names, assets, pro
 
 `Sources/ZeusCore/Pointing/*` (pure state machine, gesture, trace, context, proposals, v2 validation); `Sources/Zeus/Pointing/*` (controller, key monitor, target probe, marker, guidance and action tools); protocol v2; settings rows; tests; feature-map rows. Details in section 6.
 
-### 1d. Unknown about HeyClicky (do not claim)
+### 1d. Unknown about the reference app (do not claim)
 
-Source code, backend, LLM(s), ASR/TTS vendors, prompts, protocol, overlay technology, permission set, how it detects stale UI, retention policy, assets, pricing. **[Observed]** only: hold Control+Option to speak, double-tap Control for text entry, Fn+Control for dictation, a colored cursor marker while listening, pointing and scribbling while speaking, spoken answers with on-screen annotations. Nothing in this plan depends on how HeyClicky does any of this.
+Source code, backend, LLM(s), ASR/TTS vendors, prompts, protocol, overlay technology, permission set, how it detects stale UI, retention policy, assets, pricing. **[Observed]** only: hold Control+Option to speak, double-tap Control for text entry, Fn+Control for dictation, a colored cursor marker while listening, pointing and scribbling while speaking, spoken answers with on-screen annotations. Nothing in this plan depends on how the reference app does any of this.
 
 ---
 

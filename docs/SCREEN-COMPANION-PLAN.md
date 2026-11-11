@@ -2,8 +2,8 @@
 
 Source of truth for the request "hold a shortcut, speak while pointing, get a spoken answer that draws on the
 screen, shows photos, builds charts and animates 3D". Built on the code inventory of
-`codex/integration-20261111` (file references below) and `docs/HEYCLICKY-REA.md`. A second teardown of the
-installed HeyClicky 1.1.1 (`docs/HEYCLICKY-REA-2.md`, in progress) will refine slices S3 to S5. Everything
+`codex/integration-20261111` (file references below) and private research notes (kept outside this repo). A second teardown of the
+installed the reference app (private research notes (kept outside this repo), in progress) will refine slices S3 to S5. Everything
 below that is not marked **Exists** is a proposal until it is implemented and tested.
 
 ## 1. Sequence: "Explain what this bar does" (pointing at an input bar)
@@ -69,9 +69,9 @@ Tony        HotkeyMonitor   PointingController   ScreenContext   Provider(LLM)  
 - **S3 3D on desktop + EV demo:** card hosts SceneKit; flow markers; cutaway; edit ops; EV fixture. Acceptance: EV cutaway builds with speech, rotates, "show the inside / slow it down" edit the same scene.
 - **S4 photos** (after provider decision) and **S5 guidance and actions** (proposals, click walkthrough waiting for the user, approvals).
 
-## 4b. Decisions from the HeyClicky 1.1.1 teardown (`docs/HEYCLICKY-REA-2.md`)
+## 4b. Decisions from the the reference app teardown (private research notes (kept outside this repo))
 
-| HeyClicky (Observed) | Zeus decision |
+| the reference app (Observed) | Zeus decision |
 |---|---|
 | Model writes a small JavaScript program per rich turn, run in an in-app JavaScriptCore engine | Keep Zeus's closed, validated NDJSON op list. Same expressiveness for marks, figures, photos and 3D parts, without executing model code (Tony's spec, section 3). |
 | 2D drawing: JS engine with a fake-SVG shim, painted natively with Core Animation; pen strokes revealed over time | Native Core Animation/SwiftUI drawing already exists. Add a hand-drawn pen reveal paced to the beat's audio progress, and drop a step if the screen changed before it shows. |

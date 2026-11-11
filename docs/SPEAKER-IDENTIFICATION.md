@@ -3,20 +3,20 @@
 Goal: Scribe says who is talking by name, not "Speaker 2", and tells similar voices apart.
 Owner request 2026-11-11. Plan by Opus, build by Sonnet, live QA on the owner's Mac.
 
-## 1. What Superwhisper does (research, 2026-11-11)
+## 1. What the reference dictation app does (research, 2026-11-11)
 
 Label key: Documented = vendor docs say so. Unknown = not found. No claim here comes from inside the app.
 
-| Area | Superwhisper | Evidence |
+| Area | the reference dictation app | Evidence |
 |---|---|---|
-| Separating voices | Yes, on the Mac, with a separate model of about 150 MB downloaded before the first meeting | Documented, superwhisper.com/docs/modes/speaker-separated-meetings |
-| Default labels | "Speaker 1", "Speaker 2"; "You" only when recording alone without call audio | Documented, superwhisper.com/docs/meetings/record.md |
+| Separating voices | Yes, on the Mac, with a separate model of about 150 MB downloaded before the first meeting | Documented, vendor documentation |
+| Default labels | "Speaker 1", "Speaker 2"; "You" only when recording alone without call audio | Documented, vendor documentation |
 | Names from the call | "Suggests names from the call" in Zoom, Meet, Teams, Slack huddles; how is not stated | Documented (mechanism Unknown) |
-| Calendar | Fills meeting title and attendee list from macOS Calendar; not matched to voices | Documented, superwhisper.com/docs/meetings/overview.md |
+| Calendar | Fills meeting title and attendee list from macOS Calendar; not matched to voices | Documented, vendor documentation |
 | Manual rename | "Assign speakers": play a sample, type the name, applies to that meeting; same name twice merges | Documented, record.md |
 | Remembers voices across meetings | Not described | Unknown |
 | Names from what people say ("Thanks Sarah") | Not described | Unknown |
-| Known complaints | Names cannot be edited in the new History view; copied text loses names | Documented, superwhisper feedback board (2026-01-06) |
+| Known complaints | Names cannot be edited in the new History view; copied text loses names | Documented, vendor feedback board (2026-01-06) |
 | Model, speaker limit, overlap | Not stated | Unknown |
 
 Others (secondary sources, low trust): Granola shows real names only on Meet and Zoom, otherwise Me / Them.
@@ -30,7 +30,7 @@ learns from corrections.
 - Microphone's first voice is "You"; every other voice is "Speaker N".
 - No rename, no saved voices, no calendar names, no correction after the meeting.
 
-## 3. What Zeus will do (better than Superwhisper on every row)
+## 3. What Zeus will do (better than the reference dictation app on every row)
 
 Five layers, each one useful alone. Every name that is not typed by the owner is a suggestion until confirmed.
 
@@ -62,7 +62,7 @@ Five layers, each one useful alone. Every name that is not typed by the owner is
    - The owner's own name (About you) is never suggested for a non-microphone voice.
    - Shown as chips on the speaker row: "Marie Dubois?" with Accept. Nothing renames itself.
 4. **Rename that works everywhere.** Recap speaker row: tap the name, type, Enter. Applies to every line of that
-   meeting, the stats, the notes, the exported Markdown and copied text (fixes Superwhisper's two complaints).
+   meeting, the stats, the notes, the exported Markdown and copied text (fixes the reference app's two complaints).
    Same name on two speakers merges them. Audio is never kept, so instead of a sample clip the rename sheet shows
    the speaker's three longest lines.
 5. **Correction after the meeting.** When the transcript finishes, re-cluster all turn embeddings of the meeting
@@ -94,7 +94,7 @@ Rules: no em dashes in UI text, no `Task.sleep`, no network except the clicked m
 
 ## 5. Slices S7 to S9 and speaker parity (2026-11-11)
 
-Spec: `SUPERWHISPER-PLAUD-REA.md` sections 3 to 5. Status below is what is built; "needs a live call" means the code
+Spec: private research notes (kept outside this repo) sections 3 to 5. Status below is what is built; "needs a live call" means the code
 exists and is covered by synthetic tests, but only a real call on the owner's Mac can show what each app exposes.
 
 | Slice | Status | Notes |

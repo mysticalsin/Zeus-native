@@ -104,7 +104,7 @@ public struct MeetingWindowReading: Equatable, Sendable {
     }
 }
 
-/// Decides what a set of window readings may be used for. Superwhisper's rule, kept: no name when two meeting
+/// Decides what a set of window readings may be used for. Rule: no name when two meeting
 /// windows are open, when the windows disagree about who is speaking, or when more than one call app is active.
 public enum MeetingWindowArbiter {
     public static func observation(at time: TimeInterval, readings: [MeetingWindowReading]) -> MeetingSpeakerObservation? {

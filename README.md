@@ -33,8 +33,8 @@ cd extension && npm ci && npm run build
 ## Rules
 
 - No telemetry. Keys go in the macOS Keychain, never in the repo.
-- Nothing is copied from HeyClicky or Glance (closed source): behaviour only, never assets, sounds, prompts or names.
-- Code adapted from [farzaa/clicky](https://github.com/farzaa/clicky) keeps its MIT notice.
+- Nothing is copied from other apps: behaviour only, never assets, sounds, prompts or names.
+- Third-party code keeps its licence notice (see `NOTICES.md`).
 - `zeus-hook` never answers `allow` on its own.
 
 ## Chrome

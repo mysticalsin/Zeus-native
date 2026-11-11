@@ -33,8 +33,8 @@ public struct Vocabulary: Codable, Equatable, Sendable {
             .map { $0 }
     }
 
-    /// Case-insensitive, whole-word replacements, longest phrase first so "super whisper app"
-    /// wins over "super whisper". Vocabulary words are also restored to their exact casing.
+    /// Case-insensitive, whole-word replacements, longest phrase first so "new york city"
+    /// wins over "new york". Vocabulary words are also restored to their exact casing.
     public func apply(to text: String) -> String {
         var result = text
         let ordered = replacements

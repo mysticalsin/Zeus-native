@@ -7,7 +7,7 @@ Date: 2026-10-31. Machine: Apple M1 Pro, 16 GB, macOS 27.0. Release build of `be
 
 - 12 clips (4.4 to 6.3 s, 16 kHz mono) made with `bench/dictation/make-clips.sh` from four macOS
   voices (US, UK, AU, IE English). Each sentence is the exact reference, so WER is exact.
-  Sentences mix everyday dictation with ZEUS jargon (Swift, Parakeet, Glance, Vibe Island).
+  Sentences mix everyday dictation with ZEUS jargon (Swift, Parakeet, Murmure).
 - One real human recording (`en.wav`, 3.8 s, from the sherpa-onnx Parakeet test set), no
   reference text, shown for a qualitative check.
 - Latency = wall time from handing the full clip to the engine until text comes back (the
@@ -30,7 +30,7 @@ higher for all three; the ranking and the latency gap are what matter here.
 
 **Winner: Parakeet v3.** About 25× faster than Whisper turbo on this Mac with equal or better
 accuracy, and 2.7× faster than Apple with a third fewer errors. It also heard the jargon
-Apple got wrong ("refactor", "latency budget", "Vibe Island" → Apple wrote "reflect to",
+Apple got wrong ("refactor", "latency budget", a product name → Apple wrote "reflect to",
 "agency budget", "vibe is"). Whisper turbo stays useful only for languages Parakeet v3 lacks
 (v3 covers 25 European languages), so it is kept as a selectable engine, not the default.
 
@@ -48,7 +48,7 @@ documented slot: adding it means adding the WhisperKit package to the app target
 | clip04 | Daniel | 4.4 | 2684 | 2 | 0.0% | Remind me to buy milk, eggs, and coffee on the way home tonight. |
 | clip05 | Karen | 5.5 | 2446 | 2 | 0.0% | I think we should refactor the notch controller so the dictation tab and the chat window share one store. |
 | clip06 | Karen | 4.6 | 3034 | 2 | 0.0% | Please write a short email to the landlord saying the heating has been broken since Monday. |
-| clip07 | Moira | 6.3 | 2881 | 2 | 22.2% | Clowns, Super Whisper and Vide Island all live in the menu bar, but each one solves a different problem. |
+| clip07 | Moira | 6.3 | 2881 | 2 | 22.2% | (retired sentence) all live in the menu bar, but each one solves a different problem. |
 | clip08 | Moira | 5.1 | 6457 | 1 | 13.3% | The latency budget for dictation is under 300 milliseconds after the key is released. |
 | clip09 | Samantha | 4.8 | 5336 | 1 | 0.0% | Add a unit test that checks the word error rate is zero when both strings match exactly. |
 | clip10 | Daniel | 4.6 | 3178 | 1 | 15.4% | Let's grab lunch at the Italian place near the station around 12:15. |
@@ -65,7 +65,7 @@ documented slot: adding it means adding the WhisperKit package to the app target
 | clip04 | Daniel | 4.4 | 212 | 21 | 0.0% | Remind me to buy milk, eggs, and coffee on the way home tonight |
 | clip05 | Karen | 5.5 | 502 | 11 | 15.8% | I think we should reflect to the notch controller so the dictation tab in the chat window share one store |
 | clip06 | Karen | 4.6 | 233 | 20 | 0.0% | Please write a short email to the landlord saying the heating has been broken since Monday |
-| clip07 | Moira | 6.3 | 553 | 11 | 22.2% | Clown, super whisperer and vibe is all live in the menu bar, but each one solves a different problem |
+| clip07 | Moira | 6.3 | 553 | 11 | 22.2% | (retired sentence) all live in the menu bar, but each one solves a different problem |
 | clip08 | Moira | 5.1 | 359 | 14 | 26.7% | The agency budget for dictation is under 300 ms after the key is released |
 | clip09 | Samantha | 4.8 | 252 | 19 | 0.0% | Add a unit test that checks the word error rate is zero when both strings match exactly |
 | clip10 | Daniel | 4.6 | 220 | 21 | 15.4% | Let's grab lunch at the Italian place near the station around 1215 |
@@ -83,7 +83,7 @@ documented slot: adding it means adding the WhisperKit package to the app target
 | clip04 | Daniel | 4.4 | 110 | 40 | 0.0% | Remind me to buy milk, eggs, and coffee on the way home tonight. |
 | clip05 | Karen | 5.5 | 125 | 44 | 0.0% | I think we should refactor the notch controller so the dictation tab and the chat window share one store. |
 | clip06 | Karen | 4.6 | 119 | 39 | 0.0% | Please write a short email to the landlord saying the heating has been broken since Monday. |
-| clip07 | Moira | 6.3 | 140 | 45 | 22.2% | Clowns, Super Whisper and Vide Island all live in the menu bar, but each one solves a different problem. |
+| clip07 | Moira | 6.3 | 140 | 45 | 22.2% | (retired sentence) all live in the menu bar, but each one solves a different problem. |
 | clip08 | Moira | 5.1 | 115 | 45 | 13.3% | The latency budget for dictation is under 300 milliseconds after the key is released. |
 | clip09 | Samantha | 4.8 | 103 | 46 | 0.0% | Add a unit test that checks the word error rate is zero when both strings match exactly. |
 | clip10 | Daniel | 4.6 | 101 | 46 | 15.4% | Let's grab lunch at the Italian place near the station around 1215. |
