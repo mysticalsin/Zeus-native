@@ -38,11 +38,21 @@ public enum RecordlySourceSelection {
     public struct CatalogSnapshot: Equatable, Sendable {
         public struct Display: Equatable, Sendable {
             public let id: UInt32
+            /// Global desktop frame in points, origin at the top left of the main display (CGDisplayBounds).
             public let frame: CGRect
+            /// CGDisplayCreateUUIDFromDisplayID text. Unlike `id` it survives unplug and replug. Nil when unknown.
+            public let stableID: String?
+            /// NSScreen.localizedName, for example "Built-in Retina Display". Nil when unknown.
+            public let name: String?
+            /// True for the display that carries the menu bar.
+            public let isMain: Bool
 
-            public init(id: UInt32, frame: CGRect) {
+            public init(id: UInt32, frame: CGRect, stableID: String? = nil, name: String? = nil, isMain: Bool = false) {
                 self.id = id
                 self.frame = frame
+                self.stableID = stableID
+                self.name = name
+                self.isMain = isMain
             }
         }
 

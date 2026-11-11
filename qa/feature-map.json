@@ -1640,6 +1640,33 @@
           "acceptance": "Automated public animation capture after owner consent; export MP4/GIF trim/speed/aspect/fps, decode frames/audio timing and compare cursor-follow motion; cancellation and >512MiB playback.",
           "cases": [],
           "id": "F08.6"
+        },
+        {
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The Record page lists displays and selects the main one without a click or Screen Recording permission, remembers the owner's display by stable identity, falls back to main when it is unplugged, and the 3, 2, 1 countdown cancels, ignores stale ticks and stops when its source disappears.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+              "function": "mainDisplayIsSelectedByDefault"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+              "function": "rememberedDisplayIsFoundByStableIdentityNotByRawId"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+              "function": "unpluggedRememberedDisplayFallsBackToMain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+              "function": "secondPressCancelsAndEscapeCancels"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RecordlyDisplayCountdownTests.swift",
+              "function": "sourceUnpluggedMidCountdownReturnsToIdleWithANotice"
+            }
+          ],
+          "id": "F08.7"
         }
       ]
     },

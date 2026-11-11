@@ -218,6 +218,88 @@ class SpeakerRecognitionLint(unittest.TestCase):
         self.assertTrue(re.search(r"SpeakerModelController\b", "SpeakerModelController.shared.prepare()"))
 
 
+# --- Settings must never freeze (REG-225) -------------------------------------------------------------
+# A blocking wait on the main thread freezes the window. These primitives are banned in app sources
+# unless the file is audited as background-only (or a bounded quit-time wait) and says why.
+SOURCES = ROOT / "Sources"
+BLOCKING_PATTERNS = {
+    "DispatchQueue.main.sync": re.compile(r"DispatchQueue\.main\.sync\b"),
+    "semaphore or group wait": re.compile(r"\.wait\(\s*(?:timeout:|\))"),
+    "waitUntilExit": re.compile(r"\bwaitUntilExit\(\)"),
+}
+AUDITED_BLOCKING_FILES = {
+    "Zeus/App/PermissionsModel.swift": "Automation checks wait on global queues, bounded by a 1 s timeout, never on main.",
+    "Zeus/Prompter/PresenterNotesController.swift": "OsascriptRunner and PPTXArchive run only inside Task.detached.",
+    "Zeus/Brain/SpotlightClient.swift": "mdfind runs only inside Task.detached (VoiceTurnController).",
+    "Zeus/Insomnia/InsomniaController.swift": "Quit-time wait for the Insomnia queue, bounded to 3 s.",
+    "Zeus/Voice/KokoroWorkerSession.swift": "Child reaping on the worker's own queue and awaited tasks.",
+    "Zeus/Watch/ZeusWatchRunner.swift": "Child wait inside a continuation on a global queue, killed after 3 s.",
+    "Zeus/App/KeychainSelfTest.swift": "Command-line self test: no window exists.",
+    "Zeus/Voice/VoiceSample.swift": "Command-line sample mode: no window exists.",
+    "ZeusCore/Insomnia/InsomniaCommands.swift": "ProcessCommandRunner runs on the Insomnia serial queue; every wait has a timeout.",
+    "ZeusCore/Diagnostics/FlightRecorder.swift": "The ditto zip is exported from Task.detached (GSDiagnosticsLogs).",
+}
+KEYCHAIN_MODULE = "ZeusCore/Keychain/"
+
+
+def blocking_offenders(text, label="sample"):
+    """`label:line` for each banned blocking call in the code part of `text`."""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        code = strip_trailing_comment(line)
+        if code.strip().startswith("//"):
+            continue
+        if any(pattern.search(code) for pattern in BLOCKING_PATTERNS.values()):
+            found.append(f"{label}:{number}")
+    return found
+
+
+class SettingsNeverFreezeLint(unittest.TestCase):
+    def test_no_blocking_waits_outside_audited_files(self):
+        offenders = []
+        for path in sorted(SOURCES.rglob("*.swift")):
+            relative = path.relative_to(SOURCES).as_posix()
+            if relative in AUDITED_BLOCKING_FILES:
+                continue
+            offenders += blocking_offenders(path.read_text(), relative)
+        self.assertEqual(offenders, [], "blocking call outside an audited background-only file")
+
+    def test_audited_files_exist_and_still_need_their_entry(self):
+        for relative, reason in AUDITED_BLOCKING_FILES.items():
+            path = SOURCES / relative
+            self.assertTrue(path.exists(), f"{relative} is gone: drop its allowlist entry")
+            self.assertTrue(reason.strip())
+            self.assertTrue(blocking_offenders(path.read_text(), relative), f"{relative} no longer blocks: drop its entry")
+
+    def test_keychain_is_read_only_through_the_keychain_module(self):
+        offenders = []
+        for path in sorted(SOURCES.rglob("*.swift")):
+            relative = path.relative_to(SOURCES).as_posix()
+            if relative.startswith(KEYCHAIN_MODULE):
+                continue
+            offenders += [f"{relative}:{n}" for n, line in code_lines(path) if "SecItemCopyMatching" in strip_trailing_comment(line)]
+        self.assertEqual(offenders, [], "SecItemCopyMatching belongs in ZeusCore/Keychain (KeychainStore caches it)")
+
+    def test_settings_pages_never_read_the_login_items_service_in_a_view(self):
+        # SMAppService.status is a synchronous daemon round trip: only SettingsStore.swift may touch it.
+        offenders = []
+        for path in swift_files():
+            relative = path.relative_to(APP).as_posix()
+            if relative == "App/SettingsStore.swift":
+                continue
+            offenders += [f"{relative}:{n}" for n, line in code_lines(path) if "SMAppService.mainApp" in strip_trailing_comment(line)]
+        self.assertEqual(offenders, [])
+
+    def test_blocking_lint_detects_its_failure_shapes(self):
+        self.assertTrue(blocking_offenders("DispatchQueue.main.sync { work() }"))
+        self.assertTrue(blocking_offenders("let r = semaphore.wait(timeout: .now() + 1)"))
+        self.assertTrue(blocking_offenders("done.wait()"))
+        self.assertTrue(blocking_offenders("process.waitUntilExit()"))
+        self.assertFalse(blocking_offenders("case .wait(let ms): return ms"))
+        self.assertFalse(blocking_offenders("// done.wait() would block"))
+        self.assertFalse(blocking_offenders('let note = "never call process.waitUntilExit()" // x'.replace("waitUntilExit()", "wait")))
+
+
 # "laya" as its own word or name part (not "playback" or "overlay a..."): case-insensitive.
 LAYA_WORD = re.compile(r"(?<![A-Za-z])[Ll][Aa][Yy][Aa](?![a-z])")
 # The one allowed spelling: the owner's existing Kokoro model folder is literally named jarvis-laya-backend.

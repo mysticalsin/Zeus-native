@@ -919,6 +919,12 @@ enum SnapshotRenderer {
                 if tab == .shelf { t.shelf = [.init(url: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff"))] }
             }))
         }
+        // The Record page in the states a person meets: one or two displays, permission missing, countdown, recording, saved.
+        for (name, displays, granted, state) in RecordlySnapshotFixtures.pageStates {
+            states.append(("27-page-recordly-\(name)", make(.recordly) { _, t in
+                t.recordlyForSnapshot = RecordlySnapshotFixtures.controller(displays: displays, granted: granted, state: state)
+            }))
+        }
         states.append(("22-page-waves-wave", make(.waves)))
         states.append(("23-page-waves-mirror", make(.waves)))
         states.append(("20-page-teleprompter-rolling", make(.teleprompter) { _, t in

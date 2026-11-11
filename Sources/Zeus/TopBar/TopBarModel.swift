@@ -9,6 +9,8 @@ import ZeusCore
 @Observable
 final class TopBarModel {
     @ObservationIgnored private let defaults: UserDefaults
+    /// Offscreen snapshots give the Record page its own controller with fake displays; nil in the app.
+    @ObservationIgnored var recordlyForSnapshot: RecordlyController?
     struct CalendarItem: Identifiable, Equatable {
         let id: String
         var title: String

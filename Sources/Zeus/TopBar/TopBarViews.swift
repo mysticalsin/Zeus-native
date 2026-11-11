@@ -470,7 +470,7 @@ struct TopBarPage: View {
             case .continuity: ContinuityPage()
             case .waves: WavesPage(topBar: topBar)
             case .polyglot: PolyglotPage(polyglot: .shared, topBar: topBar)
-            case .recordly: RecordlyPage(topBar: topBar, recordly: .shared)
+            case .recordly: RecordlyPage(topBar: topBar, recordly: topBar.recordlyForSnapshot ?? .shared)
             case .scribe: ScribePage(topBar: topBar, scribe: .shared)
             case .chat: ChatPage(chat: .shared)
             case .usage: UsagePage(usage: .shared)
