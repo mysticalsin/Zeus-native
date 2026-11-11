@@ -536,7 +536,9 @@ final class SpeechInput: @unchecked Sendable {
 
     /// Stops listening and returns the final transcript (waits at most 1.5 s for it).
     /// Without Apple recognition it returns at once with an empty transcript.
-    func stop() async -> String {
+    /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
+    /// final text, so release must not wait for Apple's second pass).
+    func stop(waitForFinal: Bool = true) async -> String {
         let session = lock.withLock { () -> Int in
             stopRequested = true
             return generation
@@ -547,7 +549,7 @@ final class SpeechInput: @unchecked Sendable {
             request?.endAudio()
             return (finished, latest)
         }
-        if alreadyDone { return text }
+        if alreadyDone || !waitForFinal { return text }
 
         return await withCheckedContinuation { continuation in
             let doneText: String? = lock.withLock {
