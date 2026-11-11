@@ -40,7 +40,8 @@ struct ElevenLabsVoice: Sendable {
     static func voiceSettings(for personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
         // Studio (UNVERIFIED model, see `ElevenLabsQuality.studioModel`): only the settings every model takes.
         if model == ElevenLabsQuality.studioModel {
-            return ["stability": 0.5, "similarity_boost": 0.8, "use_speaker_boost": true]
+            let studio: [String: Any] = ["stability": 0.5, "similarity_boost": 0.8, "use_speaker_boost": true]
+            return studio
         }
         switch personality {
         case .plain: ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
