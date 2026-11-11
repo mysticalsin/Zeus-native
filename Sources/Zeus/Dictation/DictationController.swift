@@ -540,7 +540,7 @@ final class DictationController {
         let appleOnDevice = speechAllowed && languageAvailable && speech.supportsOnDevice
         guard microphoneAllowed, appleOnDevice || local else {
             let reason = !speechAllowed
-                ? "Allow Microphone and Speech Recognition in ZEUS setup first."
+                ? "Allow Microphone and Speech Recognition in Zeus setup first."
                 : languageAvailable
                     ? "On-device speech recognition isn't available for this language. Nothing was recorded. Choose another language or a local engine."
                     : "Apple Speech is unavailable for the selected language on this Mac."

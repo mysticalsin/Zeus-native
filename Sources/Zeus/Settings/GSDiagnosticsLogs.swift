@@ -105,7 +105,8 @@ struct DiagnosticsLogsCard: View {
     private func logList(_ rows: [RecordedEvent]) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             if rows.isEmpty {
-                Text("Nothing recorded yet.").font(GS.rowText).foregroundStyle(GS.secondary)
+                GSEmptyState(symbol: "text.append", title: "No log entries yet",
+                             text: "Voice, agent and sound events show here as they happen. Nothing is recorded while you are idle.")
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, event in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {

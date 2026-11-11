@@ -186,7 +186,7 @@ final class KeepAwake {
             var id = IOPMAssertionID(0)
             let type = kind == .display ? kIOPMAssertionTypePreventUserIdleDisplaySleep : kIOPMAssertionTypePreventUserIdleSystemSleep
             let result = IOPMAssertionCreateWithName(type as CFString,
-                                                     IOPMAssertionLevel(kIOPMAssertionLevelOn), "ZEUS keep awake" as CFString, &id)
+                                                     IOPMAssertionLevel(kIOPMAssertionLevelOn), "Zeus keep awake" as CFString, &id)
             if result == kIOReturnSuccess { assertion = id; isOn = true }
         } else if !on, isOn {
             IOPMAssertionRelease(assertion)

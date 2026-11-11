@@ -3,15 +3,16 @@ import ZeusCore
 
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
+    let navigation: GSNavigation
     private var voice: VoiceSettings { VoiceSettings.shared }
     private var settings: DictationSettings { DictationSettings.shared }
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
 
     var body: some View {
         GSCard {
-            GSRow(symbol: "waveform", title: UltronVoicePlan.presetTitle) { EmptyView() }
+            GSRow(symbol: "waveform", title: UltronVoicePlan.presetTitle, text: "The voice Zeus answers with unless you pick another below.")
             GSDivider()
-            GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
+            GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", text: "Zeus reads its answers aloud instead of only showing them.", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
             GSDivider()
             GSRow(symbol: "theatermasks", title: "Personality") {
                 GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
@@ -25,7 +26,7 @@ struct ZeusVoiceCards: View {
                 }), options: VoiceOrbStyle.allCases.map(\.title), label: "Voice orb style")
             }
             GSDivider()
-            GSToggleRow(symbol: "waveform.badge.plus", title: "Ultron effect",
+            GSToggleRow(symbol: "waveform.badge.plus", title: "Ultron effect", text: "Adds a layered, robotic edge to the spoken voice.",
                         isOn: Binding(get: { UltronVoiceEffect.enabled }, set: { UltronVoiceEffect.enabled = $0 }))
             GSDivider()
             GSRow(symbol: "slider.horizontal.3", title: "Effect intensity", text: String(format: "%.0f%%", UltronVoiceEffect.intensity * 100)) {
@@ -157,8 +158,7 @@ struct ZeusVoiceCards: View {
                         options: TranscriptionEngineKind.allCases.map { SpeechEngineBoard.shared.pickerTitle($0) }, label: "Speech to text engine")
             }
             GSDivider()
-            GSToggleRow(symbol: "waveform", title: "Use for voice commands too",
-                        isOn: Binding(get: { settings.engineForVoice }, set: { settings.engineForVoice = $0 }))
+            GSLinkRow(symbol: "waveform", title: "Use for voice commands too", destination: .dictation, navigation: navigation)
             if let message = SpeechEngineBoard.shared.message { GSInfo(text: message) }
         }
         .task { await SpeechEngineBoard.shared.refresh() }
@@ -219,6 +219,6 @@ struct ZeusVoiceCards: View {
     private var kokoroText: String {
         if let message = voice.kokoroMessage { return message }
         if voice.kokoroReady { return "Runs on this Mac. Nothing is sent anywhere." }
-        return LocalPython.systemPython == nil ? "Needs Python 3 on this Mac." : "Sets up a private Python environment and downloads the voice once."
+        return LocalPython.systemPython == nil ? "Needs Python 3 on this Mac." : "Sets up the voice on this Mac and downloads it once."
     }
 }

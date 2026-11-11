@@ -17,6 +17,7 @@ final class InsomniaPageState {
 struct InsomniaSettingsPage: View {
     private var insomnia: InsomniaController { .shared }
     private var page: InsomniaPageState { .shared }
+    private var ruleReady: Bool { insomnia.setup.isReady }
 
     var body: some View {
         GSPageHeading(section: .insomnia, subtitle: "Close the lid. Your agents keep working.")
@@ -34,17 +35,23 @@ struct InsomniaSettingsPage: View {
                 }
             }
             if let message = insomnia.setupMessage { GSInfo(text: message) }
-            GSInfo(text: "Set up asks macOS for your password once; Zeus never sees it. It adds \(InsomniaSudoers.path), which lets only your account run exactly four commands: pmset disablesleep 1 and 0, and lowpowermode 1 and 0. It also adds a small launchd agent that puts sleep back within a minute if Zeus quits or crashes mid-session.")
+            GSInfo(text: "Setup asks macOS for your password once. Zeus never sees it. The rule lets only your account turn lid-closed sleep and Low Power Mode on and off, and sleep comes back on its own if Zeus quits mid-session.")
+            GSDetails(text: "Adds \(InsomniaSudoers.path), which lets only your account run exactly four commands: pmset disablesleep 1 and 0, and lowpowermode 1 and 0. It also adds a small launchd agent that puts sleep back within a minute if Zeus quits or crashes mid-session.")
             GSDivider()
-            GSToggleRow(symbol: "laptopcomputer", title: "Keep working with the lid closed", text: "Insomnia sessions keep the Mac awake with the lid shut. Ending one, by hand, time, battery or heat, always puts sleep back.",
-                        isOn: Binding(get: { insomnia.lidClosedMode }, set: { insomnia.lidClosedMode = $0 }))
+            // The next two switches need the admin rule. Without it they wait, read as off and say why.
+            GSToggleRow(symbol: "laptopcomputer", title: "Keep working with the lid closed",
+                        text: ruleReady ? "Insomnia sessions keep the Mac awake with the lid shut. Ending one, by hand, time, battery or heat, always puts sleep back." : "Needs the admin rule above. Set it up first.",
+                        isOn: Binding(get: { insomnia.lidClosedMode && ruleReady }, set: { insomnia.lidClosedMode = $0 }))
+                .disabled(!ruleReady).opacity(ruleReady ? 1 : 0.55)
         }
         GSCard("When the lid closes") {
             GSToggleRow(symbol: "speaker.slash", title: "Mute the sound", text: "The volume comes back when you open the lid.",
                         isOn: Binding(get: { insomnia.muteOnClose }, set: { insomnia.muteOnClose = $0 }))
             GSDivider()
-            GSToggleRow(symbol: "leaf", title: "Low Power Mode on battery", text: "Switched on with the admin rule, and back as it was when the lid opens.",
-                        isOn: Binding(get: { insomnia.lowPowerOnBattery }, set: { insomnia.lowPowerOnBattery = $0 }))
+            GSToggleRow(symbol: "leaf", title: "Low Power Mode on battery",
+                        text: ruleReady ? "Switched on while the lid is closed, and back as it was when the lid opens." : "Needs the admin rule. Set it up first.",
+                        isOn: Binding(get: { insomnia.lowPowerOnBattery && ruleReady }, set: { insomnia.lowPowerOnBattery = $0 }))
+                .disabled(!ruleReady).opacity(ruleReady ? 1 : 0.55)
             GSDivider()
             GSRow(symbol: "snowflake", title: "Freeze these apps", text: "Paused while the lid is closed, resumed when it opens. Zeus, terminals, editors and agents are never frozen.") {
                 Button(page.pickerOpen ? "Done" : "Add from running apps") {
@@ -58,8 +65,7 @@ struct InsomniaSettingsPage: View {
             }
             ForEach(insomnia.freezeBundleIDs, id: \.self) { id in
                 HStack {
-                    Text(name(for: id)).font(GS.rowText).foregroundStyle(GS.text)
-                    Text(id).font(OB.font(12)).foregroundStyle(GS.secondary)
+                    Text(name(for: id)).font(GS.rowText).foregroundStyle(GS.text).help(id)
                     Spacer()
                     Button("Remove") { insomnia.toggleFreeze(id) }.buttonStyle(GSButtonStyle())
                 }
@@ -68,8 +74,7 @@ struct InsomniaSettingsPage: View {
             if page.pickerOpen {
                 ForEach(page.running.filter { !insomnia.freezeBundleIDs.contains($0.bundleID) }) { app in
                     HStack {
-                        Text(app.name).font(GS.rowText).foregroundStyle(GS.text)
-                        Text(app.bundleID).font(OB.font(12)).foregroundStyle(GS.secondary)
+                        Text(app.name).font(GS.rowText).foregroundStyle(GS.text).help(app.bundleID)
                         Spacer()
                         Button("Add") { insomnia.toggleFreeze(app.bundleID) }.buttonStyle(GSButtonStyle())
                     }

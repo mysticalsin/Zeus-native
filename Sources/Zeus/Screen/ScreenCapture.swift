@@ -34,7 +34,7 @@ enum ScreenCapture {
             return ordered.enumerated().map { index, item in
                 let (jpeg, width, height, frame) = item.shot
                 var label = "screen \(index + 1) of \(ordered.count)"
-                if item.hasCursor { label += " — cursor is on this screen (primary focus)" }
+                if item.hasCursor { label += ", cursor is on this screen (primary focus)" }
                 label += " (image dimensions: \(width)x\(height) pixels)"
                 return ScreenShot(jpegData: jpeg, label: label, pixelWidth: width, pixelHeight: height, displayFrame: frame)
             }

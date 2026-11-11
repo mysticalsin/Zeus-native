@@ -123,8 +123,8 @@ public enum ScribeMicIndicator: Equatable, Sendable {
     public var label: String {
         switch self {
         case .listening: return "Listening"
-        case .mutedNotRecorded: return "Mic muted — not recorded"
-        case .unknownNotRecorded: return "Mic status unknown — not recorded"
+        case .mutedNotRecorded: return "Mic muted, not recorded"
+        case .unknownNotRecorded: return "Mic status unknown, not recorded"
         }
     }
 

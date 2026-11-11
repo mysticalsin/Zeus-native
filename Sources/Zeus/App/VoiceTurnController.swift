@@ -140,7 +140,7 @@ final class VoiceTurnController {
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
                 VoicePermissions.notifyDenied(cue, pane)
             } else {
-                say("I can't hear you yet. Check that ZEUS has microphone and speech recognition access.")
+                say("I can't hear you yet. Check that Zeus has microphone and speech recognition access.")
             }
             return false
         }
@@ -235,7 +235,7 @@ final class VoiceTurnController {
     /// `zeus listen`: a hands-free voice turn of up to `seconds`, as if the talk key were held.
     func listenTurn(seconds: Double) async -> TurnResult {
         guard press() else {
-            return TurnResult(error: "ZEUS can't hear yet: microphone or speech recognition access is missing.")
+            return TurnResult(error: "Zeus can't hear yet: microphone or speech recognition access is missing.")
         }
         try? await Task.sleep(for: .seconds(max(1, min(seconds, 60))))
         if listening { release() }

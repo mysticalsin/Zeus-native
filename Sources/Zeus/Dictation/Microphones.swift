@@ -91,7 +91,7 @@ final class MicrophoneTester {
         lastSession &+= 1
         let session = lastSession
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            send(.failed(session: session, problem: "Allow the microphone for ZEUS first."))
+            send(.failed(session: session, problem: "Allow the microphone for Zeus first."))
             return
         }
         let engine = AVAudioEngine()

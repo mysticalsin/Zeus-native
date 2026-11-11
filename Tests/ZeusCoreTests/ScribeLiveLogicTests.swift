@@ -474,8 +474,8 @@ struct ScribeLiveLogicTests {
     @Test func startedAndUntitledMeetingsAndCallsHaveHonestHeadlines() {
         let now = Date(timeIntervalSince1970: 1_000)
         let started = ScribeCalendarSlot(id: "a", title: "  ", start: now.addingTimeInterval(-30))
-        #expect(ScribeCallPromptText.headline(for: .upcoming(started), now: now) == "Started — Meeting")
-        #expect(ScribeCallPromptText.headline(for: .callDetected(.teams), now: now) == "Meeting detected — Teams")
+        #expect(ScribeCallPromptText.headline(for: .upcoming(started), now: now) == "Started: Meeting")
+        #expect(ScribeCallPromptText.headline(for: .callDetected(.teams), now: now) == "Meeting detected: Teams")
         #expect(ScribeCallPromptText.headline(for: .none, now: now) == nil)
     }
 

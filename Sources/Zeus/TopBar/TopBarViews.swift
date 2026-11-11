@@ -1456,7 +1456,8 @@ struct ClosedWings: View {
             case .volume, .brightness, .keyboardBacklight: return 58
             default: return 30
             }
-        case .avatar: return 14
+        // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
+        case .avatar(let state): return state == .idle ? -36 : 14
         case .dictation: return 60
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }

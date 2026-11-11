@@ -293,7 +293,7 @@ final class TopBarModel {
     static let sampleScript = """
     # Opening
     Hi, I'm Tony. Thanks for taking the time today.
-    I'll keep this short and show you what ZEUS does.
+    I'll keep this short and show you what Zeus does.
 
     # Demo
     Watch the notch. It follows my voice, so when I stop talking, the words wait for me.

@@ -427,7 +427,7 @@ struct RouterSettingsView: View {
             } header: {
                 Text("Coding in a terminal")
             } footer: {
-                Text("\"Fix the login bug in Zeus\" opens this terminal in that project and starts the agent on it. The agent runs with its own settings, as in any terminal you open yourself; the model limits above are for ZEUS's own answers only.")
+                Text("\"Fix the login bug in Zeus\" opens this terminal in that project and starts the agent on it. The agent runs with its own settings, as in any terminal you open yourself; the model limits above are for Zeus's own answers only.")
             }
             Section("Installed") {
                 ForEach(RouterEngine.allCases) { engine in

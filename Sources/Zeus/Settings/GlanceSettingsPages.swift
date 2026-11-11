@@ -47,10 +47,10 @@ struct GSPageView: View {
             case .shortcuts: ShortcutsPage()
             case .insomnia: InsomniaSettingsPage()
             case .integrations: AIConnectionsPage(context: context)
-            case .murmure: MurmurePage(context: context)
-            case .polyglot: PolyglotSettingsPage()
-            case .dictation: DictationSettingsPage(context: context)
-            case .voice: VoicePage()
+            case .murmure: MurmurePage(context: context, navigation: navigation)
+            case .polyglot: PolyglotSettingsPage(navigation: navigation)
+            case .dictation: DictationSettingsPage(context: context, navigation: navigation)
+            case .voice: VoicePage(navigation: navigation)
             case .engine: EnginePage()
             case .iPhone: IPhonePage()
             case .features: FeaturesSettingsPage()
@@ -104,7 +104,7 @@ private struct GeneralPage: View {
             GSDivider()
             GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus windows out of screen shares and recordings.", isOn: bool("general.showInScreenSharing"))
             GSDivider()
-            GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", isOn: bool("general.welcomeBack"))
+            GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", text: "After 10 minutes or more away, the notch shows what your agents finished or are waiting on.", isOn: bool("general.welcomeBack"))
         }
         GSSetupCard(openGuide: openGuide)
         GSCard("Keep awake") {
@@ -130,9 +130,7 @@ private struct GeneralPage: View {
                 GSInfo(text: "Last session \(ended.text.prefix(1).lowercased() + ended.text.dropFirst()).")
             }
             GSDivider()
-            GSRow(symbol: "moon.zzz", title: "Lid-closed mode", text: "Keep agents working with the lid shut: the Insomnia tab and Settings › Insomnia.") {
-                Button("Open") { navigation.section = .insomnia }.buttonStyle(GSButtonStyle())
-            }
+            GSLinkRow(symbol: "moon.zzz", title: "Lid-closed mode", text: "Keep agents working with the lid shut.", destination: .insomnia, navigation: navigation)
         }
     }
 
@@ -253,7 +251,7 @@ private struct AppearancePage: View {
                                            set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
                         options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
             }
-            GSInfo(text: "The ... button on the notch has the same choice for a quick change.")
+            GSInfo(text: "The More button (three dots) on the notch has the same choice for a quick change.")
         }
         GSCard("A face for your agents") {
             HStack(spacing: 12) {
@@ -313,7 +311,7 @@ private struct AppearancePage: View {
             GSDivider()
             light("lights.capsLock", "capslock", "Case-key lights (Caps Lock and Shift)", "Shows Caps Lock changes and Shift held on its own.", last: true)
             Text("Music").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary).padding(.top, 14)
-            GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors.", isOn: musicWingsBinding)
+            GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
@@ -387,7 +385,7 @@ private struct HomeAppearanceCard: View {
 
     var body: some View {
         GSCard("Home") {
-            Text("Choose what the four Home cards show. Long-press Home or use the ... menu to change them right on the notch.")
+            Text("Choose what the four Home cards show. Long-press Home or open the More menu (three dots) to change them right on the notch.")
                 .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 8)
             ForEach(1...4, id: \.self) { slot in
                 GSRow(symbol: symbols[slot - 1], title: "Card \(slot)") {
@@ -411,7 +409,7 @@ private struct HomeAppearanceCard: View {
                 GSTextInput(text: SettingsStore.binding("home.countdown.title"), placeholder: "Launch day", label: "Countdown title")
             }
             GSDivider()
-            GSRow(symbol: "calendar.badge.clock", title: "Countdown date", text: "A day as 2026-12-25.") {
+            GSRow(symbol: "calendar.badge.clock", title: "Countdown date", text: "Type the day as year-month-day, for example 2026-12-25.") {
                 GSTextInput(text: SettingsStore.binding("home.countdown.date"), placeholder: "2026-12-25", label: "Countdown date")
             }
         }
@@ -591,7 +589,7 @@ private struct IPhonePage: View {
         GSPageHeading(section: .iPhone, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard {
-            GSRow(symbol: "iphone", title: "iPhone app", text: "Pairing needs the ZEUS iPhone app on your phone.") {
+            GSRow(symbol: "iphone", title: "iPhone app", text: "Pairing needs the Zeus iPhone app on your phone.") {
                 GSStatus(ok: false, text: "Not available")
             }
         }
@@ -615,10 +613,10 @@ private struct GSNotificationsPage: View {
             GSRow(symbol: "checkmark.circle", title: "Finished tasks", text: "A macOS banner when an agent finishes, if Show system notifications below is on.")
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.triangle", title: "Errors and stuck agents",
-                        text: "A red or amber halo and card, plus a macOS notification when macOS allows ZEUS notifications.", isOn: bool("notify.errors"))
+                        text: "A red or amber halo and card, plus a macOS notification when macOS allows Zeus notifications.", isOn: bool("notify.errors"))
             GSDivider()
-            GSRow(symbol: "hourglass", title: "Call an agent stuck after", text: "A working agent with no activity for this long turns amber.") {
-                GSPopup(selection: SettingsStore.binding("notify.stallMinutes"), options: AgentStall.choices).popupLabel("Call an agent stuck after")
+            GSRow(symbol: "hourglass", title: "Mark an agent stuck after", text: "A working agent with no activity for this long turns amber.") {
+                GSPopup(selection: SettingsStore.binding("notify.stallMinutes"), options: AgentStall.choices).popupLabel("Mark an agent stuck after")
             }
             GSDivider()
             GSToggleRow(symbol: "eye.slash", title: "Stay quiet while sharing or in full screen",
@@ -636,7 +634,7 @@ private struct GSNotificationsPage: View {
                     .labelsHidden()
                     .accessibilityLabel("Show system notifications")
                     if systemNotifications.authorization == .denied {
-                        Button("Open Settings") { systemNotifications.openSystemSettingsAfterUserAction() }
+                        Button("Open System Settings") { systemNotifications.openSystemSettingsAfterUserAction() }
                             .buttonStyle(GSButtonStyle())
                     }
                 }
@@ -654,13 +652,15 @@ private struct ShortcutsPage: View {
         GSPageHeading(section: .shortcuts, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
-            ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus", text: "",
-                                shortcut: Preferences.shared.pushToTalk, defaultValue: .optionCommand) {
+            ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus", text: "Hold to ask, let go to send.",
+                                shortcut: Preferences.shared.pushToTalk, defaultValue: .optionCommand,
+                                otherName: "Dictation", other: DictationSettings.shared.key) {
                 if let new = $0 { Preferences.shared.pushToTalk = new }
             }
             GSDivider()
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "",
-                                shortcut: DictationSettings.shared.key, defaultValue: .rightCommand, allowsOff: true) {
+            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "Hold to speak, let go to write it where your cursor is.",
+                                shortcut: DictationSettings.shared.key, defaultValue: .rightCommand, allowsOff: true,
+                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) {
                 DictationSettings.shared.key = $0
             }
         }
@@ -672,7 +672,7 @@ private struct ShortcutsPage: View {
             }
         }
         GSCard("Answer from the keyboard") {
-            GSToggleRow(symbol: "keyboard", title: "Answer permissions from the keyboard", isOn: bool("shortcut.answerKeys"))
+            GSToggleRow(symbol: "keyboard", title: "Answer permissions from the keyboard", text: "Approve, deny or open a request with a key while its card is waiting.", isOn: bool("shortcut.answerKeys"))
         }
         LearnedShortcutsCard()
     }
@@ -746,6 +746,7 @@ private struct IntegrationsPage: View {
 
 private struct MurmurePage: View {
     let context: GSContext
+    let navigation: GSNavigation
     private var settings: DictationSettings { DictationSettings.shared }
 
     var body: some View {
@@ -759,12 +760,11 @@ private struct MurmurePage: View {
                 GSInfo(text: "Microphone and Accessibility access are required.")
             }
         }
-        SpeechEngineCard(compact: true)
+        SpeechEngineCard(compact: true, navigation: navigation)
         GSCard("Murmure") {
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation shortcut", text: "",
-                                shortcut: settings.key, defaultValue: .rightCommand, allowsOff: true,
-                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) { settings.key = $0 }
-            KeyAccessRow()
+            ShortcutLinkRow(symbol: "keyboard", title: "Dictation shortcut", current: settings.key, navigation: navigation)
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
         }
         GSCard("Language and feedback") {
             GSToggleRow(symbol: "speaker.wave.1", title: "Play dictation sounds", text: "A short cue when recording starts and ends.",
@@ -790,15 +790,15 @@ private struct MurmurePage: View {
 // MARK: Voice
 
 private struct VoicePage: View {
+    let navigation: GSNavigation
     var body: some View {
         GSPageHeading(section: .voice, subtitle: "")
             .padding(.bottom, -GS.cardGap)
-        ZeusVoiceCards()
+        ZeusVoiceCards(navigation: navigation)
         GSCard("Talk to Zeus") {
-            ShortcutRecorderRow(symbol: "bolt", title: "Talk to Zeus", text: "",
-                                shortcut: Preferences.shared.pushToTalk, defaultValue: .optionCommand,
-                                otherName: "Dictation", other: DictationSettings.shared.key) { if let new = $0 { Preferences.shared.pushToTalk = new } }
-            KeyAccessRow()
+            ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
         }
         WakeWordCard()
         GSCard("Approval keywords") {
@@ -845,7 +845,7 @@ private struct WakeWordCard: View {
             if wake.enabled {
                 GSDivider()
                 GSRow(symbol: wake.listening ? "waveform" : "pause.circle", title: "Status", text: statusNote) {
-                    GSStatus(ok: wake.listening, text: wake.listening ? "Listening" : wake.needsPermissions ? (VoicePermissions.access == .needsPrompt ? "Not asked yet" : "Refused") : "Paused")
+                    GSStatus(ok: wake.listening, text: wake.listening ? "Listening" : wake.needsPermissions ? (VoicePermissions.access == .needsPrompt ? "Not asked yet" : "Denied") : "Paused")
                 }
             }
             GSInfo(text: "Apple\u{2019}s on-device speech recognition, only while someone is talking. It pauses while you hold the talk key, dictate, take a call or lock the Mac. macOS shows the microphone indicator while it listens. What you ask after the phrase is a normal request, as with the talk key: simple commands run on this Mac, and anything else goes to your AI engine (Settings \u{203A} Engine).")
@@ -937,7 +937,7 @@ private struct PermissionsPage: View {
             GSDivider()
             perm("bell.badge", "Notifications", "Zeus alerts in macOS", context.services.notificationsAllowed) { context.services.allowNotifications() }
             GSDivider()
-            perm("internaldrive", "Full Disk Access", "Notifications coming from other apps", context.services.fullDiskAccess) { context.services.allowFullDiskAccess() }
+            perm("internaldrive", "Full Disk Access", "Lets Zeus read banners from other apps for the notification mirror. Optional.", context.services.fullDiskAccess) { context.services.allowFullDiskAccess() }
             GSDivider()
             voicePerm("mic", "Microphone", "Hey Zeus, the talk key and dictation", VoicePermissions.mic, .microphone)
             GSDivider()
@@ -993,16 +993,16 @@ private struct PermissionsPage: View {
 
     /// Allowed / Not asked yet (Allow raises macOS's one prompt) / Refused (Allow opens the pane).
     private func voicePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind) -> some View {
-        GSRow(symbol: symbol, title: title, text: state == .denied ? "Refused. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
+        GSRow(symbol: symbol, title: title, text: state == .denied ? "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
-                Button("Allow") { Task { await VoicePermissions.ensure(explicit: true); context.refresh() } }.buttonStyle(GSButtonStyle(prominent: true))
+                Button("Allow") { Task { await VoicePermissions.ensure(explicit: true); context.refresh() } }.buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Allow \(title)")
             case .denied:
                 HStack(spacing: 10) {
-                    GSStatus(ok: false, text: "Refused")
-                    Button("Open Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+                    GSStatus(ok: false, text: "Denied")
+                    Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
                 }
             }
         }
@@ -1010,15 +1010,15 @@ private struct PermissionsPage: View {
 
     /// Camera and Screen Recording: request-only (never starts capture).
     private func capturePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, allow: @escaping () -> Void) -> some View {
-        GSRow(symbol: symbol, title: title, text: state == .denied ? "Refused. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
+        GSRow(symbol: symbol, title: title, text: state == .denied ? "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
-                Button("Allow", action: allow).buttonStyle(GSButtonStyle(prominent: true)).accessibilityLabel("Allow \(title)")
+                Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
             case .denied:
                 HStack(spacing: 10) {
-                    GSStatus(ok: false, text: "Refused")
-                    Button("Open Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+                    GSStatus(ok: false, text: "Denied")
+                    Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
                 }
             }
         }
@@ -1059,7 +1059,7 @@ private struct PrivacyPage: View {
                         isOn: bool("privacy.lyrics"))
         }
         GSCard("Control from the notch") {
-            GSRow(symbol: "accessibility", title: "Accessibility", text: "") {
+            GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())
             }
             GSDivider()
@@ -1092,7 +1092,7 @@ private struct DiagnosticsPage: View {
         }
         DiagnosticsLogsCard()
         GSCard("Restart the local connection") {
-            GSRow(symbol: "arrow.clockwise", title: "Restart the daemon", text: "Running tasks stay in their own applications.") {
+            GSRow(symbol: "arrow.clockwise", title: "Restart the connection", text: "Agents and running tasks keep going in their own apps.") {
                 Button("Restart") { context.restartConnection() }.buttonStyle(GSButtonStyle())
             }
         }
@@ -1104,15 +1104,15 @@ private struct SpectrumPermissionRow: View {
     private var service: AudioSpectrumService { .shared }
     var body: some View {
         GSRow(symbol: "speaker.wave.2", title: "System audio",
-              text: service.permission == .refused ? "Refused. Turn it on in System Settings \u{203A} Privacy & Security \u{203A} Screen & System Audio Recording." : "Zeus never records or saves the sound; it only measures how loud each pitch is.") {
+              text: service.permission == .refused ? "Denied. Turn it on in System Settings \u{203A} Privacy & Security \u{203A} Screen & System Audio Recording." : "Zeus never records or saves the sound; it only measures how loud each pitch is.") {
             switch service.permission {
             case .allowed: GSStatus(ok: true, text: "Allowed")
             case .notAsked:
-                Button("Allow") { service.allowPressed() }.buttonStyle(GSButtonStyle(prominent: true)).accessibilityLabel("Allow system audio")
+                Button("Allow") { service.allowPressed() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Allow system audio")
             case .refused:
                 HStack(spacing: 10) {
-                    GSStatus(ok: false, text: "Refused")
-                    Button("Open Settings") { service.openSystemSettings() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open system audio settings")
+                    GSStatus(ok: false, text: "Denied")
+                    Button("Open System Settings") { service.openSystemSettings() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open system audio settings")
                 }
             }
         }
@@ -1169,7 +1169,7 @@ private struct AirDropPermissionRow: View {
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))
                 } else {
-                    Button("Open Settings") {
+                    Button("Open System Settings") {
                         FolderAccess.openSettings()
                     }
                     .buttonStyle(GSButtonStyle())
@@ -1201,7 +1201,7 @@ private struct ScreenshotPermissionRow: View {
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))
                 } else {
-                    Button("Open Settings") {
+                    Button("Open System Settings") {
                         FolderAccess.openSettings()
                     }
                     .buttonStyle(GSButtonStyle())

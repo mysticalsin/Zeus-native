@@ -30,7 +30,7 @@ struct ElevenLabsVoice: Sendable {
     var description: String {
         switch route {
         case .direct: "ElevenLabs voice (\(Self.model), streaming, system voice as fallback)"
-        case .worker: "ElevenLabs voice via your ZEUS worker (streaming, system voice as fallback)"
+        case .worker: "ElevenLabs voice via your Zeus worker (streaming, system voice as fallback)"
         }
     }
 

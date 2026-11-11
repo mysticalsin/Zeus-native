@@ -250,6 +250,8 @@ struct GSPanelHost: View {
                     .clipShape(RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous))
             } else {
                 ScrollView(.vertical) { page }
+                    // Last row never sits against the panel edge: the scroll content ends 28 pt higher.
+                    .contentMargins(.bottom, 28, for: .scrollContent)
                     .scrollIndicators(.automatic)
                     .clipShape(RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous))
             }
@@ -264,6 +266,7 @@ struct GSPageHeading: View {
     let section: GSSection
     let subtitle: String
     var body: some View {
+        let _ = SnapshotPaneProbe.note(section.rawValue) // snapshot harness only; no-op outside snapshot mode
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 9) {
                 Text(section.title).font(GS.pageTitle).tracking(-1.1).foregroundStyle(GS.text)

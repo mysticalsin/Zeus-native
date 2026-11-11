@@ -47,7 +47,7 @@ final class AgentEventServer {
             guard let commandHandler else {
                 let probe = try? JSONDecoder().decode(ZeusCommand.self, from: line)
                 let id = probe?.id ?? "unknown"
-                return try? JSONEncoder().encode(ZeusCommandReply(id: id, ok: false, text: "ZEUS is still starting up."))
+                return try? JSONEncoder().encode(ZeusCommandReply(id: id, ok: false, text: "Zeus is still starting up."))
             }
             return await commandHandler(line)
         }
@@ -59,7 +59,7 @@ final class AgentEventServer {
     func process(_ event: HookEvent) async -> Data? {
         let sessionID = event.session ?? "unknown"
         let agent = Self.agentName(event.source)
-        let project = event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "—"
+        let project = event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "No project"
         FlightRecorder.shared.record("agent", event.event, "\(agent) \(project) session \(sessionID.prefix(8))\(event.tool.map { " tool \($0)" } ?? "")")
         AgentTerminals.shared.remember(event.terminal, for: sessionID)
         // Any event is a sign of life; it also lifts a stalled session.
@@ -128,7 +128,7 @@ final class AgentEventServer {
                 decision = QuestionAnswers.shared.decision(id: event.id, session: sessionID, input: detail.input, answers: detail.choices)
             } else {
                 decision = HookDecision(id: event.id, decision: verdict,
-                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in ZEUS") : nil,
+                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
                                         updatedInput: verdict == .allow ? detail?.updatedInput : nil)
             }
             return try? JSONEncoder().encode(decision)

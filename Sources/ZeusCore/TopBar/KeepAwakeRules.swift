@@ -93,10 +93,11 @@ public enum KeepAwakeLength {
     public static let long = [4 * 60, 8 * 60, 24 * 60]
     public static let all: [Int?] = short.map(Optional.some) + long.map(Optional.some) + [nil]
 
-    /// "15 m", "2 h", "Indefinitely".
+    /// "15 minutes", "1 hour", "2 hours", "Indefinitely".
     public static func label(_ minutes: Int?) -> String {
         guard let minutes else { return "Indefinitely" }
-        return minutes >= 60 && minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes) m"
+        guard minutes >= 60, minutes % 60 == 0 else { return "\(minutes) minutes" }
+        return minutes == 60 ? "1 hour" : "\(minutes / 60) hours"
     }
 
     public static func minutes(fromLabel label: String) -> Int?? {

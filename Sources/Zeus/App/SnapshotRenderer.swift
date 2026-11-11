@@ -1,6 +1,19 @@
 import AppKit
+import CryptoKit
 import SwiftUI
 import ZeusCore
+
+/// Snapshot mode only: Glance Settings page headings report which pane they drew, so the harness can
+/// check that a capture really shows the pane it is named after (see `SnapshotRenderer.save(pane:)`).
+@MainActor
+enum SnapshotPaneProbe {
+    private(set) static var seen: Set<String> = []
+    static func reset() { seen = [] }
+    static func note(_ pane: String) {
+        guard TopBarStyle.isSnapshot else { return }
+        seen.insert(pane)
+    }
+}
 
 /// A Glance Settings page's panel background and content, alone, with no `ScrollView` -- see the
 /// long comment where this is used in `SnapshotRenderer.runIfRequested()` for why: `ImageRenderer`
@@ -216,7 +229,7 @@ enum SnapshotRenderer {
             let nav = GSNavigation()
             for section in [GSSection.appearance, .diagnostics, .privacy, .sounds, .general] {
                 nav.section = section
-                save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1,
+                save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: section,
                      to: directory.appendingPathComponent("gs-\(section.rawValue).png"))
             }
         }
@@ -224,43 +237,35 @@ enum SnapshotRenderer {
         let obServices = OnboardingServices(permissions: permissions)
         let gsNav = GSNavigation()
         let gsContext = GSContext(services: obServices)
-        // Numbered `settings-NN-*` PNGs (QA visual table) use live Glance pages where they exist.
+        // Numbered `settings-NN-*` PNGs (QA visual table) for legacy sections that have a live Glance page of
+        // the same name. A legacy section that only *aliases* to another page (topBar, todo, memory,
+        // teleprompter, agents, stickies, routines, keepAwake, assistant, intelligence, interview, about)
+        // used to be saved as that other page under its own name, which is how `settings-08..18` ended up
+        // showing Features, Integrations or Appearance. Those are skipped now (and listed on stdout);
+        // `settings-legacy-*` still covers the old views. Every pane capture asserts the pane it shows.
         for (index, section) in SettingsNavigation.Section.allCases.enumerated() {
             let fileName = String(format: "settings-%02d-%@", index + 1, section.rawValue)
-            if let glanceID = GlanceSettingsSnapshotMapping.glanceSectionID(forLegacySection: section.rawValue),
-               let glanceSection = GSSection(rawValue: glanceID) {
-                gsNav.section = glanceSection
-                save(GlanceSettingsRoot(navigation: gsNav, context: gsContext), size: GS.size,
-                     to: directory.appendingPathComponent("\(fileName).png"))
-                save(GSPageSnapshot(section: glanceSection, context: gsContext),
-                     size: CGSize(width: GS.panelFrame.width, height: GlanceSettingsSnapshotHeight.height(for: glanceSection.rawValue)),
-                     scale: 1,
-                     to: directory.appendingPathComponent(String(format: "settings-full-%02d-%@.png", index + 1, section.rawValue)))
-            } else {
-                navigation.section = section
-                let settings = SettingsView(connections: connections, preferences: .shared, permissions: permissions, topBar: TopBarModel(),
-                                            navigation: navigation, openSetup: {})
-                save(WindowStage(content: settings), size: SettingsView.size,
-                     to: directory.appendingPathComponent("\(fileName).png"))
-                let full = SettingsView(connections: connections, preferences: .shared, permissions: permissions, topBar: TopBarModel(),
-                                        navigation: navigation, height: 2300, openSetup: {})
-                save(WindowStage(content: full), size: CGSize(width: SettingsView.size.width, height: 2300), scale: 1,
-                     to: directory.appendingPathComponent(String(format: "settings-full-%02d-%@.png", index + 1, section.rawValue)))
+            guard let glanceSection = GSSection.allCases.first(where: { $0.rawValue.lowercased() == section.rawValue.lowercased() }) else {
+                print("snapshot: skipped \(fileName): legacy section '\(section.rawValue)' has no live pane of its own")
+                continue
             }
+            gsNav.section = glanceSection
+            save(GlanceSettingsRoot(navigation: gsNav, context: gsContext), size: GS.size, pane: glanceSection,
+                 to: directory.appendingPathComponent("\(fileName).png"))
+            save(GSPageSnapshot(section: glanceSection, context: gsContext),
+                 size: CGSize(width: GS.panelFrame.width, height: GlanceSettingsSnapshotHeight.height(for: glanceSection.rawValue)),
+                 scale: 1, pane: glanceSection,
+                 to: directory.appendingPathComponent(String(format: "settings-full-%02d-%@.png", index + 1, section.rawValue)))
         }
-        // Sidebar search with results.
+        // The legacy sidebar search (legacy view, not a Glance pane). The legacy reset confirmation is an
+        // alert, which an offscreen render cannot draw, so it is no longer captured: the old
+        // `settings-17-reset-confirm.png` was just the Appearance page with no dialog.
         navigation.section = .sounds
         navigation.query = "sound"
         save(WindowStage(content: SettingsView(connections: connections, preferences: .shared, permissions: permissions, topBar: TopBarModel(),
                                                navigation: navigation, openSetup: {})),
-             size: SettingsView.size, to: directory.appendingPathComponent("settings-16-search.png"))
+             size: SettingsView.size, to: directory.appendingPathComponent("settings-legacy-search.png"))
         navigation.query = ""
-        navigation.confirmReset = .appearance
-        navigation.section = .appearance
-        save(WindowStage(content: SettingsView(connections: connections, preferences: .shared, permissions: permissions, topBar: TopBarModel(),
-                                               navigation: navigation, openSetup: {})),
-             size: SettingsView.size, to: directory.appendingPathComponent("settings-17-reset-confirm.png"))
-        navigation.confirmReset = nil
 
         // Canonical named surfaces for QA parity checks
         for step in OnboardingStep.allCases {
@@ -290,7 +295,8 @@ enum SnapshotRenderer {
 
         for section in GSSection.allCases where section.isShown {
             gsNav.section = section
-            saveSurface(GlanceSettingsRoot(navigation: gsNav, context: gsContext), size: GS.size, name: "settings-\(section.rawValue)")
+            save(GlanceSettingsRoot(navigation: gsNav, context: gsContext), size: GS.size, pane: section,
+                 to: directory.appendingPathComponent("settings-\(section.rawValue).png"))
             // QA round 10 (report-10.md VISUAL section, "blank content pane"): `ImageRenderer`
             // never lays out `GSPanelHost`'s `ScrollView` on its one-shot headless render, so the
             // `settings-\(section.rawValue)` capture just above is blank for *every* GSSection,
@@ -307,9 +313,9 @@ enum SnapshotRenderer {
             // `ScrollView` limitation on the deprecated view ("whole page, unclipped, so every
             // option shows (live has a scroll view)", above): capture the page's content alone,
             // at a generous fixed height, with no `ScrollView` for `ImageRenderer` to misjudge.
-            saveSurface(GSPageSnapshot(section: section, context: gsContext),
-                        size: CGSize(width: GS.panelFrame.width, height: GlanceSettingsSnapshotHeight.height(for: section.rawValue)),
-                        name: "settings-full-\(section.rawValue)")
+            save(GSPageSnapshot(section: section, context: gsContext),
+                 size: CGSize(width: GS.panelFrame.width, height: GlanceSettingsSnapshotHeight.height(for: section.rawValue)), pane: section,
+                 to: directory.appendingPathComponent("settings-full-\(section.rawValue).png"))
         }
         // QA round 10 (report-10.md VISUAL section): this loop and the `GSSection.allCases` loop
         // just above it both used the bare name `"settings-\(section.rawValue)"`. `SettingsView`
@@ -371,13 +377,20 @@ enum SnapshotRenderer {
 
         let murmurNav = GSNavigation()
         murmurNav.section = .murmure
-        saveSurface(GlanceSettingsRoot(navigation: murmurNav, context: gsContext), size: GS.size, name: "murmur-settings")
+        save(GlanceSettingsRoot(navigation: murmurNav, context: gsContext), size: GS.size, pane: .murmure,
+             to: directory.appendingPathComponent("murmur-settings.png"))
 
         let murmurCardState = DictationPreviewCard.State()
         murmurCardState.text = "Send the draft by Friday."
         murmurCardState.modeName = "Murmure"
         saveSurface(DictationPreviewView(state: murmurCardState, insert: {}, cancel: {}).padding(20).background(Color(hex: 0x1B2030)), size: CGSize(width: 520, height: 180), name: "murmur-overlay")
 
+        // QA tooling gate: a capture that shows the wrong pane, or two panes with identical bytes, fails the run.
+        if !harnessFailures.isEmpty {
+            fputs("snapshot harness FAILED (\(harnessFailures.count) problem(s)):\n", stderr)
+            for failure in harnessFailures { fputs("  - \(failure)\n", stderr) }
+            exit(1)
+        }
         return true
     }
 
@@ -400,6 +413,11 @@ enum SnapshotRenderer {
     /// scales (into `<dir>/<n>x/<name>.png`) unless it passes an explicit `scale:`.
     private static var activeScales: [CGFloat] = [1, 2]
     private static var snapshotsDirectory: URL!
+    /// Every pane-identity or duplicate-bytes problem found this run; a non-empty list fails the run.
+    private static var harnessFailures: [String] = []
+    /// SHA-256 of each pane capture's bytes (per size and scale) to the pane that produced it: two
+    /// different panes with the same bytes mean one capture is showing the wrong page.
+    private static var paneByDigest: [String: String] = [:]
     /// When set (`--snapshot-match voice`), only file names containing this text are written.
     private static var snapshotMatch: String?
 
@@ -407,28 +425,50 @@ enum SnapshotRenderer {
     /// subfolder, plus one flat legacy copy at the highest scale, exactly like `saveSurface`.
     /// Passing an explicit `scale:` renders once, at that scale, to `url` only (used by the
     /// handful of callers that need one specific pixel ratio, e.g. a 1x-only full-page render).
-    private static func save<V: View>(_ view: V, size: CGSize, scale: CGFloat? = nil, to url: URL) {
+    private static func save<V: View>(_ view: V, size: CGSize, scale: CGFloat? = nil, pane: GSSection? = nil, to url: URL) {
         if let snapshotMatch, !url.lastPathComponent.localizedCaseInsensitiveContains(snapshotMatch) { return }
         if let scale {
-            writeOne(view, size: size, scale: scale, to: url)
+            writeOne(view, size: size, scale: scale, pane: pane, to: url)
             return
         }
         let name = url.lastPathComponent
         for s in activeScales {
             let scaleDir = snapshotsDirectory.appendingPathComponent("\(Int(s))x", isDirectory: true)
             try? FileManager.default.createDirectory(at: scaleDir, withIntermediateDirectories: true)
-            writeOne(view, size: size, scale: s, to: scaleDir.appendingPathComponent(name))
+            writeOne(view, size: size, scale: s, pane: pane, to: scaleDir.appendingPathComponent(name))
         }
-        writeOne(view, size: size, scale: activeScales.last ?? 2, to: url)
+        writeOne(view, size: size, scale: activeScales.last ?? 2, pane: pane, to: url)
     }
 
-    private static func writeOne<V: View>(_ view: V, size: CGSize, scale: CGFloat, to url: URL) {
+    /// Renders one PNG. With `pane` set (Settings captures) the render must show exactly that pane, and
+    /// no other pane may have produced the same bytes; otherwise the run records a failure and exits 1.
+    private static func writeOne<V: View>(_ view: V, size: CGSize, scale: CGFloat, pane: GSSection? = nil, to url: URL) {
         let content = view.environment(\.mascotRasterScale, scale).frame(width: size.width, height: size.height)
         let renderer = ImageRenderer(content: content)
         renderer.scale = scale
+        // Let pending main-queue work from navigating to the pane land before rendering.
+        if pane != nil { RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02)) }
+        SnapshotPaneProbe.reset()
         guard let image = renderer.nsImage,
               let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return }
+              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+            if pane != nil { harnessFailures.append("\(url.lastPathComponent): render produced no image") }
+            return
+        }
+        if let pane {
+            let shown = SnapshotPaneProbe.seen
+            guard shown == [pane.rawValue] else {
+                let found = shown.isEmpty ? "no pane heading" : shown.sorted().map { "'\($0)'" }.joined(separator: ", ")
+                harnessFailures.append("\(url.lastPathComponent): expected pane '\(pane.rawValue)' but the render shows \(found)")
+                return
+            }
+            let digest = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
+            let key = "\(Int(size.width))x\(Int(size.height))@\(scale):\(digest)"
+            if let other = paneByDigest[key], other != pane.rawValue {
+                harnessFailures.append("\(url.lastPathComponent): identical bytes to the '\(other)' pane capture")
+            }
+            paneByDigest[key] = pane.rawValue
+        }
         try? png.write(to: url)
     }
 

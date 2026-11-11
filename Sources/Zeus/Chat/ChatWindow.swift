@@ -24,7 +24,7 @@ final class ChatWindowController {
         let panel = ChatPanel(contentRect: CGRect(x: 0, y: 0, width: 680, height: 520),
                               styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
-        panel.title = "ZEUS Chat"
+        panel.title = "Zeus Chat"
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .hidden
         panel.isMovableByWindowBackground = true
@@ -170,7 +170,7 @@ private struct ChatHistoryRow: View {
         .contextMenu {
             Button(conversation.pinned ? "Unpin" : "Pin") { chat.togglePin(conversation.id) }
             Button("Copy conversation") {
-                let text = conversation.messages.map { "\($0.role == .user ? "You" : "ZEUS"): \($0.text)" }.joined(separator: "\n\n")
+                let text = conversation.messages.map { "\($0.role == .user ? "You" : "Zeus"): \($0.text)" }.joined(separator: "\n\n")
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
             }
@@ -298,7 +298,7 @@ struct ChatComposer: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            TextField(chat.busyElsewhere ? "ZEUS is answering in another chat" : "Message",
+            TextField(chat.busyElsewhere ? "Zeus is answering in another chat" : "Message",
                       text: Binding(get: { chat.draft }, set: { chat.draft = $0 }), axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(TopBarStyle.label(13))

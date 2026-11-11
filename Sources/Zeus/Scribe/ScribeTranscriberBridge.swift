@@ -27,7 +27,7 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
     typealias TranscribePreview = @Sendable ([Float]) async -> String?
 
     static let maxPendingChunksPerSource = 4
-    static let overloadMessage = "Transcription is behind — some audio wasn't transcribed."
+    static let overloadMessage = "Transcription is behind, so some audio wasn't transcribed."
     /// Audio seconds between two preview reads of the same source.
     static let previewInterval: TimeInterval = 1.2
     /// Wall-clock seconds one preview read may take before it is abandoned; finals never wait for it.

@@ -149,11 +149,11 @@ final class KeepAwakeSession {
         releaseAll()
         guard isActive else { return }
         let timeout = endsAt.map { max(30, $0.timeIntervalSinceNow + 5) } ?? Self.openEndedLease
-        if create("PreventUserIdleSystemSleep", reason: "ZEUS keep-awake session", timeout: timeout, into: &systemID) {
+        if create("PreventUserIdleSystemSleep", reason: "Zeus keep-awake session", timeout: timeout, into: &systemID) {
             hasSystem = true
         }
         if keepDisplay,
-           create("PreventUserIdleDisplaySleep", reason: "ZEUS keep-awake display", timeout: timeout, into: &displayID) {
+           create("PreventUserIdleDisplaySleep", reason: "Zeus keep-awake display", timeout: timeout, into: &displayID) {
             hasDisplay = true
         }
     }
@@ -177,7 +177,7 @@ final class KeepAwakeSession {
         let result = IOPMAssertionCreateWithDescription(
             type as CFString,
             reason as CFString,
-            "Session from ZEUS. Ends when the countdown hits zero, a battery or heat rule trips, or you end it." as CFString,
+            "Session from Zeus. Ends when the countdown hits zero, a battery or heat rule trips, or you end it." as CFString,
             nil, nil,
             timeout,
             "TimeoutActionRelease" as CFString,

@@ -37,7 +37,8 @@ struct PointingHotkeyMonitorTests {
         monitor.feed(.keyDown(keyCode: 49, modifiers: [.control, .option]), at: 0.5)
         monitor.feed(.keyUp(keyCode: 49), at: 0.6)
         monitor.feed(.flags(keyCode: 58, modifiers: []), at: 0.7)
-        #expect(log.signals == [.cancelled])
+        // Listening starts the moment the exact hold forms (owner spec), so a spoil cancels a begun turn.
+        #expect(log.signals == [.began, .cancelled])
     }
 
     @Test func voiceOverBlocksControlOptionWithOneVisibleMessage() {

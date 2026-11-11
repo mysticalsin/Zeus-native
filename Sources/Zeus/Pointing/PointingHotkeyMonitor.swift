@@ -58,12 +58,14 @@ final class PointingHotkeyMonitor {
     func feed(_ event: ShortcutEvent, at time: TimeInterval) {
         let wanted = shortcutProvider()
         if wanted != gesture.shortcut, !gesture.isActive { gesture.shortcut = wanted }
-        let output = gesture.feed(event, at: time, voiceOverOn: voiceOverProvider())
+        let voiceOverOn = voiceOverProvider()
+        let output = gesture.feed(event, at: time, voiceOverOn: voiceOverOn)
         if gesture.blockedByVoiceOver, !announcedBlock {
             announcedBlock = true
             onSignal?(.blocked("VoiceOver is using Control and Option. Choose another pointing key in Settings."))
         }
-        if !gesture.blockedByVoiceOver { announcedBlock = false }
+        // Announce once per VoiceOver session, not on every attempt: re-arm only when VoiceOver goes off.
+        if !voiceOverOn { announcedBlock = false }
         switch output {
         case .began?: onSignal?(.began)
         case .ended?: onSignal?(.ended)

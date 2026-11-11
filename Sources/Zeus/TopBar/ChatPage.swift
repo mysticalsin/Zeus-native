@@ -63,7 +63,7 @@ struct ChatPage: View {
         PageScroll(.vertical) {
             VStack(spacing: 3) {
                 if zeusChatHasContent {
-                    listRow(title: "ZEUS", subtitle: chat.current.displayTitle, color: Theme.accent, picked: selected == nil) { hub.selectedSession = nil }
+                    listRow(title: "Zeus", subtitle: chat.current.displayTitle, color: Theme.accent, picked: selected == nil) { hub.selectedSession = nil }
                 }
                 ForEach(sessions) { session in
                     listRow(agent: session.agent, subtitle: MeetingState.hideDetails ? session.status.label : "\(session.project) · \(session.status.label)",

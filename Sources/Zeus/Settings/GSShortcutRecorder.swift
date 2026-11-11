@@ -74,14 +74,15 @@ struct ShortcutRecorderButton: View {
         } label: {
             Text(label)
                 .font(OB.font(14, .semibold))
-                .foregroundStyle(model.recording ? Color.white : GS.text)
+                .foregroundStyle(model.recording ? Color.white : (shortcut == nil ? GS.secondary : GS.controlText))
                 .lineLimit(1)
+                .fixedSize()
                 .frame(minWidth: 150)
                 .padding(.horizontal, 12)
                 .frame(height: 34)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(model.recording ? OB.blue : GS.buttonFill))
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(model.recording ? OB.controlAccentFill : GS.controlFill))
                 .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(model.recording ? OB.blue : GS.buttonStroke, lineWidth: model.recording ? 2 : 1))
+                    .strokeBorder(model.recording ? OB.controlAccent : GS.controlStroke, lineWidth: model.recording ? 2 : 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(accessibilityName): \(shortcut?.title ?? "Off"). Click, then press the shortcut you want.")
@@ -108,13 +109,14 @@ struct ShortcutRecorderRow: View {
 
     var body: some View {
         GSRow(symbol: symbol, title: title, text: text) {
+            // One recorder style everywhere: the shortcut (or "Off") in a single control, and a menu beside it
+            // with an explicit Off and Reset, instead of a loose "Off" pill that reads as a second button.
             HStack(spacing: 8) {
                 ShortcutRecorderButton(shortcut: shortcut, onChange: { set($0) }, accessibilityName: title)
-                if allowsOff, shortcut != nil {
-                    Button("Off") { set(nil) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Turn \(title) off")
-                }
-                if shortcut != defaultValue {
-                    Button("Reset") { set(defaultValue) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Reset \(title) to \(defaultValue?.title ?? "Off")")
+                if (allowsOff && shortcut != nil) || shortcut != defaultValue {
+                    ShortcutOptionsMenu(title: title, canTurnOff: allowsOff && shortcut != nil,
+                                        canReset: shortcut != defaultValue, defaultTitle: defaultValue?.title ?? "Off",
+                                        off: { set(nil) }, reset: { set(defaultValue) })
                 }
             }
         }
@@ -149,5 +151,61 @@ struct KeyAccessRow: View {
                 }
             }
         }
+    }
+}
+
+/// "More" menu for a shortcut: Turn off (when allowed) and Reset to the default. Snapshots draw the
+/// glyph only, since offscreen renders cannot draw AppKit-backed menus.
+struct ShortcutOptionsMenu: View {
+    let title: String
+    let canTurnOff: Bool
+    let canReset: Bool
+    let defaultTitle: String
+    let off: () -> Void
+    let reset: () -> Void
+
+    var body: some View {
+        if TopBarStyle.isSnapshot {
+            glyph
+        } else {
+            Menu {
+                if canTurnOff { Button("Turn off") { off() } }
+                if canReset { Button("Reset to \(defaultTitle)") { reset() } }
+            } label: { glyph }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Turn off or reset \(title)")
+            .accessibilityLabel("\(title) options")
+        }
+    }
+
+    private var glyph: some View {
+        Image(systemName: "ellipsis").font(.system(size: 13, weight: .bold)).foregroundStyle(GS.controlText)
+            .frame(width: 34, height: 34)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(GS.controlFill))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(GS.controlStroke, lineWidth: 1))
+    }
+}
+
+/// Where the key-access status lives: Permissions. Every other page links there instead of repeating it.
+struct KeyAccessLinkRow: View {
+    let navigation: GSNavigation
+    var body: some View {
+        GSLinkRow(symbol: "lock.shield", title: "Keys from other apps",
+                  text: KeyListenAccess.granted ? "Zeus can see your shortcuts in every app." : "Zeus only sees shortcuts in its own windows until you allow access.",
+                  destination: .permissions, navigation: navigation)
+    }
+}
+
+/// A shortcut is set on the Shortcuts page only; this row shows its current value and links there.
+struct ShortcutLinkRow: View {
+    let symbol: String
+    let title: String
+    let current: Shortcut?
+    let navigation: GSNavigation
+    var body: some View {
+        GSLinkRow(symbol: symbol, title: title, text: "Now: \(current?.title ?? "Off").", destination: .shortcuts, navigation: navigation)
     }
 }

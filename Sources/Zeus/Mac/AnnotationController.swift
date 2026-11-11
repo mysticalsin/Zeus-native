@@ -128,7 +128,7 @@ final class AnnotationController {
             MarkModel.shared.strokes = []
             guard let (prompt, marked) = Self.mark(combined, shape: main.shape, on: shots) else {
                 NSLog("[ZEUS] show-me: no screenshot (Screen Recording off)")
-                self.onMark?("I marked something on screen but you can't see the screen yet. Tell me to turn on Screen Recording for ZEUS.", [])
+                self.onMark?("I marked something on screen but you can't see the screen yet. Tell me to turn on Screen Recording for Zeus.", [])
                 return
             }
             self.onMark?(prompt, marked)
@@ -163,7 +163,7 @@ final class AnnotationController {
         context.stroke(CGRect(x: pixels.minX, y: CGFloat(source.height) - pixels.maxY, width: pixels.width, height: pixels.height))
         guard let image = context.makeImage(),
               let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else { return nil }
-        return ScreenShot(jpegData: jpeg, label: shot.label + " (ZEUS outlined the marked spot)", pixelWidth: shot.pixelWidth,
+        return ScreenShot(jpegData: jpeg, label: shot.label + " (Zeus outlined the marked spot)", pixelWidth: shot.pixelWidth,
                           pixelHeight: shot.pixelHeight, displayFrame: shot.displayFrame)
     }
 }
