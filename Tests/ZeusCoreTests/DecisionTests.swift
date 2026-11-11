@@ -17,6 +17,21 @@ private func sample(_ utterance: String = "open safari") -> SystemOneRequest {
                      questions: ["intent": .choice("What does the user want?", ["app.open": "Open an app", "chat.answer": "Answer a question"])])
 }
 
+/// A latch the test opens by hand, so a "slow" provider is slow without any wall-clock sleep.
+private actor Latch {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func open() {
+        isOpen = true
+        for waiter in waiters { waiter.resume() }
+        waiters = []
+    }
+}
+
 private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T12:00:00Z")! }
 
 @Suite struct DecisionTests {
@@ -49,11 +64,11 @@ private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T
 
     private static let jevBody = #"{"model":"jev-1","answers":{"intent":{"type":"choice","choice":"app.open","confidence":0.97}},"usage":{"input_tokens":100,"output_tokens":5}}"#
 
-    private func jevGuard(key: String?, cap: Double?, delay: Duration = .zero) -> (JevGuard, JevBudgetStore) {
+    private func jevGuard(key: String?, cap: Double?, hold: Latch? = nil) -> (JevGuard, JevBudgetStore) {
         let store = JevBudgetStore.inMemoryForTesting()
         _ = store.updateCap(cap)
         let client = SystemOneClient(source: .jev, endpoint: SystemOneClient.jevEndpoint, key: key ?? "k", timeout: 3) { request in
-            try? await Task.sleep(for: delay)
+            await hold?.wait()
             return (Data(Self.jevBody.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
         return (JevGuard(key: key, store: store, client: key == nil ? nil : client), store)
@@ -78,13 +93,22 @@ private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T
         #expect(await DecisionRouter(jev: jev).decide(sample())?.source == .jev)
     }
 
-    @Test func jevTimeoutFallsToTheLLMWithinTheBudget() async {
-        let (jev, _) = jevGuard(key: "k", cap: 5, delay: .seconds(3))
+    /// The provider is held shut until the router has already answered, so a nil result can only come
+    /// from the 200 ms deadline firing, never from the provider finishing. No wall-clock bound is
+    /// asserted: the whole target runs in one process with thousands of parallel tests, and the
+    /// cooperative pool can delay any timer by seconds there (a 1.5 s bound failed at 6.2 s on CI while
+    /// the deadline logic was correct).
+    @Test(.timeLimit(.minutes(1))) func jevTimeoutFallsToTheLLMWithinTheBudget() async {
+        let latch = Latch()
+        let (jev, store) = jevGuard(key: "k", cap: 5, hold: latch)
         let router = DecisionRouter(jev: jev, budget: .milliseconds(200))
-        let started = ContinuousClock.now
         let decision = await router.decide(sample())
         #expect(decision == nil)
-        #expect(ContinuousClock.now - started < .milliseconds(1500))
+        // The late call is not cancelled: it still settles once released.
+        await latch.open()
+        for _ in 0..<500 where store.reservationStatus != .clear { try? await Task.sleep(for: .milliseconds(10)) }
+        #expect(store.reservationStatus == .clear)
+        #expect(store.load().calls == 1)
     }
 
     @Test func ollamaOnlyAnswersWhenJevGaveNothingAndNeverWhenConstrained() async {

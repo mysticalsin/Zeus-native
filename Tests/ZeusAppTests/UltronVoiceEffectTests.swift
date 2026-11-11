@@ -34,6 +34,21 @@ import ZeusCore
         #expect(difference > 1)
     }
 
+    @Test func graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing() {
+        #expect(UltronEffectGraph.isConnectable(UltronAudioChain.format))
+        let tooSlow = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 4_000, channels: 1, interleaved: false)!
+        let integer = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24_000, channels: 1, interleaved: false)!
+        #expect(!UltronEffectGraph.isConnectable(tooSlow))
+        #expect(!UltronEffectGraph.isConnectable(integer))
+        // An unconnectable format is refused before any AVAudioEngine.connect call; nothing is wired.
+        let engine = AVAudioEngine()
+        let player = AVAudioPlayerNode()
+        let graph = UltronEffectGraph()
+        engine.attach(player)
+        graph.attach(to: engine)
+        #expect(graph.connect(from: player, format: tooSlow, engine: engine) != nil)
+    }
+
     @Test func disabledEffectPassesThrough() throws {
         let input = tone()
         let out = try #require(UltronOfflineRender.render(input, parameters: .neutral))
