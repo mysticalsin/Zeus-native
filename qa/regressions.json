@@ -3061,6 +3061,90 @@
         "file": "Tests/ZeusCoreTests/AppBrandCatalogTests.swift",
         "function": "coversTheLogosTheLedgerListed"
       }
+    },
+    {
+      "id": "REG-255",
+      "failure": "Pointing ink only appeared while dragging, so tracing a control while the keys were held left no trail and no stroke.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+        "function": "hoveringBeginsAStrokeAndExtendsIt"
+      }
+    },
+    {
+      "id": "REG-256",
+      "failure": "Holding the pointing keys put a mouse-capturing overlay over the screen, so clicks and focus did not reach the app being asked about.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-PointingOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+        "function": "theInkPanelsNeverBecomeKeyOrMainAndIgnoreTheMouse"
+      }
+    },
+    {
+      "id": "REG-257",
+      "failure": "A modifier release that the key stream never reported left a pointing turn open indefinitely.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "aMissedReleaseIsCaughtWhenTheLiveKeysAreUp"
+      }
+    },
+    {
+      "id": "REG-258",
+      "failure": "Sleep, wake or a display change during a hold or a turn left the hold armed and marks on stale geometry.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "sleepWakeAndDisplayChangesCancelAHoldWithoutARequest"
+      }
+    },
+    {
+      "id": "REG-259",
+      "failure": "The ring could land off the candidate on a 2x display or a display with a negative origin.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+        "function": "oneXDisplayWithANegativeOrigin"
+      }
+    },
+    {
+      "id": "REG-260",
+      "failure": "The pointing Accessibility hit test ran on a detached background task, which this process's own AX rule forbids.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_probe_ax_calls_stay_on_the_main_actor"
+      }
+    },
+    {
+      "id": "REG-261",
+      "failure": "The per-turn trace line could carry free text; it must hold only mark names and millisecond offsets.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+        "function": "theLineCarriesNoFreeTextOnlyKnownTokens"
+      }
     }
   ]
 }

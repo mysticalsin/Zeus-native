@@ -52,13 +52,15 @@ final class PointingController {
         /// Preflight only. Pointing never requests Screen Recording.
         var hasScreenPermission: () -> Bool = { CGPreflightScreenCaptureAccess() }
         var frontmostBundleID: () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
-        /// AX element under a Quartz global point. Runs off the main actor.
+        /// AX element under a Quartz global point. Hops to the main actor: AX calls never run off it.
         var probe: @Sendable (CGPoint) async -> PointingRawTarget? = { point in
-            await Task.detached(priority: .userInitiated) { PointingTargetProbe.hitTest(atQuartzPoint: point) }.value
+            await MainActor.run { PointingTargetProbe.hitTest(atQuartzPoint: point) }
         }
         var enabled: () -> Bool = { PointingSettings.enabled }
         var sendScreenshot: () -> Bool = { PointingSettings.sendScreenshot }
         var textEntryEnabled: () -> Bool = { PointingSettings.textEntry }
+        /// One `[ZEUS] pointing-trace` line per turn. Offsets only; never text or image data.
+        var log: (String) -> Void = { line in NSLog("%@", line) }
     }
 
     /// Speech input. Live: the explanation microphone. The self-test injects a fixed transcript.
@@ -88,6 +90,7 @@ final class PointingController {
         var stopLatency: TimeInterval?
         var droppedSamples = 0
         var lastFailure: String?
+        var spans = PointingTraceSpans()
         var flightLagMilliseconds: Double? {
             guard let firstAudioAt, let flightStartAt else { return nil }
             return (flightStartAt - firstAudioAt) * 1000
@@ -116,13 +119,15 @@ final class PointingController {
     private var sampler: Timer?
     private var dwellProbes: [Task<(CGPoint, PointingRawTarget?), Never>] = []
     private var inkOwner = false
-    private var previousMouseHandler: ((NSEvent.EventType, CGPoint) -> Void)?
     private var strokeCount = 0
     private var flightLaunched = false
     private var screenNoticeShown = false
     private var stale: PointingStaleTarget?
     private var watchedQuartzPoint: CGPoint?
     private var staleWork: Task<Void, Never>?
+    private var inkTrail = PointingInkTrail()
+    private var traceEmitted = true
+    private var systemObservers: [NSObjectProtocol] = []
 
     init(explanation: ExplanationController, services: Services = Services(), inputs: Inputs? = nil, marker: Marker,
          prepare: @escaping () async -> [PointingProviderPath], recordAudio: @escaping (Double) -> Void = { _ in }) {
@@ -139,6 +144,9 @@ final class PointingController {
         explanation.onEmptyInput = { [weak self] in self?.emptyInput() }
         hotkey.onSignal = { [weak self] signal in self?.handle(signal) }
         textEntry.onSubmit = { [weak self] text in self?.submitText(text) }
+        explanation.onTranscriptFinal = { [weak self] in self?.mark(.transcriptFinal) }
+        explanation.onRequestSent = { [weak self] in self?.mark(.requestSent) }
+        explanation.onFirstValidBeat = { [weak self] in self?.mark(.firstValidBeat) }
     }
 
     var state: PointingSession.State { session.state }
@@ -156,9 +164,10 @@ final class PointingController {
     }
     var isEnabled: Bool { services.enabled() }
 
-    func start() { guard services.enabled() else { return }; hotkey.start() }
+    func start() { guard services.enabled() else { return }; hotkey.start(); installSystemObservers() }
     func stop() {
         hotkey.stop()
+        removeSystemObservers()
         textEntry.hide()
         halt(clearScreen: true)
         _ = session.send(.failure("stopped")); _ = session.send(.cleanedUp)
@@ -173,6 +182,9 @@ final class PointingController {
         case .cancelled: cancelHold()
         case .escape: interrupt()
         case .doubleTapControl: openTextEntry()
+        case .timedOut:
+            onNotice?(.hint("The keys never reported being released, so Zeus sent what it heard."))
+            end(event: .holdTimedOut)
         case .blocked(let message): onNotice?(.hint(message))
         }
     }
@@ -204,6 +216,7 @@ final class PointingController {
         metrics.releaseAt = nil; metrics.firstAudioAt = nil; metrics.flightStartAt = nil
         metrics.flightUsedFallback = false; metrics.stopLatency = nil; metrics.lastFailure = nil
         flightLaunched = false
+        beginSpans()
         guard let id = inputs.begin() else {
             fail("The microphone is busy. Try again in a moment.")
             return
@@ -216,8 +229,9 @@ final class PointingController {
         captureTask = Task { [weak self] in await self?.captureAtPointer(generation: generation) }
     }
 
-    private func end() {
-        let transition = session.send(.keyUp)
+    private func end(event: PointingSession.Event = .keyUp) {
+        endInkStroke()
+        let transition = session.send(event)
         guard transition.to == .processing, transition.from != .processing else { return }
         let generation = session.generation
         metrics.releaseAt = services.now()
@@ -234,6 +248,7 @@ final class PointingController {
         if let id = attempt { inputs.cancel(id) }
         attempt = nil
         marker.idle()
+        finishCancel(.cancelled)
         _ = session.send(.cleanedUp)
     }
 
@@ -247,7 +262,74 @@ final class PointingController {
         metrics.stopLatency = services.now() - began
         explanation.screenContext.cancel()
         marker.idle()
+        finishCancel(.interrupted)
         _ = session.send(.cleanedUp)
+    }
+
+    /// Sleep, wake or a display change. A hold in progress is dropped without a request; a turn in
+    /// flight is stopped; marks are hidden because the capture geometry is no longer valid.
+    func systemInterrupt(_ event: PointingSession.Event) {
+        let transition = session.send(event)
+        hotkey.interruptGesture()
+        textEntry.hide()
+        guard transition.changed else {
+            if event == .displaysChanged { stopWatching(); hideMarks() }
+            return
+        }
+        halt(clearScreen: true)
+        if transition.effects.contains(.stopOutput) { explanation.stop() }
+        if let id = attempt { inputs.cancel(id) }
+        attempt = nil
+        marker.idle()
+        finishCancel(transition.to == .interrupted ? .interrupted : .cancelled)
+        _ = session.send(.cleanedUp)
+    }
+
+    private func installSystemObservers() {
+        guard systemObservers.isEmpty else { return }
+        let workspace = NSWorkspace.shared.notificationCenter
+        systemObservers = [
+            workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.systemInterrupt(.systemSleep) }
+            },
+            workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.systemInterrupt(.systemWake) }
+            },
+            NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+                                                   object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.systemInterrupt(.displaysChanged) }
+            },
+        ]
+    }
+
+    private func removeSystemObservers() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        for observer in systemObservers {
+            workspace.removeObserver(observer)
+            NotificationCenter.default.removeObserver(observer)
+        }
+        systemObservers = []
+    }
+
+    // MARK: Trace spans
+
+    private func mark(_ mark: PointingTraceSpans.Mark) { metrics.spans.mark(mark, at: services.now()) }
+
+    private func beginSpans() {
+        metrics.spans = PointingTraceSpans(); traceEmitted = false
+        mark(.keyDown)
+    }
+
+    private func emitTrace(_ outcome: PointingTraceSpans.Outcome) {
+        guard !traceEmitted, !metrics.spans.isEmpty else { return }
+        traceEmitted = true
+        services.log(metrics.spans.line(outcome: outcome))
+    }
+
+    /// A cancelled or interrupted turn is finished once its work is stopped.
+    private func finishCancel(_ outcome: PointingTraceSpans.Outcome) {
+        mark(.cancelComplete)
+        emitTrace(outcome)
     }
 
     private func fail(_ message: String) {
@@ -260,6 +342,7 @@ final class PointingController {
         explanation.stop()
         marker.idle()
         onNotice?(.hint(message))
+        emitTrace(.failed)
         _ = session.send(.cleanedUp)
     }
 
@@ -299,6 +382,7 @@ final class PointingController {
         metrics.captureAttempts += 1
         do {
             _ = try await explanation.screenContext.captureSelectedDisplay(display.id, lease: .renewing(max: 120))
+            mark(.screenshotReady)
         } catch ExplanationScreenContextFailure.permissionRequired {
             onNotice?(.permission("Screen Recording was turned off. Turn it on in System Settings and try again.", pane: "Privacy_ScreenCapture"))
         } catch {
@@ -420,50 +504,62 @@ final class PointingController {
 
     private func stopSampling() { sampler?.invalidate(); sampler = nil }
 
-    /// Also the injection point for the self-test: it feeds synthetic pointer positions here.
+    /// One pointer reading while the keys are held. Also the injection point for the self-test.
+    /// The pointer path itself is the ink: hovering draws, a pause starts a new shape, and nothing
+    /// here takes the mouse, so clicks and focus stay with the app underneath.
     func sample(at point: CGPoint? = nil) {
         guard session.state == .listening || session.state == .drawing else { return }
+        if metrics.spans.times[.firstMic] == nil, explanation.microphone.state == .listening { mark(.firstMic) }
         let location = point ?? services.mouseLocation()
+        let now = services.now()
         let display = services.displays().first { $0.frame.contains(location) }?.id ?? 0
-        trace.add(PointerSample(time: services.now(), x: location.x, y: location.y, displayID: display))
+        let step = inkTrail.add(location, at: now)
+        if step == .began {
+            endTraceStroke()
+            trace.beginStroke(id: "s\(strokeCount)"); strokeCount += 1
+            _ = session.send(.strokeBegan)
+        }
+        trace.add(PointerSample(time: now, x: location.x, y: location.y, displayID: display))
+        if step != .dropped, inkOwner { MarkModel.shared.strokes = inkTrail.smoothed }
+    }
+
+    private func endTraceStroke() {
+        guard trace.isDrawing else { return }
+        trace.endStroke()
+        _ = session.send(.strokeEnded)
+    }
+
+    private func endInkStroke() {
+        inkTrail.endStroke()
+        endTraceStroke()
     }
 
     private func startInk() {
         guard !MarkOverlay.shared.capturesMouse else { return }
         inkOwner = true
-        previousMouseHandler = MarkOverlay.shared.onMouse
+        inkTrail = PointingInkTrail()
         MarkModel.shared.strokes = []
-        MarkOverlay.shared.onMouse = { [weak self] type, point in self?.ink(type, point) }
-        // While the keys are held, drags are ink and clicks do not reach apps. Release restores both.
-        MarkOverlay.shared.show(capturingMouse: true)
+        MarkModel.shared.inkColor = PointingInkColor.current()
+        // Click-through on purpose: the overlay never takes mouse events, so the app under the
+        // pointer keeps focus and receives every click and drag while the keys are held.
+        MarkOverlay.shared.show(capturingMouse: false)
     }
 
     private func stopInk() {
         guard inkOwner else { return }
         inkOwner = false
         MarkOverlay.shared.hide()
-        MarkOverlay.shared.onMouse = previousMouseHandler
-        previousMouseHandler = nil
         MarkModel.shared.strokes = []
+        MarkModel.shared.inkColor = nil
+        inkTrail = PointingInkTrail()
     }
 
-    /// Mouse input on the overlay. Also the injection point for the self-test.
+    /// Test seam for the self-test: a synthetic press, drag and release become pointer samples.
     func ink(_ type: NSEvent.EventType, _ point: CGPoint) {
         switch type {
-        case .leftMouseDown:
-            guard session.send(.strokeBegan).changed else { return }
-            trace.beginStroke(id: "s\(strokeCount)"); strokeCount += 1
-            MarkModel.shared.strokes.append([point])
-            sample(at: point)
-        case .leftMouseDragged:
-            guard trace.isDrawing else { return }
-            sample(at: point)
-            if !MarkModel.shared.strokes.isEmpty { MarkModel.shared.strokes[MarkModel.shared.strokes.count - 1].append(point) }
-        case .leftMouseUp:
-            guard trace.isDrawing else { return }
-            sample(at: point)
-            trace.endStroke()
-            _ = session.send(.strokeEnded)
+        case .leftMouseDown: endInkStroke(); sample(at: point)
+        case .leftMouseDragged: sample(at: point)
+        case .leftMouseUp: sample(at: point); endInkStroke()
         default: break
         }
     }
@@ -499,6 +595,7 @@ final class PointingController {
         metrics.releaseAt = nil; metrics.firstAudioAt = nil; metrics.flightStartAt = nil
         metrics.flightUsedFallback = false; metrics.stopLatency = nil; metrics.lastFailure = nil
         flightLaunched = false; attempt = nil
+        beginSpans(); mark(.transcriptFinal)
         // Nothing was spoken: go straight from the key-down to processing.
         let processing = session.send(.keyUp)
         guard processing.to == .processing else { return }
@@ -609,12 +706,14 @@ final class PointingController {
     private func speechStarted() {
         guard session.state == .processing else { return }
         _ = session.send(.firstPlaybackStart)
+        mark(.firstAudio)
         metrics.firstAudioAt = services.now()
         if let release = metrics.releaseAt { recordAudio(services.now() - release) }
     }
 
     /// The flight starts when a ring is admitted by real playback, which is never before first audio.
     private func revealed(_ scene: ExplanationScene, fallback: Bool) {
+        mark(.firstVisual)
         beatTick()
         guard !flightLaunched, let capture = explanation.screenContext.annotationContext else { return }
         let marks = scene.objects.values.filter { $0.space == .capture && $0.captureID == capture.geometry.captureID }
@@ -640,6 +739,7 @@ final class PointingController {
         if !flightLaunched, let scene = explanation.scene { revealed(scene, fallback: true) }
         if !flightLaunched { marker.idle() }
         _ = session.send(.turnCompleted)
+        emitTrace(.completed)
     }
 
     private func emptyInput() {
@@ -650,6 +750,7 @@ final class PointingController {
         attempt = nil
         marker.idle()
         if let reason { onNotice?(.hint(reason)) }
+        emitTrace(.empty)
         _ = session.send(.cleanedUp)
     }
 }

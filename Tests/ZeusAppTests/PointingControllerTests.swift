@@ -11,6 +11,7 @@ struct PointingControllerTests {
     @MainActor private final class Calls {
         var begins = 0, finishes = 0, cancels = 0, providerRequests = 0, idles = 0, captures = 0
         var notices: [PointingNotice] = []
+        var traces: [String] = []
     }
 
     @MainActor private final class Provider: ExplanationModelProviding {
@@ -50,6 +51,7 @@ struct PointingControllerTests {
         services.probe = { _ in nil }
         services.enabled = { enabled }
         services.sendScreenshot = { false }
+        services.log = { calls.traces.append($0) }
         let inputs = PointingController.Inputs(begin: { calls.begins += 1; return UUID() },
                                                finish: { _ in calls.finishes += 1 }, cancel: { _ in calls.cancels += 1 })
         let marker = PointingController.Marker(listen: {}, think: {}, idle: { calls.idles += 1 }, flight: { _, _ in true })
@@ -118,5 +120,66 @@ struct PointingControllerTests {
             case .hint(let text), .permission(let text, _): #expect(!text.contains("—"))
             }
         }
+    }
+
+    @Test func holdingTheKeysNeverTakesTheMouseAndHoveringDrawsAStroke() {
+        let (controller, _) = make()
+        controller.handle(.began)
+        #expect(!MarkOverlay.shared.capturesMouse)
+        #expect(MarkOverlay.shared.ownedWindows.allSatisfy(\.ignoresMouseEvents))
+        controller.sample(at: CGPoint(x: 100, y: 100))
+        controller.sample(at: CGPoint(x: 140, y: 120))
+        #expect(controller.trace.strokes.count == 1)
+        #expect(controller.state == .drawing)
+        controller.handle(.cancelled)
+        #expect(MarkOverlay.shared.ownedWindows.isEmpty)
+    }
+
+    @Test func sleepCancelsAHoldWithoutARequestAndLogsOneTraceLine() {
+        let (controller, calls) = make()
+        controller.handle(.began)
+        controller.systemInterrupt(.systemSleep)
+        #expect(controller.state == .idle)
+        #expect(calls.finishes == 0 && calls.cancels == 1)
+        #expect(calls.traces.count == 1)
+        #expect(calls.traces.first?.contains("outcome=cancelled") == true)
+        #expect(calls.traces.first?.contains("cancel_complete=0") == true)
+        #expect(calls.traces.first?.hasPrefix("[ZEUS] pointing-trace") == true)
+    }
+
+    @Test func aDisplayChangeDropsTheHoldAndANewHoldStartsClean() {
+        let (controller, calls) = make()
+        controller.handle(.began)
+        controller.systemInterrupt(.displaysChanged)
+        #expect(controller.state == .idle && calls.finishes == 0)
+        controller.handle(.began)
+        #expect(controller.state == .listening && calls.begins == 2)
+        controller.handle(.cancelled)
+    }
+
+    @Test func aTimedOutHoldSendsTheTurnAndExplainsWhy() {
+        let (controller, calls) = make()
+        controller.handle(.began)
+        controller.handle(.timedOut)
+        #expect(controller.state == .processing)
+        let hints = calls.notices.compactMap { notice -> String? in
+            if case .hint(let text) = notice { text } else { nil }
+        }
+        #expect(hints.contains { $0.contains("never reported being released") && !$0.contains("—") })
+        controller.interrupt()
+    }
+
+    @Test func aCancelledTurnLogsExactlyOneTraceLine() {
+        let (controller, calls) = make()
+        controller.handle(.began)
+        controller.handle(.cancelled)
+        controller.handle(.cancelled)
+        #expect(calls.traces.count == 1)
+    }
+
+    @Test func systemEventsWhileIdleChangeNothing() {
+        let (controller, calls) = make()
+        controller.systemInterrupt(.systemWake)
+        #expect(controller.state == .idle && calls.cancels == 0 && calls.traces.isEmpty)
     }
 }

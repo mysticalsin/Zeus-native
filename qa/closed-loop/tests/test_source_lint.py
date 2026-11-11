@@ -368,5 +368,25 @@ class VoiceLatencyLint(unittest.TestCase):
         self.assertTrue(re.search(r"while\s+cursor\s*<\s*candidates\.count", "while cursor < candidates.count {"))
 
 
+class PointingMainActorLint(unittest.TestCase):
+    """Pointing: this process's Accessibility calls stay on the main actor, and the held-key overlay never takes the mouse."""
+    POINTING = APP / "Pointing"
+
+    def test_probe_ax_calls_stay_on_the_main_actor(self):
+        probe = (self.POINTING / "PointingTargetProbe.swift").read_text()
+        self.assertRegex(probe, r"@MainActor\s+static func hitTest\(atQuartzPoint")
+        self.assertNotRegex(probe, r"nonisolated\s+static func hitTest")
+
+    def test_no_pointing_source_runs_the_hit_test_on_a_detached_task(self):
+        for path in self.POINTING.glob("*.swift"):
+            match = re.search(r"Task\.detached[^\n]*\n?[^\n]*hitTest", path.read_text())
+            self.assertIsNone(match, f"{path.name}: hit test inside Task.detached")
+
+    def test_holding_the_keys_never_captures_the_mouse(self):
+        controller = (self.POINTING / "PointingController.swift").read_text()
+        self.assertNotIn("show(capturingMouse: true)", controller)
+        self.assertIn("show(capturingMouse: false)", controller)
+
+
 if __name__ == "__main__":
     unittest.main()
