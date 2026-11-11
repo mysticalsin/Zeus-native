@@ -2627,6 +2627,90 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_every_requested_permission_has_its_info_plist_usage_string"
       }
+    },
+    {
+      "id": "REG-218",
+      "failure": "Transcribing a file while the microphone was open overwrote the listening phase, so the recorder kept capturing under a phase that no longer allowed finishing it.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationFlowTests.swift",
+        "function": "fileWhileListeningCannotTakeThePhaseFromTheMicrophone"
+      }
+    },
+    {
+      "id": "REG-219",
+      "failure": "A cancelled or superseded file transcription still finished: the first of two overlapping files marked the second done and a cancelled file overwrote the clipboard.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationFlowTests.swift",
+        "function": "firstFileFinishingCannotMarkTheSecondFileDone"
+      }
+    },
+    {
+      "id": "REG-220",
+      "failure": "A late Parakeet progress callback after the download finished left the progress bar stuck and refused every later download.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ModelPreparationTests.swift",
+        "function": "lateProgressAfterFinishCannotLeaveTheBarStuck"
+      }
+    },
+    {
+      "id": "REG-221",
+      "failure": "A failed Parakeet download was retried on every dictation key press with no terminal state.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ModelPreparationTests.swift",
+        "function": "automaticRetryAfterFailureIsRefusedButExplicitRetryWorks"
+      }
+    },
+    {
+      "id": "REG-222",
+      "failure": "A double click on Turn on for Microphone and Speech Recognition (or a second talk-key press, or two Chrome steps on one site) raised the consent prompt twice.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RequestFlightTests.swift",
+        "function": "doubleClickJoinsTheLivePromptInsteadOfAskingAgain"
+      }
+    },
+    {
+      "id": "REG-223",
+      "failure": "A slow update-feed check begun before auto-update was turned off finished late and brought the update badge back.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UpdateRefreshTests.swift",
+        "function": "slowOlderCheckFinishingLateCannotBringTheBadgeBack"
+      }
+    },
+    {
+      "id": "REG-224",
+      "failure": "A microphone-test level queued from a finished test landed in the next test and inflated its peak, giving the wrong verdict.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MicTestTests.swift",
+        "function": "levelFromAnEarlierTestCannotInflateTheNewPeak"
+      }
     }
   ]
 }
