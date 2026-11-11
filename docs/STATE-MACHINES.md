@@ -8,8 +8,9 @@ must change together. The fix pattern used here: a pure `State` / `Event` / `Eff
 a controller that holds one `state` value and performs the effects, a token on every async completion, and
 Swift Testing tests in `Tests/ZeusCoreTests`.
 
-Summary: 20 machines inventoried. 6 were fixed (5 commits, Chrome consent shares the consent commit). 5 were already
-explicit or mostly explicit (skipped). 9 remain: 8 ranked at the end, plus KeepAwake which needs no change.
+Summary: 20 machines inventoried in the first audit; 6 fixed then. Second pass (branch `codex/state-machines-20261111`,
+2026-11-11) fixed items 12 to 17 and 19, the Automation Allow more bug and a new overlap-flag class (21); Insomnia is
+reviewed and left, Pointing is explicit (22). Nothing could be compiled in the authoring sandbox; CI is the first compile.
 
 ## Fixed
 
@@ -64,41 +65,80 @@ explicit or mostly explicit (skipped). 9 remain: 8 ranked at the end, plus KeepA
 ### 11. Wake word gate. MOSTLY EXPLICIT
 `Voice/WakeWordController.swift` derives run/pause from the pure `WakeGate` (ZeusCore) on a 2 s poll. The listener itself is one optional. Only the retry loop is open, see item 15.
 
-## Remaining (not fixed)
+## Fixed in the second pass (2026-11-11)
 
-### 12. Polyglot run. HAND-ROLLED BUT GUARDED, severity medium
-`Polyglot/PolyglotController.swift:24-25, 60-68, 118-173`: `isListening`, `isStarting`, `generation`, `startTask`, `pipeline`, `mic`, `system`, `audioIn`, `eventIn`, `audioTask`, `eventTask`. Every await in `begin` checks `isCurrent(token)` and tears down what it opened, and `stop()` bumps the generation, so I found no live bug. The Bools are still two flags for what is idle, starting(token), listening(token). Candidate for a `PolyglotRun` reducer; the risk is the 12 resources `stop()` must release.
+Each follows the same shape: a pure reducer in `Sources/ZeusCore`, a controller that applies its effects, Swift Testing
+tests in `Tests/ZeusCoreTests`, and a `qa/regressions.json` row (REG-227 to REG-236).
 
-### 13. Automation consent cache. IMPLICIT, severity medium
-`App/PermissionsModel.swift:365-455` (`Automation`: static `cache`, `inFlight`, `cacheLock`, `testStatusProvider`, TTLs) plus `automationPending` and `automationAsking`. Scenario: a background `ask: false` check starts, the person clicks Allow, `askAsync` stores `granted`, then the older check returns `errAEEventWouldRequireUserConsent` and `storeResolved` overwrites the grant and `remember` deletes the persisted grant until the next 20 s refresh. Needs a per-bundle generation like `UpdateRefresh`. Not fixed because the cache is static, lock-based and shared with tests.
+### 16. Onboarding completion. FIXED, severity medium
+`ZeusCore/Onboarding/OnboardingProgress.swift` (notStarted, inProgress, dismissed, completed), tests `OnboardingProgressTests.swift`,
+App tests in `OnboardingIsolationTests.swift`. Closing the window (`windowWillClose`) or "Set up later" with no step after it records
+`zeus.onboarding.dismissed`; `AppDelegate` opens the guide at launch only for an unfinished, undismissed guide
+(`OnboardingProgress.opensAtLaunch`). Settings > General > Setup keeps "Show setup guide" (still opens after a dismissal or completion).
 
-### 14. SpeechInput recorder. IMPLICIT, severity medium
-`Voice/SpeechInput.swift:118-148`: `engine`, `request`, `task`, `finished`, `waiters`, `generation`, `latest`, `finalizedText`, `stopRequested`, `consecutiveErrors`, `suppressLiveTap`, all under one `NSLock`. Generation checks exist on taps and restarts. A clean model would be idle, recording(session), restarting(session), stopping(session). Not fixed: 630 lines, lock-based, audited for the Swift 6 callback rules, and no compiler here.
+### 13. Automation consent cache. FIXED, severity medium
+`ZeusCore/Permissions/AutomationConsentCache.swift`: a generation per app. It moves when the consent sheet is raised and when it is
+answered; each background check keeps the generation it started in and a result from an older one is dropped (also the "slow" mark and a
+late answer). `Automation` in `PermissionsModel.swift` now holds `[bundleID: State]` under the lock. Tests `AutomationConsentCacheTests.swift`
+(the race is `olderCheckReportingNeedsConsentCannotOverwriteANewerGrant`) and an App-level test with a blocked provider in
+`PermissionsAutomationTests.swift`. Also fixed: a late (slower than 1 s) answer used to be discarded; it is now kept when still current.
 
-### 15. Wake word retry. OPEN LOOP, severity low
-`WakeWordController.swift:48, 168-188`: `retryStartAt` retries every 10 s (mic start failure) or 30 s (no on-device recognition) forever, with no terminal "needs attention" state and no log dedupe after the first.
+### 13b. Settings > Automation "Allow more". FIXED, severity medium
+`ZeusCore/Permissions/AutomationAllowPlan.swift`. The button asked every running app, so with only an already-allowed app open it did
+nothing visible; closed apps were never named; an app macOS had refused (it never re-prompts) failed silently. Now only apps not yet
+allowed are asked, closed ones are named ("Open Spotify, Keynote or PowerPoint, then press Allow more."), a refused or declined app opens
+the Automation pane with "Turn on Zeus for Spotify in Automation.", and the status text lists app names from an observable list.
+Tests `AutomationAllowPlanTests.swift`.
 
-### 16. Onboarding completion. GAP, severity medium
-`Onboarding/OnboardingFlow.swift:122-160, 322`. "Set up later" is a per-step skip (`flow.next()`), not a dismissal; completion is recorded only by `complete()` on the final Sounds step. Closing the window earlier records nothing, so `AppDelegate.swift:300` (`!OnboardingFlow.isCompleted`) reopens the guide at the saved step on every launch. Fix needs a dismissed state plus a policy in `AppDelegate.swift`, which is off limits tonight (see report).
+### 12. Polyglot run. FIXED, severity medium
+`ZeusCore/Polyglot/PolyglotRun.swift` (idle, starting, listening, stopping) replaces `isStarting`/`isListening`. Real bugs it removes: an input
+that ended mid-start was counted as open (the run said Listening on a dead mic); a mic change during the Mac-audio start stopped a two-input
+run; a stale start's cleanup did `mic?.stop(); mic = nil` on the newest run's microphone after Stop then Start. Tests `PolyglotRunTests.swift`
+(stop during start, double start, error mid-start, late events from an older run).
 
-### 17. Accessibility gate. IMPLICIT, severity low
-`App/PermissionsModel.swift:476-496` (`AccessibilityGate`: `waiting`, `timer`): polls every 3 s forever and never drops waiters if the feature that queued them is turned off.
+### 14. SpeechInput recorder. FIXED, severity medium
+`ZeusCore/Dictation/SpeechRecorder.swift` (idle, recording, restarting, stopping, all keyed by session). `SpeechInput` keeps its lock and
+Swift 6 callback rules (no tap or recognition handler moved; the audited file list is unchanged) and consults the reducer for `stopRequested`,
+the error counter and both restart decisions (they were written twice). A second final during a restart no longer opens a second task.
+Tests `SpeechRecorderTests.swift`.
 
-### 18. Insomnia. IMPLICIT, severity low
-`Insomnia/InsomniaController.swift:42-64, 110-219, 357`: `lidArmed`, `setupBusy`, `armFailure`, `restoreRetry` timer, `lastHotspotTry`, `nudgeTimer`. Guards exist (`guard !lidArmed`, `!setupBusy`) and `restoreRetry` is invalidated on disarm. No concrete bug found.
+### 15. Wake word retry. FIXED, severity low
+`ZeusCore/Voice/WakeRetry.swift`: doubling backoff (10 s to 60 s for the mic, 30 s to 120 s for no on-device recognition), 6 and 3 attempts, then
+"Needs attention"; one log line per streak; reset by turning it off and on, a pause (permission, call, lock) or a success. Driven by the existing 2 s
+gate check. Tests `WakeRetryTests.swift`.
 
-### 19. Teleprompter. IMPLICIT, severity low
-`TopBar/TeleprompterController.swift:10-14, 28-60, 79-105`: `topBar.prompterActive`, `engine`, `timer`. A level queued before `end()` can write `prompterLevel` after the reset to 0. Cosmetic.
+### 17. Accessibility gate. FIXED, severity low
+`ZeusCore/Permissions/TrustWait.swift`: waiters are keyed (call site by default), asking twice runs the feature once, `cancelWaiting(key:)` drops one,
+and the 3 s poll stops with the last waiter. Tests `TrustWaitTests.swift`.
+
+### 19. Teleprompter. FIXED, severity low
+`ZeusCore/TopBar/PrompterRun.swift`: a session number per voice-follow microphone; a level is accepted only from the live session of a running
+prompter, so a level queued before `end()` (or before a voice-follow off and on) no longer lights the meter. Tests `PrompterRunTests.swift`.
+
+### 21. Busy flags shared by overlapping calls (Beamer, AI connections). FIXED, severity low
+`BeamerModel.busy` was set by `perform` and `install` with no re-entry guard, and `AIConnections.checking` by every `refresh`: the first of two
+overlapping calls to finish cleared the flag under the other. `ZeusCore/Lifecycle/OverlapCounter.swift`, tests `OverlapCounterTests.swift`.
+
+## Remaining and reviewed
+
+### 18. Insomnia. IMPLICIT, severity low, not changed
+`Insomnia/InsomniaController.swift`: `lidArmed`, `setupBusy`, `armFailure`, `restoreRetry`, `lastHotspotTry`, `nudgeTimer`. Its `session` already is an
+explicit model (`session.isActive`) and the remaining flags are re-entry guards that hold; no scenario that loses state was found, so a rewrite
+would add risk without removing a bug class.
+
+### 22. Pointing (PointingController, PointingHotkeyMonitor). EXPLICIT
+Driven by `PointingSession` and `PointingKeyGesture` in ZeusCore (begin, end, cancel, escape, blocked are all session events with a generation
+and `isCurrent` checks after every await); the source lint already bans `Task.sleep` and non-nonisolated callbacks there. One gap: when the event tap
+cannot be created (`PointingHotkeyMonitor.startTap`) `onUnavailable` fires once and `isRunning` stays true, so only a stop and start (turning
+Pointing off and on) retries. Low severity, not changed.
+
+### Other sweep results (no change)
+- `KokoroWorkerSession`, `MCPStdioClient`: actors with several Task handles but one admitted request, a `closed` flag and generation checks; serialized by
+  the actor. Explicit enough.
+- `LicenseManager.busy`, `WikiMCPExport.busy`, `VoiceSettings.loadingLibrary`, `ProjectScanner.refreshing`, `AppIndex.refreshing`: each guards re-entry
+  before setting the flag (single flight), so the overlap bug does not apply.
+- `Speaker.isSpeaking` is derived from four sources (synthesizer, pump, player, file pump); read-only, no write races found.
+- Scribe and Recordly were out of scope for this pass (other work in progress on those folders); their machines remain the explicit ones in items 7 and 8.
 
 ### 20. KeepAwake. EXPLICIT ENOUGH
-`TopBar/TeleprompterController.swift:166-196`: `isOn` plus the assertion id, both set together in one place. No change needed.
-
-## Ranked work left
-1. Automation consent cache stale overwrite (13).
-2. Onboarding dismissal state (16), needs `AppDelegate.swift`.
-3. SpeechInput recorder session model (14).
-4. Polyglot `PolyglotRun` reducer (12).
-5. Wake word retry terminal state (15).
-6. Accessibility gate waiters (17).
-7. Teleprompter level after end (19).
-8. Insomnia (18).
+`TopBar/TeleprompterController.swift`: `isOn` plus the assertion id, both set together in one place. No change needed.
