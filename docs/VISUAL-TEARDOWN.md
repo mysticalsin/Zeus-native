@@ -1,11 +1,11 @@
-# Glance visual teardown (for ZEUS rounds 6 and 7)
+# the reference app visual teardown (for ZEUS rounds 6 and 7)
 
 ## Round 7 top bar (supersedes the round 6 panel rows below)
 Source: `teardown/glance-live/TOPBAR-SPEC.md` (live window captures, 19:41 BRT, 2 px per pt).
 These values live in `ZeusCore/TopBar/GlanceTopBar.swift`, and the colours in `GlassTheme.swift`
 (`Glass.notchPanelFill`) and `GlanceHomeCards.swift` (`GlanceTint`, `GlanceType`).
 
-| Item | Glance | ZEUS now |
+| Item | the reference app | ZEUS now |
 |---|---|---|
 | Closed idle | 185 x 32, black, bottom radius 6, square top, no wings | same (idle wings off: Mini ZEUS beside the notch defaults off) |
 | Open body | 870 x 210, ears 27.5 wide fading by y 30, bottom radius 22 continuous | 870 x 210 + 2 x 27.5 ears, earHeight 30, continuous 22 |
@@ -82,6 +82,6 @@ Measurements are taken from the captures. ±2 pt is the reading error. Nothing w
 - No buddy or spark is drawn over the open panel. The mascot lives in the bar.
 
 ## Settings
-- Glance's sidebar order: General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut,
+- the reference app's sidebar order: General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut,
   Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License.
 - ZEUS keeps the sections it actually has. It never shows a "Coming soon" row.

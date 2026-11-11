@@ -302,12 +302,12 @@ The app ignores any model geometry for objects with `targetID` and uses the cand
 
 ## 3. Renderer and 3D decision
 
-**[Rec] Native SwiftUI/AppKit for 2D, keeping the existing `ExplanationCanvasLayout`/`ExplanationCanvasPainter` path, with SceneKit for 3D in Phases 1 to 4 behind a renderer seam. No WKWebView/Three.js.**
+**[Rec] Native SwiftUI/AppKit for 2D, keeping the existing `ExplanationCanvasLayout`/`ExplanationCanvasPainter` path, with SceneKit for 3D in Phases 1 to 4 behind a renderer seam. No web view or web 3D library.**
 
 Justification, grounded in the code:
 1. The existing renderers already consume validated presentation snapshots and have no autonomous clock (`ExplanationSceneView.swift:13-14`, `docs/VISUAL-EXPLANATIONS.md`). That is exactly the A/V-sync property the spec requires. They are bound to native tests (`F09.ExplanationRendererTests`, 12 cases).
 2. The desktop overlay already reuses the same layout for capture-space marks (`ExplanationOverlay.swift:36-43`), so one projection serves hit testing and drawing.
-3. A WKWebView adds a JS engine, CSP, an asset/IPC bridge and a second memory pool. It also weakens the "data only, never scripts" boundary that the wire decoder enforces (`ExplanationStream.swift:29-45`). Bundling Three.js would need licensing notices and an IPC schema, while giving no capability that SceneKit primitives lack for this demo.
+3. A WKWebView adds a JS engine, CSP, an asset/IPC bridge and a second memory pool. It also weakens the "data only, never scripts" boundary that the wire decoder enforces (`ExplanationStream.swift:29-45`). Bundling a web 3D library would need licensing notices and an IPC schema, while giving no capability that SceneKit primitives lack for this demo.
 4. **SceneKit status [Verified via secondary sources]:** at WWDC25 Apple soft-deprecated SceneKit. It is in maintenance mode with critical fixes only, existing apps keep working, no removal date has been given, and migration to RealityKit is encouraged ([WWDC25 session 288](https://developer.apple.com/videos/play/wwdc2025/288/), [Apple migration guide](https://developer.apple.com/documentation/realitykit/bringing-your-scenekit-projects-to-realitykit.md), [summary](https://dev.to/arshtechpro/wwdc-2025-scenekit-deprecation-and-realitykit-migration-a-comprehensive-guide-for-ios-developers-o26)). **[Verify]** whether SwiftUI `RealityView` on macOS requires macOS 15. Zeus's floor is macOS 14.2 (`Package.swift:6`).
 5. **[Rec]** Add an `ExplanationWorldRendering` protocol now, keep `ExplanationSceneView` as the SceneKit implementation, and schedule a RealityKit implementation (Phase 6) when the floor moves to macOS 15 or later. The protocol data (primitives, groups, materials, camera, animation) is renderer-neutral, so no wire change is needed.
 
