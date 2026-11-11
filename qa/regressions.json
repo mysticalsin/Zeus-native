@@ -2977,6 +2977,155 @@
         "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
         "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
+    },
+    {
+      "id": "REG-248",
+      "failure": "A spoken turn had no timing: nobody could tell where the 85 s went. Every voice turn now writes one voice-latency line with stage times and the engine and reason, and never the transcript or a key.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "logLineHasEveryStageAndNoFreeText"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "scripts/voice-latency.sh could not report p50 and p90 for key-up to first audio, so a speed claim could not be checked on the real app.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_summary_reports_p50_p90_and_the_route_target"
+      }
+    },
+    {
+      "id": "REG-250",
+      "failure": "Brains and the persistent Claude process warmed at launch instead of when the talk key went down.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_nothing_warms_at_launch_and_the_talk_key_warms_the_brain"
+      }
+    },
+    {
+      "id": "REG-251",
+      "failure": "A long first sentence with no comma was spoken only after its full stop. The first twelve complete words now go to the voice at once.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "aLongFirstSentenceWithoutACommaSpeaksAfterTwelveWords"
+      }
+    },
+    {
+      "id": "REG-252",
+      "failure": "The direct Anthropic request used an old Haiku, no prompt cache block and left thinking on. It now sends the current Haiku with thinking off, low effort and a cached system block, and retries plain forms only on 400 or 404.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "leanTurnsThinkingOffAndEffortLowAndPlainOmitsBoth"
+      }
+    },
+    {
+      "id": "REG-253",
+      "failure": "Every CLI-only spoken turn paid process start. A lean persistent claude process is reused, recycled after a few turns, and replaced when its flags change.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "respawnsWhenMissingDeadChangedWornOrOld"
+      }
+    },
+    {
+      "id": "REG-254",
+      "failure": "Sentences joined with a click: each sentence started and ended at a non-zero sample. A 4 ms fade is applied at a buffer edge only where needed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "twoSentencesJoinWithoutAJump"
+      }
+    },
+    {
+      "id": "REG-255",
+      "failure": "An ElevenLabs answer could change model, and so timbre, between sentences. One model is pinned for the whole answer and Studio falls back to the fast model only before any audio plays.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "oneModelSpeaksTheWholeAnswer"
+      }
+    },
+    {
+      "id": "REG-256",
+      "failure": "The Ultron voice was designed automatically on first use. A voice is created only after Tony taps Create Zeus voice.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_voice_is_never_designed_without_a_tap"
+      }
+    },
+    {
+      "id": "REG-257",
+      "failure": "Saving an ElevenLabs key gave no feedback. A quick check now says Key works or why the key was refused, without echoing the key.",
+      "features": [
+        "F11",
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "aRejectedKeyGivesTheReasonWithoutEchoingAnything"
+      }
+    },
+    {
+      "id": "REG-258",
+      "failure": "The spoken persona rules (at most three sentences, lead with the answer, never menacing) and the no-filler-when-fast rule had no test.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "noFillerWhenTheFirstTextArrivesUnderSevenHundredMilliseconds"
+      }
+    },
+    {
+      "id": "REG-259",
+      "failure": "The macOS fallback voice ignored the language of the reply and no hint offered an Enhanced or Premium voice when only basic voices were installed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "hintAppearsOnlyWhenNoEnhancedOrPremiumVoiceIsUsable"
+      }
     }
   ]
 }

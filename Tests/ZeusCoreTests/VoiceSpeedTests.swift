@@ -267,3 +267,69 @@ struct VoiceQualityTests {
         #expect(abs(raw[4_800] - raw[4_799]) > 0.1)
     }
 }
+
+@Suite("ElevenLabs key check")
+struct ElevenLabsKeyCheckTests {
+    private func body(_ status: String) -> Data { Data(#"{"detail":{"status":"\#(status)","message":"x"}}"#.utf8) }
+
+    @Test func aWorkingKeySaysKeyWorks() {
+        #expect(ElevenLabsKeyCheck.interpret(status: 200, body: Data()) == .init(ok: true, message: "Key works."))
+    }
+
+    @Test func aRejectedKeyGivesTheReasonWithoutEchoingAnything() {
+        let rejected = ElevenLabsKeyCheck.interpret(status: 401, body: body("invalid_api_key"))
+        #expect(!rejected.ok)
+        #expect(rejected.message.contains("rejected"))
+        let limited = ElevenLabsKeyCheck.interpret(status: 401, body: body("missing_permissions"))
+        #expect(limited.ok)
+        #expect(limited.message.contains("limited permissions"))
+    }
+
+    @Test func quotaRateLimitAndServerErrorsAreTold() {
+        #expect(ElevenLabsKeyCheck.interpret(status: 402, body: Data()).message.contains("credits"))
+        #expect(ElevenLabsKeyCheck.interpret(status: 429, body: Data()).ok)
+        #expect(!ElevenLabsKeyCheck.interpret(status: 503, body: Data()).ok)
+        #expect(!ElevenLabsKeyCheck.unreachable.ok)
+    }
+}
+
+@Suite("Anthropic voice request body")
+struct AnthropicVoiceBodyTests {
+    private let messages = [["role": "user", "content": "hello"]]
+
+    @Test func theSystemPromptIsACachedBlockAndTheRequestStreams() throws {
+        let body = AnthropicVoiceBody.make(model: "claude-haiku-5-5", system: "persona", messages: messages, maxTokens: 512, lean: true)
+        #expect(body["stream"] as? Bool == true)
+        #expect(body["max_tokens"] as? Int == 512)
+        let system = try #require(body["system"] as? [[String: Any]])
+        #expect(system.count == 1)
+        #expect(system[0]["text"] as? String == "persona")
+        #expect((system[0]["cache_control"] as? [String: String])?["type"] == "ephemeral")
+        #expect(JSONSerialization.isValidJSONObject(body))
+    }
+
+    @Test func leanTurnsThinkingOffAndEffortLowAndPlainOmitsBoth() {
+        let lean = AnthropicVoiceBody.make(model: "claude-haiku-5-5", system: "p", messages: messages, maxTokens: 512, lean: true)
+        #expect((lean["thinking"] as? [String: String])?["type"] == "disabled")
+        #expect((lean["output_config"] as? [String: String])?["effort"] == "low")
+        let plain = AnthropicVoiceBody.make(model: "claude-haiku-5-5", system: "p", messages: messages, maxTokens: 512, lean: false)
+        #expect(plain["thinking"] == nil)
+        #expect(plain["output_config"] == nil)
+    }
+
+    @Test func fastTierRetriesPlainThenThePreviousHaikuOnlyOnABadRequestOrUnknownModel() {
+        let tries = AnthropicVoiceBody.fastAttempts(current: "claude-haiku-5-5")
+        #expect(tries.map(\.model) == ["claude-haiku-5-5", "claude-haiku-5-5", "claude-haiku-4-5"])
+        #expect(tries.map(\.lean) == [true, false, false])
+        #expect(AnthropicVoiceBody.shouldRetry(status: 400))
+        #expect(AnthropicVoiceBody.shouldRetry(status: 404))
+        #expect(!AnthropicVoiceBody.shouldRetry(status: 401))
+        #expect(!AnthropicVoiceBody.shouldRetry(status: 429))
+        #expect(!AnthropicVoiceBody.shouldRetry(status: 529))
+    }
+
+    @Test func theFastModelIsHaikuFiveFiveAndStaysInsideTheCap() {
+        #expect(ModelCap.httpModel(.anthropic, tier: .fast) == "claude-haiku-5-5")
+        #expect(ModelCap.isAllowed("claude-haiku-5-5"))
+    }
+}

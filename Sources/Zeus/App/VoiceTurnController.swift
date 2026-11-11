@@ -76,17 +76,9 @@ final class VoiceTurnController {
             }
         }
         FastActions.shared.onLateProblem = { [weak self] text in self?.say(text) }
-        ClaudeFlags.warm()
-        BrainLaunchWarm.registerWait {
-            async let ollama: Void = OpenAICompatProvider.ollama().prewarm()
-            async let anthropic: Void = AnthropicAPIProvider().prewarm()
-            _ = await (ollama, anthropic)
-        }
-        Task { await BrainLaunchWarm.awaitIfNeeded() }
+        // Perf rule: nothing warms at launch. The talk key going down warms the brain connection, the lean
+        // `claude` process and the voice (`KeyDownWarmer`, `Speaker.prewarm`) while Tony is still speaking.
         BrainWarmScheduler.shared.start()
-        Task { @MainActor in
-            await BrainWarmActions.live.warmSelectedVoice()
-        }
     }
 
     /// After the words sit still for 0.7 s, start the fastest brain. Commands stay on the instant path.
@@ -118,6 +110,7 @@ final class VoiceTurnController {
     /// Menu › Stop Speaking (pressing the talk key also interrupts).
     func stopSpeaking() {
         fastRace?.cancel()
+        PersistentClaudeSession.shared.abortBusy()
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -134,6 +127,9 @@ final class VoiceTurnController {
         // A new press always interrupts whatever ZEUS was doing.
         BrainWarmScheduler.shared.noteActivity()
         fastRace?.cancel()
+        // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
+        PersistentClaudeSession.shared.abortBusy()
+        KeyDownWarmer.talkKeyDown()
         // Off the critical path: the local-model check is read from this cache when the answer starts.
         Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
         turnTask?.cancel()
@@ -180,6 +176,7 @@ final class VoiceTurnController {
         guard listening else { return }
         listening = false
         turnReleasedAt = .now
+        VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
         ZeusSound.play(.listenStop)
         SystemAudioDucker.end()
@@ -211,6 +208,7 @@ final class VoiceTurnController {
         speaker.stop()
         buddy.model.captionVisible = false
         let heardAt = ContinuousClock.now
+        VoiceLatency.shared.begin(at: heardAt)
         // Only the LLM path uses these; the fast path never waits for them.
         screenshotsTask = Task { await ScreenCapture.captureAll() }
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
@@ -303,6 +301,8 @@ final class VoiceTurnController {
         }
         VoiceLog.logContent("transcript", transcript)
         if turnReleasedAt == nil { turnReleasedAt = finalAt }
+        if !VoiceLatency.shared.isActive { VoiceLatency.shared.begin(at: finalAt) }
+        VoiceLatency.shared.mark(.transcriptFinal)
 
         let options = SettingsStore.shared
         if let approval = notch.model.approval, options.bool("voice.answers"),
@@ -808,6 +808,7 @@ final class VoiceTurnController {
                     startedSpeaking = true
                     VoiceAnswerLatency.noteFirstSentence()
                     if spokenSentenceCount == 1 {
+                        VoiceLatency.shared.mark(.firstSentence)
                         VoiceLog.log("timing", "release->firstToken ms=\(timingFirstToken ?? -1), ->firstSentence ms=\(msSinceRelease()) (audio starts speech_start_ms later, see speaker line)")
                     }
                     if speak { speaker.speak(PersonaCompliance.stripOminousHedges(sentence)) }
@@ -822,8 +823,13 @@ final class VoiceTurnController {
             if let replay {
                 VoiceLog.log("route", "brain speculative \(replay.id)")
                 do {
+                    VoiceLatency.shared.mark(.requestSent)
                     try await Self.consume(replay.events, engine: { replay.id }, started: started) { delta in
-                        if timingFirstToken == nil { timingFirstToken = msSinceRelease() }
+                        if timingFirstToken == nil {
+                            timingFirstToken = msSinceRelease()
+                            VoiceLatency.shared.setBrain(engine: replay.id, model: Self.modelLabel(replay.id))
+                            VoiceLatency.shared.mark(.firstToken)
+                        }
                         parser.feed(delta).forEach(handle)
                     }
                     replayed = true
@@ -879,6 +885,8 @@ final class VoiceTurnController {
                         },
                         firstText: { id, ms in
                             timingFirstToken = msSinceRelease()
+                            VoiceLatency.shared.setBrain(engine: id, model: Self.modelLabel(id))
+                            VoiceLatency.shared.mark(.firstToken)
                             VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms)")
                             BrainLatencyBook.shared.record(id, firstTokenMs: Double(ms))
                         },
@@ -886,6 +894,7 @@ final class VoiceTurnController {
                             self?.deliverDeepAnswer(text, transcript: transcript, speak: speak)
                         }))
                 fastRace = race
+                VoiceLatency.shared.mark(.requestSent)
                 try await race.run { delta in parser.feed(delta).forEach(handle) }
                 VoiceLog.log("brain", "engine=\(race.winnerID ?? "?") done_ms=\(max(0, Int(Date().timeIntervalSince(started) * 1000)))")
             }
@@ -923,6 +932,7 @@ final class VoiceTurnController {
         }
         result.spoken = PersonaReplyClamp.clamp(ResponseSanitizer.sanitize(spoken), transcript: transcript,
                                                  personality: ZeusPersonality.current())
+        VoiceLatency.shared.finishWhenQuiet { [weak self] in self?.speaker.isSpeaking ?? false }
         if blockedByRestriction {
             // Said and captioned once (the flag is per turn), and the delivered answer says nothing ran.
             let note = Self.blockedActionNote
@@ -1133,6 +1143,17 @@ final class VoiceTurnController {
             return "usage limit: every AI I can reach is out of quota or signed out"
         }
         return errors.last ?? "no AI answered"
+    }
+
+    /// The model behind an engine id, for the latency line.
+    static func modelLabel(_ id: String) -> String {
+        switch id {
+        case "anthropic-api": ModelCap.httpModel(.anthropic, tier: .fast) ?? "-"
+        case "openai": ModelCap.httpModel(.openAI, tier: .fast) ?? "-"
+        case "claude": (ModelCap.model(for: .claude, tier: .fast) ?? "default") + " cli"
+        case "ollama": ModelCap.httpModel(.ollama, tier: .fast) ?? "-"
+        default: "-"
+        }
     }
 
     /// One sentence, at most 10 words (persona rule, item 5, QA7). Never reads the raw error text

@@ -1,3 +1,4 @@
+import AudioToolbox
 import AVFoundation
 import Foundation
 import ZeusCore
@@ -10,13 +11,19 @@ final class UltronEffectGraph {
     let distortion = AVAudioUnitDistortion()
     let comb = AVAudioUnitDelay()
     let reverb = AVAudioUnitReverb()
+    /// Peak limiter last in the chain, so the added warmth and edge can never clip the output.
+    let limiter = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
+        componentType: kAudioUnitType_Effect, componentSubType: kAudioUnitSubType_PeakLimiter,
+        componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0))
 
-    var nodes: [AVAudioNode] { [timePitch, eq, distortion, comb, reverb] }
+    var nodes: [AVAudioNode] { [timePitch, eq, distortion, comb, reverb, limiter] }
 
     init() {
         distortion.loadFactoryPreset(.speechRadioTower)
         distortion.preGain = -3
-        reverb.loadFactoryPreset(.smallRoom)
+        reverb.loadFactoryPreset(.plate)
+        // The highest overlap AVAudioUnitTimePitch offers: the cleanest pitch shift, at a little more CPU.
+        timePitch.overlap = 32
         comb.lowPassCutoff = 8_000
         let low = eq.bands[0]
         low.filterType = .lowShelf
@@ -56,6 +63,8 @@ final class UltronEffectGraph {
         comb.bypass = p.combWetPercent == 0
         reverb.wetDryMix = p.reverbWetPercent
         reverb.bypass = p.reverbWetPercent == 0
+        // At 0 % every node is bypassed: the voice passes through untouched.
+        limiter.bypass = p.isNeutral
     }
 }
 
@@ -120,12 +129,24 @@ final class UltronAudioChain {
 
     /// 16-bit little-endian mono PCM at 24 kHz, as ElevenLabs and OpenAI stream it.
     @discardableResult
-    func scheduleInt16(_ data: Data) -> Bool {
+    func scheduleInt16(_ data: Data, fadeHead: Bool = false, fadeTail: Bool = false) -> Bool {
         var bytes = data
         if let carry { bytes.insert(carry, at: 0); self.carry = nil }
         if bytes.count % 2 == 1 { carry = bytes.removeLast() }
         guard let buffer = Self.buffer(fromInt16: bytes) else { return false }
+        if fadeHead || fadeTail { Self.fadeEdges(buffer, head: fadeHead, tail: fadeTail) }
+        // A sentence ends here: an odd leftover byte must not leak into the next sentence's first sample.
+        if fadeTail { carry = nil }
         return schedule(buffer)
+    }
+
+    /// A few milliseconds of fade at a sentence's first or last buffer, only where that edge is not already
+    /// near zero (`AudioEdge`), so consecutive sentences join without a click.
+    nonisolated static func fadeEdges(_ buffer: AVAudioPCMBuffer, head: Bool, tail: Bool) {
+        guard let channel = buffer.floatChannelData?[0] else { return }
+        var samples = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+        AudioEdge.applyFades(&samples, sampleRate: buffer.format.sampleRate, head: head, tail: tail)
+        for index in 0..<samples.count { channel[index] = samples[index] }
     }
 
     /// A WAV (or raw .pcm) file; the file is deleted afterwards.

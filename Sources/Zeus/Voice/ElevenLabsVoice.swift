@@ -37,7 +37,11 @@ struct ElevenLabsVoice: Sendable {
     /// Delivery for each personality (docs/PERSONA.md, section 6). Plain is a natural, steady read.
     /// Ultron is more expressive: lower stability for range, some style exaggeration (supported by
     /// the flash model, at a small latency cost), speaker boost on, and a touch unhurried.
-    static func voiceSettings(for personality: ZeusPersonality) -> [String: Any] {
+    static func voiceSettings(for personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
+        // Studio (UNVERIFIED model, see `ElevenLabsQuality.studioModel`): only the settings every model takes.
+        if model == ElevenLabsQuality.studioModel {
+            return ["stability": 0.5, "similarity_boost": 0.8, "use_speaker_boost": true]
+        }
         switch personality {
         case .plain: ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
         case .ultron:
@@ -46,9 +50,13 @@ struct ElevenLabsVoice: Sendable {
     }
 
     /// The JSON body of a direct text to speech request.
-    static func speechBody(text: String, personality: ZeusPersonality) -> [String: Any] {
-        ["text": text, "model_id": model, "voice_settings": voiceSettings(for: personality)]
+    static func speechBody(text: String, personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
+        ["text": text, "model_id": model, "voice_settings": voiceSettings(for: personality, model: model)]
     }
+
+    /// 24 kHz 16-bit mono PCM, played without decoding. `pcm_44100` needs the Pro tier (ElevenLabs docs);
+    /// the tier rules for `pcm_32000` and `pcm_48000` are not stated there, so they are not used.
+    static let pcmOutputFormat = "pcm_24000"
 
     static func isKeyRejection(_ status: Int) -> Bool { status == 401 || status == 402 || status == 429 }
 
@@ -114,12 +122,12 @@ struct ElevenLabsVoice: Sendable {
         return nil
     }
 
-    func request(for text: String) -> URLRequest {
+    func request(for text: String, model: String = ElevenLabsVoice.model) -> URLRequest {
         switch route {
         case .direct(let apiKey):
             let voice = Self.savedVoiceID() ?? voiceID ?? Self.defaultVoiceID
             var components = URLComponents(string: "https://api.elevenlabs.io/v1/text-to-speech/\(voice)/stream")!
-            components.queryItems = [URLQueryItem(name: "output_format", value: "pcm_24000"),
+            components.queryItems = [URLQueryItem(name: "output_format", value: Self.pcmOutputFormat),
                                      URLQueryItem(name: "optimize_streaming_latency", value: "3")]
             var request = URLRequest(url: components.url!)
             request.httpMethod = "POST"
@@ -127,7 +135,7 @@ struct ElevenLabsVoice: Sendable {
             request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("audio/pcm", forHTTPHeaderField: "Accept")
-            request.httpBody = try? JSONSerialization.data(withJSONObject: Self.speechBody(text: text, personality: .current()))
+            request.httpBody = try? JSONSerialization.data(withJSONObject: Self.speechBody(text: text, personality: .current(), model: model))
             return request
         case .worker(let url, let token):
             var request = URLRequest(url: url.appendingPathComponent("tts"))

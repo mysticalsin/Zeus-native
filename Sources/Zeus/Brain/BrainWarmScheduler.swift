@@ -102,8 +102,8 @@ final class BrainWarmScheduler {
 
     func start() {
         guard timer == nil, !TopBarStyle.isSnapshot else { return }
-        // The launch warm-up (VoiceTurnController) already ran; the first check is one interval away.
-        lastActivity = now()
+        // Nothing is "in use" until the talk key is pressed (`noteActivity`), so an idle launch makes no warm calls.
+        lastActivity = nil
         lastCloud = lastActivity
         lastLocal = lastActivity
         let timer = Timer.scheduledTimer(withTimeInterval: BrainWarmPlan.checkEvery, repeats: true) { _ in

@@ -9,6 +9,10 @@ import ZeusCore
 @MainActor
 final class Speaker: SentenceSpeaking {
     nonisolated(unsafe) static var urlSession: URLSession = .shared
+    /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
+    /// first sentence reuses.
+    nonisolated(unsafe) static var elevenLabsSession: URLSession = TTSHTTP.makeSession()
+    nonisolated(unsafe) static var openAISession: URLSession = TTSHTTP.makeSession()
 
     struct Played: Equatable {
         var engine: UltronEngine
@@ -27,6 +31,14 @@ final class Speaker: SentenceSpeaking {
     private var prewarmed: UltronEngine?
     /// When the audio for the line now playing was first ready. Speech-start is measured to this.
     private var audioReadyAt: Date?
+    /// The ElevenLabs model for the answer in flight. One model speaks the whole answer.
+    private var answerPin = AnswerModelPin()
+    private var answerHadAudio = false
+    /// Studio was rejected by ElevenLabs on this launch: later answers use the fast model without trying it.
+    private var studioUnsupported = false
+    private(set) var lastElevenModel: String?
+    private var lastElevenStatus: Int?
+    private var systemVoices: [String: AVSpeechSynthesisVoice?] = [:]
 
     /// Apple's own default speaking rate: the premium voices are tuned for it.
     nonisolated static let systemRate = AVSpeechUtteranceDefaultSpeechRate
@@ -78,12 +90,18 @@ final class Speaker: SentenceSpeaking {
                     break
                 }
             }
-            if let self, self.pumpToken == token { self.pump = nil; self.pumpToken = nil }
+            if let self, self.pumpToken == token { self.pump = nil; self.pumpToken = nil; self.endAnswer() }
         }
+    }
+
+    private func endAnswer() {
+        answerPin.reset()
+        answerHadAudio = false
     }
 
     func speak(sentenceStream: AsyncStream<String>) async -> SpeakOutcome {
         ExplanationAudioArbitration.yieldToNewCapture()
+        defer { endAnswer() }
         let began = Date()
         var first: Played?
         var count = 0
@@ -100,22 +118,28 @@ final class Speaker: SentenceSpeaking {
                             firstAudioMs: first?.firstAudioMs, sentences: count)
     }
 
-    /// Warms the engine the next reply will use. Called on the first talk-key press, never at launch.
+    /// Warms the engine the next reply will use. Called on every talk-key press, never at launch. Cloud voices
+    /// re-open their connection (throttled in `TTSHTTP`); local engines warm once.
     func prewarm() {
         let settings = VoiceSettings.shared
-        guard let decision = settings.routeDecisions().first, prewarmed != decision.engine else { return }
-        prewarmed = decision.engine
-        chain.prepare()
+        guard let decision = settings.routeDecisions().first else { return }
         switch decision.engine {
+        case .elevenLabs:
+            Task.detached { await TTSHTTP.warmElevenLabs() }
+        case .openAI:
+            Task.detached { await TTSHTTP.warmOpenAI() }
         case .kokoro:
+            guard prewarmed != decision.engine else { return }
             let (name, speed) = (settings.kokoroVoice, settings.kokoroSpeed)
             Task { await KokoroWorkerSession.shared.prewarm(voice: name, speed: speed) }
-        case .elevenLabs:
-            VoiceDesigner.designUltronVoiceOnce()
         default:
             break
         }
-        VoiceLog.log("prewarm", "engine=\(decision.engine.logName) reason=\(decision.reason)")
+        chain.prepare()
+        if prewarmed != decision.engine {
+            prewarmed = decision.engine
+            VoiceLog.log("prewarm", "engine=\(decision.engine.logName) reason=\(decision.reason)")
+        }
     }
 
     func stop() {
@@ -126,6 +150,7 @@ final class Speaker: SentenceSpeaking {
         chain.stop()
         synthesizer.stopSpeaking(at: .immediate)
         systemRendering = false
+        endAnswer()
     }
 
     // MARK: Choosing and playing
@@ -147,6 +172,7 @@ final class Speaker: SentenceSpeaking {
 
     /// One engine, one sentence. The voice name on success, nil when this engine could not speak it.
     private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> String? {
+        VoiceLatency.shared.mark(.ttsRequest)
         switch engine {
         case .elevenLabs:
             if let id = await speakElevenLabs(text, began: began) {
@@ -183,6 +209,7 @@ final class Speaker: SentenceSpeaking {
 
     private func markAudioReady() {
         if audioReadyAt == nil { audioReadyAt = Date() }
+        VoiceLatency.shared.mark(.firstAudio)
     }
 
     /// One `engine=... voice=... reason=...` line in voice.log for the reply that is actually spoken.
@@ -194,17 +221,44 @@ final class Speaker: SentenceSpeaking {
         if let ms = firstAudioMs { line += " first_audio_ms=\(ms)" }
         if let ms = VoiceAnswerLatency.consumeSpeechStartMs(speechBegan: ready) { line += " speech_start_ms=\(ms)" }
         VoiceLog.log("speak", line)
+        let model: String? = switch engine {
+        case .elevenLabs: lastElevenModel
+        case .openAI: OpenAITTSVoice.config()?.model
+        default: nil
+        }
+        VoiceLatency.shared.setSpeech(engine: engine.logName, voice: voice, model: model, reason: reason,
+                                      effectPercent: Int(UltronEffectParameters.percent(fromIntensity: UltronVoiceEffect.intensity)))
     }
 
     // MARK: Engines
 
+    /// One model speaks the whole answer. The model is fixed at the answer's first sentence; if Studio is
+    /// refused before any audio of the answer has played, the whole answer uses the fast model instead.
     private func speakElevenLabs(_ text: String, began: Date) async -> String? {
+        let model = answerPin.resolve(quality: VoiceSettings.shared.elevenQuality, studioUnsupported: studioUnsupported)
+        lastElevenStatus = nil
+        var result = await speakElevenLabs(text, began: began, model: model)
+        if result == nil, model == ElevenLabsQuality.studioModel, !answerHadAudio, !Task.isCancelled {
+            if let status = lastElevenStatus, AnswerModelPin.isModelRejection(status: status) { studioUnsupported = true }
+            answerPin.fallBackToFast()
+            VoiceLog.log("voice", "studio model not available; this answer uses \(ElevenLabsQuality.fastModel)")
+            result = await speakElevenLabs(text, began: began, model: ElevenLabsQuality.fastModel)
+        }
+        if result != nil {
+            answerHadAudio = true
+            lastElevenModel = answerPin.model ?? model
+        }
+        return result
+    }
+
+    private func speakElevenLabs(_ text: String, began: Date, model: String) async -> String? {
         for route in ElevenLabsVoice.loadRoutes() {
-            var gotAudio = false
+            let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
             let deadline = began.addingTimeInterval(VoiceTTSChain.firstAudioTimeout)
             do {
-                let (bytes, response) = try await Self.urlSession.bytes(for: route.request(for: text))
+                let (bytes, response) = try await Self.elevenLabsSession.bytes(for: route.request(for: text, model: model))
                 if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                    lastElevenStatus = http.statusCode
                     var body = Data()
                     for try await byte in bytes { body.append(byte); if body.count > 8_192 { break } }
                     if ElevenLabsVoice.isKeyRejection(http.statusCode) {
@@ -213,25 +267,30 @@ final class Speaker: SentenceSpeaking {
                     continue
                 }
                 var chunk = Data()
-                chunk.reserveCapacity(4_800)
+                chunk.reserveCapacity(Self.pcmChunkBytes)
                 for try await byte in bytes {
-                    if Task.isCancelled { return gotAudio ? route.voiceID ?? "default" : nil }
-                    if !gotAudio, Date() > deadline { break }
+                    if Task.isCancelled { feeder.discard(); return feeder.scheduledAny ? Self.routeVoice(route) : nil }
+                    if !feeder.receivedAny, Date() > deadline { break }
                     chunk.append(byte)
-                    if chunk.count >= 4_800 {
-                        if chain.scheduleInt16(chunk) { if !gotAudio { markAudioReady() }; gotAudio = true }
+                    if chunk.count >= Self.pcmChunkBytes {
+                        feeder.push(chunk)
                         chunk.removeAll(keepingCapacity: true)
                     }
                 }
-                if !chunk.isEmpty, chain.scheduleInt16(chunk) { if !gotAudio { markAudioReady() }; gotAudio = true }
+                feeder.push(chunk)
+                feeder.finish()
             } catch {
-                if gotAudio { return route.voiceID ?? "default" }
+                if Task.isCancelled { feeder.discard() } else { feeder.finish() }
+                if feeder.scheduledAny { return Self.routeVoice(route) }
                 continue
             }
-            if gotAudio { return Self.routeVoice(route) }
+            if feeder.scheduledAny { return Self.routeVoice(route) }
         }
         return nil
     }
+
+    /// 50 ms of 24 kHz 16-bit mono PCM: small enough to start fast, with a one-buffer look-ahead for the tail fade.
+    private static let pcmChunkBytes = 2_400
 
     private static func routeVoice(_ route: ElevenLabsVoice) -> String {
         let id = ElevenLabsVoice.savedVoiceID() ?? route.voiceID ?? ElevenLabsVoice.defaultVoiceID
@@ -241,23 +300,24 @@ final class Speaker: SentenceSpeaking {
     private func speakOpenAI(_ text: String, began: Date) async -> String? {
         guard let prepared = OpenAITTSVoice.streamingRequest(text) else { return nil }
         let deadline = began.addingTimeInterval(VoiceTTSChain.firstAudioTimeout)
+        let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
         do {
-            let (bytes, response) = try await Self.urlSession.bytes(for: prepared.request)
+            let (bytes, response) = try await Self.openAISession.bytes(for: prepared.request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
             if prepared.rawPCM {
-                var gotAudio = false
                 var chunk = Data()
                 for try await byte in bytes {
-                    if Task.isCancelled { break }
-                    if !gotAudio, Date() > deadline { break }
+                    if Task.isCancelled { feeder.discard(); break }
+                    if !feeder.receivedAny, Date() > deadline { break }
                     chunk.append(byte)
-                    if chunk.count >= 4_800 {
-                        if chain.scheduleInt16(chunk) { if !gotAudio { markAudioReady() }; gotAudio = true }
+                    if chunk.count >= Self.pcmChunkBytes {
+                        feeder.push(chunk)
                         chunk.removeAll(keepingCapacity: true)
                     }
                 }
-                if !chunk.isEmpty, chain.scheduleInt16(chunk) { if !gotAudio { markAudioReady() }; gotAudio = true }
-                return gotAudio ? prepared.voice : nil
+                feeder.push(chunk)
+                feeder.finish()
+                return feeder.scheduledAny ? prepared.voice : nil
             }
             var body = Data()
             for try await byte in bytes { body.append(byte) }
@@ -267,6 +327,7 @@ final class Speaker: SentenceSpeaking {
             markAudioReady()
             return prepared.voice
         } catch {
+            feeder.discard()
             return nil
         }
     }
@@ -292,6 +353,8 @@ final class Speaker: SentenceSpeaking {
     /// The deepest Mac voice, rendered to buffers and played through the Ultron chain. If the system
     /// produces no buffers it is spoken directly, still with the deep voice, never the default one.
     private func speakSystem(_ text: String) async -> String? {
+        // The answer is spoken in the language Tony used: the best installed voice for that language.
+        let voice = SpokenLanguage.detect(text).flatMap { systemVoice(forLanguage: $0) } ?? self.voice
         let name = voice.map { "\($0.name) \(Self.qualityName($0.quality))" } ?? "default"
         func utterance() -> AVSpeechUtterance {
             let item = AVSpeechUtterance(string: text)
@@ -330,6 +393,14 @@ final class Speaker: SentenceSpeaking {
             synthesizer.speak(utterance())
         }
         return name
+    }
+
+    private func systemVoice(forLanguage code: String) -> AVSpeechSynthesisVoice? {
+        if let current = voice, current.language.lowercased().hasPrefix(code) { return current }
+        if let cached = systemVoices[code] { return cached }
+        let picked = Self.bestVoice(for: code)
+        systemVoices[code] = picked
+        return picked
     }
 
     // MARK: Silent preview and self-test
@@ -438,12 +509,71 @@ final class Speaker: SentenceSpeaking {
 
     // MARK: System voice choice
 
-    /// The deepest male macOS voice for the language, never Samantha. Nil when none qualifies.
-    nonisolated static func bestVoice(for languageCode: String) -> AVSpeechSynthesisVoice? {
-        let candidates = AVSpeechSynthesisVoice.speechVoices().map {
+    nonisolated static func systemCandidates() -> [UltronSystemVoicePick.Candidate] {
+        AVSpeechSynthesisVoice.speechVoices().map {
             UltronSystemVoicePick.Candidate(name: $0.name, language: $0.language, quality: $0.quality.rawValue, identifier: $0.identifier)
         }
+    }
+
+    /// True when no Enhanced or Premium Mac voice is installed for the language (Settings shows a one-time hint).
+    nonisolated static func needsBetterMacVoice(languageCode: String) -> Bool {
+        UltronSystemVoicePick.suggestsBetterVoice(from: systemCandidates(), languageCode: languageCode)
+    }
+
+    /// The model name for the engine that just spoke, for the Test voice panel.
+    func modelDescription(engine: String) -> String {
+        switch engine {
+        case "elevenlabs": lastElevenModel ?? ElevenLabsQuality.fastModel
+        case "openai": OpenAITTSVoice.config()?.model ?? "-"
+        default: "-"
+        }
+    }
+
+    /// The deepest male macOS voice for the language, never Samantha. Nil when none qualifies.
+    nonisolated static func bestVoice(for languageCode: String) -> AVSpeechSynthesisVoice? {
+        let candidates = systemCandidates()
         guard let pick = UltronSystemVoicePick.pick(from: candidates, languageCode: languageCode) else { return nil }
         return AVSpeechSynthesisVoice(identifier: pick.identifier)
+    }
+}
+
+/// Schedules streamed PCM for one sentence with a one-buffer look-ahead, so the last buffer of the sentence
+/// can take its tail fade and the first its head fade (`AudioEdge`): sentences join without a click.
+@MainActor
+final class PCMStreamFeeder {
+    private let chain: UltronAudioChain
+    private let onFirstAudio: () -> Void
+    private var pending: Data?
+    private var first = true
+    private(set) var receivedAny = false
+    private(set) var scheduledAny = false
+
+    init(chain: UltronAudioChain, onFirstAudio: @escaping () -> Void) {
+        self.chain = chain
+        self.onFirstAudio = onFirstAudio
+    }
+
+    func push(_ data: Data) {
+        guard !data.isEmpty else { return }
+        receivedAny = true
+        if let held = pending { flush(held, tail: false) }
+        pending = data
+    }
+
+    /// The sentence's last buffer, with its tail fade.
+    func finish() {
+        guard let held = pending else { return }
+        pending = nil
+        flush(held, tail: true)
+    }
+
+    func discard() { pending = nil }
+
+    private func flush(_ data: Data, tail: Bool) {
+        if chain.scheduleInt16(data, fadeHead: first, fadeTail: tail) {
+            if !scheduledAny { onFirstAudio() }
+            scheduledAny = true
+        }
+        first = false
     }
 }

@@ -7,10 +7,33 @@ struct ZeusVoiceCards: View {
     private var voice: VoiceSettings { VoiceSettings.shared }
     private var settings: DictationSettings { DictationSettings.shared }
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
+    private var testModel: VoiceTestModel { VoiceTestModel.shared }
     static let automaticTitle = "Automatic (best working voice)"
 
     var body: some View {
         GSCard {
+            GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus speaks with ElevenLabs first." : "Best Zeus voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain.") {
+                HStack(spacing: 10) {
+                    SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
+                        .textFieldStyle(.plain)
+                        .snapshotSafeText(voice.elevenKeyDraft, placeholder: voice.elevenKeySaved ? "Saved" : "Paste a key", secure: true)
+                        .font(OB.font(13.5)).foregroundStyle(GS.text)
+                        .padding(.horizontal, 10).frame(width: 200, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                        .accessibilityLabel("ElevenLabs key")
+                        .onSubmit { voice.saveElevenKey() }
+                    Button("Save key") { voice.saveElevenKey() }.buttonStyle(GSButtonStyle()).disabled(voice.elevenKeyDraft.isEmpty)
+                    if !voice.elevenKeySaved {
+                        Button("Get a key") { NSWorkspace.shared.open(URL(string: "https://elevenlabs.io")!) }.buttonStyle(GSButtonStyle())
+                    }
+                    if voice.elevenKeySaved { Button("Remove") { voice.removeElevenKey() }.buttonStyle(GSButtonStyle()) }
+                }
+            }
+            if let line = voice.keyCheckMessage {
+                GSInfo(text: line)
+            }
+            GSDivider()
             GSRow(symbol: "waveform", title: UltronVoicePlan.presetTitle, text: "The voice Zeus answers with unless you pick another below.")
             GSDivider()
             GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", text: "Zeus reads its answers aloud instead of only showing them.", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
@@ -43,6 +66,31 @@ struct ZeusVoiceCards: View {
                     if title == Self.automaticTitle { voice.engineAuto = true }
                     else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
                 }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
+            }
+            GSDivider()
+            GSRow(symbol: "sparkles", title: "Voice quality", text: voice.elevenQuality.detail) {
+                GSPopup(selection: Binding(get: { voice.elevenQuality.title }, set: { title in
+                    if let choice = ElevenLabsQuality.allCases.first(where: { $0.title == title }) { voice.elevenQuality = choice }
+                }), options: ElevenLabsQuality.allCases.map(\.title), label: "Voice quality")
+            }
+            if !voice.macVoiceHintDismissed, Speaker.needsBetterMacVoice(languageCode: Locale.current.identifier) {
+                GSDivider()
+                GSRow(symbol: "person.badge.plus", title: "A better Mac voice",
+                      text: "Only the basic Mac voices are installed. Without a cloud key Zeus sounds best with an Enhanced or Premium voice. Nothing is downloaded until you choose one.") {
+                    HStack(spacing: 10) {
+                        Button("Open Spoken Content") { Self.openSpokenContent(); voice.macVoiceHintDismissed = true }
+                            .buttonStyle(GSButtonStyle(prominent: true))
+                        Button("Dismiss") { voice.macVoiceHintDismissed = true }.buttonStyle(GSButtonStyle())
+                    }
+                }
+            }
+            GSDivider()
+            GSRow(symbol: "waveform.badge.mic", title: "Test voice", text: "Speaks a short line in English and in French and times the first sound.") {
+                Button(testModel.running ? "Speaking" : "Test voice") { testModel.run(speaker: Self.previewSpeaker) }
+                    .buttonStyle(GSButtonStyle(prominent: true)).disabled(testModel.running)
+            }
+            ForEach(testModel.rows) { row in
+                GSInfo(text: row.summary)
             }
             GSDivider()
             GSRow(symbol: "waveform.badge.mic", title: "Answer voice") {
@@ -78,22 +126,6 @@ struct ZeusVoiceCards: View {
                         .onSubmit { voice.saveOpenAIKey() }
                     Button("Save key") { voice.saveOpenAIKey() }.buttonStyle(GSButtonStyle()).disabled(voice.openAIKeyDraft.isEmpty)
                     if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle()) }
-                }
-            }
-            GSDivider()
-            GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus speaks with ElevenLabs first." : "Best Zeus voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain.") {
-                HStack(spacing: 10) {
-                    SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
-                        .textFieldStyle(.plain)
-                        .snapshotSafeText(voice.elevenKeyDraft, placeholder: voice.elevenKeySaved ? "Saved" : "Paste a key", secure: true)
-                        .font(OB.font(13.5)).foregroundStyle(GS.text)
-                        .padding(.horizontal, 10).frame(width: 200, height: 30)
-                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                        .accessibilityLabel("ElevenLabs key")
-                        .onSubmit { voice.saveElevenKey() }
-                    Button("Save key") { voice.saveElevenKey() }.buttonStyle(GSButtonStyle()).disabled(voice.elevenKeyDraft.isEmpty)
-                    if voice.elevenKeySaved { Button("Remove") { voice.removeElevenKey() }.buttonStyle(GSButtonStyle()) }
                 }
             }
             if voice.elevenKeySaved {
@@ -165,10 +197,10 @@ struct ZeusVoiceCards: View {
     @ViewBuilder private var designRows: some View {
         if voice.elevenKeySaved {
             GSDivider()
-            GSRow(symbol: "wand.and.stars", title: "Design a voice", text: designer.status) {
+            GSRow(symbol: "wand.and.stars", title: voice.hasDesignedVoice ? "Design a new Zeus voice" : "Create Zeus voice", text: designer.status) {
                 if designer.busy { ProgressView().controlSize(.small) }
                 else {
-                    Button(designer.previews.isEmpty ? "Design" : "Again") { designer.design() }
+                    Button(designer.previews.isEmpty ? (voice.hasDesignedVoice ? "Design" : "Create Zeus voice") : "Again") { designer.design() }
                         .buttonStyle(GSButtonStyle(prominent: designer.previews.isEmpty))
                 }
             }
@@ -183,6 +215,15 @@ struct ZeusVoiceCards: View {
                     }
                 }
             }
+        }
+    }
+
+    /// System Settings > Accessibility > Spoken Content. The pane anchor is not documented by Apple, so the
+    /// Accessibility pane opens if the anchor is refused.
+    @MainActor static func openSpokenContent() {
+        let anchored = URL(string: "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")!
+        if !NSWorkspace.shared.open(anchored) {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.universalaccess")!)
         }
     }
 

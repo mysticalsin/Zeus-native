@@ -93,3 +93,35 @@ public enum AudioEdge {
         }
     }
 }
+
+/// What the quick check after "Save key" tells the person. Reads only the status code and ElevenLabs'
+/// `detail.status`; the key is never part of any message.
+public enum ElevenLabsKeyCheck {
+    public struct Result: Equatable, Sendable {
+        public var ok: Bool
+        public var message: String
+    }
+
+    public static let unreachable = Result(ok: false, message: "Could not reach ElevenLabs. Check the connection, then save the key again.")
+
+    public static func interpret(status: Int, body: Data) -> Result {
+        let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+        let code = (((json?["detail"] as? [String: Any])?["status"] as? String) ?? "").lowercased()
+        switch status {
+        case 200...299:
+            return Result(ok: true, message: "Key works.")
+        case 401 where code.contains("missing_permission"):
+            return Result(ok: true, message: "Key works. It has limited permissions, which is fine for speaking.")
+        case 401, 403:
+            return Result(ok: false, message: "ElevenLabs rejected this key. Check it and paste it again.")
+        case 402:
+            return Result(ok: true, message: "Key works, but the credits are used up for now.")
+        case 429:
+            return Result(ok: true, message: "Key works. ElevenLabs is rate limiting right now.")
+        case 500...599:
+            return Result(ok: false, message: "ElevenLabs had a problem (\(status)). Try again in a minute.")
+        default:
+            return Result(ok: false, message: "ElevenLabs answered \(status). The key was saved but not confirmed.")
+        }
+    }
+}

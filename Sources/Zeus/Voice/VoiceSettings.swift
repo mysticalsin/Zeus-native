@@ -87,6 +87,18 @@ final class VoiceSettings {
     /// A key that could not be saved, or a preview that was written to a file instead of played.
     var keyMessage: String?
     var previewMessage: String?
+    /// "Fastest" (ElevenLabs flash, the default for talking to Zeus) or "Studio" (highest quality, expressive).
+    var elevenQuality: ElevenLabsQuality = .resolve(stored: UserDefaults.standard.string(forKey: ElevenLabsQuality.defaultsKey)) {
+        didSet { defaults.set(elevenQuality.rawValue, forKey: ElevenLabsQuality.defaultsKey) }
+    }
+    /// The result of the quick check after "Save key": a plain line, never the key.
+    private(set) var keyCheckMessage: String?
+    private(set) var keyCheckOK: Bool?
+    private(set) var checkingKey = false
+    /// The one-time hint to install an Enhanced or Premium Mac voice. Dismissed by its button.
+    var macVoiceHintDismissed: Bool = UserDefaults.standard.bool(forKey: "voice.macVoiceHint.dismissed") {
+        didSet { defaults.set(macVoiceHintDismissed, forKey: "voice.macVoiceHint.dismissed") }
+    }
 
     private init() {
         let stored = UserDefaults.standard.string(forKey: "voice.engine").flatMap(VoiceEngine.init(rawValue:))
@@ -247,6 +259,9 @@ final class VoiceSettings {
 
     // MARK: ElevenLabs
 
+    /// A voice id has been saved (designed or picked): the default voice from then on.
+    var hasDesignedVoice: Bool { Keychain.get("elevenlabs.voice-id")?.isEmpty == false }
+
     var elevenVoiceID: String { Keychain.get("elevenlabs.voice-id") ?? ElevenLabsVoice.defaultVoiceID }
 
     func setElevenVoice(_ id: String) {
@@ -268,6 +283,28 @@ final class VoiceSettings {
         library = []
         libraryMessage = nil
         clearElevenLabsPause()
+        Task { await validateElevenKey() }
+    }
+
+    /// One free metadata call with the saved key: "Key works" or the reason it was refused.
+    func validateElevenKey() async {
+        guard let key = Keychain.get("elevenlabs.api-key")?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else { return }
+        checkingKey = true
+        keyCheckMessage = "Checking the key."
+        keyCheckOK = nil
+        defer { checkingKey = false }
+        var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/models")!, timeoutInterval: 10)
+        request.setValue(key, forHTTPHeaderField: "xi-api-key")
+        let result: ElevenLabsKeyCheck.Result
+        do {
+            let (data, response) = try await Speaker.elevenLabsSession.data(for: request)
+            result = ElevenLabsKeyCheck.interpret(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
+        } catch {
+            result = ElevenLabsKeyCheck.unreachable
+        }
+        keyCheckMessage = result.message
+        keyCheckOK = result.ok
+        VoiceLog.log("voice", "elevenlabs key check ok=\(result.ok)")
     }
 
     func removeElevenKey() {
@@ -277,6 +314,8 @@ final class VoiceSettings {
         }
         elevenKeySaved = false
         elevenKeyDraft = ""
+        keyCheckMessage = nil
+        keyCheckOK = nil
         keyMessage = nil
         library = []
         elevenLabsStatusMessage = nil
