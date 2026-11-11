@@ -10,7 +10,19 @@ Swift Testing tests in `Tests/ZeusCoreTests`.
 
 Summary: 20 machines inventoried in the first audit; 6 fixed then. Second pass (branch `codex/state-machines-20261111`,
 2026-11-11) fixed items 12 to 17 and 19, the Automation Allow more bug and a new overlap-flag class (21); Insomnia is
-reviewed and left, Pointing is explicit (22). Nothing could be compiled in the authoring sandbox; CI is the first compile.
+reviewed and left, Pointing is explicit (22). Nothing could be compiled in the authoring sandbox; CI is the first compile. Item 23 (Scribe meeting start) was added by the auto-start branch, explicit from the start.
+
+## Added after the audit
+
+### 23. Scribe meeting start and call end. EXPLICIT from the start (2026-11-11)
+- Where: `ZeusCore/Scribe/ScribeAutoStart.swift` (`ScribeAutoStartMachine`), driven by `Zeus/Scribe/ScribeAutoStartController.swift`, fed by `ScribeCallWatcher` (poll plus Core Audio wake-ups in `ScribeMicActivity.swift`), banner in `ScribeMeetingBanner.swift`. Setting `scribe.autoStart`: Off, Ask me (default), Start automatically.
+- States: idle, armed (seen, debouncing 3 s), prompting (20 s), countingDown (5 s, Cancel), recording, endingSuggested, cooldown.
+- Signals: calendar event with a call link within 2 min before to 5 min after its start and its call app open; or a known call app holding the microphone (`kAudioProcessPropertyIsRunningInput`, Zeus excluded). An open app alone is not a meeting. Event-driven: Core Audio listeners on the input flag of every known call process (added and removed with the process list) plus the default input device flag; the 5 s poll stays as backup.
+- Start rules: one trigger per meeting (key = calendar event id, else call app; the same key stays quiet until it was gone 30 s and 60 s passed). Automatic start needs Microphone already granted AND a one-time consent (`scribe.autoStart.consentAt` timestamp, stored when the person taps Start and allow on the first automatic start); without either it asks. A permission or consent lost during the countdown falls back to asking. A recording started by hand is never prompted over.
+- End rules: the call app released the microphone for 8 s after holding it (a Zoom breakout hop of a few seconds is ignored), or its call window (read from window titles, only when readable; Zoom, Meet, Slack huddle, Webex) was seen and then gone for 8 s. Then Scribe's own end window opens (9 s, Keep recording). Keep returns to recording and waits for the microphone to come back. While the end timer runs the app reads fresh signals every second (`needsFreshEvidence`); ticks alone never advance it.
+- Next meeting: while recording, another calendar meeting with a call link about to start (2 min before to 30 s after) is offered once with Switch or Keep recording (20 s). Switch ends this recording and lets the next meeting trigger without the cooldown.
+- Indicator: the closed notch shows the Scribe recording wings for any Scribe recording (`ClosedWings.kind`), however it started.
+- Tests: `ScribeAutoStartTests.swift` (every transition, debounce, single trigger, consent, permission fallback, call-ended path, breakout, window, keep, cooldown re-arm, next meeting).
 
 ## Fixed
 
