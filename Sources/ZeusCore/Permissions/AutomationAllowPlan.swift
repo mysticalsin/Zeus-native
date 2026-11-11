@@ -28,7 +28,15 @@ public enum AutomationAllowPlan {
         public var message: String?
         public var opensAutomationPane = false
 
-        public init() {}
+        // An explicit init suppresses the synthesized memberwise one, so it lists every field
+        // with a default: `Plan()` and the labelled calls in this file both compile.
+        public init(ask: [String] = [], refused: [Target] = [], message: String? = nil,
+                    opensAutomationPane: Bool = false) {
+            self.ask = ask
+            self.refused = refused
+            self.message = message
+            self.opensAutomationPane = opensAutomationPane
+        }
     }
 
     public static func plan(targets: [Target], access: [String: Access], running: Set<String>) -> Plan {
