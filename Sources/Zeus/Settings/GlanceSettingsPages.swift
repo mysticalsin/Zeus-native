@@ -47,10 +47,10 @@ struct GSPageView: View {
             case .shortcuts: ShortcutsPage()
             case .insomnia: InsomniaSettingsPage()
             case .integrations: AIConnectionsPage(context: context)
-            case .murmure: MurmurePage(context: context)
-            case .polyglot: PolyglotSettingsPage()
-            case .dictation: DictationSettingsPage(context: context)
-            case .voice: VoicePage()
+            case .murmure: MurmurePage(context: context, navigation: navigation)
+            case .polyglot: PolyglotSettingsPage(navigation: navigation)
+            case .dictation: DictationSettingsPage(context: context, navigation: navigation)
+            case .voice: VoicePage(navigation: navigation)
             case .engine: EnginePage()
             case .iPhone: IPhonePage()
             case .features: FeaturesSettingsPage()
@@ -652,13 +652,15 @@ private struct ShortcutsPage: View {
         GSPageHeading(section: .shortcuts, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
-            ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus", text: "",
-                                shortcut: Preferences.shared.pushToTalk, defaultValue: .optionCommand) {
+            ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus", text: "Hold to ask, let go to send.",
+                                shortcut: Preferences.shared.pushToTalk, defaultValue: .optionCommand,
+                                otherName: "Dictation", other: DictationSettings.shared.key) {
                 if let new = $0 { Preferences.shared.pushToTalk = new }
             }
             GSDivider()
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "",
-                                shortcut: DictationSettings.shared.key, defaultValue: .rightCommand, allowsOff: true) {
+            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "Hold to speak, let go to write it where your cursor is.",
+                                shortcut: DictationSettings.shared.key, defaultValue: .rightCommand, allowsOff: true,
+                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) {
                 DictationSettings.shared.key = $0
             }
         }
@@ -744,6 +746,7 @@ private struct IntegrationsPage: View {
 
 private struct MurmurePage: View {
     let context: GSContext
+    let navigation: GSNavigation
     private var settings: DictationSettings { DictationSettings.shared }
 
     var body: some View {
@@ -757,12 +760,11 @@ private struct MurmurePage: View {
                 GSInfo(text: "Microphone and Accessibility access are required.")
             }
         }
-        SpeechEngineCard(compact: true)
+        SpeechEngineCard(compact: true, navigation: navigation)
         GSCard("Murmure") {
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation shortcut", text: "",
-                                shortcut: settings.key, defaultValue: .rightCommand, allowsOff: true,
-                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) { settings.key = $0 }
-            KeyAccessRow()
+            ShortcutLinkRow(symbol: "keyboard", title: "Dictation shortcut", current: settings.key, navigation: navigation)
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
         }
         GSCard("Language and feedback") {
             GSToggleRow(symbol: "speaker.wave.1", title: "Play dictation sounds", text: "A short cue when recording starts and ends.",
@@ -788,15 +790,15 @@ private struct MurmurePage: View {
 // MARK: Voice
 
 private struct VoicePage: View {
+    let navigation: GSNavigation
     var body: some View {
         GSPageHeading(section: .voice, subtitle: "")
             .padding(.bottom, -GS.cardGap)
-        ZeusVoiceCards()
+        ZeusVoiceCards(navigation: navigation)
         GSCard("Talk to Zeus") {
-            ShortcutRecorderRow(symbol: "bolt", title: "Talk to Zeus", text: "",
-                                shortcut: Preferences.shared.pushToTalk, defaultValue: .optionCommand,
-                                otherName: "Dictation", other: DictationSettings.shared.key) { if let new = $0 { Preferences.shared.pushToTalk = new } }
-            KeyAccessRow()
+            ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
         }
         WakeWordCard()
         GSCard("Approval keywords") {
@@ -1090,7 +1092,7 @@ private struct DiagnosticsPage: View {
         }
         DiagnosticsLogsCard()
         GSCard("Restart the local connection") {
-            GSRow(symbol: "arrow.clockwise", title: "Restart the daemon", text: "Running tasks stay in their own applications.") {
+            GSRow(symbol: "arrow.clockwise", title: "Restart the connection", text: "Agents and running tasks keep going in their own apps.") {
                 Button("Restart") { context.restartConnection() }.buttonStyle(GSButtonStyle())
             }
         }

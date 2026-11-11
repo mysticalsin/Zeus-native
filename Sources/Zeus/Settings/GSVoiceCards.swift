@@ -3,6 +3,7 @@ import ZeusCore
 
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
+    let navigation: GSNavigation
     private var voice: VoiceSettings { VoiceSettings.shared }
     private var settings: DictationSettings { DictationSettings.shared }
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
@@ -157,8 +158,7 @@ struct ZeusVoiceCards: View {
                         options: TranscriptionEngineKind.allCases.map { SpeechEngineBoard.shared.pickerTitle($0) }, label: "Speech to text engine")
             }
             GSDivider()
-            GSToggleRow(symbol: "waveform", title: "Use for voice commands too",
-                        isOn: Binding(get: { settings.engineForVoice }, set: { settings.engineForVoice = $0 }))
+            GSLinkRow(symbol: "waveform", title: "Use for voice commands too", destination: .dictation, navigation: navigation)
             if let message = SpeechEngineBoard.shared.message { GSInfo(text: message) }
         }
         .task { await SpeechEngineBoard.shared.refresh() }
@@ -219,6 +219,6 @@ struct ZeusVoiceCards: View {
     private var kokoroText: String {
         if let message = voice.kokoroMessage { return message }
         if voice.kokoroReady { return "Runs on this Mac. Nothing is sent anywhere." }
-        return LocalPython.systemPython == nil ? "Needs Python 3 on this Mac." : "Sets up a private Python environment and downloads the voice once."
+        return LocalPython.systemPython == nil ? "Needs Python 3 on this Mac." : "Sets up the voice on this Mac and downloads it once."
     }
 }

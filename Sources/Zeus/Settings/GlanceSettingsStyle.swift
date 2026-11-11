@@ -171,6 +171,26 @@ struct GSInfo: View {
     }
 }
 
+/// A calm empty state for a list that has nothing yet: what it is for and what fills it.
+struct GSEmptyState: View {
+    let symbol: String
+    let title: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 20, weight: .regular)).foregroundStyle(GS.secondary)
+                .frame(width: 28).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(GS.rowTitle).foregroundStyle(GS.text)
+                Text(text).font(GS.rowText).foregroundStyle(GS.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 16)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// Technical detail kept out of the way: a plain-words row stays visible and the file names, commands
 /// and mechanisms live behind "Details".
 struct GSDetails: View {

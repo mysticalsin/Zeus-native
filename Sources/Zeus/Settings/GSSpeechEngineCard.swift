@@ -9,6 +9,8 @@ struct SpeechEngineCard: View {
     var showsWhisperModel = false
     /// Murmure settings: one row plus picker, not the full engine catalog.
     var compact = false
+    /// Murmure only links to the Dictation page, where "Use for voice commands too" lives.
+    var navigation: GSNavigation? = nil
     private var board: SpeechEngineBoard { SpeechEngineBoard.shared }
     private var settings: DictationSettings { DictationSettings.shared }
 
@@ -20,9 +22,13 @@ struct SpeechEngineCard: View {
                 fullBody
             }
             GSDivider()
-            GSToggleRow(symbol: "waveform", title: "Use for voice commands too",
-                        text: "",
-                        isOn: Binding(get: { settings.engineForVoice }, set: { settings.engineForVoice = $0 }))
+            if compact, let navigation {
+                GSLinkRow(symbol: "waveform", title: "Use for voice commands too", destination: .dictation, navigation: navigation)
+            } else {
+                GSToggleRow(symbol: "waveform", title: "Use for voice commands too",
+                            text: "Spoken commands to Zeus use this engine instead of Apple's.",
+                            isOn: Binding(get: { settings.engineForVoice }, set: { settings.engineForVoice = $0 }))
+            }
             if let message = board.message { GSInfo(text: message) }
         }
         .task { await board.refresh() }

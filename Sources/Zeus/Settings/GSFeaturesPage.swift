@@ -20,7 +20,7 @@ struct FeaturesSettingsPage: View {
         GSCard("Instant commands") {
             GSToggleRow(symbol: "bolt", title: "Fast path", text: "Simple commands (open an app, volume, timers, to-dos, Beamer) run the moment you finish speaking. Off sends every command to the AI.",
                         isOn: store.boolBinding("fastPath.enabled"))
-            GSInfo(text: "Laya or Jev, and the cost cap, are on the Engine page.")
+            GSInfo(text: "Which engine understands you, and its monthly cost cap, are on the Engine page.")
         }
         GSCard("Teleprompter") {
             GSToggleRow(symbol: "play.rectangle", title: "Follow my presentation", text: "Opens the prompter on its own when a Keynote or PowerPoint slideshow starts, with each slide\u{2019}s notes.",
@@ -32,7 +32,7 @@ struct FeaturesSettingsPage: View {
             GSDivider()
             GSToggleRow(symbol: "arrow.left.and.right.righttriangle.left.righttriangle.right", title: "Mirror the text", text: "For a prompter glass.", isOn: prompter($mirror))
             GSDivider()
-            GSToggleRow(symbol: "timer", title: "Count down before rolling", isOn: prompter($countdown))
+            GSToggleRow(symbol: "timer", title: "Count down before rolling", text: "A short countdown before the text starts scrolling, so you can get ready.", isOn: prompter($countdown))
         }
         GSCard("Browser agent") {
             GSToggleRow(symbol: "globe", title: "Let Zeus work in Chrome", text: "Web tasks you ask for, step by step, with a card you can stop. Passwords and card fields are always left to you.",
@@ -46,7 +46,7 @@ struct FeaturesSettingsPage: View {
                 GSTextInput(text: store.stringBinding("browserAgent.alwaysAsk"), placeholder: "e.g. apply, invite", label: "Always ask before")
             }
             GSDivider()
-            GSRow(symbol: "macwindow", title: "Browser for the agent", text: "Your Chrome uses the Zeus extension and your own logins. A separate browser (browser-use) has its own profile and never touches your Chrome.") {
+            GSRow(symbol: "macwindow", title: "Browser for the agent", text: "Your Chrome uses the Zeus extension and your own logins. A separate browser has its own profile and never touches your Chrome.") {
                 GSPopup(selection: store.stringBinding("browserAgent.backend"), options: FeatureSettings.browserBackendChoices)
             }
             GSDivider()
@@ -84,15 +84,24 @@ struct FeaturesSettingsPage: View {
         GSCard("Models Zeus uses") {
             ForEach(Array(RouterEngine.allCases.enumerated()), id: \.element) { index, engine in
                 if index > 0 { GSDivider() }
-                let models = ModelCap.describe(engine)
                 HStack(spacing: 0) {
                     EngineBrandLogo(agentLabel: engine.title, size: 20, tint: GS.text)
                         .frame(width: 42, alignment: .leading).accessibilityHidden(true)
-                    GSRow(title: engine.title, text: "Quick: \(models.fast). Deep: \(models.deep).")
+                    GSRow(title: engine.title, text: "Uses a quick model for simple asks and a deeper one for harder ones.")
                 }
             }
-            GSInfo(text: "Zeus acts with Haiku, or Sonnet at most, and the same size on every other engine. Your own coding sessions keep their own models. A provider that renames models can be pinned with a \u{201C}modelCap.<engine>.<fast|deep>\u{201D} default; anything larger than Sonnet is refused.")
+            GSInfo(text: "Zeus acts with Haiku, or Sonnet at most, and the same size on every other engine. Your own coding sessions keep their own models.")
+            GSDetails(text: modelDetails)
         }
+    }
+
+    /// The exact model names and the pin override: useful to a person debugging, not part of the normal page.
+    private var modelDetails: String {
+        let lines = RouterEngine.allCases.map { engine -> String in
+            let models = ModelCap.describe(engine)
+            return "\(engine.title): quick \(models.fast), deep \(models.deep)"
+        }
+        return lines.joined(separator: "\n") + "\n\nA provider that renames models can be pinned with a modelCap.<engine>.<fast|deep> default. Anything larger than Sonnet is refused."
     }
 
     private var folderText: String {
