@@ -236,6 +236,7 @@ private struct AppearancePage: View {
                     OBTickSlider(value: Binding(get: { TopBarPositionModel.shared.sliderValue }, set: { TopBarPositionModel.shared.choose($0) }),
                                  range: TopBarPosition.minimum...TopBarPosition.maximum, step: TopBarPosition.step)
                         .frame(width: 200).environment(\.ob, OB.Palette.settings).accessibilityLabel("Top bar position")
+                        .accessibilityIdentifier("settings.appearance.topBarPosition")
                     Text("Lower").font(GS.rowText).foregroundStyle(GS.secondary)
                     Text("\(Int(TopBarPositionModel.shared.sliderValue)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
                         .frame(width: 40, alignment: .trailing)

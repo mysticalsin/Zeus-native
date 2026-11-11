@@ -211,6 +211,7 @@ struct GSSidebar: View {
         .buttonStyle(.plain)
         .padding(.bottom, 2)
         .accessibilityLabel(section.title)
+        .accessibilityIdentifier("settings.sidebar.\(section.rawValue)")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }

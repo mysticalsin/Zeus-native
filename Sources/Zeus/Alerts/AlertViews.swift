@@ -163,8 +163,8 @@ struct AlertCapsule: View {
 
     private var actionRow: some View {
         HStack(spacing: 6) {
-            if AlertAppGlyph.supportsReply(item.appID) {
-                AlertActionButton(title: "Reply", symbol: "arrowshape.turn.up.left.fill", tint: accent) { actions.open(item.id) }
+            if AlertReply.supportsReply(item) {
+                AlertActionButton(title: "Reply", symbol: "arrowshape.turn.up.left.fill", tint: accent) { actions.reply(item.id) }
             }
             AlertActionButton(title: "Open", symbol: "arrow.up.forward.app.fill", tint: accent) { actions.open(item.id) }
             AlertActionButton(title: "Snooze", symbol: "moon.zzz.fill", tint: nil) { actions.snooze(item.id) }
@@ -215,6 +215,7 @@ private struct Stagger: ViewModifier {
 
 struct AlertActions {
     var open: (String) -> Void = { _ in }
+    var reply: (String) -> Void = { _ in }
     var dismiss: (String) -> Void = { _ in }
     var snooze: (String) -> Void = { _ in }
 }

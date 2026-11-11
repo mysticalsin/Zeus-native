@@ -30,6 +30,8 @@ final class NotchController {
     var now: () -> Date = { Date() }
     /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
     private var alertWake: Task<Void, Never>?
+    /// Alerts waiting out their ten minute snooze, by alert id.
+    private var snoozeTasks: [String: Task<Void, Never>] = [:]
     /// What happens when the notification line is clicked.
     var openNotificationLine: (NotchModel.NotificationLine) -> Void = { _ in }
 
@@ -40,7 +42,11 @@ final class NotchController {
     private var hoverTask: Task<Void, Never>?
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
-    private var keepsPolyglotOpen: Bool { topBar?.selectedTab == .polyglot && isPolyglotPinned() }
+    /// The pin rules live in ZeusCore; this only reports the current facts.
+    private func pinContext() -> PolyglotPinContext {
+        PolyglotPinContext(isPolyglotTabSelected: topBar?.selectedTab == .polyglot, isPinned: isPolyglotPinned(),
+                           autoHideEnabled: SettingsStore.shared.bool("notch.autoHide"))
+    }
 
     func start() {
         NotchControllerBridge.controller = self
@@ -132,6 +138,9 @@ final class NotchController {
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
         setIgnoresMouse(presentation == .closed)
+        // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
+        model.alerts.setSuspended(presentation != .closed, now: now())
+        alertsChanged()
         if opening { NotchHaptics.open() }
         onPresentationChange(presentation)
     }
@@ -344,8 +353,13 @@ final class NotchController {
             // beside or below it reach the app underneath.
             setIgnoresMouse(!over)
             guard outside else { closeTask?.cancel(); closeTask = nil; return }
-            guard !keepsPolyglotOpen else { closeTask?.cancel(); closeTask = nil; return }
-            guard SettingsStore.shared.bool("notch.autoHide"), closeTask == nil else { return }
+            switch PolyglotPinPolicy.decide(.pointerExited, pinContext()) {
+            case .keepOpen:
+                closeTask?.cancel(); closeTask = nil
+                return
+            case .close, .scheduleClose:
+                guard closeTask == nil else { return }
+            }
             let delay = Self.closeDelayMilliseconds
             guard delay > 0 else { dismissAutomatically(); return }
             closeTask = Task { @MainActor [weak self] in
@@ -368,8 +382,14 @@ final class NotchController {
 
     /// Automatic dismissal respects a pin; explicit `show(.closed)` still always works.
     func dismissAutomatically() {
-        guard !keepsPolyglotOpen else { return }
+        guard PolyglotPinPolicy.decide(.clickedOutside, pinContext()) == .close else { return }
         show(model.approval != nil ? .peek : .closed)
+    }
+
+    /// The Dismiss button: closes even a pinned bar (it always showed `.closed`, approval or not).
+    func dismissExplicitly() {
+        guard PolyglotPinPolicy.decide(.explicitDismiss, pinContext()) == .close else { return }
+        show(.closed)
     }
 
     /// With auto-hide off the panel stays open until a click elsewhere (global monitors only see other apps).
@@ -548,8 +568,10 @@ final class NotchController {
                             title: line.title, body: line.detail, priority: .normal, postedAt: now()))
     }
 
-    func postAlert(_ item: AlertItem) {
-        guard model.presentation == .closed else { return }
+    /// `whileOpen` queues the alert even when the notch is open (a snoozed alert coming back must not be lost); it then
+    /// shows, with its full time, when the notch closes.
+    func postAlert(_ item: AlertItem, whileOpen: Bool = false) {
+        guard whileOpen || model.presentation == .closed else { return }
         let result = model.alerts.post(item, now: now())
         if case .added = result {
             // Each alert is announced once, politely; a coalesced duplicate does not repeat it.
@@ -577,16 +599,29 @@ final class NotchController {
         dismissAlert(id)
     }
 
+    /// Opens the source app on a reply to the alert (a draft the owner sends). Without a reply URL, or when the
+    /// app is not installed, it falls back to Open; the button is only shown when a URL exists.
+    func replyAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        guard let url = AlertReply.url(for: item), AlertReplyLauncher.open(url, bundleID: item.appID) else {
+            return openAlert(id)
+        }
+        dismissAlert(id)
+    }
+
     /// Hides the alert and brings it back in ten minutes.
     func snoozeAlert(_ id: String) {
         guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
         dismissAlert(id)
-        Task { @MainActor [weak self] in
+        // One snooze per alert: snoozing it again replaces the pending return instead of doubling it.
+        snoozeTasks[id]?.cancel()
+        snoozeTasks[id] = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(600))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let self else { return }
+            self.snoozeTasks[id] = nil
             var again = item
-            again.postedAt = Date()
-            self?.postAlert(again)
+            again.postedAt = self.now()
+            self.postAlert(again, whileOpen: true)
         }
     }
 

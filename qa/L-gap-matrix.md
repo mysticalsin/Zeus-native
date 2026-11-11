@@ -1,6 +1,6 @@
 # L gap matrix
 
-Behavior check of Zeus on `swarm/B1` (base `4b4bb8fe624395e109806afb67d520331d317ca0`) against present brief P0-P6. Reference only: `ref/present-clicky/agent/AGENT_IMPLEMENTATION_BRIEF.md` and Atticus spec O8, O10. No code, prompts, or art were copied.
+Behavior check of Zeus on `swarm/B1` (base `4b4bb8fe624395e109806afb67d520331d317ca0`) against present brief P0-P6. Reference only: `ref/present-reference/agent/AGENT_IMPLEMENTATION_BRIEF.md` and Atticus spec O8, O10. No code, prompts, or art were copied.
 
 Lane B1 owns L0, L1, L2, L3. L4, L5, L7 stay listed so the gaps are visible. They are not this lane.
 

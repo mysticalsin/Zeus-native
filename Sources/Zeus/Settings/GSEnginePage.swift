@@ -72,6 +72,7 @@ struct EnginePage: View {
                         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("Jev monthly limit in US dollars")
+                        .accessibilityIdentifier("settings.engine.jevLimit")
                         .onSubmit(saveCap)
                     Button("Set limit", action: saveCap).buttonStyle(GSButtonStyle()).disabled(parsedCapDraft == nil)
                     if (center.jevBudget.monthlyCap ?? 0) > 0 {

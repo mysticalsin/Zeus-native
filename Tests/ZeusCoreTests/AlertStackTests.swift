@@ -172,8 +172,31 @@ import Testing
     @Test func fallbackGlyphsAndReplySupport() {
         #expect(AlertAppGlyph.symbol(for: "com.apple.mail") == "envelope.fill")
         #expect(AlertAppGlyph.symbol(for: "unknown.app") == "app.fill")
-        #expect(AlertAppGlyph.supportsReply("com.apple.MobileSMS"))
-        #expect(!AlertAppGlyph.supportsReply("com.apple.iCal"))
+    }
+
+    private func alert(_ app: String, title: String, body: String = "") -> AlertItem {
+        AlertItem(id: "1", appID: app, appName: "App", title: title, body: body, postedAt: Date(timeIntervalSince1970: 0))
+    }
+
+    @Test func messagesRepliesOpenTheChatOnlyWhenTheTitleIsAnAddress() {
+        #expect(AlertReply.url(for: alert("com.apple.MobileSMS", title: "+1 (514) 555-0100"))?.absoluteString
+                == "imessage:%2B1%20(514)%20555-0100")
+        #expect(AlertReply.url(for: alert("com.apple.MobileSMS", title: "ana@example.com"))?.absoluteString == "imessage:ana@example.com")
+        #expect(AlertReply.url(for: alert("com.apple.MobileSMS", title: "Marie Dubois")) == nil, "a name cannot address a chat")
+    }
+
+    @Test func mailRepliesOpenADraftWithReAndNeverSend() {
+        let withAddress = AlertReply.url(for: alert("com.apple.mail", title: "ana@example.com", body: "Budget\nsecond line"))
+        #expect(withAddress?.absoluteString == "mailto:ana@example.com?subject=Re:%20Budget")
+        let named = AlertReply.url(for: alert("com.apple.mail", title: "Ana Lopez", body: "Re: Budget"))
+        #expect(named?.absoluteString == "mailto:?subject=Re:%20Budget", "no double Re:")
+        #expect(AlertReply.url(for: alert("com.apple.mail", title: "Ana Lopez")) == nil, "nothing to reply to")
+    }
+
+    @Test func slackTeamsAndOtherAppsHideReplyInsteadOfDuplicatingOpen() {
+        for app in ["com.tinyspeck.slackmacgap", "com.microsoft.teams2", "com.microsoft.teams", "com.apple.iCal", "unknown.app"] {
+            #expect(!AlertReply.supportsReply(alert(app, title: "Marie", body: "hello")), "\(app)")
+        }
     }
 
     @Test func animationWindowEndsSoIdleOwnsNoClock() {
@@ -185,5 +208,73 @@ import Testing
         #expect(!AlertMotion.isAnimating(elapsed: 0.5, reduceMotion: true))
         #expect(AlertMotion.contentDelay(index: 2) - AlertMotion.contentDelay(index: 1) == AlertMotion.contentStagger)
         #expect(AlertMotion.stretchResponse == 0.42 && AlertMotion.stretchDamping == 0.78)
+    }
+}
+
+@Suite struct AlertStackSuspendTests {
+    private let t0 = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    private func alert(_ id: String, title: String = "Anna", priority: AlertPriority = .normal) -> AlertItem {
+        AlertItem(id: id, appID: "com.apple.MobileSMS", appName: "Messages", title: title, body: "Hi", priority: priority, postedAt: t0)
+    }
+
+    @Test func aSuspendedStackNeverExpiresAnAlertUnseen() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0) // deadline t0+6
+        stack.setSuspended(true, now: t0.addingTimeInterval(2)) // the panel opened with 4 s left
+        #expect(stack.nextDeadline() == nil)
+        let expired = stack.expire(now: t0.addingTimeInterval(60))
+        #expect(expired.isEmpty)
+        #expect(stack.items.count == 1)
+    }
+
+    @Test func resumingGivesTheAlertItsRemainingTimeAgain() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.setSuspended(true, now: t0.addingTimeInterval(2))
+        stack.setSuspended(false, now: t0.addingTimeInterval(30))
+        #expect(stack.nextDeadline() == t0.addingTimeInterval(34))
+    }
+
+    @Test func anAlertPostedWhileSuspendedStartsItsClockOnResume() {
+        var stack = AlertStack()
+        stack.setSuspended(true, now: t0)
+        stack.post(alert("a"), now: t0.addingTimeInterval(1))
+        #expect(stack.nextDeadline() == nil)
+        stack.setSuspended(false, now: t0.addingTimeInterval(20))
+        #expect(stack.nextDeadline() == t0.addingTimeInterval(26))
+    }
+
+    @Test func hoverAndSuspendKeepTheClockFrozenUntilBothEnd() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.setHovered(true, now: t0.addingTimeInterval(1))
+        stack.setSuspended(true, now: t0.addingTimeInterval(2))
+        stack.setHovered(false, now: t0.addingTimeInterval(3))
+        #expect(stack.isPaused)
+        #expect(stack.nextDeadline() == nil)
+        stack.setSuspended(false, now: t0.addingTimeInterval(10))
+        #expect(!stack.isPaused)
+        #expect(stack.nextDeadline() != nil)
+    }
+
+    @Test func dismissingTheLastAlertClearsAStaleHover() {
+        // The capsule vanished under the pointer: the next alert must still count down.
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.setHovered(true, now: t0.addingTimeInterval(1))
+        stack.dismiss(id: "a", now: t0.addingTimeInterval(2))
+        #expect(!stack.isHovered)
+        stack.post(alert("b", title: "Ben"), now: t0.addingTimeInterval(3))
+        #expect(stack.nextDeadline() == t0.addingTimeInterval(9))
+    }
+
+    @Test func dismissingOneOfTwoKeepsTheHover() {
+        var stack = AlertStack()
+        stack.post(alert("a"), now: t0)
+        stack.post(alert("b", title: "Ben"), now: t0)
+        stack.setHovered(true, now: t0.addingTimeInterval(1))
+        stack.dismiss(id: "a", now: t0.addingTimeInterval(2))
+        #expect(stack.isHovered)
     }
 }

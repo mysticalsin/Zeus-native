@@ -15,6 +15,9 @@ struct ScribeTranscriberCallbacks: Sendable {
     /// Every closed turn's voice, said once, just before `onFinished`. Memory only: it feeds the post-meeting
     /// speaker correction and "Remember this voice", and is never written to disk.
     var onTurns: @Sendable ([ScribeTurnEmbedding]) -> Void = { _ in }
+    /// Said once at the end when the streaming diarizer ran: the system-audio turns (segment id to "Speaker N")
+    /// whose final label differs from the live one. Empty when nothing changed; never said without the model.
+    var onRelabel: @Sendable ([String: String]) -> Void = { _ in }
 }
 
 /// What the recogniser needs to tell voices apart, ready before the first chunk: a trained embedder when its
@@ -22,12 +25,15 @@ struct ScribeTranscriberCallbacks: Sendable {
 struct ScribeSpeakerSetup: Sendable {
     var embedder: FluidVoiceEmbedder?
     var library = ScribeVoiceLibrary()
+    /// The Nemotron streaming diarizer for the system channel when its model is on disk (preferred), else nil.
+    var streaming: FluidStreamingDiarizer?
 
     /// The shipped app: the model if downloaded, and the saved voices if the file reads.
     static func live() async -> ScribeSpeakerSetup {
         let embedder = await SpeakerModelStore.loadEmbedder()
+        let streaming = await StreamingDiarizerStore.load()
         let library = (try? ScribeVoiceLibraryStore.standard.load()) ?? ScribeVoiceLibrary()
-        return ScribeSpeakerSetup(embedder: embedder, library: library)
+        return ScribeSpeakerSetup(embedder: embedder, library: library, streaming: streaming)
     }
 }
 
@@ -217,9 +223,11 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
     private struct Speakers {
         private var diarizer = ScribeDiarizer()
         private var embedder: (any ScribeVoiceEmbedder)?
+        private var streaming: FluidStreamingDiarizer?
 
         init(setup: ScribeSpeakerSetup = ScribeSpeakerSetup()) {
             embedder = setup.embedder
+            streaming = setup.streaming
             if let embedder {
                 for seed in setup.library.seeds(kind: embedder.kind) { diarizer.seed(name: seed.name, embedding: seed.embedding) }
             }
@@ -230,9 +238,32 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
         }
 
         /// The speaker and the voice that decided it (nil when the chunk was too short or had no speech).
-        mutating func assign(source: ScribeAudioSource, samples: [Float]) -> (speaker: ScribeSpeaker, voice: ScribeVoiceEmbedding?) {
+        mutating func assign(id: String, source: ScribeAudioSource, samples: [Float]) -> (speaker: ScribeSpeaker, voice: ScribeVoiceEmbedding?) {
             let voice = embedding(for: samples)
-            return (diarizer.assign(source: source, embedding: voice), voice)
+            guard let streaming else { return (diarizer.assign(source: source, embedding: voice), voice) }
+            switch source {
+            case .system:
+                // The streaming model decides who spoke. A saved voice that matches still keeps its own name.
+                let slot = streaming.assign(id: id, samples: samples)
+                if let known = diarizer.classify(source: .system, embedding: voice) {
+                    streaming.exclude(id: id)
+                    return (known, voice)
+                }
+                return (.participant("Speaker \((slot ?? streaming.lastSlot ?? 0) + 1)"), voice)
+            case .microphone:
+                // A second voice in the room gets its own label so it never shares a number with a call voice.
+                let speaker = diarizer.assign(source: source, embedding: voice)
+                if case .participant(let label) = speaker, label.hasPrefix("Speaker ") {
+                    return (.participant("Room voice " + label.dropFirst("Speaker ".count)), voice)
+                }
+                return (speaker, voice)
+            }
+        }
+
+        /// Flushes the stream and returns the turns whose final speaker differs from the live one; nil without the model.
+        mutating func finishStreaming() -> [String: String]? {
+            guard let streaming else { return nil }
+            return streaming.finish().mapValues { "Speaker \($0 + 1)" }
         }
 
         func provisional(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
@@ -261,13 +292,17 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
 
         func assign(id: String, source: ScribeAudioSource, samples: [Float], duration: TimeInterval) -> ScribeSpeaker {
             lock.withLock {
-                let result = speakers.assign(source: source, samples: samples)
+                let result = speakers.assign(id: id, source: source, samples: samples)
                 if let voice = result.voice {
                     turns.append(ScribeTurnEmbedding(segmentID: id, source: source, embedding: voice, duration: duration))
                     if turns.count > Self.turnCap { turns.removeFirst(turns.count - Self.turnCap) }
                 }
                 return result.speaker
             }
+        }
+
+        func finishStreaming() -> [String: String]? {
+            lock.withLock { speakers.finishStreaming() }
         }
 
         func takeTurns() -> [ScribeTurnEmbedding] {
@@ -445,6 +480,7 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
                 }
                 if cancelled.isSet { break }
                 if pending.isDrainedAndFinishing {
+                    if let relabels = state.finishStreaming() { callbacks.onRelabel(relabels) }
                     callbacks.onTurns(state.takeTurns())
                     callbacks.onFinished(session)
                     break

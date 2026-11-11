@@ -1,8 +1,8 @@
 # Zeus Pointing Assistant: Implementation Plan (v1)
 
-Labels used throughout: **[Observed]** means behavior the owner reports seeing in HeyClicky. We have not verified it, and we know nothing about its implementation. **[Verified]** means read in this repo (file:line) or confirmed in a public source cited here. **[Rec]** means our recommendation. **[Verify]** means a fact that must be checked against current vendor docs before anyone relies on it.
+Labels used throughout: **[Observed]** means behavior the owner reports seeing in the reference app. We have not verified it, and we know nothing about its implementation. **[Verified]** means read in this repo (file:line) or confirmed in a public source cited here. **[Rec]** means our recommendation. **[Verify]** means a fact that must be checked against current vendor docs before anyone relies on it.
 
-This design is independent of HeyClicky. It uses no HeyClicky names, assets, prompts, voices or branding. We do not know its source, backend, models, voice provider or prompts.
+This design is independent of the reference app. It uses no the reference app names, assets, prompts, voices or branding. We do not know its source, backend, models, voice provider or prompts.
 
 ---
 
@@ -60,9 +60,9 @@ This design is independent of HeyClicky. It uses no HeyClicky names, assets, pro
 
 `Sources/ZeusCore/Pointing/*` (pure state machine, gesture, trace, context, proposals, v2 validation); `Sources/Zeus/Pointing/*` (controller, key monitor, target probe, marker, guidance and action tools); protocol v2; settings rows; tests; feature-map rows. Details in section 6.
 
-### 1d. Unknown about HeyClicky (do not claim)
+### 1d. Unknown about the reference app (do not claim)
 
-Source code, backend, LLM(s), ASR/TTS vendors, prompts, protocol, overlay technology, permission set, how it detects stale UI, retention policy, assets, pricing. **[Observed]** only: hold Control+Option to speak, double-tap Control for text entry, Fn+Control for dictation, a colored cursor marker while listening, pointing and scribbling while speaking, spoken answers with on-screen annotations. Nothing in this plan depends on how HeyClicky does any of this.
+Source code, backend, LLM(s), ASR/TTS vendors, prompts, protocol, overlay technology, permission set, how it detects stale UI, retention policy, assets, pricing. **[Observed]** only: hold Control+Option to speak, double-tap Control for text entry, Fn+Control for dictation, a colored cursor marker while listening, pointing and scribbling while speaking, spoken answers with on-screen annotations. Nothing in this plan depends on how the reference app does any of this.
 
 ---
 
@@ -370,7 +370,7 @@ The existing seam is the "Any LLM" OpenAI-compatible endpoint (`ExplanationProvi
 4. **Hard refusals.** No action on any `isSecure` candidate or focused `AXSecureTextField`. Values are never read (`AXSnapshotter.swift:55` already drops secure values). Never type passwords, card numbers or CVV (`DrivePlan.secretWords`, `:94`). Never press Return on insert (`TextInserter.insert(pressReturn: false)`). Send, delete, purchase and publish always ask (reuse `DrivePlan.isDestructive`). `openURL` is https only, the host is shown, it asks the first time per host, and there are no `file:`, `javascript:` or custom schemes. `openApp` takes a bundle ID resolved by `NSWorkspace.urlForApplication(withBundleIdentifier:)` and shows the app name. `clipboardWrite` always asks and can be restored.
 5. **Visible agency.** While any action tool runs: an indicator next to the marker plus a menu-bar Stop; Esc cancels (global Esc is available only with key-listen access); long jobs appear as visible background jobs (**[Rec]** reuse the existing agent job cards in `ZeusCore/AgentCards.swift`, [Verify] fit).
 6. **Credentials.** Keychain only (`Keychain.get(AnyLLMConfig.keyAccount)` pattern, `AppDelegate.swift:576`). No environment-variable secrets. The no-redirect delegate is kept (`ExplanationProvider.swift:150-155`).
-7. **Consent and retention.** Feature off by default (`pointing.enabled=false`). Screenshot upload requires `pointing.sendScreenshot` (default off, with a disclosure sentence naming the endpoint host) plus OS Screen Recording granted by the user. Capture covers only the display under the pointer, excludes Zeus, and happens only at key-down, or once more at key-up if a change was observed. Session memory is RAM only: at most 3 snapshots and 10 minutes, cleared at session end, quit, feature-off or delete. Transcripts are kept in `ExplanationHistory` like Chat explanations (50 records / 64 MiB / 30 days); **[Rec]** pointing sessions default to a 24 h TTL (owner decision). Durable preferences ("speak slower", "prefer simpler") go in `UserMemoryStore` (`ZeusCore/UserMemory.swift:4`), which is never filled from screen OCR and already has inspect/delete. Add a `pointing.memory.enabled` toggle.
+7. **Consent and retention.** Feature on by default since 2026-11-11 (`pointing.enabled=true`, owner decision; it only listens for the keys the owner's own Input Monitoring or Accessibility grant allows and captures nothing until the keys are held). `pointing.drawWhileHeld` (default on) controls whether drags are ink while held. Screenshot upload requires `pointing.sendScreenshot` (default off, with a disclosure sentence naming the endpoint host) plus OS Screen Recording granted by the user. Capture covers only the display under the pointer, excludes Zeus, and happens only at key-down, or once more at key-up if a change was observed. Session memory is RAM only: at most 3 snapshots and 10 minutes, cleared at session end, quit, feature-off or delete. Transcripts are kept in `ExplanationHistory` like Chat explanations (50 records / 64 MiB / 30 days); **[Rec]** pointing sessions default to a 24 h TTL (owner decision). Durable preferences ("speak slower", "prefer simpler") go in `UserMemoryStore` (`ZeusCore/UserMemory.swift:4`), which is never filled from screen OCR and already has inspect/delete. Add a `pointing.memory.enabled` toggle.
 
 ---
 
@@ -418,6 +418,36 @@ Acceptance:
 - Portable plus the native suites above pass.
 - Packaged app (M3) launches with the feature off and has no new prompts.
 - With the feature on and permissions granted by the owner: holding the keys over the Finder toolbar "Share" and asking "what is this" draws an orange ring at the AX frame within 2 pt and speaks; pressing the keys again mid-speech stops speech and animation within one frame of the stop call.
+
+### Phase 2 status (2026-11-11, branch `codex/pointing-phase2-20261111`)
+
+M1 code written. M2 tests are written; CI is the only compile and test proof (the authoring sandbox cannot run `swift build`). M3 and M4 not done: nothing here has been launched.
+
+| Item | State |
+|---|---|
+| Strokes on the overlay, `drawing` state | Done in Phase 1 (`PointingController.ink`). |
+| Stroke targeting (circle, underline, dot to best element, else region) | Done: `ZeusCore/Pointing/PointingStrokeTargeting.swift`, wired in `buildTurn`. Region candidates use `source: .strokeBounds`, role `region`. |
+| Deixis ("this", "that", "here", "these", French forms) | Done with a gap: `PointingDeixis` resolves against stroke, dwell and release evidence and is applied to the final transcript in `ExplanationController.submit()`. The on-device recognizer returns text only, so words are matched in order, not by `SFTranscriptionSegment` time. The timed path exists and is tested; feeding segment times is open. |
+| Stale detection | Done: `PointingStaleTarget` (pure) and `PointingTargetWatcher` (AXObserver on the target and its window, main-actor hop, per-beat frame re-read, 2 pt tolerance). A stale mark is hidden and the target is looked up once more. A control found at a new spot is reported ("hold the keys and ask again"), not re-ringed. |
+| Double-Control text entry | Done behind `pointing.textEntry`, default off, because macOS Dictation can use "Press Control key twice". `PointingTextEntry` panel, `submitText`. |
+| Fn+Control dictation preset | Done behind `pointing.dictationFnControl`, default off. Remembers and restores the previous dictation key (`DictationFnControlPreset`). |
+| Conflict warnings | Done in Core: `ShortcutConflicts.pointingWarnings` (talk, dictation, chat, show-me, double Control). Not yet shown in a Settings row. |
+| Reduce Motion and Reduce Transparency ink variants | Not done. |
+| TTS marker word alignment | Not done. |
+| Off-main SSE reader | Not done. |
+| `PointingOverlayTests` (app, owned windows) | Not done. |
+
+### Slice S1 additions (2026-11-11, same branch)
+
+| Item | State |
+|---|---|
+| Trail while hovering | Done: `PointingInkTrail` (Core). The pointer path is the ink; near-duplicates (under 2.5 pt) are dropped, a 0.6 s pause starts a new shape, smoothing keeps corners (turns over 55 degrees) and both endpoints. Bounded at 512 points per stroke and 16 strokes. Colour: the macOS pointer fill colour when the user set one, else the Zeus accent. |
+| Holding the keys must not swallow clicks | Done: the pointing overlay is shown with `capturingMouse: false`, so it is click-through and the app underneath keeps focus. The key tap was already listen-only. `capturingMouse` remains for show-me only. |
+| AX hit test on the main actor | Done: `PointingTargetProbe.hitTest` is `@MainActor`; the controller hops with `MainActor.run`. Worst case on a hung target app is the 0.1 s messaging timeout per probe, up to four probes. |
+| Stuck-modifier timeout | Done: `PointingKeyGesture.tick` compares tracked keys with the live modifiers four times a second and ends the hold after 95 s regardless; it resyncs and blocks a restart until all keys are up (`holdTimedOut`). |
+| Sleep, wake, display change | Done: `PointingKeyGesture.interrupt`, session events `systemSleep`, `systemWake`, `displaysChanged`, and controller observers. A hold is cancelled without a request; a turn in flight is stopped; marks are hidden. |
+| Overlay tests | Done: `PointingOverlayTests` (app panels never key or main, ignore the mouse, excluded from capture) and `PointingOverlayGeometryTests` (ring on the candidate on 2x, 1x negative origin, and a display above main). |
+| Trace spans | Done: `PointingTraceSpans` in `PointingController.Metrics`, one `[ZEUS] pointing-trace` line per turn with offsets in ms and no text or image data. "First mic buffer" is the first sample tick with the microphone in the listening state. |
 
 ### Phase 2: full input surface and sync (3 to 4 days)
 

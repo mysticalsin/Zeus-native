@@ -64,61 +64,57 @@ struct ZeusVoiceCards: View {
                 GSDivider()
                 GSInfo(text: line)
             }
-            if voice.ttsProvider == .openAICompatible || voice.openAIKeySaved {
-                GSDivider()
-                GSRow(symbol: "key", title: "OpenAI TTS key", text: voice.openAIKeySaved ? "Saved in Keychain." : "Saved in Keychain when you add one.") {
-                    HStack(spacing: 10) {
-                        SecureField(voice.openAIKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.openAIKeyDraft }, set: { voice.openAIKeyDraft = $0 }))
-                            .textFieldStyle(.plain)
-                            .snapshotSafeText(voice.openAIKeyDraft, placeholder: voice.openAIKeySaved ? "Saved" : "Paste a key", secure: true)
-                            .font(OB.font(13.5)).foregroundStyle(GS.text)
-                            .padding(.horizontal, 10).frame(width: 200, height: 30)
-                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                            .accessibilityLabel("OpenAI TTS key")
-                            .onSubmit { voice.saveOpenAIKey() }
-                        Button("Save key") { voice.saveOpenAIKey() }.buttonStyle(GSButtonStyle()).disabled(voice.openAIKeyDraft.isEmpty)
-                        if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle()) }
-                    }
+            GSDivider()
+            GSRow(symbol: "key", title: "OpenAI TTS key", text: voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.") {
+                HStack(spacing: 10) {
+                    SecureField(voice.openAIKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.openAIKeyDraft }, set: { voice.openAIKeyDraft = $0 }))
+                        .textFieldStyle(.plain)
+                        .snapshotSafeText(voice.openAIKeyDraft, placeholder: voice.openAIKeySaved ? "Saved" : "Paste a key", secure: true)
+                        .font(OB.font(13.5)).foregroundStyle(GS.text)
+                        .padding(.horizontal, 10).frame(width: 200, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                        .accessibilityLabel("OpenAI TTS key")
+                        .onSubmit { voice.saveOpenAIKey() }
+                    Button("Save key") { voice.saveOpenAIKey() }.buttonStyle(GSButtonStyle()).disabled(voice.openAIKeyDraft.isEmpty)
+                    if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle()) }
                 }
             }
-            if voice.ttsProvider == .elevenLabs || voice.elevenKeySaved {
+            GSDivider()
+            GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus speaks with ElevenLabs first." : "Best Zeus voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain.") {
+                HStack(spacing: 10) {
+                    SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
+                        .textFieldStyle(.plain)
+                        .snapshotSafeText(voice.elevenKeyDraft, placeholder: voice.elevenKeySaved ? "Saved" : "Paste a key", secure: true)
+                        .font(OB.font(13.5)).foregroundStyle(GS.text)
+                        .padding(.horizontal, 10).frame(width: 200, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                        .accessibilityLabel("ElevenLabs key")
+                        .onSubmit { voice.saveElevenKey() }
+                    Button("Save key") { voice.saveElevenKey() }.buttonStyle(GSButtonStyle()).disabled(voice.elevenKeyDraft.isEmpty)
+                    if voice.elevenKeySaved { Button("Remove") { voice.removeElevenKey() }.buttonStyle(GSButtonStyle()) }
+                }
+            }
+            if voice.elevenKeySaved {
                 GSDivider()
-                GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain." : "Saved in Keychain when you add one.") {
-                    HStack(spacing: 10) {
-                        SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
-                            .textFieldStyle(.plain)
-                            .snapshotSafeText(voice.elevenKeyDraft, placeholder: voice.elevenKeySaved ? "Saved" : "Paste a key", secure: true)
-                            .font(OB.font(13.5)).foregroundStyle(GS.text)
-                            .padding(.horizontal, 10).frame(width: 200, height: 30)
-                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                            .accessibilityLabel("ElevenLabs key")
-                            .onSubmit { voice.saveElevenKey() }
-                        Button("Save key") { voice.saveElevenKey() }.buttonStyle(GSButtonStyle()).disabled(voice.elevenKeyDraft.isEmpty)
-                        if voice.elevenKeySaved { Button("Remove") { voice.removeElevenKey() }.buttonStyle(GSButtonStyle()) }
+                GSRow(symbol: "person.wave.2", title: "ElevenLabs voice") {
+                    if voice.loadingLibrary {
+                        ProgressView().controlSize(.small)
+                    } else if voice.library.isEmpty {
+                        Button("Load voices") { Task { await voice.loadLibrary() } }.buttonStyle(GSButtonStyle())
+                    } else {
+                        GSPopup(selection: Binding(get: { voice.library.first { $0.id == voice.elevenVoiceID }?.name ?? voice.elevenVoiceID },
+                                                   set: { name in if let item = voice.library.first(where: { $0.name == name }) { voice.setElevenVoice(item.id) } }),
+                                options: voice.library.map(\.name), label: "ElevenLabs voice")
                     }
                 }
-                if voice.elevenKeySaved {
-                    GSDivider()
-                    GSRow(symbol: "person.wave.2", title: "ElevenLabs voice") {
-                        if voice.loadingLibrary {
-                            ProgressView().controlSize(.small)
-                        } else if voice.library.isEmpty {
-                            Button("Load voices") { Task { await voice.loadLibrary() } }.buttonStyle(GSButtonStyle())
-                        } else {
-                            GSPopup(selection: Binding(get: { voice.library.first { $0.id == voice.elevenVoiceID }?.name ?? voice.elevenVoiceID },
-                                                       set: { name in if let item = voice.library.first(where: { $0.name == name }) { voice.setElevenVoice(item.id) } }),
-                                    options: voice.library.map(\.name), label: "ElevenLabs voice")
-                        }
-                    }
-                    if let line = voice.libraryMessage {
-                        GSInfo(text: line)
-                    }
-                }
-                if let line = voice.elevenLabsStatusMessage {
+                if let line = voice.libraryMessage {
                     GSInfo(text: line)
                 }
+            }
+            if let line = voice.elevenLabsStatusMessage {
+                GSInfo(text: line)
             }
             if voice.ttsProvider == .kokoro || voice.kokoroReady || voice.settingUpKokoro {
                 GSDivider()

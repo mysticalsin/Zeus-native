@@ -79,9 +79,10 @@ enum TextInserter {
 
     /// The delayed ⌘V sequence; `insert` runs exactly this. The text is already on the clipboard.
     static func runPaste(pressReturn: Bool, restoreClipboard: Bool, steps: SinkSteps,
-                         check: DeliveryCheck?) async -> PasteResult {
-        // Let the modifier the person was holding come up before we press ⌘V.
-        await steps.sleep(60)
+                         check: DeliveryCheck?, settleMs: Int = 60) async -> PasteResult {
+        // Let the modifier the person was holding come up before we press ⌘V. With no modifier
+        // down there is nothing to wait for, which saves 60 ms on every dictation.
+        if settleMs > 0 { await steps.sleep(settleMs) }
         switch check?() ?? .paste {
         case .paste: break
         case .clipboardOnly: return .clipboardOnly
@@ -159,8 +160,12 @@ enum TextInserter {
         return read()
     }
 
+    /// How long to wait before ⌘V: nothing when no modifier key is down, else the usual 60 ms.
+    static func pasteSettleMs(modifiersDown: Bool) -> Int { modifiersDown ? 60 : 0 }
+
+    /// `onPasteKey` runs the moment ⌘V is posted: the text is on its way into the app.
     static func insert(_ text: String, pressReturn: Bool = false, restoreClipboard: Bool = true,
-                       deliveryCheck: DeliveryCheck? = nil) async -> Outcome {
+                       deliveryCheck: DeliveryCheck? = nil, onPasteKey: (@MainActor () -> Void)? = nil) async -> Outcome {
         let board = NSPasteboard.general
         let saved = resolveSnapshot(boardChangeCount: board.changeCount, pending: pendingOriginal,
                                     read: { snapshot(board) })
@@ -173,13 +178,14 @@ enum TextInserter {
         guard AXIsProcessTrusted() else { return .copiedOnly }
         let steps = SinkSteps(
             sleep: { try? await Task.sleep(for: .milliseconds($0)) },
-            pasteKey: { press(key: 9, flags: .maskCommand) }, // V
+            pasteKey: { press(key: 9, flags: .maskCommand); onPasteKey?() }, // V
             returnKey: { press(key: 36, flags: []) }, // Return
             restoreIfUnchanged: {
                 if let saved, board.changeCount == ours { restore(saved, to: board) }
             })
         let result = await runPaste(pressReturn: pressReturn, restoreClipboard: restoreClipboard && saved != nil,
-                                    steps: steps, check: deliveryCheck)
+                                    steps: steps, check: deliveryCheck,
+                                    settleMs: pasteSettleMs(modifiersDown: !NSEvent.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty))
         return result == .pasted ? .pasted : .copiedOnly
     }
 

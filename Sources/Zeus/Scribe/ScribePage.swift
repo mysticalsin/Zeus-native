@@ -10,6 +10,10 @@ struct ScribePage: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
+        ScribeOpenScope { pageBody }
+    }
+
+    private var pageBody: some View {
         VStack(spacing: 6) {
             // Persistent until the person retries or dismisses it; the controller also announces it.
             // At most one storage banner is shown, the most urgent first; the rest are counted, and each
@@ -31,6 +35,7 @@ struct ScribePage: View {
                         ScribeStage(topBar: topBar, scribe: scribe,
                             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency)
                             .padding(CardFinish.inset)
+                            .scribeEntrance(.panel)
                     }
                 }
             }
@@ -135,7 +140,7 @@ private struct ScribeUnsavedBanner: View {
 }
 
 /// A transcription problem of the current meeting, without actions (it clears when the meeting is closed).
-private struct ScribeIssueLine: View {
+struct ScribeIssueLine: View {
     let text: String
     /// Keeps a warning compact where the page needs the room (the live transcript).
     var lineLimit: Int?
@@ -155,7 +160,7 @@ private struct ScribeIssueLine: View {
     }
 }
 
-private func scribeColor(_ rgb: ScribeGlow.RGB) -> Color {
+func scribeColor(_ rgb: ScribeGlow.RGB) -> Color {
     Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
 }
 
@@ -337,7 +342,7 @@ private struct ScribeGlowLayer: View {
 
 /// An accessibility element that VoiceOver is sent to whenever `focusToken` changes (a new state heading).
 /// Posting `.layoutChanged` with the element is the documented way to direct VoiceOver focus on macOS.
-private struct ScribeAccessibilityFocusAnchor: NSViewRepresentable {
+struct ScribeAccessibilityFocusAnchor: NSViewRepresentable {
     let label: String
     let focusToken: Int
 
@@ -408,122 +413,8 @@ private struct ScribeHeader: View {
     }
 }
 
-private struct ScribeIdle: View {
-    let scribe: ScribeController
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 18) {
-            VStack(alignment: .leading, spacing: 10) {
-                ScribeHeader(title: "Scribe", focusToken: scribe.focusToken)
-                Text("Listens to a meeting and writes your notes when it ends.")
-                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let disclosure = scribe.cloudDisclosure {
-                    ScribeIssueLine(text: disclosure)
-                }
-                if let note = scribe.availabilityNote {
-                    Text(note)
-                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Availability: \(note)")
-                }
-                Spacer(minLength: 0)
-                NotchActionButton(title: "Start", tint: TopBarStyle.rec) { scribe.start() }
-                    .accessibilityHint("Starts listening to a meeting.")
-                    .ownedJourneyControl("scribe.start")
-            }
-            .frame(width: 270, alignment: .topLeading)
-            ScribeRecapList(scribe: scribe)
-        }
-    }
-}
-
-private struct ScribeRecapList: View {
-    let scribe: ScribeController
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Recent meetings").font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                NotchActionButton(title: "Memory", tint: Theme.cloudSecondary, filled: false) { WikiController.shared.showWindow() }
-                    .accessibilityHint("Opens what Zeus has learned from your meetings.")
-            }
-            if scribe.recaps.isEmpty {
-                Text("Finished meetings and their notes show up here.")
-                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(scribe.recaps) { recap in
-                            ScribeRecapRow(scribe: scribe, recap: recap)
-                        }
-                    }
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-}
-
-private struct ScribeRecapRow: View {
-    let scribe: ScribeController
-    let recap: ScribeRecap
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 8) {
-                Button { scribe.openRecap(recap.id) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(recap.title).font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
-                            Text(recap.endedAt, style: .time).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                        }
-                        Text(recap.notes.summary.isEmpty ? "No summary." : recap.notes.summary)
-                            .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
-                            .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                        if let badge = ScribeRecapNote.badge(for: recap.transcriptionNote) {
-                            Text(badge)
-                                .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.ember)
-                        }
-                        if recap.micExcludedDuringCall {
-                            Text(ScribeMicCallText.recapLine)
-                                .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.ember)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open notes for \(recap.title)")
-                .accessibilityHint("Shows the summary, action items, private notes and transcript.")
-                Button { scribe.requestDelete(recap.id) } label: {
-                    Image(systemName: "trash").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.cloudSecondary)
-                        .frame(width: 20, height: 20).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Delete \(recap.title) permanently")
-                Button { scribe.dismissRecap(recap.id) } label: {
-                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.cloudSecondary)
-                        .frame(width: 20, height: 20).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(recap.title) from recent meetings")
-                .accessibilityHint("Hides it from this list. The saved meeting stays on this Mac until you delete it permanently.")
-            }
-            if scribe.pendingDeleteID == recap.id {
-                ScribeDeleteConfirm(scribe: scribe, id: recap.id)
-            }
-        }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
-    }
-}
-
 /// The second step of "Delete permanently": says exactly what is removed, and that it can't be undone.
-private struct ScribeDeleteConfirm: View {
+struct ScribeDeleteConfirm: View {
     let scribe: ScribeController
     let id: ScribeSessionID
 
@@ -672,7 +563,7 @@ private struct ScribeRecording: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             toolbar
-            ScribeInputStatus(scribe: scribe)
+            ScribeLiveStatusRow(scribe: scribe, reduceMotion: reduceMotion)
             if let note = scribe.systemAudioNote {
                 ScribeIssueLine(text: note, lineLimit: 2)
             }
@@ -690,7 +581,7 @@ private struct ScribeRecording: View {
         }
     }
 
-    /// Stop and discard on the left, the meter and clock centred.
+    /// The square Stop control, the live dot and the clock (the only red on the page), and discard.
     @ViewBuilder
     private var toolbar: some View {
         if scribe.discardRequested {
@@ -708,31 +599,56 @@ private struct ScribeRecording: View {
                     scribe.keepAfterDiscardRequest()
                 }
             }
-            .frame(minHeight: 28)
+            .frame(minHeight: 40)
         } else {
-            HStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    ScribeCircleButton(symbol: "stop.fill", label: "Stop recording", hint: "Asks whether to end the meeting.") {
-                        scribe.requestEnd()
-                    }
-                    .ownedJourneyControl("scribe.stop")
-                    ScribeCircleButton(symbol: "trash", label: "Discard recording", hint: "Asks before throwing this meeting away.") {
-                        scribe.requestDiscard()
-                    }
+            HStack(spacing: 10) {
+                stopControl
+                ScribeLiveClock(state: state, elapsed: scribe.elapsed)
+                Spacer(minLength: 0)
+                ScribeCircleButton(symbol: "trash", label: "Discard recording", hint: "Asks before throwing this meeting away.") {
+                    scribe.requestDiscard()
                 }
-                Spacer(minLength: 0)
-                ScribeRecordingStatus(state: state, elapsed: scribe.elapsed, history: scribe.levelHistory, reduceMotion: reduceMotion)
-                Spacer(minLength: 0)
-                // Balances the buttons so the meter sits in the middle.
-                Color.clear.frame(width: 64, height: 1).accessibilityHidden(true)
             }
+            .frame(minHeight: 40)
             .background { ScribeAccessibilityFocusAnchor(label: "Scribe, listening", focusToken: scribe.focusToken) }
         }
+    }
+
+    private var stopControl: some View {
+        RecordlyCaptureControl(
+            visual: .recording, enabled: true, countdownBeganAt: nil,
+            help: "Stop recording", spokenSource: nil,
+            idleSymbol: "waveform", idleLabel: "Start Scribe", stopLabel: "Stop recording"
+        ) { scribe.requestEnd() }
+        .accessibilityHint("Asks whether to end the meeting.")
+        .scaleEffect(0.72)
+        .frame(width: 40, height: 40)
+        .ownedJourneyControl("scribe.stop")
+    }
+}
+
+/// The live dot and the elapsed time, spoken as one status. Red marks capturing right now, nothing else.
+private struct ScribeLiveClock: View {
+    let state: ScribePresentation
+    let elapsed: TimeInterval
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(TopBarStyle.rec).frame(width: 8, height: 8)
+            Text("Recording")
+                .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudSecondary)
+            Text(RecordlyElapsed.format(elapsed))
+                .font(TopBarStyle.label(20, .semibold).monospacedDigit())
+                .foregroundStyle(TopBarStyle.rec)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(state.accessibilityLabel)
+        .accessibilityValue(state.accessibilityValue)
     }
 }
 
 /// Which audio is actually being kept: the microphone gate (from the router's own reading) and system audio.
-private struct ScribeInputStatus: View {
+struct ScribeInputStatus: View {
     let scribe: ScribeController
 
     var body: some View {
@@ -1007,7 +923,7 @@ private struct ScribeNotesView: View {
 
 /// The finished notes' look: one lavender family (the writing glow's own edge purple) that settles from a
 /// tinted summary card into soft neutral cards, so the page ends calm after the glow.
-private enum ScribeNotesStyle {
+enum ScribeNotesStyle {
     static let accent = scribeColor(ScribeGlow.edgeColor)
     static let cardFill = Color.white.opacity(0.06)
     static let cardRim = Color.white.opacity(0.08)
@@ -1024,10 +940,34 @@ private enum ScribeNotesStyle {
 struct ScribeSpeakerTools {
     var suggestions: [ScribeNameSuggestion]
     var attendeeNames: [String]
+    /// Who named each speaker and how sure Zeus is (saved with the meeting).
+    var identities: [ScribeSpeakerIdentity] = []
+    /// Tiny voices were folded into other speakers at the end of the meeting and can be put back.
+    var hasPrunedVoices = false
+    /// What Undo would undo ("Undo merge"), nil when there is nothing to undo.
+    var undoTitle: String?
+    /// True while naming can still happen, so an unresolved voice reads "Identifying this speaker...".
+    var isIdentifying = false
     var canRemember: (ScribeSpeaker) -> Bool
     /// The speaker, the name typed, and whether "Remember this voice" was ticked.
     var rename: (ScribeSpeaker, String, Bool) -> Void
+    /// Accepts a suggested name (its source is kept: the invite or what was said).
+    var accept: (ScribeSpeaker, String) -> Void
+    var confirm: (ScribeSpeaker) -> Void
+    var notThem: (ScribeSpeaker) -> Void
+    /// Segment id and the name the block should go to.
+    var reassignBlock: (String, String) -> Void
+    /// Segment id, the word range, and the name those words should go to.
+    var assignWords: (String, Range<Int>, String) -> Void
+    var undo: () -> Void
+    var restorePruned: () -> Void
     var copyTranscript: () -> Void
+    /// Plays a short clip of a speaker. Nil while Zeus keeps no meeting audio, which hides the play button.
+    var playSample: ((ScribeSpeaker) -> Void)?
+
+    func identity(of speaker: ScribeSpeaker) -> ScribeSpeakerIdentity? {
+        identities.first { ScribeSpeakerNames.key($0.name) == ScribeSpeakerNames.key(speaker.displayName) }
+    }
 }
 
 /// One speaker of the meeting: colour dot, name, talk time and a thin bar for their share of the talking.
@@ -1055,8 +995,9 @@ private struct ScribeSpeakerRow: View {
                 Circle().fill(tint).frame(width: 7, height: 7)
                 if canRename {
                     Button { startEditing() } label: {
-                        Text(entry.speaker.displayName)
+                        Text(shownName)
                             .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                            .overlay(alignment: .bottom) { unconfirmedUnderline }
                     }
                     .buttonStyle(.plain)
                     .help("Rename this speaker")
@@ -1066,7 +1007,7 @@ private struct ScribeSpeakerRow: View {
                         .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
                 }
                 if let suggestion = suggestion, !editing {
-                    Button { tools?.rename(entry.speaker, suggestion.name, false) } label: {
+                    Button { tools?.accept(entry.speaker, suggestion.name) } label: {
                         Text("\(suggestion.name)? Accept")
                             .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -1089,6 +1030,7 @@ private struct ScribeSpeakerRow: View {
                 }
             }
             .frame(height: 3)
+            identityLine
             if editing { editor }
         }
         .accessibilityElement(children: editing ? .contain : .ignore)
@@ -1100,12 +1042,53 @@ private struct ScribeSpeakerRow: View {
         tools?.suggestions.first { $0.speaker == entry.speaker }
     }
 
+    private var identity: ScribeSpeakerIdentity? { tools?.identity(of: entry.speaker) }
+
+    /// The name, or "Identifying this speaker..." for a voice still unnamed while naming can happen.
+    private var shownName: String {
+        ScribeSpeakerCaption.name(for: entry.speaker, identifying: tools?.isIdentifying ?? false).text
+    }
+
+    /// A dotted line under a name Zeus chose and the person has not confirmed.
+    @ViewBuilder private var unconfirmedUnderline: some View {
+        if identity?.needsConfirmation == true {
+            Rectangle().fill(Color.clear).frame(height: 1)
+                .overlay(Rectangle().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [2, 2])).foregroundStyle(ScribeNotesStyle.accent))
+        }
+    }
+
+    /// Where the name came from, and Confirm / Not them for one that is not confirmed yet.
+    @ViewBuilder private var identityLine: some View {
+        if let identity, !editing {
+            HStack(spacing: 8) {
+                Text(identity.confirmed ? identity.source.caption : "\(identity.source.caption), not confirmed")
+                    .font(TopBarStyle.label(9)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                if !identity.confirmed {
+                    Button("Confirm") { tools?.confirm(entry.speaker) }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(9, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityLabel("Confirm the name \(identity.name)")
+                    Button("Not them") { tools?.notThem(entry.speaker) }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(9, .semibold)).foregroundStyle(Theme.cloudSecondary)
+                        .accessibilityLabel("\(identity.name) is not this speaker")
+                }
+            }
+        }
+    }
+
     @ViewBuilder private var editor: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 Text("\u{201C}\(line)\u{201D}")
                     .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if let play = tools?.playSample {
+                Button("Play 3 seconds") { play(entry.speaker) }
+                    .buttonStyle(.plain)
+                    .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                    .accessibilityLabel("Play a short sample of \(entry.speaker.displayName)")
             }
             TextField("Name", text: $draft)
                 .textFieldStyle(.plain)
@@ -1236,6 +1219,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                         card("Decisions") { bullets(notes.decisions, empty: "None found.") }
                         if stats.isWorthShowing {
                             card("Speakers") {
+                                speakerHistoryControls
                                 ForEach(Array(stats.speakers.enumerated()), id: \.offset) { _, entry in
                                     ScribeSpeakerRow(
                                         entry: entry, tools: speakerTools,
@@ -1284,6 +1268,38 @@ private struct ScribeMeetingBody<Actions: View>: View {
         guard let speakerTools else { return [] }
         let taken = Set(stats.speakers.map { ScribeSpeakerNames.key($0.speaker.displayName) })
         return speakerTools.attendeeNames.filter { !taken.contains(ScribeSpeakerNames.key($0)) }
+    }
+
+    /// Names a block can be reassigned to: the meeting's speakers (not "You" twice), then the invite.
+    private var blockNames: [String] {
+        var seen: Set<String> = []
+        var names: [String] = []
+        for entry in ScribeSpeakerStats(segments: transcript).speakers {
+            let name = entry.speaker.displayName
+            if entry.speaker != .unknown, seen.insert(ScribeSpeakerNames.key(name)).inserted { names.append(name) }
+        }
+        for name in speakerTools?.attendeeNames ?? [] where seen.insert(ScribeSpeakerNames.key(name)).inserted { names.append(name) }
+        return names
+    }
+
+    /// Undo for the last speaker change, and a way to put folded tiny voices back.
+    @ViewBuilder private var speakerHistoryControls: some View {
+        if let tools = speakerTools, tools.undoTitle != nil || tools.hasPrunedVoices {
+            HStack(spacing: 10) {
+                if let title = tools.undoTitle {
+                    Button(title) { tools.undo() }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityHint("Brings back the speakers as they were before the last change.")
+                }
+                if tools.hasPrunedVoices {
+                    Button("Restore small voices") { tools.restorePruned() }
+                        .buttonStyle(.plain)
+                        .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
+                        .accessibilityHint("Puts back the very short voices Zeus folded into other speakers.")
+                }
+            }
+        }
     }
 
     /// The date it ended (when known) and how long it ran.
@@ -1377,20 +1393,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(segments, id: \.id) { segment in
-                            VStack(alignment: .leading, spacing: 1) {
-                                // The same colour the speaker had on the live page.
-                                HStack(spacing: 4) {
-                                    Text(segment.speaker.displayName)
-                                        .font(TopBarStyle.label(9, .semibold))
-                                        .foregroundStyle(scribeColor(ScribeSpeakerPalette.color(for: segment.speaker)))
-                                    Text("· \(RecordlyElapsed.format(segment.start))")
-                                        .font(TopBarStyle.label(9).monospacedDigit()).foregroundStyle(Theme.cloudSecondary)
-                                }
-                                Text(segment.text).font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityElement(children: .combine)
+                            ScribeTranscriptBlock(segment: segment, tools: speakerTools, names: blockNames)
                         }
                     }
                 }

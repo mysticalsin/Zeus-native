@@ -92,8 +92,9 @@ public struct ScribeHandBuiltEmbedder: ScribeVoiceEmbedder {
     public func embedding(samples: [Float]) -> ScribeVoiceEmbedding? { .handBuilt(samples: samples) }
 }
 
-/// One closed speech turn's voice, kept in memory for the meeting only: it feeds the post-meeting correction and
-/// the owner's "Remember this voice". Never written to disk.
+/// One closed speech turn's voice: it feeds the post-meeting correction and the owner's "Remember this voice".
+/// It is saved only inside that meeting's own file (`ScribeMeetingRecord.TurnVoice`, 0600) so naming still works
+/// after a relaunch, and goes when the meeting is deleted. Never uploaded, never in the vault.
 public struct ScribeTurnEmbedding: Equatable, Sendable {
     public let segmentID: String
     public let source: ScribeAudioSource

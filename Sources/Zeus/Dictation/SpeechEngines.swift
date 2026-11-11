@@ -8,13 +8,18 @@ import ZeusCore
 /// downloads once into ~/Library/Application Support/FluidAudio and loads in under a second.
 /// Parakeet Ultra (Moondream's post-training of v3, same tokenizer and decoder contract) runs
 /// through the very same FluidAudio path with `AsrModelVersion.ultra`.
-final class ParakeetEngine: TranscriptionEngine, @unchecked Sendable {
+final class ParakeetEngine: StreamingTranscriptionEngine, @unchecked Sendable {
     let kind: TranscriptionEngineKind
     private let version: AsrModelVersion
     private let lock = NSLock()
     private var manager: AsrManager?
     private var loading: Task<AsrManager, Error>?
     private var progress: Double?
+    // Keep-alive: the model stays in memory for ten minutes after its last use (ModelKeepAlivePolicy).
+    private let keepAlive = ModelKeepAlivePolicy()
+    private var lastUse: Date?
+    private var activeUses = 0
+    private var idleTask: Task<Void, Never>?
 
     init(_ kind: TranscriptionEngineKind = .parakeet) {
         self.kind = kind
@@ -33,29 +38,88 @@ final class ParakeetEngine: TranscriptionEngine, @unchecked Sendable {
         return isDownloaded ? .ready : .notDownloaded
     }
 
+    /// The only path that may download the model. It runs from a Download button (Settings, onboarding),
+    /// or to load a model already on disk; `transcribe` never reaches the network.
     func prepare(progress report: (@Sendable (Double) -> Void)?) async throws {
-        _ = try await loadedManager(progress: report)
+        _ = try await loadedManager(progress: report, allowDownload: true)
+    }
+
+    /// Starts loading the model now (key down) so the first chunk does not wait for it. Never downloads.
+    func prewarm() {
+        guard isDownloaded else { return }
+        markUse()
+        Task { [self] in _ = try? await loadedManager(progress: nil, allowDownload: false) }
+    }
+
+    /// Audio is transcribed in chunks while the key is held; release only finishes the tail.
+    func openStream(hints: [String], language: String?) -> any TranscriptionStream {
+        prewarm()
+        return IncrementalTranscriptionStream(engine: self, hints: hints, language: language)
+    }
+
+    private func markUse() {
+        lock.withLock { lastUse = Date() }
+        scheduleIdleCheck(after: keepAlive.keepAliveSeconds)
+    }
+
+    private func scheduleIdleCheck(after seconds: TimeInterval) {
+        let task = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.idleCheck()
+        }
+        lock.withLock {
+            idleTask?.cancel()
+            idleTask = task
+        }
+    }
+
+    private func idleCheck() {
+        let action = lock.withLock { keepAlive.evaluate(lastUse: lastUse, activeUses: activeUses, now: Date()) }
+        switch action {
+        case .checkAgain(let seconds):
+            scheduleIdleCheck(after: seconds)
+        case .unload:
+            let released = lock.withLock { () -> Bool in
+                guard activeUses == 0, manager != nil else { return false }
+                manager = nil
+                return true
+            }
+            if released { NSLog("[ZEUS] dictation: %@ unloaded after %.0f s idle", kind.rawValue, keepAlive.keepAliveSeconds) }
+        }
     }
 
     func transcribe(samples: [Float], hints: [String], language: String?) async throws -> String {
         guard !samples.isEmpty else { throw TranscriptionError.noSpeech }
-        let manager = try await loadedManager(progress: nil)
+        lock.withLock { activeUses += 1; lastUse = Date() }
+        defer {
+            lock.withLock { activeUses -= 1; lastUse = Date() }
+            scheduleIdleCheck(after: keepAlive.keepAliveSeconds)
+        }
+        let manager = try await loadedManager(progress: nil, allowDownload: false)
         var state = TdtDecoderState.make()
         let code = DictationLanguage.engineLanguageCode(for: language)
         let scriptHint = code.flatMap(Language.init(rawValue:))
         return try await manager.transcribe(samples, decoderState: &state, language: scriptHint).text
     }
 
-    private func loadedManager(progress report: (@Sendable (Double) -> Void)?) async throws -> AsrManager {
+    private func loadedManager(progress report: (@Sendable (Double) -> Void)?, allowDownload: Bool) async throws -> AsrManager {
         let task: Task<AsrManager, Error> = lock.withLock {
             if let manager { return Task { manager } }
             if let loading { return loading }
             let downloading = !isDownloaded
+            // A missing model is never fetched unless the caller is the explicit download path.
+            if downloading, !allowDownload { return Task<AsrManager, Error> { throw TranscriptionError.notReady(self.kind) } }
             if downloading { progress = 0 }
             let task = Task { [self] () throws -> AsrManager in
-                let models = try await AsrModels.downloadAndLoad(version: self.version) { update in
-                    self.lock.withLock { self.progress = update.fractionCompleted }
-                    report?(update.fractionCompleted)
+                let models: AsrModels
+                if downloading {
+                    models = try await AsrModels.downloadAndLoad(version: self.version) { update in
+                        self.lock.withLock { self.progress = update.fractionCompleted }
+                        report?(update.fractionCompleted)
+                    }
+                } else {
+                    models = try await AsrModels.load(from: self.modelDirectory, version: self.version)
                 }
                 let manager = AsrManager(config: .default)
                 try await manager.loadModels(models)
@@ -68,6 +132,7 @@ final class ParakeetEngine: TranscriptionEngine, @unchecked Sendable {
             let manager = try await task.value
             lock.withLock {
                 self.manager = manager
+                lastUse = Date()
                 // A cancelled load must not clear the newer load that replaced it.
                 if loading == task { loading = nil; progress = nil }
             }

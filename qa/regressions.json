@@ -2977,6 +2977,606 @@
         "file": "Tests/ZeusCoreTests/OverlapCounterTests.swift",
         "function": "theFirstOfTwoOverlappingOperationsFinishingDoesNotClearTheFlag"
       }
+    },
+    {
+      "id": "REG-248",
+      "failure": "UltronEffectGraph connected its effect nodes to the engine's main mixer before the engine had a usable output. On a Mac with no audio device, an unusual format or a changed device AVFAudio raised an uncatchable Objective-C exception (setFormat error -10868) and ended the app, or the whole test process on CI. Connection now validates the format and output first, offline rendering enables manual mode before connecting, the live chain connects lazily and a refusal falls back to passthrough or no audio with a logged reason.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "graphRefusesFormatsAvfAudioWouldRejectInsteadOfCrashing"
+      }
+    },
+    {
+      "id": "REG-249",
+      "failure": "Onboarding footer: the Languages step had its own Set up later and Continue buttons in a separate switch branch, so while a step animated the outgoing and incoming pairs existed together (duplicate controls, a tap could reach the previous step's action), and Set up later on Languages bypassed the skip event of the progress state machine. One shared footer now serves every middle step.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-OnboardingComponentJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OnboardingComponentJourneyTests.swift",
+        "function": "setupCardOpensGuideAndDeferredStepsFinishOnce"
+      }
+    },
+    {
+      "id": "REG-260",
+      "failure": "A talk-to-Zeus fast answer that broke off mid-sentence left its background deep answer running and able to be spoken after the broken one.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TurnRaceLiveTierTests.swift",
+        "function": "theWinnerBreakingOffCancelsTheDeepAnswerBehindIt"
+      }
+    },
+    {
+      "id": "REG-261",
+      "failure": "Engines stopped because another engine won the race reported a cancellation error that was logged, ranked as a failure in the latency book and could be counted against quota state.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TurnRaceLiveTierTests.swift",
+        "function": "aCancelledLoserIsNoLongerLiveSoItsLateErrorIsNotAFailure"
+      }
+    },
+    {
+      "id": "REG-250",
+      "failure": "A voice turn cancelled by a new key press finished later and cleared turnRunning under the turn that replaced it, so the wake word and busy checks saw an idle assistant mid-answer.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/LatestRunTests.swift",
+        "function": "aSupersededRunFinishingLateDoesNotClearTheNewerRun"
+      }
+    },
+    {
+      "id": "REG-251",
+      "failure": "A hands-free silence timer from an earlier turn released the talk key while the owner was holding it, and a wake-word turn left the previous answer's deep follow-up and speculative run alive to speak over it.",
+      "features": [
+        "F11"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_press_stops_the_hands_free_timer"
+      }
+    },
+    {
+      "id": "REG-252",
+      "failure": "Pressing the talk key or Esc while a voice engine was mid-request counted as that engine failing and could pause a healthy ElevenLabs, OpenAI, Kokoro or Chatterbox route; a line rendered after the interruption still played.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechAttemptPolicyTests.swift",
+        "function": "aBargeInIsNeverAnEngineFailure"
+      }
+    },
+    {
+      "id": "REG-253",
+      "failure": "Alert timers kept running while the notch peek or panel covered the capsule, so alerts expired without ever being seen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "aSuspendedStackNeverExpiresAnAlertUnseen"
+      }
+    },
+    {
+      "id": "REG-254",
+      "failure": "Dismissing the last alert under the pointer left the stack hovered, so the next alert never started its auto-dismiss clock.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "dismissingTheLastAlertClearsAStaleHover"
+      }
+    },
+    {
+      "id": "REG-255",
+      "failure": "A snoozed alert was dropped for good when the notch was open at the moment it came back ten minutes later.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_a_snoozed_alert_returns_even_when_the_notch_is_open"
+      }
+    },
+    {
+      "id": "REG-256",
+      "failure": "The Record countdown kept running after the owner left the Record page, then started a screen capture they could no longer see or cancel with Escape.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyCountdownSourceTests.swift",
+        "function": "leavingThePageCancelsTheCountdownAndAPendingTickDoesNothing"
+      }
+    },
+    {
+      "id": "REG-257",
+      "failure": "A Record countdown whose display or window disappeared ended in a silent no-op instead of saying the source was gone.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyCountdownSourceTests.swift",
+        "function": "theLastTickWithTheSourceGoneNoLongerEndsInASilentNoOp"
+      }
+    },
+    {
+      "id": "REG-258",
+      "failure": "A background Launch at login status read that began before the owner flipped the switch landed afterwards and put the switch back.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/LatestRunTests.swift",
+        "function": "aReadStartedBeforeAWriteCannotPublishAfterIt"
+      }
+    },
+    {
+      "id": "REG-259",
+      "failure": "A background hook-file look that began before Connect or Disconnect overwrote the click's result, and Connect for Codex never updated the AI connections row until the next look.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_hook_read_is_invalidated_by_connect_and_disconnect"
+      }
+    },
+    {
+      "id": "REG-262",
+      "failure": "Desktop pointing shipped off with no draw-while-held setting although the owner chose Control+Option and draw while held as the defaults.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FirstRunDefaultsTests.swift",
+        "function": "pointingIsOnWithControlOptionAndDrawWhileHeld"
+      }
+    },
+    {
+      "id": "REG-263",
+      "failure": "Scribe call-window names had no first-run default and could have been read without the owner's existing Accessibility grant.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FirstRunDefaultsTests.swift",
+        "function": "callWindowNamesNeverActivateWithoutAccessibility"
+      }
+    },
+    {
+      "id": "REG-264",
+      "failure": "The alert Reply button only opened the item, the same as Open, for apps that have no reply target.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AlertStackTests.swift",
+        "function": "slackTeamsAndOtherAppsHideReplyInsteadOfDuplicatingOpen"
+      }
+    },
+    {
+      "id": "REG-265",
+      "failure": "Invitee names and per-turn voices were memory only, so after a relaunch the recap had no invite names and no Remember this voice button.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerPersistenceTests.swift",
+        "function": "namesAndVoicesComeBackAfterAReload"
+      }
+    },
+    {
+      "id": "REG-266",
+      "failure": "The Dismiss button and Stop could leave a pinned Polyglot bar stuck, and the pin decision was spread over the notch with no pure contract.",
+      "features": [
+        "S03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotPinPolicyTests.swift",
+        "function": "explicitDismissClosesEvenWhenPinned"
+      }
+    },
+    {
+      "id": "REG-267",
+      "failure": "On macOS older than 26 Polyglot reported translation as unavailable for the language pair, hiding the real reason.",
+      "features": [
+        "S02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PolyglotTests.swift",
+        "function": "olderSystemShowsHeardLineWithOneNewerSystemNotice"
+      }
+    },
+    {
+      "id": "REG-268",
+      "failure": "The Language packs and Speaker recognition cards could be defined without being placed on any Settings page, so the features were unreachable.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_every_settings_card_and_page_is_placed_on_a_page"
+      }
+    },
+    {
+      "id": "REG-269",
+      "failure": "A process of another user, or a program other than the Zeus app on the browser bridge socket, could connect to the agent and browser sockets: the files were only mode 0600.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PeerCredentialsTests.swift",
+        "function": "bridgePolicyNeedsTheSameUserAndTheNamedProgram"
+      }
+    },
+    {
+      "id": "REG-270",
+      "failure": "A hook client could send a bundle ID of its own choosing and have Zeus launch that app, or label a risky command low risk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ClientInputPolicyTests.swift",
+        "function": "aTerminalInfoWithAForgedBundleIDHasNoTarget"
+      }
+    },
+    {
+      "id": "REG-271",
+      "failure": "A model-written action could start a coding agent, or send a prompt to ChatGPT, Claude or Dust, without an approval card.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ClientInputPolicyTests.swift",
+        "function": "aModelStartedCodingAgentAndAnySendNeedACard"
+      }
+    },
+    {
+      "id": "REG-272",
+      "failure": "The update feed accepted http, file and app-scheme addresses, and its download link was opened whatever its scheme.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UpdateFeedPolicyTests.swift",
+        "function": "aFeedLinkThatIsNotHTTPSIsDropped"
+      }
+    },
+    {
+      "id": "REG-273",
+      "failure": "The system HUD monitor woke ten times a second for as long as the app ran, whether or not a HUD was shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SystemHUDTests.swift",
+        "function": "theFastRateOnlyLastsForABurstAfterAChange"
+      }
+    },
+    {
+      "id": "REG-274",
+      "failure": "Zeus pinged Ollama and the cloud API at launch and at every wake from sleep, before anyone used voice.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrainWarmPlanTests.swift",
+        "function": "launchAndWakeNeverWarmButTheTalkKeyDoes"
+      }
+    },
+    {
+      "id": "REG-275",
+      "failure": "Transcribing with Parakeet when its model was missing started the model download without any click.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_download_is_behind_the_explicit_prepare_path"
+      }
+    },
+    {
+      "id": "REG-276",
+      "failure": "A call-window name was bound to a voice on weak evidence: two people lit about equally over one voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aCloseRunnerUpWithholdsTheName"
+      }
+    },
+    {
+      "id": "REG-277",
+      "failure": "Call-window evidence overwrote a speaker name the person had typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aTypedNameAlwaysWinsOverAutomaticEvidence"
+      }
+    },
+    {
+      "id": "REG-278",
+      "failure": "A muted participant tile could win the vote for a voice and name it.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aMutedTileNeverWinsTheVote"
+      }
+    },
+    {
+      "id": "REG-279",
+      "failure": "One call-window name landed on two different voices.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "oneNameNeverLandsOnTwoVoices"
+      }
+    },
+    {
+      "id": "REG-280",
+      "failure": "A name the person declined for a voice was offered again for that voice.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aDeclinedNameIsNotOfferedAgainForThatVoice"
+      }
+    },
+    {
+      "id": "REG-281",
+      "failure": "French call-window labels (parle, micro coupe, Invitee, Vous) were not understood, so no name was found.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "parserReadsSpeakingAndMutedSignalsInBothLanguages"
+      }
+    },
+    {
+      "id": "REG-282",
+      "failure": "Where a speaker name came from was lost when a meeting was reopened, so an automatic name looked typed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "theBookRoundTripsThroughAMeetingRecordAndOlderFilesStillLoad"
+      }
+    },
+    {
+      "id": "REG-283",
+      "failure": "Merging two speakers could not be undone.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "undoBringsBackTheStateBeforeTheLastMerge"
+      }
+    },
+    {
+      "id": "REG-284",
+      "failure": "Pruning tiny voices folded a named speaker or the owner into someone else, or could not be reversed.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "aNamedVoiceYouAndShortMeetingsAreNeverPruned"
+      }
+    },
+    {
+      "id": "REG-285",
+      "failure": "Assigning selected words to another speaker lost or overlapped the block time.",
+      "features": [
+        "F02"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeSpeakerParityTests.swift",
+        "function": "assigningSelectedWordsSplitsTheBlockAndKeepsTheTime"
+      }
+    },
+    {
+      "id": "REG-286",
+      "failure": "A circle or underline drawn around a control mapped to no target, so ink never selected what the user meant.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStrokeTargetingTests.swift",
+        "function": "aLoopAroundAControlPicksThatControl"
+      }
+    },
+    {
+      "id": "REG-287",
+      "failure": "Spoken 'this' and 'that' reached the model with no link to what the pointer or ink showed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingDeixisTests.swift",
+        "function": "untimedWordsTakeEvidenceInOrder"
+      }
+    },
+    {
+      "id": "REG-288",
+      "failure": "A mark stayed on screen after the control it pointed at moved, changed or closed.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingStaleTargetTests.swift",
+        "function": "driftBeyondTwoPointsHidesTheMarkAndReResolves"
+      }
+    },
+    {
+      "id": "REG-289",
+      "failure": "The Fn+Control dictation preset overwrote the dictation key with no way back, and its collisions were not reported.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
+        "function": "thePresetRemembersAndRestoresTheDictationKey"
+      }
+    },
+    {
+      "id": "REG-290",
+      "failure": "Alerts for Spotify, Chrome, Notion, Dropbox, terminal and meeting apps fell back to a generic glyph because only one bundle id was tried.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AppBrandCatalogTests.swift",
+        "function": "coversTheLogosTheLedgerListed"
+      }
+    },
+    {
+      "id": "REG-291",
+      "failure": "Pointing ink only appeared while dragging, so tracing a control while the keys were held left no trail and no stroke.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
+        "function": "hoveringBeginsAStrokeAndExtendsIt"
+      }
+    },
+    {
+      "id": "REG-292",
+      "failure": "Holding the pointing keys put a mouse-capturing overlay over the screen, so clicks and focus did not reach the app being asked about.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-PointingOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PointingOverlayTests.swift",
+        "function": "theInkPanelsNeverBecomeKeyOrMainAndIgnoreTheMouse"
+      }
+    },
+    {
+      "id": "REG-293",
+      "failure": "A modifier release that the key stream never reported left a pointing turn open indefinitely.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "aMissedReleaseIsCaughtWhenTheLiveKeysAreUp"
+      }
+    },
+    {
+      "id": "REG-294",
+      "failure": "Sleep, wake or a display change during a hold or a turn left the hold armed and marks on stale geometry.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingRobustnessTests.swift",
+        "function": "sleepWakeAndDisplayChangesCancelAHoldWithoutARequest"
+      }
+    },
+    {
+      "id": "REG-295",
+      "failure": "The ring could land off the candidate on a 2x display or a display with a negative origin.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift",
+        "function": "oneXDisplayWithANegativeOrigin"
+      }
+    },
+    {
+      "id": "REG-296",
+      "failure": "The pointing Accessibility hit test ran on a detached background task, which this process's own AX rule forbids.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_probe_ax_calls_stay_on_the_main_actor"
+      }
+    },
+    {
+      "id": "REG-297",
+      "failure": "The per-turn trace line could carry free text; it must hold only mark names and millisecond offsets.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PointingTraceSpansTests.swift",
+        "function": "theLineCarriesNoFreeTextOnlyKnownTokens"
+      }
     }
   ]
 }

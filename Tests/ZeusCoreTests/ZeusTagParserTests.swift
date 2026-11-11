@@ -20,7 +20,7 @@ import Testing
         #expect(result.tags == [.point(PointTarget(x: 10, y: 20, label: nil, screen: 1))])
     }
 
-    @Test func trailingClickyStyleTagStillWorks() {
+    @Test func trailingLegacyStyleTagStillWorks() {
         let result = ZeusTagParser.parse("click the blue button. [POINT:100,200:save]")
         #expect(result.tags == [.point(PointTarget(x: 100, y: 200, label: "save"))])
         #expect(result.spokenText == "click the blue button.")
