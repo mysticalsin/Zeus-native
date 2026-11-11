@@ -1,6 +1,6 @@
 # Voice latency
 
-Owner request (2026-11-11): Zeus talks like Ultron, has a very nice voice and answers as fast as HeyClicky. This page is the pipeline, the targets and how to measure them.
+Owner request (2026-11-11): Zeus talks like Ultron, has a very nice voice and answers as fast as the quickest reference voice assistant. This page is the pipeline, the targets and how to measure them.
 
 ## Targets
 
@@ -11,7 +11,7 @@ Measured from the talk key going up to the first audio buffer scheduled for play
 | Anthropic or OpenAI key plus ElevenLabs or OpenAI voice | 1.2 s or less |
 | CLI brains only (Claude CLI, Codex CLI), any voice | 2.5 s or less |
 
-Reference: HeyClicky waits for the whole model answer, then fetches a whole mp3 (`docs/HEYCLICKY-REA.md`, section 3). Zeus starts the voice on the first sentence while the model is still writing.
+Reference: the comparison app waits for the whole model answer, then fetches a whole mp3. Zeus starts the voice on the first sentence while the model is still writing.
 
 ## The turn, stage by stage
 
