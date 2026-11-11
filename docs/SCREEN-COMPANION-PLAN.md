@@ -69,6 +69,19 @@ Tony        HotkeyMonitor   PointingController   ScreenContext   Provider(LLM)  
 - **S3 3D on desktop + EV demo:** card hosts SceneKit; flow markers; cutaway; edit ops; EV fixture. Acceptance: EV cutaway builds with speech, rotates, "show the inside / slow it down" edit the same scene.
 - **S4 photos** (after provider decision) and **S5 guidance and actions** (proposals, click walkthrough waiting for the user, approvals).
 
+## 4b. Decisions from the HeyClicky 1.1.1 teardown (`docs/HEYCLICKY-REA-2.md`)
+
+| HeyClicky (Observed) | Zeus decision |
+|---|---|
+| Model writes a small JavaScript program per rich turn, run in an in-app JavaScriptCore engine | Keep Zeus's closed, validated NDJSON op list. Same expressiveness for marks, figures, photos and 3D parts, without executing model code (Tony's spec, section 3). |
+| 2D drawing: JS engine with a fake-SVG shim, painted natively with Core Animation; pen strokes revealed over time | Native Core Animation/SwiftUI drawing already exists. Add a hand-drawn pen reveal paced to the beat's audio progress, and drop a step if the screen changed before it shows. |
+| 3D: three.js 0.186 geometry in JavaScriptCore, drawn with Metal; no SceneKit, no WebGL | Stay on SceneKit for S3 (exists, tested, no JS runtime). Add a part-recipe library (battery pack, motor, inverter, wheel, shell), flow markers, cutaway, rotate and speed edits by part id. RealityKit or Metal stays a later swap behind the same scene schema. |
+| Simple turns use text tags (POINT, HOVER, TARGET, HIGHLIGHT, TYPE, IMAGES); after a TARGET it watches the click, recaptures and asks for the next step | S5 click walkthrough: same loop (wait for the user's click, recapture, next step), plus wrong-click detection, freshness check and a step cap. |
+| Voice: OpenAI Realtime over WebSocket speaks lines verbatim; STT via Deepgram WebSocket; short-lived tokens from its worker | Zeus voice branch: streamed sentences (ElevenLabs/OpenAI) with keys from the Keychain on this Mac, no relay worker. Voice-activity barge-in is a later slice. |
+| Barge-in: server voice detection, echo-cancellation probe, cancel and truncate to what was heard, pen pause/resume | Today Zeus stops on key press or Esc. Add voice barge-in later (S6) with echo cancellation, never while the mic is off. |
+| Photos: web image search at answer time (host unknown) | S4 needs Tony's choice of an image search provider with a key. Attribution chip required. |
+| Measured on this Mac: median first token about 1.9 s, total about 5.7 s, about $0.056 per round (26 rounds) | Zeus targets: first audio at most 1.2 s with keys, cost per turn logged. |
+
 ## 5. Verification
 
 Each slice: unit tests for pure logic, CI green, then the packaged-app walkthrough (`scripts/human-qa.sh`, a `pointing` journey added per slice) on Tony's Mac. Compile, unit tests and a packaged-app interaction are reported separately; none implies the others.
