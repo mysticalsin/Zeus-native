@@ -730,6 +730,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         stop.isEnabled = voice?.isSpeaking == true || explanation?.isBusy == true
         menu.autoenablesItems = false
         menu.addItem(.separator())
+        menu.addItem(ScreenShareQuickToggle.menuItem(target: self, action: #selector(toggleScreenShareFromMenu)))
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit ZEUS", action: #selector(quitFromMenu), keyEquivalent: "").target = self
         statusItem.menu = menu
@@ -749,6 +751,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func stopSpeakingFromMenu() { explanation?.stop(); voice?.stopSpeaking() }
     @objc private func openSettingsFromMenu() { showSettings() }
+    @objc private func toggleScreenShareFromMenu() { ScreenShareQuickToggle.toggle() }
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 
     /// The welcome guide (Sources/Zeus/Onboarding), Glance's seven steps.

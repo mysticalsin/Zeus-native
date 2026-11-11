@@ -343,6 +343,11 @@ enum SnapshotRenderer {
 
         let notchPeek = NotchModel()
         notchPeek.presentation = .peek
+        // Top bar position: the closed bar lowered 12 pt, light and wings with it.
+        let notchLowered = NotchModel()
+        notchLowered.presentation = .closed
+        saveSurface(NotchStage(model: notchLowered, topBar: TopBarModel(), notch: notch, topOffset: 12), size: CGSize(width: 960, height: 120), name: "notch-closed-lowered")
+
         saveSurface(NotchStage(model: notchPeek, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-peek")
 
         let notchPanel = NotchModel()
@@ -993,7 +998,7 @@ private struct NotchStage: View {
         ZStack(alignment: .top) {
             LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
             Rectangle().fill(Color.black.opacity(0.35)).frame(height: notch.height)
-            NotchView(model: model, topBar: topBar, notch: notch)
+            NotchView(model: model, topBar: topBar, notch: notch, topOffsetOverride: topOffset)
         }
     }
 }
@@ -1006,6 +1011,8 @@ private struct BuddyStage: View {
         ZStack(alignment: .topLeading) {
             LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .topLeading, endPoint: .bottomTrailing)
             BuddyOverlayView(model: model, screenFrame: frame)
+    /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
+    var topOffset: Double = 0
         }
     }
 }

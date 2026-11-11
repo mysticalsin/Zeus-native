@@ -17,6 +17,13 @@ final class NotchController {
     /// The display the pointer and the open panel work on.
     private(set) var screen: NSScreen?
     private(set) var notchSize: CGSize = .zero
+    /// How far the closed bar and the peek card sit below the screen top on the active display
+    /// (Settings > Appearance > Top bar position); 0 while the panel is open.
+    private var topOffset: CGFloat {
+        CGFloat(TopBarPosition.applied(
+            resolved: TopBarPositionModel.shared.offset(forNotchHeight: Double(notchSize.height)),
+            panelOpen: model.presentation == .panel))
+    }
     private(set) var displays: [DisplayDescriptor] = []
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
@@ -385,7 +392,7 @@ final class NotchController {
             island += 2 * (ClosedWings.wingWidth + 8) + ClosedWings.extraWidth(for: topBar)
         }
         return GlanceTopBar.inHoverZone(NSEvent.mouseLocation, screen: screen.frame,
-                                        notch: CGSize(width: island, height: max(notchSize.height, 30)))
+                                        notch: CGSize(width: island, height: max(notchSize.height, 30) + topOffset))
     }
 
     private func mouseDragged() {
@@ -426,7 +433,7 @@ final class NotchController {
         let wide = detailHeight > 0
         let peekWidth = max(notchSize.width + 16 + 240, wide ? 520 : 440)
         let rowOffset: CGFloat = 55 + (wide ? detailHeight + 8 : 0) + (model.approval?.previewHeight ?? 0)
-        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - max(notchSize.height, 30) - rowOffset)
+        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(notchSize.height, 30) - rowOffset)
     }
 
     // MARK: Window

@@ -103,6 +103,15 @@ struct PanelView: View {
                 .foregroundStyle(Theme.cloudPrimary)
                 .tint(OB.controlAccent)
 
+            // The same switch as "Show Zeus in screen shares" in the "..." menu and Settings.
+            Toggle(isOn: SettingsStore.shared.boolBinding(ZeusScreenSharePolicy.showInSharingKey)) {
+                Label("Show Zeus in screen shares", systemImage: SettingsStore.shared.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash")
+            }
+                .toggleStyle(.switch)
+                .font(Glass.body)
+                .foregroundStyle(Theme.cloudPrimary)
+                .tint(OB.controlAccent)
+
             HStack(spacing: 8) {
                 Button("Play Demo", action: playDemo)
                 Spacer()

@@ -414,6 +414,8 @@ enum MoreMenu {
         }
         parent.submenu = sub
         menu.addItem(parent)
+        menu.addItem(.separator())
+        menu.addItem(ScreenShareQuickToggle.menuItem(target: MoreMenuTarget.shared, action: #selector(MoreMenuTarget.toggleScreenShareVisibility)))
         MoreMenuTarget.shared.topBar = topBar
         topBar.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
@@ -429,6 +431,7 @@ final class MoreMenuTarget: NSObject {
     @objc func openSettings() { topBar?.openSettings() }
     @objc func editTabs() { topBar?.beginTabEditing() }
     @objc func customizeHome() { topBar?.beginHomeCustomize() }
+    @objc func toggleScreenShareVisibility() { ScreenShareQuickToggle.toggle() }
 
     @objc func chooseBuddy(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String, let choice = BuddyShow(rawValue: raw) else { return }

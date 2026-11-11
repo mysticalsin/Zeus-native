@@ -228,6 +228,31 @@ private struct AppearancePage: View {
                 GSPopup(selection: physicalFinishBinding, options: SettingsCatalog.option("appearance.physicalFinish")?.choices ?? []).popupLabel("Physical finish")
             }
         }
+        GSCard("Top bar") {
+            GSRow(symbol: "arrow.up.and.down", title: "Top bar position",
+                  text: "Lowers the closed notch with its light, ticker and wings so nothing hides behind the camera housing. The open panel stays flush with the top. Applies to every display.") {
+                HStack(spacing: 10) {
+                    Text("Higher").font(GS.rowText).foregroundStyle(GS.secondary)
+                    OBTickSlider(value: Binding(get: { TopBarPositionModel.shared.sliderValue }, set: { TopBarPositionModel.shared.choose($0) }),
+                                 range: TopBarPosition.minimum...TopBarPosition.maximum, step: TopBarPosition.step)
+                        .frame(width: 200).environment(\.ob, OB.Palette.settings).accessibilityLabel("Top bar position")
+                    Text("Lower").font(GS.rowText).foregroundStyle(GS.secondary)
+                    Text("\(Int(TopBarPositionModel.shared.sliderValue)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
+                        .frame(width: 40, alignment: .trailing)
+                }
+            }
+            GSDivider()
+            GSRow(symbol: "arrow.counterclockwise", title: "Automatic position", text: "A small drop on a Mac with a notch, none on other displays.") {
+                Button("Reset") { TopBarPositionModel.shared.reset() }
+                    .buttonStyle(GSButtonStyle())
+                    .ownedJourneyControl("settings.appearance.topBarPositionReset")
+            }
+            GSDivider()
+            GSToggleRow(symbol: store.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash",
+                        title: "Show Zeus in screen shares",
+                        text: "On: people you share your screen with, and screenshots, can see Zeus. Off keeps it out of them. Your choice applies during meetings too.",
+                        isOn: bool(ZeusScreenSharePolicy.showInSharingKey))
+        }
         GSCard("Running card") {
             HStack(spacing: 12) {
                 runningTheme("Wave", "")
