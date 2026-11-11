@@ -223,7 +223,7 @@ struct OnboardingBrand: View {
 }
 
 /// A small, readable progress landmark; a permission step remains optional and can be set up later.
-struct OnboardingProgress: View {
+struct OnboardingProgressBar: View {
     let step: OnboardingStep
     @Environment(\.ob) private var ob
 
