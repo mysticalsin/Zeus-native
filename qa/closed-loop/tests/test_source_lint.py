@@ -23,6 +23,26 @@ AUDITED_AUDIO_FILES = {
 HANDLER_APIS = re.compile(r"\b(?:SFSpeechRecognizer\.requestAuthorization|INFocusStatusCenter\.default\.requestAuthorization)\s*[({]")
 
 
+POINTING = APP / "Pointing"
+# Pointing must advance on real events, never a sleep, and must never use the word-count clock.
+POINTING_FORBIDDEN = re.compile(r"\bTask\.sleep\b|SpeechDrawingTimeline\.estimate|\.installTap\(|\brequestAccess\(|\brequestAuthorization\b|CGRequestScreenCaptureAccess|CGRequestListenEventAccess")
+# System callbacks that must be installed from a nonisolated function.
+POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents")
+
+
+def pointing_callback_offenders(text, label="sample"):
+    """Lines that install a system callback outside a function declared `nonisolated`."""
+    lines = text.splitlines()
+    offenders = []
+    for index, line in enumerate(lines):
+        if line.strip().startswith("//") or not POINTING_CALLBACK_APIS.search(line):
+            continue
+        header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
+        if "nonisolated" not in header:
+            offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
 def swift_files():
     return sorted(APP.rglob("*.swift"))
 
@@ -80,6 +100,27 @@ class SourceLint(unittest.TestCase):
         self.assertNotIn("@MainActor", text)
         self.assertEqual(len(HANDLER_APIS.findall(text)), 2)
         self.assertEqual(text.count("nonisolated static func"), 2)
+
+    def test_pointing_never_sleeps_or_requests_permission_or_uses_the_estimated_clock(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in sorted(POINTING.rglob("*.swift"))
+                     for n, line in code_lines(p) if POINTING_FORBIDDEN.search(line)]
+        self.assertEqual(offenders, [])
+
+    def test_pointing_system_callbacks_are_installed_from_nonisolated_functions(self):
+        offenders = []
+        for p in sorted(POINTING.rglob("*.swift")):
+            offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(ROOT)))
+        self.assertEqual(offenders, [])
+
+    def test_pointing_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: the exact shapes the lint exists to catch.
+        self.assertTrue(POINTING_FORBIDDEN.search("try await Task.sleep(for: .seconds(1))"))
+        self.assertTrue(POINTING_FORBIDDEN.search("let t = SpeechDrawingTimeline.estimate(text)"))
+        self.assertTrue(POINTING_FORBIDDEN.search("CGRequestScreenCaptureAccess()"))
+        bad = "@MainActor final class A {\n    func start() {\n        NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { _ in }\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(bad), ["sample:3"])
+        good = "enum B {\n    nonisolated static func start() {\n        CGEvent.tapCreate(tap: x)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(good), [])
 
     def test_lint_detects_the_original_crash_shapes(self):
         # Fail-first evidence kept as a test: the exact pre-fix lines must be flagged.

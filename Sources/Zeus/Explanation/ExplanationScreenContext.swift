@@ -78,6 +78,14 @@ final class ExplanationScreenContext {
     static let maximumImageBytes = 8 * 1024 * 1024
     static let annotationLifetime: TimeInterval = 5
 
+    /// How long an annotation lease lasts. Chat keeps `.standard` (5 s, never renewed). A desktop
+    /// pointing turn can run 10 to 60 s, so it renews while the observed identity is unchanged, up
+    /// to a hard cap. Any observed change still invalidates at once.
+    enum LeasePolicy: Equatable {
+        case standard
+        case renewing(max: TimeInterval)
+    }
+
     enum Invalidation: String {
         case changed, expired, permissionLost, verificationUnavailable, cancelled, cleared
     }
@@ -90,6 +98,7 @@ final class ExplanationScreenContext {
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var identity: ExplanationScreenIdentity?
     @ObservationIgnored private var deadline: TimeInterval?
+    @ObservationIgnored private var leaseCap: TimeInterval?
     @ObservationIgnored private var lastMetadataCheck: TimeInterval?
     @ObservationIgnored private var changes: ExplanationScreenObservation?
     @ObservationIgnored private var clock: ExplanationScreenObservation?
@@ -108,7 +117,7 @@ final class ExplanationScreenContext {
     /// Only the app's explicit selected-display control calls this. No automatic permission
     /// prompt, default-display fallback, all-display capture, or background recapture exists.
     @discardableResult
-    func captureSelectedDisplay(_ displayID: UInt32) async throws -> ExplanationScreenSnapshot {
+    func captureSelectedDisplay(_ displayID: UInt32, lease: LeasePolicy = .standard) async throws -> ExplanationScreenSnapshot {
         guard !isCapturing else { throw ExplanationScreenContextFailure.busy }
         invalidate(.changed)
         guard displayID != 0 else { throw ExplanationScreenContextFailure.unavailable }
@@ -156,6 +165,9 @@ final class ExplanationScreenContext {
             guard now < started + Self.annotationLifetime else { invalidate(.expired); return value }
             identity = before
             deadline = started + Self.annotationLifetime
+            if case .renewing(let maximum) = lease, maximum.isFinite, maximum > Self.annotationLifetime {
+                leaseCap = started + maximum
+            } else { leaseCap = nil }
             lastMetadataCheck = now
             annotationContext = ExplanationCaptureContext(geometry: geometry, currentDisplay: display)
             invalidation = nil
@@ -197,6 +209,8 @@ final class ExplanationScreenContext {
         guard services.hasPermission() else { invalidate(.permissionLost); return }
         do {
             guard try services.identity(identity.displayID) == identity else { invalidate(.changed); return }
+            // Unchanged metadata renews a pointing lease, never past its hard cap.
+            if let leaseCap { self.deadline = min(now + Self.annotationLifetime, leaseCap) }
         } catch { invalidate(.verificationUnavailable) }
     }
 
@@ -205,6 +219,7 @@ final class ExplanationScreenContext {
         annotationContext = nil
         identity = nil
         deadline = nil
+        leaseCap = nil
         lastMetadataCheck = nil
         changes?.cancel(); changes = nil
         clock?.cancel(); clock = nil

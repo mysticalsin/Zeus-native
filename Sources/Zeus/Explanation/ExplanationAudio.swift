@@ -173,10 +173,13 @@ final class ExplanationPCMSink: @unchecked Sendable {
     private var bytes = 0
     private var completed = false
     private var completion: (@Sendable (Result<ExplanationPreparedAudio, Error>) -> Void)?
+    /// Real provider word timings, computed from the final clip duration. Empty for providers with none.
+    private let alignment: @Sendable (Double) -> [ExplanationAlignmentMark]
 
     init(request: ExplanationSpeechRequest, root: URL = FileManager.default.temporaryDirectory,
+         alignment: @escaping @Sendable (Double) -> [ExplanationAlignmentMark] = { _ in [] },
          completion: @escaping @Sendable (Result<ExplanationPreparedAudio, Error>) -> Void) throws {
-        self.request = request; self.completion = completion
+        self.request = request; self.completion = completion; self.alignment = alignment
         directory = root.appendingPathComponent("zeus-explanation-" + UUID().uuidString, isDirectory: true)
         url = directory.appendingPathComponent("speech.caf")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
@@ -191,9 +194,10 @@ final class ExplanationPCMSink: @unchecked Sendable {
                 if pcm.frameLength == 0 {
                     guard let format, frames > 0 else { throw ExplanationAudioError.noAudio }
                     file = nil // close and finalize the owned audio container before transfer
-                    let result = ExplanationPreparedAudio(chunk: request.chunk(duration: Double(frames) / format.sampleRate,
-                                                                                 sampleRate: format.sampleRate),
-                                                          file: url, directory: directory)
+                    let duration = Double(frames) / format.sampleRate
+                    var chunk = request.chunk(duration: duration, sampleRate: format.sampleRate)
+                    chunk.alignment = alignment(duration)
+                    let result = ExplanationPreparedAudio(chunk: chunk, file: url, directory: directory)
                     return finishLocked(.success(result))
                 }
                 let incoming = pcm.format

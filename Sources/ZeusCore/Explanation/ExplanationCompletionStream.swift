@@ -16,8 +16,9 @@ public struct ExplanationCompletionStream: Sendable {
     private var failed = false
     public private(set) var isComplete = false
 
-    public init(sessionID: UUID, turnID: UUID, sceneID: UUID, baseRevision: Int) throws {
-        scenes = try .init(sessionID: sessionID, turnID: turnID, sceneID: sceneID, baseRevision: baseRevision)
+    public init(sessionID: UUID, turnID: UUID, sceneID: UUID, baseRevision: Int,
+                profile: ExplanationWireProfile = .v1) throws {
+        scenes = try .init(sessionID: sessionID, turnID: turnID, sceneID: sceneID, baseRevision: baseRevision, profile: profile)
     }
 
     public mutating func append(_ bytes: Data) throws -> [ExplanationEvent] {

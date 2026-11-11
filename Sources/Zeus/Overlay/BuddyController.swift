@@ -217,6 +217,24 @@ final class BuddyController: NSObject {
         launch(curve, label: label, ring: CGRect(x: target.x - 22, y: target.y - 22, width: 44, height: 44))
     }
 
+    /// The companion's flight and label only. The pointing assistant draws its own ring from the
+    /// scene, so this adds none. Starts now; the caller decides when (at real first audio).
+    /// Returns the CACurrentMediaTime at which the flight began, or nil when the companion is hidden.
+    @discardableResult
+    func flight(to point: CGPoint, label: String) -> CFTimeInterval? {
+        guard CompanionSpring.tracksPointer(showPolicy) else { return nil }
+        wake()
+        resetPointing()
+        startPointingClickMonitor()
+        AvatarStatus.shared.set(\.turn, .pointing)
+        let curve = CompanionFlight.plan(from: model.position, to: clampedToScreen(point), reducedMotion: Motion.reduced)
+        let began = CACurrentMediaTime()
+        flight = ActiveFlight(curve: curve, start: began, returning: false, mouseAtStart: NSEvent.mouseLocation)
+        pointing = Pointing(target: curve.to, label: CompanionPointingLabel(text: label, beganAt: 0, reduceMotion: Motion.reduced))
+        model.mode = .flying
+        return began
+    }
+
     private func launch(_ curve: CompanionFlight, label: String, ring rect: CGRect) {
         flight = ActiveFlight(curve: curve, start: CACurrentMediaTime(), returning: false, mouseAtStart: NSEvent.mouseLocation)
         pointing = Pointing(target: curve.to,

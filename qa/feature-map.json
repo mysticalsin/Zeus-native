@@ -618,6 +618,36 @@
       "suite": "ExplanationChatLifecycleTests",
       "file": "Tests/ZeusAppTests/ExplanationChatLifecycleTests.swift",
       "scope": "Production ChatModel with disposable stores and owned ChatPanel controls: durable visual links, immutable conversation identity, per-record failed-save retry, deletion and synchronous hide/close/minimize/Escape stop. No capture, providers or installed-app navigation."
+    },
+    {
+      "id": "portable-pointing",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "pointing",
+      "scope": "Pointing key gesture and spoil rule, session state machine with generation tokens, bounded trace, AX to image coordinate round trips on mixed scales and negative origins, protocol v2 targetID and scene resolver, Anthropic stream envelope, ElevenLabs timestamp parsing, provider selection and error classes. Synthetic data; no capture, key tap, provider request or device acceptance."
+    },
+    {
+      "id": "native-PointingHotkeyMonitorTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "PointingHotkeyMonitorTests",
+      "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+      "scope": "Production hotkey monitor fed synthetic ShortcutEvents: began, ended, spoiled, VoiceOver block. No event tap and no permission."
+    },
+    {
+      "id": "native-PointingControllerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "PointingControllerTests",
+      "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+      "scope": "Production pointing controller with synthetic services, inputs, marker and provider: spoil sends no request, double hold, denied Screen Recording notice without capture, disabled setting. No microphone, capture, key tap or sound."
+    },
+    {
+      "id": "missing-pointing-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "Desktop pointing end to end on a consented Mac: hold keys, speech, capture, AX ring within 2 pt, interruption, packaged launch with no new prompts.",
+      "reason": "Native compilation and execution, the key tap, Screen Recording, Accessibility and real provider calls are unverified. The owner-run self-test (scripts/pointing-selftest.sh) produces the evidence receipt; no physical Mac executor is connected to CI."
     }
   ],
   "features": [
@@ -2462,6 +2492,369 @@
               "function": "legacyConversationWithoutVisualLinkStillDecodesAndUnlinkedEmptyStaysUnsaved"
             }
           ]
+        },
+        {
+          "id": "F09.pointing-contracts",
+          "check": "portable-pointing",
+          "acceptance": "Holding the pointing keys begins at once, release ends, any extra key cancels with no request; sessions drop late callbacks; coordinates round-trip within tolerance on Retina, negative-origin and mixed-scale displays and out-of-image points are rejected, never clamped; v2 targetID is accepted only for app-issued candidates and ungrounded marks are dropped before render; vendor streams are strict and bounded.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "holdStartsImmediately"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "releasingAChordKeyEndsTheHold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "chatHotkeySpaceSpoilsAndCancelsWithoutSubmit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "commandJoiningCancels"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "voiceOverBlocksControlOption"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "aConfiguredSingleKeyShortcutWorks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "escapeWithoutAHoldInterruptsSpeech"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "twoQuickControlTapsAreDetectedButAChordIsNot"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift",
+              "function": "aSlowControlPressIsNotATap"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "keyDownStartsListeningAndBumpsTheGeneration"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "drawingIsASubstateOfTheHold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "releaseGoesToProcessingAndFinishesListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "spoilCancelsWithoutAnyRequest"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "escapeWhileHoldingCancelsAndEscapeWhileSpeakingInterrupts"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "emptyTranscriptCancels"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "bargeInStopsOutputThenListens"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "lateCallbacksFromAnOldGenerationAreDropped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "failureAndPermissionLossStopEverythingWithAVisibleReason"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "guidanceIsStubbedButTheTransitionsExist"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
+              "function": "idleIgnoresStrayEvents"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "samplesAreCappedAndTheLossIsCounted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "nonFiniteSamplesAreRejectedAndCounted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "restingInsideTwelvePointsForThreeHundredFiftyMillisecondsIsOneDwell"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "dwellCountIsBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "strokesCollectOnlyWhileOpenAndAreBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "sampleAtAudioOffsetFindsTheNearestInTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingTraceTests.swift",
+              "function": "downsamplingKeepsTheEndpoints"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "retinaDisplayDownscaledToTheDeliveredImage"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "eachAxisKeepsItsOwnDeliveredRatio"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "displayLeftOfMainWithNegativeOriginAndOneXScale"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "displayAboveMain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "aFrameOnAnotherDisplayIsNotClampedOntoThisOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "aFramePartlyPastTheEdgeIsCutAtTheImageEdge"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "degenerateAndNonFiniteFramesAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "imageToGlobalToImageRoundTripsOnEveryDisplayMix"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "contextDropsPointsOutsideTheImageInsteadOfClamping"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "withoutCaptureTheContextHasNoImageGeometry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "secureFieldsNeverCarryALabel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingCoordinateTests.swift",
+              "function": "candidateLabelsAreTruncatedToOneHundredTwentyEightBytes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "v1StillDecodesUnderBothProfiles"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "v2TargetIDIsAcceptedOnlyWithAMatchingCandidate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "targetIDIsRejectedOutsideAV2PointingTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "unknownFieldsAreStillRejectedInV2"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "aTargetOnANonCaptureObjectIsRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "aPartialLineIsNeverRenderedAtAnyByteBoundary"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "malformedV2NeverReachesTheStreamConsumer"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "aTargetedRingAndLabelUseTheCandidateRectNotModelGeometry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "aMarkWithNoTargetAndNoNearbyEvidenceIsDroppedWithItsFollowUps"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "aTargetWithoutARectOrWithAnotherCaptureIsDropped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "geometryEditsToAPlacedObjectAreIgnoredButStyleEditsKeep"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "speechIsNeverChangedByResolution"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplanationProtocolV2Tests.swift",
+              "function": "v1HistoryRoundTripsWithoutATargetIDKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "autoTakesTheFirstPathWithCredentials"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "aFailedHealthProbeSkipsThePath"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "autoPrefersTheLowestMeasuredLatency"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "aRecentFailureMovesAPathToTheEndUntilTheCooldownPasses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "aSuccessClearsTheFailureMark"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "anExplicitChoiceIsUsedAloneAndNeverSilentlyReplaced"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "latencyKeepsNumbersOnly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "settingTitlesMapAndUnknownFallsBackToAuto"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "anthropicTextDeltasAssembleIntoOneValidatedEvent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "anthropicBytesMaySplitAnywhere"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "anthropicTruncationMissingStopAndRefusalAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "anthropicToolUseAndErrorEventsAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "anthropicUnknownEventTypesAreIgnored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "splitterFindsObjectsWhateverTheFraming"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "elevenLabsChunkDecodesAudioAndCharacterTimes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "wordMarksFollowCharacterTimesAndPassTheExistingValidator"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "invalidTimingYieldsNoMarksRatherThanAnEstimate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "marksAreClampedToTheClipDuration"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "failuresAreClassifiedWithSpecificCopy"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "pointingInstructionsHaveNoEmDashAndNameVersionTwo"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PointingProviderTests.swift",
+              "function": "contextBlockIsLabelledUntrustedAndKeepsCandidateTextAsData"
+            }
+          ]
+        },
+        {
+          "id": "F09.PointingHotkeyMonitorTests",
+          "check": "native-PointingHotkeyMonitorTests",
+          "acceptance": "The production monitor turns the keyboard stream into began, ended, cancelled and blocked signals.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+              "function": "controlOptionBeginsAndReleaseEnds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+              "function": "anotherKeyJoiningCancelsAndNeverEnds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+              "function": "voiceOverBlocksControlOptionWithOneVisibleMessage"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+              "function": "aConfiguredShortcutIsHonoured"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+              "function": "escapeOutsideAHoldIsReported"
+            }
+          ]
+        },
+        {
+          "id": "F09.PointingControllerTests",
+          "check": "native-PointingControllerTests",
+          "acceptance": "The production controller never sends a request after a spoil, starts one session on a double hold, shows one Screen Recording notice without capturing, and ignores the hold while the setting is off.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "spoilCancelsWithoutSendingARequest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "aSecondHoldWhileHoldingStartsNoSecondSession"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "deniedScreenRecordingShowsOneNoticeAndNeverCaptures"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "theHoldIsIgnoredWhileTheSettingIsOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "escapeWhileIdleDoesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PointingControllerTests.swift",
+              "function": "noticesNeverUseAnEmDash"
+            }
+          ]
+        },
+        {
+          "id": "F09.pointing-device",
+          "check": "missing-pointing-device",
+          "acceptance": "On a consented Mac the self-test receipt passes every required check, and the manual demo (hold over the Finder Share button, ask, hear and see the ring, interrupt) works in the packaged app.",
+          "cases": []
         }
       ]
     },

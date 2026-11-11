@@ -27,6 +27,34 @@ final class ExplanationController {
     var includeSnapshot = false
     var localInput: (any TranscriptionEngine)?
     var onSubmission: ((String) -> Void)?
+    /// One desktop pointing turn: the app-built context and, only with the owner's upload consent,
+    /// the frozen snapshot. Consumed by the next `submit()`.
+    struct PointingTurn: Sendable {
+        var context: PointingContext
+        var snapshot: ExplanationScreenSnapshot?
+    }
+    var desktopTurn: PointingTurn?
+    /// The desktop overlay's windows, for own-process window-policy checks.
+    var overlayWindows: [NSWindow] { overlay.ownedWindows }
+    var overlayVisible: Bool { overlay.isVisible }
+    /// Window level of the desktop overlay. Chat keeps `.floating`; pointing sits above menus.
+    var overlayLevel: NSWindow.Level {
+        get { overlay.windowLevel }
+        set { overlay.windowLevel = newValue }
+    }
+    /// Real first audio start of a pointing turn (not the request, not the first token).
+    @ObservationIgnored var onSpeechStart: (() -> Void)?
+    /// A cue was admitted by real playback; the argument is the admitted target scene.
+    @ObservationIgnored var onReveal: ((ExplanationScene) -> Void)?
+    /// The turn finished (nil) or failed (the error; `problem` already holds user-facing copy).
+    @ObservationIgnored var onTurnEnded: ((Error?) -> Void)?
+    /// Listening produced no usable text, or the microphone failed.
+    @ObservationIgnored var onEmptyInput: (() -> Void)?
+    /// Marks the model asked for that were not grounded and were dropped before render.
+    private(set) var droppedUngroundedMarks = 0
+    private var activePointing: PointingTurn?
+    private var pointingFirstBeatSeen = false
+    private var desktopSessionStart: Date?
     let microphone: ExplanationMicrophone
     let screenContext: ExplanationScreenContext
     private let overlay: ExplanationOverlay
@@ -149,14 +177,40 @@ final class ExplanationController {
         }
     }
 
+    /// A desktop turn has no open Chat conversation, so it owns a session-scoped, in-memory history
+    /// (never written to disk). A session is reused for follow-ups and replaced after `maxAge`.
+    func prepareDesktopSession(maxAge: TimeInterval = 600) {
+        guard !isClosing else { return }
+        if let history, let started = desktopSessionStart, Date().timeIntervalSince(started) < maxAge,
+           history.canonicalScene.sessionID == requestedConversationID { return }
+        stop(); screenContext.clear(); overlay.hide()
+        let id = UUID()
+        do {
+            let value = try ExplanationHistory(scene: .init(sessionID: id, sceneID: UUID()), title: "Desktop help", at: Date())
+            generation = UUID(); conversationID = id; requestedConversationID = id
+            history = value; scene = value.canonicalScene; phase = .idle; problem = nil; caption = ""
+            replayEvents = []; baseline = nil; desktopSessionStart = Date()
+            saveProblem = nil
+        } catch { problem = "Zeus could not start a pointing session." }
+    }
+
     func submit() {
         guard canInteract else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.utf8.count <= 16_384, history != nil else { return }
-        onSubmission?(text)
+        let pointing = desktopTurn; desktopTurn = nil
+        if pointing == nil { onSubmission?(text) }
         linkedHistoryIDs.insert(history!.id)
         stop(); draft = ""; problem = nil; isReplaying = false
+        activePointing = pointing; pointingFirstBeatSeen = false
         do {
+            if let pointing {
+                // Capture-space marks need the scene to carry this capture's identity.
+                var next = history!.canonicalScene
+                next.objects = next.objects.filter { $0.value.space != .capture }
+                next.captureID = pointing.context.captureID
+                try history!.applyUserScene(next, baseRevision: history!.revision, at: Date())
+            }
             let turn = UUID(); turnID = turn
             diagnosticTurn = diagnostics.beginTurn(identity: turn)
             sampleDiagnosticResources()
@@ -171,7 +225,9 @@ final class ExplanationController {
             replayEvents = []; completedBeatIDs = []; caption = ""; phase = .thinking; isReceiving = true
             queueSave()
             let request = ExplanationModelRequest(turnID: turn, scene: start, history: history!.messages, prompt: text,
-                                                  snapshot: includeSnapshot ? screenContext.snapshot : nil)
+                                                  snapshot: pointing != nil ? pointing?.snapshot
+                                                      : (includeSnapshot ? screenContext.snapshot : nil),
+                                                  pointing: pointing?.context)
             includeSnapshot = false
             let token = generation
             work = Task { [weak self] in
@@ -194,6 +250,7 @@ final class ExplanationController {
     private func receive(_ event: ExplanationEvent, generation token: UUID) async throws {
         try Task.checkCancellation()
         guard generation == token, let turnID, let projected else { throw CancellationError() }
+        let event = resolvedForRender(event)
         let future = try ExplanationSceneReducer.applying(event, to: projected, activeTurn: turnID)
         while !muted && prepared.count >= 2 {
             try await withTaskCancellationHandler {
@@ -227,6 +284,15 @@ final class ExplanationController {
         updatePhase()
     }
 
+    /// Pointing turns only: replace targetID marks with app-placed geometry and drop ungrounded
+    /// marks. The returned event is protocol v1, so every downstream stage is unchanged.
+    private func resolvedForRender(_ event: ExplanationEvent) -> ExplanationEvent {
+        guard let context = activePointing?.context else { return event }
+        let resolution = PointingSceneResolver.resolve(event, context: context)
+        droppedUngroundedMarks += resolution.droppedObjects
+        return resolution.event
+    }
+
     private func observed(_ observation: ExplanationPlaybackObservation) {
         guard playback != nil else { return }
         do {
@@ -243,6 +309,9 @@ final class ExplanationController {
             case .audio(let command): player.execute(command)
             case .startBeat(let event):
                 caption = event.speech.text
+                if activePointing != nil, !isReplaying, !pointingFirstBeatSeen {
+                    pointingFirstBeatSeen = true; onSpeechStart?()
+                }
                 if !isReplaying, !muted, let diagnosticTurn {
                     diagnostics.recordFirstAudioStart(for: diagnosticTurn)
                 }
@@ -255,6 +324,7 @@ final class ExplanationController {
                 try presentation!.begin(event)
             case .reveal(let cue):
                 try presentation!.apply(cue)
+                if activePointing != nil, !isReplaying { onReveal?(presentation!.targetScene) }
                 if !isReplaying, let diagnosticTurn {
                     visualSubmissionPending = true
                     if !muted, let playback {
@@ -339,6 +409,7 @@ final class ExplanationController {
         }
         if playback != nil { _ = playback!.cancel() }
         playback = nil; presentation = nil; replayPresentation = nil; projected = nil
+        activePointing = nil
         isReceiving = false; isReplaying = false; phase = .idle; scene = history?.canonicalScene
         if ownsAudio { ownsAudio = false; releaseAudio() }
         overlay.hide(); queueSave()
@@ -460,6 +531,7 @@ final class ExplanationController {
                 if self.generation == token, !Task.isCancelled {
                     self.inputAttemptID = nil
                     self.problem = "Microphone input is unavailable. Check the selected device and macOS permissions, or type your request."
+                    self.onEmptyInput?()
                 }
             }
         }
@@ -480,10 +552,12 @@ final class ExplanationController {
                 let text = try await self.microphone.finish()
                 guard self.generation == token else { return }
                 self.draft = text; self.submit()
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.desktopTurn = nil; self.onEmptyInput?() }
             } catch {
                 if self.generation == token, !Task.isCancelled {
                     self.inputAttemptID = nil
                     self.problem = "No transcription was available. Try again or type your request."
+                    self.desktopTurn = nil; self.onEmptyInput?()
                 }
             }
         }
@@ -586,6 +660,7 @@ final class ExplanationController {
         case .awaitingCaptionAdvance: phase = .captions
         case .completed:
             phase = isReceiving ? .thinking : .completed
+            if !isReceiving, activePointing != nil { activePointing = nil; onTurnEnded?(nil) }
             if !isReceiving, ownsAudio { ownsAudio = false; releaseAudio() }
             if !isReceiving, let diagnosticTurn {
                 sampleDiagnosticResources()
@@ -606,6 +681,7 @@ final class ExplanationController {
         if let provider = error as? ExplanationProviderError { problem = provider.localizedDescription }
         else if error is ExplanationAudioError { problem = "Narration is unavailable. Switch to Captions and try again." }
         else { problem = "The explanation stopped because its response was incomplete or invalid. Your committed scene is retained." }
+        onTurnEnded?(error)
     }
     private func releaseCapacity(throwing error: Error? = nil) {
         let continuation = capacity; capacity = nil

@@ -39,6 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let keepAwake = KeepAwake()
     private let chatWindow: ChatWindowController?
     private var explanation: ExplanationController?
+    private var pointing: PointingController?
+    private var pointingProviders: PointingProviders?
+    private var pointingSettingsObserver: NSObjectProtocol?
     private var explanationQuitToken: UUID?
     private var explanationDeletionTasks: [UUID: Task<Void, Never>] = [:]
     /// History UUID -> conversation UUID. Retained until exact deletion succeeds.
@@ -84,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         explanation?.stop()
+        pointing?.stop()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
         if on(.layaShutdown) { LayaHelper.shared.shutdown() }
@@ -265,6 +269,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
             hotkey.start()
+        }
+        if on(.pointingHotkey) {
+            syncPointing()
+            // The setting can change while Zeus runs; the hold monitor starts or stops with it.
+            pointingSettingsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncPointing() }
+            }
         }
         if on(.polyglotHotkey) {
             PolyglotController.shared.onHint = { [weak self] text in self?.topBar.show(.hint(text)) }
@@ -553,6 +565,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         voice?.press()
+    }
+
+    /// Desktop pointing: off until the owner turns it on. Starting it only installs the key
+    /// listener (gated by the owner's own Accessibility/Input Monitoring grant); no capture and no
+    /// prompt happens until the keys are held.
+    private func syncPointing() {
+        guard on(.pointingHotkey) else { return }
+        if PointingSettings.enabled { pointingController().start() }
+        else if let pointing { pointing.stop(); self.pointing = nil; pointingProviders = nil }
+    }
+
+    private func pointingController() -> PointingController {
+        if let pointing { return pointing }
+        let acquire: () throws -> Void = { [weak self] in
+            guard let self, !self.topBar.isDictating, self.voice?.isListening != true,
+                  !ScribeController.shared.phase.isActive,
+                  ![RecordlyController.Phase.starting, .recording, .stopping].contains(RecordlyController.shared.phase) else {
+                throw ExplanationMicrophoneError.busy
+            }
+            self.voice?.stopSpeaking()
+            WakeWordController.shared.talkKeyHeld = true
+            ExplanationAudioArbitration.onTakeover = { [weak self] in self?.pointing?.interrupt() }
+        }
+        let release = {
+            ExplanationAudioArbitration.onTakeover = nil
+            WakeWordController.shared.talkKeyHeld = false
+        }
+        let providers = PointingProviders(
+            anyLLM: { (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount)) },
+            localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) },
+            anyLLMComplete: { AIConnections.shared.anyLLM.isComplete })
+        // In memory only: a desktop session is never written to disk.
+        let controller = ExplanationController(provider: providers.model, speechProvider: providers.speech,
+            microphone: ExplanationMicrophone(acquire: acquire, release: release), acquireAudio: acquire, releaseAudio: release)
+        controller.localInput = dictation?.whisperKit
+        let marker = PointingController.Marker(
+            listen: { [weak self] in self?.buddy.listen() },
+            think: { [weak self] in self?.buddy.think() },
+            idle: { [weak self] in self?.buddy.idle() },
+            flight: { [weak self] point, label in self?.buddy.flight(to: point, label: label) != nil })
+        let pointing = PointingController(explanation: controller, marker: marker,
+            prepare: { await providers.prepareTurn() },
+            recordAudio: { providers.recordFirstAudio(secondsSinceRelease: $0) })
+        pointing.onNotice = { [weak self] notice in
+            switch notice {
+            case .hint(let text): self?.topBar.show(.hint(text))
+            case .permission(let text, let pane): self?.topBar.show(.permission(text, pane: pane))
+            }
+        }
+        pointing.hotkey.onUnavailable = { [weak self] in
+            self?.topBar.show(.permission("Pointing needs Input Monitoring or Accessibility to see the hold keys.", pane: "Privacy_ListenEvent"))
+        }
+        self.pointing = pointing; pointingProviders = providers
+        return pointing
     }
 
     private func visualExplanation() -> ExplanationController? {

@@ -88,6 +88,8 @@ if !startupMode.allowsFullAppStartup {
 if !startupPolicy.isQA {
     KeychainSelfTest.runIfRequested()
     MainActor.assumeIsolated { MacControlSelfTest.runIfRequested() }
+    // `--pointing-selftest --receipt <abs path> [--live]`: only when started explicitly.
+    if MainActor.assumeIsolated({ PointingSelfTest.runIfRequested() }) { app.setActivationPolicy(.accessory); app.run() }
 }
 GlassFonts.register()
 if !startupPolicy.isQA {

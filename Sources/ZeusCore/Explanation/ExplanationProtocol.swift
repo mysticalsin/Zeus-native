@@ -114,13 +114,17 @@ public struct ExplanationObject: Codable, Equatable, Sendable, Identifiable {
     public var provenance: ExplanationProvenance
     public var highlighted: Bool
     public var reveal: Double
+    /// Protocol v2 only: names an app-issued pointing candidate ("t0".."t15"). The app
+    /// replaces model geometry with the candidate's rectangle and clears this field.
+    public var targetID: String?
 
     public init(id: String, parentID: String? = nil, space: ExplanationSpace = .canvas,
                 captureID: UUID? = nil, geometry: ExplanationGeometry,
                 transform: ExplanationTransform = .identity, style: ExplanationStyle = .init(),
                 text: String? = nil, accessibleDescription: String, assetID: String? = nil,
                 sourceIDs: [String] = [], provenance: ExplanationProvenance = .proceduralIllustration,
-                highlighted: Bool = false, reveal: Double = 1) {
+                highlighted: Bool = false, reveal: Double = 1, targetID: String? = nil) {
+        self.targetID = targetID
         self.id = id; self.parentID = parentID; self.space = space; self.captureID = captureID
         self.geometry = geometry; self.transform = transform; self.style = style; self.text = text
         self.accessibleDescription = accessibleDescription; self.assetID = assetID
@@ -129,7 +133,7 @@ public struct ExplanationObject: Codable, Equatable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, parentID, space, captureID, geometry, transform, style, text, accessibleDescription
-        case assetID, sourceIDs, provenance, highlighted, reveal
+        case assetID, sourceIDs, provenance, highlighted, reveal, targetID
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -145,7 +149,8 @@ public struct ExplanationObject: Codable, Equatable, Sendable, Identifiable {
                   sourceIDs: try c.decodeIfPresent([String].self, forKey: .sourceIDs) ?? [],
                   provenance: try c.decodeIfPresent(ExplanationProvenance.self, forKey: .provenance) ?? .proceduralIllustration,
                   highlighted: try c.decodeIfPresent(Bool.self, forKey: .highlighted) ?? false,
-                  reveal: try c.decodeIfPresent(Double.self, forKey: .reveal) ?? 1)
+                  reveal: try c.decodeIfPresent(Double.self, forKey: .reveal) ?? 1,
+                  targetID: try c.decodeIfPresent(String.self, forKey: .targetID))
     }
 }
 
@@ -337,6 +342,13 @@ public struct ExplanationRegistry: Equatable, Sendable {
     public var sourceIDs: Set<String>
     public init(assetIDs: Set<String> = [], sourceIDs: Set<String> = []) { self.assetIDs = assetIDs; self.sourceIDs = sourceIDs }
     public static let empty = Self()
+}
+
+/// Which wire version a turn may use. v1 is the Chat protocol. v2 (pointing turns only)
+/// additionally admits `targetID`, limited to the candidate IDs the app issued for this turn.
+public enum ExplanationWireProfile: Equatable, Sendable {
+    case v1
+    case v2(candidateIDs: Set<String>)
 }
 
 public enum ExplanationFailure: Error, LocalizedError, Equatable, Sendable {
