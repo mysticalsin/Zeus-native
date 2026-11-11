@@ -73,7 +73,7 @@ struct ZeusVoiceCards: View {
                     if let choice = ElevenLabsQuality.allCases.first(where: { $0.title == title }) { voice.elevenQuality = choice }
                 }), options: ElevenLabsQuality.allCases.map(\.title), label: "Voice quality")
             }
-            if !voice.macVoiceHintDismissed, Speaker.needsBetterMacVoice(languageCode: Locale.current.identifier) {
+            if !voice.macVoiceHintDismissed, Self.macVoiceHintNeeded {
                 GSDivider()
                 GSRow(symbol: "person.badge.plus", title: "A better Mac voice",
                       text: "Only the basic Mac voices are installed. Without a cloud key Zeus sounds best with an Enhanced or Premium voice. Nothing is downloaded until you choose one.") {
@@ -220,6 +220,9 @@ struct ZeusVoiceCards: View {
 
     /// System Settings > Accessibility > Spoken Content. The pane anchor is not documented by Apple, so the
     /// Accessibility pane opens if the anchor is refused.
+    /// Looked up once: enumerating the installed voices is not free and the view body runs often.
+    @MainActor static let macVoiceHintNeeded = Speaker.needsBetterMacVoice(languageCode: Locale.current.identifier)
+
     @MainActor static func openSpokenContent() {
         let anchored = URL(string: "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")!
         if !NSWorkspace.shared.open(anchored) {

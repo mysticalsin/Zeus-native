@@ -35,9 +35,11 @@ struct VoicePersonaRulesTests {
         var fast = TurnRaceState()
         _ = fast.reduce(.released(tiers: ["anthropic-api"], deep: nil, atMs: 0))
         _ = fast.reduce(.firstText(tier: "anthropic-api", atMs: 600))
-        #expect(!fast.reduce(.tick(atMs: FastTier.fillerMs + 50)).contains(.speakFiller))
+        let fastTick = fast.reduce(.tick(atMs: FastTier.fillerMs + 50))
+        #expect(!fastTick.contains(.speakFiller))
         var slow = TurnRaceState()
         _ = slow.reduce(.released(tiers: ["claude"], deep: nil, atMs: 0))
-        #expect(slow.reduce(.tick(atMs: FastTier.fillerMs)).contains(.speakFiller))
+        let slowTick = slow.reduce(.tick(atMs: FastTier.fillerMs))
+        #expect(slowTick.contains(.speakFiller))
     }
 }

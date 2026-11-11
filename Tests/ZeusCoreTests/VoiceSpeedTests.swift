@@ -136,26 +136,30 @@ struct VoiceTierAndFirstWordsTests {
     @Test func aLongFirstSentenceWithoutACommaSpeaksAfterTwelveWords() {
         var splitter = SentenceSplitter()
         // Tokens arrive mid-word; the twelfth word is complete only once whitespace follows it.
-        var spoken = splitter.feed("The quarterly numbers look strong across every region we track and the")
-        #expect(spoken.isEmpty)
-        spoken = splitter.feed(" margin")
+        let before = splitter.feed("The quarterly numbers look strong across every region we track and the")
+        let spoken = splitter.feed(" margin")
+        let rest = splitter.flush()
+        #expect(before.isEmpty)
         #expect(spoken == ["The quarterly numbers look strong across every region we track and the"])
-        #expect(splitter.flush() == "margin")
+        #expect(rest == "margin")
     }
 
     @Test func aShortFirstSentenceStillWaitsForItsFullStop() {
         var splitter = SentenceSplitter()
-        #expect(splitter.feed("Steady and quiet ").isEmpty)
-        #expect(splitter.feed("today. The desk") == ["Steady and quiet today."])
-        #expect(splitter.flush() == "The desk")
+        let early = splitter.feed("Steady and quiet ")
+        let full = splitter.feed("today. The desk")
+        let rest = splitter.flush()
+        #expect(early.isEmpty)
+        #expect(full == ["Steady and quiet today."])
+        #expect(rest == "The desk")
     }
 
     @Test func onlyTheFirstChunkIsCutByWordCount() {
         var splitter = SentenceSplitter()
         let first = splitter.feed("one two three four five six seven eight nine ten eleven twelve thirteen fourteen ")
+        let next = splitter.feed("fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree done. ")
         #expect(first == ["one two three four five six seven eight nine ten eleven twelve"])
         // The rest of the sentence waits for its full stop: the word cut applies once, to the first chunk.
-        let next = splitter.feed("fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree done. ")
         #expect(next == ["thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree done."])
     }
 }
@@ -165,7 +169,8 @@ struct FillerTimingTests {
     @Test func noFillerWhenTheFirstTextArrivesUnderSevenHundredMilliseconds() {
         var state = TurnRaceState()
         _ = state.reduce(.released(tiers: ["anthropic-api"], deep: nil, atMs: 0))
-        #expect(state.reduce(.tick(atMs: 300)).isEmpty)
+        let early = state.reduce(.tick(atMs: 300))
+        #expect(early.isEmpty)
         _ = state.reduce(.firstText(tier: "anthropic-api", atMs: 650))
         // Past the filler threshold, but the answer is already speaking: nothing may be added.
         let late = state.reduce(.tick(atMs: FastTier.fillerMs + 100))
@@ -177,9 +182,12 @@ struct FillerTimingTests {
     @Test func aSilentStartStillGetsOneFillerAfterTheThreshold() {
         var state = TurnRaceState()
         _ = state.reduce(.released(tiers: ["claude"], deep: nil, atMs: 0))
-        #expect(state.reduce(.tick(atMs: FastTier.fillerMs - 1)).isEmpty)
-        #expect(state.reduce(.tick(atMs: FastTier.fillerMs)) == [.speakFiller])
-        #expect(state.reduce(.tick(atMs: FastTier.fillerMs + 100)).isEmpty)
+        let before = state.reduce(.tick(atMs: FastTier.fillerMs - 1))
+        let at = state.reduce(.tick(atMs: FastTier.fillerMs))
+        let after = state.reduce(.tick(atMs: FastTier.fillerMs + 100))
+        #expect(before.isEmpty)
+        #expect(at == [.speakFiller])
+        #expect(after.isEmpty)
     }
 }
 
@@ -319,8 +327,8 @@ struct AnthropicVoiceBodyTests {
 
     @Test func fastTierRetriesPlainThenThePreviousHaikuOnlyOnABadRequestOrUnknownModel() {
         let tries = AnthropicVoiceBody.fastAttempts(current: "claude-haiku-5-5")
-        #expect(tries.map(\.model) == ["claude-haiku-5-5", "claude-haiku-5-5", "claude-haiku-4-5"])
-        #expect(tries.map(\.lean) == [true, false, false])
+        #expect(tries.map { $0.model } == ["claude-haiku-5-5", "claude-haiku-5-5", "claude-haiku-4-5"])
+        #expect(tries.map { $0.lean } == [true, false, false])
         #expect(AnthropicVoiceBody.shouldRetry(status: 400))
         #expect(AnthropicVoiceBody.shouldRetry(status: 404))
         #expect(!AnthropicVoiceBody.shouldRetry(status: 401))
