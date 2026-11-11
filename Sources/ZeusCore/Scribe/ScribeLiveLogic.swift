@@ -1295,31 +1295,22 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
     /// One closed speech turn's voice, saved with the meeting so "Remember this voice" and the post-meeting
     /// corrections still work after a relaunch. It lives only in this meeting's file (0600), is removed with
     /// the file and is never uploaded. `vector` is little-endian Float32 (Codable stores it as base64).
+    /// Conversion to and from `ScribeTurnEmbedding` is in `ScribeMeetingVoices.swift`.
     public struct TurnVoice: Codable, Equatable, Sendable {
         public var segmentID: String
         /// "microphone" or "system".
         public var source: String
-        public var kind: ScribeEmbeddingKind
+        /// "handBuilt" or "wespeaker".
+        public var kind: String
         public var vector: Data
         public var duration: TimeInterval
 
-        public init(_ turn: ScribeTurnEmbedding) {
-            segmentID = turn.segmentID
-            source = turn.source == .microphone ? "microphone" : "system"
-            kind = turn.embedding.kind
-            vector = turn.embedding.vector.withUnsafeBufferPointer { Data(buffer: $0) }
-            duration = turn.duration
-        }
-
-        /// Nil when the saved bytes are not a whole, finite vector.
-        public var turn: ScribeTurnEmbedding? {
-            guard vector.count > 0, vector.count % 4 == 0 else { return nil }
-            let values: [Float] = vector.withUnsafeBytes { raw in
-                (0..<(vector.count / 4)).map { raw.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
-            }
-            guard values.allSatisfy(\.isFinite) else { return nil }
-            return ScribeTurnEmbedding(segmentID: segmentID, source: source == "microphone" ? .microphone : .system,
-                                       embedding: ScribeVoiceEmbedding(kind: kind, vector: values), duration: duration)
+        public init(segmentID: String, source: String, kind: String, vector: Data, duration: TimeInterval) {
+            self.segmentID = segmentID
+            self.source = source
+            self.kind = kind
+            self.vector = vector
+            self.duration = duration
         }
     }
 
@@ -1359,11 +1350,10 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         transcriptionNote: String? = nil,
         micExcludedDuringCall: Bool = false,
         attendees: [String] = [],
-        turnVoices: [ScribeTurnEmbedding] = []
+        turnVoices: [TurnVoice] = []
     ) {
-        let names = ScribeAttendeeNames.clean(attendees)
-        self.attendees = names.isEmpty ? nil : names
-        self.turnVoices = turnVoices.isEmpty ? nil : turnVoices.map(TurnVoice.init)
+        self.attendees = attendees.isEmpty ? nil : attendees
+        self.turnVoices = turnVoices.isEmpty ? nil : turnVoices
         self.transcriptionNote = transcriptionNote
         self.micExcludedDuringCall = micExcludedDuringCall ? true : nil
         self.version = Self.currentVersion
@@ -1391,12 +1381,6 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
             method: method == "extractive" ? .extractive : nil
         )
     }
-
-    /// The saved invitee names, cleaned.
-    public var attendeeNames: [String] { ScribeAttendeeNames.clean(attendees ?? []) }
-
-    /// The saved turn voices that are still valid vectors.
-    public var turnEmbeddings: [ScribeTurnEmbedding] { (turnVoices ?? []).compactMap(\.turn) }
 
     /// The saved lines as final segments of `session`.
     public func segments(session: ScribeSessionID) -> [ScribeTranscriptSegment] {

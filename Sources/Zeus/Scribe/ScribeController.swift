@@ -1449,8 +1449,8 @@ final class ScribeController {
             dismissedAt: dismissedAt,
             transcriptionNote: recap.transcriptionNote,
             micExcludedDuringCall: recap.micExcludedDuringCall,
-            attendees: attendeesByMeeting[recap.id.rawValue] ?? [],
-            turnVoices: turnVoices[recap.id.rawValue] ?? []
+            attendees: ScribeAttendeeNames.clean(attendeesByMeeting[recap.id.rawValue] ?? []),
+            turnVoices: (turnVoices[recap.id.rawValue] ?? []).map(ScribeMeetingRecord.TurnVoice.init)
         )
         do {
             try writeMeeting(record)

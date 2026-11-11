@@ -31,7 +31,7 @@ import Testing
         ]
         return ScribeMeetingRecord(id: id, title: "Sync", endedAt: Date(timeIntervalSince1970: 1_700_000_000), duration: 6,
                                    notes: ScribeMeetingNotes(), transcript: segments,
-                                   attendees: attendees, turnVoices: voices)
+                                   attendees: ScribeAttendeeNames.clean(attendees), turnVoices: voices.map(ScribeMeetingRecord.TurnVoice.init))
     }
 
     @Test func namesAndVoicesComeBackAfterAReload() throws {

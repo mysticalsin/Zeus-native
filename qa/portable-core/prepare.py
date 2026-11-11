@@ -65,8 +65,8 @@ GROUPS = {
         tests("TextInsertionReceiptTests"),
     ),
     "polyglot": (
-        core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
-        tests("PolyglotTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),
+        core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
+        tests("PolyglotTests", "PolyglotPinPolicyTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),
     ),
     "regressions": (
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
