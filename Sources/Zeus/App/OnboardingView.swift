@@ -307,7 +307,8 @@ struct OnboardingView: View {
             } label: {
                 Label("Celebrate with Zeus", systemImage: "party.popper.fill")
             }
-            .buttonStyle(GlassButtonStyle(kind: .primary))
+            // Done is the one primary action on this step.
+            .buttonStyle(GlassButtonStyle(kind: .secondary))
         }
     }
 

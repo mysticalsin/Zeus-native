@@ -217,6 +217,7 @@ struct AboutYouView: View {
                         Text("No vault found at ~/Documents/brain.").font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary)
                     }
                     Button(model.vault == nil ? "Choose Vault Folder…" : "Choose Another Folder…") { model.chooseVault() }
+                        .buttonStyle(ZeusButtonStyle(prominent: false))
                 }
             }
             .frame(height: 112)
@@ -264,6 +265,7 @@ struct AboutYouView: View {
             body("Your profile note is in your vault's inbox. You can come back here any time from Settings.")
             if let written = model.written {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([written]) }
+                    .buttonStyle(ZeusButtonStyle(prominent: false))
             }
         }
     }
@@ -275,25 +277,29 @@ struct AboutYouView: View {
             if model.step != .intro, model.step != .done {
                 Button("Back") { model.back() }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: false))
             }
             Spacer()
             switch model.step {
             case .intro:
-                Button("Not Now", action: close)
-                Button("Get Started") { model.next() }.keyboardShortcut(.defaultAction)
+                Button("Not Now", action: close).buttonStyle(ZeusButtonStyle(prominent: false))
+                Button("Get Started") { model.next() }.keyboardShortcut(.defaultAction).buttonStyle(ZeusButtonStyle(prominent: true))
             case .vault:
                 Button(model.vault == nil ? "Skip" : "Continue") { model.next() }.keyboardShortcut(.defaultAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: model.vault != nil))
             case .questions:
                 Button("Continue") { model.next() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: true))
                     .disabled(!model.profile.isComplete)
             case .review:
-                Button("Don't Save") { close() }
+                Button("Don't Save") { close() }.buttonStyle(ZeusButtonStyle(prominent: false))
                 Button("Save Note") { model.save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: true))
                     .disabled(model.vault == nil)
             case .done:
-                Button("Done", action: close).keyboardShortcut(.defaultAction)
+                Button("Done", action: close).keyboardShortcut(.defaultAction).buttonStyle(ZeusButtonStyle(prominent: true))
             }
         }
         .controlSize(.large)

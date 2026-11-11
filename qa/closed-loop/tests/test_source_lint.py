@@ -34,6 +34,25 @@ def code_lines(path):
             yield number, line
 
 
+def strip_trailing_comment(line):
+    """The code part of a Swift line: drops a `//` comment that starts outside a string literal."""
+    in_string = False
+    escaped = False
+    for index, char in enumerate(line):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char == "/" and line[index + 1:index + 2] == "/":
+            return line[:index]
+    return line
+
+
 class SourceLint(unittest.TestCase):
     def test_app_target_never_uses_swiftpm_bundle_module(self):
         offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p)
@@ -74,6 +93,20 @@ class SourceLint(unittest.TestCase):
             if used and not str(info.get(key, "")).strip():
                 missing.append(f"{key} (used at {used[0]})")
         self.assertEqual(missing, [])
+
+    def test_user_visible_swift_strings_have_no_em_dash(self):
+        # House style: no em dashes in anything a person reads. Only the code part of each line is checked:
+        # a trailing `// comment` and whole-line comments may use one. ZeusCore is out of scope here because
+        # its dash handling (parsers that must recognise a dash) is covered by its own tests.
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p)
+                     if "—" in strip_trailing_comment(line)]
+        self.assertEqual(offenders, [], "rewrite with a comma, colon or full stop")
+
+    def test_em_dash_lint_is_precise(self):
+        self.assertEqual(strip_trailing_comment('let a = 1 // fine — a comment'), "let a = 1 ")
+        self.assertIn("—", strip_trailing_comment('Text("Overdue — do this next")'))
+        self.assertIn("—", strip_trailing_comment('Text("see https://x.test — now") // ok'))
+        self.assertNotIn("—", strip_trailing_comment('Text("ok") // https://x.test — note'))
 
     def test_helper_is_nonisolated_and_covers_each_api(self):
         text = "\n".join(line for _, line in code_lines(HELPER))

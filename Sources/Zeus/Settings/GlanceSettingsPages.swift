@@ -311,7 +311,7 @@ private struct AppearancePage: View {
             GSDivider()
             light("lights.capsLock", "capslock", "Case-key lights (Caps Lock and Shift)", "Shows Caps Lock changes and Shift held on its own.", last: true)
             Text("Music").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary).padding(.top, 14)
-            GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors.", isOn: musicWingsBinding)
+            GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
@@ -1059,7 +1059,7 @@ private struct PrivacyPage: View {
                         isOn: bool("privacy.lyrics"))
         }
         GSCard("Control from the notch") {
-            GSRow(symbol: "accessibility", title: "Accessibility", text: "") {
+            GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())
             }
             GSDivider()
