@@ -79,16 +79,8 @@ final class VoiceTurnController {
         }
         FastActions.shared.onLateProblem = { [weak self] text in self?.say(text) }
         ClaudeFlags.warm()
-        BrainLaunchWarm.registerWait {
-            async let ollama: Void = OpenAICompatProvider.ollama().prewarm()
-            async let anthropic: Void = AnthropicAPIProvider().prewarm()
-            _ = await (ollama, anthropic)
-        }
-        Task { await BrainLaunchWarm.awaitIfNeeded() }
+        // No model or network warm-up at launch. The talk key warms the brains (BrainWarmScheduler.talkKeyDown).
         BrainWarmScheduler.shared.start()
-        Task { @MainActor in
-            await BrainWarmActions.live.warmSelectedVoice()
-        }
     }
 
     /// After the words sit still for 0.7 s, start the fastest brain. Commands stay on the instant path.
@@ -135,7 +127,7 @@ final class VoiceTurnController {
     func press() -> Bool {
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
-        BrainWarmScheduler.shared.noteActivity()
+        BrainWarmScheduler.shared.talkKeyDown()
         fastRace?.cancel()
         // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
         handsFreeTask?.cancel()
@@ -763,7 +755,7 @@ final class VoiceTurnController {
                     let command = CodeCommand(action)
                     task = Task { @MainActor in
                         guard let command else { return "I couldn't tell what to run, so I left it." }
-                        let outcome = await CodeActions.shared.perform(command, speak: speak)
+                        let outcome = await CodeActions.shared.perform(command, speak: speak, fromModel: true)
                         return outcome.ok ? nil : outcome.message
                     }
                 case .macWalkthrough:

@@ -17,15 +17,32 @@ public enum BrainWarmPlan {
     /// How often the scheduler looks at all (a loose timer with tolerance, never a tight loop).
     public static let checkEvery: TimeInterval = 120
 
-    /// What to warm now. `forced` (launch, wake from sleep) warms everything once; otherwise nothing
-    /// happens while Zeus is not in use, so an idle Mac makes no calls.
-    public static func due(now: Date, lastActivity: Date?, lastCloud: Date?, lastLocal: Date?, forced: Bool = false) -> Set<Target> {
-        if forced { return [.localModel, .cloudConnection] }
+    /// What starts a warm-up. Launch and wake from sleep are deliberately not on the list: an app that
+    /// has not been spoken to makes no network call and loads no model.
+    public enum Trigger: Sendable, Hashable { case launch, wake, talkKeyDown, voiceActivity, idleCheck }
+
+    /// Whether this trigger may start a warm-up at all.
+    public static func mayWarm(on trigger: Trigger) -> Bool {
+        switch trigger {
+        case .launch, .wake: false
+        case .talkKeyDown, .voiceActivity, .idleCheck: true
+        }
+    }
+
+    /// What to warm now. Nothing happens until the person has used voice (`lastActivity`), and not
+    /// after the active window ends, so an idle Mac makes no calls.
+    public static func due(now: Date, lastActivity: Date?, lastCloud: Date?, lastLocal: Date?) -> Set<Target> {
         guard let lastActivity, now.timeIntervalSince(lastActivity) <= activeWindow else { return [] }
         var targets: Set<Target> = []
         if lastCloud.map({ now.timeIntervalSince($0) >= cloudInterval }) ?? true { targets.insert(.cloudConnection) }
         if lastLocal.map({ now.timeIntervalSince($0) >= localInterval }) ?? true { targets.insert(.localModel) }
         return targets
+    }
+
+    /// True once the active window has passed: the scheduler stops its timer.
+    public static func isIdle(now: Date, lastActivity: Date?) -> Bool {
+        guard let lastActivity else { return true }
+        return now.timeIntervalSince(lastActivity) > activeWindow
     }
 }
 

@@ -41,10 +41,12 @@ final class CodeActions {
 
     // MARK: Commands
 
-    func perform(_ command: CodeCommand, speak: Bool) async -> Result {
+    /// `fromModel`: the command came from a model-written action tag. A coding agent started that way
+    /// asks on a card first; the same words spoken by the person, or typed in the CLI, do not.
+    func perform(_ command: CodeCommand, speak: Bool, fromModel: Bool = false) async -> Result {
         switch command {
         case .agent(let tool, let project, let dir, let task):
-            return await startAgent(tool: tool, project: project, dir: dir, task: task)
+            return await startAgent(tool: tool, project: project, dir: dir, task: task, askFirst: fromModel, speak: speak)
         case .openTerminal(let project, let dir):
             return await openTerminal(project: project, dir: dir)
         case .run(let shell, let dir):
@@ -71,7 +73,8 @@ final class CodeActions {
     /// Starts Tony's coding agent in the project, with `task` as its first prompt. These are his own sessions:
     /// the CLI runs with ITS user defaults. `ModelCap` only pins Zeus's own brain calls (voice,
     /// browser agent, research), never a session started here. The agent hooks show it in the notch.
-    func startAgent(tool requested: CodingTool?, project: String?, dir: String?, task: String) async -> Result {
+    func startAgent(tool requested: CodingTool?, project: String?, dir: String?, task: String,
+                    askFirst: Bool = false, speak: Bool = false) async -> Result {
         let tool = requested ?? CodingTool.preferred()
         guard let binary = CLILocator.tools.first(where: { $0.name == tool.binary }).flatMap(CLILocator.locate) else {
             return Result(message: "\(tool.title) isn't installed.", ok: false)
@@ -80,6 +83,14 @@ final class CodeActions {
         switch folder(project: project, dir: dir) {
         case .problem(let text): return Result(message: text, ok: false)
         case .found(let found, let foundName): (url, name) = (found, foundName)
+        }
+        if askFirst {
+            guard let notch else { return Result(message: "I can't ask you about that yet, so I left it.", ok: false) }
+            if speak { say(ZeusVoiceLines.line(for: .approval, context: ["agent": "Zeus"])) }
+            let verdict = await notch.requestApproval(
+                agent: "Zeus", project: name ?? ProjectIndex.tilde(url.path), tool: tool.title,
+                command: "Start \(tool.title): \(task)", risk: .medium, timeout: .seconds(90), onTimeout: .deny)
+            guard verdict == .allow else { return Result(message: "Okay, I won't start it.", ok: false) }
         }
         let job = TerminalJob.agent(tool, task: task, directory: url.path, binaryPath: binary)
         let (app, problem) = await TerminalLauncher.launch(job)

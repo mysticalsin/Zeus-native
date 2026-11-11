@@ -3229,6 +3229,90 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_every_settings_card_and_page_is_placed_on_a_page"
       }
+    },
+    {
+      "id": "REG-269",
+      "failure": "A process of another user, or a program other than the Zeus app on the browser bridge socket, could connect to the agent and browser sockets: the files were only mode 0600.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PeerCredentialsTests.swift",
+        "function": "bridgePolicyNeedsTheSameUserAndTheNamedProgram"
+      }
+    },
+    {
+      "id": "REG-270",
+      "failure": "A hook client could send a bundle ID of its own choosing and have Zeus launch that app, or label a risky command low risk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ClientInputPolicyTests.swift",
+        "function": "aTerminalInfoWithAForgedBundleIDHasNoTarget"
+      }
+    },
+    {
+      "id": "REG-271",
+      "failure": "A model-written action could start a coding agent, or send a prompt to ChatGPT, Claude or Dust, without an approval card.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ClientInputPolicyTests.swift",
+        "function": "aModelStartedCodingAgentAndAnySendNeedACard"
+      }
+    },
+    {
+      "id": "REG-272",
+      "failure": "The update feed accepted http, file and app-scheme addresses, and its download link was opened whatever its scheme.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UpdateFeedPolicyTests.swift",
+        "function": "aFeedLinkThatIsNotHTTPSIsDropped"
+      }
+    },
+    {
+      "id": "REG-273",
+      "failure": "The system HUD monitor woke ten times a second for as long as the app ran, whether or not a HUD was shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SystemHUDTests.swift",
+        "function": "theFastRateOnlyLastsForABurstAfterAChange"
+      }
+    },
+    {
+      "id": "REG-274",
+      "failure": "Zeus pinged Ollama and the cloud API at launch and at every wake from sleep, before anyone used voice.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrainWarmPlanTests.swift",
+        "function": "launchAndWakeNeverWarmButTheTalkKeyDoes"
+      }
+    },
+    {
+      "id": "REG-275",
+      "failure": "Transcribing with Parakeet when its model was missing started the model download without any click.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_download_is_behind_the_explicit_prepare_path"
+      }
     }
   ]
 }
