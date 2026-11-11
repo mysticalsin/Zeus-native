@@ -126,7 +126,8 @@ struct PointingControllerTests {
         let (controller, _) = make()
         controller.handle(.began)
         #expect(!MarkOverlay.shared.capturesMouse)
-        #expect(MarkOverlay.shared.ownedWindows.allSatisfy(\.ignoresMouseEvents))
+        let windows = MarkOverlay.shared.ownedWindows
+        #expect(windows.allSatisfy { $0.ignoresMouseEvents })
         controller.sample(at: CGPoint(x: 100, y: 100))
         controller.sample(at: CGPoint(x: 140, y: 120))
         #expect(controller.trace.strokes.count == 1)
