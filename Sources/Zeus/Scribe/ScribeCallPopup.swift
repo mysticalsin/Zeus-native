@@ -18,12 +18,13 @@ private struct ScribeCallPopupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.headline)
-                .font(.system(size: 13, weight: .semibold))
+                .font(TopBarStyle.label(13, .semibold))
+                .foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Text(model.detail)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(TopBarStyle.label(11, .regular))
+                .foregroundStyle(Theme.cloudSecondary)
             HStack(spacing: 8) {
                 Button {
                     model.onRecord()
@@ -43,7 +44,8 @@ private struct ScribeCallPopupView: View {
         }
         .padding(14)
         .frame(width: ScribeCallPopup.width, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .alertGlass(radius: 16)
+        .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Scribe suggestion: \(model.headline)")
     }

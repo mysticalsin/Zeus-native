@@ -8,6 +8,11 @@ enum NotchControllerBridge {
     static weak var controller: NotchController?
     static func dismissFailure() { controller?.dismissFailure() }
     static func clickNotificationLine() { controller?.clickNotificationLine() }
+    static func alertActions() -> AlertActions {
+        AlertActions(open: { controller?.openAlert($0) }, dismiss: { controller?.dismissAlert($0) },
+                     snooze: { controller?.snoozeAlert($0) })
+    }
+    static func alertHover(_ hovered: Bool) { controller?.setAlertHovered(hovered) }
     static func closePeek() { if controller?.model.presentation == .peek { controller?.show(.closed) } }
     static func applyScreenSharePolicy(visibleInShare: Bool) { controller?.applyScreenSharePolicy(visibleInShare: visibleInShare) }
 
@@ -49,39 +54,6 @@ struct AgentTroubleCard: View {
                 .accessibilityHint("Brings \(agent)'s terminal forward.")
             }
         }
-    }
-}
-
-/// Glance-style slim line under the closed notch for a notification from another app.
-struct NotchNotificationLine: View {
-    static let width: CGFloat = 340
-    static let height: CGFloat = 26
-
-    let line: NotchModel.NotificationLine
-    let open: () -> Void
-
-    var body: some View {
-        Button(action: open) {
-            HStack(spacing: 7) {
-                if let icon = NotificationsController.shared.icon(line.app) {
-                    Image(nsImage: icon).resizable().frame(width: 15, height: 15)
-                } else {
-                    Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(Theme.cloudSecondary)
-                }
-                Text(line.title).font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
-                Text(line.detail).font(.system(size: 11, design: .rounded)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 11)
-            .frame(width: Self.width, height: Self.height)
-            .background(Capsule().fill(Color.black))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(PressableStyle())
-        .accessibilityLabel("\(line.title). \(line.detail)")
-        .accessibilityHint("Opens the app.")
     }
 }
 

@@ -366,7 +366,7 @@ struct TopBarHeader: View {
         switch tab {
         case .notifications:
             let since = Date().addingTimeInterval(-86_400)
-            return NotificationsController.shared.items.filter { $0.date > since }.count
+            return NotificationsController.shared.visibleItems.filter { $0.date > since }.count
         case .shelf: return topBar.shelf.count
         case .clipboard: return topBar.clipboard.entries.count
         default: return nil

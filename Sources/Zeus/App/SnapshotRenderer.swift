@@ -84,6 +84,8 @@ enum SnapshotRenderer {
                  size: wide ? CGSize(width: 1000, height: 120) : CGSize(width: 960, height: tall ? 520 : 400),
                  to: directory.appendingPathComponent("topbar-\(name).png"))
         }
+        // Alerts page: nothing to show.
+        saveSurface(ZStack { Theme.storm; AlertsAllClear() }.environment(\.colorScheme, .dark), size: CGSize(width: 480, height: 236), name: "alerts-page-empty")
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
         renderParityStates(into: directory, notch: notch)
@@ -341,13 +343,13 @@ enum SnapshotRenderer {
         notchClosed.presentation = .closed
         saveSurface(NotchStage(model: notchClosed, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-closed")
 
-        let notchPeek = NotchModel()
-        notchPeek.presentation = .peek
         // Top bar position: the closed bar lowered 12 pt, light and wings with it.
         let notchLowered = NotchModel()
         notchLowered.presentation = .closed
         saveSurface(NotchStage(model: notchLowered, topBar: TopBarModel(), notch: notch, topOffset: 12), size: CGSize(width: 960, height: 120), name: "notch-closed-lowered")
 
+        let notchPeek = NotchModel()
+        notchPeek.presentation = .peek
         saveSurface(NotchStage(model: notchPeek, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-peek")
 
         let notchPanel = NotchModel()
@@ -488,7 +490,21 @@ enum SnapshotRenderer {
         let approval = NotchModel.Approval(id: "a", agent: "Claude Code", project: "zeus", tool: "Bash",
                                            command: "rm -rf dist && npm run build", risk: .high,
                                            deadline: Date().addingTimeInterval(87), timeoutNote: "then your terminal asks", resolve: { _ in })
+        // Incoming alerts at rest (after the landing spring and the edge sweep): one, a stack of three with "+2", and hover actions.
+        let alertTime = Date()
+        func alert(_ id: String, _ app: String, _ name: String, _ title: String, _ body: String) -> AlertItem {
+            AlertItem(id: id, appID: app, appName: name, title: title, body: body, postedAt: alertTime)
+        }
+        let messages = alert("1", "com.apple.MobileSMS", "Messages", "Anna", "Deck looks great, ship it")
+        let stackOfFive = [alert("1", "com.apple.mail", "Mail", "Legal", "Contract v3 attached"),
+                           alert("2", "com.apple.iCal", "Calendar", "Design review", "In 25 minutes"),
+                           alert("3", "com.apple.Safari", "Safari", "Download finished", "Q4-numbers.xlsx"),
+                           alert("4", "com.apple.reminders", "Reminders", "Pay the electricity bill", "Due today"),
+                           messages]
         return [
+            ("9-alert-single", make { $0.alerts.post(messages, now: alertTime) }),
+            ("9-alert-stack3", make { model in for item in stackOfFive { model.alerts.post(item, now: alertTime) } }),
+            ("9-alert-hover", make { $0.alerts.post(messages, now: alertTime); $0.alerts.setHovered(true, now: alertTime) }),
             ("1-closed-working", make { $0.sessions = [claude]; $0.presentation = .closed }),
             ("2-peek-running", make { $0.sessions = [claude]; $0.peekSessionID = "cc"; $0.presentation = .peek }),
             ("3-peek-approval", make { $0.sessions = [claude]; $0.approval = approval; $0.presentation = .peek }),
@@ -909,6 +925,8 @@ enum SnapshotRenderer {
             MirroredNotification(id: 1, app: "com.apple.MobileSMS", title: "Anna", subtitle: nil, body: "Deck looks great, ship it", date: now.addingTimeInterval(-120)),
             MirroredNotification(id: 2, app: "com.apple.mail", title: "GitHub", subtitle: "zeus", body: "CI passed on devon/zeus-next", date: now.addingTimeInterval(-900)),
             MirroredNotification(id: 3, app: "com.apple.iCal", title: "Design review", subtitle: nil, body: "In 25 minutes", date: now.addingTimeInterval(-1800)),
+            MirroredNotification(id: 4, app: "com.apple.MobileSMS", title: "Marta", subtitle: nil, body: "Can you send the Q4 numbers?", date: now.addingTimeInterval(-2400)),
+            MirroredNotification(id: 5, app: "com.apple.MobileSMS", title: "Team chat", subtitle: nil, body: "Lunch at 12:30?", date: now.addingTimeInterval(-7200)),
         ])
         // A made-up spectrum (a bass-heavy tilt with a couple of peaks) so the Waves tab has bars to draw.
         AudioSpectrumService.shared.seedForSnapshot((0..<SpectrumMath.bandCount).map { i in
@@ -993,6 +1011,8 @@ private struct NotchStage: View {
     let model: NotchModel
     var topBar: TopBarModel? = nil
     let notch: CGSize
+    /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
+    var topOffset: Double = 0
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -1011,8 +1031,6 @@ private struct BuddyStage: View {
         ZStack(alignment: .topLeading) {
             LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .topLeading, endPoint: .bottomTrailing)
             BuddyOverlayView(model: model, screenFrame: frame)
-    /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
-    var topOffset: Double = 0
         }
     }
 }

@@ -211,6 +211,12 @@ final class NotificationsController {
 
     private(set) var items: [MirroredNotification] = []
     private(set) var failure: NotificationMirror.Failure?
+    /// Alerts the person cleared in Zeus. Notification Center itself is never changed: Clear all remembers the
+    /// newest id (kept across launches) and a single Clear hides one id until the next launch.
+    private(set) var clearedThrough: Int64 = Int64(UserDefaults.standard.integer(forKey: "notifications.clearedThrough"))
+    private(set) var dismissed: Set<Int64> = []
+    /// What the Alerts page and its tab count show.
+    var visibleItems: [MirroredNotification] { items.filter { $0.id > clearedThrough && !dismissed.contains($0.id) } }
     var enabled: Bool {
         didSet {
             if !TopBarStyle.isSnapshot { UserDefaults.standard.set(enabled, forKey: "notifications.mirror") }
@@ -221,7 +227,7 @@ final class NotificationsController {
     init() { enabled = UserDefaults.standard.bool(forKey: "notifications.mirror") }
 
     private var seeded = false
-    func seedForSnapshot(_ items: [MirroredNotification]) { seeded = true; enabled = true; self.items = items; failure = nil }
+    func seedForSnapshot(_ items: [MirroredNotification]) { seeded = true; enabled = true; self.items = items; failure = nil; clearedThrough = 0; dismissed = [] }
 
     func refresh() {
         guard !seeded else { return }
@@ -249,8 +255,16 @@ final class NotificationsController {
         return NotificationMirror.shortName(bundleID)
     }
 
-    func icon(_ bundleID: String) -> NSImage? {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { NSWorkspace.shared.icon(forFile: $0.path) }
+    /// The rasterised, cached app icon (nil when it cannot be drawn). See `AppIconCache`.
+    func icon(_ bundleID: String) -> NSImage? { AppIconCache.shared.entry(for: bundleID).image }
+
+    func clear(_ id: Int64) { dismissed.insert(id) }
+
+    func clearAll() {
+        guard let newest = items.map(\.id).max() else { return }
+        clearedThrough = max(clearedThrough, newest)
+        dismissed = []
+        if !TopBarStyle.isSnapshot { UserDefaults.standard.set(Int(clearedThrough), forKey: "notifications.clearedThrough") }
     }
 
     func openFullDiskAccess() {

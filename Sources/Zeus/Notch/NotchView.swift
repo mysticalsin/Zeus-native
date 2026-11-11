@@ -205,13 +205,14 @@ struct NotchView: View {
             .padding(.top, topOffset)
             .animation(Motion.reduced ? nil : .easeOut(duration: 0.12), value: topOffset)
             .overlay(alignment: .top) {
-                if let line = model.notificationLine, model.presentation == .closed {
-                    NotchNotificationLine(line: line) { NotchControllerBridge.clickNotificationLine() }
-                        .padding(.top, barHeight + 6)
-                        .transition(.opacity.combined(with: .offset(y: -6)))
+                if !model.alerts.isEmpty, model.presentation == .closed {
+                    AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
+                                   onHover: { NotchControllerBridge.alertHover($0) })
+                        .padding(.top, barHeight + 6 + topOffset)
+                        .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
                 }
             }
-            .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.notificationLine)
+            .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
     }
 
     /// Whether the outline itself glows (and so breathes). With the top bar, the closed notch glows

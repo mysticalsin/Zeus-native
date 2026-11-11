@@ -298,27 +298,12 @@ struct NotificationsPage: View {
                     secondary: "Try again",
                     secondaryAction: { notifications.refresh() }
                 )
-            } else if notifications.items.isEmpty {
-                GlanceEmpty(symbol: "bell.slash", text: notifications.failure == nil ? "No recent notifications" : "Notification Center's history couldn't be read.")
+            } else if notifications.failure != nil, notifications.items.isEmpty {
+                GlanceEmpty(symbol: "bell.slash", text: "Notification Center's history couldn't be read.")
+            } else if notifications.visibleItems.isEmpty {
+                AlertsAllClear()
             } else {
-                PageScroll(.vertical) {
-                    VStack(spacing: 4) {
-                        ForEach(notifications.items) { item in
-                            GlanceRow(key: "n\(item.id)", topBar: topBar, title: item.title.isEmpty ? notifications.appName(item.app) : item.title,
-                                      detail: [item.subtitle, item.body].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
-                                      action: { notifications.openApp(item.app) }) {
-                                if let icon = notifications.icon(item.app) {
-                                    Image(nsImage: icon).resizable().frame(width: 18, height: 18)
-                                } else {
-                                    Image(systemName: "app.fill").font(.system(size: 14)).foregroundStyle(Theme.cloudSecondary)
-                                }
-                            } trailing: {
-                                Text(item.date.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)))
-                                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
-                            }
-                        }
-                    }
-                }
+                AlertsGroupedList(notifications: notifications)
             }
         }
         .onAppear { notifications.refresh() }

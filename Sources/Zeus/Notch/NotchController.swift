@@ -28,7 +28,8 @@ final class NotchController {
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
-    private var lineTask: Task<Void, Never>?
+    /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
+    private var alertWake: Task<Void, Never>?
     /// What happens when the notification line is clicked.
     var openNotificationLine: (NotchModel.NotificationLine) -> Void = { _ in }
 
@@ -304,6 +305,7 @@ final class NotchController {
             if model.notificationLine != nil, model.presentation == .closed {
                 let over = notificationLineRect(screen).contains(NSEvent.mouseLocation)
                 setIgnoresMouse(!over)
+                if !over, model.alerts.isHovered { setAlertHovered(false) }
                 if over { return }
             }
             guard inHotZone(screen) else { hoverTask?.cancel(); hoverTask = nil; return }
@@ -540,35 +542,88 @@ final class NotchController {
 
     // MARK: Notification line
 
-    /// A slim line under the closed notch for about four seconds; click opens the app.
+    /// A mirrored notification from another app becomes a glass alert under the notch (see `AlertStack`).
     func showNotificationLine(_ line: NotchModel.NotificationLine) {
+        postAlert(AlertItem(id: "\(line.id)", appID: line.app, appName: NotificationsController.shared.appName(line.app),
+                            title: line.title, body: line.detail, priority: .normal, postedAt: now()))
+    }
+
+    func postAlert(_ item: AlertItem) {
         guard model.presentation == .closed else { return }
-        model.notificationLine = line
-        lineTask?.cancel()
-        lineTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(NotificationPeekRules.visibleSeconds))
-            guard !Task.isCancelled else { return }
-            self?.dismissNotificationLine()
+        let result = model.alerts.post(item, now: now())
+        if case .added = result {
+            // Each alert is announced once, politely; a coalesced duplicate does not repeat it.
+            NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+                .announcement: item.spokenText,
+                .priority: NSAccessibilityPriorityLevel.low.rawValue,
+            ])
         }
+        alertsChanged()
     }
 
     func dismissNotificationLine() {
-        lineTask?.cancel()
-        model.notificationLine = nil
-        if model.presentation == .closed { setIgnoresMouse(true) }
+        model.alerts.clear()
+        alertsChanged()
+    }
+
+    func dismissAlert(_ id: String) {
+        model.alerts.dismiss(id: id, now: now())
+        alertsChanged()
+    }
+
+    func openAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        openNotificationLine(.init(id: Int64(item.id) ?? 0, app: item.appID, title: item.title, detail: item.body))
+        dismissAlert(id)
+    }
+
+    /// Hides the alert and brings it back in ten minutes.
+    func snoozeAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        dismissAlert(id)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(600))
+            guard !Task.isCancelled else { return }
+            var again = item
+            again.postedAt = Date()
+            self?.postAlert(again)
+        }
     }
 
     func clickNotificationLine() {
-        guard let line = model.notificationLine else { return }
-        dismissNotificationLine()
-        openNotificationLine(line)
+        guard let front = model.alerts.visible.first else { return }
+        openAlert(front.id)
+    }
+
+    func setAlertHovered(_ hovered: Bool) {
+        model.alerts.setHovered(hovered, now: now())
+        alertsChanged()
+    }
+
+    /// Re-arms the single wake-up for the next deadline. With nothing to expire there is no task at all.
+    private func alertsChanged() {
+        alertWake?.cancel()
+        alertWake = nil
+        if model.alerts.isEmpty {
+            if model.presentation == .closed { setIgnoresMouse(true) }
+            return
+        }
+        guard let deadline = model.alerts.nextDeadline() else { return }
+        alertWake = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSince(self.now()))))
+            guard !Task.isCancelled else { return }
+            self.model.alerts.expire(now: self.now())
+            self.alertsChanged()
+        }
     }
 
     /// Where the line sits, in screen coordinates: centred under the notch.
     private func notificationLineRect(_ screen: NSScreen) -> CGRect {
-        let top = screen.frame.maxY - max(notchSize.height, 30) - 6
-        return CGRect(x: screen.frame.midX - NotchNotificationLine.width / 2, y: top - NotchNotificationLine.height,
-                      width: NotchNotificationLine.width, height: NotchNotificationLine.height)
+        let top = screen.frame.maxY - topOffset - max(notchSize.height, 30) - 6
+        // Room for the fanned stack and the hover actions, so the pointer stays on the capsule while it grows.
+        let height = AlertCapsule.actionHeight + 24
+        return CGRect(x: screen.frame.midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)
     }
 
     // MARK: Keyboard agent picker
