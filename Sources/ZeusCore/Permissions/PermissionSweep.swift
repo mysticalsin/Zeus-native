@@ -194,6 +194,39 @@ public enum PermissionSweep {
         return now - progress.savedAt >= 0 && now - progress.savedAt < resumeWindow
     }
 
+    /// Buttons on the floating guide, in keyboard focus order.
+    /// Key actions are filled in by the guide fix: Done is Return, Skip is Escape.
+    public struct GuideButton: Equatable, Sendable {
+        public enum Role: String, Hashable, Sendable { case done, skip, stop }
+        /// Return (default) or Escape (cancel). Nil is pointer-only.
+        public enum KeyAction: Equatable, Sendable { case defaultAction, cancelAction }
+        public var role: Role
+        public var title: String
+        public var voiceOverLabel: String
+        public var keyAction: KeyAction?
+        public var focusOrder: Int
+        public init(role: Role, title: String, voiceOverLabel: String, keyAction: KeyAction?, focusOrder: Int) {
+            self.role = role
+            self.title = title
+            self.voiceOverLabel = voiceOverLabel
+            self.keyAction = keyAction
+            self.focusOrder = focusOrder
+        }
+    }
+
+    public static func guideButtons(_ phase: Phase) -> [GuideButton] {
+        var buttons: [GuideButton] = []
+        if case .guiding(let item) = phase, item.mayNeedRestart {
+            buttons.append(.init(role: .done, title: "Done", voiceOverLabel: "Done, \(item.title) is on",
+                                  keyAction: nil, focusOrder: buttons.count))
+        }
+        buttons.append(.init(role: .skip, title: "Skip", voiceOverLabel: "Skip this one",
+                              keyAction: nil, focusOrder: buttons.count))
+        buttons.append(.init(role: .stop, title: "Stop", voiceOverLabel: "Stop allowing",
+                              keyAction: nil, focusOrder: buttons.count))
+        return buttons
+    }
+
     /// The guide's one line for the current step.
     public static func guideText(_ phase: Phase) -> String {
         switch phase {
