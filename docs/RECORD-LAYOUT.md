@@ -80,7 +80,7 @@ Snapshots never use a scroll view (ImageRenderer cannot draw one).
 - The staggered entrance runs once, when the page first opens, not again after Back.
 - Visible motion runs on `DisplaySynchronizedView` (native display rate, paused off screen and in
   Reduce Motion) instead of `TimelineView`: the countdown ring, the 3 2 1 numeral and the audio meter
-  (was capped at 30 fps). The elapsed timer is a 1 Hz label on `TickingView`, which stops when the
+  (was capped at 30 fps). The elapsed timer is a label on `TickingView` (twice a second), which stops when the
   window is hidden.
 
 ## Option mapping

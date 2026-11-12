@@ -2,7 +2,8 @@ import SwiftUI
 import ZeusCore
 
 // Shared glass pieces for the Record page. Pure drawing: every number comes from ZeusCore (RecordlyVisuals).
-// Nothing here owns a timer. Animations are one-shot, or live in views that exist only while capturing.
+// Nothing here owns a timer. Animations are one-shot, or live in views that exist only while capturing and run on
+// the display's own clock (DisplaySynchronizedView), which stops off screen, in Reduce Motion and in snapshots.
 
 // MARK: Glass frame
 
@@ -42,11 +43,17 @@ extension View {
 // MARK: Entrance
 
 /// Staggered entrance when the page appears: a short rise and fade, item by item (about 0.35 s in all).
-/// Reduce Motion: no movement and no stagger, a plain cross-fade. Snapshots start settled.
+/// Reduce Motion: no movement and no stagger, a plain cross-fade. Snapshots, and views that come back after the
+/// page already played its entrance (`enabled: false`), start settled.
 struct RecordlyEntranceModifier: ViewModifier {
     let item: RecordlyEntrance.Item
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = TopBarStyle.isSnapshot
+    @State private var shown: Bool
+
+    init(item: RecordlyEntrance.Item, enabled: Bool = true) {
+        self.item = item
+        _shown = State(initialValue: TopBarStyle.isSnapshot || !enabled)
+    }
 
     func body(content: Content) -> some View {
         content
@@ -59,8 +66,8 @@ struct RecordlyEntranceModifier: ViewModifier {
 }
 
 extension View {
-    func recordlyEntrance(_ item: RecordlyEntrance.Item) -> some View {
-        modifier(RecordlyEntranceModifier(item: item))
+    func recordlyEntrance(_ item: RecordlyEntrance.Item, enabled: Bool = true) -> some View {
+        modifier(RecordlyEntranceModifier(item: item, enabled: enabled))
     }
 }
 
@@ -87,8 +94,8 @@ struct RecordlyLiveFrame: View {
     }
 }
 
-/// The large 3, 2, 1 over the preview. The numeral springs in once per second; the clock exists only during the
-/// countdown. Reduce Motion: the digit cross-fades and holds still.
+/// The large 3, 2, 1 over the preview. The numeral springs in once per second on the display's own clock, which
+/// exists only during the countdown and stops when it ends. Reduce Motion: the digit cross-fades and holds still.
 struct RecordlyCountdownNumeral: View {
     let remaining: Int
     let beganAt: Date?
@@ -98,7 +105,7 @@ struct RecordlyCountdownNumeral: View {
         if reduceMotion || TopBarStyle.isSnapshot {
             numeral(scale: 1, opacity: 1)
         } else {
-            TimelineView(.animation) { context in
+            DisplaySynchronizedView(until: beganAt?.addingTimeInterval(Double(RecordlyCountdown.seconds))) { context in
                 let elapsed = beganAt.map { context.date.timeIntervalSince($0) } ?? 0
                 let fraction = RecordlyCountdownVisual.stepFraction(elapsed: elapsed)
                 numeral(scale: RecordlyCountdownVisual.numeralScale(stepFraction: fraction),
@@ -154,7 +161,8 @@ struct RecordlyMeterBars: View {
 }
 
 /// Mic and system level meters inside the live capsule. The system meter reads the capture engine's latest peak
-/// on a 30 fps clock that exists only while recording. The microphone is not recordable yet, so its row is idle.
+/// at the display's own rate (no 30 fps cap) on a clock that exists only while recording and stops off screen.
+/// The microphone is not recordable yet, so its row is idle.
 struct RecordlyLiveMeters: View {
     let recordly: RecordlyController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -176,7 +184,7 @@ struct RecordlyLiveMeters: View {
         } else if reduceMotion || TopBarStyle.isSnapshot {
             RecordlyMeterBars(value: TopBarStyle.isSnapshot ? 0.55 : 0)
         } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+            DisplaySynchronizedView { context in
                 RecordlyMeterBars(value: box.advance(to: context.date, peak: recordly.systemAudioPeak()))
             }
         }
@@ -201,7 +209,7 @@ struct RecordlyLiveCapsule: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 RecordlyPulseDotView()
                 Text(recordly.isStopping ? "Saving" : "Recording")
@@ -215,14 +223,15 @@ struct RecordlyLiveCapsule: View {
             }
             if !recordly.isStopping { RecordlyLiveMeters(recordly: recordly) }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .recordlyGlassFrame(radius: 18, glow: TopBarStyle.rec, glowOpacity: reduceTransparency ? 0 : 0.12)
     }
 
-    /// A TimelineView only ticks while it is on screen, once a second, and not at all when nothing shows it.
+    /// A run-loop tick twice a second (so the seconds turn over on time) that stops when the window is hidden and
+    /// does not exist when nothing shows it. Unlike a TimelineView it does not lay out the panel every frame.
     private var timer: some View {
-        TimelineView(.periodic(from: recordly.startedAt ?? Date(), by: 1)) { context in
+        TickingView(interval: 0.5) { context in
             let seconds = recordly.startedAt.map { max(0, context.date.timeIntervalSince($0)) } ?? recordly.elapsed
             Text(RecordlyElapsed.format(seconds))
                 .font(TopBarStyle.label(26, .bold).monospacedDigit())
