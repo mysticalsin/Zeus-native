@@ -116,7 +116,7 @@ public enum PermissionSweep {
     }
 
     /// A saved sweep older than this is dropped instead of resumed.
-    public static let resumeWindow: Double = 30 * 60
+    public static let resumeWindow: Double = 10 * 60
 
     public struct State: Equatable, Sendable {
         public var phase: Phase = .idle

@@ -4186,6 +4186,66 @@
         "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
         "function": "theShippedVoiceKeysDoNotWarn"
       }
+    },
+    {
+      "id": "REG-391",
+      "failure": "Turning on every permission meant pressing Allow on each row one by one; there was no single button that asked for everything in order.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+        "function": "aFullSweepOnAFreshMacVisitsEveryItemExactlyOnce"
+      }
+    },
+    {
+      "id": "REG-392",
+      "failure": "Allow all must ask in-place macOS prompts first and leave Screen Recording, which can make macOS reopen Zeus, for last.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+        "function": "inPlacePromptsComeFirstThenSystemSettingsWithScreenRecordingLast"
+      }
+    },
+    {
+      "id": "REG-393",
+      "failure": "A prompt macOS had already refused cannot show again, so asking it did nothing; Allow all must open its System Settings pane instead.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+        "function": "aRefusedPromptGoesToItsSettingsPaneInstead"
+      }
+    },
+    {
+      "id": "REG-394",
+      "failure": "Allow all must never ask twice in one sweep, including Speech after the shared voice prompt or a prompt refused during the sweep.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+        "function": "aPromptRefusedDuringTheSweepIsNotSentToSettingsOrAskedAgain"
+      }
+    },
+    {
+      "id": "REG-395",
+      "failure": "When macOS quit and reopened Zeus for Screen Recording, the sweep must resume without asking finished steps again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+        "function": "afterARelaunchTheSweepResumesWithoutAskingVisitedItemsAgain"
+      }
     }
   ]
 }

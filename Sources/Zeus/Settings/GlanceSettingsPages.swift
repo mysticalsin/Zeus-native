@@ -19,6 +19,8 @@ final class GSContext {
     @ObservationIgnored var setContinuityTabShown: (Bool) -> Void = { _ in }
     /// The notch's model: Appearance edits its tab row, weather place and music wings through it.
     @ObservationIgnored var topBar: TopBarModel?
+    /// "Allow all" on the Permissions page; nil in parity captures, which then show the rows only.
+    @ObservationIgnored var sweep: PermissionSweepRunner?
 
     init(services: OnboardingServices) {
         self.services = services
@@ -955,9 +957,11 @@ private struct PermissionsPage: View {
             .task {
                 while !Task.isCancelled {
                     context.refresh()
+                    context.sweep?.refreshProgress()
                     try? await Task.sleep(for: .seconds(1))
                 }
             }
+        if let sweep = context.sweep { allowAll(sweep) }
         GSCard("Access") {
             perm("accessibility", "Accessibility", "Shortcuts, volume, brightness and agents", context.services.granted(.accessibility)) { context.permissions.request(.accessibility) }
             GSDivider()
@@ -1015,6 +1019,32 @@ private struct PermissionsPage: View {
             }
         }
         GSTrustedChatsCard()
+    }
+
+    /// One button for everything: macOS still asks for each, but Zeus asks in turn, opens the right pane
+    /// and moves on by itself (PermissionSweep).
+    private func allowAll(_ sweep: PermissionSweepRunner) -> some View {
+        let text: String = if sweep.needsRestart {
+            "Screen Recording starts working after Zeus reopens."
+        } else if sweep.isRunning {
+            "Follow the guide at the top of the screen. Skip anything you do not want."
+        } else if sweep.allAllowed {
+            "Everything Zeus can use is allowed."
+        } else {
+            "Asks for everything at once, one after another. Click Allow in each macOS prompt or turn on the switch Zeus opens, and it moves on by itself."
+        }
+        return GSCard {
+            GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text) {
+                if sweep.needsRestart {
+                    Button("Restart Zeus now") { sweep.restartZeus() }.buttonStyle(GSButtonStyle(prominent: true))
+                } else if sweep.isRunning {
+                    Button("Stop") { sweep.cancel() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Stop allowing")
+                } else if !sweep.allAllowed {
+                    Button("Allow all") { sweep.start() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityHint("Asks macOS for each access in turn and opens System Settings where a switch is needed.")
+                }
+            }
+        }
     }
 
     /// "Allowed: Music, Spotify": the apps macOS lets Zeus script (access is per app, so it can be partial).
