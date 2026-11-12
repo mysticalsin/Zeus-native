@@ -31,6 +31,11 @@ final class PointingHotkeyMonitor {
 
     var onSignal: ((Signal) -> Void)?
     var shortcutProvider: () -> Shortcut = { PointingSettings.shortcut }
+    /// False when the pointing key is the talk key: the Zeus talk turn owns that hold (docs/VOICE-KEY.md),
+    /// so this monitor starts no turn and shows no VoiceOver notice for it. Esc and double Control still pass.
+    var startsTurnsProvider: () -> Bool = {
+        VoiceKey.pointingStartsTurns(talk: Preferences.shared.pushToTalk, pointing: PointingSettings.shortcut, pointingEnabled: true)
+    }
     var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
     /// The modifiers the system reports right now, for the stuck-key watchdog.
     var liveModifiers: () -> ShortcutModifiers? = {
@@ -43,6 +48,8 @@ final class PointingHotkeyMonitor {
     private var gesture = PointingKeyGesture()
     private var tap: PointingEventTap?
     private var announcedBlock = false
+    /// A `.began` was reported, so its end must be reported too, even if ownership changed mid-hold.
+    private var turnOpen = false
     private var watchdog: Timer?
     private(set) var isRunning = false
 
@@ -58,12 +65,14 @@ final class PointingHotkeyMonitor {
         tap?.stop(); tap = nil
         stopWatchdog()
         gesture.reset()
+        turnOpen = false
     }
 
     /// Sleep, wake or a display change: drops a hold in progress. Nothing is sent.
     func interruptGesture() {
         _ = gesture.interrupt()
         stopWatchdog()
+        turnOpen = false
     }
 
     /// While a hold is active, a few times a second, compare the tracked keys with the live ones.
@@ -78,7 +87,7 @@ final class PointingHotkeyMonitor {
     func watchdogTick() {
         guard let output = gesture.tick(at: now(), liveModifiers: liveModifiers()) else { return }
         stopWatchdog()
-        if output == .holdTimedOut { onSignal?(.timedOut) }
+        if output == .holdTimedOut, turnOpen { turnOpen = false; onSignal?(.timedOut) }
     }
 
     private func startTap() {
@@ -94,17 +103,21 @@ final class PointingHotkeyMonitor {
         if wanted != gesture.shortcut, !gesture.isActive { gesture.shortcut = wanted }
         let voiceOverOn = voiceOverProvider()
         let output = gesture.feed(event, at: time, voiceOverOn: voiceOverOn)
-        if gesture.blockedByVoiceOver, !announcedBlock {
+        let startsTurns = startsTurnsProvider()
+        if startsTurns, gesture.blockedByVoiceOver, !announcedBlock {
             announcedBlock = true
             onSignal?(.blocked("VoiceOver is using Control and Option. Choose another pointing key in Settings."))
         }
         // Announce once per VoiceOver session, not on every attempt: re-arm only when VoiceOver goes off.
         if !voiceOverOn { announcedBlock = false }
         switch output {
-        case .began?: startWatchdog(); onSignal?(.began)
-        case .ended?: stopWatchdog(); onSignal?(.ended)
-        case .cancelled?: stopWatchdog(); onSignal?(.cancelled)
-        case .holdTimedOut?: stopWatchdog(); onSignal?(.timedOut)
+        case .began?:
+            // One hold, one turn: the talk turn already answers this key.
+            guard startsTurns else { return }
+            turnOpen = true; startWatchdog(); onSignal?(.began)
+        case .ended?: guard turnOpen else { return }; turnOpen = false; stopWatchdog(); onSignal?(.ended)
+        case .cancelled?: guard turnOpen else { return }; turnOpen = false; stopWatchdog(); onSignal?(.cancelled)
+        case .holdTimedOut?: guard turnOpen else { return }; turnOpen = false; stopWatchdog(); onSignal?(.timedOut)
         case .escape?: onSignal?(.escape)
         case .doubleTapControl?: onSignal?(.doubleTapControl)
         case nil: break

@@ -201,6 +201,27 @@ final class VoiceTurnController {
         }
     }
 
+    /// The talk keys became another shortcut while held (⌃⌥Space opens Chat): stop listening and send nothing.
+    func cancelListening() {
+        guard listening else { return }
+        listening = false
+        handsFreeTask?.cancel()
+        handsFreeTask = nil
+        ahead.cancel()
+        speech.cancel()
+        screenshotsTask?.cancel()
+        screenshotsTask = nil
+        tabTask?.cancel()
+        tabTask = nil
+        turnEngine = nil
+        SystemAudioDucker.end()
+        liveWords.clear()
+        buddy.model.audioLevel = nil
+        buddy.model.captionVisible = false
+        buddy.idle()
+        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+    }
+
     /// "Hey Zeus, open Spotify": the request already heard by the wake-word listener runs as a
     /// voice turn at once. "Hey Zeus" alone opens a hands-free turn that ends when you stop talking.
     func wakeTurn(request: String) {

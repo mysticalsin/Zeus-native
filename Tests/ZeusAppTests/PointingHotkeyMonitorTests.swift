@@ -9,10 +9,12 @@ import ZeusCore
 struct PointingHotkeyMonitorTests {
     private final class Log { var signals: [PointingHotkeyMonitor.Signal] = [] }
 
-    private func monitor(voiceOver: Bool = false, shortcut: Shortcut = .controlOption) -> (PointingHotkeyMonitor, Log) {
+    private func monitor(voiceOver: Bool = false, shortcut: Shortcut = .controlOption,
+                         startsTurns: Bool = true) -> (PointingHotkeyMonitor, Log) {
         let monitor = PointingHotkeyMonitor()
         let log = Log()
         monitor.shortcutProvider = { shortcut }
+        monitor.startsTurnsProvider = { startsTurns }
         monitor.voiceOverProvider = { voiceOver }
         monitor.onSignal = { log.signals.append($0) }
         return (monitor, log)
@@ -48,6 +50,21 @@ struct PointingHotkeyMonitorTests {
         #expect(log.signals.count == 1)
         guard case .blocked(let message)? = log.signals.first else { Issue.record("expected a block"); return }
         #expect(message.contains("VoiceOver") && !message.contains("—"))
+    }
+
+    /// Control+Option is the talk key too: the talk turn owns the hold, so pointing starts nothing,
+    /// shows no VoiceOver notice, and Esc still passes through.
+    @Test func theTalkKeyHoldStartsNoPointingTurn() {
+        let (monitor, log) = monitor(startsTurns: false)
+        press(monitor)
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control]), at: 1)
+        monitor.feed(.flags(keyCode: 59, modifiers: []), at: 1.1)
+        #expect(log.signals.isEmpty)
+        monitor.feed(.keyDown(keyCode: 53, modifiers: []), at: 2)
+        #expect(log.signals == [.escape])
+        let (blocked, blockedLog) = self.monitor(voiceOver: true, startsTurns: false)
+        press(blocked)
+        #expect(blockedLog.signals.isEmpty)
     }
 
     @Test func aConfiguredShortcutIsHonoured() {
