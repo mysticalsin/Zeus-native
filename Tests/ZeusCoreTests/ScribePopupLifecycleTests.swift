@@ -56,13 +56,10 @@ struct ScribePopupLifecycleTests {
         #expect(card.phase == .starting)
     }
 
-    /// 30s is the longest a hover may pause dismissal. The lifetime passed to `present` stays 45s.
-    private let hoverCap: TimeInterval = 30
-
     @Test func aHoverCannotHoldTheCardPastTheCapAndNeverStartsRecording() {
         var card = shownCard()
         card.handle(.pointer(inside: true, now: 40))
-        let cap = 40 + hoverCap
+        let cap = 40 + card.timing.hoverCap
         #expect(card.handle(.tick(now: cap)).isEmpty)
         let gone = card.handle(.tick(now: cap + 5))
         #expect(gone == [.hide, .timedOut])
@@ -74,23 +71,24 @@ struct ScribePopupLifecycleTests {
         card.handle(.click(now: 1, scribe: .idle, microphoneBlocked: true))
         #expect(card.phase == .failed(.microphoneOff))
         card.handle(.pointer(inside: true, now: 2))
-        let cap = 2 + hoverCap
+        let cap = 2 + card.timing.hoverCap
         #expect(card.handle(.tick(now: cap)).isEmpty)
         let gone = card.handle(.tick(now: cap + 59))
         #expect(gone == [.hide])
         #expect(card.phase == .expired)
     }
 
-    @Test func theCardNeverExpiresUnderThePointer() {
+    @Test func theCardStaysUpUnderThePointerUntilThePointerLeaves() {
         var card = shownCard()
         card.handle(.pointer(inside: true, now: 40))
-        let held = card.handle(.tick(now: 100))
+        // Past the 45s lifetime, still inside the hover cap.
+        let held = card.handle(.tick(now: 60))
         #expect(held.isEmpty)
         #expect(card.phase == .shown)
-        card.handle(.pointer(inside: false, now: 100))
-        let grace = card.handle(.tick(now: 102))
+        card.handle(.pointer(inside: false, now: 60))
+        let grace = card.handle(.tick(now: 63))
         #expect(grace.isEmpty)
-        let gone = card.handle(.tick(now: 104))
+        let gone = card.handle(.tick(now: 64))
         #expect(gone == [.hide, .timedOut])
         #expect(card.phase == .expired)
     }

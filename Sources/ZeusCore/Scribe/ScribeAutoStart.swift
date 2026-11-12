@@ -236,12 +236,15 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// then only once it has been gone for `rearmAfterAbsence`.
     public var cooldown: TimeInterval
     public var rearmAfterAbsence: TimeInterval
-    /// "Ask me" never leaves while the pointer is over it, and stays at least this long after the pointer leaves.
+    /// "Ask me" pauses its timer while the pointer is over it, and stays at least this long after the pointer leaves.
     public var hoverGrace: TimeInterval
+    /// Longest that pause may last. After this, the ask timer resumes. A hover never starts a recording.
+    public var hoverCap: TimeInterval
 
     public init(debounce: TimeInterval = 3, askTimeout: TimeInterval = 20, countdown: TimeInterval = 5,
                 callEndedAfter: TimeInterval = 8, endingGrace: TimeInterval = 3, startGrace: TimeInterval = 10,
-                cooldown: TimeInterval = 60, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4) {
+                cooldown: TimeInterval = 60, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4,
+                hoverCap: TimeInterval = 30) {
         self.debounce = debounce
         self.askTimeout = askTimeout
         self.countdown = countdown
@@ -251,6 +254,7 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
         self.cooldown = cooldown
         self.rearmAfterAbsence = rearmAfterAbsence
         self.hoverGrace = hoverGrace
+        self.hoverCap = hoverCap
     }
 
     public static let standard = ScribeAutoStartTiming()
@@ -320,7 +324,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case accept(now: TimeInterval)
         /// Not now, or Cancel.
         case decline(now: TimeInterval)
-        /// The pointer entered or left the banner. "Ask me" does not time out under the pointer.
+        /// The pointer entered or left the banner. "Ask me" pauses its timer under the pointer
+        /// until the pointer leaves or the hover cap, then the timer resumes. A hover never starts a recording.
         case pointer(inside: Bool, now: TimeInterval)
         /// The person tapped Start on the card showing `meeting`, but the card's question is no longer pending
         /// (it timed out or was replaced at the same moment). An explicit tap still starts, unless Scribe is
@@ -350,6 +355,10 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private var switching = false
     /// The pointer is over the banner.
     public private(set) var pointerInside = false
+    /// When this hover began pausing the ask timer.
+    private var hoverSince: TimeInterval?
+    /// Time still left on the ask deadline when the hover began.
+    private var pausedRemaining: TimeInterval?
 
     public init(timing: ScribeAutoStartTiming = .standard) {
         self.timing = timing
@@ -414,8 +423,20 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 return []
             }
         case .pointer(let inside, let now):
+            let wasInside = pointerInside
             pointerInside = inside
-            if !inside, case .prompting(let meeting, let deadline) = state {
+            if inside {
+                if !wasInside {
+                    hoverSince = now
+                    if case .prompting(_, let deadline) = state {
+                        pausedRemaining = max(0, deadline - now)
+                    }
+                }
+                return []
+            }
+            hoverSince = nil
+            pausedRemaining = nil
+            if case .prompting(let meeting, let deadline) = state {
                 state = .prompting(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
             }
             return []
@@ -554,6 +575,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private mutating func ask(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence?, now: TimeInterval) -> [Effect] {
         // A fresh card: an old "pointer inside" from a card that was taken down must not hold this one.
         pointerInside = false
+        hoverSince = nil
+        pausedRemaining = nil
         state = .prompting(meeting: meeting, deadline: now + timing.askTimeout)
         if let evidence, evidence.mode == .automatic, evidence.micPermissionGranted, !evidence.autoConsentGiven {
             return [.showConsentAsk(meeting)]
@@ -561,9 +584,26 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         return [.showAsk(meeting)]
     }
 
+    private func hoverHolds(_ now: TimeInterval) -> Bool {
+        guard pointerInside, let hoverSince else { return false }
+        return now - hoverSince < timing.hoverCap
+    }
+
+    /// The hover has lasted long enough. The paused ask countdown runs again from now.
+    private mutating func resumeAskTimerIfHoverCapped(now: TimeInterval) {
+        guard pointerInside, let hoverSince, now - hoverSince >= timing.hoverCap else { return }
+        if let remaining = pausedRemaining, case .prompting(let meeting, let deadline) = state {
+            state = .prompting(meeting: meeting, deadline: max(deadline, now + remaining))
+        }
+        self.hoverSince = nil
+        pausedRemaining = nil
+    }
+
     private mutating func expire(now: TimeInterval) -> [Effect] {
+        resumeAskTimerIfHoverCapped(now: now)
+        let hovering = hoverHolds(now)
         switch state {
-        case .prompting(let meeting, let deadline) where now >= deadline && !pointerInside:
+        case .prompting(let meeting, let deadline) where now >= deadline && !hovering:
             state = cooling(meeting.key, now: now)
             return [.hideBanner]
         case .countingDown(let meeting, let deadline) where now >= deadline:
