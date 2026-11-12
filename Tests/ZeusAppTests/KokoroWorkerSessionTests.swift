@@ -643,6 +643,28 @@ struct KokoroWorkerSessionTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launch-request-received").path))
     }
 
+    /// Configuration under load costs about 0.4s. A 0.1s deadline is spent before
+    /// `launchProcess`, so `probe.entered` never becomes true.
+    @Test func slowConfigurationStillEntersTheLaunchProbe() async throws {
+        try await withFixture { fixture in
+            let probe = LaunchProbe()
+            defer { probe.release() }
+            let queue = DispatchQueue(label: "zeus.test.launch-slow-config")
+            let launch = launchReader(fixture)
+            let session = fixture.session(timeout: 0.1, configuration: {
+                Thread.sleep(forTimeInterval: 0.4)
+                return launch
+            }, launchQueue: queue, launchProcess: { try probe.run($0, held: true) })
+            let request = fixture.render(session, "slow-config")
+            try await wait { probe.entered }
+            #expect(await request.value == nil)
+            #expect(!probe.leftGate)
+            probe.release()
+            await session.close()
+            try requireLateChildReaped(probe, fixture: fixture)
+        }
+    }
+
     @Test func deadlineDuringLaunchReturnsBeforeRunnerAndReapsLateChild() async throws {
         try await withFixture { fixture in
             let probe = LaunchProbe()
