@@ -47,7 +47,7 @@ final class AgentEventServer {
             guard let commandHandler else {
                 let probe = try? JSONDecoder().decode(ZeusCommand.self, from: line)
                 let id = probe?.id ?? "unknown"
-                return try? JSONEncoder().encode(ZeusCommandReply(id: id, ok: false, text: "ZEUS is still starting up."))
+                return try? JSONEncoder().encode(ZeusCommandReply(id: id, ok: false, text: "Zeus is still starting up."))
             }
             return await commandHandler(line)
         }
@@ -57,9 +57,11 @@ final class AgentEventServer {
 
     /// One agent event from a hook or a log watcher. Returns the reply for decision events.
     func process(_ event: HookEvent) async -> Data? {
+        // The client's risk label is never trusted below what the app computes from the input.
+        let risk = HookClientInput.effectiveRisk(claimed: event.risk, tool: event.tool, input: event.input)
         let sessionID = event.session ?? "unknown"
         let agent = Self.agentName(event.source)
-        let project = event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "—"
+        let project = event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "No project"
         FlightRecorder.shared.record("agent", event.event, "\(agent) \(project) session \(sessionID.prefix(8))\(event.tool.map { " tool \($0)" } ?? "")")
         AgentTerminals.shared.remember(event.terminal, for: sessionID)
         // Any event is a sign of life; it also lifts a stalled session.
@@ -95,7 +97,7 @@ final class AgentEventServer {
                 return try? JSONEncoder().encode(decision)
             }
             // A chat the person trusted ("Allow this whole chat") runs without a card, unless it is risky.
-            if TrustedChatStore.shared.autoApproves(session: sessionID, tool: event.tool, input: event.input, risk: event.risk) {
+            if TrustedChatStore.shared.autoApproves(session: sessionID, tool: event.tool, input: event.input, risk: risk) {
                 notch.upsertSession(id: sessionID, agent: agent, project: project,
                                     task: Self.describe(tool: event.tool ?? "Tool", input: event.input), status: .working)
                 return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .allow))
@@ -105,7 +107,7 @@ final class AgentEventServer {
             collapseTask?.cancel()
             let detail = ApprovalDetail.make(tool: event.tool, input: event.input, session: sessionID)
             var trust: (session: String, onTrust: @MainActor () -> Void)?
-            if sessionID != "unknown", TrustedChats.canOffer(tool: event.tool, input: event.input, risk: event.risk) {
+            if sessionID != "unknown", TrustedChats.canOffer(tool: event.tool, input: event.input, risk: risk) {
                 let onTrust: @MainActor () -> Void = { TrustedChatStore.shared.trust(session: sessionID, agent: agent, project: project) }
                 trust = (sessionID, onTrust)
             }
@@ -114,7 +116,7 @@ final class AgentEventServer {
                 project: project,
                 tool: Self.cardTitle(tool: event.tool),
                 command: Self.command(tool: event.tool, input: event.input),
-                risk: event.risk ?? .medium,
+                risk: risk,
                 timeout: .seconds(100),
                 onTimeout: .ask,
                 detail: detail,
@@ -128,7 +130,7 @@ final class AgentEventServer {
                 decision = QuestionAnswers.shared.decision(id: event.id, session: sessionID, input: detail.input, answers: detail.choices)
             } else {
                 decision = HookDecision(id: event.id, decision: verdict,
-                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in ZEUS") : nil,
+                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
                                         updatedInput: verdict == .allow ? detail?.updatedInput : nil)
             }
             return try? JSONEncoder().encode(decision)

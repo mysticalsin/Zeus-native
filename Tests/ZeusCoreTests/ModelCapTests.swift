@@ -22,9 +22,10 @@ struct ModelCapTests {
     }
 
     @Test func everyEngineThatTakesAModelGetsOneOnEveryLaunch() {
+        let defaults = store()
         for engine in [RouterEngine.claude, .codex, .gemini, .cursorAgent] {
             for tier in [ModelTier.fast, .deep] {
-                let arguments = engine.headlessArguments(prompt: "hi", tier: tier)
+                let arguments = engine.headlessArguments(prompt: "hi", tier: tier, defaults: defaults)
                 #expect(arguments.contains("--model") || arguments.contains("-m") || arguments.contains("-c"),
                         "\(engine) \(tier) launched without a pinned model")
             }
@@ -48,7 +49,8 @@ struct ModelCapTests {
     @Test func httpModelNamesStayInsideTheCap() {
         let defaults = store()
         _ = defaults
-        #expect(ModelCap.httpModel(.anthropic, tier: .fast) == "claude-haiku-4-5")
+        #expect(ModelCap.httpModel(.anthropic, tier: .fast) == "claude-haiku-5-5")
+        #expect(ModelCap.httpModel(.anthropic, tier: .deep) == "claude-sonnet-4-5")
         #expect(ModelCap.httpModel(.ollama, tier: .fast) == "llama3.2")
         #expect(ModelCap.httpModel(.openAI, tier: .fast) == "gpt-4o-mini")
         #expect(ModelCap.gatedHTTPModel("claude-opus-4-5") == nil)

@@ -1,4 +1,5 @@
 import Foundation
+import os
 import ZeusCore
 
 /// `Zeus --keychain-selftest`: loads the one `com.zeus.app` Keychain service exactly as the app
@@ -68,21 +69,24 @@ enum KeychainSelfTest {
             "intent": .choice("What does the person want?", ["app.open": "Open an app", "chat.answer": "Answer a question"]),
         ])
         let done = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var line = ""
-        nonisolated(unsafe) var ok = false
+        // Only a locked, Sendable value crosses back to the synchronous CLI thread.
+        let result = OSAllocatedUnfairLock(initialState: (line: "", ok: false))
         Task.detached {
+            let completed: (line: String, ok: Bool)
             do {
                 let d = try await guardian.decide(request)
                 let intent = d.answers["intent"]?.choice ?? "?"
-                line = "{\"source\":\"\(d.source.rawValue)\",\"intent\":\"\(intent)\",\"confidence\":\(d.confidence),\"inputTokens\":\(d.inputTokens),\"cost\":\(d.cost),\"latencyMs\":\(d.latencyMs)}"
-                ok = true
+                let line = "{\"source\":\"\(d.source.rawValue)\",\"intent\":\"\(intent)\",\"confidence\":\(d.confidence),\"inputTokens\":\(d.inputTokens),\"cost\":\(d.cost),\"latencyMs\":\(d.latencyMs)}"
+                completed = (line, true)
             } catch {
-                line = "{\"error\":\"\(String(describing: error).prefix(160))\"}"
+                completed = ("{\"error\":\"\(String(describing: error).prefix(160))\"}", false)
             }
+            result.withLock { $0 = completed }
             done.signal()
         }
         done.wait()
-        print(line)
-        exit(ok ? 0 : 1)
+        let completed = result.withLock { $0 }
+        print(completed.line)
+        exit(completed.ok ? 0 : 1)
     }
 }

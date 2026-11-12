@@ -36,6 +36,10 @@
 	<string>ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>ZEUS shows your next events in the notch and lets you join calls in one click.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ZEUS uses your approximate location only to show local weather in the notch.</string>
+	<key>NSFocusStatusUsageDescription</key>
+	<string>ZEUS checks whether a Focus is on so it can hold its morning brief and nudges until you are free.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>ZEUS shows today's reminders in the notch.</string>
 	<key>CFBundleURLTypes</key>

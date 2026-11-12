@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "scope": "Synthetic production extension service-worker tests in mandatory npm test CI job; not native Swift or real-browser acceptance.",
+  "feature": "F13",
+  "command": [
+    "npm",
+    "test"
+  ],
+  "file": "extension/tests/native-session.test.mjs",
+  "required_tests": [
+    "a late reply cannot cross into a replacement native connection",
+    "retired port events cannot dispatch work or disconnect its replacement",
+    "a rejected handshake cannot be presented as connected",
+    "a retired handshake cannot replace current connection metadata",
+    "a port retired before its disconnect notification cannot reject the worker task",
+    "a failed initial handshake send retires once and can reconnect"
+  ]
+}

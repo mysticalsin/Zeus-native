@@ -33,37 +33,39 @@ struct GlanceTopBarTests {
     }
 
     @Test func tabCapsuleMatchesTheLivePair() {
-        // Glance (parity/N4): 411 wide with Home selected, Clipboard "39" (+15.5) and Shelf "7" (+9).
-        #expect(abs(Double(GlanceTopBar.capsuleWidth(tabs: 7, countsExtra: 24.5)) - 411) <= 1)
+        // Measured live (parity/N4): 411 wide with Home selected, Clipboard "39" (+15.5) and Shelf "7" (+9),
+        // at 14 pt between tabs. Zeus uses 12 pt so thirteen tabs fit: 2 pt less for each of the 6 gaps.
+        #expect(abs(Double(GlanceTopBar.capsuleWidth(tabs: 7, countsExtra: 24.5)) - (411 - 6 * 2)) <= 1)
         #expect(GlanceTopBar.capsuleWidth(tabs: 0) == 0)
         // Top 38, 34 tall (centre 55), and the cards still start at 82.
         #expect(Double(GlanceTopBar.tabRowTop) == 38 && Double(GlanceTopBar.tabRowTop + GlanceTopBar.tabRowHeight / 2) == 55)
         #expect(Double(GlanceTopBar.cardTop) == 82)
     }
 
-    @Test func rowKeepsTwelveAndTheSelectedTab() {
-        let tabs = Array(1...13)
-        #expect(GlanceTopBar.maxTabs == 12)
-        #expect(GlanceTabRow.visible(tabs, selected: 3) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-        #expect(GlanceTabRow.visible(tabs, selected: 13) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13])
+    @Test func rowKeepsThirteenAndTheSelectedTab() {
+        let tabs = Array(1...14)
+        #expect(GlanceTopBar.maxTabs == 13)
+        #expect(GlanceTabRow.visible(tabs, selected: 3) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+        #expect(GlanceTabRow.visible(tabs, selected: 14) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14])
         #expect(GlanceTabRow.visible(tabs, selected: 11, max: 7) == [1, 2, 3, 4, 5, 6, 11])
         #expect(GlanceTabRow.visible([1, 2, 3], selected: 2) == [1, 2, 3])
     }
 
-    /// Twelve tabs fit beside the more circle even with the widest selected label and three big counts.
-    @Test func twelveTabsFitTheRow() {
+    /// Thirteen tabs fit beside the more circle even with the widest selected label and three big counts.
+    @Test func thirteenTabsFitTheRow() {
         #expect(Double(GlanceTopBar.rowRoom) == 803)
         let widest = TopBarLayout.defaultRow.map { GlanceTopBar.selectedPillWidth(title: $0.title, countWidth: 26) }.max() ?? 0
         let counts: CGFloat = 3 * 26 // "99+" beside Alerts, Clipboard and Shelf
-        let worst = GlanceTopBar.capsuleWidth(tabs: 12, countsExtra: counts + widest - GlanceTopBar.selectedPill.width)
+        let worst = GlanceTopBar.capsuleWidth(tabs: 13, countsExtra: counts + widest - GlanceTopBar.selectedPill.width)
         #expect(worst < GlanceTopBar.rowRoom)
-        // 12 plain slots: 2 x 5.5 + 82 + 11 x 49.
-        #expect(Double(GlanceTopBar.capsuleWidth(tabs: 12)) == 632)
+        // 13 plain slots: 2 x 5.5 + 82 + 12 x 47 (13 pt icon, 11 pt padding either side, 12 pt apart).
+        #expect(Double(GlanceTopBar.capsuleWidth(tabs: 13)) == 657)
         #expect(GlanceTopBar.selectedPillWidth(title: "Home") == GlanceTopBar.selectedPill.width)
     }
 
     @Test func glanceSevenComeFirst() {
-        #expect(Array(TopBarLayout.standard.tabs.prefix(7)) == TopBarLayout.glanceSeven)
+        // The default row starts with Home and Agents, then the other six of the seven in their order.
+        #expect(Array(TopBarLayout.standard.tabs.prefix(8)) == [TopBarTab.home, .agents] + Array(TopBarLayout.glanceSeven.dropFirst()))
         let saved = TopBarLayout(tabs: [.home, .today, .agents, .music, .clipboard, .usage, .chat])
         #expect(saved.glanceOrdered().tabs == [.home, .chat, .clipboard, .today, .agents, .music, .usage])
         // Nothing turned on that was off.

@@ -30,8 +30,9 @@ public enum RouterEngine: String, CaseIterable, Codable, Identifiable, Sendable 
     /// Arguments for a one-shot, non-interactive answer that prints plain text. Claude has its
     /// own streaming provider and is not run through these.
     /// Every launch is pinned to ModelCap's tier: Haiku/Sonnet size at most, never a CLI's default.
-    public func headlessArguments(prompt: String, localModel: String = "llama3.2", tier: ModelTier = .fast) -> [String] {
-        let cap = ModelCap.arguments(for: self, tier: tier)
+    public func headlessArguments(prompt: String, localModel: String = "llama3.2", tier: ModelTier = .fast,
+                                  defaults: UserDefaults = .standard) -> [String] {
+        let cap = ModelCap.arguments(for: self, tier: tier, defaults: defaults)
         return switch self {
         case .claude: cap + ["-p", prompt]
         case .codex: ["exec", "--skip-git-repo-check"] + cap + [prompt]

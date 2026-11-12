@@ -10,7 +10,7 @@ enum ChromeInstaller {
 
         var errorDescription: String? {
             switch self {
-            case .extensionMissing(let path): "The ZEUS extension wasn't found at \(path). Rebuild with scripts/bundle.sh."
+            case .extensionMissing(let path): "The Zeus extension wasn't found at \(path). Rebuild with scripts/bundle.sh."
             }
         }
     }
@@ -30,7 +30,7 @@ enum ChromeInstaller {
 
         let manifest: [String: Any] = [
             "name": ZeusPaths.nativeHostName,
-            "description": "ZEUS browser bridge",
+            "description": "Zeus browser bridge",
             "path": installedBridge.path,
             "type": "stdio",
             "allowed_origins": ["chrome-extension://\(ZeusPaths.extensionID)/"],
@@ -83,7 +83,7 @@ enum HelperInstaller {
         case missing(String)
         var errorDescription: String? {
             switch self {
-            case .missing(let path): "\((path as NSString).lastPathComponent) was not found at \(path). Run ZEUS from its app bundle."
+            case .missing(let path): "\((path as NSString).lastPathComponent) was not found at \(path). Run Zeus from its app bundle."
             }
         }
     }

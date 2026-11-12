@@ -154,9 +154,9 @@ struct StartupPolicyTests {
 
     @Test func denylistInvariant() {
         let mustDeny: [StartupService] = [
-            .wakeWord, .assistantKeyImport, .routines, .insomniaLaunch, .insomniaShutdown, .layaShutdown, .cliInstall,
+            .wakeWord, .assistantKeyImport, .routines, .insomniaLaunch, .insomniaShutdown, .cliInstall,
             .agentServer, .updates, .connectionsRefresh, .settingsWindow, .chatBrain, .chatWindow, .deepLinks,
-            .onboardingWindow, .demoPlayback, .voiceTurn, .talkHotkey, .dictation, .teleprompter,
+            .onboardingWindow, .demoPlayback, .voiceTurn, .talkHotkey, .pointingHotkey, .dictation, .teleprompter,
             .notchUI, .panelUI, .intelligence, .windowSharing, .systemNotifications,
         ]
         for service in mustDeny { #expect(!StartupPolicy.qaAllowed.contains(service), "\(service)") }

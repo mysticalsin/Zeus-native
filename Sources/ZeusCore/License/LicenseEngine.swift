@@ -38,8 +38,10 @@ public struct LicenseEvaluator: Sendable {
         public var revocations: String?
         public var trialStart: Date
         public var now: Date
-        public init(key: String? = nil, activation: String? = nil, revocations: String? = nil, trialStart: Date, now: Date = Date()) {
+        public var activationRejected: Bool
+        public init(key: String? = nil, activation: String? = nil, revocations: String? = nil, trialStart: Date, now: Date = Date(), activationRejected: Bool = false) {
             self.key = key; self.activation = activation; self.revocations = revocations; self.trialStart = trialStart; self.now = now
+            self.activationRejected = activationRejected
         }
     }
 
@@ -48,6 +50,8 @@ public struct LicenseEvaluator: Sendable {
             let left = Trial.daysLeft(start: inputs.trialStart, now: inputs.now)
             return left > 0 ? .trial(daysLeft: left) : .trialEnded
         }()
+        // A refused activation cannot be restored by a cached key that Keychain refused to delete.
+        guard !inputs.activationRejected else { return trial }
         guard let key = inputs.key, let payload = License.read(key, publicKeys: publicKeys) else { return trial }
         if isRevoked(payload.id, list: inputs.revocations) { return .revoked(payload) }
         switch License.verify(key, publicKeys: publicKeys, deviceID: deviceID, now: inputs.now) {

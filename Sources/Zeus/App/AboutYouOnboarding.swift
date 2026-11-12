@@ -53,7 +53,7 @@ final class AboutYouModel {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Use This Vault"
-        panel.message = "Choose your notes folder. ZEUS reads it and never changes your notes."
+        panel.message = "Choose your notes folder. Zeus reads it and never changes your notes."
         panel.directoryURL = vault ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -128,7 +128,7 @@ final class AboutYouWindow {
         }
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 560, height: 470),
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
-        window.title = "Teach ZEUS About You"
+        window.title = "Teach Zeus About You"
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
@@ -191,8 +191,8 @@ struct AboutYouView: View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: "bolt.fill").font(.system(size: 30, weight: .bold)).foregroundStyle(Theme.bolt)
                 .accessibilityHidden(true)
-            title("Teach ZEUS about you")
-            body("A minute of setup so ZEUS answers like it knows you: who you are, what you work on, and where your notes live.")
+            title("Teach Zeus about you")
+            body("A minute of setup so Zeus answers like it knows you: who you are, what you work on, and where your notes live.")
             privacyLine
         }
     }
@@ -200,7 +200,7 @@ struct AboutYouView: View {
     private var vaultStep: some View {
         VStack(alignment: .leading, spacing: 12) {
             title("Your second brain")
-            body("ZEUS reads your notes folder to learn context. It never edits your notes.")
+            body("Zeus reads your notes folder to learn context. It never edits your notes.")
             Tile(padding: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     if let vault = model.vault {
@@ -217,6 +217,7 @@ struct AboutYouView: View {
                         Text("No vault found at ~/Documents/brain.").font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary)
                     }
                     Button(model.vault == nil ? "Choose Vault Folder…" : "Choose Another Folder…") { model.chooseVault() }
+                        .buttonStyle(ZeusButtonStyle(prominent: false))
                 }
             }
             .frame(height: 112)
@@ -227,9 +228,9 @@ struct AboutYouView: View {
     private var questions: some View {
         VStack(alignment: .leading, spacing: 12) {
             title("A few quick questions")
-            field("What should ZEUS call you?", text: Binding(get: { model.profile.name }, set: { model.profile.name = $0 }), prompt: "Your name")
+            field("What should Zeus call you?", text: Binding(get: { model.profile.name }, set: { model.profile.name = $0 }), prompt: "Your name")
             field("What do you work on?", text: Binding(get: { model.profile.work }, set: { model.profile.work = $0 }), prompt: "e.g. founder, building a Mac app")
-            field("What should ZEUS help you with most?", text: Binding(get: { model.profile.helpWith }, set: { model.profile.helpWith = $0 }),
+            field("What should Zeus help you with most?", text: Binding(get: { model.profile.helpWith }, set: { model.profile.helpWith = $0 }),
                   prompt: "e.g. mornings, email, coding agents")
             field("Anything else? (optional)", text: Binding(get: { model.profile.notes }, set: { model.profile.notes = $0 }), prompt: "Preferences, languages, people")
         }
@@ -239,7 +240,7 @@ struct AboutYouView: View {
         VStack(alignment: .leading, spacing: 10) {
             title("Save your profile note?")
             if let target = model.plannedNote {
-                body("ZEUS will add this one note to your vault, at \(target.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")). Nothing else is written.")
+                body("Zeus will add this one note to your vault, at \(target.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")). Nothing else is written.")
             } else {
                 body("Choose a vault first to save a profile note.")
             }
@@ -264,6 +265,7 @@ struct AboutYouView: View {
             body("Your profile note is in your vault's inbox. You can come back here any time from Settings.")
             if let written = model.written {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([written]) }
+                    .buttonStyle(ZeusButtonStyle(prominent: false))
             }
         }
     }
@@ -275,25 +277,29 @@ struct AboutYouView: View {
             if model.step != .intro, model.step != .done {
                 Button("Back") { model.back() }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: false))
             }
             Spacer()
             switch model.step {
             case .intro:
-                Button("Not Now", action: close)
-                Button("Get Started") { model.next() }.keyboardShortcut(.defaultAction)
+                Button("Not Now", action: close).buttonStyle(ZeusButtonStyle(prominent: false))
+                Button("Get Started") { model.next() }.keyboardShortcut(.defaultAction).buttonStyle(ZeusButtonStyle(prominent: true))
             case .vault:
                 Button(model.vault == nil ? "Skip" : "Continue") { model.next() }.keyboardShortcut(.defaultAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: model.vault != nil))
             case .questions:
                 Button("Continue") { model.next() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: true))
                     .disabled(!model.profile.isComplete)
             case .review:
-                Button("Don't Save") { close() }
+                Button("Don't Save") { close() }.buttonStyle(ZeusButtonStyle(prominent: false))
                 Button("Save Note") { model.save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(ZeusButtonStyle(prominent: true))
                     .disabled(model.vault == nil)
             case .done:
-                Button("Done", action: close).keyboardShortcut(.defaultAction)
+                Button("Done", action: close).keyboardShortcut(.defaultAction).buttonStyle(ZeusButtonStyle(prominent: true))
             }
         }
         .controlSize(.large)
@@ -328,7 +334,7 @@ struct AboutYouView: View {
 struct AboutYouSettingsRow: View {
     var body: some View {
         Section("You") {
-            Button("Teach ZEUS About You…") { AboutYouWindow.shared.show() }
+            Button("Teach Zeus About You…") { AboutYouWindow.shared.show() }
             Text("Your name, your work and where your notes live. Nothing leaves this Mac.")
                 .font(.callout).foregroundStyle(.secondary)
         }

@@ -54,28 +54,28 @@ struct ScribeDetectedCall: Equatable, Sendable {
 struct ScribeCallScan: Equatable, Sendable {
     /// Calls in progress: a known call app (or a browser on a Meet tab) capturing the microphone.
     var calls: [ScribeDetectedCall]
-    /// What the mute detector needs: incomplete when any process couldn't be read, browser state unknown unless
-    /// window titles were read. Never "no call" by default.
-    var inputScan: ScribeInputScan
     /// Known call apps that are running (or a browser showing a Meet tab) whether or not they use the
     /// microphone right now. A call app that stopped capturing while muted still shows up here.
     var runningCallApps: [ScribeDetectedCall] = []
-    /// A known call app is running or browser call evidence exists, even when `inputScan` is `.incomplete`
-    /// (an unreadable process). Never used to admit the microphone.
+    /// A known call app is capturing or browser call evidence exists, even when a process couldn't be read.
+    /// Never used to withhold the microphone; it only drives the "shared" note.
     var callPresent: Bool = false
-    /// Includes unsupported owners: releasing input later must not silently restore Zeus's microphone.
+    /// Any other process capturing the microphone right now, identified or not. Never withholds Zeus's microphone.
     var externalInputDetected: Bool = false
+    /// Whether each running call app's call window is on screen. Unknown unless window titles are readable.
+    var callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]
 }
 
 /// Finds calls in progress: a known call app (or a browser on a Meet tab) that is capturing the microphone.
 /// A running call app alone does not prove a call (Teams is always open), so `calls` follows microphone
-/// capture; `inputScan` and `runningCallApps` are reported for the mute detector, which fails closed on them.
+/// capture. Another app using the microphone never withholds Zeus's own microphone; the mute detector only
+/// reports it.
 enum ScribeCallProbe {
     static func scan() -> ScribeCallScan {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let running = runningApps()
+        let titles = windowTitlesByPID()
+        let running = runningApps(titles: titles)
         let reads = inputReads()
-        let inputScan = reads.map { ScribeScanReducer.reduce(reads: $0, running: running, ownPID: ownPID) } ?? .incomplete
         var calls: [ScribeDetectedCall] = []
         for case .input(let pid, let bundleID) in reads ?? [] where pid != ownPID {
             guard let appBundleID = ScribeCallDetection.appBundleID(for: bundleID) else { continue }
@@ -89,15 +89,36 @@ enum ScribeCallProbe {
         calls.sort { rank($0.app) != rank($1.app) ? rank($0.app) < rank($1.app) : ScribeCallDetection.displayName($0.app) < ScribeCallDetection.displayName($1.app) }
         let callPresent = ScribeScanReducer.callPresence(reads: reads ?? [], running: running, ownPID: ownPID)
         let externalInput = (reads ?? []).contains { $0.isExternalInput(excluding: ownPID) }
-        return ScribeCallScan(calls: calls, inputScan: inputScan, runningCallApps: runningCallApps(from: running),
-                              callPresent: callPresent, externalInputDetected: externalInput)
+        return ScribeCallScan(calls: calls, runningCallApps: runningCallApps(from: running),
+                              callPresent: callPresent, externalInputDetected: externalInput,
+                              callWindows: callWindows(running: running, titles: titles))
+    }
+
+    /// Call window state per call app. A native app is judged by its own window titles; Meet by whether any
+    /// browser shows a Meet tab. Hidden or missing titles are "unknown", which never ends a recording.
+    private static func callWindows(
+        running: [ScribeRunningApp],
+        titles: [pid_t: (titles: [String], numbers: [Int], complete: Bool)]?
+    ) -> [ScribeCallApp: ScribeCallWindowState] {
+        var states: [ScribeCallApp: ScribeCallWindowState] = [:]
+        for app in running where !ScribeCallDetection.isBrowser(app.bundleID) {
+            guard let kind = ScribeCallDetection.identify(bundleID: app.bundleID) else { continue }
+            guard let read = titles?[app.pid] else { states[kind] = .unknown; continue }
+            states[kind] = ScribeCallWindow.state(app: kind, titles: read.titles, complete: read.complete)
+        }
+        let browsers = running.filter { ScribeCallDetection.isBrowser($0.bundleID) }
+        if browsers.contains(where: { ScribeCallDetection.identify(bundleID: $0.bundleID, windowTitles: $0.windowTitles ?? []) == .meet }) {
+            states[.meet] = .present
+        } else {
+            states[.meet] = browsers.allSatisfy { $0.windowTitles != nil && $0.titlesComplete } ? .gone : .unknown
+        }
+        return states
     }
 
     /// Running GUI apps. Browsers carry their window titles, read once for all windows (nil when the list
     /// couldn't be read; empty when titles are hidden).
-    private static func runningApps() -> [ScribeRunningApp] {
+    private static func runningApps(titles: [pid_t: (titles: [String], numbers: [Int], complete: Bool)]?) -> [ScribeRunningApp] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let titles = windowTitlesByPID()
         return NSWorkspace.shared.runningApplications.compactMap { application -> ScribeRunningApp? in
             guard !application.isTerminated, application.processIdentifier != ownPID,
                   let bundleID = application.bundleIdentifier else { return nil }
@@ -200,6 +221,7 @@ final class ScribeCallWatcher {
     private var dismissedInstances: [ScribeCallApp: ScribeCallProcessIdentity] = [:]
     private var latestCalls: [ScribeDetectedCall] = []
     private var terminationObserver: NSObjectProtocol?
+    private var micObserver: ScribeMicActivityObserver?
     private lazy var eventStore = EKEventStore()
 
     var isRunning: Bool { timer != nil }
@@ -209,16 +231,23 @@ final class ScribeCallWatcher {
         terminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
         ) { [weak self] notification in
+            // Notification/userInfo are not Sendable. Read the OS object on its callback queue and
+            // carry only immutable identity values into actor isolation, as for the music observers.
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier > 0, let bundle = app.bundleIdentifier, let launched = app.launchDate else { return }
+            let identity = ScribeCallProcessIdentity(pid: app.processIdentifier, bundleID: bundle,
+                                                    launchedAt: launched.timeIntervalSince1970)
             MainActor.assumeIsolated {
-                guard let self,
-                      let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      let identity = Self.identity(of: app) else { return }
-                self.applicationTerminated(identity)
+                self?.applicationTerminated(identity)
             }
         }
         timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
+        // The poll above stays as the backup; this wakes it the moment the microphone starts or stops.
+        let observer = ScribeMicActivityObserver { [weak self] in self?.poll() }
+        observer.start()
+        micObserver = observer
         // Not synchronously: `start()` runs inside `ScribeController.shared`'s initialiser.
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(1))
@@ -229,10 +258,13 @@ final class ScribeCallWatcher {
     func stop() {
         if let terminationObserver { NSWorkspace.shared.notificationCenter.removeObserver(terminationObserver) }
         terminationObserver = nil
+        micObserver?.stop()
+        micObserver = nil
         timer?.invalidate()
         timer = nil
         decision = .none
         ScribeCallPopup.shared.hide()
+        ScribeAutoStartController.shared.stop()
     }
 
     /// Dismisses this prompt: a calendar slot by id, a detected call until that call ends.
@@ -283,6 +315,9 @@ final class ScribeCallWatcher {
         ScribeController.shared.boundCallApplicationDidTerminate(identity)
     }
 
+    /// Reads fresh signals now (the call-ended timer and microphone wake-ups ask for this).
+    func pollNow() { poll() }
+
     private func poll() {
         guard isRunning, !scanning else { return }
         scanning = true
@@ -298,13 +333,17 @@ final class ScribeCallWatcher {
         scanning = false
         guard isRunning else { return }
         latestCalls = scan.calls
-        let detectedApps = scan.calls.map(\.app)
+        // A meeting that has started, or a call in progress, is the meeting-start detector's job: it asks, starts
+        // by itself or stays quiet by the "When a meeting starts" setting. This card is only the heads-up
+        // before a calendar meeting, and only for "Ask me".
+        ScribeAutoStartController.shared.ingest(scan: scan, slots: slots, date: now)
+        let headsUp = ScribeAutoStartMode.current() == .ask ? slots.filter { $0.start > now } : []
         // Mic disappearance can mean mute. Keep Not now suppressed until a positive app-instance exit;
         // neither an empty/incomplete scan nor a changed browser title proves a new call.
         let next = ScribeCallPrompt.decide(
             now: now,
-            upcoming: slots,
-            activeCallApp: detectedApps.first { !dismissedApps.contains($0) },
+            upcoming: headsUp,
+            activeCallApp: nil,
             isRecording: ScribeController.shared.phase.isActive,
             dismissedIDs: dismissedIDs,
             dismissedCallApps: dismissedApps
@@ -337,7 +376,10 @@ final class ScribeCallWatcher {
                 id: "\(base)@\(Int(start.timeIntervalSince1970))",
                 title: event.title ?? "Meeting",
                 start: start,
-                end: event.endDate
+                end: event.endDate,
+                // Display names only; the slot drops anything that looks like an address.
+                attendeeNames: (event.attendees ?? []).filter { !$0.isCurrentUser }.compactMap(\.name),
+                hasCallLink: hasLink
             )
         }
     }

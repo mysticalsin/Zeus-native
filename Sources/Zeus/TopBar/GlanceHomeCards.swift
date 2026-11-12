@@ -169,11 +169,12 @@ private struct SlotFrame: View {
         let shape = RoundedRectangle(cornerRadius: GlanceTopBar.cardRadius, style: .continuous)
         ZStack {
             HomeWidgetCard(kind: kind, topBar: topBar, agentSummary: agentSummary)
-                .opacity(editing ? 0.14 : 1)
+                // In customise mode the card shows only its rim and name, so the name chip never covers content.
+                .opacity(editing ? 0 : 1)
                 .allowsHitTesting(!editing)
                 .accessibilityHidden(editing)
             if editing {
-                shape.strokeBorder(selected ? Theme.glow : Color.white.opacity(0.28),
+                shape.strokeBorder(selected ? OB.controlAccent : Color.white.opacity(0.28),
                                    style: StrokeStyle(lineWidth: selected ? 2 : 1, dash: selected ? [] : [4, 3]))
                 // A real Button: focusable, Space/Return and VoiceOver press all select the slot.
                 Button { topBar.homePickerSlot = slot } label: {
@@ -184,7 +185,7 @@ private struct SlotFrame: View {
                 .accessibilityLabel("Slot \(slot), \(kind.title)")
                 .accessibilityHint("Choose this slot to change its widget.")
                 .accessibilityAddTraits(selected ? .isSelected : [])
-                // The card's content is ghosted in edit mode and the slot name sits alone in the middle,
+                // The card content is hidden in edit mode and the slot name sits alone in the middle,
                 // so the pill never lands on a title or a number.
                 HStack(spacing: 5) {
                     Image(systemName: kind.symbol).font(.system(size: 11, weight: .semibold))
@@ -192,7 +193,7 @@ private struct SlotFrame: View {
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(Capsule().fill(selected ? Theme.glow.opacity(0.9) : Color.black.opacity(0.72)))
+                .background(Capsule().fill(selected ? OB.controlAccentFill : Color.black.opacity(0.72)))
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .allowsHitTesting(false)

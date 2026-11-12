@@ -94,7 +94,7 @@ final class CommandCenter {
 
     func handle(_ line: Data) async -> Data? {
         guard let command = try? JSONDecoder().decode(ZeusCommand.self, from: line) else {
-            return try? JSONEncoder().encode(ZeusCommandReply(id: "unknown", ok: false, text: "ZEUS couldn't read that command."))
+            return try? JSONEncoder().encode(ZeusCommandReply(id: "unknown", ok: false, text: "Zeus couldn't read that command."))
         }
         return try? JSONEncoder().encode(await reply(to: command))
     }
@@ -120,7 +120,7 @@ final class CommandCenter {
         }
         switch command.op {
         case .status:
-            return ZeusCommandReply(id: command.id, ok: true, text: "ZEUS is running.", status: await status())
+            return ZeusCommandReply(id: command.id, ok: true, text: "Zeus is running.", status: await status())
         case .tasks:
             return ZeusCommandReply(id: command.id, ok: true,
                                     text: entries.isEmpty ? "No tasks yet." : "\(entries.count) recent task(s):",
@@ -146,7 +146,7 @@ final class CommandCenter {
             voice.say(text)
             return ZeusCommandReply(id: command.id, ok: true, text: "Speaking with the \(voice.voiceDescription).")
         case .ask:
-            guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask ZEUS something.") }
+            guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask Zeus something.") }
             let deep = command.deep, speak = command.speak
             let restricted = !CLIAccess.enabled
             if restricted, let refusal = CLIAccess.restrictedAskRefusal(text) {
@@ -183,12 +183,12 @@ final class CommandCenter {
             let result = await CodeActions.shared.openTerminal(project: command.project, dir: nil)
             return ZeusCommandReply(id: command.id, ok: result.ok, text: result.message, actions: result.ok ? ["terminal.open"] : [])
         case .research:
-            guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask ZEUS something to research.") }
+            guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask Zeus something to research.") }
             let depth: ResearchDepth = command.deep ? .deep : .quick, speak = command.speak
             let restricted = !CLIAccess.enabled
             return await track(command, label: "research: \(text)") { _, _ in
                 guard let outcome = await ResearchRunner.shared.start(question: text, depth: depth, speak: speak, restricted: restricted) else {
-                    return TurnResult(error: "ZEUS is already researching something. Stop it first.")
+                    return TurnResult(error: "Zeus is already researching something. Stop it first.")
                 }
                 var result = TurnResult(spoken: outcome.spoken)
                 if let report = outcome.report { result.actions = ["report: \(report.path)"] }

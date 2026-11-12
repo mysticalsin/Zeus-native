@@ -132,7 +132,7 @@ public struct DiagnosticsManifest: Codable, Equatable, Sendable {
 }
 
 public enum DiagnosticsExporter {
-    public struct Input {
+    public struct Input: Sendable {
         public var version: String
         public var build: String
         public var settingsJSON: Data

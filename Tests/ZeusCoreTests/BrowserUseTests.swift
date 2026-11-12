@@ -64,6 +64,33 @@ struct BrowserUseProtocolTests {
         #expect(throws: MCPCodecError.notAMessage) { try MCPCodec.decode(Data(#"{"jsonrpc":"2.0"}"#.utf8)) }
     }
 
+    @Test func responseIDsOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping() {
+        for id in ["1e100", "-1e100", "9223372036854775808", "-9223372036854777856", "1.5",
+                   #""NaN""#, #""Infinity""#, #""-Infinity""#] {
+            let line = Data("{\"jsonrpc\":\"2.0\",\"id\":\(id),\"result\":{}}".utf8)
+            #expect(throws: MCPCodecError.notAMessage) { try MCPCodec.decode(line) }
+        }
+    }
+
+    @Test func errorCodesOutsideIntegerRangeOrWithFractionsAreRejectedWithoutTrapping() {
+        for code in ["1e100", "-1e100", "9223372036854775808", "-9223372036854777856", "1.5", "-0.5",
+                     #""NaN""#, #""Infinity""#, #""-Infinity""#] {
+            let line = Data("{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":\(code),\"message\":\"bad\"}}".utf8)
+            #expect(throws: MCPCodecError.notAMessage) { try MCPCodec.decode(line) }
+        }
+    }
+
+    @Test func exactlyRepresentableIntegerBoundariesAndDefaultErrorCodeKeepTheirValues() throws {
+        let upper = try #require(Int(exactly: Double(Int.max).nextDown))
+        for number in [Int.min, -32_602, 0, 42, upper] {
+            let line = Data("{\"jsonrpc\":\"2.0\",\"id\":\(number),\"error\":{\"code\":\(number),\"message\":\"bad\"}}".utf8)
+            #expect(try MCPCodec.decode(line) == .response(id: number, result: nil,
+                                                         error: MCPError(code: number, message: "bad")))
+        }
+        #expect(try MCPCodec.decode(Data(#"{"jsonrpc":"2.0","id":1,"error":{"message":"missing code"}}"#.utf8))
+                == .response(id: 1, result: nil, error: MCPError(code: -32_603, message: "missing code")))
+    }
+
     @Test func everyRecordedLineDecodes() throws {
         for name in ["example-com", "form-page", "form-extras"] {
             for entry in try BrowserUseFixture.load(name) where !entry.outgoing {

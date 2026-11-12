@@ -99,3 +99,22 @@ import Testing
         #expect(!SystemHUDSettings.replaceSystemEnabled { _ in false })
     }
 }
+
+/// Perf: brightness and keyboard backlight reads are a slow timer with a short burst, never a constant 10 Hz.
+@Suite struct SystemHUDPollPolicyTests {
+    @Test func theFastRateOnlyLastsForABurstAfterAChange() {
+        #expect(SystemHUDPollPolicy.interval(sinceLastChange: 0) == SystemHUDPollPolicy.burstInterval)
+        #expect(SystemHUDPollPolicy.interval(sinceLastChange: SystemHUDPollPolicy.burstWindow - 0.01) == SystemHUDPollPolicy.burstInterval)
+        #expect(SystemHUDPollPolicy.interval(sinceLastChange: SystemHUDPollPolicy.burstWindow) == SystemHUDPollPolicy.idleInterval)
+        #expect(SystemHUDPollPolicy.interval(sinceLastChange: 3600) == SystemHUDPollPolicy.idleInterval)
+        #expect(SystemHUDPollPolicy.idleInterval >= 1)
+        #expect(SystemHUDPollPolicy.burstWindow <= 5)
+    }
+
+    @Test func noTimerWhenNothingIsShownOrTheDisplaysSleep() {
+        #expect(!SystemHUDPollPolicy.shouldPoll(brightnessEnabled: false, keyboardBacklightEnabled: false, displaysAsleep: false))
+        #expect(!SystemHUDPollPolicy.shouldPoll(brightnessEnabled: true, keyboardBacklightEnabled: true, displaysAsleep: true))
+        #expect(SystemHUDPollPolicy.shouldPoll(brightnessEnabled: true, keyboardBacklightEnabled: false, displaysAsleep: false))
+        #expect(SystemHUDPollPolicy.shouldPoll(brightnessEnabled: false, keyboardBacklightEnabled: true, displaysAsleep: false))
+    }
+}

@@ -76,7 +76,7 @@ public enum EngineRecommendation {
 /// Names and jargon every engine should expect, plus the forms each engine takes them in.
 public enum DictationVocabularyPrompt {
     /// Names Tony says often, written the way they should come out.
-    public static let names = ["Zeus", "Laya", "Jev", "Claude", "Codex", "Murmure", "TotoStudio", "TOTO OS",
+    public static let names = ["Zeus", "Jev", "Claude", "Codex", "Murmure", "TotoStudio", "TOTO OS",
                                "Métis", "Kronos", "TrueForge"]
     /// Biased towards, but never re-cased afterwards: "soul" is also an ordinary word.
     public static let hintOnly = ["Soul"]

@@ -14,6 +14,9 @@ final class UpdateCoordinator {
     private let source: BundleUpdateSource
     private let defaults: UserDefaults
     private var pollTask: Task<Void, Never>?
+    private var refreshState = UpdateRefresh.State.idle
+    private var refreshTask: Task<Void, Never>?
+    private var lastRefreshToken: UInt64 = 0
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -37,25 +40,53 @@ final class UpdateCoordinator {
         let feedOn = SettingsStore.shared.bool("about.autoUpdate")
         let feedURL = SettingsStore.shared.string("about.updateFeedURL")
         let fake = defaults.string(forKey: DebugUpdateFake.defaultsKey)
-        Task { @MainActor in
-            var offer = await source.latestOffer(feedEnabled: feedOn, feedURL: feedURL)
-            if offer == nil, let fake, let v = ZeusVersion(parsing: fake) {
-                offer = UpdateOffer(latest: v)
+        lastRefreshToken &+= 1
+        let token = lastRefreshToken
+        let (next, effects) = UpdateRefresh.reduce(refreshState, .requested(token: token))
+        refreshState = next
+        for effect in effects {
+            switch effect {
+            case .cancelFetch:
+                refreshTask?.cancel()
+                refreshTask = nil
+            case .startFetch:
+                refreshTask = Task { @MainActor [weak self] in
+                    await self?.fetch(token: token, current: current, feedOn: feedOn, feedURL: feedURL, fake: fake)
+                }
+            case .apply:
+                break
             }
-            badgeState = UpdateBadgeLogic.badgeState(
-                current: current,
-                offer: offer,
-                feedEnabled: feedOn,
-                debugFake: fake,
-                defaults: defaults
-            )
-            onBadgeDidChange?()
-            maybePresentHUD()
         }
+    }
+
+    /// Only the newest request writes the badge: an older check that finishes late is dropped.
+    private func fetch(token: UInt64, current: ZeusVersion, feedOn: Bool, feedURL: String, fake: String?) async {
+        var offer = await source.latestOffer(feedEnabled: feedOn, feedURL: feedURL)
+        if offer == nil, let fake, let v = ZeusVersion(parsing: fake) {
+            offer = UpdateOffer(latest: v)
+        }
+        let (next, effects) = UpdateRefresh.reduce(refreshState, .completed(token: token))
+        refreshState = next
+        guard effects.contains(.apply(token: token)) else { return }
+        refreshTask = nil
+        badgeState = UpdateBadgeLogic.badgeState(
+            current: current,
+            offer: offer,
+            feedEnabled: feedOn,
+            debugFake: fake,
+            defaults: defaults
+        )
+        onBadgeDidChange?()
+        maybePresentHUD()
     }
 
     @MainActor
     func refreshBadgeSync(offer: UpdateOffer? = nil) {
+        // This write is the newest word on the badge: a feed check still in flight must not overwrite it.
+        let (next, _) = UpdateRefresh.reduce(refreshState, .invalidated)
+        refreshState = next
+        refreshTask?.cancel()
+        refreshTask = nil
         let current = source.currentVersion()
         let feedOn = SettingsStore.shared.bool("about.autoUpdate")
         let fake = defaults.string(forKey: DebugUpdateFake.defaultsKey)
@@ -86,7 +117,8 @@ final class UpdateCoordinator {
 
     func performUpdate() {
         guard case .available(let offer, _) = badgeState else { return }
-        if let url = offer.downloadURL {
+        // The offer's link is re-checked here: only HTTPS ever reaches the browser.
+        if let url = offer.downloadURL, UpdateFeedPolicy.isSecure(url) {
             NSWorkspace.shared.open(url)
         } else if let url = URL(string: "https://zeus.app") {
             NSWorkspace.shared.open(url)

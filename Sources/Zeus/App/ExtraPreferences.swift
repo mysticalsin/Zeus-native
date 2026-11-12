@@ -189,7 +189,7 @@ enum ZeusSound {
     /// The bundled file for a slot and style; nil for "Off" or when the resource is missing.
     static func url(slot: SoundSlot, style: String?) -> URL? {
         guard let spec = SoundCatalog.spec(slot, style: style) else { return nil }
-        let name = "\(spec.file).\(SoundCatalog.fileExtension)"
+        let name = spec.fileName
         return ZeusResources.bundle?.resourceURL?.appendingPathComponent("Sounds/\(name)")
             ?? Bundle.main.resourceURL?.appendingPathComponent("Sounds/\(name)")
     }
@@ -273,7 +273,7 @@ enum Diagnostics {
         let info = ProcessInfo.processInfo
         let socketUp = FileManager.default.fileExists(atPath: ZeusPaths.socket.path)
         var rows: [(String, String)] = [
-            ("ZEUS", ZeusCoreVersion.string),
+            ("Zeus", ZeusCoreVersion.string),
             ("macOS", info.operatingSystemVersionString),
             ("Agent socket", socketUp ? "Listening" : "Not running"),
             ("Support folder", redact(ZeusPaths.supportDirectory.path)),

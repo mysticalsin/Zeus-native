@@ -1,0 +1,33 @@
+{
+  "checked_at": "2026-11-10T16:36:03.013951+00:00",
+  "source_sha": "0802bf0ca4041d0eaee51500ab38e73096ccbab0",
+  "run_id": 42854927189,
+  "job_id": 129965245191,
+  "artifact_id": 13783390236,
+  "event": "push",
+  "attempt": 1,
+  "archive_sha256": "07da357622a524c8b35ebfa382d8711e64ddc993227ce3cabb093d88b23cb7ca",
+  "build_log_sha256": "81d79a4231480c80b186dc4a26a3ce19a5c7614985d5518ca34c9acb509d5b7d",
+  "job_receipt_sha256": "db024294d6424fc034d2600c1936d3b47bc8c566e858d031e80c6d065eb3ce2c",
+  "job_head_binding_valid": true,
+  "embedded_file_binding_valid": true,
+  "build": "failure",
+  "native_tests_completed": 0,
+  "native_partitions_passed": 0,
+  "test": "skipped",
+  "bundle": "skipped",
+  "archive": "skipped",
+  "compiler_validator_exit_code": 1,
+  "compiler_validator_log_sha256": "337ab5b19130990b00aa7e78e0c7d902da0203041ce75c06e293828969308acf",
+  "errors": [
+    "Sources/Zeus/Explanation/ExplanationAudio.swift:525:34: error: type of expression is ambiguous without a type annotation",
+    "Sources/Zeus/Explanation/ExplanationCanvas.swift:497:71: error: ambiguous use of operator '+'",
+    "Sources/Zeus/Explanation/ExplanationSceneView.swift:130:45: error: type 'String' has no member 'preferredRenderingAPI'"
+  ],
+  "exact_commit_error_file_sha256": {
+    "Sources/Zeus/Explanation/ExplanationAudio.swift": "24619d41a0ba13a636ae8f5486eaffa1f92fa1e69f9eccdf237b0bddc7a57e12",
+    "Sources/Zeus/Explanation/ExplanationCanvas.swift": "efe96135dfb8c51df21a960bc3c2c183b3b2b13ae379c733767029a940d56d5b",
+    "Sources/Zeus/Explanation/ExplanationSceneView.swift": "9392d964bb1ee49ff3b6f1e0f7de297d996fc1b8d2d86e347ba92a777471fdb7"
+  },
+  "scope": "Source revision and uploaded build-log binding verified; compiler failure retained. No native tests or preview bundle produced. No source manifest/discovery/native-run receipts exist because build failed. Not release acceptance."
+}

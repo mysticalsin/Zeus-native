@@ -29,9 +29,17 @@ final class VoiceTurnController {
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
     private var currentTurn: UUID?
+    /// The spoken answer in flight: fast tiers racing and the deep follow-up behind them.
+    private var fastRace: FastRaceRun?
+    /// When the talk key was released, for the per-stage timing log.
+    private var turnReleasedAt: ContinuousClock.Instant?
+    /// When the last fast answer finished: the deep follow-up is spoken only inside the conversation window.
+    private var lastAnswerAt: Date?
     private var history: [Exchange] = []
     /// True from release (or a wake phrase) until the turn's work is done.
-    private(set) var turnRunning = false
+    var turnRunning: Bool { turnRun.isActive }
+    /// One slot for the turn in flight: a turn cancelled by a new press finishes later and must not clear the newer turn's flag.
+    private var turnRun = LatestRun()
     /// When the recogniser last changed its live transcript (hands-free turns end on silence).
     private var lastPartialAt: ContinuousClock.Instant?
     private var liveWords = LiveWordsHUD()
@@ -54,7 +62,7 @@ final class VoiceTurnController {
         speech.onLevel = { [weak buddy] level in
             Task { @MainActor in buddy?.model.audioLevel = level }
         }
-        // Live partials warm the fast path up (rules, then a speculative Laya answer) and time
+        // Live partials warm the fast path up (rules) and time
         // the end of a hands-free turn.
         speech.onPartial = { [weak self] text in
             Task { @MainActor in
@@ -70,18 +78,9 @@ final class VoiceTurnController {
             }
         }
         FastActions.shared.onLateProblem = { [weak self] text in self?.say(text) }
-        ClaudeFlags.warm()
-        BrainLaunchWarm.registerWait {
-            async let ollama: Void = OpenAICompatProvider.ollama().prewarm()
-            async let anthropic: Void = AnthropicAPIProvider().prewarm()
-            _ = await (ollama, anthropic)
-        }
-        Task { await BrainLaunchWarm.awaitIfNeeded() }
+        // Perf rule: nothing warms at launch. The talk key going down warms the brain connection, the lean
+        // `claude` process and the voice (`KeyDownWarmer`, `Speaker.prewarm`) while Tony is still speaking.
         BrainWarmScheduler.shared.start()
-        Task { @MainActor in
-            let settings = VoiceSettings.shared
-            await KokoroWorkerSession.shared.prewarm(voice: settings.kokoroVoice, speed: settings.kokoroSpeed)
-        }
     }
 
     /// After the words sit still for 0.7 s, start the fastest brain. Commands stay on the instant path.
@@ -89,10 +88,14 @@ final class VoiceTurnController {
         ahead.partial(text) { [weak self] utterance, _ in
             guard let self, AheadBrain.canStart(utterance) else { return }
             // Same privacy rule and provider choice as the real turn, applied before any provider exists.
+            // The speculative run is a fast-tier engine launched lean, never a full CLI setup.
             let task = RouterTask.classify(utterance)
-            guard let first = BrainLatencyBook.shared.ordered(
-                RouterSettings.shared.brainCandidates(task: task, hasAnthropicKey: AnthropicAPIProvider.hasKey), id: \.id).first else { return }
-            let request = BrainRequest(turn: UUID(), transcript: utterance, systemPrompt: ZeusPrompt.system, deep: false)
+            let ordered = BrainLatencyBook.shared.ordered(
+                RouterSettings.shared.brainEngineCandidates(task: task, hasAnthropicKey: AnthropicAPIProvider.hasKey), id: \.id)
+            let fast = Set(FastTier.fastRace(order: ordered.map(\.engine), ollamaWarm: RouterSettings.shared.ollamaHTTPReachable))
+            guard let first = ordered.first(where: { fast.contains($0.engine) }) else { return }
+            let request = BrainRequest(turn: UUID(), transcript: utterance, systemPrompt: ZeusPrompt.system, deep: false,
+                                       firstTextBudget: Double(FastTier.firstTextBudgetMs) / 1000)
             self.ahead.begin(engineID: first.id, provider: first.provider, request: request)
         }
     }
@@ -108,6 +111,9 @@ final class VoiceTurnController {
 
     /// Menu › Stop Speaking (pressing the talk key also interrupts).
     func stopSpeaking() {
+        fastRace?.cancel()
+        PersistentClaudeSession.shared.abortBusy()
+        turnRun.invalidate()
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -120,8 +126,19 @@ final class VoiceTurnController {
 
     @discardableResult
     func press() -> Bool {
+        ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
-        BrainWarmScheduler.shared.noteActivity()
+        BrainWarmScheduler.shared.talkKeyDown()
+        fastRace?.cancel()
+        // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
+        handsFreeTask?.cancel()
+        handsFreeTask = nil
+        turnRun.invalidate()
+        // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
+        PersistentClaudeSession.shared.abortBusy()
+        KeyDownWarmer.talkKeyDown()
+        // Off the critical path: the local-model check is read from this cache when the answer starts.
+        Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -135,12 +152,12 @@ final class VoiceTurnController {
         do {
             try speech.start()
         } catch {
-            VoiceLog.log("error", "can't start listening: \(error.localizedDescription) (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech))")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
                 VoicePermissions.notifyDenied(cue, pane)
             } else {
-                say("I can't hear you yet. Check that ZEUS has microphone and speech recognition access.")
+                say("I can't hear you yet. Check that Zeus has microphone and speech recognition access.")
             }
             return false
         }
@@ -165,21 +182,44 @@ final class VoiceTurnController {
     func release() {
         guard listening else { return }
         listening = false
+        turnReleasedAt = .now
+        VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
         ZeusSound.play(.listenStop)
         SystemAudioDucker.end()
         handsFreeTask?.cancel()
         handsFreeTask = nil
         buddy.think()
-        turnRunning = true
+        let run = turnRun.begin()
         turnTask = Task {
             let result = await finishTurn()
-            turnRunning = false
-            if wakeConversationActive, result.error == nil, !result.cancelled {
+            let live = turnRun.finish(run)
+            if live, wakeConversationActive, result.error == nil, !result.cancelled {
                 handsFree()
             }
             return result
         }
+    }
+
+    /// The talk keys became another shortcut while held (⌃⌥Space opens Chat): stop listening and send nothing.
+    func cancelListening() {
+        guard listening else { return }
+        listening = false
+        handsFreeTask?.cancel()
+        handsFreeTask = nil
+        ahead.cancel()
+        speech.cancel()
+        screenshotsTask?.cancel()
+        screenshotsTask = nil
+        tabTask?.cancel()
+        tabTask = nil
+        turnEngine = nil
+        SystemAudioDucker.end()
+        liveWords.clear()
+        buddy.model.audioLevel = nil
+        buddy.model.captionVisible = false
+        buddy.idle()
+        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
     }
 
     /// "Hey Zeus, open Spotify": the request already heard by the wake-word listener runs as a
@@ -191,21 +231,25 @@ final class VoiceTurnController {
         let request = Self.dropWakeEchoes(request.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !request.isEmpty else { VoiceLog.log("wake", "no request after the phrase: listening hands-free"); handsFree(); return }
         VoiceLog.logContent("wake", request, prefix: "same-breath request: ")
+        // The same interruption a key press makes: the previous answer, its deep follow-up and any speculative run stop.
+        fastRace?.cancel()
+        ahead.cancel()
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         speaker.stop()
         buddy.model.captionVisible = false
         let heardAt = ContinuousClock.now
+        VoiceLatency.shared.begin(at: heardAt)
         // Only the LLM path uses these; the fast path never waits for them.
         screenshotsTask = Task { await ScreenCapture.captureAll() }
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
-        turnRunning = true
+        let run = turnRun.begin()
         turnTask = Task {
             let result = await complete(transcript: request, finalAt: heardAt)
-            turnRunning = false
-            if wakeConversationActive, result.error == nil, !result.cancelled {
+            let live = turnRun.finish(run)
+            if live, wakeConversationActive, result.error == nil, !result.cancelled {
                 handsFree()
             }
             return result
@@ -215,6 +259,7 @@ final class VoiceTurnController {
     /// A voice turn without the key: starts listening and stops after quiet once you have spoken.
     func handsFree() {
         guard press() else { return }
+        handsFreeTask?.cancel()
         let opened = ContinuousClock.now
         let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(1000)
         let idleLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceWhenEmpty) : .seconds(4)
@@ -235,7 +280,7 @@ final class VoiceTurnController {
     /// `zeus listen`: a hands-free voice turn of up to `seconds`, as if the talk key were held.
     func listenTurn(seconds: Double) async -> TurnResult {
         guard press() else {
-            return TurnResult(error: "ZEUS can't hear yet: microphone or speech recognition access is missing.")
+            return TurnResult(error: "Zeus can't hear yet: microphone or speech recognition access is missing.")
         }
         try? await Task.sleep(for: .seconds(max(1, min(seconds, 60))))
         if listening { release() }
@@ -287,6 +332,9 @@ final class VoiceTurnController {
             return .nothingHeard
         }
         VoiceLog.logContent("transcript", transcript)
+        if turnReleasedAt == nil { turnReleasedAt = finalAt }
+        if !VoiceLatency.shared.isActive { VoiceLatency.shared.begin(at: finalAt) }
+        VoiceLatency.shared.mark(.transcriptFinal)
 
         let options = SettingsStore.shared
         if let approval = notch.model.approval, options.bool("voice.answers"),
@@ -404,7 +452,7 @@ final class VoiceTurnController {
     }
 
     /// Everything answered without the LLM, in order: local rules (`FastIntent`), the to-do and
-    /// brief phrases (`LocalTurns`), then the decision engine (Laya, Jev). nil means "LLM".
+    /// brief phrases (`LocalTurns`), then the decision engine (Jev). nil means "LLM".
     private func understand(_ transcript: String, finalAt: ContinuousClock.Instant, speak: Bool) async -> TurnResult? {
         let fast = FastPath.shared
         switch fast.rules(transcript) {
@@ -451,7 +499,6 @@ final class VoiceTurnController {
         let problem = await plan.run { [weak self] in
             let elapsed = FastPath.ms(ContinuousClock.now - finalAt)
             fast.signposter.emitEvent("action started", "\(elapsed, format: .fixed(precision: 1), privacy: .public) ms")
-            NSLog("[ZEUS] fast: %@ via %@ started %.1fms after the transcript", plan.summary, engine, elapsed)
             VoiceLog.log("route", "fast via \(engine): \(plan.intent.intentLabel)")
             VoiceLog.log("action", "\(VoiceLog.described(plan.summary)) started \(String(format: "%.0f", elapsed)) ms after the transcript")
             IntelligenceCenter.shared.announce(engine: engine, summary: plan.summary)
@@ -468,10 +515,9 @@ final class VoiceTurnController {
         // said, which is nothing.
         var result = TurnResult(spoken: plan.ack ?? "", actions: ["fast \(plan.intent.intentLabel) via \(engine): \(plan.summary)"])
         if let problem {
-            NSLog("[ZEUS] fast: %@ problem: %@", plan.summary, problem)
             result.problems.append(problem)
             AvatarStatus.shared.flash(.error, for: 2)
-            VoiceLog.log("error", "action problem: \(problem)")
+            VoiceLog.logContent("error", problem, prefix: "action problem: ")
             ZeusSound.play(.voiceError)
             let spoken = SpokenFailure.line(problem)
             if speak { say(spoken) } else { buddy.showCaption(spoken); buddy.hideCaption() }
@@ -498,7 +544,6 @@ final class VoiceTurnController {
 
     /// Not sure which one you meant: ask instead of guessing.
     private func askBack(_ question: String, engine: String, transcript: String, speak: Bool) -> TurnResult {
-        NSLog("[ZEUS] fast: asking (%@): %@", engine, question)
         VoiceLog.logContent("route", question, prefix: "fast via \(engine) asks: ")
         buddy.idle()
         if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
@@ -566,13 +611,13 @@ final class VoiceTurnController {
             }
             if changed {
                 do { try persistence.save(store) } catch {
-                    VoiceLog.log("error", "memory save: \(error.localizedDescription)")
+                    VoiceLog.logContent("error", error.localizedDescription, prefix: "memory save: ")
                     reply = "I couldn't save that, so nothing changed."
                     logOutcome = "save failed"
                 }
             }
         } catch {
-            VoiceLog.log("error", "memory load: \(error.localizedDescription)")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "memory load: ")
             reply = "I can't read my memory file, so I left it alone."
             logOutcome = "load failed"
         }
@@ -628,8 +673,8 @@ final class VoiceTurnController {
             return TurnResult(spoken: reply)
         }
         VoiceLog.log("route", "brain (LLM)\(route.map { ", agent \($0.agent.name)" } ?? "")")
-        RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable())
-        await BrainLaunchWarm.awaitIfNeeded()
+        // No network or process work before the engines start: the Ollama check runs at key press and the
+        // launch warm-up never blocks a turn (both used to wait here, ahead of the first token).
         VoiceAnswerLatency.beginTurn()
         var system = ZeusPrompt.system
         let spokenTranscript = route?.request ?? transcript
@@ -681,6 +726,13 @@ final class VoiceTurnController {
         // (see `ResponseSanitizer`'s own doc comment). Once a hallucinated turn is found, every
         // later chunk of this same reply is the model talking to itself, not to Tony.
         var haltedForHallucination = false
+        let releasedAt = turnReleasedAt ?? .now
+        turnReleasedAt = nil
+        var timingFirstToken: Int?
+        func msSinceRelease() -> Int {
+            let d = ContinuousClock.now - releasedAt
+            return max(0, Int(d.components.seconds) * 1000 + Int(d.components.attoseconds / 1_000_000_000_000_000))
+        }
         let personaSentenceLimit = PersonaReplyClamp.maxSentences(transcript: transcript, personality: ZeusPersonality.current())
         var spokenSentenceCount = 0
         var haltedForPersonaLimit = false
@@ -732,7 +784,7 @@ final class VoiceTurnController {
                     let command = CodeCommand(action)
                     task = Task { @MainActor in
                         guard let command else { return "I couldn't tell what to run, so I left it." }
-                        let outcome = await CodeActions.shared.perform(command, speak: speak)
+                        let outcome = await CodeActions.shared.perform(command, speak: speak, fromModel: true)
                         return outcome.ok ? nil : outcome.message
                     }
                 case .macWalkthrough:
@@ -787,6 +839,10 @@ final class VoiceTurnController {
                     if !startedSpeaking, !pointed { buddy.idle() }
                     startedSpeaking = true
                     VoiceAnswerLatency.noteFirstSentence()
+                    if spokenSentenceCount == 1 {
+                        VoiceLatency.shared.mark(.firstSentence)
+                        VoiceLog.log("timing", "release->firstToken ms=\(timingFirstToken ?? -1), ->firstSentence ms=\(msSinceRelease()) (audio starts speech_start_ms later, see speaker line)")
+                    }
                     if speak { speaker.speak(PersonaCompliance.stripOminousHedges(sentence)) }
                     buddy.showCaption(Self.captionTail(spoken))
                 }
@@ -795,57 +851,84 @@ final class VoiceTurnController {
 
         do {
             let started = Date()
+            var replayed = false
             if let replay {
                 VoiceLog.log("route", "brain speculative \(replay.id)")
-                try await Self.consume(replay.events, engine: { replay.id }, started: started) { delta in
-                    parser.feed(delta).forEach(handle)
+                do {
+                    VoiceLatency.shared.mark(.requestSent)
+                    try await Self.consume(replay.events, engine: { replay.id }, started: started) { delta in
+                        if timingFirstToken == nil {
+                            timingFirstToken = msSinceRelease()
+                            VoiceLatency.shared.setBrain(engine: replay.id, model: Self.modelLabel(replay.id))
+                            VoiceLatency.shared.mark(.firstToken)
+                        }
+                        parser.feed(delta).forEach(handle)
+                    }
+                    replayed = true
+                } catch where spoken.isEmpty && !Task.isCancelled {
+                    // The speculative run failed before saying anything: answer from a fresh race instead.
+                    VoiceLog.logContent("route", error.localizedDescription, prefix: "speculative \(replay.id) failed; racing; detail ")
                 }
-            } else {
+            }
+            if !replayed {
                 // The task's privacy rule and provider choice decide the candidates before any
                 // provider (and so any request) is created; a private task never sees a cloud engine.
                 let taskKind = RouterTask.classify(transcript)
-                let candidates = BrainLatencyBook.shared.ordered(
-                    RouterSettings.shared.brainCandidates(task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain),
+                let ordered = BrainLatencyBook.shared.ordered(
+                    RouterSettings.shared.brainEngineCandidates(task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain),
                     id: \.id)
-                VoiceLog.log("route", candidates.isEmpty ? "brain (none)" : "brain \(candidates.map(\.id).joined(separator: " > "))")
-                guard !candidates.isEmpty else {
+                guard !ordered.isEmpty else {
+                    VoiceLog.log("route", "brain (none)")
                     throw ClaudeCLIProvider.ProviderError.failed(
                         taskKind == .privateLocal ? "no local AI is available for a private request" : "no AI answered")
                 }
-                var deepNow = deep || ModelBudget.shouldEscalate(task: taskKind, failed: false)
-                var cursor = 0
-                var lastErrors: [String] = []
-                // One provider at a time (sequential fallback) unless the person turned cloud racing on:
-                // racing sends the full contextual request to several providers at once.
-                let racing = UserDefaults.standard.bool(forKey: "opt.brain.cloudRacing")
-                while cursor < candidates.count {
-                    let end = min(cursor + (racing ? 4 : 1), candidates.count)
-                    let slice = Array(candidates[cursor..<end])
-                    let opened = Self.openBrains(slice, request: request.with(deep: deepNow))
-                    do {
-                        try await Self.consume(opened.events, engine: opened.engine, started: started) { delta in
-                            parser.feed(delta).forEach(handle)
-                        }
-                        break
-                    } catch where spoken.isEmpty && !Task.isCancelled {
-                        let text = error.localizedDescription
-                        if let engine = RouterEngine(rawValue: opened.engine()) {
-                            if RouterSettings.isQuotaError(text) || RouterSettings.isSignInError(text) {
-                                RouterSettings.shared.markExhausted(engine)
-                            } else if RouterSettings.isTimeoutError(text) {
-                                RouterSettings.shared.markExhausted(engine, for: 10 * 60)
-                            }
-                        }
-                        lastErrors.append(text)
-                        for racer in slice { BrainLatencyBook.shared.recordFailure(racer.id) }
-                        VoiceLog.log("route", "\(opened.engine()) failed (\(text.prefix(80)))")
-                        cursor += slice.count
-                        deepNow = true
-                        if cursor >= candidates.count {
-                            throw ClaudeCLIProvider.ProviderError.failed(Self.allEnginesFailed(lastErrors))
-                        }
-                    }
+                // Every fast engine starts at once; the first to stream text speaks and the rest stop.
+                let engines = ordered.map(\.engine)
+                let fastSet = Set(FastTier.fastRace(order: engines, ollamaWarm: RouterSettings.shared.ollamaHTTPReachable))
+                var raced = ordered.filter { fastSet.contains($0.engine) }
+                if raced.isEmpty { raced = Array(ordered.prefix(2)) } // only slow engines installed: still race, never sequential
+                // `zeus --deep` keeps its long first-text allowance; a spoken turn gets 8 s.
+                let budget: TimeInterval = deep ? 45 : Double(FastTier.firstTextBudgetMs) / 1000
+                let deepReason = deep ? nil : DeepTrigger.reason(for: transcript, task: taskKind)
+                let deepTier = FastTier.deepEngine(order: engines).flatMap { engine in
+                    ordered.first { $0.engine == engine }.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) }
                 }
+                VoiceLog.log("route", "brain race \(raced.map(\.id).joined(separator: " + "))\(deepReason != nil && deepTier != nil ? ", deep behind: \(deepTier?.id ?? "")" : "")")
+                let race = FastRaceRun(
+                    tiers: raced.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
+                    request: request.with(deep: deep, firstTextBudget: budget),
+                    deepTier: deepTier, deepReason: deepReason,
+                    callbacks: FastRaceRun.Callbacks(
+                        filler: { [weak self] in
+                            guard speak, let self else { return }
+                            let line = AckLines.filler(personality: ZeusPersonality.current())
+                            VoiceLog.log("timing", "filler at \(msSinceRelease()) ms, nothing streamed yet")
+                            self.say(line)
+                        },
+                        tierFailed: { id, text in
+                            if let engine = RouterEngine(rawValue: id) {
+                                if RouterSettings.isQuotaError(text) || RouterSettings.isSignInError(text) {
+                                    RouterSettings.shared.markExhausted(engine)
+                                }
+                                // A silent 8 s is not a reason to park an engine for 10 minutes: it only ranks last.
+                            }
+                            BrainLatencyBook.shared.recordFailure(id)
+                            VoiceLog.logContent("route", text, prefix: "\(id) failed; detail ")
+                        },
+                        firstText: { id, ms in
+                            timingFirstToken = msSinceRelease()
+                            VoiceLatency.shared.setBrain(engine: id, model: Self.modelLabel(id))
+                            VoiceLatency.shared.mark(.firstToken)
+                            VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms)")
+                            BrainLatencyBook.shared.record(id, firstTokenMs: Double(ms))
+                        },
+                        deliverDeep: { [weak self] text in
+                            self?.deliverDeepAnswer(text, transcript: transcript, speak: speak)
+                        }))
+                fastRace = race
+                VoiceLatency.shared.mark(.requestSent)
+                try await race.run { delta in parser.feed(delta).forEach(handle) }
+                VoiceLog.log("brain", "engine=\(race.winnerID ?? "?") done_ms=\(max(0, Int(Date().timeIntervalSince(started) * 1000)))")
             }
             parser.finish().forEach(handle)
             if let rest = splitter.flush(), speak { speaker.speak(PersonaCompliance.stripOminousHedges(rest)) }
@@ -859,6 +942,7 @@ final class VoiceTurnController {
             let answer = PersonaReplyClamp.clamp(ResponseSanitizer.sanitize(spoken), transcript: transcript, personality: personality)
             if answer.isEmpty { VoiceLog.log("spoken", "(nothing)") } else { VoiceLog.logContent("spoken", answer) }
             ZeusSound.play(.voiceDone)
+            lastAnswerAt = Date()
             if let route, !answer.isEmpty {
                 var memory = agentStore.memory(for: route.agent)
                 memory.remember("Asked: \(route.request.prefix(160)) / Answered: \(answer.prefix(200))")
@@ -872,7 +956,7 @@ final class VoiceTurnController {
             guard !Task.isCancelled else { return TurnResult(cancelled: true) }
             buddy.idle()
             let message = Self.spokenError(error)
-            VoiceLog.log("error", "brain: \(error.localizedDescription)")
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "brain: ")
             ZeusSound.play(.voiceError)
             AvatarStatus.shared.flash(.error, for: 3)
             result.error = message
@@ -880,6 +964,7 @@ final class VoiceTurnController {
         }
         result.spoken = PersonaReplyClamp.clamp(ResponseSanitizer.sanitize(spoken), transcript: transcript,
                                                  personality: ZeusPersonality.current())
+        VoiceLatency.shared.finishWhenQuiet { [weak self] in self?.speaker.isSpeaking ?? false }
         if blockedByRestriction {
             // Said and captioned once (the flag is per turn), and the delivered answer says nothing ran.
             let note = Self.blockedActionNote
@@ -911,6 +996,34 @@ final class VoiceTurnController {
 
     private func globalPoint(x: Int, y: Int, screen: Int?, in shots: [ScreenShot]) -> CGPoint? {
         PresentPointMapping.screenPoint(x: x, y: y, screen: screen, in: shots)
+    }
+
+    /// The fuller answer from the background deep engine, after the quick one. It always shows in the notch caption;
+    /// it is spoken only while the owner is still in the conversation (hands-free window, or within
+    /// `FastTier.conversationWindowSeconds` of the quick answer) and not already talking again.
+    private func deliverDeepAnswer(_ text: String, transcript: String, speak: Bool) {
+        var parser = ZeusTagStreamParser()
+        var plain = ""
+        for output in parser.feed(text) + parser.finish() {
+            if case .text(let piece) = output { plain += piece }
+        }
+        let clean = ResponseSanitizer.sanitize(ResponseSanitizer.stripArtifacts(plain))
+        guard !clean.isEmpty else { return }
+        var splitter = SentenceSplitter()
+        var sentences = splitter.feed(clean)
+        if let rest = splitter.flush() { sentences.append(rest) }
+        let inWindow = wakeConversationActive || (lastAnswerAt.map { Date().timeIntervalSince($0) < FastTier.conversationWindowSeconds } ?? false)
+        let speakIt = speak && inWindow && !listening
+        VoiceLog.log("timing", "deep answer ready, spoken=\(speakIt)")
+        VoiceLog.logContent("spoken", clean, prefix: "deep: ")
+        buddy.showCaption("Here is the fuller answer. " + Self.captionTail(clean))
+        buddy.hideCaption()
+        if speakIt, SettingsStore.shared.bool("voice.speakReplies") {
+            speaker.speak("Here is the fuller answer.")
+            for sentence in sentences.prefix(4) { speaker.speak(PersonaCompliance.stripOminousHedges(sentence)) }
+        }
+        history.append(Exchange(user: "(fuller answer to: \(transcript.prefix(80)))", assistant: String(clean.prefix(400))))
+        if history.count > 10 { history.removeFirst(history.count - 10) }
     }
 
     /// Speaks and captions a short message of ZEUS's own (errors, "Approved.").
@@ -1064,6 +1177,17 @@ final class VoiceTurnController {
         return errors.last ?? "no AI answered"
     }
 
+    /// The model behind an engine id, for the latency line.
+    static func modelLabel(_ id: String) -> String {
+        switch id {
+        case "anthropic-api": ModelCap.httpModel(.anthropic, tier: .fast) ?? "-"
+        case "openai": ModelCap.httpModel(.openAI, tier: .fast) ?? "-"
+        case "claude": (ModelCap.model(for: .claude, tier: .fast) ?? "default") + " cli"
+        case "ollama": ModelCap.httpModel(.ollama, tier: .fast) ?? "-"
+        default: "-"
+        }
+    }
+
     /// One sentence, at most 10 words (persona rule, item 5, QA7). Never reads the raw error text
     /// aloud -- it stays in voice.log via the caller's own `VoiceLog.log` -- except the
     /// "can't find the claude" case, whose own text is already a short, clear instruction and is
@@ -1077,6 +1201,7 @@ final class VoiceTurnController {
         if lowered.contains("login") || lowered.contains("auth") || lowered.contains("401") {
             return "That AI isn't signed in; check Settings."
         }
+        if lowered.contains("in time") { return "No AI answered in time; try again." }
         if lowered.contains("can't find the claude") { return AckLines.clamp(text) ?? text }
         if lowered.contains("network") || lowered.contains("offline") || lowered.contains("connect") {
             return "I couldn't reach Claude; check your connection."

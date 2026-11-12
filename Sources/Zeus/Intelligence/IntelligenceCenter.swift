@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import ZeusCore
 
-/// The decision engine for commands: local rules, then Laya on this Mac, then Jev in the cloud
-/// (inside the local estimate cap), then Ollama last. Provider billing remains authoritative.
+/// The decision engine for commands: local rules, then Jev in the cloud (needs a key and a monthly
+/// cap, inside the local estimate cap), then Ollama last when it is already running. Provider billing remains authoritative.
 /// Every answer is kept in a short history tagged with
 /// the engine that made it, so Settings > Intelligence can show it and offer "Try with Jev".
 @MainActor
@@ -28,27 +28,19 @@ final class IntelligenceCenter {
     private(set) var jevMessage: String?
     var onDecided: ((String, String) -> Void)?
 
-    var engine: IntelligenceEngine {
-        didSet { engineDefaults?.set(engine.rawValue, forKey: IntelligenceEngine.settingsKey) }
-    }
-
     private let budgetStore: JevBudgetStore
-    private let engineDefaults: UserDefaults?
     private let testMode: Bool
-    private let layaProvider: DecisionProvider?
-    private let layaHelper: LayaHelper?
     private var jev: JevGuard
 
     private init() {
         let store = JevBudgetStore()
-        let laya = LayaHelper.shared
         budgetStore = store
-        engineDefaults = .standard
         testMode = false
-        layaProvider = laya
-        layaHelper = laya
-        engine = IntelligenceEngine(rawValue: UserDefaults.standard.string(forKey: IntelligenceEngine.settingsKey) ?? "") ?? .laya
-        jev = JevGuard(key: JevKey.load(from: Keychain.store), store: store)
+        // A retired engine choice saved by an older build now means Jev, the only engine.
+        IntelligenceEngine.migrateStoredChoice(in: .standard)
+        let key = JevKey.load(from: Keychain.store)
+        jev = JevGuard(key: key, store: store)
+        hasJevKey = key != nil
         Task { await refreshBudget() }
     }
 
@@ -63,24 +55,19 @@ final class IntelligenceCenter {
 
     private init(testStore: JevBudgetStore) {
         budgetStore = testStore
-        engineDefaults = nil
         testMode = true
-        layaProvider = nil
-        layaHelper = nil
-        engine = .laya
         jev = JevGuard(key: nil, store: testStore)
         Task { await refreshBudget() }
     }
     #endif
 
-    var hasJevKey: Bool { !testMode && JevKey.load(from: Keychain.store) != nil }
-    var layaInstalled: Bool { layaHelper?.installed ?? false }
-    var layaRunning: Bool { layaHelper?.running ?? false }
+    /// Whether a Jev key is saved. Stored, not computed: the Engine page asks on every render, and each ask
+    /// used to go through the Keychain store (its first call loads the whole Keychain).
+    private(set) var hasJevKey = false
 
     nonisolated static func name(_ source: Decision.Source) -> String {
         switch source {
         case .rules: "Rules"
-        case .laya: "Laya"
         case .jev: "Jev"
         case .ollama: "Ollama"
         case .mock: "Mock"
@@ -91,7 +78,7 @@ final class IntelligenceCenter {
     static func request(for utterance: String, frontApp: String = "") -> SystemOneRequest {
         SystemOneRequest(model: "jev-latest", state: ["utterance": utterance, "front_app": frontApp],
                          questions: [
-                            "intent": .choice("What does the person want ZEUS to do?", [
+                            "intent": .choice("What does the person want Zeus to do?", [
                                 "app.open": "Open an app", "app.quit": "Quit an app", "media.play": "Play, pause or skip music",
                                 "system.volume": "Change the volume", "timer.start": "Start a timer", "todo.add": "Add a to-do",
                                 "calendar.query": "Ask about the calendar", "browser.open": "Open a website",
@@ -105,13 +92,12 @@ final class IntelligenceCenter {
         let rules: @Sendable (SystemOneRequest) -> Decision? = { request in
             FastIntent.parse(request.state["utterance"] ?? "").map(\.decision)
         }
-        var router = DecisionRouter(rules: rules, laya: layaProvider, jev: jev,
-                                    ollama: testMode ? nil : OllamaDecision(), engine: engine)
+        var router = DecisionRouter(rules: rules, jev: jev, ollama: testMode ? nil : OllamaDecision())
         router.constrained = testMode || PowerState.current.constrained
         return router
     }
 
-    /// Runs the chain (rules → Laya → Jev within the cap → Ollama) on one command. The fast path
+    /// Runs the chain (rules → Jev within the cap → Ollama) on one command. The fast path
     /// passes `announce: false` and shows the badge itself once it knows what it will do.
     @discardableResult
     func decide(_ utterance: String, forceJev: Bool = false, announce: Bool = true) async -> Record {
@@ -123,7 +109,7 @@ final class IntelligenceCenter {
         return record
     }
 
-    /// Keeps a decision made elsewhere (a rules hit, or a speculative Laya answer that was used).
+    /// Keeps a decision made elsewhere (a rules hit).
     func remember(_ utterance: String, decision: Decision) {
         var record = Record(utterance: utterance, at: Date())
         record.decision = decision
@@ -136,24 +122,8 @@ final class IntelligenceCenter {
         if history.count > 50 { history.removeLast(history.count - 50) }
     }
 
-    /// The notch badge for an understood command ("Rules", "Laya", "Jev") with a readable summary.
+    /// The notch badge for an understood command ("Rules", "Jev") with a readable summary.
     func announce(engine: String, summary: String) { onDecided?(engine, summary) }
-
-    /// Whether a partial transcript may be sent to Laya ahead of time. Only Laya (free, on this
-    /// Mac) is ever asked speculatively; Jev is never called on a partial, and an explicit Jev
-    /// choice in Settings means no speculation at all.
-    var speculates: Bool {
-        !testMode && engine != .jev && layaInstalled && !PowerState.current.constrained
-    }
-
-    /// Laya alone, for a speculative partial. Not kept in the history; nil when Laya is unavailable.
-    func layaOnly(_ utterance: String) async -> Decision? {
-        guard speculates, let layaProvider else { return nil }
-        return try? await layaProvider.decide(Self.request(for: utterance))
-    }
-
-    /// The confidence below which Auto asks Jev (`DecisionRouter.confidenceFloor`).
-    static let confidenceFloor = DecisionRouter().confidenceFloor
 
     /// The "Try with Jev" re-run on any earlier command.
     func tryWithJev(_ record: Record) async { await decide(record.utterance, forceJev: true) }
@@ -187,6 +157,9 @@ final class IntelligenceCenter {
         return succeeded
     }
 
+    /// Whether Jev will answer instant commands: needs a key and a monthly limit.
+    var jevReadiness: JevReadiness { JevReadiness.evaluate(hasKey: hasJevKey, monthlyCap: jevBudget.monthlyCap) }
+
     /// Jev is offered for a re-run only with a key, a cap that is not used up, and no pending request.
     var jevAvailable: Bool {
         guard hasJevKey, jevReservationStatus == .clear else { return false }
@@ -202,7 +175,10 @@ final class IntelligenceCenter {
         guard !testMode else { return false }
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            Keychain.remove(JevKey.account)
+            guard Keychain.remove(JevKey.account) else {
+                jevMessage = "Couldn't remove the key. Check Keychain access and try again."
+                return false
+            }
         } else {
             guard Keychain.set(trimmed, for: JevKey.account) else {
                 jevMessage = "Couldn't save the key to your Keychain. It is still in the field."
@@ -210,7 +186,9 @@ final class IntelligenceCenter {
             }
         }
         jevMessage = nil
-        jev = JevGuard(key: JevKey.load(from: Keychain.store), store: budgetStore)
+        let saved = JevKey.load(from: Keychain.store)
+        jev = JevGuard(key: saved, store: budgetStore)
+        hasJevKey = saved != nil
         Task { await refreshBudget() }
         return true
     }

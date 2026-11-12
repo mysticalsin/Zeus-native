@@ -463,13 +463,14 @@ public enum ScribeCallDetection {
     }
 }
 
-// MARK: - Microphone-excluded wording
+// MARK: - Microphone shared-with-a-call wording
 
 public enum ScribeMicCallText {
-    /// Shown while recording when the microphone is dropped because a call was detected, and kept with the meeting.
-    public static let excludedNotice =
-        "Your microphone stays excluded after another app uses it, because Zeus can't confirm its mute state. System audio is still recorded."
-    /// The recap row's short line for a meeting saved with the microphone left out.
+    /// Shown while recording when another app is using the microphone too. Zeus keeps recording it; the note
+    /// goes away when the other app lets go of the microphone.
+    public static let sharedNotice =
+        "Another app is using your microphone too. Zeus keeps recording it, so muting in that app does not mute Zeus."
+    /// The recap row's short line for a meeting saved by an older Zeus with the microphone left out.
     public static let recapLine = "Your microphone was excluded after another app used it."
 }
 
@@ -500,8 +501,8 @@ public enum ScribeRecapNote {
     /// The short line a recap row shows for a saved note.
     public static func badge(for note: String?) -> String? {
         guard let note else { return nil }
-        if note.hasPrefix(stoppedEarlyPrefix) { return "Recording stopped early — saved what was captured." }
-        return "Transcription incomplete — notes may be missing speech."
+        if note.hasPrefix(stoppedEarlyPrefix) { return "Recording stopped early. Saved what was captured." }
+        return "Transcription incomplete. Notes may be missing speech."
     }
 }
 
@@ -551,14 +552,14 @@ public enum ScribeCallPromptText {
         case .none:
             return nil
         case .callDetected(let app):
-            return "Meeting detected — \(ScribeCallDetection.displayName(app))"
+            return "Meeting detected: \(ScribeCallDetection.displayName(app))"
         case .upcoming(let slot):
             let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let name = title.isEmpty ? "Meeting" : title
             let until = slot.start.timeIntervalSince(now)
-            if until <= 0 { return "Started — \(name)" }
+            if until <= 0 { return "Started: \(name)" }
             let minutes = max(1, Int((until / 60).rounded(.up)))
-            return "Starts in \(minutes) min — \(name)"
+            return "Starts in \(minutes) min: \(name)"
         }
     }
 
@@ -634,8 +635,8 @@ public enum ScribeProcessRead: Equatable, Sendable {
     case idle
     case input(pid: Int32, bundleID: String)
 
-    /// Preserve positive input activity even when its owner cannot be resolved. Losing that fact as a
-    /// generic unreadable scan would allow a later empty scan to silently unmute the local microphone.
+    /// Keep positive input activity even when its owner cannot be resolved, so another app using the
+    /// microphone is still noticed (for the "shared" note). It never withholds Zeus's microphone.
     public static func activeInput(pid: Int32?, bundleID: String?) -> Self {
         .input(pid: pid ?? -1, bundleID: bundleID ?? "")
     }
@@ -784,26 +785,22 @@ public struct ScribeMuteSample: Equatable, Sendable {
 }
 
 public enum ScribeMuteResolver {
-    /// Positive evidence only. `.unmuted` needs BOTH:
-    /// (a) the default input device is not muted, and
-    /// (b) a COMPLETE scan with ZERO call identities and no browser uncertainty.
-    /// A muted device is `.muted`. Any detected call, any unknown browser state, an
-    /// incomplete scan or an unreadable device is `.unknown`. Nothing else can admit the microphone.
-    public static func resolve(device: ScribeDeviceMute, scan: ScribeInputScan) -> ScribeMuteState {
+    /// The microphone's admission depends on the person's own mute only:
+    /// a muted default input device is `.muted`, an unreadable one is `.unknown`, anything else is `.unmuted`.
+    /// Another app using the microphone (a call, a browser, an app Zeus can't identify) is never a reason to
+    /// leave it out: macOS shares the input between apps, and Zeus records the person's own voice in a meeting.
+    public static func resolve(device: ScribeDeviceMute) -> ScribeMuteState {
         switch device {
         case .muted: return .muted
         case .unreadable: return .unknown
-        case .notMuted, .noSwitch: break
+        case .notMuted, .noSwitch: return .unmuted
         }
-        guard case .completed(let calls, let browserUnknown) = scan, !browserUnknown, calls.isEmpty else { return .unknown }
-        return .unmuted
     }
 
-    /// One reading: the admission verdict (fail-closed, unchanged) and, separately, whether a call was seen.
-    /// `callPresent` comes from `ScribeScanReducer.callPresence`, so it survives a muted device and an
-    /// incomplete scan; it never influences `admission`.
-    public static func sample(device: ScribeDeviceMute, scan: ScribeInputScan, callPresent: Bool) -> ScribeMuteSample {
-        ScribeMuteSample(admission: resolve(device: device, scan: scan), callPresent: callPresent)
+    /// One reading: the admission verdict and, separately, whether a call was seen. `callPresent` comes from
+    /// `ScribeScanReducer.callPresence`; it never influences `admission`.
+    public static func sample(device: ScribeDeviceMute, callPresent: Bool) -> ScribeMuteSample {
+        ScribeMuteSample(admission: resolve(device: device), callPresent: callPresent)
     }
 
     /// True when a call (or a browser that might be in one) is named by a COMPLETE scan. An incomplete scan names
@@ -1292,6 +1289,28 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         }
     }
 
+    /// One closed speech turn's voice, saved with the meeting so "Remember this voice" and the post-meeting
+    /// corrections still work after a relaunch. It lives only in this meeting's file (0600), is removed with
+    /// the file and is never uploaded. `vector` is little-endian Float32 (Codable stores it as base64).
+    /// Conversion to and from `ScribeTurnEmbedding` is in `ScribeMeetingVoices.swift`.
+    public struct TurnVoice: Codable, Equatable, Sendable {
+        public var segmentID: String
+        /// "microphone" or "system".
+        public var source: String
+        /// "handBuilt" or "wespeaker".
+        public var kind: String
+        public var vector: Data
+        public var duration: TimeInterval
+
+        public init(segmentID: String, source: String, kind: String, vector: Data, duration: TimeInterval) {
+            self.segmentID = segmentID
+            self.source = source
+            self.kind = kind
+            self.vector = vector
+            self.duration = duration
+        }
+    }
+
     public static let currentVersion = 1
 
     public var version: Int
@@ -1312,6 +1331,13 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
     public var transcriptionNote: String?
     /// True when the microphone was left out during a detected call. Absent in older files.
     public var micExcludedDuringCall: Bool?
+    /// Display names from the calendar invite (never email addresses). Absent in older files.
+    public var attendees: [String]?
+    /// Each closed turn's voice, for speaker naming after a relaunch. Absent in older files.
+    public var turnVoices: [TurnVoice]?
+    /// Who each name came from (typed, call window, invite, introduction, saved voice), how sure, names the
+    /// person declined, and folded tiny voices. Absent in older files: their names then count as typed.
+    public var speakerBook: ScribeSpeakerBook?
 
     public init(
         id: UUID,
@@ -1322,8 +1348,14 @@ public struct ScribeMeetingRecord: Codable, Equatable, Sendable {
         transcript: [ScribeTranscriptSegment],
         dismissedAt: Date? = nil,
         transcriptionNote: String? = nil,
-        micExcludedDuringCall: Bool = false
+        micExcludedDuringCall: Bool = false,
+        attendees: [String] = [],
+        turnVoices: [TurnVoice] = [],
+        speakerBook: ScribeSpeakerBook? = nil
     ) {
+        self.attendees = attendees.isEmpty ? nil : attendees
+        self.turnVoices = turnVoices.isEmpty ? nil : turnVoices
+        self.speakerBook = speakerBook
         self.transcriptionNote = transcriptionNote
         self.micExcludedDuringCall = micExcludedDuringCall ? true : nil
         self.version = Self.currentVersion

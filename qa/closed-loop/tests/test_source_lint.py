@@ -1,0 +1,719 @@
+"""Source lint for two crashes found by launching the packaged app (CI never launches it).
+
+1. `Bundle.module` in the app target traps in the packaged Zeus.app: SwiftPM's accessor looks
+   beside Zeus.app, while scripts/bundle.sh seals Zeus_Zeus.bundle in Contents/Resources.
+2. A TCC permission completion handler written inside a @MainActor type inherits main-actor
+   isolation; TCC calls it on a background queue and Swift 6 traps. Only the nonisolated
+   SystemAuthorization helper may pass these handlers.
+"""
+from pathlib import Path
+import re
+import unittest
+
+ROOT = Path(__file__).resolve().parents[3]
+APP = ROOT / "Sources/Zeus"
+HELPER = APP / "App/SystemAuthorization.swift"
+AUDIO_CALLBACK_APIS = re.compile(r"\.(?:installTap\(|recognitionTask\(with)")
+# Enclosing types audited as not main-actor isolated (2026-11-10), plus the nonisolated helper.
+AUDITED_AUDIO_FILES = {
+    "Audio/OffMainAudioCallbacks.swift", "Dictation/SpeechEngines.swift", "Polyglot/PolyglotAudio.swift",
+    "Polyglot/PolyglotEngines.swift", "Scribe/ScribeLiveCapture.swift", "Voice/SpeechInput.swift",
+    "Voice/WakeWordListener.swift",
+}
+HANDLER_APIS = re.compile(r"\b(?:SFSpeechRecognizer\.requestAuthorization|INFocusStatusCenter\.default\.requestAuthorization)\s*[({]")
+
+
+POINTING = APP / "Pointing"
+# Pointing must advance on real events, never a sleep, and must never use the word-count clock.
+POINTING_FORBIDDEN = re.compile(r"\bTask\.sleep\b|SpeechDrawingTimeline\.estimate|\.installTap\(|\brequestAccess\(|\brequestAuthorization\b|CGRequestScreenCaptureAccess|CGRequestListenEventAccess")
+# System callbacks that must be installed from a nonisolated function.
+POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents")
+
+
+def pointing_callback_offenders(text, label="sample"):
+    """Lines that install a system callback outside a function declared `nonisolated`."""
+    lines = text.splitlines()
+    offenders = []
+    for index, line in enumerate(lines):
+        if line.strip().startswith("//") or not POINTING_CALLBACK_APIS.search(line):
+            continue
+        header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
+        if "nonisolated" not in header:
+            offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
+def swift_files():
+    return sorted(APP.rglob("*.swift"))
+
+
+def code_lines(path):
+    for number, line in enumerate(path.read_text().splitlines(), 1):
+        stripped = line.strip()
+        if not stripped.startswith("//"):
+            yield number, line
+
+
+def strip_trailing_comment(line):
+    """The code part of a Swift line: drops a `//` comment that starts outside a string literal."""
+    in_string = False
+    escaped = False
+    for index, char in enumerate(line):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char == "/" and line[index + 1:index + 2] == "/":
+            return line[:index]
+    return line
+
+
+class SourceLint(unittest.TestCase):
+    def test_every_one_time_tab_upgrade_saves_the_row(self):
+        # A row upgrade that sets its flag but is missing from the save condition is lost on relaunch.
+        text = (APP / "TopBar/TopBarModel.swift").read_text()
+        flags = re.findall(r"let (add\w+|reorder) = !defaults\.bool\(forKey: \"topBar\.row", text)
+        save = re.search(r"if (reorder \|\|[^{]+)\{", text)
+        self.assertTrue(flags and save, "tab upgrade flags or save condition not found")
+        saved = {name.strip() for name in save.group(1).split("||")}
+        self.assertEqual(sorted(set(flags) - saved), [])
+
+    def test_app_target_never_uses_swiftpm_bundle_module(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p)
+                     if re.search(r"\bBundle\.module\b", line)]
+        self.assertEqual(offenders, [], "use ZeusResources.bundle; Bundle.module traps in the packaged app")
+
+    def test_tcc_completion_handlers_only_in_nonisolated_helper(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if p != HELPER
+                     for n, line in code_lines(p) if HANDLER_APIS.search(line)]
+        self.assertEqual(offenders, [], "await SystemAuthorization instead of passing a TCC handler")
+
+    def test_audio_taps_and_recognition_handlers_only_in_audited_files(self):
+        # Same trap as the TCC handler: a tap block or recognition handler written in a @MainActor
+        # type fails the executor check on the first buffer. New sites go through
+        # OffMainAudioCallbacks, or are added here only after their enclosing type is audited.
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files()
+                     if str(p.relative_to(APP)) not in AUDITED_AUDIO_FILES
+                     for n, line in code_lines(p) if AUDIO_CALLBACK_APIS.search(line)]
+        self.assertEqual(offenders, [], "use OffMainAudioCallbacks from @MainActor code")
+
+    def test_every_requested_permission_has_its_info_plist_usage_string(self):
+        # macOS terminates an app that requests a protected resource without the matching key.
+        # Live QA found Location and Focus requests with no usage string (2026-11-10).
+        import plistlib
+        info = plistlib.loads((ROOT / "Resources/Info.plist").read_bytes())
+        required = {
+            r"requestWhenInUseAuthorization|requestAlwaysAuthorization": "NSLocationWhenInUseUsageDescription",
+            r"INFocusStatusCenter\.default\.requestAuthorization": "NSFocusStatusUsageDescription",
+            r"AVCaptureDevice\.requestAccess\(for: *\.audio": "NSMicrophoneUsageDescription",
+            r"AVCaptureDevice\.requestAccess\(for: *\.video|requestCamera": "NSCameraUsageDescription",
+            r"SFSpeechRecognizer\.requestAuthorization": "NSSpeechRecognitionUsageDescription",
+            r"requestFullAccessToEvents": "NSCalendarsFullAccessUsageDescription",
+            r"requestFullAccessToReminders": "NSRemindersFullAccessUsageDescription",
+        }
+        missing = []
+        for pattern, key in required.items():
+            used = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p) if re.search(pattern, line)]
+            if used and not str(info.get(key, "")).strip():
+                missing.append(f"{key} (used at {used[0]})")
+        self.assertEqual(missing, [])
+
+    def test_user_visible_swift_strings_have_no_em_dash(self):
+        # House style: no em dashes in anything a person reads. Only the code part of each line is checked:
+        # a trailing `// comment` and whole-line comments may use one. ZeusCore is out of scope here because
+        # its dash handling (parsers that must recognise a dash) is covered by its own tests.
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p)
+                     if "—" in strip_trailing_comment(line)]
+        self.assertEqual(offenders, [], "rewrite with a comma, colon or full stop")
+
+    def test_em_dash_lint_is_precise(self):
+        self.assertEqual(strip_trailing_comment('let a = 1 // fine — a comment'), "let a = 1 ")
+        self.assertIn("—", strip_trailing_comment('Text("Overdue — do this next")'))
+        self.assertIn("—", strip_trailing_comment('Text("see https://x.test — now") // ok'))
+        self.assertNotIn("—", strip_trailing_comment('Text("ok") // https://x.test — note'))
+
+    def test_helper_is_nonisolated_and_covers_each_api(self):
+        text = "\n".join(line for _, line in code_lines(HELPER))
+        self.assertNotIn("@MainActor", text)
+        self.assertEqual(len(HANDLER_APIS.findall(text)), 2)
+        self.assertEqual(text.count("nonisolated static func"), 2)
+
+    def test_pointing_never_sleeps_or_requests_permission_or_uses_the_estimated_clock(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in sorted(POINTING.rglob("*.swift"))
+                     for n, line in code_lines(p) if POINTING_FORBIDDEN.search(line)]
+        self.assertEqual(offenders, [])
+
+    def test_pointing_system_callbacks_are_installed_from_nonisolated_functions(self):
+        offenders = []
+        for p in sorted(POINTING.rglob("*.swift")):
+            offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(ROOT)))
+        self.assertEqual(offenders, [])
+
+    def test_pointing_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: the exact shapes the lint exists to catch.
+        self.assertTrue(POINTING_FORBIDDEN.search("try await Task.sleep(for: .seconds(1))"))
+        self.assertTrue(POINTING_FORBIDDEN.search("let t = SpeechDrawingTimeline.estimate(text)"))
+        self.assertTrue(POINTING_FORBIDDEN.search("CGRequestScreenCaptureAccess()"))
+        bad = "@MainActor final class A {\n    func start() {\n        NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { _ in }\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(bad), ["sample:3"])
+        good = "enum B {\n    nonisolated static func start() {\n        CGEvent.tapCreate(tap: x)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(good), [])
+
+    def test_lint_detects_the_original_crash_shapes(self):
+        # Fail-first evidence kept as a test: the exact pre-fix lines must be flagged.
+        self.assertTrue(HANDLER_APIS.search("SFSpeechRecognizer.requestAuthorization { _ in continuation.resume() }"))
+        self.assertTrue(HANDLER_APIS.search("INFocusStatusCenter.default.requestAuthorization { _ in }"))
+        self.assertTrue(re.search(r"\bBundle\.module\b", "Bundle.module.url(forResource: name)"))
+
+
+# Speaker recognition (docs/SPEAKER-IDENTIFICATION.md): the WeSpeaker model downloads only from an explicit click.
+SPEAKER_MODEL_FILE = "Scribe/ScribeVoiceModel.swift"
+SPEAKER_SETTINGS_FILE = "Settings/GSSpeakerRecognitionCard.swift"
+SPEAKER_CORE = ROOT / "Sources/ZeusCore/Scribe"
+SPEAKER_CORE_FILES = ["ScribeVoiceEmbedding.swift", "ScribeDiarizer.swift", "ScribeSpeakerNames.swift", "ScribeSpeakerCorrection.swift",
+                      "ScribeVoiceLibrary.swift", "ScribeNameSuggester.swift"]
+
+
+class SpeakerRecognitionLint(unittest.TestCase):
+    def test_diarizer_models_are_named_only_in_the_model_file(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if str(p.relative_to(APP)) != SPEAKER_MODEL_FILE
+                     for n, line in code_lines(p) if re.search(r"\bDiarizerModels\b", line)]
+        self.assertEqual(offenders, [], "only ScribeVoiceModel.swift may touch DiarizerModels")
+
+    def test_download_is_reachable_only_from_the_settings_click(self):
+        # The download call lives in the model file; its controller's prepare() is called by the Settings card only.
+        download = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if str(p.relative_to(APP)) != SPEAKER_MODEL_FILE
+                    for n, line in code_lines(p) if re.search(r"SpeakerModelStore\.download\b", line)]
+        self.assertEqual(download, [])
+        prepare = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files()
+                   if str(p.relative_to(APP)) not in (SPEAKER_MODEL_FILE, SPEAKER_SETTINGS_FILE)
+                   for n, line in code_lines(p) if re.search(r"SpeakerModelController\b", line)]
+        self.assertEqual(prepare, [], "no launch or meeting path may start the model download")
+        card = "\n".join(line for _, line in code_lines(APP / SPEAKER_SETTINGS_FILE))
+        self.assertEqual(len(re.findall(r"model\.prepare\(\)", card)), 2)
+        self.assertIn('Button("Download")', card)
+        self.assertIn("Only save voices of people who agreed.", card)
+
+    def test_meeting_code_only_loads_a_model_that_is_already_on_disk(self):
+        model = "\n".join(line for _, line in code_lines(APP / SPEAKER_MODEL_FILE))
+        load = model[model.index("static func loadEmbedder"):]
+        self.assertLess(load.index("guard isDownloaded"), load.index("DiarizerModels.load"))
+
+    def test_speaker_files_do_not_sleep_and_core_stays_free_of_fluidaudio(self):
+        for name in (SPEAKER_MODEL_FILE, SPEAKER_SETTINGS_FILE):
+            offenders = [n for n, line in code_lines(APP / name) if re.search(r"\bTask\.sleep\b", line)]
+            self.assertEqual(offenders, [], name)
+        for name in SPEAKER_CORE_FILES:
+            lines = list(code_lines(SPEAKER_CORE / name))
+            self.assertEqual([n for n, line in lines if "import FluidAudio" in line], [], name)
+            self.assertEqual([n for n, line in lines if "\u2014" in strip_trailing_comment(line)], [], name)
+            self.assertEqual([n for n, line in lines if re.search(r"\bTask\.sleep\b", line)], [], name)
+
+    def test_saved_voices_never_leave_the_mac(self):
+        for name in ("ScribeVoiceLibrary.swift",):
+            text = "\n".join(line for _, line in code_lines(SPEAKER_CORE / name))
+            self.assertNotIn("URLSession", text)
+            self.assertNotIn("Second Brain", text)
+        self.assertIn('appendingPathComponent("Voices"', "\n".join(line for _, line in code_lines(SPEAKER_CORE / "ScribeVoiceLibrary.swift")))
+
+    def test_speaker_lint_detects_its_failure_shapes(self):
+        self.assertTrue(re.search(r"\bDiarizerModels\b", "let m = try await DiarizerModels.download()"))
+        self.assertTrue(re.search(r"SpeakerModelStore\.download\b", "try await SpeakerModelStore.download { _ in }"))
+        self.assertTrue(re.search(r"SpeakerModelController\b", "SpeakerModelController.shared.prepare()"))
+
+
+# --- Settings must never freeze (REG-225) -------------------------------------------------------------
+# A blocking wait on the main thread freezes the window. These primitives are banned in app sources
+# unless the file is audited as background-only (or a bounded quit-time wait) and says why.
+SOURCES = ROOT / "Sources"
+BLOCKING_PATTERNS = {
+    "DispatchQueue.main.sync": re.compile(r"DispatchQueue\.main\.sync\b"),
+    "semaphore or group wait": re.compile(r"\.wait\(\s*(?:timeout:|\))"),
+    "waitUntilExit": re.compile(r"\bwaitUntilExit\(\)"),
+}
+AUDITED_BLOCKING_FILES = {
+    "Zeus/App/PermissionsModel.swift": "Automation checks wait on global queues, bounded by a 1 s timeout, never on main.",
+    "Zeus/Prompter/PresenterNotesController.swift": "OsascriptRunner and PPTXArchive run only inside Task.detached.",
+    "Zeus/Brain/SpotlightClient.swift": "mdfind runs only inside Task.detached (VoiceTurnController).",
+    "Zeus/Insomnia/InsomniaController.swift": "Quit-time wait for the Insomnia queue, bounded to 3 s.",
+    "Zeus/Voice/KokoroWorkerSession.swift": "Child reaping on the worker's own queue and awaited tasks.",
+    "Zeus/Watch/ZeusWatchRunner.swift": "Child wait inside a continuation on a global queue, killed after 3 s.",
+    "Zeus/App/KeychainSelfTest.swift": "Command-line self test: no window exists.",
+    "Zeus/Voice/VoiceSample.swift": "Command-line sample mode: no window exists.",
+    "ZeusCore/Insomnia/InsomniaCommands.swift": "ProcessCommandRunner runs on the Insomnia serial queue; every wait has a timeout.",
+    "ZeusCore/Diagnostics/FlightRecorder.swift": "The ditto zip is exported from Task.detached (GSDiagnosticsLogs).",
+}
+KEYCHAIN_MODULE = "ZeusCore/Keychain/"
+
+
+def blocking_offenders(text, label="sample"):
+    """`label:line` for each banned blocking call in the code part of `text`."""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        code = strip_trailing_comment(line)
+        if code.strip().startswith("//"):
+            continue
+        if any(pattern.search(code) for pattern in BLOCKING_PATTERNS.values()):
+            found.append(f"{label}:{number}")
+    return found
+
+
+class SettingsNeverFreezeLint(unittest.TestCase):
+    def test_no_blocking_waits_outside_audited_files(self):
+        offenders = []
+        for path in sorted(SOURCES.rglob("*.swift")):
+            relative = path.relative_to(SOURCES).as_posix()
+            if relative in AUDITED_BLOCKING_FILES:
+                continue
+            offenders += blocking_offenders(path.read_text(), relative)
+        self.assertEqual(offenders, [], "blocking call outside an audited background-only file")
+
+    def test_audited_files_exist_and_still_need_their_entry(self):
+        for relative, reason in AUDITED_BLOCKING_FILES.items():
+            path = SOURCES / relative
+            self.assertTrue(path.exists(), f"{relative} is gone: drop its allowlist entry")
+            self.assertTrue(reason.strip())
+            self.assertTrue(blocking_offenders(path.read_text(), relative), f"{relative} no longer blocks: drop its entry")
+
+    def test_keychain_is_read_only_through_the_keychain_module(self):
+        offenders = []
+        for path in sorted(SOURCES.rglob("*.swift")):
+            relative = path.relative_to(SOURCES).as_posix()
+            if relative.startswith(KEYCHAIN_MODULE):
+                continue
+            offenders += [f"{relative}:{n}" for n, line in code_lines(path) if "SecItemCopyMatching" in strip_trailing_comment(line)]
+        self.assertEqual(offenders, [], "SecItemCopyMatching belongs in ZeusCore/Keychain (KeychainStore caches it)")
+
+    def test_settings_pages_never_read_the_login_items_service_in_a_view(self):
+        # SMAppService.status is a synchronous daemon round trip: only SettingsStore.swift may touch it.
+        offenders = []
+        for path in swift_files():
+            relative = path.relative_to(APP).as_posix()
+            if relative == "App/SettingsStore.swift":
+                continue
+            offenders += [f"{relative}:{n}" for n, line in code_lines(path) if "SMAppService.mainApp" in strip_trailing_comment(line)]
+        self.assertEqual(offenders, [])
+
+    def test_selftests_have_no_docstrings(self):
+        # unittest -v prints a test docstring on its own line, which splits "name ... ok" and makes the
+        # closed-loop gate count fewer passing cases than ran ("Python cases missing/duplicated/skipped").
+        import re
+        offenders = []
+        for path in sorted((ROOT / "qa/closed-loop/tests").glob("test_*.py")):
+            text = path.read_text()
+            for match in re.finditer(r"^\s+def (test_\w+)\(self[^)]*\):\s*\n\s+(\"\"\"|\'\'\')", text, re.MULTILINE):
+                offenders.append(f"{path.name}:{match.group(1)}")
+        self.assertEqual(offenders, [], "use a comment, not a docstring, in closed-loop selftests")
+
+    def test_every_settings_card_and_page_is_placed_on_a_page(self):
+        # A card or page that is defined but never instantiated cannot be reached (the Language packs and
+        # Speaker recognition cards were once orphaned this way). Intentional exceptions are listed by name.
+        # IntegrationsPage is the superseded integrations page (AIConnectionsPage is routed); left in place, reported.
+        allowed_unplaced = {"IntegrationsPage"}
+        defined = {}
+        for folder in ("Settings", "App"):
+            for path in sorted((APP / folder).glob("*.swift")):
+                for _, line in code_lines(path):
+                    match = re.match(r"\s*(?:private |fileprivate )?struct (\w+(?:Card|SettingsPage|Page))\b", line)
+                    if match and (folder == "Settings" or path.name.endswith("Pages.swift") or path.name.endswith("Settings.swift")):
+                        defined[match.group(1)] = path
+        self.assertIn("LanguagePacksCard", defined)
+        self.assertIn("SpeakerRecognitionCard", defined)
+        orphans = []
+        for name, home in sorted(defined.items()):
+            if name in allowed_unplaced:
+                continue
+            use = re.compile(rf"\b{name}\s*[({{]")
+            placed = any(use.search(strip_trailing_comment(line))
+                         for path in swift_files() for _, line in code_lines(path)
+                         if not re.match(r"\s*(?:private |fileprivate )?struct ", line))
+            if not placed:
+                orphans.append(f"{name} ({home.relative_to(APP).as_posix()})")
+        self.assertEqual(orphans, [], "defined but never placed on a Settings page: add it to a page or list it in allowed_unplaced")
+
+    def test_blocking_lint_detects_its_failure_shapes(self):
+        self.assertTrue(blocking_offenders("DispatchQueue.main.sync { work() }"))
+        self.assertTrue(blocking_offenders("let r = semaphore.wait(timeout: .now() + 1)"))
+        self.assertTrue(blocking_offenders("done.wait()"))
+        self.assertTrue(blocking_offenders("process.waitUntilExit()"))
+        self.assertFalse(blocking_offenders("case .wait(let ms): return ms"))
+        self.assertFalse(blocking_offenders("// done.wait() would block"))
+        self.assertFalse(blocking_offenders('let note = "never call process.waitUntilExit()" // x'.replace("waitUntilExit()", "wait")))
+
+
+# "laya" as its own word or name part (not "playback" or "overlay a..."): case-insensitive.
+LAYA_WORD = re.compile(r"(?<![A-Za-z])[Ll][Aa][Yy][Aa](?![a-z])")
+# The one allowed spelling: the owner's existing Kokoro model folder is literally named jarvis-laya-backend.
+LAYA_EXTERNAL_FOLDER = "jarvis-laya-backend"
+
+
+def laya_offenders(text, label="sample"):
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if LAYA_WORD.search(line.replace(LAYA_EXTERNAL_FOLDER, ""))]
+
+
+class LayaRemovedLint(unittest.TestCase):
+    """The Laya local decision server was removed; Jev is the only model stage of instant commands."""
+
+    def test_sources_never_mention_laya(self):
+        offenders = []
+        for path in sorted((ROOT / "Sources").rglob("*.swift")):
+            offenders += laya_offenders(path.read_text(), path.relative_to(ROOT).as_posix())
+        self.assertEqual(offenders, [], "Laya was removed; Jev is the only decision stage")
+
+    def test_laya_lint_detects_its_failure_shapes(self):
+        self.assertTrue(laya_offenders("case laya, jev"))
+        self.assertTrue(laya_offenders("LayaHelper.shared.shutdown()"))
+        self.assertTrue(laya_offenders("// Laya answers on this Mac"))
+        self.assertTrue(laya_offenders('exec("laya-serve")'))
+        self.assertFalse(laya_offenders("let playback = overlayAnimation"))
+        self.assertFalse(laya_offenders('path("AI-Brain-build/jarvis-laya-backend/models")'))
+
+
+# "Talk to Zeus" latency (owner run of build 0405391: four engines tried one after another, 85 s of silence).
+VOICE_TURN = APP / "App/VoiceTurnController.swift"
+CLAUDE_PROVIDER = APP / "Brain/Providers/ClaudeCLIProvider.swift"
+TURN_RACE_CORE = ROOT / "Sources/ZeusCore/Brain/TurnRace.swift"
+
+
+class VoiceLatencyLint(unittest.TestCase):
+    def _turn_text(self):
+        return "\n".join(line for _, line in code_lines(VOICE_TURN))
+
+    def test_engines_are_raced_in_parallel_never_tried_one_after_another(self):
+        text = self._turn_text()
+        self.assertIn("FastRaceRun(", text)
+        self.assertNotRegex(text, r"while\s+cursor\s*<\s*candidates\.count", "sequential fallback loop is back")
+
+    def test_no_network_probe_or_warm_wait_before_the_engines_start(self):
+        text = self._turn_text()
+        run_turn = text[text.index("private func runTurn"):text.index("VoiceAnswerLatency.beginTurn()")]
+        self.assertNotIn("OllamaHTTPProbe", run_turn)
+        self.assertNotIn("awaitIfNeeded", run_turn)
+
+    def test_first_text_budget_is_at_most_eight_seconds(self):
+        core = "\n".join(line for _, line in code_lines(TURN_RACE_CORE))
+        budget = int(re.search(r"firstTextBudgetMs\s*=\s*([0-9_]+)", core).group(1).replace("_", ""))
+        self.assertLessEqual(budget, 8000)
+        filler = int(re.search(r"fillerMs\s*=\s*([0-9_]+)", core).group(1).replace("_", ""))
+        self.assertLessEqual(filler, 900)
+
+    def test_spoken_claude_launch_is_lean(self):
+        text = "\n".join(line for _, line in code_lines(CLAUDE_PROVIDER))
+        self.assertIn('"--safe-mode"', text)
+        self.assertIn('"--tools", ""', text)
+        # The help probe must use the located binary: a GUI app's PATH has no ~/.local/bin.
+        self.assertNotIn('"/usr/bin/env"', text)
+
+    def test_nothing_warms_at_launch_and_the_talk_key_warms_the_brain(self):
+        text = self._turn_text()
+        init = text[text.index("init("):text.index("private func armAhead")]
+        for forbidden in ("prewarm", "BrainLaunchWarm", "ClaudeFlags.warm", "warmSelectedVoice"):
+            self.assertNotIn(forbidden, init, f"{forbidden} runs at launch")
+        press = text[text.index("func press()"):text.index("func release()")]
+        self.assertIn("KeyDownWarmer.talkKeyDown()", press)
+        self.assertIn("abortBusy()", press)
+
+    def test_every_turn_writes_one_voice_latency_line_without_text(self):
+        latency = (ROOT / "Sources/Zeus/Voice/VoiceLatency.swift").read_text()
+        self.assertIn('NSLog("[ZEUS] voice-latency %@"', latency)
+        self.assertNotIn("transcript:", latency)
+        text = self._turn_text()
+        for stage in (".transcriptFinal", ".requestSent", ".firstToken", ".firstSentence"):
+            self.assertIn(f"VoiceLatency.shared.mark({stage})", text)
+        speaker = (ROOT / "Sources/Zeus/Voice/Speaker.swift").read_text()
+        self.assertIn("VoiceLatency.shared.mark(.firstAudio)", speaker)
+        self.assertIn("VoiceLatency.shared.mark(.ttsRequest)", speaker)
+
+    def test_the_voice_is_never_designed_without_a_tap(self):
+        for path in (ROOT / "Sources/Zeus").rglob("*.swift"):
+            self.assertNotIn("designUltronVoiceOnce", path.read_text(), str(path))
+
+    def test_latency_lint_detects_its_failure_shapes(self):
+        self.assertTrue(re.search(r"while\s+cursor\s*<\s*candidates\.count", "while cursor < candidates.count {"))
+
+
+
+import importlib.util as _ilu
+
+_VL_SPEC = _ilu.spec_from_file_location("voice_latency", ROOT / "scripts/voice-latency.py")
+voice_latency = _ilu.module_from_spec(_VL_SPEC)
+_VL_SPEC.loader.exec_module(voice_latency)
+
+LINE = ('2026-11-11T14:00:01.100-05:00 voice-latency turn=a1 key_up=0 transcript=300 request=320 first_token=780 '
+        'first_sentence=1000 tts_request=1010 first_audio=1350 turn_end=4800 ttfa=1350 brain=anthropic-api '
+        'model=claude-haiku-5-5 tts=elevenlabs/eleven_flash_v2_5 voice=v effect=60 reason="auto: best, low delay"')
+
+
+class VoiceLatencyScript(unittest.TestCase):
+    def test_parses_a_log_line_with_a_quoted_reason(self):
+        row = voice_latency.parse(LINE)
+        self.assertEqual(row["turn"], "a1")
+        self.assertEqual(row["at"], "14:00:01")
+        self.assertEqual(voice_latency.number(row, "ttfa"), 1350)
+        self.assertEqual(row["reason"], "auto: best, low delay")
+
+    def test_ignores_other_lines_and_dashes(self):
+        self.assertIsNone(voice_latency.parse("2026-11-11T14:00:09.000-05:00 speak engine=x"))
+        row = voice_latency.parse(LINE.replace("ttfa=1350", "ttfa=-"))
+        self.assertIsNone(voice_latency.number(row, "ttfa"))
+
+    def test_percentiles_interpolate(self):
+        self.assertEqual(voice_latency.percentile([], 0.5), None)
+        self.assertEqual(voice_latency.percentile([100], 0.9), 100)
+        self.assertEqual(voice_latency.percentile([100, 200], 0.5), 150)
+        self.assertEqual(voice_latency.percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.9), 9.1)
+
+    def test_summary_reports_p50_p90_and_the_route_target(self):
+        rows = [voice_latency.parse(LINE.replace("ttfa=1350", f"ttfa={ms}")) for ms in (1000, 1100, 1200, 2000)]
+        text = voice_latency.summary(rows)
+        self.assertIn("key-up -> first audio: p50 1150 ms", text)
+        self.assertIn("target p50 for this route: 1200 ms -> PASS", text)
+
+    def test_log_line_never_needs_a_transcript(self):
+        row = voice_latency.parse(LINE)
+        self.assertNotIn("transcript_text", row)
+
+
+# Third state-machine pass (docs/STATE-MACHINES.md): wiring the pure reducers cannot see.
+
+
+def pass3_source(rel):
+    return (ROOT / rel).read_text(encoding="utf-8")
+
+
+def pass3_function_body(text, signature):
+    start = text.index(signature)
+    brace = text.index("{", start)
+    depth = 0
+    for index in range(brace, len(text)):
+        depth += {"{": 1, "}": -1}.get(text[index], 0)
+        if depth == 0:
+            return text[brace:index]
+    raise AssertionError(signature)
+
+
+class Pass3VoiceTurnWiring(unittest.TestCase):
+    TEXT = pass3_source("Sources/Zeus/App/VoiceTurnController.swift")
+
+    def test_turn_flag_is_a_latest_run_not_a_bool(self):
+        self.assertIn("private var turnRun = LatestRun()", self.TEXT)
+        self.assertNotRegex(self.TEXT, r"turnRunning\s*=\s*(true|false)")
+
+    def test_press_stops_the_hands_free_timer(self):
+        body = pass3_function_body(self.TEXT, "func press() -> Bool")
+        self.assertIn("handsFreeTask?.cancel()", body)
+        self.assertIn("turnRun.invalidate()", body)
+
+    def test_wake_turn_stops_the_previous_answer_and_its_deep_follow_up(self):
+        body = pass3_function_body(self.TEXT, "func wakeTurn(request: String)")
+        self.assertIn("fastRace?.cancel()", body)
+        self.assertIn("ahead.cancel()", body)
+
+
+class Pass3SpeakerWiring(unittest.TestCase):
+    TEXT = pass3_source("Sources/Zeus/Voice/Speaker.swift")
+
+    def test_provider_failures_are_not_recorded_for_a_cancelled_line(self):
+        notes = re.findall(r"^(.*noteProviderFailure\(.*)$", self.TEXT, re.M)
+        self.assertGreaterEqual(len(notes), 4)
+        for line in notes:
+            self.assertIn("countsAsFailure()", line, line)
+
+    def test_rendered_files_are_dropped_after_a_cancel(self):
+        for engine in ("speakKokoro", "speakChatterbox"):
+            body = pass3_function_body(self.TEXT, f"private func {engine}(")
+            self.assertIn("SpeechAttemptPolicy.mayPlay", body, engine)
+
+
+class Pass3RaceRunWiring(unittest.TestCase):
+    def test_only_live_tiers_count_as_failed(self):
+        text = pass3_source("Sources/Zeus/Brain/FastRaceRun.swift")
+        self.assertGreaterEqual(text.count("guard state.isLive(id) else { break }"), 2)
+
+
+class Pass3RecordlyWiring(unittest.TestCase):
+    def test_leaving_the_record_page_cancels_the_countdown(self):
+        self.assertIn(".onDisappear { recordly.pageDisappeared() }", pass3_source("Sources/Zeus/Recordly/RecordlyPage.swift"))
+        body = pass3_function_body(pass3_source("Sources/Zeus/Recordly/RecordlyController.swift"), "func pageDisappeared()")
+        self.assertIn("countdown.send(.cancel)", body)
+
+
+class Pass3NotchWiring(unittest.TestCase):
+    TEXT = pass3_source("Sources/Zeus/Notch/NotchController.swift")
+
+    def test_alert_timers_pause_while_the_capsule_is_covered(self):
+        self.assertIn("model.alerts.setSuspended(presentation != .closed", pass3_function_body(self.TEXT, "func show(_ presentation"))
+
+    def test_a_snoozed_alert_returns_even_when_the_notch_is_open(self):
+        self.assertIn("whileOpen: true", pass3_function_body(self.TEXT, "func snoozeAlert("))
+
+
+class Pass3StaleReadWiring(unittest.TestCase):
+    def test_launch_at_login_read_is_invalidated_by_a_toggle(self):
+        text = pass3_source("Sources/Zeus/App/SettingsStore.swift")
+        self.assertIn("launchReads.invalidate()", pass3_function_body(text, "private func applyLaunchAtLogin("))
+        self.assertIn("launchReads.isCurrent(read)", text)
+
+    def test_hook_read_is_invalidated_by_connect_and_disconnect(self):
+        text = pass3_source("Sources/Zeus/Integrations/AIConnections.swift")
+        self.assertGreaterEqual(text.count("hookReads.invalidate()"), 3)
+        self.assertIn("hookReads.isCurrent(read)", text)
+
+
+# Model downloads and launch warm-ups (docs/SECURITY-FIXES-20261111.md): a model download starts only from an
+# explicit user button, and the brains are never pinged at launch or wake.
+SPEECH_ENGINES_FILE = "Dictation/SpeechEngines.swift"
+DOWNLOAD_CALLS = re.compile(r"\bAsrModels\.(?:downloadAndLoad|download)\b|\bWhisperKit\.download\b|\bDiarizerModels\.download\b")
+
+
+def parakeet_transcribe_body(text):
+    start = text.index("func transcribe(samples")
+    return text[start:text.index("\n    }\n", start)]
+
+
+class ModelDownloadConsentLint(unittest.TestCase):
+    def test_parakeet_download_is_named_only_in_the_engine_file(self):
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() if str(p.relative_to(APP)) != SPEECH_ENGINES_FILE
+                     for n, line in code_lines(p) if re.search(r"\bAsrModels\.(?:downloadAndLoad|download)\b", line)]
+        self.assertEqual(offenders, [], "only SpeechEngines.swift may download the Parakeet model")
+
+    def test_download_is_behind_the_explicit_prepare_path(self):
+        text = "\n".join(line for _, line in code_lines(APP / SPEECH_ENGINES_FILE))
+        self.assertIn("allowDownload: true", text)
+        self.assertLess(text.index("if downloading, !allowDownload"), text.index("AsrModels.downloadAndLoad"))
+        prepare = text[text.index("func prepare(progress"):text.index("func transcribe(samples")]
+        self.assertIn("allowDownload: true", prepare)
+        self.assertNotIn("allowDownload: true", parakeet_transcribe_body(text), "transcribe must never download")
+        self.assertIn("allowDownload: false", parakeet_transcribe_body(text))
+
+    def test_no_model_download_call_runs_from_launch_or_wake(self):
+        for name in ("App/AppDelegate.swift", "App/VoiceTurnController.swift", "Brain/BrainWarmScheduler.swift"):
+            text = "\n".join(line for _, line in code_lines(APP / name))
+            self.assertIsNone(DOWNLOAD_CALLS.search(text), name)
+
+    def test_launch_and_wake_do_not_warm_the_brains(self):
+        voice = "\n".join(line for _, line in code_lines(APP / "App/VoiceTurnController.swift"))
+        self.assertNotIn("BrainLaunchWarm", voice)
+        self.assertNotIn(".prewarm()", voice)
+        self.assertIn("BrainWarmScheduler.shared.talkKeyDown()", voice)
+        scheduler = "\n".join(line for _, line in code_lines(APP / "Brain/BrainWarmScheduler.swift"))
+        self.assertNotIn("didWakeNotification", scheduler)
+        self.assertNotIn("forced", scheduler)
+
+    def test_the_hud_monitor_has_no_constant_fast_timer(self):
+        text = "\n".join(line for _, line in code_lines(APP / "TopBar/SystemHUDMonitor.swift"))
+        self.assertNotRegex(text, r"Timer\(timeInterval:\s*0\.1")
+        self.assertNotIn("repeats: true", text)
+        self.assertIn("SystemHUDPollPolicy", text)
+
+    def test_lint_detects_its_failure_shapes(self):
+        self.assertTrue(DOWNLOAD_CALLS.search("let m = try await AsrModels.downloadAndLoad(version: v)"))
+        self.assertTrue(re.search(r"Timer\(timeInterval:\s*0\.1", "pollTimer = Timer(timeInterval: 0.1, repeats: true) {"))
+        sample = "func transcribe(samples: [Float]) async throws -> String {\n        let m = try await loadedManager(progress: nil, allowDownload: true)\n    }\n"
+        self.assertIn("allowDownload: true", parakeet_transcribe_body(sample))
+
+
+class PointingMainActorLint(unittest.TestCase):
+    """Pointing: this process's Accessibility calls stay on the main actor, and the held-key overlay never takes the mouse."""
+    POINTING = APP / "Pointing"
+
+    def test_probe_ax_calls_stay_on_the_main_actor(self):
+        probe = (self.POINTING / "PointingTargetProbe.swift").read_text()
+        self.assertRegex(probe, r"@MainActor\s+static func hitTest\(atQuartzPoint")
+        self.assertNotRegex(probe, r"nonisolated\s+static func hitTest")
+
+    def test_no_pointing_source_runs_the_hit_test_on_a_detached_task(self):
+        for path in self.POINTING.glob("*.swift"):
+            match = re.search(r"Task\.detached[^\n]*\n?[^\n]*hitTest", path.read_text())
+            self.assertIsNone(match, f"{path.name}: hit test inside Task.detached")
+
+    def test_holding_the_keys_never_captures_the_mouse(self):
+        controller = (self.POINTING / "PointingController.swift").read_text()
+        self.assertNotIn("show(capturingMouse: true)", controller)
+        self.assertIn("show(capturingMouse: false)", controller)
+
+
+def mic_read(relative):
+    return (APP / relative).read_text()
+
+
+def mic_body(text, start, end):
+    first = text.index(start)
+    return text[first:text.index(end, first)]
+
+
+class MicReleaseTests(unittest.TestCase):
+    def test_quitting_restores_the_ducked_output_device(self):
+        terminate = mic_body(mic_read("App/AppDelegate.swift"), "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertIn("SystemAudioDucker.end()", terminate)
+        ducker = mic_read("Voice/SystemAudioDucker.swift")
+        end = mic_body(ducker, "static func end()", "private static func isMuted")
+        self.assertIn("duckedDevice", end)
+        self.assertNotIn("defaultOutput()", end)
+
+    def test_a_spoken_todo_releases_the_microphone_when_its_page_closes_or_after_a_minute(self):
+        self.assertIn(".onDisappear { todo.endVoice() }", mic_read("TopBar/TodoPage.swift"))
+        controller = mic_read("TopBar/TodoController.swift")
+        self.assertIn("static let voiceLimitSeconds = 60", controller)
+        self.assertIn("func endVoice()", controller)
+
+    def test_closing_the_prompter_cancels_a_recording_that_is_still_starting(self):
+        window = mic_read("Prompter/PrompterWindow.swift")
+        close = mic_body(window, "func close()", "onVisibilityChange()")
+        self.assertIn("recorder.cancel()", close)
+        recorder = mic_read("Prompter/PrompterRecorder.swift")
+        self.assertIn("if cancelRequested {", recorder)
+        self.assertIn("func cancel()", recorder)
+
+    def test_scribe_never_withholds_the_microphone_because_another_app_uses_it(self):
+        detector = mic_read("Scribe/ScribeMuteDetector.swift")
+        coverage = mic_body(detector, "func coverage(start:", "func otherAppUsingMicrophone")
+        self.assertNotIn("hasExternalInput", coverage)
+        capture = mic_read("Scribe/ScribeLiveCapture.swift")
+        self.assertNotIn("microphoneExcludedByCall", capture)
+        rebuild = mic_body(capture, "private func micConfigurationChanged()", "// MARK: System audio")
+        self.assertIn(".defaultInputChanged", rebuild)
+
+
+
+class ScribeMeetingCardTests(unittest.TestCase):
+    def test_scribe_meeting_cards_take_the_first_click(self):
+        driver = mic_read("Scribe/ScribePopupDriver.swift")
+        host = mic_body(driver, "final class ScribeCardHostingView", "final class ScribePopupDriver")
+        self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", host)
+        self.assertIn(".activeAlways", host)
+        for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingBanner.swift"):
+            text = mic_read(card)
+            self.assertIn("ScribeCardHostingView(rootView:", text, card)
+            self.assertNotIn("NSHostingView(rootView:", text, card)
+
+    def test_scribe_meeting_card_taps_go_through_the_lifecycle(self):
+        popup = mic_read("Scribe/ScribeCallPopup.swift")
+        self.assertIn("model.onRecord = { [weak self] in self?.driver.click() }", popup)
+        self.assertNotIn("autoHide", popup)
+        hide = mic_body(popup, "    func hide() {", "    func refresh(")
+        self.assertIn("guard !driver.isBusy else { return }", hide)
+        banner = mic_read("Scribe/ScribeMeetingBanner.swift")
+        self.assertIn("Button(model.primaryTitle) { model.primaryTapped() }", banner)
+        hide = mic_body(banner, "    func hide() {", "    private func begin(")
+        self.assertIn("guard !driver.isBusy else { return }", hide)
+        controller = mic_read("Scribe/ScribeAutoStartController.swift")
+        accept = mic_body(controller, "    func accept() {", "    func decline() {")
+        self.assertIn(".startNow(meeting, now: now)", accept)
+
+    def test_scribe_meeting_card_taps_are_logged(self):
+        driver = mic_read("Scribe/ScribePopupDriver.swift")
+        for stage in ('"click"', '"start requested"', '"start ok"', '"start failed"'):
+            self.assertIn(stage, driver)
+        self.assertIn('NSLog("[ZEUS] scribe popup: %@ %@"', driver)
+        self.assertIn("FlightRecorder.shared.record(", driver)
+
+
+if __name__ == "__main__":
+    unittest.main()

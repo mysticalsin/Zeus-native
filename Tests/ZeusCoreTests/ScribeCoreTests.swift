@@ -113,6 +113,19 @@ private final class OrderLog: @unchecked Sendable {
     func add(_ entry: String) { lock.withLock { entries.append(entry) } }
 }
 
+/// These deliberately blocking contention workers must not depend on the global dispatch pool,
+/// which the complete parallel test module also uses. Each case starts at most two owned threads;
+/// the existing bounded waits and deferred sink release still detect hangs and ordering failures.
+private func startRouterContentionWorker(group: DispatchGroup, operation: @escaping @Sendable () -> Void) {
+    group.enter()
+    let thread = Thread {
+        defer { group.leave() }
+        operation()
+    }
+    thread.name = "zeus-router-contention-test"
+    thread.start()
+}
+
 /// One-shot arm flag shared by the blocking sinks: only the first delivery blocks.
 private final class BlockOnce: @unchecked Sendable {
     private let lock = NSLock()
@@ -199,18 +212,19 @@ private final class BlockingTranscriber: ScribeTranscriber, @unchecked Sendable 
 
 @Suite("Scribe mic gate and router")
 struct ScribeMicGateRouterTests {
-    @Test func anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition() {
+    @Test func anUnsupportedMicrophoneOwnerStillLetsTheMicrophoneThrough() {
         let scan = ScribeScanReducer.reduce(
             reads: [.input(pid: 50, bundleID: "com.example.unsupported-call")],
             running: [], ownPID: 1
         )
-        let state = ScribeMuteResolver.resolve(device: .noSwitch, scan: scan)
-        let rig = RouterRig(mute: state)
-        #expect(rig.router.route(rig.frame(.microphone, 0)) == .droppedMicrophone(.muteUnknown))
-        #expect(rig.store.stored.isEmpty)
-        #expect(rig.transcriber.ingested.isEmpty)
-        // Remote participants remain independent of the microphone admission verdict.
+        #expect(scan == .incomplete)
+        // Another app sharing the input never withholds the person's microphone; only the device's mute does.
+        let rig = RouterRig(mute: ScribeMuteResolver.resolve(device: .noSwitch))
+        #expect(rig.router.route(rig.frame(.microphone, 0)) == .delivered)
         #expect(rig.router.route(rig.frame(.system, 1)) == .delivered)
+        let muted = RouterRig(mute: ScribeMuteResolver.resolve(device: .muted))
+        #expect(muted.router.route(muted.frame(.microphone, 0)) != .delivered)
+        #expect(muted.store.stored.isEmpty)
     }
 
     @Test func mutedAndUnknownMicFramesReachNeitherStoreNorTranscriber() {
@@ -363,13 +377,13 @@ struct ScribeMicGateRouterTests {
         defer { store.releaseAll() }
 
         // This test bounds hangs and checks ordering under contention; it does not prove the lock by itself.
-        DispatchQueue.global().async(group: group) { router.route(frame) }
+        startRouterContentionWorker(group: group) { router.route(frame) }
         // Frame A passed validation and is blocked inside the store sink.
         guard store.entered.wait(timeout: .now() + 2) == .success else {
             Issue.record("frame never reached the store sink")
             return
         }
-        DispatchQueue.global().async(group: group) {
+        startRouterContentionWorker(group: group) {
             log.add("switch-start")
             started.signal()
             router.setActiveSession(next)
@@ -419,13 +433,13 @@ struct ScribeMicGateRouterTests {
         defer { transcriber.releaseAll() }
 
         // This test bounds hangs and checks ordering under contention; it does not prove the lock by itself.
-        DispatchQueue.global().async(group: group) { router.route(frame) }
+        startRouterContentionWorker(group: group) { router.route(frame) }
         // The frame is blocked inside ingest.
         guard transcriber.entered.wait(timeout: .now() + 2) == .success else {
             Issue.record("frame never reached the transcriber sink")
             return
         }
-        DispatchQueue.global().async(group: group) {
+        startRouterContentionWorker(group: group) {
             log.add("finish-start")
             started.signal()
             router.finish()

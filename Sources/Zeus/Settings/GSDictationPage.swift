@@ -39,11 +39,12 @@ final class DictationPageState {
     }
 }
 
-/// Settings > Dictation: the Superwhisper style tools on top of the same pipeline Murmure uses.
+/// Settings > Dictation: the dictation tools on top of the same pipeline Murmure uses.
 /// Modes, the recorder pill, the speech engine (the same picker as Settings › Murmure),
 /// custom vocabulary and history.
 struct DictationSettingsPage: View {
     let context: GSContext
+    let navigation: GSNavigation
     private var settings: DictationSettings { DictationSettings.shared }
     private var page: DictationPageState { DictationPageState.shared }
     private var controller: DictationController? { DictationHub.shared.controller }
@@ -57,11 +58,9 @@ struct DictationSettingsPage: View {
             GSToggleRow(symbol: "mic", title: "Dictation", text: "Hold the key to speak. Release to write it where your cursor is.",
                         isOn: Binding(get: { settings.enabled }, set: { settings.enabled = $0 }))
             GSDivider()
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation shortcut",
-                                text: "",
-                                shortcut: settings.key, defaultValue: .rightCommand, allowsOff: true,
-                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) { settings.key = $0 }
-            KeyAccessRow()
+            ShortcutLinkRow(symbol: "keyboard", title: "Dictation shortcut", current: settings.key, navigation: navigation)
+            GSDivider()
+            KeyAccessLinkRow(navigation: navigation)
             GSDivider()
             let behaviors = settings.availableBehaviors
             GSRow(symbol: "hand.tap", title: "Shortcut behavior",
@@ -91,6 +90,7 @@ struct DictationSettingsPage: View {
             GSToggleRow(symbol: "keyboard.badge.ellipsis", title: "Type instead of paste", text: "Slower, but works where \u{2318}V is blocked.",
                         isOn: Binding(get: { settings.alwaysType }, set: { settings.alwaysType = $0 }))
         }
+        soundCard
         GSCard("Voice glow") {
             GSToggleRow(symbol: "sparkles", title: "Voice glow", text: "A soft glow on the recorder that rises with your voice and sweeps while it writes.",
                         isOn: Binding(get: { VoiceGlowSettings.shared.enabled }, set: { VoiceGlowSettings.shared.enabled = $0 }))
@@ -130,12 +130,50 @@ struct DictationSettingsPage: View {
                 }
             }
         }
-        .onAppear { tester.devices = Microphones.all() }
+        .onAppear { Task { tester.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } } // CoreAudio queries can stall: never on main
         .onDisappear { tester.stop() }
         modesCard
         engineCard
+        LanguagePacksCard()
         vocabularyCard
         historyCard
+    }
+
+    // MARK: Sounds
+
+    @ViewBuilder private var soundCard: some View {
+        GSCard("Sounds") {
+            GSRow(symbol: "speaker.wave.2", title: "Start and stop sound", text: Self.cueDetail(settings.cueStyle)) {
+                GSPopup(selection: Binding(get: { settings.cueStyle.title },
+                                           set: { title in settings.cueStyle = DictationCueStyle(saved: title) }),
+                        options: DictationCueStyle.allCases.map(\.title), label: "Dictation start and stop sound")
+            }
+            GSDivider()
+            GSRow(symbol: "play.circle", title: "Preview", text: "Plays the start sound, then the stop sound.") {
+                Button("Play") { DictationCuePlayer.preview() }
+                    .buttonStyle(GSButtonStyle()).disabled(settings.cueStyle == .none)
+            }
+            GSDivider()
+            GSRow(symbol: "speaker.wave.1", title: "Volume", text: "\(settings.cueVolume)%") {
+                Slider(value: Binding(get: { Double(settings.cueVolume) }, set: { settings.cueVolume = Int($0.rounded()) }),
+                       in: 0...100, step: 5)
+                    .snapshotSafeSlider(value: Double(settings.cueVolume), in: 0...100)
+                    .frame(width: 160)
+                    .accessibilityLabel("Start and stop sound volume")
+                    .accessibilityValue("\(settings.cueVolume) percent")
+            }
+        }
+    }
+
+    private static func cueDetail(_ style: DictationCueStyle) -> String {
+        switch style {
+        case .crystal: "Two soft glass notes, rising when you start and falling when you stop."
+        case .softClick: "The classic Zeus click."
+        case .glass: "A bright, clear tone."
+        case .pop: "A short, soft bubble."
+        case .airy: "A short warm blip, rising when you start and falling when you stop."
+        case .none: "No sound when dictation starts or stops."
+        }
     }
 
     /// One label per device, in device order. Two microphones with the same name stay distinguishable

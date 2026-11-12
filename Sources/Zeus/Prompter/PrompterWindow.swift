@@ -120,8 +120,12 @@ final class PrompterWindowModel {
 
     /// The block the reading line is on, for highlighting.
     var currentBlock: Int? {
-        let line = offset + viewHeight * Self.readingLine
-        return blockFrames.first { $0.value.minY - 4 <= line && line <= $0.value.maxY + 4 }?.key
+        let line: Double = offset + viewHeight * Self.readingLine
+        return blockFrames.first { entry in
+            let minimum = Double(entry.value.minY) - 4.0
+            let maximum = Double(entry.value.maxY) + 4.0
+            return minimum <= line && line <= maximum
+        }?.key
     }
 
     var cueOffsets: [Double] {
@@ -208,7 +212,7 @@ final class PrompterWindowController {
         if sync?.playing == true, !autoOpened { onDismissDuringShow() }
         stop()
         endFollowing()
-        if recorder.isRecording { recorder.stop() }
+        recorder.cancel()
         stopMouseTracking()
         window?.orderOut(nil)
         onVisibilityChange()
@@ -703,13 +707,13 @@ final class PrompterWindowController {
     }
 
     private func toggleRecording() {
-        if recorder.isRecording {
-            recorder.stop()
+        if recorder.isRecording || recorder.isStarting {
+            recorder.cancel()
             return
         }
         Task {
             do {
-                try await recorder.start()
+                guard try await recorder.start() else { return }
                 model.recordingSince = Date()
                 model.notice = nil
                 if model.roll.phase == .idle { start() }

@@ -23,7 +23,7 @@ public struct ShortcutModifiers: OptionSet, Codable, Hashable, Sendable {
     var count: Int { rawValue.nonzeroBitCount }
 }
 
-/// One user-chosen shortcut: a modifier-only chord (Option+Command, Right Command, Fn) or a key
+/// One user-chosen shortcut: a modifier-only chord (Control+Option, Right Command, Fn) or a key
 /// with modifiers (⌥Space, ⌃⌥Z). Pure data; `ShortcutState` decides whether it is held.
 public struct Shortcut: Codable, Hashable, Sendable {
     public enum Side: String, Codable, Sendable { case any, left, right }
@@ -142,25 +142,47 @@ private extension JSONEncoder {
     }
 }
 
-/// Loads and migrates the two bindings. "Talk to Zeus" defaults to Option+Command; dictation
-/// keeps its old default (Right Command). Saved choices of the old fixed list carry over.
+/// Loads and migrates the two bindings. "Talk to Zeus" defaults to Control+Option (docs/VOICE-KEY.md);
+/// dictation keeps its old default (Right Command). Saved choices of the old fixed list carry over.
 public enum ShortcutStore {
     public static let talkKey = "talk.shortcut"
     public static let dictationKey = "dictation.shortcut"
     public static let legacyTalk = "pushToTalk"
     public static let legacyDictation = "dictation.key"
+    /// True once the owner picked a talk key in Settings or onboarding. Auto-written defaults never set it.
+    public static let talkChosenKey = "talk.shortcut.chosen"
+    /// The one-time move of auto-written talk keys to Control+Option has run.
+    public static let talkMigrationKey = "talk.shortcut.migratedToControlOption"
+    public static let talkDefault = Shortcut.controlOption
+    /// Defaults earlier builds wrote for everybody who had not chosen: not choices, so they migrate once.
+    static let autoTalkDefaults: Set<Shortcut> = [.optionCommand, .rightCommand]
 
-    /// Tony's earlier build forced Right Command for everybody who had not chosen a key. That is
-    /// not a choice, so it (and the original Control+Option default) moves to Option+Command.
+    /// Earlier builds wrote Option+Command (and before that Right Command) into `talk.shortcut` on first load,
+    /// so a stored value alone is not a choice. Those move to Control+Option once; after that, and for any
+    /// key the owner recorded, the stored value is kept as it is.
     public static func loadTalk(_ defaults: UserDefaults) -> Shortcut {
-        if let text = defaults.string(forKey: talkKey), let saved = Shortcut.parse(text) { return saved }
-        var result = Shortcut.optionCommand
+        let migrated = defaults.bool(forKey: talkMigrationKey)
+        defaults.set(true, forKey: talkMigrationKey)
+        if let text = defaults.string(forKey: talkKey), let saved = Shortcut.parse(text) {
+            guard !migrated, !defaults.bool(forKey: talkChosenKey), autoTalkDefaults.contains(saved) else { return saved }
+            defaults.set(Shortcut.stored(talkDefault), forKey: talkKey)
+            return talkDefault
+        }
+        var result = talkDefault
         if let name = defaults.string(forKey: legacyTalk), let old = Shortcut.legacy(name),
-           old != .rightCommand, old != .controlOption {
+           !autoTalkDefaults.contains(old), old != talkDefault {
             result = old
+            defaults.set(true, forKey: talkChosenKey) // Picked from the old fixed list.
         }
         defaults.set(Shortcut.stored(result), forKey: talkKey)
         return result
+    }
+
+    /// The owner picked `shortcut` (Settings recorder, Reset, onboarding). Later migrations leave it alone.
+    public static func recordTalkChoice(_ shortcut: Shortcut, in defaults: UserDefaults) {
+        defaults.set(Shortcut.stored(shortcut), forKey: talkKey)
+        defaults.set(true, forKey: talkChosenKey)
+        defaults.set(true, forKey: talkMigrationKey)
     }
 
     /// nil means dictation has no key.
@@ -200,15 +222,24 @@ public enum ShortcutConflicts {
         (Shortcut(keyCode: 23, modifiers: [.shift, .command]), "Screenshot options (⇧⌘5)"),
         (Shortcut(keyCode: 53, modifiers: [.option, .command]), "Force Quit (⌥⌘Esc)"),
         (Shortcut(keyCode: 12, modifiers: [.control, .command]), "Lock screen (⌃⌘Q)"),
-        (Shortcut(modifiers: [.control, .option]), "VoiceOver's modifier (⌃⌥)"),
         (Shortcut(modifiers: .function), "the Globe key (emoji and Apple Dictation)"),
     ]
 
     /// Why `shortcut` may misbehave, as short sentences. Empty when it looks safe.
-    public static func warnings(for shortcut: Shortcut, other: Shortcut?, otherName: String) -> [String] {
+    /// Control+Option is VoiceOver's modifier, so it warns only while VoiceOver is on; `voiceOverFallback` is
+    /// the key that stands in meanwhile (the talk key has one, see `VoiceKey.effectiveTalkKey`).
+    public static func warnings(for shortcut: Shortcut, other: Shortcut?, otherName: String,
+                                voiceOverOn: Bool = false, voiceOverFallback: Shortcut? = nil) -> [String] {
         var out: [String] = []
         if let hit = system.first(where: { $0.0 == shortcut }) {
             out.append("This is also \(hit.1). One of them will win; the system usually does.")
+        }
+        if voiceOverOn, shortcut == .controlOption {
+            if let voiceOverFallback, voiceOverFallback != shortcut {
+                out.append("VoiceOver is on and uses Control and Option. Hold \(voiceOverFallback.title) to talk until VoiceOver is off.")
+            } else {
+                out.append("VoiceOver is on and uses Control and Option, so this key pauses until VoiceOver is off.")
+            }
         }
         if let other {
             if other == shortcut {
@@ -230,7 +261,7 @@ public enum ShortcutConflicts {
         return false
     }
 
-    /// Shipped talk (Option+Command) and dictation (Right Command) must never warn.
+    /// Shipped talk (Control+Option) and dictation (Right Command) must never warn.
     public static func warningsForShippedDefaults(talk: Shortcut, dictation: Shortcut?) -> [String] {
         guard let dictation else { return [] }
         return warnings(for: dictation, other: talk, otherName: "Talk to Zeus")

@@ -36,6 +36,19 @@ import Testing
         #expect(payload.id == "L-VECTOR0001")
     }
 
+    @Test func rejectedActivationCannotBeRestoredByAKeyRetainedAfterFailedDeletion() {
+        let day30 = start.addingTimeInterval(30 * 86_400)
+        #expect(evaluator.evaluate(.init(key: Self.key, activation: Self.activation,
+                                        trialStart: start, now: day30)).isLicensed)
+        let rejected = evaluator.evaluate(.init(key: Self.key, activation: Self.activation,
+                                                trialStart: start, now: day30, activationRejected: true))
+        #expect(rejected == .trialEnded)
+        #expect(!rejected.isLicensed)
+        #expect(!LicenseGate.allows(.pro, status: rejected, gatingEnabled: true))
+        // Existing commercial configuration remains separate from credential cleanup.
+        #expect(LicenseGate.allows(.pro, status: rejected, gatingEnabled: false))
+    }
+
     @Test func activationProofIsForThisKeyAndMac() throws {
         let proof = try evaluator.checkActivation(Self.activation, licenseID: "L-VECTOR0001").get()
         #expect(proof.seat == 1 && proof.seats == 2)

@@ -6,6 +6,9 @@ import ZeusCore
 @MainActor
 enum SystemAudioDucker {
     private static var quiet: AudioQuiet?
+    /// The output device that was lowered. Restored even if the default output changed in between (a headset
+    /// plugged in for a call), so no device is left at the ducked volume.
+    private static var duckedDevice: AudioObjectID?
 
     static func snapshotNow() -> AudioQuiet? {
         guard let device = SystemVolume.defaultOutput(),
@@ -19,16 +22,21 @@ enum SystemAudioDucker {
               let target = snap.beginDuck() else { return }
         _ = SystemVolume.setVolume(target, device)
         quiet = snap
+        duckedDevice = device
     }
 
     static func end() {
-        guard var snap = quiet, let device = SystemVolume.defaultOutput() else { quiet = nil; return }
-        if let restore = snap.restoreVolume(currentVolume: SystemVolume.volume(device) ?? snap.snapshotVolume,
-                                            currentMuted: isMuted(device)) {
+        defer {
+            quiet = nil
+            duckedDevice = nil
+        }
+        guard var snap = quiet, let device = duckedDevice else { return }
+        // A device that went away has nothing left to restore.
+        guard let current = SystemVolume.volume(device) else { return }
+        if let restore = snap.restoreVolume(currentVolume: current, currentMuted: isMuted(device)) {
             _ = SystemVolume.setVolume(restore, device)
         }
         snap.endDuck()
-        quiet = nil
     }
 
     private static func isMuted(_ device: AudioObjectID) -> Bool {

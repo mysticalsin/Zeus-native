@@ -5,10 +5,10 @@ import AppKit
 enum Brand {
     static let menuBarImage: NSImage? = {
         let image = Bundle.main.image(forResource: "MenuBarTemplate")
-            ?? NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "ZEUS")
+            ?? NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Zeus")
         image?.size = NSSize(width: 18, height: 18)
         image?.isTemplate = true
-        image?.accessibilityDescription = "ZEUS"
+        image?.accessibilityDescription = "Zeus"
         return image
     }()
 
@@ -30,6 +30,6 @@ enum Brand {
             pdf.size = NSSize(width: 22, height: 22)
             return pdf
         }
-        return NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "ZEUS") ?? NSImage()
+        return NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Zeus") ?? NSImage()
     }()
 }

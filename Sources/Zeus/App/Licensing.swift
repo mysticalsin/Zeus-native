@@ -11,7 +11,7 @@ enum Keychain {
 
     static func get(_ account: String) -> String? { store.get(account) }
     @discardableResult static func set(_ value: String, for account: String) -> Bool { store.set(value, for: account) }
-    static func remove(_ account: String) { store.remove(account) }
+    @discardableResult static func remove(_ account: String) -> Bool { store.remove(account) }
 }
 
 extension TopBarStyle {
@@ -49,6 +49,7 @@ final class AssistantAccount {
     }
 
     private(set) var saved: Set<Provider> = []
+    private(set) var keyMessage: String?
 
     init() { refresh() }
 
@@ -59,18 +60,36 @@ final class AssistantAccount {
         saved = Set(Provider.allCases.filter { Keychain.get($0.account) != nil })
     }
 
-    func save(_ key: String, for provider: Provider) {
+    @discardableResult
+    func save(_ key: String, for provider: Provider) -> Bool {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, Keychain.set(trimmed, for: provider.account) else { return }
+        guard !trimmed.isEmpty else { return false }
+        guard Keychain.set(trimmed, for: provider.account) else {
+            keyMessage = "Couldn't save the \(provider.title) key. Check Keychain access and try again."
+            return false
+        }
         saved.insert(provider)
+        keyMessage = nil
+        return true
     }
 
-    func remove(_ provider: Provider) {
-        Keychain.remove(provider.account)
+    @discardableResult
+    func remove(_ provider: Provider) -> Bool {
+        guard Keychain.remove(provider.account) else {
+            keyMessage = "Couldn't remove the \(provider.title) key. Check Keychain access and try again."
+            return false
+        }
         saved.remove(provider)
+        keyMessage = nil
+        return true
     }
 
-    func signOut() { Provider.allCases.forEach(remove) }
+    func signOut() {
+        let failed = Provider.allCases.filter { !remove($0) }
+        if !failed.isEmpty {
+            keyMessage = "Couldn't remove \(failed.map(\.title).joined(separator: ", ")) keys. Check Keychain access and try again."
+        }
+    }
 
     /// For whichever feature talks to the provider (chat, replies). Never logged.
     func key(for provider: Provider) -> String? { Keychain.get(provider.account) }

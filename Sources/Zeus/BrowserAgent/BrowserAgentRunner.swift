@@ -38,7 +38,7 @@ final class BrowserAgentRunner {
         let goal = rawGoal.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !goal.isEmpty else { return finish(.failed("there was no goal."), speak: speak) }
         let kind = Self.backendKind(forceSeparate: separate)
-        guard let chrome, notch != nil else { return finish(.failed("ZEUS isn't ready yet."), speak: speak) }
+        guard let chrome, notch != nil else { return finish(.failed("Zeus isn't ready yet."), speak: speak) }
         if kind == .chrome {
             guard await ChromeBridge.isConnected() else {
                 return finish(.failed(ChromeBridge.BridgeFailure.notConnected.errorDescription ?? "Chrome isn't connected."), speak: speak)
@@ -197,7 +197,7 @@ final class BrowserAgentRunner {
         guard let notch else { return false }
         updateSession(status: .needsYou)
         if speak { say(ZeusVoiceLines.line(for: .approval, context: ["agent": "The browser agent"])) }
-        let verdict = await notch.requestApproval(agent: "ZEUS", project: approval.host, tool: "Browser agent",
+        let verdict = await notch.requestApproval(agent: "Zeus", project: approval.host, tool: "Browser agent",
                                                   command: "\(approval.summary) (\(approval.reason))", risk: .high,
                                                   timeout: .seconds(90), onTimeout: .deny)
         updateSession(status: .working)
@@ -302,7 +302,7 @@ final class BrowserAgentRunner {
                 guard let request = config.request(prompt: prompt.user, key: key, system: prompt.system) else {
                     throw BridgeError(code: "failed", message: "The Any LLM endpoint isn't set up.")
                 }
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await AnyLLMHTTPTransport.data(for: request)
                 guard (response as? HTTPURLResponse)?.statusCode ?? 0 < 300, let answer = AnyLLMConfig.answer(from: data) else {
                     throw BridgeError(code: "failed", message: "The Any LLM endpoint didn't answer.")
                 }

@@ -70,6 +70,15 @@ struct NotchView: View {
     let notch: CGSize
     /// A slim pill on a display without a notch, so the notch still has a place to glow and open from.
     var slimPill = false
+    /// Snapshots and previews pin the drop; nil reads Settings > Appearance > Top bar position.
+    var topOffsetOverride: Double? = nil
+
+    /// How far the closed bar and the peek card sit below the top of the screen. The open panel stays
+    /// flush with the top; the notch light, ticker and wings are part of the closed bar and move with it.
+    private var topOffset: CGFloat {
+        let resolved = topOffsetOverride.map(TopBarPosition.clamped) ?? TopBarPositionModel.shared.offset
+        return CGFloat(TopBarPosition.applied(resolved: resolved, panelOpen: model.presentation == .panel))
+    }
 
     private var barHeight: CGFloat { max(notch.height, 30) }
     private var hasNotch: Bool { notch.width > 0 }
@@ -192,14 +201,20 @@ struct NotchView: View {
             .animation(Self.wingsSpring, value: closedWidthKey)
             .animation(open ? TopBarStyle.openSpring : TopBarStyle.closeMotion, value: model.presentation)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, topOffset)
+            // The drop changes with the presentation (the open panel is flush with the top), so it moves with
+            // the same curve as the body. A separate easing made the bar slide on its own after every open
+            // and close.
+            .animation(Motion.reduced ? nil : (open ? TopBarStyle.openSpring : TopBarStyle.closeMotion), value: topOffset)
             .overlay(alignment: .top) {
-                if let line = model.notificationLine, model.presentation == .closed {
-                    NotchNotificationLine(line: line) { NotchControllerBridge.clickNotificationLine() }
-                        .padding(.top, barHeight + 6)
-                        .transition(.opacity.combined(with: .offset(y: -6)))
+                if !model.alerts.isEmpty, model.presentation == .closed {
+                    AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
+                                   onHover: { NotchControllerBridge.alertHover($0) })
+                        .padding(.top, barHeight + 6 + topOffset)
+                        .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
                 }
             }
-            .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.notificationLine)
+            .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
     }
 
     /// Whether the outline itself glows (and so breathes). With the top bar, the closed notch glows
@@ -240,8 +255,8 @@ struct NotchView: View {
                         // below, 0.10 at 15 pt, gone by 50 pt; weaker at the sides).
                         .shadow(color: .black.opacity(glanceOpen ? Glass.notchShadow.opacity : 0),
                                 radius: Glass.notchShadow.radius, y: Glass.notchShadow.y)
-                        .shadow(color: glow.opacity(glowing ? 0.65 * breath : 0), radius: 14)
-                        .shadow(color: glow.opacity(glowing ? 0.35 * breath : 0), radius: 4)
+                        .shadow(color: glow.opacity(glowing ? 0.28 * breath : 0), radius: 9)
+                        .shadow(color: glow.opacity(glowing ? 0.2 * breath : 0), radius: 3)
                         .shadow(color: Theme.bolt.opacity(glowing && halo == .storm ? 0.3 * breath : 0), radius: 26)
                     shape.stroke(glow.opacity(glowing ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
                 }
@@ -349,7 +364,7 @@ struct NotchView: View {
                 .fill(status.color)
                 .frame(width: 11, height: 13)
                 .shadow(color: status.color.opacity(0.9), radius: 4)
-            Text(model.approval?.agent ?? model.peekSession?.agent ?? "ZEUS")
+            Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(1)
@@ -460,11 +475,9 @@ private struct ApprovalBody: View {
         let hidden = MeetingState.hideDetails
         return HStack(spacing: 6) {
             if compact {
+                // The peek bar above already names the agent and says "Needs you"; the card shows each once.
                 BotAvatarView.forAgent(approval.agent, state: cardKind.avatarState, size: 22)
-                Text(approval.agent)
-                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Theme.cloudPrimary)
-                    .lineLimit(1)
+                    .accessibilityLabel(approval.agent)
             }
             if !hidden {
                 Text(approval.project)
@@ -486,7 +499,7 @@ private struct ApprovalBody: View {
                     .foregroundStyle(Theme.danger)
                     .background(Theme.danger.opacity(0.15), in: Capsule())
             }
-            AgentStatusChip(kind: cardKind)
+            if !compact { AgentStatusChip(kind: cardKind) }
         }
         .frame(minHeight: compact ? 22 : 18)
         .accessibilityElement(children: .combine)
@@ -513,7 +526,8 @@ private struct ApprovalBody: View {
             if approval.detail?.hasOwnActions != true {
                 let preview = NotchModel.Approval.isChangePreview(approval.command) && !MeetingState.hideDetails
                 if preview {
-                    Text(approval.command)
+                    Text(CommandDisplay.plain(approval.command))
+                        .accessibilityLabel(approval.command)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundStyle(Theme.cloudPrimary)
                         .lineLimit(8)
@@ -523,7 +537,8 @@ private struct ApprovalBody: View {
                 }
                 HStack(spacing: 8) {
                     if !preview {
-                        Text(MeetingState.hideDetails ? "Details hidden (Settings > Privacy)" : approval.command)
+                        Text(MeetingState.hideDetails ? "Details hidden (Settings > Privacy)" : CommandDisplay.plain(approval.command))
+                            .accessibilityLabel(MeetingState.hideDetails ? "Details hidden" : approval.command)
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .foregroundStyle(Theme.cloudPrimary)
                             .lineLimit(1)
@@ -556,7 +571,7 @@ private struct ApprovalBody: View {
                             .underline()
                     }
                     .buttonStyle(PressableStyle())
-                    .accessibilityHint("Approves this and later requests from \(approval.agent) in this chat, except risky commands, until ZEUS quits.")
+                    .accessibilityHint("Approves this and later requests from \(approval.agent) in this chat, except risky commands, until Zeus quits.")
                 }
             }
             .font(.system(size: 10.5, design: .rounded))
@@ -598,7 +613,7 @@ private struct PanelBody: View {
             HStack(spacing: 7) {
                 BoltShape().fill(Theme.bolt).frame(width: 11, height: 13)
                     .shadow(color: Theme.bolt.opacity(0.8), radius: 4)
-                Text("ZEUS")
+                Text("Zeus")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Theme.cloudPrimary)
                 Spacer(minLength: notchWidth + 8)
@@ -810,13 +825,31 @@ private struct NotchSizeReader<Content: View>: View {
 
 /// Dims on press so custom-drawn buttons still show feedback.
 struct PressableStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.isEnabled) private var isEnabled
+    private let reduceMotionOverride: Bool?
+
+    init(reduceMotion: Bool? = nil) { reduceMotionOverride = reduceMotion }
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        let reduceMotion = reduceMotionOverride ?? systemReduceMotion
+        return configuration.label
             .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
             .scaleEffect(configuration.isPressed && isEnabled && !reduceMotion ? Motion.pressedScale : 1)
             .animation(Motion.feedback(reduceMotion: reduceMotion), value: configuration.isPressed)
+    }
+}
+
+/// Commands are shown character for character. A zero-width non-joiner between the two characters of a
+/// pair like `--`, `->` or `!=` stops the font joining them into one glyph, so `--force` never reads as a dash followed by `force`.
+/// Display only: the command that runs, and the VoiceOver label, are the original text.
+enum CommandDisplay {
+    static func plain(_ command: String) -> String {
+        var text = command
+        for pair in ["--", "->", "=>", "!=", "==", "<=", ">=", "&&", "||", "::"] {
+            let characters = Array(pair)
+            text = text.replacingOccurrences(of: pair, with: "\(characters[0])\u{200C}\(characters[1])")
+        }
+        return text
     }
 }

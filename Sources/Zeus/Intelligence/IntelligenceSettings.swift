@@ -8,23 +8,13 @@ struct IntelligenceSettings: View {
 
     var body: some View {
         VStack(spacing: Glass.gap) {
-            GlassCard(title: "Engine") {
-                GlassRow(title: "Understands your commands", note: note) {
-                    GlassMenu(options: IntelligenceEngine.allCases.map { ($0.rawValue, $0.title) },
-                              selection: Binding(get: { center.engine.rawValue },
-                                                 set: { center.engine = IntelligenceEngine(rawValue: $0) ?? .laya }))
-                }
-                GlassDivider()
-                GlassRow(title: "Laya", note: center.layaInstalled ? "Loads on first use and unloads after 5 idle minutes." : "Not installed on this Mac yet. Commands use rules, then Jev if allowed.") {
-                    GlassStatus(ok: center.layaInstalled, text: center.layaRunning ? "Loaded" : center.layaInstalled ? "Ready" : "Not installed")
-                }
-                GlassDivider()
-                GlassRow(title: "Jev", note: center.hasJevKey ? "Key saved in Keychain." : "No key saved.") {
-                    GlassStatus(ok: center.hasJevKey, text: center.hasJevKey ? "Ready" : "No key")
+            GlassCard(title: "Instant commands") {
+                GlassRow(title: "Jev", note: center.jevReadiness.statusText) {
+                    GlassStatus(ok: center.jevReadiness == .ready, text: center.jevReadiness == .ready ? "On" : "Off")
                 }
             }
             GlassCard(title: "Usage") {
-                GlassRow(title: "Local (free)", note: "Rules and Laya answers since launch.") {
+                GlassRow(title: "Local (free)", note: "Rules answers since launch.") {
                     Text("\(center.localCount)").font(Glass.font(12, .semibold).monospacedDigit()).foregroundStyle(Glass.secondary)
                 }
                 GlassDivider()
@@ -51,14 +41,6 @@ struct IntelligenceSettings: View {
                     }
                 }
             }
-        }
-    }
-
-    private var note: String {
-        switch center.engine {
-        case .laya: "Free and private: runs on this Mac."
-        case .jev: "TypeSafe's cloud model. Counts against the local usage estimate."
-        case .auto: "Laya first; Jev only when Laya is unsure."
         }
     }
 }

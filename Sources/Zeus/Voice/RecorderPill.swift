@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 import ZeusCore
 
-/// Superwhisper style recorder: a small floating pill at the bottom of the screen with a live
+/// Floating recorder: a small floating pill at the bottom of the screen with a live
 /// waveform, the mode and a timer while you speak, then a short "Transcribing" and a result mark.
 /// It shows only while a dictation runs, takes no focus, and does no work while hidden.
 @MainActor

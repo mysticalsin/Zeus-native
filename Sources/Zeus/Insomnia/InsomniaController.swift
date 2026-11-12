@@ -377,7 +377,10 @@ final class InsomniaController {
     @discardableResult
     func saveHotspotPassword(_ password: String) -> Bool {
         if password.isEmpty {
-            Keychain.remove(Self.hotspotAccount)
+            guard Keychain.remove(Self.hotspotAccount) else {
+                setupMessage = "Couldn't remove the hotspot password. Check Keychain access and try again."
+                return false
+            }
         } else if !Keychain.set(password, for: Self.hotspotAccount) {
             setupMessage = "Couldn't save the hotspot password to your Keychain. It is still in the field."
             return false

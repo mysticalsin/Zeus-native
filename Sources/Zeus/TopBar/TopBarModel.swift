@@ -8,6 +8,9 @@ import ZeusCore
 @MainActor
 @Observable
 final class TopBarModel {
+    @ObservationIgnored private let defaults: UserDefaults
+    /// Offscreen snapshots give the Record page its own controller with fake displays; nil in the app.
+    @ObservationIgnored var recordlyForSnapshot: RecordlyController?
     struct CalendarItem: Identifiable, Equatable {
         let id: String
         var title: String
@@ -43,9 +46,8 @@ final class TopBarModel {
         var pluggedIn: Bool
     }
 
-    enum DictationPhase: Equatable {
-        case idle, listening, transcribing, rewriting, done, failed(String)
-    }
+    /// The phases live in ZeusCore (`DictationFlow` decides them); the top bar only reads the value.
+    typealias DictationPhase = ZeusCore.DictationPhase
 
     enum Access: Equatable { case unknown, granted, denied }
 
@@ -87,8 +89,8 @@ final class TopBarModel {
 
     var layout: TopBarLayout {
         didSet {
-            UserDefaults.standard.set(layout.encoded(), forKey: "topBar.tabs")
-            UserDefaults.standard.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
+            defaults.set(layout.encoded(), forKey: "topBar.tabs")
+            defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
         }
     }
     /// Hover and drop-target state for rows, kept here because the toolchain builds without SwiftUI macros.
@@ -108,17 +110,17 @@ final class TopBarModel {
     }
     /// Short cues on the closed notch (copy, caps lock, volume, battery, track change).
     var cuesEnabled: Bool {
-        didSet { UserDefaults.standard.set(cuesEnabled, forKey: "topBar.cues") }
+        didSet { defaults.set(cuesEnabled, forKey: "topBar.cues") }
     }
     /// Music artwork and bars beside the closed notch while something plays.
     var liveMusicWings: Bool {
-        didSet { UserDefaults.standard.set(liveMusicWings, forKey: "topBar.musicWings") }
+        didSet { defaults.set(liveMusicWings, forKey: "topBar.musicWings") }
     }
     var weatherCity: String {
-        didSet { UserDefaults.standard.set(weatherCity, forKey: "topBar.weatherCity") }
+        didSet { defaults.set(weatherCity, forKey: "topBar.weatherCity") }
     }
     var useCelsius: Bool {
-        didSet { UserDefaults.standard.set(useCelsius, forKey: "topBar.celsius") }
+        didSet { defaults.set(useCelsius, forKey: "topBar.celsius") }
     }
 
     // MARK: Live data
@@ -137,7 +139,7 @@ final class TopBarModel {
     var shelf: [ShelfItem] = []
     var focus = FocusTimer()
     var note: String {
-        didSet { UserDefaults.standard.set(note, forKey: "topBar.note") }
+        didSet { defaults.set(note, forKey: "topBar.note") }
     }
 
     // Dictation
@@ -151,17 +153,17 @@ final class TopBarModel {
     var dictationHistory: [DictationRecord] = []
     var dictationModes: [DictationMode] = DictationMode.builtIns
     var selectedModeKey: String {
-        didSet { UserDefaults.standard.set(selectedModeKey, forKey: "dictation.mode") }
+        didSet { defaults.set(selectedModeKey, forKey: "dictation.mode") }
     }
 
     // Teleprompter
     var script: String {
-        didSet { UserDefaults.standard.set(script, forKey: "prompter.script") }
+        didSet { defaults.set(script, forKey: "prompter.script") }
     }
     var roll: PrompterRoll {
         didSet {
-            if roll.speed != oldValue.speed { UserDefaults.standard.set(roll.speed, forKey: "prompter.speed") }
-            if roll.voiceFollow != oldValue.voiceFollow, !savingVoiceFallback { UserDefaults.standard.set(roll.voiceFollow, forKey: "prompter.voice") }
+            if roll.speed != oldValue.speed { defaults.set(roll.speed, forKey: "prompter.speed") }
+            if roll.voiceFollow != oldValue.voiceFollow, !savingVoiceFallback { defaults.set(roll.voiceFollow, forKey: "prompter.voice") }
         }
     }
     private var savingVoiceFallback = false
@@ -175,10 +177,10 @@ final class TopBarModel {
 
     /// A new run starts from the saved voice-follow choice (a fallback lasted one run only).
     func restoreSavedVoiceFollow() {
-        roll.voiceFollow = UserDefaults.standard.object(forKey: "prompter.voice") as? Bool ?? true
+        roll.voiceFollow = defaults.object(forKey: "prompter.voice") as? Bool ?? true
     }
     var prompterTextSize: Double {
-        didSet { UserDefaults.standard.set(prompterTextSize, forKey: "prompter.size") }
+        didSet { defaults.set(prompterTextSize, forKey: "prompter.size") }
     }
     var prompterHovered = false
     var prompterLevel: Double = 0
@@ -237,8 +239,8 @@ final class TopBarModel {
     /// A menu from the notch (the ... button) is open: the notch stays up while it is.
     var menuOpen = false
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let knownBefore = defaults.string(forKey: "topBar.tabs.known")
         let saved = TopBarLayout.decode(defaults.string(forKey: "topBar.tabs"), known: knownBefore)
         // Once: put the nine-tab row (Glance's seven, Teleprompter, Insomnia) first in a saved layout.
@@ -259,6 +261,10 @@ final class TopBarModel {
         let addScribe = !defaults.bool(forKey: "topBar.row12.v1")
         if addScribe, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row12.v1") }
         if addScribe { upgraded = upgraded.upgradedToScribeRow() }
+        // v2: v1 set its flag without saving the moved row, so Agents fell back past the visible end on relaunch.
+        let addAgents = !defaults.bool(forKey: "topBar.row13.v2")
+        if addAgents, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row13.v2") }
+        if addAgents { upgraded = upgraded.upgradedToAgentsRow() }
         // Repair, once per version: an earlier launch saved the flags above without the upgraded row, so on
         // this launch none of them is true and the row would stay old. Only a row that was saved is repaired.
         let needsRepair = defaults.integer(forKey: "topBar.layoutRepair") < TopBarLayoutRepair.version
@@ -272,7 +278,7 @@ final class TopBarModel {
         // Property observers don't run inside init, so save the upgraded row here. Otherwise the
         // one-time flags above stop the upgrade from running again while the old row stays saved.
         if !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA {
-            if reorder || addPolyglot || addRecordly || addScribe || repairedRow {
+            if reorder || addPolyglot || addRecordly || addScribe || addAgents || repairedRow {
                 defaults.set(upgraded.encoded(), forKey: "topBar.tabs")
                 defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
             }
@@ -293,7 +299,7 @@ final class TopBarModel {
     static let sampleScript = """
     # Opening
     Hi, I'm Tony. Thanks for taking the time today.
-    I'll keep this short and show you what ZEUS does.
+    I'll keep this short and show you what Zeus does.
 
     # Demo
     Watch the notch. It follows my voice, so when I stop talking, the words wait for me.

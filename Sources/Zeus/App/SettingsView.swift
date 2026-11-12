@@ -288,7 +288,7 @@ struct SettingsView: View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Talk to ZEUS") {
                 GlassRow(title: "Talk key", note: (DictationSettings.shared.enabled && DictationSettings.shared.key == preferences.pushToTalk ? "Double-tap it, then speak. Holding the same key dictates." : "Hold it, ask, let go. ZEUS answers out loud and points.")) {
-                    ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.pushToTalk = $0 }, accessibilityName: "Talk key")
+                    ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
                 }
                 GlassDivider()
                 GlassRow(title: "Show captions next to the bolt") {
@@ -366,7 +366,7 @@ struct SettingsView: View {
     private var voice: some View {
         let settings = VoiceSettings.shared
         let paused = settings.elevenLabsPausedUntil.map { $0 > Date() } ?? false
-        let plan = UltronVoicePlan.preferred(kokoroReady: KokoroVoice.isSetUp,
+        let plan = UltronVoicePlan.preferred(kokoroReady: settings.kokoroReady,
                                              elevenLabsKeyValid: settings.elevenKeySaved && !paused)
         return VStack(spacing: Glass.gap) {
             GlassCard(title: "Voice") {
@@ -618,7 +618,7 @@ private struct DictationSettingsView: View {
             GlassCard(title: "Vocabulary") {
                 Group {
                     if TopBarStyle.isSnapshot {
-                        Text(topBar.vocabularyDraft.isEmpty ? "Superwhisper\nsuper whisper -> Superwhisper" : topBar.vocabularyDraft)
+                        Text(topBar.vocabularyDraft.isEmpty ? "Walteur\nwalter -> Walteur" : topBar.vocabularyDraft)
                             .foregroundStyle(Glass.secondary).frame(maxWidth: .infinity, minHeight: 74, alignment: .topLeading)
                     } else {
                         TextEditor(text: Binding(get: { topBar.vocabularyDraft }, set: { topBar.vocabularyDraft = $0 }))
@@ -630,7 +630,7 @@ private struct DictationSettingsView: View {
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.35)))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Glass.hairline, lineWidth: 1))
                 HStack {
-                    Text("One word per line, or a fix like “super whisper -> Superwhisper”.").font(Glass.caption).foregroundStyle(Glass.secondary)
+                    Text("One word per line, or a fix like “walter -> Walteur”.").font(Glass.caption).foregroundStyle(Glass.secondary)
                     Spacer()
                     if let dictation {
                         Button("Save") { dictation.vocabulary = Vocabulary.parse(topBar.vocabularyDraft) }

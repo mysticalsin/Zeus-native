@@ -197,7 +197,7 @@ struct RemindersPage: View {
         Group {
             if !reminders.allowed {
                 GlanceEmpty(symbol: "list.bullet.circle.fill", tint: Theme.ember,
-                            text: reminders.access == .notDetermined ? "See and tick off your Apple Reminders here." : "ZEUS can't see Reminders. Turn it on in System Settings, Privacy, Reminders.",
+                            text: reminders.access == .notDetermined ? "See and tick off your Apple Reminders here." : "Zeus can't see Reminders. Turn it on in System Settings, Privacy, Reminders.",
                             button: reminders.access == .notDetermined ? "Allow Reminders" : "Open Settings") {
                     topBar.openPermissions()
                 }
@@ -292,33 +292,18 @@ struct NotificationsPage: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     ),
                     title: "Allow Full Disk Access",
-                    detail: "Turn on ZEUS in Full Disk Access, then relaunch the app so macOS applies the permission.",
+                    detail: "Turn on Zeus in Full Disk Access, then relaunch the app so macOS applies the permission.",
                     primary: "Open Full Disk Access",
                     primaryAction: { notifications.openFullDiskAccess() },
                     secondary: "Try again",
                     secondaryAction: { notifications.refresh() }
                 )
-            } else if notifications.items.isEmpty {
-                GlanceEmpty(symbol: "bell.slash", text: notifications.failure == nil ? "No recent notifications" : "Notification Center's history couldn't be read.")
+            } else if notifications.failure != nil, notifications.items.isEmpty {
+                GlanceEmpty(symbol: "bell.slash", text: "Notification Center's history couldn't be read.")
+            } else if notifications.visibleItems.isEmpty {
+                AlertsAllClear()
             } else {
-                PageScroll(.vertical) {
-                    VStack(spacing: 4) {
-                        ForEach(notifications.items) { item in
-                            GlanceRow(key: "n\(item.id)", topBar: topBar, title: item.title.isEmpty ? notifications.appName(item.app) : item.title,
-                                      detail: [item.subtitle, item.body].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
-                                      action: { notifications.openApp(item.app) }) {
-                                if let icon = notifications.icon(item.app) {
-                                    Image(nsImage: icon).resizable().frame(width: 18, height: 18)
-                                } else {
-                                    Image(systemName: "app.fill").font(.system(size: 14)).foregroundStyle(Theme.cloudSecondary)
-                                }
-                            } trailing: {
-                                Text(item.date.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)))
-                                    .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
-                            }
-                        }
-                    }
-                }
+                AlertsGroupedList(notifications: notifications)
             }
         }
         .onAppear { notifications.refresh() }

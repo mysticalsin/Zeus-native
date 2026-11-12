@@ -56,6 +56,9 @@ def digest(data):
 
 
 def source_snapshot(root, output):
+    # macOS temporary paths may enter through /var and resolve under /private/var.
+    # Normalize the owned output root, not arbitrary child symlinks in inputs.
+    output = output.resolve()
     paths = subprocess.check_output(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root).decode().split("\0")
     files = []
     for name in sorted(set(paths) - {""}):
@@ -87,6 +90,49 @@ def load(path):
     return json.loads(Path(path).read_text(), object_pairs_hook=pairs)
 
 
+def validate_compiler_log(text):
+    """Require compiler completion and reject diagnostic headers, not source excerpts."""
+    require(re.search(r"(?m)^Build complete!(?: \([^\n]*\))?\s*$", text),
+            "native compiler log has no completion")
+    for raw in text.splitlines():
+        line = re.sub(r"\x1b\[[0-9;]*m", "", raw).strip()
+        # Swift prints source/caret gutters below warnings. An argument such as
+        # converter.convert(to: output, error: &error) is not a diagnostic.
+        if re.match(r"(?:\d+)?\s*\|", line):
+            continue
+        failure = re.match(
+            r"(?:(?:.*?:\d+(?::\d+)?:|(?:[^\r\n:]*[/\\])?"
+            r"(?:swift(?:c|-frontend|-driver)?|clang(?:\+\+)?|ld|ld64|lld|lld-link|<unknown>):)\s*)?"
+            r"(?:error|fatal error|internal error|llvm error):", line, re.IGNORECASE)
+        require(not failure and not re.match(r"CHECK (?:TIMEOUT|COULD NOT START)\b", line),
+                "native compiler log contains failure")
+
+
+def validate_native_build(build, output, source_hash, jobs=None):
+    """Only fresh, intact compiler success may authorize native --skip-build."""
+    fields(build, {"status", "command", "exit_code", "source_snapshot_sha256", "artifacts", "duration_seconds"}, {"reason"})
+    require(build["status"] == "passed" and type(build["exit_code"]) is int and build["exit_code"] == 0,
+            "native compiler barrier did not pass")
+    command = build["command"]
+    require(type(command) is list and len(command) == 5 and command[:4] == ["swift", "build", "--build-tests", "--jobs"]
+            and type(command[4]) is str and command[4].isdigit() and int(command[4]) > 0,
+            "native compiler barrier command is not allowlisted")
+    require(jobs is None or command[4] == str(jobs), "native compiler barrier job count changed")
+    require(build["source_snapshot_sha256"] == source_hash, "native compiler barrier belongs to other source")
+    require(type(build["duration_seconds"]) in {int, float} and build["duration_seconds"] >= 0,
+            "native compiler barrier duration is invalid")
+    require(type(build["artifacts"]) is list and len(build["artifacts"]) == 1, "native compiler barrier needs its compiler log")
+    evidence = build["artifacts"][0]
+    fields(evidence, {"path", "sha256"})
+    require(evidence["path"] == "native-build/build.log", "native compiler barrier has an unexpected log")
+    root = output.resolve()
+    log = root / evidence["path"]
+    require(not log.is_symlink() and not log.parent.is_symlink() and log.resolve().is_relative_to(root),
+            "native compiler log is redirected")
+    require(log.is_file() and digest(log.read_bytes()) == evidence["sha256"], "native compiler log is missing or changed")
+    validate_compiler_log(log.read_text())
+
+
 def runnable_functions(text, python=False):
     if python:
         return re.findall(r"(?m)^\s*def\s+(test_[A-Za-z_0-9]+)\s*\(", text)
@@ -99,7 +145,11 @@ def validate_case(case, root=ROOT):
     fields(case, {"file", "function"})
     file = relative_file(case["file"], root)
     require(case["file"].startswith(("Tests/ZeusCoreTests/", "Tests/ZeusAppTests/")) or case["file"] in {
-        "qa/release-scripts/test_release_scripts.py", "qa/closed-loop/tests/test_gate.py", "qa/closed-loop/tests/test_contracts.py"}, "case must be a repository test")
+        "qa/release-scripts/test_release_scripts.py", "qa/closed-loop/tests/test_gate.py", "qa/closed-loop/tests/test_contracts.py",
+        "qa/closed-loop/tests/test_native_evidence.py", "qa/closed-loop/tests/test_native_processes.py",
+        "qa/closed-loop/tests/test_native_app_host.py", "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "qa/closed-loop/tests/test_execution_cleanup.py", "qa/closed-loop/tests/test_ax_crash_report.py",
+        "qa/closed-loop/tests/test_settings_catalog.py", "qa/closed-loop/tests/test_source_lint.py"}, "case must be a repository test")
     require(type(case["function"]) is str and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", case["function"]), "invalid test function")
     require(runnable_functions(file.read_text(), file.suffix == ".py").count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
 
@@ -111,7 +161,7 @@ def validate_map(data, portable, root=ROOT):
     unique(data["checks"], "id")
     checks = {c["id"]: c for c in data["checks"]}
     for check in checks.values():
-        fields(check, {"id", "kind", "tier", "scope"}, {"group", "suite", "file", "reason"})
+        fields(check, {"id", "kind", "tier", "scope"}, {"group", "suite", "file", "reason", "module"})
         nonempty(check["scope"])
         nonempty(check["kind"])
         nonempty(check["tier"])
@@ -128,6 +178,20 @@ def validate_map(data, portable, root=ROOT):
             nonempty(check["suite"])
             require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
             require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing native suite")
+        elif check["kind"] == "trusted-native-fixture":
+            # Same shape as a native fixture, but only a trusted Mac can execute it: SwiftUI exposes no
+            # in-process accessibility tree, so the CI app job never selects it.
+            require(set(check) == {"id", "kind", "tier", "scope", "suite", "file"}, "invalid trusted native fields")
+            require(check["tier"] == "device-proof", "trusted native fixtures are device proof only")
+            file = relative_file(check["file"], root)
+            require(check["file"].startswith("Tests/ZeusAppTests/"), "trusted native fixture must be an app test")
+            nonempty(check["suite"])
+            require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
+            require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing trusted native suite")
+        elif check["kind"] == "native-module":
+            require(set(check) == {"id", "kind", "tier", "scope", "module"}, "invalid native module fields")
+            require(check["tier"] == "native-integration" and check["module"] == "ZeusCoreTests",
+                    "only audited ZeusCoreTests may run as a complete native module")
         elif check["kind"] == "release-mocks":
             require(set(check) == {"id", "kind", "tier", "scope"} and check["tier"] == "contract", "release mocks are contract evidence only")
         elif check["kind"] == "unimplemented":
@@ -160,8 +224,10 @@ def validate_map(data, portable, root=ROOT):
             require(bool(obligation["cases"]) == (check["kind"] != "unimplemented"), "implemented obligations need actual cases; unimplemented cannot claim them")
             for case in obligation["cases"]:
                 validate_case(case, root)
-                if check["kind"] == "native-fixture":
+                if check["kind"] in {"native-fixture", "trusted-native-fixture"}:
                     require(case["file"] == check["file"], "case not in native fixture")
+                elif check["kind"] == "native-module":
+                    require(case["file"].startswith("Tests/ZeusCoreTests/"), "case not in the complete Core module")
                 elif check["kind"] == "portable":
                     # Exact excerpt membership is checked against the prepared manifest.
                     require(case["file"].startswith(("Tests/ZeusCoreTests/", "Tests/ZeusAppTests/")), "portable case must be selected real repository test")
@@ -169,6 +235,10 @@ def validate_map(data, portable, root=ROOT):
                     require(case["file"] == "qa/release-scripts/test_release_scripts.py", "release case not in mock suite")
         require(TIERS <= tiers, f"{feature['id']} needs contract, native integration, and device proof obligations")
     require(used_checks == checks.keys(), "orphan checker not used by feature map")
+    modules = [check for check in checks.values() if check["kind"] == "native-module"]
+    require(len(modules) == 1, "exactly one complete audited Core module checker is required")
+    require(not any(c["kind"] == "native-fixture" and c["file"].startswith("Tests/ZeusCoreTests/") for c in checks.values()),
+            "named Core obligations must bind to complete Core execution, not duplicate narrow runs")
     return checks
 
 
@@ -185,8 +255,10 @@ def validate_registry(data, checks, root=ROOT):
         validate_case(row["guard"], root)
         if row["check"] == "closed-loop-selftests":
             require(row["guard"]["file"].startswith("qa/closed-loop/tests/"), "selftest guard not in runner test suite")
-        elif checks[row["check"]]["kind"] == "native-fixture":
+        elif checks[row["check"]]["kind"] in {"native-fixture", "trusted-native-fixture"}:
             require(row["guard"]["file"] == checks[row["check"]]["file"], "guard not in selected native suite")
+        elif checks[row["check"]]["kind"] == "native-module":
+            require(row["guard"]["file"].startswith("Tests/ZeusCoreTests/"), "guard not in complete Core module")
     return data["regressions"]
 
 
@@ -230,6 +302,10 @@ def manifest_matches(actual_root, expected_root):
 
 def case_passed(case, check, output, root=ROOT):
     require(check["status"] == "passed", "checker did not pass")
+    if check.get("kind") in {"native-fixture", "native-module"}:
+        from native_evidence import case_passed as qualified_case_passed
+        qualified_case_passed(case, check.get("passed_cases", []))
+        return
     require(case["function"] in check.get("passed_functions", []), f"required case did not run: {case['function']}")
     if "package" in check:
         # Test definitions must be among the exact copied/selected excerpt bytes.

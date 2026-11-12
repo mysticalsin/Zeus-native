@@ -130,7 +130,7 @@ struct SettingOptionRow: View {
         switch option.kind {
         case .toggle:
             if option.id == "general.launchAtLogin" {
-                GlassToggle(isOn: Binding(get: { LaunchAtLogin.isBundled && !TopBarStyle.isSnapshot ? LaunchAtLogin.isOn : store.bool(option.id) },
+                GlassToggle(isOn: Binding(get: { store.bool(option.id) },
                                           set: { store.set(option.id, $0 ? "true" : "false") }), label: option.title)
             } else {
                 GlassToggle(isOn: store.boolBinding(option.id), label: option.title)

@@ -135,6 +135,37 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(len(signatures), 4)
         self.assertTrue(all("--timestamp=none" in c for c in signatures))
 
+    def test_bundle_strips_symbols_from_app_and_helpers_before_signing(self):
+        # Lean install: unstripped binaries were 62 MB of the 194 MB app (language data is not in the bundle at all).
+        self.bundle_fixture()
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.commands()
+        stripped = [c[-1] for c in commands if c[:3] == ["xcrun", "strip", "-S"] and "-x" in c]
+        self.assertEqual(sorted(Path(p).name for p in stripped), ["Zeus", "zeus", "zeus-bridge", "zeus-hook"])
+        first_sign = next(i for i, c in enumerate(commands) if c[:2] == ["codesign", "--force"])
+        last_strip = max(i for i, c in enumerate(commands) if c[:3] == ["xcrun", "strip", "-S"])
+        self.assertLess(last_strip, first_sign)
+
+    def test_symbols_can_be_kept_for_a_profiling_build(self):
+        self.bundle_fixture()
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-", ZEUS_KEEP_SYMBOLS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([c for c in self.commands() if c[:2] == ["xcrun", "strip"]], [])
+
+    def test_bundle_ships_product_resources_but_never_test_resource_bundles(self):
+        # A local QA launch of the CI preview found Zeus_ZeusCoreTests.bundle (test fixtures) inside the app.
+        self.bundle_fixture()
+        output = Path(self.env["ZEUS_TEST_BIN"])
+        for name in ("Zeus_Zeus.bundle", "Zeus_ZeusCoreTests.bundle", "Zeus_ZeusAppTests.bundle"):
+            (output / name).mkdir()
+            (output / name / "resource.txt").write_text("fixture")
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        resources = self.root / "build/Zeus.app/Contents/Resources"
+        self.assertTrue((resources / "Zeus_Zeus.bundle/resource.txt").is_file())
+        self.assertEqual(sorted(p.name for p in resources.glob("*Tests.bundle")), [])
+
     def test_release_requires_identity_and_profile_before_build(self):
         self.package_fixture()
         result = self.run_script("package.sh", RELEASE="1")

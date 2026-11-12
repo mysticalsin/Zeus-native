@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Ultron voice preset: a free local engine first, ElevenLabs only when its key is valid.
+/// The Ultron voice preset.
 /// A 401 is not a voice the person should hear. Preview stays silent unless AUDIBLE-OK is set.
 public enum UltronVoicePlan {
     public static let presetTitle = "Ultron voice (default)"
@@ -11,12 +11,16 @@ public enum UltronVoicePlan {
         case system
     }
 
-    /// Default order. Kokoro (on this Mac) wins whenever it is ready, even if an ElevenLabs key is saved.
-    /// ElevenLabs is next, and only when that key has not been rejected. Otherwise the Mac voice.
+    /// Default order, from `UltronEngineRouter`: ElevenLabs when its key is valid (lowest latency designed
+    /// voice), then Kokoro on this Mac, otherwise the deepest Mac voice with the Ultron effect.
     public static func preferred(kokoroReady: Bool, elevenLabsKeyValid: Bool) -> Engine {
-        if kokoroReady { return .kokoro }
-        if elevenLabsKeyValid { return .elevenLabs }
-        return .system
+        let chain = UltronEngineRouter.chain(
+            choice: .auto, availability: UltronEngineAvailability(elevenLabsConfigured: elevenLabsKeyValid, kokoroReady: kokoroReady))
+        switch chain.first?.engine {
+        case .elevenLabs: return .elevenLabs
+        case .kokoro: return .kokoro
+        default: return .system
+        }
     }
 
     /// 401 and 402 mean the key itself is bad. Speak with the local engine instead, and do not say an error aloud.

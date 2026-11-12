@@ -29,8 +29,37 @@ def tests(*names):
 
 
 GROUPS = {
+    "explanation": (
+        core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
+             "Explanation/ExplanationModelWire.swift", "Explanation/ExplanationRecipes.swift",
+             "Explanation/ExplanationModelMotion.swift",
+             "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
+             "Explanation/ExplanationPlayback.swift", "Explanation/ExplanationCoordinates.swift",
+             "Explanation/ExplanationHistory.swift", "Explanation/ExplanationDiagnostics.swift",
+             "Explanation/ExplanationChartMath.swift", "Explanation/ExplanationCardPlacement.swift",
+             "Explanation/ExplanationCardContentBuilder.swift"),
+        tests("ExplanationProtocolTests", "ExplanationReducerTests", "ExplanationStreamTests",
+              "ExplanationCompletionStreamTests", "ExplanationPlaybackTests", "ExplanationCoordinatesTests",
+              "ExplanationHistoryTests", "ExplanationDiagnosticsTests", "ExplanationModelSchemaTests",
+              "ExplanationRecipeTests", "ExplanationModelEditTests", "ExplanationModelMotionTests",
+              "ExplanationChartMathTests", "ExplanationCardPlacementTests"),
+    ),
+    "socket-safety": (
+        core("UnixSocket.swift", "PeerCredentials.swift"),
+        tests("UnixSocketSafetyTests", "PeerCredentialsTests"),
+    ),
+    "bridge-transport": (
+        core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
+             "PeerCredentials.swift", "JSONValue.swift", "ZeusPaths.swift", "Version.swift") + ["Sources/zeus-bridge/main.swift"],
+        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
+    ),
+    "keychain": (
+        core("Keychain/KeychainStore.swift"),
+        tests("KeychainStoreTests"),
+    ),
     "wiki-export": (
-        core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift",
+        core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
@@ -43,8 +72,8 @@ GROUPS = {
         tests("TextInsertionReceiptTests"),
     ),
     "polyglot": (
-        core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
-        tests("PolyglotTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),
+        core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
+        tests("PolyglotTests", "PolyglotPinPolicyTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),
     ),
     "regressions": (
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
@@ -57,14 +86,19 @@ GROUPS = {
         core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift", "Scribe/ScribeCallPrompt.swift",
              "Scribe/ScribeCapture.swift", "Scribe/ScribeMicGate.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribePresentation.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeSpeakerStats.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift"),
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift",
+             "Scribe/ScribeMuteReadScheduler.swift", "Scribe/ScribeIncomingWordLayout.swift", "Scribe/MicInputOwnership.swift",
+             "Scribe/ScribePopupLifecycle.swift"),
         tests("ScribeCoreTests", "ScribePresentationTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
-              "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests"),
+              "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
+              "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
+              "ScribePopupLifecycleTests"),
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift"),
-        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests"),
+             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
+             "TopBar/RecordingFeedback.swift"),
+        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
@@ -72,20 +106,39 @@ GROUPS = {
              "Recordly/RecordlyExportSettings.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
     ),
+    "pointing": (
+        core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
+             "Explanation/ExplanationModelWire.swift", "Explanation/ExplanationRecipes.swift",
+             "Explanation/ExplanationModelMotion.swift",
+             "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
+             "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
+             "Explanation/ExplanationChartMath.swift", "Pointing/PointingCardAnchors.swift", "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
+             "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
+             "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
+             "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
+             "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",
+             "Pointing/PointingStaleTarget.swift", "Pointing/PointingShortcutConflicts.swift",
+             "Pointing/PointingInkTrail.swift", "Pointing/PointingTraceSpans.swift"),
+        tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
+              "ExplanationProtocolV2Tests", "ExplanationProtocolV3Tests", "PointingCardAnchorsTests", "PointingProviderTests", "PointingStrokeTargetingTests", "PointingDeixisTests",
+              "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
+              "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests"),
+    ),
     "buddy": (
         core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift"),
-        tests("WikiRelationshipsTests", "ScribeRecapNavigationTests"),
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
+        tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
              "Wiki/WikiStore.swift", "Wiki/SensitiveInfoScanner.swift"),
         tests("WikiTests"),
     ),
@@ -160,7 +213,13 @@ def write_excerpts(root, group, manifest):
         pieces.append(text)
         manifest["excerpts"].append(evidence)
     if pieces:
-        (root / CORE / "PortableExcerpts.swift").write_text("import Foundation\n\n" + "\n".join(pieces))
+        imports = ["Foundation"]
+        # These exact declarations use CoreGraphics extensions on Apple SDKs.
+        # Linux Foundation provides the geometry values without that module.
+        if group in {"presentation", "recordly-geometry"} and manifest["platform"] == "darwin":
+            imports.append("CoreGraphics")
+        manifest["excerpt_imports"] = imports
+        (root / CORE / "PortableExcerpts.swift").write_text("".join(f"import {name}\n" for name in imports) + "\n" + "\n".join(pieces))
 
 
 def prepare(output, group, *, platform_name=None):
@@ -179,12 +238,16 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing") and platform_name == "linux"
     extra_target = ''
+    products = ''
     core_dependencies = '[]'
     test_dependencies = '["ZeusCore"]'
     test_settings = ''
-    if group == "wiki-export":
+    if group == "bridge-transport":
+        products = 'products: [.executable(name: "zeus-bridge", targets: ["zeus-bridge"])], '
+        extra_target = '    .executableTarget(name: "zeus-bridge", dependencies: ["ZeusCore"]),\n'
+    elif group == "wiki-export":
         wrapper = root / "Sources/zeus-memory-helper/main.swift"
         wrapper.parent.mkdir(parents=True)
         wrapper.write_text('import Foundation\nimport ZeusCore\nexit(WikiExportMCPCommand.run(Array(CommandLine.arguments.dropFirst())))\n')
@@ -192,6 +255,7 @@ def prepare(output, group, *, platform_name=None):
                         '    .target(name: "MCPTransportValidation", dependencies: ["ZeusCore"]),\n')
         for source, target in [
             ("Sources/Zeus/BrowserAgent/MCPStdioClient.swift", "Sources/MCPTransportValidation/MCPStdioClient.swift"),
+            ("Sources/Zeus/BrowserAgent/MCPPipeIO.swift", "Sources/MCPTransportValidation/MCPPipeIO.swift"),
             ("Tests/ZeusAppTests/MemoryMCPTransportTests.swift", TESTS + "MemoryMCPTransportTests.swift"),
         ]:
             data = (REPO / source).read_bytes()
@@ -213,7 +277,8 @@ def prepare(output, group, *, platform_name=None):
         core_dependencies = '["CoreGraphics"]'
     (root / "Package.swift").write_text(
         '// swift-tools-version: 6.0\nimport PackageDescription\n'
-        'let package = Package(name: "ZeusPortableValidation", targets: [\n'
+        'let package = Package(name: "ZeusPortableValidation", platforms: [.macOS("14.2")], '
+        + products + 'targets: [\n'
         + extra_target + f'    .target(name: "ZeusCore", dependencies: {core_dependencies}),\n'
         +
         f'    .testTarget(name: "ZeusCoreTests", dependencies: {test_dependencies}{test_settings})\n])\n')

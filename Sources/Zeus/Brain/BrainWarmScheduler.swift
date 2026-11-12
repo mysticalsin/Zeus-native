@@ -32,15 +32,63 @@ final class BrainHTTPObserver: NSObject, URLSessionTaskDelegate, @unchecked Send
     }
 }
 
-/// Keeps the brains warm only while Zeus is in use (`BrainWarmPlan`): a loose 2-minute check, a free
-/// metadata call for the cloud connection, a one-token ping for the local model. Launch and wake
-/// from sleep warm everything at once. Nothing runs on an idle Mac.
+/// The warm-up actions are explicit so a cloud connection refresh cannot start a local voice worker.
+/// Selection and readiness are read only when a local warm-up is actually due.
+@MainActor
+struct BrainWarmActions {
+    struct VoiceSelection: Sendable {
+        let provider: VoiceTTSProvider
+        let ready: Bool
+        let paused: Bool
+        let voice: String
+        let speed: Double
+    }
+
+    var localModel: @MainActor @Sendable () async -> Void
+    var cloudConnection: @MainActor @Sendable () async -> Void
+    var voiceSelection: @MainActor @Sendable () -> VoiceSelection
+    var renderVoice: @MainActor @Sendable (String, Double) async -> Void
+
+    func run(_ targets: Set<BrainWarmPlan.Target>) async {
+        guard !Task.isCancelled else { return }
+        async let local: Void = targets.contains(.localModel) ? localModel() : ()
+        async let cloud: Void = targets.contains(.cloudConnection) ? cloudConnection() : ()
+        async let voice: Void = targets.contains(.localModel) ? warmSelectedVoice() : ()
+        _ = await (local, cloud, voice)
+    }
+
+    func warmSelectedVoice() async {
+        guard !Task.isCancelled else { return }
+        let selection = voiceSelection()
+        guard selection.provider == .kokoro, selection.ready, !selection.paused else { return }
+        await renderVoice(selection.voice, selection.speed)
+    }
+
+    static var live: Self {
+        Self(localModel: { await OpenAICompatProvider.ollama().prewarm() },
+             cloudConnection: { await AnthropicAPIProvider().prewarm() },
+             voiceSelection: {
+                 let settings = VoiceSettings.shared
+                 return VoiceSelection(provider: settings.ttsProvider, ready: settings.kokoroReady,
+                                       paused: settings.isProviderPaused(.kokoro),
+                                       voice: settings.kokoroVoice, speed: settings.kokoroSpeed)
+             },
+             renderVoice: { voice, speed in
+                 await KokoroWorkerSession.shared.prewarm(voice: voice, speed: speed)
+             })
+    }
+}
+
+/// Keeps the brains warm only while voice is in use (`BrainWarmPlan`). Nothing runs at launch or
+/// wake. The talk key going down starts the first warm-up and a loose 2-minute timer (a free
+/// metadata call for the cloud connection, a one-token ping for the local model); the timer
+/// stops itself when the active window passes, so an idle app has no timer and no calls.
 @MainActor
 final class BrainWarmScheduler {
     static let shared = BrainWarmScheduler()
 
+    private var enabled = false
     private var timer: Timer?
-    private var wakeObserver: NSObjectProtocol?
     private var lastActivity: Date?
     private var lastCloud: Date?
     private var lastLocal: Date?
@@ -49,40 +97,44 @@ final class BrainWarmScheduler {
     /// Hooks for tests.
     var now: () -> Date = { Date() }
     var warm: (Set<BrainWarmPlan.Target>) async -> Void = { targets in
-        async let local: Void = targets.contains(.localModel) ? OpenAICompatProvider.ollama().prewarm() : ()
-        async let cloud: Void = targets.contains(.cloudConnection) ? AnthropicAPIProvider().prewarm() : ()
-        async let voice: Void = KokoroWorkerSession.shared.prewarm(
-            voice: VoiceSettings.shared.kokoroVoice, speed: VoiceSettings.shared.kokoroSpeed)
-        _ = await (local, cloud, voice)
+        await BrainWarmActions.live.run(targets)
     }
 
+    /// Allows warm-ups; starts nothing.
     func start() {
-        guard timer == nil, !TopBarStyle.isSnapshot else { return }
-        // The launch warm-up (VoiceTurnController) already ran; the first check is one interval away.
+        guard !TopBarStyle.isSnapshot else { return }
+        enabled = true
+    }
+
+    /// The talk key went down: warm now, and keep warm while the conversation goes on.
+    func talkKeyDown() {
+        noteActivity()
+        Task { await tick() }
+    }
+
+    /// The person pressed the key, spoke or asked something.
+    func noteActivity() {
         lastActivity = now()
-        lastCloud = lastActivity
-        lastLocal = lastActivity
+        armTimer()
+    }
+
+    private func armTimer() {
+        guard enabled, timer == nil else { return }
         let timer = Timer.scheduledTimer(withTimeInterval: BrainWarmPlan.checkEvery, repeats: true) { _ in
             Task { @MainActor in await BrainWarmScheduler.shared.tick() }
         }
         timer.tolerance = 30
         self.timer = timer
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { _ in
-            Task { @MainActor in
-                BrainWarmScheduler.shared.noteActivity()
-                await BrainWarmScheduler.shared.tick(forced: true)
-            }
-        }
     }
 
-    /// Tony pressed the key, spoke or asked something.
-    func noteActivity() { lastActivity = now() }
-
-    func tick(forced: Bool = false) async {
+    func tick() async {
+        if BrainWarmPlan.isIdle(now: now(), lastActivity: lastActivity) {
+            timer?.invalidate()
+            timer = nil
+            return
+        }
         guard !inFlight else { return }
-        let targets = BrainWarmPlan.due(now: now(), lastActivity: lastActivity, lastCloud: lastCloud, lastLocal: lastLocal, forced: forced)
+        let targets = BrainWarmPlan.due(now: now(), lastActivity: lastActivity, lastCloud: lastCloud, lastLocal: lastLocal)
         guard !targets.isEmpty else { return }
         inFlight = true
         defer { inFlight = false }

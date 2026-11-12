@@ -165,6 +165,65 @@
           "package": {
             "type": "string",
             "minLength": 1
+          },
+          "blocker": {
+            "enum": [
+              "native-build",
+              "native-discovery"
+            ]
+          },
+          "passed_cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "file",
+                "function",
+                "line",
+                "column",
+                "parameterized",
+                "parameter_cases"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "file": {
+                  "type": "string",
+                  "pattern": "^Tests/Zeus(Core|App)Tests/"
+                },
+                "function": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "parameterized": {
+                  "type": "boolean"
+                },
+                "parameter_cases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                }
+              }
+            }
+          },
+          "parameter_cases": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -179,6 +238,65 @@
           "suites",
           "passed_functions",
           "artifacts"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "blocker"
+              ]
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "blocked"
+                },
+                "command": {
+                  "maxItems": 0
+                },
+                "exit_code": {
+                  "type": "null"
+                },
+                "tests": {
+                  "const": 0
+                },
+                "suites": {
+                  "const": 0
+                },
+                "passed_functions": {
+                  "maxItems": 0
+                },
+                "artifacts": {
+                  "maxItems": 0
+                },
+                "passed_cases": {
+                  "maxItems": 0
+                },
+                "parameter_cases": {
+                  "const": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "native-fixture",
+                    "native-module",
+                    "native-combined"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "passed_cases",
+                "parameter_cases"
+              ]
+            }
+          }
         ]
       }
     },
@@ -312,6 +430,144 @@
         "linux",
         "darwin"
       ]
+    },
+    "native_build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "command",
+        "exit_code",
+        "source_snapshot_sha256",
+        "artifacts",
+        "duration_seconds"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "sha256"
+            ]
+          }
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "output_directory": {
+      "type": "string",
+      "minLength": 1
+    },
+    "native_discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "command",
+        "exit_code",
+        "source_snapshot_sha256",
+        "artifacts",
+        "duration_seconds"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "sha256"
+            ]
+          }
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
     }
   },
   "required": [
@@ -327,7 +583,9 @@
     "regressions",
     "totals",
     "errors",
-    "platform"
+    "platform",
+    "repository",
+    "output_directory"
   ],
   "allOf": [
     {
@@ -358,6 +616,66 @@
                 "minimum": 1
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "native_build"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mode": {
+            "const": "full"
+          },
+          "platform": {
+            "const": "darwin"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "full"
+          },
+          "platform": {
+            "const": "darwin"
+          },
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": [
+          "mode",
+          "platform",
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "native_build",
+          "native_discovery"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "native_discovery"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mode": {
+            "const": "full"
+          },
+          "platform": {
+            "const": "darwin"
           }
         }
       }

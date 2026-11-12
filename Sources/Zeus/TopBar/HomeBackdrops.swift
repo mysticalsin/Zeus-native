@@ -168,20 +168,31 @@ enum HomeBackdropPainter {
         gc.drawLayer { layer in
             layer.addFilter(.blur(radius: 0.8))
             for vein in 0..<6 {
-                var path = Path()
-                let seed = Double(vein) * 1.7
-                for i in 0...40 {
-                    let u = Double(i) / 40
-                    let x = size.width * CGFloat(u)
-                    let y = size.height * CGFloat(0.5 + 0.34 * sin(u * 4.3 + seed + t * 0.05) + 0.12 * sin(u * 13 + seed * 2 - t * 0.04)
-                                                   + 0.5 * (Double(vein) / 6 - 0.5))
-                    i == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
-                }
-                layer.stroke(path, with: .color(Color(red: 0.82, green: 0.82, blue: 0.95).opacity(vein % 2 == 0 ? 0.40 : 0.2)),
-                             lineWidth: vein % 2 == 0 ? 1.6 : 0.8)
+                let path = marbleVein(vein, size: size, time: t)
+                let opacity: Double = vein % 2 == 0 ? 0.40 : 0.2
+                let lineWidth: CGFloat = vein % 2 == 0 ? 1.6 : 0.8
+                let color = Color(red: 0.82, green: 0.82, blue: 0.95).opacity(opacity)
+                layer.stroke(path, with: .color(color), lineWidth: lineWidth)
             }
         }
         blob(&gc, CGPoint(x: size.width * 0.8, y: size.height * 0.2), size.width * 0.3, .white, 0.08)
+    }
+
+    private static func marbleVein(_ vein: Int, size: CGSize, time: Double) -> Path {
+        var path = Path()
+        let seed: Double = Double(vein) * 1.7
+        let verticalShift: Double = 0.5 * (Double(vein) / 6.0 - 0.5)
+        for sample in 0...40 {
+            let u: Double = Double(sample) / 40.0
+            let primaryPhase: Double = u * 4.3 + seed + time * 0.05
+            let secondaryPhase: Double = u * 13.0 + seed * 2.0 - time * 0.04
+            let primaryWave: Double = 0.34 * sin(primaryPhase)
+            let secondaryWave: Double = 0.12 * sin(secondaryPhase)
+            let normalizedY: Double = 0.5 + primaryWave + secondaryWave + verticalShift
+            let point = CGPoint(x: size.width * CGFloat(u), y: size.height * CGFloat(normalizedY))
+            if sample == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        return path
     }
 
     // MARK: 6. Watercolor: overlapping washes that breathe.
@@ -255,21 +266,32 @@ enum HomeBackdropPainter {
             layer.addFilter(.blur(radius: 1.6))
             layer.blendMode = .plusLighter
             for layerIndex in 0..<2 {
-                let scale = layerIndex == 0 ? 1.0 : 1.7
-                let dir = layerIndex == 0 ? 1.0 : -1.0
                 for k in 0..<9 {
-                    var path = Path()
-                    let row = Double(k) / 9
-                    for i in 0...48 {
-                        let u = Double(i) / 48
-                        let wobble = sin(u * 9 * scale + t * 0.7 * dir + row * 11) * 0.045 + sin(u * 4.5 * scale - t * 0.5 * dir + row * 5) * 0.06
-                        let point = CGPoint(x: size.width * CGFloat(u), y: size.height * CGFloat(row * 1.1 - 0.05 + wobble))
-                        i == 0 ? path.move(to: point) : path.addLine(to: point)
-                    }
-                    layer.stroke(path, with: .color(Color(red: 0.7, green: 1.0, blue: 0.95).opacity(0.17)), lineWidth: 1.4)
+                    let path = causticLine(k, layerIndex: layerIndex, size: size, time: t)
+                    let color = Color(red: 0.7, green: 1.0, blue: 0.95).opacity(0.17)
+                    layer.stroke(path, with: .color(color), lineWidth: 1.4)
                 }
             }
         }
+    }
+
+    private static func causticLine(_ index: Int, layerIndex: Int, size: CGSize, time: Double) -> Path {
+        var path = Path()
+        let scale: Double = layerIndex == 0 ? 1.0 : 1.7
+        let direction: Double = layerIndex == 0 ? 1.0 : -1.0
+        let row: Double = Double(index) / 9.0
+        for sample in 0...48 {
+            let u: Double = Double(sample) / 48.0
+            let primaryPhase: Double = u * 9.0 * scale + time * 0.7 * direction + row * 11.0
+            let secondaryPhase: Double = u * 4.5 * scale - time * 0.5 * direction + row * 5.0
+            let primaryWave: Double = sin(primaryPhase) * 0.045
+            let secondaryWave: Double = sin(secondaryPhase) * 0.06
+            let wobble: Double = primaryWave + secondaryWave
+            let normalizedY: Double = row * 1.1 - 0.05 + wobble
+            let point = CGPoint(x: size.width * CGFloat(u), y: size.height * CGFloat(normalizedY))
+            if sample == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        return path
     }
 
     // MARK: 10. Cosmos: a dark sky, twinkling stars and two nebulae.

@@ -51,7 +51,7 @@ final class ResearchRunner {
         if stopped || Task.isCancelled { return finish(Outcome(spoken: "Stopped.", cancelled: true), question: question, depth: depth, speak: speak, engine: nil) }
         guard let parsed else {
             let raw = problem ?? "failed"
-            VoiceLog.log("error", "research: \(raw.prefix(200))")
+            VoiceLog.logContent("error", raw, prefix: "research provider error ")
             let spoken = VoiceTurnController.spokenError(ClaudeCLIProvider.ProviderError.failed(raw))
             return finish(Outcome(spoken: spoken, problem: raw), question: question, depth: depth, speak: speak, engine: nil)
         }
@@ -92,7 +92,7 @@ final class ResearchRunner {
             } catch {
                 if Task.isCancelled || stopped { return (nil, engine.title, nil) }
                 lastError = (error as? BridgeError)?.message ?? error.localizedDescription
-                NSLog("[ZEUS] research: %@ failed (%@), trying the next one", engine.title, lastError ?? "?")
+                VoiceLog.logContent("error", lastError ?? "?", prefix: "research \(engine.title) failed, trying next; detail ")
             }
         }
         // No engine with a web tool: the browser agent searches and reads the top results in Chrome.
@@ -141,7 +141,7 @@ final class ResearchRunner {
             try Data(text.utf8).write(to: url, options: .withoutOverwriting)
             return url
         } catch {
-            NSLog("[ZEUS] research: couldn't save %@: %@", url.path, error.localizedDescription)
+            VoiceLog.logContent("error", error.localizedDescription, prefix: "research save failed: ")
             return nil
         }
     }

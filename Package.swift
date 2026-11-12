@@ -10,6 +10,7 @@ let package = Package(
         .executable(name: "zeus-bridge", targets: ["zeus-bridge"]),
         .executable(name: "zeus-cli", targets: ["zeus-cli"]),
         .executable(name: "zeus-silent-eval", targets: ["zeus-silent-eval"]),
+        .executable(name: "zeus-native-test-host", targets: ["zeus-native-test-host"]),
         .library(name: "ZeusCore", targets: ["ZeusCore"]),
     ],
     dependencies: [
@@ -20,8 +21,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "ZeusCore"),
+        // Catches Objective-C exceptions from Apple frameworks that Swift cannot catch (see header).
+        .target(name: "ZeusObjCGuard"),
         .executableTarget(name: "Zeus", dependencies: [
             "ZeusCore",
+            "ZeusObjCGuard",
             .product(name: "FluidAudio", package: "FluidAudio"),
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
         ], resources: [
@@ -33,6 +37,8 @@ let package = Package(
         // Installed as `zeus` (a `zeus` target would clash with `Zeus` on a case-insensitive disk).
         .executableTarget(name: "zeus-cli", dependencies: ["ZeusCore"]),
         .executableTarget(name: "zeus-silent-eval", dependencies: ["ZeusCore"]),
+        // Test-only AppKit lifecycle owner. Never included in the Zeus app bundle.
+        .executableTarget(name: "zeus-native-test-host", path: "qa/native-app-host"),
         .testTarget(name: "ZeusCoreTests", dependencies: ["ZeusCore"], resources: [
             .copy("Fixtures"),
         ]),

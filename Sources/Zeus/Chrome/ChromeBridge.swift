@@ -38,7 +38,7 @@ enum ChromeBridge {
 
         var errorDescription: String? {
             switch self {
-            case .notConnected: "Chrome isn't connected to ZEUS. Open Chrome and check the ZEUS extension is on."
+            case .notConnected: "Chrome isn't connected to Zeus. Open Chrome and check the Zeus extension is on."
             case .failed(let error): error.spokenMessage
             }
         }

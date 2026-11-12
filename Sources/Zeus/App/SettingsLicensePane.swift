@@ -35,8 +35,10 @@ struct LicenseSettings: View {
                     GlassRow(title: "Seat", note: seatNote(payload)) {
                         GlassStatus(ok: license.activation != nil || license.serverURL == nil, text: seatLabel(payload))
                     }
+                }
+                if license.status.payload != nil || license.deactivationError != nil {
                     GlassDivider()
-                    // A failed server call keeps the local license; its reason shows here with the retry.
+                    // A partial cleanup still exposes its reason and retry after the key is gone.
                     GlassRow(title: "Deactivate or move to another Mac", note: license.deactivationError ?? "Frees this Mac's seat and removes the key from its Keychain. Activate the same key on the new Mac.") {
                         Button(drafts.confirmDeactivate ? "Press again" : license.deactivationError == nil ? "Deactivate" : "Try again") {
                             if drafts.confirmDeactivate {

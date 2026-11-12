@@ -1,0 +1,277 @@
+{
+  "head": "5dfeeb8208bd3029f4347c56a2c7d372db45c779",
+  "tested": "5dfeeb8208bd3029f4347c56a2c7d372db45c779",
+  "source_snapshot_sha256": "e2d9b206e9e3cbced630332f2dffd4190bc6df06db3a5410e8193535b4108f97",
+  "verified_partition_count": 23,
+  "verified_tests": 2320,
+  "verified_partitions": [
+    {
+      "id": "native-ZeusCoreTests",
+      "tests": 2146,
+      "suites": 290
+    },
+    {
+      "id": "native-DictationOwnershipIntegrationTests",
+      "tests": 49,
+      "suites": 1
+    },
+    {
+      "id": "native-PolyglotPinTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-RecorderPillTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainCaptureModelTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-UltronVoiceEffectTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-EngineBrandLogoTests",
+      "tests": 6,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingTests",
+      "tests": 18,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingIsolationTests",
+      "tests": 14,
+      "suites": 1
+    },
+    {
+      "id": "native-PermissionsCaptureTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordlyDebugWiringTests",
+      "tests": 5,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeLifecycleScenarioTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordingFeedbackRenderTests",
+      "tests": 7,
+      "suites": 1
+    },
+    {
+      "id": "native-WikiGraphNavigationTests",
+      "tests": 10,
+      "suites": 1
+    },
+    {
+      "id": "native-HaloRendererTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeComponentJourneyTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-DisplaySynchronizedViewTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeIncomingWordTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-LicenseCredentialCleanupTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-MemoryMCPTransportTests",
+      "tests": 12,
+      "suites": 1
+    },
+    {
+      "id": "native-KokoroWorkerTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-TickingTests",
+      "tests": 9,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainWarmSchedulerTests",
+      "tests": 8,
+      "suites": 1
+    }
+  ],
+  "failed_partitions": [
+    {
+      "id": "native-ScribeAccessibilityJourneyTests",
+      "reason": "command exited 1",
+      "exit_code": 1,
+      "issues": [
+        {
+          "test_id": "ZeusAppTests.ScribeAccessibilityJourneyTests/waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl()/ScribeComponentJourneyTests.swift:515:6",
+          "source": {
+            "fileID": "ZeusAppTests/ScribeComponentJourneyTests.swift",
+            "line": 515,
+            "column": 6
+          },
+          "messages": [
+            "Caught error: Fixture control is unavailable: scribe.start (identified NSButton has role AXUnknown, enabled=true)"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.ScribeAccessibilityJourneyTests/realButtonsDriveStartKeepStopFailedSaveRetryAndClose()/ScribeComponentJourneyTests.swift:521:6",
+          "source": {
+            "fileID": "ZeusAppTests/ScribeComponentJourneyTests.swift",
+            "line": 521,
+            "column": 6
+          },
+          "messages": [
+            "Caught error: Missing fixture control scribe.start. Own tree: owned host: visible=true, key=false, applicationActive=false, launchFinished=true; semantic probe raw view: SwiftUI.NSHostingView<SwiftUI.ModifiedContent<SwiftUI.ModifiedContent<SwiftUI.ModifiedContent<Zeus.ScribePage, SwiftUI._EnvironmentKeyWritingModifier<Swift.Opti, sameAsSource=true, element=true, role=AXGroup, id=-, enabled=false, window=owned, finiteFrame=true, emptyFrame=false, intersectsWindow=true; semantic probe unignored-only-child results=1, reportingFirst=1; semantic probe unignored-only-child[0]: SwiftUI.NSHostingView<SwiftUI.ModifiedContent<SwiftUI.ModifiedContent<SwiftUI.ModifiedContent<Zeus.ScribePage, SwiftUI._EnvironmentKeyWritingModifier<Swift.Opti, sameAsSource=true, element=true, role=AXGroup, id=-, enabled=false, window=owned, finiteFrame=true, emptyFrame=false, intersectsWindow=true; SwiftUI.NSHostingView<SwiftUI.ModifiedContent<SwiftUI.ModifiedContent<SwiftUI.ModifiedContent<Zeus.ScribePage, SwiftUI._EnvironmentKeyWritingModifier<Swift.Opti:AXGroup:-:- element=true, children=0, navigation=0, contents=0; SwiftUI.KeyViewProxy:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.KeyViewProxy:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI._NSInheritedView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba2f6da8)._FocusRingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI._NSInheritedView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba315620)._NSShapeHitTestingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI._NSInheritedView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba2f6da8)._FocusRingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI._NSInheritedView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba315620)._NSShapeHitTestingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.CGDrawingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI._NSInheritedView:AXUnknown:-:- element=false, children=1, navigation=1, contents=0; Zeus.(unknown context at $10fe7de00).ScribeAccessibilityFocusAnchor.AnchorView:AXStaticText:-:Scribe element=true, children=0, navigation=0, contents=0; SwiftUI.PlatformViewHost<SwiftUI.(unknown context at $1ba305720).PlatformViewRepresentableAdaptor<Zeus.(unknown context at $10fe7de00).ScribeAccessibilityFocusA:AXUnknown:-:- element=false, children=1, navigation=1, contents=0; SwiftUI._NSInheritedView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba315620)._NSShapeHitTestingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba315620)._NSShapeHitTestingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0; SwiftUI.(unknown context at $1ba315620)._NSShapeHitTestingView:AXUnknown:-:- element=false, children=0, navigation=0, contents=0"
+          ],
+          "is_known": false
+        }
+      ]
+    },
+    {
+      "id": "native-OwnedWindowEventDriverTests",
+      "reason": "command exited 1",
+      "exit_code": 1,
+      "issues": [
+        {
+          "test_id": "ZeusAppTests.OwnedWindowEventDriverTests/consumedReleaseLeavesAnUnrelatedQueuedMouseUpUntouched()/OwnedWindowEventDriver.swift:198:6",
+          "source": {
+            "fileID": "ZeusAppTests/OwnedWindowEventDriver.swift",
+            "line": 233,
+            "column": 35
+          },
+          "messages": [
+            "Expectation failed: (NSApplication.shared \u2192 <NSApplication: 0x14e805370>).nextEvent(matching: (.leftMouseUp \u2192 NSEventMask(rawValue: 4)), until: (.distantPast \u2192 0001-01-01 00:00:00 +0000), inMode: (.eventTracking \u2192 NSRunLoopMode(rawValue: \"NSEventTrackingRunLoopMode\")), dequeue: false) \u2192 nil"
+          ],
+          "is_known": false
+        }
+      ]
+    },
+    {
+      "id": "native-KokoroWorkerSessionTests",
+      "reason": "command exited 1",
+      "exit_code": 1,
+      "issues": [
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/cancellingSynthesisReturnsNoArtifactAndStopsItsWorker()/KokoroWorkerSessionTests.swift:221:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 199,
+            "column": 13
+          },
+          "messages": [
+            "Expectation failed: await condition()"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/productionWorkerPublishesOnlyACompleteAcknowledgedWAV()/KokoroWorkerSessionTests.swift:202:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 199,
+            "column": 13
+          },
+          "messages": [
+            "Expectation failed: await condition()"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/cancelledPartialWriteCannotLeaveAnAudioArtifact()/KokoroWorkerSessionTests.swift:365:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 199,
+            "column": 13
+          },
+          "messages": [
+            "Expectation failed: await condition()"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/completedRequestCanImmediatelyReuseTheSameWorker()/KokoroWorkerSessionTests.swift:587:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 593,
+            "column": 34
+          },
+          "messages": [
+            "Expectation failed: await session.render(text, voice: \"synthetic\", speed: 1) \u2192 nil"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/idleWorkerReleasesItsProcessAndClosedSessionCannotRestart()/KokoroWorkerSessionTests.swift:312:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 315,
+            "column": 29
+          },
+          "messages": [
+            "Expectation failed: await session.render(\"first\", voice: \"synthetic\", speed: 1) \u2192 nil"
+          ],
+          "is_known": false
+        }
+      ]
+    }
+  ],
+  "complete_native_acceptance": false,
+  "evidence_kind": "partial-native-revalidation",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42806557428",
+  "app_job": 129797076680,
+  "artifact_id": 13761860280,
+  "artifact_zip_sha256": "a21b58987f3754fffcb87a94f1a838bfa34b30f8a4ae0ed94f9c51c4e85e25a9",
+  "revalidated_artifacts": {
+    "job.json": "001415acf369e6de7694f986635eb00f5cc701c000b2245e0698e0c8a537d8e1",
+    "build.log": "470c57a9afa299dd4263773e5f51afe173bcae15dcc32595f488c5e0839013d0",
+    "native-evidence/result.json": "e8850ee0998679828542541c128c0fed098bcbea72c6e588827e44f8520b9624",
+    "native-evidence/source-manifest.json": "58e9e9a9fb6614cff454082daa07344a11e2d9623a8aaa9a1d0301248fc708db",
+    "native-evidence/native-build/build.log": "9c04fd594e4af4346e090888e89a2a14260f4f394e8b0cf24dd1aa7b3eeb1a45",
+    "native-evidence/native-discovery/events.jsonl": "ed412a05c59a15841a5cfb9bf55eb9fe1e218e009686d17e508bca805aa5440f",
+    "python-launcher.log": "e8e1c1496b4b29b71454c1f66638237c596d7d135f9b98f506e07629ff92e3d4"
+  },
+  "validation_scope": {
+    "production_compiler_log": "passed",
+    "native_test_build_receipt": "passed",
+    "source_manifest": "exact head tree",
+    "feature_map_checks": 69,
+    "regressions": 133,
+    "compiled_selected_functions": 2349,
+    "hashed_partition_artifacts": 134,
+    "complete_receipt_rejection": "missing fields: {'native_summary'}"
+  },
+  "python_launcher_metadata": {
+    "artifact": "python-launcher.log",
+    "sha256": "e8e1c1496b4b29b71454c1f66638237c596d7d135f9b98f506e07629ff92e3d4",
+    "binary": "/usr/bin/python3",
+    "linkage": "/usr/lib/libxcselect.dylib",
+    "import": "_xcselect_invoke_xcrun",
+    "resolved_interpreter": "/Applications/Xcode_26.3.app/Contents/Developer/usr/bin/python3",
+    "scope": "Observed exact-runner launcher indirection only; these after-test metadata probes do not attribute cold startup delay."
+  }
+}

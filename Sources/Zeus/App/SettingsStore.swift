@@ -58,6 +58,9 @@ final class SettingsStore {
     @ObservationIgnored var onChange: ((String) -> Void)?
     @ObservationIgnored var actions: [String: @MainActor () -> Void] = [:]
     @ObservationIgnored private let defaults: UserDefaults
+    /// Background reads of the login-item status. A toggle made while one is in flight invalidates it, so the
+    /// old answer cannot put the switch back.
+    @ObservationIgnored private var launchReads = LatestRun()
 
     static func key(_ id: String) -> String { "opt." + id }
 
@@ -72,9 +75,20 @@ final class SettingsStore {
         for option in SettingsCatalog.all where option.state != .custom {
             values[option.id] = defaults.string(forKey: Self.key(option.id)) ?? option.defaultValue
         }
-        // Show what macOS has registered, not the stored default. Nothing is registered here.
-        if !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled {
-            values[Self.launchAtLoginID] = LaunchAtLogin.isOn ? "true" : "false"
+        refreshLaunchAtLogin()
+    }
+
+    /// Shows what macOS has registered, not the stored default. `SMAppService.status` is a synchronous
+    /// round trip to the login-items daemon and can take seconds, so it is read off the main thread
+    /// (once per call) and the switch draws from `values`, never from the service. Nothing is registered here.
+    func refreshLaunchAtLogin() {
+        guard !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled else { return }
+        let read = launchReads.begin()
+        Task { [weak self] in
+            let on = await Task.detached(priority: .userInitiated) { LaunchAtLogin.currentStatus() }.value
+            guard let self, self.launchReads.isCurrent(read) else { return }
+            let text = on ? "true" : "false"
+            if self.values[Self.launchAtLoginID] != text { self.values[Self.launchAtLoginID] = text }
         }
     }
 
@@ -100,13 +114,15 @@ final class SettingsStore {
 
     func boolBinding(_ id: String) -> Binding<Bool> {
         if id == Self.launchAtLoginID, !TopBarStyle.isSnapshot, LaunchAtLogin.isBundled {
-            // Reads the real SMAppService state and drives it; a refused change shows an alert and the switch stays put.
-            return Binding(get: { LaunchAtLogin.isOn }, set: { on in self.applyLaunchAtLogin(on) })
+            // Drives the real SMAppService state; a refused change shows an alert and the switch stays put.
+            // The getter reads the cached value (see `refreshLaunchAtLogin`), never the service.
+            return Binding(get: { self.bool(id) }, set: { on in self.applyLaunchAtLogin(on) })
         }
         return Binding(get: { self.bool(id) }, set: { self.set(id, $0 ? "true" : "false") })
     }
 
     private func applyLaunchAtLogin(_ on: Bool) {
+        launchReads.invalidate()
         let problem = LaunchAtLogin.set(on)
         // Store what macOS now says. Changing the stored value makes the switch redraw.
         let actual = LaunchAtLogin.isOn
@@ -325,7 +341,11 @@ enum MeetingState {
 
     static func refresh(ownMicInUse: Bool) {
         guard SettingsStore.shared.bool("general.meetingMode"), !TopBarStyle.isSnapshot else { active = false; return }
-        active = (!ownMicInUse && micInUseSomewhere()) || displayMirrored()
+        // Zeus's own microphone (wake word, Scribe, a dictation still closing) is not a meeting: ask Core
+        // Audio which process is recording. Only when that list is unavailable, fall back to the device
+        // view, which cannot tell Zeus from a call app and so is skipped while Zeus knows it records.
+        let otherApp = micInUseByAnotherProcess() ?? (!ownMicInUse && micInUseSomewhere())
+        active = otherApp || displayMirrored()
     }
 
     /// Hide commands and project names on cards when asked, or while a meeting is on.
@@ -344,6 +364,31 @@ enum MeetingState {
         return running != 0
     }
 
+    /// Whether a process other than Zeus is recording from any input; nil when Core Audio cannot say.
+    private static func micInUseByAnotherProcess() -> Bool? {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size = UInt32(0)
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr else { return nil }
+        var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard !objects.isEmpty, AudioObjectGetPropertyData(system, &address, 0, nil, &size, &objects) == noErr else { return nil }
+        let processes = objects.prefix(Int(size) / MemoryLayout<AudioObjectID>.size).compactMap { object -> MeetingMicPolicy.InputProcess? in
+            var pid = pid_t(0)
+            var pidSize = UInt32(MemoryLayout<pid_t>.size)
+            var pidAddress = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyPID,
+                                                        mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            guard AudioObjectGetPropertyData(object, &pidAddress, 0, nil, &pidSize, &pid) == noErr else { return nil }
+            var running = UInt32(0)
+            var runningSize = UInt32(MemoryLayout<UInt32>.size)
+            var runningAddress = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyIsRunningInput,
+                                                            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            guard AudioObjectGetPropertyData(object, &runningAddress, 0, nil, &runningSize, &running) == noErr else { return nil }
+            return MeetingMicPolicy.InputProcess(pid: pid, recording: running != 0)
+        }
+        return MeetingMicPolicy.anotherProcessRecords(processes, ownPID: ProcessInfo.processInfo.processIdentifier)
+    }
+
     private static func displayMirrored() -> Bool {
         NSScreen.screens.contains { screen in
             guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return false }
@@ -356,7 +401,11 @@ enum MeetingState {
 @MainActor
 enum LaunchAtLogin {
     static var isBundled: Bool { Bundle.main.bundleURL.pathExtension == "app" }
-    static var isOn: Bool { isBundled && SMAppService.mainApp.status == .enabled }
+    /// Synchronous XPC to the login-items daemon: call it only from a background thread (never from a view body).
+    nonisolated static func currentStatus() -> Bool {
+        Bundle.main.bundleURL.pathExtension == "app" && SMAppService.mainApp.status == .enabled
+    }
+    static var isOn: Bool { isBundled && currentStatus() }
 
     /// Why the last register or unregister did not end as asked; nil when it did.
     private(set) static var lastError: String?
@@ -409,7 +458,7 @@ enum SettingStatus {
         case "integrations.antigravity":
             let found = ["/Applications/Antigravity.app", NSHomeDirectory() + "/Applications/Antigravity.app"].contains { FileManager.default.fileExists(atPath: $0) }
             return found ? (true, "App found") : (false, "Not installed")
-        case "privacy.analytics": return (true, "Off · ZEUS sends nothing")
+        case "privacy.analytics": return (true, "Off · Zeus sends nothing")
         case "interview.key": return (true, "Not needed")
         case "perm.trustedChats": return (false, "None")
         default: return (false, "Coming")
@@ -441,7 +490,7 @@ enum SettingStatus {
         case "dictation.model": (true, "Apple on-device · no download")
         case "integrations.codex": codexConnectionStatus(cliFound: true, hookInstalled: false)
         case "integrations.antigravity": (false, "Not installed")
-        case "privacy.analytics": (true, "Off · ZEUS sends nothing")
+        case "privacy.analytics": (true, "Off · Zeus sends nothing")
         case "interview.key": (true, "Not needed")
         case "diag.agents": (true, "Claude Code · 2 sessions")
         case "perm.trustedChats": (false, "None")

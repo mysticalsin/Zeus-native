@@ -47,7 +47,7 @@ public struct TodoSync: Sendable {
             try manager.moveItem(at: file, to: aside)
             return (TodoList(), "Your to-do file could not be read. It was kept as \(aside.lastPathComponent) next to it, and a new list was started.", false)
         } catch {
-            return (TodoList(), "Your to-do file could not be read and could not be moved aside, so ZEUS will not save to-dos until it is fixed or removed.", true)
+            return (TodoList(), "Your to-do file could not be read and could not be moved aside, so Zeus will not save to-dos until it is fixed or removed.", true)
         }
     }
 
@@ -106,7 +106,7 @@ public struct TodoSync: Sendable {
             do {
                 existing = try String(contentsOf: url, encoding: .utf8)
             } catch {
-                syncError = "The note \(url.lastPathComponent) could not be read, so ZEUS left it unchanged: \(error.localizedDescription)"
+                syncError = "The note \(url.lastPathComponent) could not be read, so Zeus left it unchanged: \(error.localizedDescription)"
                 throw error
             }
         } else {
@@ -126,7 +126,7 @@ public struct TodoSync: Sendable {
     /// Writes ZEUS's copy atomically. Throws (and records `saveError`) instead of failing silently.
     private mutating func saveStore() throws {
         if storeLocked {
-            saveError = "ZEUS will not save to-dos until the unreadable to-do file is fixed or removed."
+            saveError = "Zeus will not save to-dos until the unreadable to-do file is fixed or removed."
             throw CocoaError(.fileWriteUnknown)
         }
         do {
@@ -151,7 +151,7 @@ public struct TodoSync: Sendable {
 public enum TopBarLayoutRepair {
     public static let version = 1
     /// The tabs the one-time row upgrades switch on.
-    public static let upgradeTabs: [TopBarTab] = [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
+    public static let upgradeTabs: [TopBarTab] = [.agents, .teleprompter, .insomnia, .polyglot, .recordly, .scribe]
 
     /// Adds each upgrade tab the row lacks and the person never had the chance to turn off (it is not in
     /// the `known` list saved with the row), then puts the default row in front. Tabs they removed

@@ -28,12 +28,13 @@ public enum GlanceTopBar {
     public static let capsuleInset = CGSize(width: 5.5, height: 3)
     public static let tabIcon: CGFloat = 13
     public static let tabPadding: CGFloat = 11
-    public static let tabSpacing: CGFloat = 14
+    /// 12 pt (was 14) so a thirteenth tab, Agents, fits with the widest selected label and three counts.
+    public static let tabSpacing: CGFloat = 12
     public static var plainTabSlot: CGFloat { tabIcon + 2 * tabPadding + tabSpacing }
     public static let moreSize: CGFloat = 30
-    /// Twelve tabs: Glance's seven plus Teleprompter, Insomnia, Polyglot, Recordly and Scribe. They fit with
-    /// Glance's own spacing: even the widest selected label with three 3-digit counts leaves about 35 pt spare (see `rowRoom`).
-    public static let maxTabs = 12
+    /// Thirteen tabs: the default row with Agents after Home. At 12 pt spacing the widest selected label
+    /// ("Clipboard") with three 3-digit counts is 801.75 pt of the 803 pt `rowRoom`.
+    public static let maxTabs = 13
     /// Space after the "more" circle, to the body's right edge.
     public static let rowTrailing: CGFloat = 13
     /// Width the capsule may take: the body less its left inset, the more circle and the right inset.

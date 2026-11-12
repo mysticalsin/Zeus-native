@@ -18,6 +18,11 @@ public enum ModelCap {
         .gemini: [.fast: "gemini-3.7-flash", .deep: "gemini-3.7-flash"],
         .cursorAgent: [.fast: "gemini-3.7-flash-high", .deep: "claude-sonnet-5-thinking-high"],
     ]
+    /// The smallest GPT model in Codex's own model list (`gpt-6-luna`, seen in `~/.codex/models_cache.json`).
+    /// A spoken turn pins it so the account default (a larger model on priority tier) is never used.
+    /// Override with `modelCap.codex.fast` when a provider renames it.
+    public static let codexVoiceModel = "gpt-6-luna"
+
     static let codexEffort: [ModelTier: String] = [.fast: "low", .deep: "medium"]
 
     public static func model(for engine: RouterEngine, tier: ModelTier, defaults store: UserDefaults = .standard) -> String? {
@@ -76,10 +81,15 @@ public enum ModelCap {
     public static func httpModel(_ preset: HTTPPreset, tier: ModelTier) -> String? {
         let name: String = switch (preset, tier) {
         case (.ollama, _): "llama3.2"
-        case (.anthropic, .fast): "claude-haiku-4-5"
+        case (.anthropic, .fast): "claude-haiku-5-5"
         case (.anthropic, .deep): "claude-sonnet-4-5"
         case (.openAI, .fast): "gpt-4o-mini"
         case (.openAI, .deep): "gpt-4o"
+        }
+        // A provider renames its models: `modelCap.<preset>.<tier>` in UserDefaults wins while it stays inside the cap.
+        if let override = UserDefaults.standard.string(forKey: "modelCap.http.\(preset.rawValue).\(tier.rawValue)"),
+           !override.isEmpty, isAllowed(override) {
+            return override
         }
         return isAllowed(name) ? name : nil
     }

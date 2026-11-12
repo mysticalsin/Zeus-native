@@ -14,7 +14,46 @@ import ZeusCore
 /// also written to ~/Library/Logs/Zeus/voice.log. Exit 0 when the wake phrase was heard.
 @MainActor
 enum VoiceSelfTest {
+    /// The fixed line every engine speaks in the engine self-test.
+    static let engineTestLine = "Good evening, Tony. All systems are in order, and I am listening."
+
+    /// `Zeus --voice-engine-selftest [--receipt <absolute path>] [--silent]`: speaks the fixed line through
+    /// each available engine with the Ultron effect and writes a JSON receipt (engine, reason, time to
+    /// first audio) to ~/AI-Brain-build/voice-selftest/ unless a path is given. Exit 0 when the Mac voice
+    /// spoke through the effect and was not Samantha.
+    static func runEngineTestIfRequested(_ arguments: [String]) -> Bool {
+        guard arguments.contains("--voice-engine-selftest") else { return false }
+        let receipt = arguments.firstIndex(of: "--receipt").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
+        let silent = arguments.contains("--silent")
+        Task { @MainActor in exit(await runEngineTest(receiptPath: receipt, silent: silent)) }
+        return true
+    }
+
+    static func defaultReceiptURL(now: Date = Date()) -> URL {
+        let stamp = ISO8601DateFormatter().string(from: now).replacingOccurrences(of: ":", with: "")
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("AI-Brain-build/voice-selftest/receipt-\(stamp).json")
+    }
+
+    static func runEngineTest(receiptPath: String?, silent: Bool) async -> Int32 {
+        VoiceLog.echo = true
+        let speaker = Speaker(languageCode: Locale.current.identifier)
+        let rows = await speaker.selfTest(line: engineTestLine, muted: silent)
+        let receipt = VoiceSelfTestReceipt(created: ISO8601DateFormatter().string(from: Date()), line: engineTestLine,
+                                           systemVoice: speaker.systemVoiceName, rows: rows)
+        let url = receiptPath.map { URL(fileURLWithPath: $0) } ?? defaultReceiptURL()
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? receipt.json().write(to: url, options: .atomic)
+        for row in rows {
+            print("\(row.engine): \(row.spoke ? "spoke" : row.available ? "FAILED" : "skipped"), \(row.reason), first audio \(row.firstAudioMs.map { "\($0) ms" } ?? "none")")
+        }
+        print("system voice: \(receipt.systemVoice)")
+        print("receipt: \(url.path)")
+        return receipt.passed ? 0 : 1
+    }
+
     static func runIfRequested(_ arguments: [String]) -> Bool {
+        if runEngineTestIfRequested(arguments) { return true }
         guard let flag = arguments.firstIndex(of: "--voice-selftest"), flag + 1 < arguments.count else { return false }
         let url = URL(fileURLWithPath: arguments[flag + 1])
         let override = arguments.firstIndex(of: "--transcript").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
@@ -79,7 +118,7 @@ enum VoiceSelfTest {
             stage("route", "fast via \(engine) asks back")
             line = question
         case .miss:
-            stage("route", "no local rule: Laya/Jev, then the Claude brain (not called here)")
+            stage("route", "no local rule: Jev, then the Claude brain (not called here)")
         }
         if !line.isEmpty {
             stage("spoken", "would say \"\(line)\"")

@@ -99,7 +99,12 @@ final class NotchModel {
     var recap: WelcomeRecap?
     /// The keyboard agent picker (shortcut, arrows, Return, Esc); nil when closed.
     var picker: AgentPicker?
-    var notificationLine: NotificationLine?
+    /// Incoming alerts from other apps: the glass capsule under the notch (see `AlertStack`).
+    var alerts = AlertStack()
+    /// The front alert, as the line the open action understands.
+    var notificationLine: NotificationLine? {
+        alerts.visible.first.map { NotificationLine(id: Int64($0.id) ?? 0, app: $0.appID, title: $0.title, detail: $0.body) }
+    }
     /// The session the peek talks about when there is no approval.
     var peekSessionID: String?
     /// Sessions ZEUS runs itself (the browser agent) get a Stop button on their card.

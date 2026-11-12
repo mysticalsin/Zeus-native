@@ -14,11 +14,8 @@ struct JevSettingsHarnessTests {
         let center = IntelligenceCenter.isolatedSettingsTestCenter()
         await center.refreshBudget()
         #expect(!center.hasJevKey)
-        #expect(!center.layaInstalled)
-        #expect(!center.layaRunning)
         #expect(center.jevReservationStatus == .reconciliationRequired)
 
-        center.engine = .auto
         #expect(standard.object(forKey: IntelligenceEngine.settingsKey) as? String == engineBefore as? String)
 
         let ordinary = await center.decide("synthetic UI safety check")

@@ -7,7 +7,7 @@ import ZeusCore
 enum GSSection: String, CaseIterable, Identifiable, Sendable {
     case general, appearance, sounds, notifications, shortcuts, insomnia
     case integrations, murmure, polyglot, dictation, voice, engine, iPhone
-    case license, permissions, privacy, diagnostics
+    case license, permissions, privacy, diagnostics, about
     case features, beamer
 
     var id: String { rawValue }
@@ -18,7 +18,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general, .appearance, .sounds, .notifications, .shortcuts, .insomnia: .settings
         case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer: .tools
-        case .license, .permissions, .privacy, .diagnostics: .app
+        case .license, .permissions, .privacy, .diagnostics, .about: .app
         }
     }
 
@@ -51,6 +51,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .permissions: "Permissions"
         case .privacy: "Privacy"
         case .diagnostics: "Diagnostics"
+        case .about: "About"
         }
     }
 
@@ -86,6 +87,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .permissions: "checkmark.shield"
         case .privacy: "lock.shield"
         case .diagnostics: "waveform.path.ecg.rectangle"
+        case .about: "info.circle"
         }
     }
 }
@@ -209,6 +211,7 @@ struct GSSidebar: View {
         .buttonStyle(.plain)
         .padding(.bottom, 2)
         .accessibilityLabel(section.title)
+        .accessibilityIdentifier("settings.sidebar.\(section.rawValue)")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
@@ -250,6 +253,8 @@ struct GSPanelHost: View {
                     .clipShape(RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous))
             } else {
                 ScrollView(.vertical) { page }
+                    // Last row never sits against the panel edge: the scroll content ends 28 pt higher.
+                    .contentMargins(.bottom, 28, for: .scrollContent)
                     .scrollIndicators(.automatic)
                     .clipShape(RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous))
             }
@@ -264,6 +269,7 @@ struct GSPageHeading: View {
     let section: GSSection
     let subtitle: String
     var body: some View {
+        let _ = SnapshotPaneProbe.note(section.rawValue) // snapshot harness only; no-op outside snapshot mode
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 9) {
                 Text(section.title).font(GS.pageTitle).tracking(-1.1).foregroundStyle(GS.text)

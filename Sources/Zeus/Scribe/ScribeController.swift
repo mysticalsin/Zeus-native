@@ -116,14 +116,19 @@ struct ScribeRecap: Identifiable, Equatable {
     var transcript: [ScribeTranscriptSegment]
     /// Set when part of the meeting couldn't be transcribed, so the notes may be missing speech.
     var transcriptionNote: String? = nil
-    /// Set when the microphone was left out while a call app was open (saved with the meeting).
+    /// Set on meetings saved by an older Zeus that left the microphone out while a call app was open.
     var micExcludedDuringCall = false
+    /// Where each speaker's name came from and how sure Zeus is (saved with the meeting).
+    var speakerBook: ScribeSpeakerBook?
 }
 
 /// What the transcriber reports, in the order it happened. One consumer applies them one at a time, so the
 /// completion can never overtake the last segment.
 enum ScribeTranscriberEvent: Sendable {
     case segment(ScribeTranscriptSegment)
+    case turns([ScribeTurnEmbedding])
+    /// Streaming diarizer's final read: segment id to the "Speaker N" it should carry. Said before `finished`.
+    case relabel([String: String])
     case issue(String)
     case finished(ScribeSessionID)
 }
@@ -200,6 +205,7 @@ private struct ScribeWordRevealEntry {
     var text: String
     var alreadyShown: Int
     var since: Date
+    var layout: ScribeIncomingWordLayout
 }
 
 /// Cancelled meetings whose transcript file couldn't be removed. Kept in the app's preferences, outside the
@@ -207,19 +213,21 @@ private struct ScribeWordRevealEntry {
 enum ScribeCancelTombstones {
     private static let key = "scribe.cancelledMeetings"
 
-    static var ids: Set<UUID> {
-        Set((UserDefaults.standard.stringArray(forKey: key) ?? []).compactMap { UUID(uuidString: $0) })
+    static var ids: Set<UUID> { ids(in: .standard) }
+
+    static func ids(in defaults: UserDefaults) -> Set<UUID> {
+        Set((defaults.stringArray(forKey: key) ?? []).compactMap { UUID(uuidString: $0) })
     }
 
-    static func add(_ id: UUID) { write(ids.union([id])) }
+    static func add(_ id: UUID, in defaults: UserDefaults = .standard) { write(ids(in: defaults).union([id]), to: defaults) }
 
-    static func remove(_ id: UUID) { write(ids.subtracting([id])) }
+    static func remove(_ id: UUID, in defaults: UserDefaults = .standard) { write(ids(in: defaults).subtracting([id]), to: defaults) }
 
-    private static func write(_ ids: Set<UUID>) {
+    private static func write(_ ids: Set<UUID>, to defaults: UserDefaults) {
         if ids.isEmpty {
-            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removeObject(forKey: key)
         } else {
-            UserDefaults.standard.set(ids.map(\.uuidString).sorted(), forKey: key)
+            defaults.set(ids.map(\.uuidString).sorted(), forKey: key)
         }
     }
 }
@@ -262,10 +270,10 @@ final class ScribeController {
     private(set) var transcriptionIssues: [String] = []
     /// Seconds of microphone audio withheld this session because the mute state couldn't be established.
     private(set) var microphoneUnknownSeconds: Double = 0
-    /// The microphone is being dropped right now because a call was detected.
-    private(set) var micCallExcludedNow = false
-    /// The microphone was dropped because of a call at some point this session; kept with the meeting.
-    private(set) var micExcludedDuringCall = false
+    /// Another app is using the microphone right now; Zeus keeps recording it. Clears when that app lets go.
+    private(set) var micSharedNow = false
+    /// The shared note was already announced this session (announced once, shown while it lasts).
+    private var micSharedAnnounced = false
     /// Why capture stopped before the person ended the meeting (what was captured is still kept and saved).
     private(set) var stoppedEarlyReason: String?
     /// Set when the notes couldn't be written or were cancelled; the transcript is saved without them.
@@ -288,9 +296,32 @@ final class ScribeController {
     /// How loud the meeting audio is, newest last (about 20 values a second, the last 24 kept). Empty when
     /// nothing is recording; decays to zeros when no audio arrives. Drives the meter on the page and the wings.
     private(set) var levelHistory: [Double] = []
+    /// Cached only on real transcript revisions, so a display link can stop once incoming text settles.
+    private(set) var incomingWordsRevealUntil: Date?
     /// The person pressed the trash button and hasn't confirmed throwing the recording away yet.
     private(set) var discardRequested = false
     @ObservationIgnored var meetingTitleHint: String?
+    /// Display names from the calendar invite the call popup matched; for the next recording only.
+    @ObservationIgnored var meetingAttendeeHint: [String] = []
+    /// This recording's attendee names, and each finished meeting's (display names only). Saved with the meeting file.
+    @ObservationIgnored private var sessionAttendees: [String] = []
+    @ObservationIgnored private var attendeesByMeeting: [UUID: [String]] = [:]
+    /// The voice of each closed turn, per meeting. Saved only inside that meeting's own file (0600) so naming works
+    /// after a relaunch, dropped from memory when the meeting is dismissed, and removed with the file on delete.
+    @ObservationIgnored private var liveTurns: [ScribeTurnEmbedding] = []
+    @ObservationIgnored private var turnVoices: [UUID: [ScribeTurnEmbedding]] = [:]
+    /// Call-window naming for the recording in progress (memory only; the result is saved as the speaker book).
+    @ObservationIgnored private var liveNaming = ScribeLiveNaming()
+    /// The streaming diarizer made its final read of this recording.
+    @ObservationIgnored private var streamingUsed = false
+    /// Reads the call window while recording; nil in tests and previews. Set by `makeProduction`.
+    @ObservationIgnored var speakerMonitor: MeetingSpeakerMonitor?
+    @ObservationIgnored private var lastNamingEvaluation = -TimeInterval.infinity
+    @ObservationIgnored private var sessionSpeakerBook: ScribeSpeakerBook?
+    /// Undo for speaker changes, per meeting, this session only.
+    @ObservationIgnored private var speakerHistories: [UUID: ScribeSpeakerEditHistory] = [:]
+    /// Bumps when an undo entry is added or used, so the recap redraws its Undo button.
+    private(set) var speakerHistoryRevision = 0
     @ObservationIgnored var meetingCallHint: ScribeCallProcessIdentity?
     private var endWorkflow = ScribeEndWorkflow()
     private(set) var endingRemaining: Int?
@@ -315,11 +346,13 @@ final class ScribeController {
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let monotonicClock: () -> TimeInterval
     @ObservationIgnored private let store: ScribeMeetingStore?
+    @ObservationIgnored private let cancellationDefaults: UserDefaults
+    @ObservationIgnored private let transcriptionEngine: () -> TranscriptionEngineKind
     @ObservationIgnored private let writeMeeting: (ScribeMeetingRecord) throws -> Void
     @ObservationIgnored private let muteSourceFactory: () -> any ScribeMicMuteSource
     @ObservationIgnored private let transcriberFactory: (ScribeSessionID, ScribeTranscriberCallbacks) -> any ScribeTranscriber
     @ObservationIgnored private let paceWritingMotion: Bool
-    @ObservationIgnored private let showsEndWindow: Bool
+    @ObservationIgnored private let endWindow: ScribeEndWindow?
     @ObservationIgnored private var router: ScribeFrameRouter?
     @ObservationIgnored private var transcriber: (any ScribeTranscriber)?
     @ObservationIgnored private var sessionTitle: String?
@@ -363,18 +396,25 @@ final class ScribeController {
         },
         paceWritingMotion: Bool = false,
         showsEndWindow: Bool = false,
-        writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil
+        writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil,
+        cancellationDefaults: UserDefaults = .standard,
+        endWindow: ScribeEndWindow? = nil,
+        transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine },
+        motionReduced: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     ) {
         self.provider = provider
         self.generator = generator
         self.clock = clock
         self.monotonicClock = monotonicClock
         self.store = store
+        self.cancellationDefaults = cancellationDefaults
+        self.transcriptionEngine = transcriptionEngine
+        self.motionReduced = motionReduced
         self.writeMeeting = writeMeeting ?? { record in try store?.save(record) }
         self.muteSourceFactory = muteSourceFactory
         self.transcriberFactory = transcriberFactory
         self.paceWritingMotion = paceWritingMotion
-        self.showsEndWindow = showsEndWindow
+        self.endWindow = showsEndWindow ? (endWindow ?? .shared) : nil
         loadSavedMeetings()
     }
 
@@ -392,6 +432,7 @@ final class ScribeController {
             paceWritingMotion: true,
             showsEndWindow: true
         )
+        controller.speakerMonitor = MeetingSpeakerMonitor()
         ScribeCallWatcher.shared.start()
         return controller
     }
@@ -436,10 +477,11 @@ final class ScribeController {
     /// True while a failed save or a failed cleanup can be retried.
     var storageRetryAvailable: Bool { !unsavedMeetings.isEmpty || !pendingCleanup.isEmpty }
 
-    /// Shown while recording when the microphone is being dropped because its mute state is unknown.
+    /// Shown while recording: the microphone is being dropped because its mute state is unknown, or another
+    /// app is using it too (Zeus still records it).
     var microphoneNote: String? {
-        if micCallExcludedNow { return ScribeMicCallText.excludedNotice }
-        return micMute == .unknown ? Self.microphoneUnknownNote : nil
+        if micMute == .unknown { return Self.microphoneUnknownNote }
+        return micSharedNow ? ScribeMicCallText.sharedNotice : nil
     }
 
     /// All transcription problems of this session as one sentence, or nil.
@@ -474,14 +516,20 @@ final class ScribeController {
     /// How many words of `segment` to show at `date`: all of them, unless its text just changed while recording,
     /// in which case the new words appear a few at a time (`ScribeWordReveal`).
     func visibleWordCount(for segment: ScribeTranscriptSegment, at date: Date, reduceMotion: Bool) -> Int {
-        let total = ScribeWordText.count(segment.text)
-        guard let entry = wordReveals[segment.id], entry.text == segment.text else { return total }
+        guard let entry = wordReveals[segment.id], entry.text == segment.text else { return ScribeWordText.count(segment.text) }
         return ScribeWordReveal.visibleWords(
-            total: total,
+            total: entry.layout.words.count,
             alreadyShown: entry.alreadyShown,
             since: max(0, date.timeIntervalSince(entry.since)),
             reduceMotion: reduceMotion
         )
+    }
+
+    /// Tokenization and fade origins are cached when real transcript text changes, never per frame.
+    func incomingWordLayout(for segment: ScribeTranscriptSegment) -> ScribeIncomingWordLayout? {
+        guard machine.phase.sessionID == segment.session,
+              let entry = wordReveals[segment.id], entry.text == segment.text else { return nil }
+        return entry.layout
     }
 
     var failureReason: String? {
@@ -506,7 +554,12 @@ final class ScribeController {
     // MARK: Actions
 
     func start() {
-        guard !machine.phase.isActive else { return }
+        guard !machine.phase.isActive else {
+            NSLog("[ZEUS] scribe: start refused, already %@", ScribePopupDriver.describe(machine.phase))
+            FlightRecorder.shared.record("scribe", "start refused", ScribePopupDriver.describe(machine.phase))
+            return
+        }
+        ExplanationAudioArbitration.yieldToNewCapture()
         clearCompletedNotice()
         hideEndWindow()
         cancelTranscriber()
@@ -526,14 +579,15 @@ final class ScribeController {
         systemAudioReceiving = false
         transcriptionIssues = []
         microphoneUnknownSeconds = 0
-        micCallExcludedNow = false
-        micExcludedDuringCall = false
+        micSharedNow = false
+        micSharedAnnounced = false
         stoppedEarlyReason = nil
         notesIssue = nil
         systemAudioStalled = false
         levelHistory = []
         discardRequested = false
         wordReveals = [:]
+        incomingWordsRevealUntil = nil
         notesReadyTask?.cancel()
         notesReadyTask = nil
         let levels = ScribeLevelBox()
@@ -543,6 +597,13 @@ final class ScribeController {
         pendingDeleteID = nil
         sessionTitle = meetingTitleHint
         meetingTitleHint = nil
+        sessionAttendees = meetingAttendeeHint
+        meetingAttendeeHint = []
+        liveTurns = []
+        liveNaming = ScribeLiveNaming()
+        streamingUsed = false
+        sessionSpeakerBook = nil
+        lastNamingEvaluation = -.infinity
         let readout = ScribeLiveReadout()
         self.readout = readout
         // One ordered stream for everything the capture side says (see `ScribeCaptureInput`).
@@ -569,7 +630,9 @@ final class ScribeController {
                 onSegment: { segment in continuation.yield(.segment(segment)) },
                 onFinished: { session in continuation.yield(.finished(session)) },
                 onIssue: { message in continuation.yield(.issue(message)) },
-                onLevel: { source, level in levels.set(source, level) }
+                onLevel: { source, level in levels.set(source, level) },
+                onTurns: { turns in continuation.yield(.turns(turns)) },
+                onRelabel: { labels in continuation.yield(.relabel(labels)) }
             )
         )
         self.transcriber = transcriber
@@ -584,7 +647,13 @@ final class ScribeController {
             transcriber: transcriber
         )
         self.router = router
-        guard run({ $0.start(id, now: nowSeconds()) }).isApplied else { return }
+        guard run({ $0.start(id, now: nowSeconds()) }).isApplied else {
+            NSLog("[ZEUS] scribe: start not applied")
+            FlightRecorder.shared.record("scribe", "start not applied")
+            return
+        }
+        NSLog("[ZEUS] scribe: start session")
+        FlightRecorder.shared.record("scribe", "start session")
         // The prompt has done its job; the watcher won't offer another while a session is active.
         ScribeCallWatcher.shared.recordingDidStart()
         let frames: @Sendable (ScribeAudioFrame) -> Void = { [weak self] frame in
@@ -614,7 +683,7 @@ final class ScribeController {
         guard endWorkflow.requestEnd(session: id, now: now) else { return }
         run { $0.requestEnd(id, now: now, grace: ScribeEndWorkflow.grace) }
         updateEndingCountdown(now: now)
-        if showsEndWindow { ScribeEndWindow.shared.present(scribe: self) }
+        endWindow?.present(scribe: self)
     }
 
     /// Positive termination of the exact native call-app instance bound when Record was chosen.
@@ -630,7 +699,7 @@ final class ScribeController {
         discardRequested = false
         run { $0.requestEnd(id, now: now, grace: ScribeEndWorkflow.grace) }
         updateEndingCountdown(now: now)
-        if showsEndWindow { ScribeEndWindow.shared.present(scribe: self) }
+        endWindow?.present(scribe: self)
     }
 
     /// Trash button, step one: asks the page to confirm throwing the recording away.
@@ -680,10 +749,13 @@ final class ScribeController {
         // Cancelling throws the meeting away on purpose, so a transcript checkpoint must not come back at launch.
         if recaps.contains(where: { $0.id == id }) == false { discardCheckpoint(id) }
         run { $0.cancel(id) }
+        speakerMonitor?.stop()
         cancelTranscriber()
         cancelCaptureInputs()
         transcript = nil
         notes = nil
+        wordReveals = [:]
+        incomingWordsRevealUntil = nil
     }
 
     /// Clears a failure and starts again.
@@ -724,6 +796,7 @@ final class ScribeController {
             persist(recap, dismissedAt: clock())
         }
         recaps.removeAll { $0.id == id }
+        forgetVoices(of: id)
         if openedRecapID == id { openedRecapID = nil }
         if pendingDeleteID == id { pendingDeleteID = nil }
     }
@@ -734,7 +807,7 @@ final class ScribeController {
     func openRecap(_ id: ScribeSessionID) -> Bool {
         let decision = ScribeRecapNavigation.decision(
             phase: machine.phase, recapExists: recaps.contains(where: { $0.id == id }),
-            isCancelled: ScribeCancelTombstones.ids.contains(id.rawValue)
+            isCancelled: ScribeCancelTombstones.ids(in: cancellationDefaults).contains(id.rawValue)
         )
         switch decision {
         case .busy, .unavailable: return false
@@ -789,6 +862,7 @@ final class ScribeController {
         }
         pendingSaves.remove(id.rawValue)
         recaps.removeAll { $0.id == id }
+        forgetVoices(of: id)
         if openedRecapID == id { openedRecapID = nil }
         if saveFailures.recordSuccess(id: id.rawValue) { refreshUnsavedMeetings() }
         if pendingDiscardID == id { pendingDiscardID = nil }
@@ -823,13 +897,15 @@ final class ScribeController {
 
     /// Where the meeting audio goes when the dictation engine is a cloud one, else nil.
     var cloudDisclosure: String? {
-        ScribeCloudDisclosure.text(for: DictationSettings.shared.engine)
+        ScribeCloudDisclosure.text(for: transcriptionEngine())
     }
 
     // MARK: Pipeline inputs (called by a real transcriber later; also used by tests and previews)
 
-    func receive(_ segment: ScribeTranscriptSegment) {
+    func receive(_ incoming: ScribeTranscriptSegment) {
         guard let id = machine.phase.sessionID, var current = transcript, current.session == id else { return }
+        // A voice that already has a name wears it from its first line; unnamed ones keep the diarizer's label.
+        let segment = liveNaming.ingest(incoming)
         let result = current.upsert(segment)
         guard result == .inserted || result == .replaced else { return }
         transcript = current
@@ -850,7 +926,7 @@ final class ScribeController {
         guard case .recording = machine.phase else { return }
         let previous = wordReveals[segment.id]
         if previous?.text == segment.text { return }
-        let now = Date()
+        let now = clock()
         var shown = 0
         // The "…" placeholder is not text anyone has read.
         if let previous, previous.text != "…" {
@@ -864,15 +940,51 @@ final class ScribeController {
         wordReveals[segment.id] = ScribeWordRevealEntry(
             text: segment.text,
             alreadyShown: min(shown, ScribeWordText.count(segment.text)),
-            since: now
+            since: now,
+            layout: ScribeIncomingWordLayout(text: segment.text,
+                alreadyShown: min(shown, ScribeWordText.count(segment.text)),
+                since: now.timeIntervalSinceReferenceDate, previous: previous?.layout)
         )
+        let lastEnd = transcript?.segments.suffix(60).reduce(-TimeInterval.infinity) {
+            max($0, wordReveals[$1.id]?.layout.revealEndsAt ?? -.infinity)
+        } ?? -.infinity
+        incomingWordsRevealUntil = lastEnd.isFinite ? Date(timeIntervalSinceReferenceDate: lastEnd) : nil
     }
 
-    private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    @ObservationIgnored private let motionReduced: () -> Bool
+    private var reduceMotion: Bool { motionReduced() }
 
     /// The transcriber has produced its final segments. Notes are generated from the final transcript only.
     func transcriptDidFinish(session id: ScribeSessionID) {
         guard case .processing(let current) = machine.phase, current == id, var finished = transcript else { return }
+        speakerMonitor?.stop()
+        // Last look at the call window's evidence, so every line of a named voice carries its name.
+        _ = liveNaming.evaluate(force: true)
+        finished.relabelSpeakers { liveNaming.displayed($0.speaker, segmentID: $0.id) }
+        // The second look: with the whole meeting in hand, turns the live pass split or merged are relabelled.
+        // When the streaming diarizer ran, it already made its final read of the system channel: only the
+        // microphone's turns go through the embedding correction.
+        let correctionTurns = streamingUsed ? liveTurns.filter { $0.source == .microphone } : liveTurns
+        let corrected = ScribeSpeakerCorrection.corrected(segments: finished.segments, turns: correctionTurns)
+        let speakerByID = Dictionary(corrected.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+        finished.relabelSpeakers { speakerByID[$0.id] ?? $0.speaker }
+        // Names from saved voices, then tiny spurious voices folded into the nearest speaker (undoable).
+        var book = liveNaming.book
+        let saved = SavedVoicesModel.shared.names
+        for segment in finished.segments {
+            guard case .participant(let label) = segment.speaker, !ScribeLiveNaming.isAnonymous(segment.speaker),
+                  book.identity(named: label) == nil,
+                  saved.contains(where: { ScribeSpeakerNames.key($0) == ScribeSpeakerNames.key(label) }) else { continue }
+            book.bindAutomatic(label: label, name: label, source: .savedVoice, confidence: 0.85)
+        }
+        let pruned = ScribeSpeakerPruning.prune(segments: finished.segments, book: book)
+        if !pruned.folds.isEmpty {
+            let prunedByID = Dictionary(pruned.segments.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+            finished.relabelSpeakers { prunedByID[$0.id] ?? $0.speaker }
+            book.recordFolds(pruned.folds)
+        }
+        book.keepOnly(namesIn: finished.segments)
+        sessionSpeakerBook = book
         finished.finalize()
         transcript = finished
         guard run({ $0.transcriptFinalized(id) }).isApplied else { return }
@@ -918,6 +1030,8 @@ final class ScribeController {
     private func handleTranscriber(_ event: ScribeTranscriberEvent, session id: ScribeSessionID) {
         switch event {
         case .segment(let segment): receive(segment)
+        case .turns(let turns): liveTurns = turns
+        case .relabel(let labels): applyStreamingRelabel(labels)
         case .issue(let message): noteTranscriptionIssue(message, session: id)
         case .finished(let session): transcriptDidFinish(session: session)
         }
@@ -936,11 +1050,11 @@ final class ScribeController {
                 noteTranscriptionIssue(Self.audioLostMessage, session: id)
             case .microphone(let state):
                 publishMic(state, session: id)
-            case .microphoneExcludedByCall(let excluded):
-                micCallExcludedNow = excluded
-                if excluded, !micExcludedDuringCall {
-                    micExcludedDuringCall = true
-                    announce(ScribeMicCallText.excludedNotice)
+            case .microphoneShared(let shared):
+                micSharedNow = shared
+                if shared, !micSharedAnnounced {
+                    micSharedAnnounced = true
+                    announce(ScribeMicCallText.sharedNotice)
                 }
             case .microphoneWithheld(let state, let seconds):
                 // A muted microphone withheld on purpose isn't missing speech; an unknown one might be.
@@ -1091,7 +1205,7 @@ final class ScribeController {
             router?.finish()
             if let id = machine.phase.sessionID { checkpointTranscript(id) }
         case .notesReady(let id):
-            if showsEndWindow { ScribeEndWindow.shared.present(scribe: self) }
+            endWindow?.present(scribe: self)
             completedNoticeID = id
             completedNoticeTask?.cancel()
             completedNoticeTask = Task { @MainActor [weak self] in
@@ -1165,8 +1279,7 @@ final class ScribeController {
             dismissedAt: dismissedAt,
             transcriptionNote: ScribeRecapNote.compose(
                 issues: transcriptionIssues, stoppedEarly: stoppedEarlyReason, notesIssue: ScribeRecapNote.checkpointNote
-            ),
-            micExcludedDuringCall: micExcludedDuringCall
+            )
         )
     }
 
@@ -1194,7 +1307,7 @@ final class ScribeController {
     private func discardCheckpoint(_ id: ScribeSessionID) {
         guard let store, checkpointedMeetings.contains(id.rawValue) else { return }
         pendingCleanup.insert(id.rawValue)
-        ScribeCancelTombstones.add(id.rawValue)
+        ScribeCancelTombstones.add(id.rawValue, in: cancellationDefaults)
         if removeCheckpoint(id.rawValue) { return }
         if let record = checkpointRecord(id, dismissedAt: clock()) { try? store.save(record) }
         cleanupIssue = Self.cleanupFailedMessage
@@ -1209,7 +1322,7 @@ final class ScribeController {
                 try store.delete(id: raw)
                 pendingCleanup.remove(raw)
                 checkpointedMeetings.remove(raw)
-                ScribeCancelTombstones.remove(raw)
+                ScribeCancelTombstones.remove(raw, in: cancellationDefaults)
                 if pendingCleanup.isEmpty { cleanupIssue = nil }
                 return true
             } catch { continue }
@@ -1245,10 +1358,13 @@ final class ScribeController {
             transcriptionNote: ScribeRecapNote.compose(
                 issues: transcriptionIssues, stoppedEarly: stoppedEarlyReason, notesIssue: notesIssue
             ),
-            micExcludedDuringCall: micExcludedDuringCall
+            speakerBook: sessionSpeakerBook
         )
         if let index = recaps.firstIndex(where: { $0.id == id }) { recaps[index] = recap }
         else { recaps.insert(recap, at: 0) }
+        // Only what speaker naming needs, kept in memory: this meeting's turn voices and invitee names.
+        if !liveTurns.isEmpty { turnVoices[id.rawValue] = liveTurns }
+        if !sessionAttendees.isEmpty { attendeesByMeeting[id.rawValue] = sessionAttendees }
         let saved = persist(recap)
         // A failed final save can leave the transcript checkpoint on disk. Keep its identity so an
         // explicit discard removes that private transcript too, rather than resurrecting it at launch.
@@ -1259,13 +1375,227 @@ final class ScribeController {
         return saved
     }
 
+    // MARK: Speaker names
+
+    private func forgetVoices(of id: ScribeSessionID) {
+        turnVoices[id.rawValue] = nil
+        attendeesByMeeting[id.rawValue] = nil
+        speakerHistories[id.rawValue] = nil
+    }
+
+    /// Names Zeus suggests for this meeting's unnamed speakers. Suggestions only: nothing renames itself.
+    func speakerSuggestions(for id: ScribeSessionID) -> [ScribeNameSuggestion] {
+        guard let recap = recaps.first(where: { $0.id == id }) else { return [] }
+        let owner = UserDefaults.standard.string(forKey: "aboutYou.name") ?? NSFullUserName()
+        return ScribeNameSuggester.suggestions(
+            segments: recap.transcript, attendees: attendeesByMeeting[id.rawValue] ?? [],
+            savedNames: SavedVoicesModel.shared.names, ownerName: owner
+        )
+    }
+
+    /// Invitee display names for this meeting (saved with the meeting, so they survive a relaunch).
+    func attendeeNames(for id: ScribeSessionID) -> [String] { attendeesByMeeting[id.rawValue] ?? [] }
+
+    /// A voice can be remembered only from this session's trained embeddings, for a speaker other than "You".
+    func canRememberVoice(_ speaker: ScribeSpeaker, in id: ScribeSessionID) -> Bool {
+        speaker != .you && voiceCentroid(of: speaker, in: id)?.embedding.kind == .wespeaker
+    }
+
+    private func voiceCentroid(of speaker: ScribeSpeaker, in id: ScribeSessionID) -> (embedding: ScribeVoiceEmbedding, turns: Int)? {
+        guard let recap = recaps.first(where: { $0.id == id }), let turns = turnVoices[id.rawValue] else { return nil }
+        let owner = Dictionary(recap.transcript.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+        let mine = turns.filter { owner[$0.segmentID] == speaker }
+        guard let centroid = ScribeEmbeddingMath.centroid(of: mine.map { (embedding: $0.embedding, weight: $0.duration) }) else { return nil }
+        return (centroid, mine.count)
+    }
+
+    /// The state an undo brings back for a meeting.
+    private func editState(_ recap: ScribeRecap) -> ScribeSpeakerEditState {
+        ScribeSpeakerEditState(segments: recap.transcript, book: recap.speakerBook ?? ScribeSpeakerBook())
+    }
+
+    private func rememberEdit(_ title: String, before recap: ScribeRecap) {
+        speakerHistories[recap.id.rawValue, default: ScribeSpeakerEditHistory()].push(title, before: editState(recap))
+        speakerHistoryRevision &+= 1
+    }
+
+    /// Writes new lines and book into a meeting and keeps the live transcript, the saved file and the notes in step.
+    private func applySpeakerEdit(at index: Int, segments: [ScribeTranscriptSegment], book: ScribeSpeakerBook) {
+        let id = recaps[index].id
+        var book = book
+        book.keepOnly(namesIn: segments)
+        recaps[index].transcript = segments
+        recaps[index].speakerBook = book
+        let speakerByID = Dictionary(segments.map { ($0.id, $0.speaker) }, uniquingKeysWith: { first, _ in first })
+        if case .complete(let current) = machine.phase, current == id {
+            transcript?.relabelSpeakers { speakerByID[$0.id] ?? $0.speaker }
+        }
+        scheduleSave(id)
+    }
+
+    /// The diarizer's own label for a speaker, so a name can be traced back to its voice.
+    private func originalLabel(of speaker: ScribeSpeaker, in book: ScribeSpeakerBook) -> String {
+        book.identity(named: speaker.displayName)?.originalLabel ?? speaker.displayName
+    }
+
+    /// Renames a speaker in one meeting: every line, the speaker statistics, the saved file and any copied or
+    /// exported text follow. A name another speaker already has merges the two. `rememberVoice` (off unless the
+    /// person ticked it) also saves the voice locally under that name. A typed name is final: no automatic
+    /// evidence changes it. `source` is where an accepted suggestion came from (typed names are `.manual`).
+    func renameSpeaker(
+        _ speaker: ScribeSpeaker, to name: String, in id: ScribeSessionID, rememberVoice: Bool = false,
+        source: ScribeNameSource = .manual
+    ) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let before = recaps[index].transcript
+        let after = ScribeSpeakerNames.rename(speaker, to: name, in: before)
+        guard after != before else { return }
+        // The voice is read before the lines change: it is the turns the speaker had under the old label.
+        if rememberVoice, let voice = voiceCentroid(of: speaker, in: id),
+           case .participant(let saveAs)? = ScribeSpeakerNames.target(for: name, in: before) {
+            if !SavedVoicesModel.shared.remember(name: saveAs, embedding: voice.embedding, sampleCount: voice.turns) {
+                announce(SavedVoicesModel.shared.problem ?? "Couldn't save the voice.")
+            }
+        }
+        let recap = recaps[index]
+        var book = recap.speakerBook ?? ScribeSpeakerBook()
+        var merges = false
+        if let target = ScribeSpeakerNames.target(for: name, in: before) {
+            merges = before.contains { $0.speaker == target }
+        }
+        rememberEdit(merges ? "Undo merge" : "Undo rename", before: recap)
+        book.setConfirmed(label: originalLabel(of: speaker, in: book), name: name, source: source, confidence: 1)
+        applySpeakerEdit(at: index, segments: after, book: book)
+    }
+
+    /// "Reassign this block to...": one block of lines goes to another speaker.
+    func reassignBlock(_ segmentID: String, to name: String, in id: ScribeSessionID) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let recap = recaps[index]
+        let after = ScribeSpeakerEdits.reassign(segmentID: segmentID, to: name, in: recap.transcript)
+        guard after != recap.transcript else { return }
+        rememberEdit("Undo reassign", before: recap)
+        applySpeakerEdit(at: index, segments: after, book: namedBook(recap, adding: name))
+    }
+
+    /// "Assign selected words to...": the chosen words of one block go to another speaker.
+    func assignWords(_ range: Range<Int>, of segmentID: String, to name: String, in id: ScribeSessionID) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let recap = recaps[index]
+        let after = ScribeSpeakerEdits.assignWords(segmentID: segmentID, range: range, to: name, in: recap.transcript)
+        guard after != recap.transcript else { return }
+        rememberEdit("Undo word assignment", before: recap)
+        applySpeakerEdit(at: index, segments: after, book: namedBook(recap, adding: name))
+    }
+
+    /// A typed name that is new to the meeting becomes a confirmed identity, so pruning and corrections leave it alone.
+    private func namedBook(_ recap: ScribeRecap, adding name: String) -> ScribeSpeakerBook {
+        var book = recap.speakerBook ?? ScribeSpeakerBook()
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, ScribeSpeakerNames.key(trimmed) != ScribeSpeakerNames.key("You"), book.identity(named: trimmed) == nil {
+            book.setConfirmed(label: trimmed, name: trimmed)
+        }
+        return book
+    }
+
+    /// The person confirms an automatic name: from now on nothing automatic changes it.
+    func confirmSpeaker(_ speaker: ScribeSpeaker, in id: ScribeSessionID) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let recap = recaps[index]
+        var book = recap.speakerBook ?? ScribeSpeakerBook()
+        guard let identity = book.identity(named: speaker.displayName), !identity.confirmed else { return }
+        rememberEdit("Undo confirm", before: recap)
+        book.setConfirmed(label: identity.originalLabel, name: identity.name, source: identity.source, confidence: identity.confidence)
+        applySpeakerEdit(at: index, segments: recap.transcript, book: book)
+    }
+
+    /// "Not them": the automatic name goes back to the diarizer's label and is never offered again for that voice.
+    func declineSpeakerName(_ speaker: ScribeSpeaker, in id: ScribeSessionID) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let recap = recaps[index]
+        var book = recap.speakerBook ?? ScribeSpeakerBook()
+        guard let identity = book.identity(named: speaker.displayName), !identity.confirmed,
+              let label = book.decline(name: identity.name) else { return }
+        rememberEdit("Undo not them", before: recap)
+        let back = ScribeSpeaker.participant(label)
+        let after = recap.transcript.map { segment -> ScribeTranscriptSegment in
+            guard segment.speaker == speaker else { return segment }
+            var changed = segment
+            changed.speaker = back
+            return changed
+        }
+        applySpeakerEdit(at: index, segments: after, book: book)
+    }
+
+    /// Brings back the meeting as it was before the last speaker change (this session only).
+    func undoSpeakerEdit(for id: ScribeSessionID) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }),
+              var history = speakerHistories[id.rawValue], let state = history.undo() else { return }
+        speakerHistories[id.rawValue] = history
+        speakerHistoryRevision &+= 1
+        applySpeakerEdit(at: index, segments: state.segments, book: state.book)
+    }
+
+    func speakerUndoTitle(for id: ScribeSessionID) -> String? { speakerHistories[id.rawValue]?.lastTitle }
+
+    /// Puts tiny voices that were folded into other speakers back where they were.
+    func restorePrunedSpeakers(in id: ScribeSessionID) {
+        guard let index = recaps.firstIndex(where: { $0.id == id }) else { return }
+        let recap = recaps[index]
+        var book = recap.speakerBook ?? ScribeSpeakerBook()
+        guard !book.folds.isEmpty else { return }
+        rememberEdit("Undo restore", before: recap)
+        let after = ScribeSpeakerPruning.restore(folds: book.folds, in: recap.transcript)
+        book.clearFolds()
+        applySpeakerEdit(at: index, segments: after, book: book)
+    }
+
+    /// The meeting's transcript as text for the clipboard, with the current names.
+    func transcriptText(for id: ScribeSessionID, markdown: Bool) -> String {
+        guard let recap = recaps.first(where: { $0.id == id }) else { return "" }
+        return markdown
+            ? ScribeTranscriptExport.markdown(title: recap.title, segments: recap.transcript)
+            : ScribeTranscriptExport.plainText(segments: recap.transcript)
+    }
+
+    /// What the recap offers for naming this meeting's speakers. The closures run on user clicks, on the main actor.
+    func speakerTools(for id: ScribeSessionID) -> ScribeSpeakerTools {
+        let book = recaps.first(where: { $0.id == id })?.speakerBook ?? ScribeSpeakerBook()
+        let attendees = attendeeNames(for: id)
+        return ScribeSpeakerTools(
+            suggestions: speakerSuggestions(for: id),
+            attendeeNames: attendees,
+            identities: book.identities,
+            hasPrunedVoices: !book.folds.isEmpty,
+            undoTitle: speakerUndoTitle(for: id),
+            isIdentifying: false,
+            canRemember: { [unowned self] speaker in self.canRememberVoice(speaker, in: id) },
+            rename: { [unowned self] speaker, name, remember in self.renameSpeaker(speaker, to: name, in: id, rememberVoice: remember) },
+            accept: { [unowned self] speaker, name in
+                // The invite when an attendee matches, else what the speaker said.
+                let fromInvite = attendees.contains { ScribeSpeakerNames.key($0) == ScribeSpeakerNames.key(name) }
+                self.renameSpeaker(speaker, to: name, in: id, source: fromInvite ? .calendar : .introduction)
+            },
+            confirm: { [unowned self] speaker in self.confirmSpeaker(speaker, in: id) },
+            notThem: { [unowned self] speaker in self.declineSpeakerName(speaker, in: id) },
+            reassignBlock: { [unowned self] segmentID, name in self.reassignBlock(segmentID, to: name, in: id) },
+            assignWords: { [unowned self] segmentID, range, name in self.assignWords(range, of: segmentID, to: name, in: id) },
+            undo: { [unowned self] in self.undoSpeakerEdit(for: id) },
+            restorePruned: { [unowned self] in self.restorePrunedSpeakers(in: id) },
+            copyTranscript: { [unowned self] in
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(self.transcriptText(for: id, markdown: false), forType: .string)
+            }
+        )
+    }
+
     // MARK: Saved meetings
 
     private func loadSavedMeetings() {
         guard let store else { return }
         // A meeting cancelled in an earlier run whose file couldn't be removed then: finish that deletion now, and
         // never list it as a recap while the file is still there.
-        let cancelled = ScribeCancelTombstones.ids
+        let cancelled = ScribeCancelTombstones.ids(in: cancellationDefaults)
         for raw in cancelled {
             pendingCleanup.insert(raw)
             _ = removeCheckpoint(raw)
@@ -1279,6 +1609,8 @@ final class ScribeController {
             .filter { $0.dismissedAt == nil && !cancelled.contains($0.id) }
             .map { record in
                 let id = ScribeSessionID(rawValue: record.id)
+                if !record.attendeeNames.isEmpty { attendeesByMeeting[record.id] = record.attendeeNames }
+                if !record.turnEmbeddings.isEmpty { turnVoices[record.id] = record.turnEmbeddings }
                 return ScribeRecap(
                     id: id,
                     title: record.title,
@@ -1287,7 +1619,8 @@ final class ScribeController {
                     notes: record.meetingNotes,
                     transcript: record.segments(session: id),
                     transcriptionNote: record.transcriptionNote,
-                    micExcludedDuringCall: record.micExcludedDuringCall ?? false
+                    micExcludedDuringCall: record.micExcludedDuringCall ?? false,
+                    speakerBook: record.speakerBook
                 )
             }
         if !result.failures.isEmpty {
@@ -1312,7 +1645,10 @@ final class ScribeController {
             transcript: recap.transcript,
             dismissedAt: dismissedAt,
             transcriptionNote: recap.transcriptionNote,
-            micExcludedDuringCall: recap.micExcludedDuringCall
+            micExcludedDuringCall: recap.micExcludedDuringCall,
+            attendees: ScribeAttendeeNames.clean(attendeesByMeeting[recap.id.rawValue] ?? []),
+            turnVoices: (turnVoices[recap.id.rawValue] ?? []).map(ScribeMeetingRecord.TurnVoice.init),
+            speakerBook: recap.speakerBook
         )
         do {
             try writeMeeting(record)
@@ -1453,6 +1789,7 @@ final class ScribeController {
         notesReadyTask?.cancel()
         notesReadyTask = nil
         wordReveals = [:]
+        incomingWordsRevealUntil = nil
         discardRequested = false
         stoppedEarlyReason = nil
         notesIssue = nil
@@ -1472,8 +1809,8 @@ final class ScribeController {
         systemAudioReceiving = false
         transcriptionIssues = []
         microphoneUnknownSeconds = 0
-        micCallExcludedNow = false
-        micExcludedDuringCall = false
+        micSharedNow = false
+        micSharedAnnounced = false
     }
 
     // MARK: Clock text (display only)
@@ -1485,7 +1822,7 @@ final class ScribeController {
     }
 
     private func hideEndWindow() {
-        if showsEndWindow { ScribeEndWindow.shared.hide() }
+        endWindow?.hide()
     }
 
     private func startClock() {
@@ -1509,7 +1846,48 @@ final class ScribeController {
         default: break
         }
         updateEndingCountdown(now: nowSeconds())
+        pollSpeakerNames()
     }
+
+    /// Reads the call window (main actor, only with Accessibility already granted) and names voices when the
+    /// audio and the tile agree. Names apply to the lines already on screen too.
+    private func pollSpeakerNames() {
+        guard let monitor = speakerMonitor, let since = recordingSince else { return }
+        switch machine.phase {
+        case .recording, .ending: break
+        default: return
+        }
+        let now = nowSeconds()
+        guard let observation = monitor.poll(now: now, elapsed: max(0, now - since)) else { return }
+        liveNaming.observe(observation)
+        guard now - lastNamingEvaluation >= 2 else { return }
+        lastNamingEvaluation = now
+        applyLiveNames(force: false)
+    }
+
+    private func applyLiveNames(force: Bool) {
+        guard !liveNaming.evaluate(force: force).isEmpty else { return }
+        transcript?.relabelSpeakers { liveNaming.displayed($0.speaker, segmentID: $0.id) }
+    }
+
+    /// The streaming diarizer's final read of the whole meeting: lines it labelled differently live are moved,
+    /// and names the call window gave are worked out again on the corrected voices.
+    private func applyStreamingRelabel(_ labels: [String: String]) {
+        streamingUsed = true
+        guard !labels.isEmpty, transcript != nil else { return }
+        liveNaming.relabelClusters(labels)
+        transcript?.relabelSpeakers { liveNaming.rawSpeaker(segmentID: $0.id) ?? $0.speaker }
+        _ = liveNaming.evaluate(force: true)
+        transcript?.relabelSpeakers { liveNaming.displayed($0.speaker, segmentID: $0.id) }
+    }
+
+    /// Who is speaking now, by the best name known, for the live "Now speaking" pill. Reads the newest words.
+    func nowSpeakingClaim() -> ScribeSpeakerClaim? {
+        liveNaming.nowSpeaking(latestWordsSegment())
+    }
+
+    /// Whether names from the call window can work this session: Accessibility must already be granted.
+    var callWindowNamesAvailable: Bool { speakerMonitor?.isAvailable ?? false }
 
     private func updateEndingCountdown(now: TimeInterval) {
         guard case .ending(let id, _) = machine.phase else { return }

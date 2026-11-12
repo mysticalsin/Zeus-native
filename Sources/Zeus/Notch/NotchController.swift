@@ -17,11 +17,19 @@ final class NotchController {
     /// The display the pointer and the open panel work on.
     private(set) var screen: NSScreen?
     private(set) var notchSize: CGSize = .zero
+    /// How far the closed bar and the peek card sit below the screen top on the active display
+    /// (Settings > Appearance > Top bar position); 0 while the panel is open.
+    private var topOffset: CGFloat {
+        CGFloat(TopBarPosition.applied(resolved: TopBarPositionModel.shared.offset, panelOpen: model.presentation == .panel))
+    }
     private(set) var displays: [DisplayDescriptor] = []
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
-    private var lineTask: Task<Void, Never>?
+    /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
+    private var alertWake: Task<Void, Never>?
+    /// Alerts waiting out their ten minute snooze, by alert id.
+    private var snoozeTasks: [String: Task<Void, Never>] = [:]
     /// What happens when the notification line is clicked.
     var openNotificationLine: (NotchModel.NotificationLine) -> Void = { _ in }
 
@@ -32,7 +40,11 @@ final class NotchController {
     private var hoverTask: Task<Void, Never>?
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
-    private var keepsPolyglotOpen: Bool { topBar?.selectedTab == .polyglot && isPolyglotPinned() }
+    /// The pin rules live in ZeusCore; this only reports the current facts.
+    private func pinContext() -> PolyglotPinContext {
+        PolyglotPinContext(isPolyglotTabSelected: topBar?.selectedTab == .polyglot, isPinned: isPolyglotPinned(),
+                           autoHideEnabled: SettingsStore.shared.bool("notch.autoHide"))
+    }
 
     func start() {
         NotchControllerBridge.controller = self
@@ -124,6 +136,9 @@ final class NotchController {
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
         setIgnoresMouse(presentation == .closed)
+        // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
+        model.alerts.setSuspended(presentation != .closed, now: now())
+        alertsChanged()
         if opening { NotchHaptics.open() }
         onPresentationChange(presentation)
     }
@@ -297,6 +312,7 @@ final class NotchController {
             if model.notificationLine != nil, model.presentation == .closed {
                 let over = notificationLineRect(screen).contains(NSEvent.mouseLocation)
                 setIgnoresMouse(!over)
+                if !over, model.alerts.isHovered { setAlertHovered(false) }
                 if over { return }
             }
             guard inHotZone(screen) else { hoverTask?.cancel(); hoverTask = nil; return }
@@ -335,8 +351,13 @@ final class NotchController {
             // beside or below it reach the app underneath.
             setIgnoresMouse(!over)
             guard outside else { closeTask?.cancel(); closeTask = nil; return }
-            guard !keepsPolyglotOpen else { closeTask?.cancel(); closeTask = nil; return }
-            guard SettingsStore.shared.bool("notch.autoHide"), closeTask == nil else { return }
+            switch PolyglotPinPolicy.decide(.pointerExited, pinContext()) {
+            case .keepOpen:
+                closeTask?.cancel(); closeTask = nil
+                return
+            case .close, .scheduleClose:
+                guard closeTask == nil else { return }
+            }
             let delay = Self.closeDelayMilliseconds
             guard delay > 0 else { dismissAutomatically(); return }
             closeTask = Task { @MainActor [weak self] in
@@ -359,8 +380,14 @@ final class NotchController {
 
     /// Automatic dismissal respects a pin; explicit `show(.closed)` still always works.
     func dismissAutomatically() {
-        guard !keepsPolyglotOpen else { return }
+        guard PolyglotPinPolicy.decide(.clickedOutside, pinContext()) == .close else { return }
         show(model.approval != nil ? .peek : .closed)
+    }
+
+    /// The Dismiss button: closes even a pinned bar (it always showed `.closed`, approval or not).
+    func dismissExplicitly() {
+        guard PolyglotPinPolicy.decide(.explicitDismiss, pinContext()) == .close else { return }
+        show(.closed)
     }
 
     /// With auto-hide off the panel stays open until a click elsewhere (global monitors only see other apps).
@@ -385,7 +412,7 @@ final class NotchController {
             island += 2 * (ClosedWings.wingWidth + 8) + ClosedWings.extraWidth(for: topBar)
         }
         return GlanceTopBar.inHoverZone(NSEvent.mouseLocation, screen: screen.frame,
-                                        notch: CGSize(width: island, height: max(notchSize.height, 30)))
+                                        notch: CGSize(width: island, height: max(notchSize.height, 30) + topOffset))
     }
 
     private func mouseDragged() {
@@ -426,7 +453,7 @@ final class NotchController {
         let wide = detailHeight > 0
         let peekWidth = max(notchSize.width + 16 + 240, wide ? 520 : 440)
         let rowOffset: CGFloat = 55 + (wide ? detailHeight + 8 : 0) + (model.approval?.previewHeight ?? 0)
-        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - max(notchSize.height, 30) - rowOffset)
+        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(notchSize.height, 30) - rowOffset)
     }
 
     // MARK: Window
@@ -533,35 +560,103 @@ final class NotchController {
 
     // MARK: Notification line
 
-    /// A slim line under the closed notch for about four seconds; click opens the app.
+    /// A mirrored notification from another app becomes a glass alert under the notch (see `AlertStack`).
     func showNotificationLine(_ line: NotchModel.NotificationLine) {
-        guard model.presentation == .closed else { return }
-        model.notificationLine = line
-        lineTask?.cancel()
-        lineTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(NotificationPeekRules.visibleSeconds))
-            guard !Task.isCancelled else { return }
-            self?.dismissNotificationLine()
+        postAlert(AlertItem(id: "\(line.id)", appID: line.app, appName: NotificationsController.shared.appName(line.app),
+                            title: line.title, body: line.detail, priority: .normal, postedAt: now()))
+    }
+
+    /// `whileOpen` queues the alert even when the notch is open (a snoozed alert coming back must not be lost); it then
+    /// shows, with its full time, when the notch closes.
+    func postAlert(_ item: AlertItem, whileOpen: Bool = false) {
+        guard whileOpen || model.presentation == .closed else { return }
+        let result = model.alerts.post(item, now: now())
+        if case .added = result {
+            // Each alert is announced once, politely; a coalesced duplicate does not repeat it.
+            NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+                .announcement: item.spokenText,
+                .priority: NSAccessibilityPriorityLevel.low.rawValue,
+            ])
         }
+        alertsChanged()
     }
 
     func dismissNotificationLine() {
-        lineTask?.cancel()
-        model.notificationLine = nil
-        if model.presentation == .closed { setIgnoresMouse(true) }
+        model.alerts.clear()
+        alertsChanged()
+    }
+
+    func dismissAlert(_ id: String) {
+        model.alerts.dismiss(id: id, now: now())
+        alertsChanged()
+    }
+
+    func openAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        openNotificationLine(.init(id: Int64(item.id) ?? 0, app: item.appID, title: item.title, detail: item.body))
+        dismissAlert(id)
+    }
+
+    /// Opens the source app on a reply to the alert (a draft the owner sends). Without a reply URL, or when the
+    /// app is not installed, it falls back to Open; the button is only shown when a URL exists.
+    func replyAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        guard let url = AlertReply.url(for: item), AlertReplyLauncher.open(url, bundleID: item.appID) else {
+            return openAlert(id)
+        }
+        dismissAlert(id)
+    }
+
+    /// Hides the alert and brings it back in ten minutes.
+    func snoozeAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        dismissAlert(id)
+        // One snooze per alert: snoozing it again replaces the pending return instead of doubling it.
+        snoozeTasks[id]?.cancel()
+        snoozeTasks[id] = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(600))
+            guard !Task.isCancelled, let self else { return }
+            self.snoozeTasks[id] = nil
+            var again = item
+            again.postedAt = self.now()
+            self.postAlert(again, whileOpen: true)
+        }
     }
 
     func clickNotificationLine() {
-        guard let line = model.notificationLine else { return }
-        dismissNotificationLine()
-        openNotificationLine(line)
+        guard let front = model.alerts.visible.first else { return }
+        openAlert(front.id)
+    }
+
+    func setAlertHovered(_ hovered: Bool) {
+        model.alerts.setHovered(hovered, now: now())
+        alertsChanged()
+    }
+
+    /// Re-arms the single wake-up for the next deadline. With nothing to expire there is no task at all.
+    private func alertsChanged() {
+        alertWake?.cancel()
+        alertWake = nil
+        if model.alerts.isEmpty {
+            if model.presentation == .closed { setIgnoresMouse(true) }
+            return
+        }
+        guard let deadline = model.alerts.nextDeadline() else { return }
+        alertWake = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSince(self.now()))))
+            guard !Task.isCancelled else { return }
+            self.model.alerts.expire(now: self.now())
+            self.alertsChanged()
+        }
     }
 
     /// Where the line sits, in screen coordinates: centred under the notch.
     private func notificationLineRect(_ screen: NSScreen) -> CGRect {
-        let top = screen.frame.maxY - max(notchSize.height, 30) - 6
-        return CGRect(x: screen.frame.midX - NotchNotificationLine.width / 2, y: top - NotchNotificationLine.height,
-                      width: NotchNotificationLine.width, height: NotchNotificationLine.height)
+        let top = screen.frame.maxY - topOffset - max(notchSize.height, 30) - 6
+        // Room for the fanned stack and the hover actions, so the pointer stays on the capsule while it grows.
+        let height = AlertCapsule.actionHeight + 24
+        return CGRect(x: screen.frame.midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)
     }
 
     // MARK: Keyboard agent picker

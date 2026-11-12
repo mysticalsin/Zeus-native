@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """One table, two outputs: teardown/glance-settings-inventory.md and Sources/Zeus/App/SettingsCatalog.swift.
-Glance labels come from studying Glance 0.3.1 (its fr/es Localizable.strings keys, Info.plist, binary
+the reference app labels come from studying a reference app (its fr/es Localizable.strings keys, Info.plist, binary
 strings and settings icon names). Only option names and behaviour are recorded, never code or assets.
 Usage: gen-settings-catalog.py <repo> <inventory.md>"""
 import sys, json
@@ -20,14 +20,16 @@ o(S,'Day to day','Launch at login','toggle','on','Starts the app when you log in
 o(S,'Day to day','Keep the Mac awake while agents work','toggle','off','Blocks idle sleep while an agent runs; the screen can still lock.','missing','general.keepAwake','toggle',[],'false','live','Power assertion held only while a session is working.')
 o(S,'Day to day','Welcome back recap (Recap and return)','toggle','on','After 10 minutes or more away, the notch shows what agents finished, failed or are waiting on, and Zeus says one line about it when voice answers are on.','missing','general.welcomeBack','toggle',[],'true','live','Away is system idle time (no keys or mouse). Only agent events since you left are listed; waiting ones only while still waiting.')
 o(S,'Day to day','Meeting mode (discreet during calls and screen sharing)','toggle','on','When another app uses the mic or camera, or the display is mirrored: leave captures, mute sounds, hide details.','partial','general.meetingMode','toggle',[],'true','live','Detects the mic in use by another app and mirrored displays. Camera detection TODO.')
+o(S,'Day to day','Show in screen sharing','toggle','-','','missing','general.showInScreenSharing','toggle',[],'false','live','N1. Every Zeus window uses the shared sharing helper.')
 o(S,'Guided setup','Run setup again','button','-','Replays the first-run guide.','has','general.runSetup','action',[],'','custom','')
-o(S,'Updates','Check for updates automatically','toggle','on','Sparkle checks the feed and installs with consent.','missing','about.autoUpdate','toggle',[],'false','stub','No update server (no remote, no deploys). TODO when a release channel exists.')
+o(S,'Updates','Check for updates automatically','toggle','on','','missing','about.autoUpdate','toggle',[],'false','live','N6. Polls the feed URL when set.')
+o(S,'Updates','Update feed URL','text','-','','missing','about.updateFeedURL','text',[],'','live','N6. JSON feed with version and downloadURL; empty means off.')
 o(S,'Updates','Check for updates','button','-','Checks now.','missing','about.checkNow','action',[],'','stub','Same as above.')
 
 S='appearance'
 o(S,'Find your look','Card style (Classic, Glass, Physical, Liquid Glass, Dashboard, Dashboard B)','picture cards','Glass','Look of the permission, running and finished cards.','partial','appearance.cardStyle','choice',['Liquid Glass','Glass','Classic','Physical','Dashboard','Dashboard B'],'Liquid Glass','live','')
 o(S,'Find your look','Home style (Device, Borderless, Borderless colour)','picture cards','Device','Frame of the Home band.','missing','appearance.homeStyle','choice',['Device','Borderless','Borderless colour'],'Device','live','')
-o(S,'Find your look','Customize Physical (Home and card finishes)','menus','-','Separate finishes for Home and cards in the Physical theme.','missing','appearance.physicalFinish','choice',['Same everywhere','Separate'],'Same everywhere','live','')
+o(S,'Find your look','Customize Physical (Home and card finishes)','menus','-','Separate finishes for Home and cards in the Physical theme.','missing','appearance.physicalFinish','choice',['Same all','Separate'],'Same all','live','')
 o(S,'Home','Home slot 1','menu','-','The widget in the first Home card.','missing','home.widget.1','choice',['Music', 'Focus', 'Weather', 'Calendar', 'Clock', 'World clock', 'Month', 'Agenda', 'Countdown', 'Note', 'Battery', 'Agents'],'Music','live','Click a card in Customize Home, or pick here. Defaults are today\'s Music, Focus, Weather and Calendar.')
 o(S,'Home','Home slot 2','menu','-','The widget in the second Home card.','missing','home.widget.2','choice',['Music', 'Focus', 'Weather', 'Calendar', 'Clock', 'World clock', 'Month', 'Agenda', 'Countdown', 'Note', 'Battery', 'Agents'],'Focus','live','Click a card in Customize Home, or pick here. Defaults are today\'s Music, Focus, Weather and Calendar.')
 o(S,'Home','Home slot 3','menu','-','The widget in the third Home card.','missing','home.widget.3','choice',['Music', 'Focus', 'Weather', 'Calendar', 'Clock', 'World clock', 'Month', 'Agenda', 'Countdown', 'Note', 'Battery', 'Agents'],'Weather','live','Click a card in Customize Home, or pick here. Defaults are today\'s Music, Focus, Weather and Calendar.')
@@ -43,7 +45,7 @@ o(S,'Home','Countdown date','text','-','A day as 2026-12-25.','missing','home.co
 o(S,'Agent cards','Running card (Wave, Essentials)','segmented','Wave','Layout of the running-agent preview.','missing','appearance.runningCard','choice',['Wave','Essentials'],'Wave','live','Wave shows activity bars; Essentials keeps the compact status row.')
 o(S,'Agents','Agent status icon (Glyphs, Lumi, Lumi Pixel, Creatures)','picture cards','Glyphs','Symbol or a character for each agent state.','partial','avatar.alwaysInNotch','toggle',[],'true','custom','ZEUS answer: the Mini ZEUS mascot (13 states) on General.')
 o(S,'Notch behavior','Hide the notch automatically','toggle','on','Closes when the pointer leaves.','partial','notch.autoHide','toggle',[],'true','live','Off: it stays open until the shortcut or a click elsewhere.')
-o(S,'Notch behavior','Delay before closing','menu','Short','How long it waits after the pointer leaves.','missing','notch.closeDelay','choice',['Instantly','0.5 s','1 s','2 s'],'0.5 s','live','Glance closes about 0.53 s after the pointer leaves (glance-clone-proof/parity/N8-glance.mp4).')
+o(S,'Notch behavior','Delay before closing','menu','Short','How long it waits after the pointer leaves.','missing','notch.closeDelay','choice',['Instantly','0.5 s','1 s','2 s'],'0.5 s','live','the reference app closes about 0.53 s after the pointer leaves (private reference notes).')
 o(S,'Notch behavior','Show the notch (hover dwell)','menu','On hover','How quickly hovering opens it.','partial','notch.openDelay','choice',['Fast','Normal','Relaxed'],'Normal','live','0.1 s, 0.25 s or 0.6 s.')
 o(S,'Notch behavior','Show Zeus next to cursor','toggle','off','When summoned, Zeus anchors beside the mouse pointer instead of the notch.','missing','presence.nearCursor','toggle',[],'true','live','P0 item I. Offset 18 pt right and down from the pointer, clamped and flipped at screen edges, multi-display aware, 60 fps with a light spring; off keeps the notch/top-bar placement. Also in the menu bar menu and `zeus debug presence`.')
 o(S,'Halo','Halo style','menu','Classic halo','The closed-notch glow while an agent works or needs you. One setting: the notch, Settings and the welcome guide all read it.','partial','halo.style','choice',['classic', 'pixelated', 'rayons', 'prisme', 'nimbus', 'lumiere', 'volumetric', 'bioluminescent', 'aurora', 'storm', 'off'],'classic','custom','Stable ids; titles come from ZeusCore.HaloStyle. Replaces the old topBar.halo key (migrated at launch).')
@@ -57,7 +59,7 @@ o(S,'Halo','Light wave to the screen edges','toggle','on','A wave of light cross
 o(S,'Everyday lights','Light wave while music plays','toggle','on','Artwork-tinted wave on the closed notch.','has','topBar.musicWings','toggle',[],'true','custom','')
 o(S,'Everyday lights','Progress outline on the music preview','toggle','on','Outline empties as the track plays.','missing','lights.musicProgress','toggle',[],'true','live','Tracks media progress around the music wings.')
 o(S,'Everyday lights','React to real sound (live spectrum)','toggle','off','The music light follows the sound your Mac is playing.','missing','lights.liveSpectrum','toggle',[],'false','live','CoreAudio process tap of system output, listen only. Asks for System Audio Recording once, when this is turned on or the Waves tab opens. Runs only while music plays.')
-o(S,'Everyday lights','Waves style (Bars, Wave, Mirror)','segmented','Bars','How the Waves tab draws the spectrum.','missing','waves.style','choice',['Bars','Wave','Mirror'],'Bars','live','Zeus addition. The Waves tab is off by default; add it in Settings > Top Bar.')
+o(S,'Everyday lights','Waves style (Bars, Wave, Mirror)','segmented','Bars','How the Waves tab draws the spectrum.','missing','waves.style','choice',['Bars','Wave','Mirror'],'Bars','live','Zeus addition. The Waves tab is off by default; add it in Settings > Appearance > Top bar tabs.')
 o(S,'Everyday lights','Waves sensitivity','slider','100 %','How strongly the bars react to quiet sound.','missing','waves.sensitivity','slider',[50,200,10],'100','live','Zeus addition. A gain on the live band levels.')
 o(S,'Everyday lights','Light sweep on copy','toggle','on','Confirms a copy was caught.','partial','lights.copy','toggle',[],'true','live','Gates the copy cue.')
 o(S,'Everyday lights','Intake light when files land','toggle','on','Glow when files land on the shelf.','partial','lights.shelf','toggle',[],'true','live','Gates the shelf cue.')
@@ -70,7 +72,7 @@ o(S,'Everyday lights','Keyboard backlight HUD','toggle','on','Level glow when ke
 o(S,'Everyday lights','Mute pulse in the notch','toggle','on','Dim slash pulse when output is muted.','live','lights.hud.mute','toggle',[],'true','live','')
 o(S,'Everyday lights','Replace macOS volume and brightness HUD','toggle','on','Needs Accessibility in Settings > Permissions. Without it, both HUDs can show.','live','lights.hud.replaceSystem','toggle',[],'true','live','CGEventTap consumes media keys when trusted.')
 o(S,'Everyday lights','Screen-edge glow on volume, brightness and keyboard-backlight HUDs','toggle','on','A glow runs around every screen edge and joins the notch, filled to the level.','missing','lights.hud.screenEdge','toggle',[],'true','live','P0 item G. Click-through overlay above the menu bar on every display; fades in 120 ms, holds, fades out after about 1.2 s idle; respects Reduce Motion and Reduce Transparency.')
-o(S,'Everyday lights','Ignore mic conflicts (debug)','toggle','-','For QA environments where Core Audio keeps reporting a stale recorder.','has','wake.ignoreMicConflicts','toggle',[],'false','live','Item 6 (Hey Zeus). An escape hatch for a QA box with a stuck recorder; off is correct for everyday use.')
+o(S,'Everyday lights','Ignore mic conflicts (debug)','toggle','-','For QA environments where Core Audio keeps reporting a stale recorder.','has','wake.ignoreMicConflicts','toggle',[],'false','stub','Item 6 (Hey Zeus). Never shown. Read only in DEBUG builds (WakeWordController); release builds always keep the call guard.')
 o(S,'Everyday lights','Incoming rain alert','toggle','on','"Rain in X min" pill before a shower.','partial','lights.rain','toggle',[],'true','live','Uses hourly forecast timing; suppresses repeat alerts for three hours after a shower starts.')
 o(S,'Everyday lights','Timer light gauge','toggle','on','Outline counts down a focus session.','partial','lights.timer','toggle',[],'true','live','Gates the closed focus wings.')
 o(S,'Everyday lights','Purple glow while the mic listens','toggle','on','Glows with your voice during a spoken answer.','partial','lights.micGlow','toggle',[],'true','live','Gates the mic-listening glow while Zeus speaks.')
@@ -104,7 +106,8 @@ o(S,'Sound categories','Ambient loop while an agent works','toggle','off','A qui
 o(S,'Sound categories','Failure sound','toggle','on','A short sound when an agent turn fails.','missing','sound.failure','toggle',[],'true','live','Plays the Failure sound when a session turns red (rate limit, auth or API error).')
 
 S='voice'
-o(S,'Voice answer','Enable voice answers','toggle','off','Say a keyword to answer a permission card; mic only while the card shows.','partial','voice.answers','toggle',[],'true','live','ZEUS also answers out loud (Answers card).')
+o(S,'Voice answer','Listen for approval keywords','toggle','off','Say a keyword to answer a permission card. The microphone opens only while a card is waiting. Off until you turn it on.','partial','voice.answers','toggle',[],'false','live','Opt-in: it opens the microphone. ZEUS also answers out loud (Answers card).')
+o(S,'Voice answer','Speak replies','toggle','-','Zeus reads answers aloud with the Ultron voice.','missing','voice.speakReplies','toggle',[],'true','live','')
 o(S,'Your keywords','Approve keywords','text','ok, yes','Comma separated; the last word counts.','missing','voice.approveWords','text',[],'ok, yes, approve, allow','live','')
 o(S,'Your keywords','Deny keywords','text','no','Comma separated.','missing','voice.denyWords','text',[],'no, deny, stop','live','')
 o(S,'Your keywords','Open the app keywords','text','open','Comma separated.','missing','voice.openWords','text',[],'open, show me','live','')
@@ -174,6 +177,15 @@ S='license'
 o(S,'License','Activate a license, key, buy, trial status','field + buttons','trial','Paid licence.','missing','license','status',[],'','custom','Trial countdown, offline Ed25519 key check, Keychain, deactivate to move Macs. No payment provider; gating off (Entitlements).')
 
 S='assistant'
+o(S,'Visual explanation','Enable visual explanations','toggle','off','Explain and edit diagrams in Chat with optional on-device narration. No capture starts automatically.','missing','explanation.enabled','toggle',[],'false','live','Native opt-in Chat surface; requires an explicitly configured Any LLM endpoint. Physical-device acceptance remains pending.')
+o(S,'Visual explanation','Spoken request shortcut','menu','Command-Shift-Space','Active only inside the visual explanation window. Hold the native Speak control for push-to-talk.','missing','explanation.shortcut','choice',['Command-Shift-Space','Command-Shift-V'],'Command-Shift-Space','live','No global keyboard monitoring or Accessibility permission is required for this shortcut.')
+o(S,'Desktop pointing','Enable desktop pointing','toggle','on','Hold the pointing keys, ask about what is under your pointer, and Zeus rings it and answers aloud. Nothing is captured until you hold the keys.','missing','pointing.enabled','toggle',[],'true','live','On by default (owner decision, docs/FIRST-RUN-DEFAULTS.md). Needs your own Input Monitoring or Accessibility grant to see the keys, and Screen Recording to place marks. Zeus never prompts for these.')
+o(S,'Desktop pointing','Pointing keys','menu','Control-Option','Control-Option is also the Talk to Zeus key: one hold is one Zeus turn that speaks in the Zeus voice and can point at the screen. Pick Right Option or Fn for a separate pointing turn that draws while held.','missing','pointing.shortcut','choice',['Control-Option','Right Option','Fn (Globe)'],'Control-Option','live','One hold, one turn (docs/VOICE-KEY.md). Control and Option is VoiceOver\'s modifier: while VoiceOver is on, Talk to Zeus moves to Option + Command and pointing on Control-Option pauses.')
+o(S,'Desktop pointing','Draw while held','toggle','on','While you hold the pointing keys, your pointer leaves a trail on the screen and Zeus sees it. Clicks always reach your apps. Off: no trail is drawn; Zeus still follows the pointer.','missing','pointing.drawWhileHeld','toggle',[],'true','live','Owner decision 2026-11-10. Drawing needs no Screen Recording permission; the ink is a Zeus overlay that is removed when you let go.')
+o(S,'Desktop pointing','Send a screenshot with each question','toggle','off','Off: Zeus asks the model using only what is under your pointer. On: the display under your pointer is sent to the provider you picked, once per question, and never saved.','missing','pointing.sendScreenshot','toggle',[],'false','live','Separate consent from the macOS Screen Recording permission.')
+o(S,'Desktop pointing','Provider','menu','Auto','Auto uses the first provider with a saved key that responds, preferring the fastest it has measured this session.','missing','pointing.provider','choice',['Auto','Anthropic + ElevenLabs','OpenAI','Zeus setup'],'Auto','live','Keys come from the Keychain only. Latency numbers stay in memory.')
+o(S,'Desktop pointing','Double-tap Control to type a question','toggle','off','Two quick taps on Control open a small box to type a question about what is under your pointer. Off by default.','missing','pointing.textEntry','toggle',[],'false','live','macOS Dictation can also use "Press Control key twice" (System Settings, Keyboard). If both are on, both fire. Turn one off.')
+o(S,'Desktop pointing','Use Fn+Control for dictation','toggle','off','Sets the dictation key to Fn+Control. Turning it off puts your previous dictation key back.','missing','pointing.dictationFnControl','toggle',[],'false','live','Off by default. Fn (Globe) alone is used by macOS for emoji and Dictation; check System Settings, Keyboard.')
 o(S,'Account','ChatGPT account, model, reasoning effort, speed','sign-in + menus','-','Assistant on your ChatGPT plan.','missing','assistant.provider','choice',['Claude CLI','OpenAI','Anthropic'],'Claude CLI','custom','Bring your own key (OpenAI, Anthropic, ElevenLabs) in the Keychain, model picker. ChatGPT sign-in is Coming: needs an OAuth backend.')
 o(S,'Model','Model','menu','-','Selected chat model for the chosen provider.','missing','assistant.model','choice',[],'Claude Code default','custom','Provider-specific model picker on the Assistant settings page.')
 o(S,'Behaviour','Double Command replies, Right Command hold to speak','toggles','-','Drafts a reply from the conversation.','partial','assistant.doubleCommand','toggle',[],'false','stub','Hold-to-speak is the ZEUS talk key. Reply drafting TODO with the chat on devon/claude.')
@@ -184,9 +196,9 @@ o(S,'Beamer','Beamer: start when Zeus starts','toggle','-','Opens Beamer hidden 
 o(S,'Beamer','Beamer: light the notch when control crosses','toggle','-','A Zeus cue when your keyboard and mouse move to another machine.','missing','beamer.cue','toggle',[],'true','live','Zeus addition. Reads Beamer\'s menu bar status (Accessibility).')
 
 S='voice'
-o(S,'Fast path','Fast path (instant commands)','toggle','-','Simple commands run the moment you finish speaking; off sends everything to the AI.','missing','fastPath.enabled','toggle',[],'true','live','Zeus addition. Laya or Jev is on the Engine page.')
-o(S,'Hey Zeus','Listen for "Hey Zeus"','toggle','-','Say it, then your request.','missing','voice.heyZeus','toggle',[],'true','custom','Zeus addition. Hand-built card on Voice.')
-o(S,'Talk to Zeus','Talk shortcut','recorder','-','Hold to talk, let go to send.','missing','voice.talkKey','choice',[],'','custom','Zeus addition. Recorder on Voice.')
+o(S,'Fast path','Fast path (instant commands)','toggle','-','Simple commands run the moment you finish speaking; off sends everything to the AI.','missing','fastPath.enabled','toggle',[],'true','live','Zeus addition. Jev is on the Engine page.')
+o(S,'Hey Zeus','Listen for "Hey Zeus"','toggle','-','Say it, then your request. Off until you turn it on.','missing','voice.heyZeus','toggle',[],'false','custom','Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off).')
+o(S,'Talk to Zeus','Talk shortcut','recorder','-','Hold Control + Option to talk, let go to send. Point at something while you hold and Zeus sees what you mean.','missing','voice.talkKey','choice',[],'','custom','Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept.')
 o(S,'Voice','Personality (Ultron or Plain) and Design voice','menu','-','How Zeus sounds and what it calls itself.','missing','voice.personality','choice',['Ultron','Plain'],'Ultron','custom','Zeus addition. Voice page.')
 o(S,'Dictation','Murmure speech engines','menu','-','Which speech recognition writes your words.','missing','dictation.engine','choice',[],'','custom','Zeus addition. Murmure page.')
 
@@ -204,19 +216,39 @@ o(S,'Browser agent','Most steps per task','menu','-','Where a web task stops and
 o(S,'Browser agent','Always ask before','text','-','Extra words that always show an approval card.','missing','browserAgent.alwaysAsk','text',[],'','live','Zeus addition. Added to the built-in list (buy, send, delete, post...).')
 o(S,'Browser agent','Browser for the agent','menu','-','Your own Chrome through the ZEUS extension, or a separate browser (browser-use) with its own profile.','missing','browserAgent.backend','choice',['Your Chrome','Separate browser (browser-use)'],'Your Chrome','live','Zeus addition. The separate one needs the Set up button once; `zeus browse --separate` forces it for one task.')
 o(S,'Browser agent','Allowed sites (separate browser)','text','-','Sites the separate browser may open, separated by commas. Empty means any site.','missing','browserAgent.allowedDomains','text',[],'','live','Zeus addition. Passed to browser-use as BROWSER_USE_ALLOWED_DOMAINS and checked before every open.')
+o(S,'Scribe','When a meeting starts','menu','-','Off, ask first, or start notes on its own when a call or calendar meeting begins.','missing','scribe.autoStart','choice',['Off','Ask me','Start automatically'],'Ask me','live','Zeus addition. Settings > Features > Scribe. Start automatically needs Microphone to be allowed already; otherwise Zeus asks. Never prompts for permission.')
 o(S,'Coding','Default coding agent','menu','-','Claude Code, Codex, Gemini or Cursor Agent.','missing','code.tool','choice',['Claude Code','Codex','Gemini','Cursor Agent'],'Claude Code','custom','Zeus addition. Stored under the code.tool key.')
 o(S,'Coding','Terminal app','menu','-','Automatic, Ghostty, iTerm, Warp or Terminal.','missing','code.terminal','choice',['Automatic','Ghostty','iTerm','Warp','Terminal'],'Automatic','custom','Zeus addition. Stored under the code.terminal key.')
 o(S,'Research','Research depth','menu','-','Quick or Deep when you do not say deep research.','missing','research.depth','choice',['Quick','Deep'],'Quick','live','Zeus addition.')
 o(S,'Research','Save reports in','text','-','A folder for research reports.','missing','research.folder','text',[],'','live','Zeus addition. Empty keeps the second brain, else Documents/Zeus Research.')
 o(S,'Models','Models Zeus uses (read-only)','status','-','Which model each engine uses, never above Haiku or Sonnet.','missing','models.caps','status',[],'','custom','Zeus addition. Read-only display of ModelCap.')
 o(S,'Drive','When Zeus may drive your Mac','menu','-','How much Zeus may do on its own on your Mac.','missing','privacy.driveAutonomy','choice',['Always ask','Safe steps alone','Trusted'],'Safe steps alone','custom','Zeus addition. Privacy page; stored under drive.autonomy.')
+o(S,'Drive','Move the system pointer','toggle','-','Drive mode may glide and click with CGEvent when Accessibility cannot.','missing','present.physicalPointer','toggle',[],'false','live','L5. Off by default. Key present.physicalPointer.')
 
 SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents'}
 
 def swift_str(s): return json.dumps(s, ensure_ascii=False)
 
+def validate_table():
+    """Generation must not turn passive settings into implicit capture or input."""
+    by_id = {}
+    for row in R:
+        if row[11] != 'excluded':
+            by_id.setdefault(row[7], row)  # Same first-row-wins rule as write_swift.
+    opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
+              'lights.liveSpectrum', 'general.showInScreenSharing',
+              'present.physicalPointer', 'explanation.enabled',
+              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl')
+    for key in opt_in:
+        row = by_id.get(key)
+        if row is None or row[8] != 'toggle' or row[10] != 'false':
+            raise ValueError(f'{key} must remain an explicit opt-in with a false default')
+    if by_id['wake.ignoreMicConflicts'][11] != 'stub':
+        raise ValueError('wake.ignoreMicConflicts must remain hidden from release settings')
+
 def write_swift(path):
-    lines=['// Generated by scripts/gen-settings-catalog.py. Edit the table there, then run it again.','// Option names follow Glance 0.3.1 settings (studied, not copied); behaviour is ours.','','enum SettingsCatalog {','    static let all: [SettingOption] = [']
+    validate_table()
+    lines=['// Generated by scripts/gen-settings-catalog.py. Edit the table there, then run it again.','// Option names follow a reference app settings (studied, not copied); behaviour is ours.','','enum SettingsCatalog {','    static let all: [SettingOption] = [']
     seen=set()
     for (sec,grp,gl,gc,gd,does,before,zid,kind,choices,zdef,state,note) in R:
         if state=='excluded' or zid in seen: continue
@@ -227,26 +259,29 @@ def write_swift(path):
         title=gl.split(' (')[0] if kind!='choice' or '(' not in gl else gl.split(' (')[0]
         lines.append(f'        SettingOption(id: {swift_str(zid)}, section: .{sec}, group: {swift_str(grp)}, title: {swift_str(title)}, note: {swift_str(does)}, kind: .{kind}, choices: {ch}, range: {rng}, defaultValue: {swift_str(zdef)}, state: .{state}, todo: {swift_str(note)}),')
     lines += ['    ]','}','']
-    open(path,'w').write('\n'.join(lines))
+    with open(path, 'w', encoding='utf-8') as output:
+        output.write('\n'.join(lines))
 
 def write_md(path):
+    validate_table()
     n=len(R); exc=sum(1 for r in R if r[11]=='excluded')
     matched=sum(1 for r in R if r[11] in ('live','custom','stub'))
     live=sum(1 for r in R if r[11] in ('live','custom'))
     before={k:sum(1 for r in R if r[6]==k) for k in ('has','partial','missing')}
-    out=['# Glance 0.3.1 settings inventory','',
-         'Source: Glance 0.3.1 (build 26) from app-71mb.dmg, studied on the box: the fr and es `Localizable.strings` (1,644 keys; the en table is intentionally empty because the English copy lives in code), `Info.plist` usage strings, `strings` on the binary (defaults keys such as `notchpilot.lyrics.enabled`, `notchpilot.notifications.replaceSystem`, `notchpilot.notifications.mutedApps`, `haloStyle`, `cardStyle`, `avatarStyle`, `haloThickness`, `armWidthSetting`, `rainAlertEnabledKey`, `focusMinutes`, `keepAwake`, `inMeeting`) and the 14 `settings-glass-*` sidebar icon names. No code or assets were copied; Zeus draws its own UI and uses macOS system sounds.','',
-         'Sidebar (Glance order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.','',
-         f'**Coverage:** {matched} of {n} Glance options are in Zeus Settings with a matching control ({matched*100//n}% of all, {matched*100//(n-exc)}% of the {n-exc} in scope). {live} are wired to real behaviour ({live*100//n}%). {matched-live} are labelled stubs with a TODO. {exc} are excluded.','',
+    out=['# a reference app settings inventory','',
+         'Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr and es `Localizable.strings` (1,644 keys; the en table is intentionally empty because the English copy lives in code), `Info.plist` usage strings, `strings` on the binary (defaults keys such as `notchpilot.lyrics.enabled`, `notchpilot.notifications.replaceSystem`, `notchpilot.notifications.mutedApps`, `haloStyle`, `cardStyle`, `avatarStyle`, `haloThickness`, `armWidthSetting`, `rainAlertEnabledKey`, `focusMinutes`, `keepAwake`, `inMeeting`) and the 14 `settings-glass-*` sidebar icon names. No code or assets were copied; Zeus draws its own UI and uses macOS system sounds.','',
+         'Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.','',
+         f'**Coverage:** {matched} of {n} the reference app options are in Zeus Settings with a matching control ({matched*100//n}% of all, {matched*100//(n-exc)}% of the {n-exc} in scope). {live} are wired to real behaviour ({live*100//n}%). {matched-live} are labelled stubs with a TODO. {exc} are excluded.','',
          f'**Before this round:** has {before["has"]}, partial {before["partial"]}, missing {before["missing"]}.','',
          'Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.','']
     cur=None
     for (sec,grp,gl,gc,gd,does,before_,zid,kind,choices,zdef,state,note) in R:
         if sec!=cur:
-            cur=sec; out += ['',f'## {SECTION_TITLES[sec]}','','| Group | Glance option | Control | Glance default | What it does | Zeus before | Zeus now | Zeus id | Note |','|---|---|---|---|---|---|---|---|---|']
+            cur=sec; out += ['',f'## {SECTION_TITLES[sec]}','','| Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |','|---|---|---|---|---|---|---|---|---|']
         out.append(f'| {grp} | {gl} | {gc} | {gd} | {does} | {before_} | {state} | `{zid}` | {note} |')
-    out += ['','## Zeus additions beyond Glance','','- Search box in the Settings sidebar (every option, section titles and notes; Return opens the first hit).','- Live preview card on Appearance (halo style, arm width, thickness and cues drawn as you change them).','- Reset this section to defaults (header button on every page).','- Export and import all settings as JSON (General).','- Keyboard navigation: Up and Down move between sections, Command F focuses search, Escape clears it.','- Sections Glance does not have: Top Bar (tab order, weather city and units), the To-do quick-add shortcut, second-brain rows.','']
-    open(path,'w').write('\n'.join(out))
+    out += ['','## Zeus additions beyond the reference app','','- Search box in the Settings sidebar (every option, section titles and notes; Return opens the first hit).','- Live preview card on Appearance (halo style, arm width, thickness and cues drawn as you change them).','- Reset this section to defaults (header button on every page).','- Export and import all settings as JSON (General).','- Keyboard navigation: Up and Down move between sections, Command F focuses search, Escape clears it.','- Sections the reference app does not have: Top Bar (tab order, weather city and units), the To-do quick-add shortcut, second-brain rows.','']
+    with open(path, 'w', encoding='utf-8') as output:
+        output.write('\n'.join(out))
     print(f'options {n} matched {matched} live {live} stub {matched-live} excluded {exc}')
 
 if __name__=='__main__':

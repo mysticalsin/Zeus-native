@@ -34,7 +34,20 @@ enum TopBarStyle {
 }
 
 /// A rounded glass tile used by every zone and page.
+private struct CardFinishOverrideKey: EnvironmentKey {
+    static var defaultValue: CardFinish? { nil }
+}
+
+extension EnvironmentValues {
+    /// A scoped appearance value, used by isolated hosts without reading process-global preferences.
+    var cardFinishOverride: CardFinish? {
+        get { self[CardFinishOverrideKey.self] }
+        set { self[CardFinishOverrideKey.self] = newValue }
+    }
+}
+
 struct Tile<Content: View>: View {
+    @Environment(\.cardFinishOverride) private var finishOverride
     var padding: CGFloat = CardFinish.inset
     /// Home band tiles follow Home style; every other card follows Card style.
     var home = false
@@ -42,11 +55,11 @@ struct Tile<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        let finish: CardFinish? = home ? CardFinish.home.finish : CardFinish.current
+        let finish: CardFinish? = finishOverride ?? (home ? CardFinish.home.finish : CardFinish.current)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .notchCard(finish, tint: home && CardFinish.home.tinted ? tint : nil)
+            .notchCard(finish, tint: finishOverride == nil && home && CardFinish.home.tinted ? tint : nil)
             .cardHoverLift()
     }
 }
@@ -137,15 +150,20 @@ struct LevelBars: View {
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<count, id: \.self) { index in
-                    let phase = sin(t * (5.1 + Double(index) * 1.7) + Double(index) * 1.3)
-                    let base = level.map { max($0, 0.08) * (0.6 + 0.4 * abs(phase)) } ?? (0.35 + 0.65 * abs(phase))
                     Capsule()
                         .fill(color)
-                        .frame(width: 2.6, height: max(3, height * (active ? base : 0.2)))
+                        .frame(width: 2.6, height: barHeight(index: index, time: t))
                 }
             }
             .frame(height: height)
         }
+    }
+
+    private func barHeight(index: Int, time: TimeInterval) -> CGFloat {
+        let phase: Double = sin(time * (5.1 + Double(index) * 1.7) + Double(index) * 1.3)
+        let base: Double = level.map { max($0, 0.08) * (0.6 + 0.4 * abs(phase)) } ?? (0.35 + 0.65 * abs(phase))
+        let fraction = CGFloat(active ? base : 0.2)
+        return max(CGFloat(3), height * fraction)
     }
 }
 
@@ -348,7 +366,7 @@ struct TopBarHeader: View {
         switch tab {
         case .notifications:
             let since = Date().addingTimeInterval(-86_400)
-            return NotificationsController.shared.items.filter { $0.date > since }.count
+            return NotificationsController.shared.visibleItems.filter { $0.date > since }.count
         case .shelf: return topBar.shelf.count
         case .clipboard: return topBar.clipboard.entries.count
         default: return nil
@@ -396,6 +414,8 @@ enum MoreMenu {
         }
         parent.submenu = sub
         menu.addItem(parent)
+        menu.addItem(.separator())
+        menu.addItem(ScreenShareQuickToggle.menuItem(target: MoreMenuTarget.shared, action: #selector(MoreMenuTarget.toggleScreenShareVisibility)))
         MoreMenuTarget.shared.topBar = topBar
         topBar.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
@@ -411,6 +431,7 @@ final class MoreMenuTarget: NSObject {
     @objc func openSettings() { topBar?.openSettings() }
     @objc func editTabs() { topBar?.beginTabEditing() }
     @objc func customizeHome() { topBar?.beginHomeCustomize() }
+    @objc func toggleScreenShareVisibility() { ScreenShareQuickToggle.toggle() }
 
     @objc func chooseBuddy(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String, let choice = BuddyShow(rawValue: raw) else { return }
@@ -452,7 +473,7 @@ struct TopBarPage: View {
             case .continuity: ContinuityPage()
             case .waves: WavesPage(topBar: topBar)
             case .polyglot: PolyglotPage(polyglot: .shared, topBar: topBar)
-            case .recordly: RecordlyPage(topBar: topBar, recordly: .shared)
+            case .recordly: RecordlyPage(topBar: topBar, recordly: topBar.recordlyForSnapshot ?? .shared)
             case .scribe: ScribePage(topBar: topBar, scribe: .shared)
             case .chat: ChatPage(chat: .shared)
             case .usage: UsagePage(usage: .shared)
@@ -1438,7 +1459,8 @@ struct ClosedWings: View {
             case .volume, .brightness, .keyboardBacklight: return 58
             default: return 30
             }
-        case .avatar: return 14
+        // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
+        case .avatar(let state): return state == .idle ? -36 : 14
         case .dictation: return 60
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }
@@ -1690,7 +1712,7 @@ enum ScribeWings {
     }
 }
 
-/// Superwhisper-style live waveform: the last levels scroll right to left, newest at the notch.
+/// Live waveform: the last levels scroll right to left, newest at the notch.
 struct DictationWave: View {
     let levels: [Double]
     let color: Color
@@ -1750,7 +1772,7 @@ struct EngineBadge: View {
     }
 }
 
-/// Superwhisper in one click: start talking, click again (or press the talk key) to type it
+/// Dictation in one click: start talking, click again (or press the talk key) to type it
 /// into the app you were in. The notch never takes focus, so the text lands where your cursor was.
 struct DictateButton: View {
     let topBar: TopBarModel

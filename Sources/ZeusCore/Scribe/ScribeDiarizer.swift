@@ -305,55 +305,92 @@ private struct MelBank {
 
 // MARK: - Diarizer
 
-/// Online speaker clustering for one meeting. Each chunk's voiceprint joins the nearest cluster of its own source
-/// when it is within `threshold`, otherwise it starts a new one; a cluster's centroid is the running mean of its
-/// members. The first microphone cluster is the person at the keyboard (`.you`). Every other cluster, a second
-/// voice on the microphone or any voice in the system audio, is `.participant("Speaker N")`, numbered in order of
-/// first appearance across both sources. A microphone voice and a system voice are never merged: they come
-/// through different channels, and the microphone is only ever admitted for the user and the room.
+/// Online speaker clustering for one meeting. Each chunk's embedding joins the nearest cluster of its own source
+/// when it is within that kind's threshold, otherwise it starts a new one; a cluster's centroid is the running
+/// mean of its members. The first microphone cluster is the person at the keyboard (`.you`). Every other cluster,
+/// a second voice on the microphone or any voice in the system audio, is `.participant("Speaker N")`, numbered in
+/// order of first appearance across both sources. A microphone voice and a system voice are never merged: they
+/// come through different channels, and the microphone is only ever admitted for the user and the room.
+///
+/// The embedding is the hand-built voiceprint by default (`assign(source:samples:)`) or any
+/// `ScribeVoiceEmbedding` a caller computed, such as a trained WeSpeaker vector (`assign(source:embedding:)`).
+/// Clusters of different kinds never compare. Voices the owner chose to remember are `seed`ed by name before
+/// the meeting; a seed counts as a speaker only once a chunk matches it.
 public struct ScribeDiarizer: Sendable {
     /// Voiceprint distance up to which a chunk is the same voice (0 identical, about 0.5 for a low and a high
     /// voice). See the tests for the synthetic cases it separates; real voices are unverified.
     public static let defaultThreshold: Float = 0.22
 
+    /// Hand-built voiceprint threshold (the historical `threshold`).
     public let threshold: Float
+    /// Trained-embedding threshold; see `ScribeVoiceEmbedding.defaultThreshold(for:)`.
+    public let wespeakerThreshold: Float
     public let maxSpeakers: Int
-    /// Clusters so far, across both sources.
+    /// Clusters so far, across both sources. Seeds that nobody matched yet are not counted.
     public private(set) var speakerCount = 0
 
     private struct Cluster: Sendable {
-        let source: ScribeAudioSource
+        /// Nil for a seeded saved voice, which may be heard on either source.
+        let source: ScribeAudioSource?
         let speaker: ScribeSpeaker
-        var spectral: [Float]
-        var pitch: [Float]
+        let kind: ScribeEmbeddingKind
+        let isSeed: Bool
+        var isActive: Bool
         var count = 1
-        var pitchCount: Int
+        // Hand-built centroid (blocks averaged separately).
+        var spectral: [Float] = []
+        var pitch: [Float] = []
+        var pitchCount = 0
+        // Trained centroid.
+        var mean: [Float] = []
 
-        init(source: ScribeAudioSource, speaker: ScribeSpeaker, print: ScribeVoiceprint) {
+        init(source: ScribeAudioSource?, speaker: ScribeSpeaker, embedding: ScribeVoiceEmbedding, isSeed: Bool = false) {
             self.source = source
             self.speaker = speaker
-            self.spectral = print.spectralBlock
-            if let block = print.pitchBlock {
-                self.pitch = block
-                self.pitchCount = 1
-            } else {
-                self.pitch = [Float](repeating: 0, count: ScribeVoiceprint.pitchCount)
-                self.pitchCount = 0
+            self.kind = embedding.kind
+            self.isSeed = isSeed
+            self.isActive = !isSeed
+            switch embedding.kind {
+            case .handBuilt:
+                let print = ScribeVoiceprint(vector: embedding.vector)
+                spectral = print.spectralBlock
+                if let block = print.pitchBlock {
+                    pitch = block
+                    pitchCount = 1
+                } else {
+                    pitch = [Float](repeating: 0, count: ScribeVoiceprint.pitchCount)
+                }
+            case .wespeaker:
+                mean = embedding.vector
             }
         }
 
-        var voiceprint: ScribeVoiceprint {
-            ScribeVoiceprint(spectral: spectral, pitch: pitchCount > 0 ? pitch : nil)
+        func serves(_ source: ScribeAudioSource) -> Bool { self.source == nil || self.source == source }
+
+        var centroid: ScribeVoiceEmbedding {
+            switch kind {
+            case .handBuilt:
+                ScribeVoiceEmbedding(kind: .handBuilt, vector: ScribeVoiceprint(spectral: spectral, pitch: pitchCount > 0 ? pitch : nil).vector)
+            case .wespeaker:
+                ScribeVoiceEmbedding(kind: .wespeaker, vector: mean)
+            }
         }
 
-        /// Running mean; the pitch block only averages the members that had a pitch.
-        mutating func absorb(_ print: ScribeVoiceprint) {
+        /// Running mean; the pitch block only averages the members that had a pitch. A seed's own embedding
+        /// counts as one member, so a saved voice drifts slowly.
+        mutating func absorb(_ embedding: ScribeVoiceEmbedding) {
             count += 1
-            let spectralBlock = print.spectralBlock
-            for index in spectral.indices { spectral[index] += (spectralBlock[index] - spectral[index]) / Float(count) }
-            if let block = print.pitchBlock {
-                pitchCount += 1
-                for index in pitch.indices { pitch[index] += (block[index] - pitch[index]) / Float(pitchCount) }
+            switch kind {
+            case .handBuilt:
+                let print = ScribeVoiceprint(vector: embedding.vector)
+                let spectralBlock = print.spectralBlock
+                for index in spectral.indices { spectral[index] += (spectralBlock[index] - spectral[index]) / Float(count) }
+                if let block = print.pitchBlock {
+                    pitchCount += 1
+                    for index in pitch.indices { pitch[index] += (block[index] - pitch[index]) / Float(pitchCount) }
+                }
+            case .wespeaker:
+                for index in mean.indices { mean[index] += (embedding.vector[index] - mean[index]) / Float(count) }
             }
         }
     }
@@ -363,56 +400,89 @@ public struct ScribeDiarizer: Sendable {
     private var lastMicrophone: ScribeSpeaker = .you
     private var lastSystem: ScribeSpeaker = .participant("Speaker 1")
 
-    public init(threshold: Float = ScribeDiarizer.defaultThreshold, maxSpeakers: Int = 8) {
+    public init(
+        threshold: Float = ScribeDiarizer.defaultThreshold,
+        maxSpeakers: Int = 8,
+        wespeakerThreshold: Float = ScribeVoiceEmbedding.defaultThreshold(for: .wespeaker)
+    ) {
         self.threshold = threshold
+        self.wespeakerThreshold = wespeakerThreshold
         self.maxSpeakers = max(1, maxSpeakers)
     }
 
-    /// Who spoke this chunk. A chunk with no usable voiceprint (silent, too short, or too little voiced audio)
+    private func limit(for kind: ScribeEmbeddingKind) -> Float {
+        kind == .handBuilt ? threshold : wespeakerThreshold
+    }
+
+    /// Adds a remembered voice. A chunk within threshold of it takes `name`; until then it is not a speaker.
+    /// Seeds of another kind than the audio's embeddings simply never match.
+    public mutating func seed(name: String, embedding: ScribeVoiceEmbedding) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !embedding.vector.isEmpty else { return }
+        clusters.append(Cluster(source: nil, speaker: .participant(trimmed), embedding: embedding, isSeed: true))
+    }
+
+    /// Who spoke this chunk, by its hand-built voiceprint. See `assign(source:embedding:)`.
+    public mutating func assign(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
+        assign(source: source, embedding: .handBuilt(samples: samples))
+    }
+
+    /// Who spoke this chunk. A chunk with no usable embedding (silent, too short, or too little voiced audio)
     /// continues that source's previous speaker: `.you` on the microphone, "Speaker 1" on system audio until
     /// someone has been heard. Once `maxSpeakers` clusters exist a chunk joins the nearest cluster of its source
     /// whatever the distance; a source's first cluster is always allowed so the microphone can still be `.you`.
-    public mutating func assign(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
-        guard let print = ScribeVoiceprint.make(samples: samples) else { return previous(for: source) }
+    public mutating func assign(source: ScribeAudioSource, embedding: ScribeVoiceEmbedding?) -> ScribeSpeaker {
+        guard let embedding else { return previous(for: source) }
 
         var nearest: (index: Int, distance: Float)?
-        for (index, cluster) in clusters.enumerated() where cluster.source == source {
-            let distance = cluster.voiceprint.distance(to: print)
+        var nearestActive: (index: Int, distance: Float)?
+        for (index, cluster) in clusters.enumerated() where cluster.serves(source) && cluster.kind == embedding.kind {
+            let distance = cluster.centroid.distance(to: embedding)
             if nearest == nil || distance < nearest!.distance { nearest = (index, distance) }
+            if cluster.isActive, nearestActive == nil || distance < nearestActive!.distance { nearestActive = (index, distance) }
         }
-        if let nearest, nearest.distance <= threshold || speakerCount >= maxSpeakers {
-            clusters[nearest.index].absorb(print)
-            return remember(clusters[nearest.index].speaker, for: source)
+        let within = nearest.flatMap { $0.distance <= limit(for: embedding.kind) ? $0 : nil }
+        if let chosen = within ?? (speakerCount >= maxSpeakers ? nearestActive : nil) {
+            clusters[chosen.index].absorb(embedding)
+            if !clusters[chosen.index].isActive {
+                clusters[chosen.index].isActive = true
+                speakerCount = clusters.filter(\.isActive).count
+            }
+            return remember(clusters[chosen.index].speaker, for: source)
         }
 
         let speaker: ScribeSpeaker
-        if source == .microphone, !clusters.contains(where: { $0.source == .microphone }) {
+        if source == .microphone, !clusters.contains(where: { $0.source == .microphone && $0.isActive }) {
             speaker = .you
         } else {
             speaker = .participant("Speaker \(nextParticipant)")
             nextParticipant += 1
         }
-        clusters.append(Cluster(source: source, speaker: speaker, print: print))
-        speakerCount = clusters.count
+        clusters.append(Cluster(source: source, speaker: speaker, embedding: embedding))
+        speakerCount = clusters.filter(\.isActive).count
         return remember(speaker, for: source)
     }
 
     /// Who this audio sounds like, without learning from it: the nearest existing cluster of the source when it
-    /// is within `threshold`, otherwise nil (no usable voiceprint, no clusters yet, or a voice not heard before).
+    /// is within threshold, otherwise nil (no usable embedding, no clusters yet, or a voice not heard before).
     /// Never creates a cluster, moves a centroid or changes the remembered speaker, so a rolling preview of a
-    /// turn can be classified again and again without skewing the finals.
+    /// turn can be classified again and again without skewing the finals. A matching seed answers with its name.
     public func classify(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker? {
-        guard let print = ScribeVoiceprint.make(samples: samples) else { return nil }
+        classify(source: source, embedding: .handBuilt(samples: samples))
+    }
+
+    public func classify(source: ScribeAudioSource, embedding: ScribeVoiceEmbedding?) -> ScribeSpeaker? {
+        guard let embedding else { return nil }
         var nearest: (speaker: ScribeSpeaker, distance: Float)?
-        for cluster in clusters where cluster.source == source {
-            let distance = cluster.voiceprint.distance(to: print)
+        for cluster in clusters where cluster.serves(source) && cluster.kind == embedding.kind {
+            let distance = cluster.centroid.distance(to: embedding)
             if nearest == nil || distance < nearest!.distance { nearest = (cluster.speaker, distance) }
         }
-        guard let nearest, nearest.distance <= threshold else { return nil }
+        guard let nearest, nearest.distance <= limit(for: embedding.kind) else { return nil }
         return nearest.speaker
     }
 
-    /// Forget everyone (a new meeting).
+    /// Forget everyone (a new meeting). Seeds go too: seed again for the next meeting.
     public mutating func reset() {
         clusters.removeAll()
         speakerCount = 0

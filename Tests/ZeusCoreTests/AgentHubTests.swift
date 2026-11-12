@@ -148,7 +148,7 @@ struct NewChatTests {
     @Test func offeredAgentsFollowTheIntegrationToggles() {
         #expect(NewChatAgents.offered(claude: true, codex: true, installed: []) == [.claude, .codex])
         #expect(NewChatAgents.offered(claude: false, codex: true, installed: [.gemini, .cursorAgent]) == [.codex, .gemini, .cursorAgent])
-        #expect(NewChatAgents.offered(claude: false, codex: false, installed: []) == [.claude])
+        #expect(NewChatAgents.offered(claude: false, codex: false, installed: []).isEmpty)
     }
 
     @Test func defaultAgentMustBeOffered() {

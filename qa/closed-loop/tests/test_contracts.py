@@ -6,6 +6,8 @@ import sys
 import tempfile
 import subprocess
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import contracts as c
@@ -40,9 +42,15 @@ class MatrixContractTests(unittest.TestCase):
                 c.validate_map(data, self.portable)
 
     def test_every_feature_keeps_all_three_evidence_tiers(self):
-        self.data["features"][0]["obligations"].pop()
-        with self.assertRaises(c.Invalid):
-            c.validate_map(self.data, self.portable)
+        checks = {check["id"]: check for check in self.data["checks"]}
+        for index, feature in enumerate(self.data["features"]):
+            for tier in ("contract", "native-integration", "device-proof"):
+                with self.subTest(feature=feature["id"], missing_tier=tier):
+                    data = copy.deepcopy(self.data)
+                    data["features"][index]["obligations"] = [
+                        row for row in feature["obligations"] if checks[row["check"]]["tier"] != tier]
+                    with self.assertRaisesRegex(c.Invalid, feature["id"] + " needs contract, native integration, and device proof"):
+                        c.validate_map(data, self.portable)
 
     def test_missing_native_suite_and_missing_case_are_errors(self):
         data = copy.deepcopy(self.data)
@@ -80,6 +88,67 @@ class MatrixContractTests(unittest.TestCase):
         results = c.evaluate_features(self.data, checks, Path("/tmp"))
         self.assertTrue(all(row["status"] == "incomplete" for row in results))
         self.assertTrue(any(o["status"] == "not-run" for row in results for o in row["obligations"]))
+
+
+class TrustedNativeFixtureTests(unittest.TestCase):
+    ID = "device-ScribeTrustedAccessibilityJourneyTests"
+
+    def setUp(self):
+        self.data = c.load(c.ROOT / "qa/feature-map.json")
+        self.portable = runner.portable_module()
+
+    def trusted(self, data=None):
+        return next(row for row in (data or self.data)["checks"] if row["id"] == self.ID)
+
+    def test_ax_journey_is_bound_to_the_trusted_kind_and_regressions_stay_executable(self):
+        checks = c.validate_map(self.data, self.portable)
+        self.assertEqual((checks[self.ID]["kind"], checks[self.ID]["tier"]), ("trusted-native-fixture", "device-proof"))
+        ledger = c.validate_registry(c.load(c.ROOT / "qa/regressions.json"), checks)
+        self.assertEqual({row["id"] for row in ledger if row["check"] == self.ID}, {"REG-046", "REG-140"})
+
+    def test_trusted_kind_is_never_selected_by_the_ci_app_job(self):
+        import gate
+        import native_evidence as native
+        checks = c.validate_map(self.data, self.portable)
+        self.assertNotIn("trusted-native-fixture", native.NATIVE_KINDS)
+        self.assertNotIn("ScribeTrustedAccessibilityJourneyTests", gate.native_filter())
+        selection = [row for row in checks.values() if row["kind"] in native.NATIVE_KINDS]
+        self.assertFalse(any(native.selected("ZeusAppTests.ScribeTrustedAccessibilityJourneyTests/x()/F.swift:1:1", [row])
+                             for row in selection))
+        with self.assertRaises(c.Invalid):
+            native.partitions(selection + [checks[self.ID]])
+
+    def test_trusted_kind_keeps_native_fixture_field_and_tier_rules(self):
+        for change in (lambda row: row.update(tier="native-integration"), lambda row: row.update(extra="x"),
+                       lambda row: row.update(suite="InventedTests"), lambda row: row.pop("file"),
+                       lambda row: row.update(file="Tests/ZeusCoreTests/ScribeTests.swift")):
+            data = copy.deepcopy(self.data)
+            change(self.trusted(data))
+            with self.subTest(change=change), self.assertRaises(c.Invalid):
+                c.validate_map(data, self.portable)
+
+    def test_trusted_obligation_cases_and_guards_must_live_in_its_file(self):
+        data = copy.deepcopy(self.data)
+        obligation = next(o for f in data["features"] for o in f["obligations"] if o["check"] == self.ID)
+        obligation["cases"][0]["file"] = "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift" \
+            if obligation["cases"][0]["file"] != "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift" else "Tests/ZeusAppTests/OwnedWindowEventDriver.swift"
+        with self.assertRaises(c.Invalid):
+            c.validate_map(data, self.portable)
+        checks = c.validate_map(self.data, self.portable)
+        ledger = c.load(c.ROOT / "qa/regressions.json")
+        row = next(r for r in ledger["regressions"] if r["check"] == self.ID)
+        row["guard"]["file"] = "qa/closed-loop/tests/test_gate.py"
+        row["guard"]["function"] = "test_complete_current_revision_evidence_passes"
+        with self.assertRaises(c.Invalid):
+            c.validate_registry(ledger, checks)
+
+    def test_runner_reports_not_run_in_development_and_blocked_in_full_without_executing(self):
+        definition = self.trusted()
+        for mode, status in (("development", "not-run"), ("full", "blocked")):
+            with self.subTest(mode=mode), patch.object(runner, "execute", side_effect=AssertionError("must not execute")):
+                row = runner.run_check(definition, SimpleNamespace(mode=mode, jobs=1, timeout=1), Path("/nonexistent"), None)
+                self.assertEqual((row["status"], row["command"], row["exit_code"], row["artifacts"]), (status, [], None, []))
+                self.assertTrue(row["reason"])
 
 
 class EvidenceContractTests(unittest.TestCase):
@@ -193,6 +262,40 @@ class EvidenceContractTests(unittest.TestCase):
             source.write_text("let value = 2\n")
             self.assertNotEqual(c.source_snapshot(root, output), before)
 
+    def test_output_root_alias_does_not_make_receipt_an_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "actual"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "Sources").mkdir()
+            (root / "Sources/fixture.swift").write_text("let value = 1\n")
+            (root / "output").mkdir()
+            alias = base / "alias"
+            alias.symlink_to(root, target_is_directory=True)
+            before = c.source_snapshot(alias, alias / "output")
+            (root / "output/result.json").write_text("{}")
+            self.assertEqual(c.source_snapshot(alias, alias / "output"), before)
+            self.assertEqual(c.source_snapshot(root, root / "output"), before)
+
+    def test_portable_package_uses_the_production_macos_floor(self):
+        portable = runner.portable_module()
+        production = (c.ROOT / "Package.swift").read_text()
+        self.assertIn('platforms: [.macOS("14.2")]', production)
+        with tempfile.TemporaryDirectory() as directory:
+            package = portable.prepare(Path(directory), "polyglot", platform_name="darwin")
+            self.assertIn('platforms: [.macOS("14.2")]', (package / "Package.swift").read_text())
+
+    def test_mac_geometry_excerpts_preserve_their_required_framework_import(self):
+        portable = runner.portable_module()
+        for group, original in [("presentation", "Mac/AXSnapshot.swift"),
+                                ("recordly-geometry", "Present/CompanionMotion.swift")]:
+            with self.subTest(group=group), tempfile.TemporaryDirectory() as directory:
+                self.assertIn("import CoreGraphics", (c.ROOT / "Sources/ZeusCore" / original).read_text())
+                package = portable.prepare(Path(directory), group, platform_name="darwin")
+                self.assertTrue((package / "Sources/ZeusCore/PortableExcerpts.swift").read_text().startswith("import Foundation\nimport CoreGraphics\n"))
+                self.assertEqual(c.load(package / "validation-manifest.json")["excerpt_imports"], ["Foundation", "CoreGraphics"])
+
     def test_duplicate_json_keys_cannot_overwrite_failure_with_success(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "receipt.json"
@@ -211,6 +314,96 @@ class EvidenceContractTests(unittest.TestCase):
             code, _ = runner.execute(["/zeus/no-such-executable"], log, 1)
             self.assertEqual(code, 127)
             self.assertIn("COULD NOT START", log.read_text())
+
+
+class NativeBuildBarrierTests(unittest.TestCase):
+    def definitions(self):
+        return [{"id": "native-" + name, "kind": "native-fixture", "tier": "native-integration",
+                 "scope": "Synthetic runner control-flow fixture only.", "suite": name,
+                 "file": "Tests/ZeusAppTests/" + name + ".swift"} for name in ["FirstTests", "SecondTests", "ThirdTests"]]
+
+    def run_matrix(self, output, build_code=0, failed_suite=None):
+        commands = []
+        def execute(command, log, timeout, environment=None):
+            commands.append(command)
+            if command[1] == "build":
+                log.write_text("error: synthetic compiler failure\n" if build_code else "Build complete! (0.1s)\n")
+                return build_code, 0.1
+            if failed_suite and any(failed_suite in argument for argument in command):
+                log.write_text("✘ Test syntheticCase() recorded an issue: expected value\n")
+                return 1, 0.1
+            log.write_text("✔ Test syntheticCase() passed after 0.1 seconds.\n✔ Test run with 1 test in 1 suite passed after 0.1 seconds.\n")
+            if "--event-stream-output-path" in command:
+                Path(command[command.index("--event-stream-output-path") + 1]).write_text("{}\n")
+            return 0, 0.1
+        result = {"checks": [], "source_snapshot_sha256": "a" * 64}
+        with patch.object(runner.platform, "system", return_value="Darwin"), \
+             patch.object(runner, "snapshot", return_value={"sha256": "a" * 64}), \
+             patch.object(runner, "execute", side_effect=execute), patch("builtins.print"), \
+             patch.object(runner, "discover_native", return_value={"status": "passed"}), \
+             patch.object(runner.native, "validate_discovery_receipt", return_value={}), \
+             patch.object(runner.native, "execution", return_value={"tests": 1, "suites": 1, "parameter_cases": 0,
+                          "passed_cases": [{"file": "synthetic", "function": "syntheticCase"}]}):
+            runner.run_checks(self.definitions(), SimpleNamespace(mode="full", jobs=2, timeout=10), output, None, result)
+        return result, commands
+
+    def test_failed_common_build_blocks_every_native_suite_without_executing_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, commands = self.run_matrix(Path(directory), build_code=1)
+            self.assertEqual(commands, [["swift", "build", "--build-tests", "--jobs", "2"]])
+            self.assertEqual(result["native_build"]["status"], "failed")
+            self.assertEqual(len(result["checks"]), 3)
+            for check in result["checks"]:
+                self.assertEqual((check["status"], check["blocker"], check["command"], check["tests"], check["artifacts"]),
+                                 ("blocked", "native-build", [], 0, []))
+            self.assertTrue((Path(directory) / "native-build/build.log").read_text().startswith("error:"))
+
+    def test_one_runtime_failure_keeps_its_failure_and_runs_remaining_suites(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, commands = self.run_matrix(Path(directory), failed_suite="SecondTests")
+            self.assertEqual(len(commands), 4)
+            self.assertEqual(result["native_build"]["status"], "passed")
+            self.assertEqual([c["status"] for c in result["checks"]], ["passed", "failed", "passed"])
+            self.assertEqual(["--skip-build" in command for command in commands], [False, True, True, True])
+            self.assertNotIn("blocker", result["checks"][1])
+
+    def test_native_artifacts_allow_an_aliased_output_root_but_reject_redirected_children(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve()
+            actual, alias = parent / "actual", parent / "alias"
+            actual.mkdir()
+            alias.symlink_to(actual, target_is_directory=True)
+            result, _ = self.run_matrix(alias)
+            self.assertEqual([row["status"] for row in result["checks"]], ["passed"] * 3)
+            self.assertTrue(all(row["artifacts"] for row in result["checks"]))
+            (actual / "redirected").symlink_to(actual / "native-FirstTests", target_is_directory=True)
+            with self.assertRaises(c.Invalid):
+                runner.artifact(alias / "redirected/test.log", alias)
+            (actual / "linked.log").symlink_to(actual / "native-FirstTests/test.log")
+            with self.assertRaises(c.Invalid):
+                runner.artifact(alias / "linked.log", alias)
+
+    def test_changed_source_after_compilation_cannot_execute_skip_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            result, _ = self.run_matrix(output)
+            with patch.object(runner.platform, "system", return_value="Darwin"), \
+                 patch.object(runner, "snapshot", return_value={"sha256": "b" * 64}), \
+                 patch.object(runner, "execute") as execute:
+                row = runner.run_check({**self.definitions()[0], "id": "native-Changed"},
+                                       SimpleNamespace(mode="full", jobs=2, timeout=10), output, None, result["native_build"])
+            execute.assert_not_called()
+            self.assertEqual((row["status"], row["blocker"], row["command"]), ("blocked", "native-build", []))
+
+    def test_development_or_linux_never_attempts_a_native_build(self):
+        for mode, host in [("development", "Darwin"), ("full", "Linux")]:
+            with self.subTest(mode=mode, host=host), tempfile.TemporaryDirectory() as directory:
+                result = {"checks": [], "source_snapshot_sha256": "a" * 64}
+                with patch.object(runner.platform, "system", return_value=host), patch.object(runner, "execute") as execute:
+                    runner.run_checks(self.definitions(), SimpleNamespace(mode=mode, jobs=2, timeout=10), Path(directory), None, result)
+                execute.assert_not_called()
+                self.assertNotIn("native_build", result)
+                self.assertEqual({r["status"] for r in result["checks"]}, {"not-run" if mode == "development" else "blocked"})
 
 
 if __name__ == "__main__":

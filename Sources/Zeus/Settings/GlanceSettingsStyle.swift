@@ -21,6 +21,11 @@ enum GS {
     static let selectedText = Color(rgb: 128, 178, 249)
     static let buttonFill = Color(rgb: 20, 22, 27)
     static let buttonStroke = Color(rgb: 48, 50, 54)
+    /// Secondary buttons and chips on dark surfaces: a lifted fill and a rim that reads on cards
+    /// (3:1 against the card), with label text above 4.5:1. Use these, not buttonFill, for controls.
+    static let controlFill = Color(rgb: 54, 57, 66)
+    static let controlStroke = Color(rgb: 104, 109, 122)
+    static let controlText = Color(rgb: 232, 235, 242)
     static let toggleOff = Color(rgb: 89, 91, 97)
     static let knob = Color(rgb: 230, 231, 232)
 
@@ -120,6 +125,28 @@ struct GSToggleRow: View {
     }
 }
 
+/// "Set in <Page>": the small link-row that replaces a duplicate control. Each control keeps one home;
+/// every other page points to it.
+struct GSLinkRow: View {
+    let symbol: String?
+    let title: String
+    var text: String? = nil
+    let destination: GSSection
+    let navigation: GSNavigation
+    var body: some View {
+        GSRow(symbol: symbol, title: title, text: text) {
+            Button { navigation.section = destination } label: {
+                HStack(spacing: 6) {
+                    Text("Set in \(destination.title)")
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                }
+            }
+            .buttonStyle(GSButtonStyle())
+            .accessibilityLabel("\(title): set in \(destination.title)")
+        }
+    }
+}
+
 struct GSDivider: View {
     var body: some View { Rectangle().fill(GS.separator).frame(height: 1) }
 }
@@ -144,20 +171,63 @@ struct GSInfo: View {
     }
 }
 
-/// Dark outlined action ("Check for updates": 138 x 34, radius 10).
+/// A calm empty state for a list that has nothing yet: what it is for and what fills it.
+struct GSEmptyState: View {
+    let symbol: String
+    let title: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 20, weight: .regular)).foregroundStyle(GS.secondary)
+                .frame(width: 28).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(GS.rowTitle).foregroundStyle(GS.text)
+                Text(text).font(GS.rowText).foregroundStyle(GS.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 16)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Technical detail kept out of the way: a plain-words row stays visible and the file names, commands
+/// and mechanisms live behind "Details".
+struct GSDetails: View {
+    let text: String
+    var label = "Details"
+    var body: some View {
+        DisclosureGroup {
+            Text(text).font(GS.rowText).foregroundStyle(GS.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+                .padding(.top, 6)
+        } label: {
+            Text(label).font(OB.font(13, .semibold)).foregroundStyle(GS.controlText)
+        }
+        .tint(GS.controlText)
+        .padding(.vertical, 10)
+    }
+}
+
+/// Outlined action ("Check for updates": 138 x 34, radius 10). Secondary buttons use the lifted control
+/// tokens so they stay readable on dark cards; `prominent` is the single primary action of a row.
 struct GSButtonStyle: ButtonStyle {
     var prominent = false
+    @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(OB.font(14, .semibold))
-            .foregroundStyle(prominent ? Color.white : GS.text)
+            .foregroundStyle(prominent ? Color.white : GS.controlText)
             .lineLimit(1)
             .fixedSize() // a button label never wraps ("Remo / ve"); the row gives way instead
             .padding(.horizontal, 14)
-            .frame(height: 34)
+            .frame(minHeight: 34)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(prominent ? OB.blue : GS.buttonFill).opacity(configuration.isPressed ? 0.75 : 1))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(prominent ? .clear : GS.buttonStroke, lineWidth: 1))
+                .fill(prominent ? OB.controlAccentFill : GS.controlFill).opacity(configuration.isPressed ? 0.75 : 1))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(prominent ? .clear : GS.controlStroke, lineWidth: 1))
+            .opacity(isEnabled ? 1 : 0.5)
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

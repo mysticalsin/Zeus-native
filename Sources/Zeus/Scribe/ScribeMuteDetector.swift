@@ -4,11 +4,11 @@ import ZeusCore
 
 /// Reads whether the person's microphone is muted, and keeps the history of those readings.
 ///
-/// Positive evidence only (see `ScribeMuteResolver`): the microphone is admitted only when the default input
-/// device isn't muted AND a complete scan finds no external microphone owner. Idle call apps and idle browsers
-/// do not count as calls. Unidentified active inputs fail closed. There is no Accessibility reading and no per-app mute check: any call
-/// means `.unknown`. Anything unreadable, incomplete or stale is `.unknown` too, and the microphone is dropped
-/// before storage and ASR (system audio is unaffected).
+/// The person's own mute decides (see `ScribeMuteResolver`): the microphone is admitted while the default input
+/// device isn't muted. Another app using the microphone (a call, a browser, an app Zeus can't identify) never
+/// withholds it, and nothing stays set after that app lets go. An unreadable device or stale evidence is
+/// `.unknown`, and the microphone is dropped before storage and ASR (system audio is unaffected).
+/// Whether another app is using the microphone is still recorded per reading, for the "shared" note only.
 ///
 /// Two consumers share one monitor:
 /// - the capture drain asks `coverage(start:seconds:)` for each microphone sample interval, against the history
@@ -18,14 +18,13 @@ import ZeusCore
 final class ScribeMuteMonitor: @unchecked Sendable {
     let ingress: ScribeMicrophoneIngress
     private let lock = NSLock()
-    // Concurrent: a read stalled in CoreAudio or the window list must not queue the watchdog's replacement read behind it.
-    private let queue = DispatchQueue(label: "zeus.scribe.mute", qos: .userInitiated, attributes: .concurrent)
+    // One replacement can bypass a stalled scan. Further refreshes wait for an actual free slot.
+    private let reads = ScribeMuteReadScheduler()
     private let refreshInterval: TimeInterval
     private let timeToLive: TimeInterval
     private let refreshWatchdog: TimeInterval
     private var evidence: ScribeMuteEvidence?
     private var timeline: ScribeMuteTimeline
-    private var refreshStartedAt: TimeInterval?
 
     init(
         refreshInterval: TimeInterval = 0.5,
@@ -49,14 +48,13 @@ final class ScribeMuteMonitor: @unchecked Sendable {
     /// Whether a microphone sample interval (`ScribeHostClock` seconds) lies fully inside fresh unmuted evidence.
     /// A nil `start` (capture time unknown) is never admitted.
     func coverage(start: TimeInterval?, seconds: TimeInterval) -> ScribeMicCoverage {
-        if ingress.hasExternalInput { return .dropped(.unknown) }
-        return lock.withLock { timeline.coverage(start: start, seconds: seconds) }
+        lock.withLock { timeline.coverage(start: start, seconds: seconds) }
     }
 
-    /// Whether call evidence (a known call app or browser using the microphone) was present for this interval,
-    /// even if the microphone was dropped as muted or unknown for another reason.
-    func callDetected(start: TimeInterval?, seconds: TimeInterval) -> Bool {
-        ingress.hasExternalInput || lock.withLock { timeline.callDetected(start: start, seconds: seconds) }
+    /// Whether another app (a call app, a browser or any other process) was using the microphone for this
+    /// interval, by the newest reading taken by then. Follows the readings: false again once that app lets go.
+    func otherAppUsingMicrophone(start: TimeInterval?, seconds: TimeInterval) -> Bool {
+        lock.withLock { timeline.callDetected(start: start, seconds: seconds) }
     }
 
     func refreshIfNeeded() {
@@ -64,41 +62,30 @@ final class ScribeMuteMonitor: @unchecked Sendable {
     }
 
     private func refreshIfNeeded(now: TimeInterval) {
-        let start = lock.withLock { () -> Bool in
-            let begin = ScribeMuteRefreshPolicy.shouldStart(
-                now: now,
-                evidenceTakenAt: evidence?.takenAt,
-                inFlightSince: refreshStartedAt,
-                interval: refreshInterval,
-                watchdog: refreshWatchdog
-            )
-            if begin { refreshStartedAt = now }
-            return begin
-        }
-        guard start else { return }
-        queue.async { [self] in
+        let takenAt = lock.withLock { evidence?.takenAt }
+        reads.schedule(now: now, evidenceTakenAt: takenAt, interval: refreshInterval,
+                       watchdog: refreshWatchdog) { [self] in
             let reading = Self.read()
             let finished = ScribeHostClock.now()
-            ingress.record(state: reading.state, readStart: now, readEnd: finished,
-                           externalInputDetected: reading.externalInputDetected || reading.callDetected)
+            ingress.record(state: reading.state, readStart: now, readEnd: finished)
+            let shared = reading.callDetected || reading.externalInputDetected
             lock.withLock {
                 // Every reading joins the history; a late one never replaces fresher cached evidence.
-                timeline.record(state: reading.state, readStart: now, readEnd: finished, callDetected: reading.callDetected)
+                timeline.record(state: reading.state, readStart: now, readEnd: finished, callDetected: shared)
                 if (evidence?.takenAt ?? -.infinity) <= now {
                     evidence = ScribeMuteEvidence(state: reading.state, takenAt: now)
                 }
-                if refreshStartedAt == now { refreshStartedAt = nil }
             }
         }
     }
 
-    /// One full reading. Runs off the audio thread. The scan always runs, so `callDetected` (call evidence:
-    /// a microphone-using call app, browser call window or doubt) is collected whatever the device mute state and
-    /// whether or not every process was readable. Admission rules are unchanged and still fail closed.
+    /// One full reading. Runs off the audio thread. Admission comes from the device's mute switch alone; the scan
+    /// only says whether another app is using the microphone (`callDetected`: a call app, a browser call window or
+    /// doubt; `externalInputDetected`: any other process capturing input).
     static func read() -> (state: ScribeMuteState, callDetected: Bool, externalInputDetected: Bool) {
         let device = ScribeInputDevice.state()
         let scan = ScribeCallProbe.scan()
-        let sample = ScribeMuteResolver.sample(device: device, scan: scan.inputScan, callPresent: scan.callPresent)
+        let sample = ScribeMuteResolver.sample(device: device, callPresent: scan.callPresent)
         return (sample.admission, sample.callPresent, scan.externalInputDetected)
     }
 }

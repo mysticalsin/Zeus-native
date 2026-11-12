@@ -157,11 +157,11 @@ struct BrowserAgentLoopTests {
 
     @Test func approvalRequiredOps() {
         let buy = shop.element(3), link = shop.element(2), search = shop.element(1)
-        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 3), element: buy) == "it may buy something")
-        #expect(BrowserAgentSafety.approvalReason(for: .type(index: 1, text: "x", submit: true), element: search) == "it submits a form")
-        #expect(BrowserAgentSafety.approvalReason(for: .type(index: 1, text: "x", submit: false), element: search) == nil)
-        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 2), element: link) == nil)
-        #expect(BrowserAgentSafety.approvalReason(for: .scroll(.down), element: nil) == nil)
+        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 3), element: buy, alwaysAsk: []) == "it may buy something")
+        #expect(BrowserAgentSafety.approvalReason(for: .type(index: 1, text: "x", submit: true), element: search, alwaysAsk: []) == "it submits a form")
+        #expect(BrowserAgentSafety.approvalReason(for: .type(index: 1, text: "x", submit: false), element: search, alwaysAsk: []) == nil)
+        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 2), element: link, alwaysAsk: []) == nil)
+        #expect(BrowserAgentSafety.approvalReason(for: .scroll(.down), element: nil, alwaysAsk: []) == nil)
         let cases: [(String, String)] = [
             ("Send", "it sends something"), ("Post", "it posts something"), ("Delete account", "it deletes something"),
             ("Place order", "it may buy something"), ("Book now", "it may book something"), ("Submit", "it submits a form"),
@@ -169,12 +169,12 @@ struct BrowserAgentLoopTests {
         ]
         for (label, reason) in cases {
             let element = PageElement(index: 1, role: "button", text: label)
-            #expect(BrowserAgentSafety.approvalReason(for: .click(index: 1), element: element) == reason, "\(label)")
+            #expect(BrowserAgentSafety.approvalReason(for: .click(index: 1), element: element, alwaysAsk: []) == reason, "\(label)")
         }
         // Whole words only: "Repost settings" and "Facebook" are not posting or booking.
-        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 1), element: PageElement(index: 1, role: "link", text: "Facebook")) == nil)
+        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 1), element: PageElement(index: 1, role: "link", text: "Facebook"), alwaysAsk: []) == nil)
         // The link's path counts too.
-        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 1), element: PageElement(index: 1, role: "link", text: "Next", href: "/checkout/start")) != nil)
+        #expect(BrowserAgentSafety.approvalReason(for: .click(index: 1), element: PageElement(index: 1, role: "link", text: "Next", href: "/checkout/start"), alwaysAsk: []) != nil)
     }
 
     @Test func passwordAndCardFieldsAreRefused() {
@@ -350,13 +350,22 @@ struct BrowserAgentLoopTests {
 
     // MARK: Brain launch
 
+    @Test func brainLaunchUsesOnlyInjectedModelPreferences() {
+        let suite = "zeus.browserAgent.model-fixture.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("gemini-fixture-flash", forKey: "modelCap.gemini.fast")
+        #expect(BrowserAgentBrainLaunch.arguments(engine: .gemini, prompt: "p", defaults: defaults)
+            == ["-m", "gemini-fixture-flash", "-p", "p"])
+    }
+
     @Test func everyStepIsPinnedToTheFastTier() {
         let defaults = UserDefaults(suiteName: "zeus.browserAgent.\(UUID().uuidString)")!
         let claude = BrowserAgentBrainLaunch.arguments(engine: .claude, prompt: "p", defaults: defaults)
         #expect(claude.starts(with: ["--model", "haiku", "-p", "p"]))
         #expect(claude.contains("--strict-mcp-config"))
-        #expect(BrowserAgentBrainLaunch.arguments(engine: .gemini, prompt: "p").contains("-p"))
-        #expect(BrowserAgentBrainLaunch.arguments(engine: .codex, prompt: "p").contains(#"model_reasoning_effort="low""#))
+        #expect(BrowserAgentBrainLaunch.arguments(engine: .gemini, prompt: "p", defaults: defaults).contains("-p"))
+        #expect(BrowserAgentBrainLaunch.arguments(engine: .codex, prompt: "p", defaults: defaults).contains(#"model_reasoning_effort="low""#))
         #expect(!claude.contains { $0.lowercased().contains("opus") })
     }
 }

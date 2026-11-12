@@ -7,13 +7,19 @@ import ZeusCore
 @MainActor
 final class ScribeEndWindow {
     static let shared = ScribeEndWindow()
-    private var panel: NSPanel?
+    private(set) var panel: NSPanel?
+    private let journeyRegistry: OwnedWindowControlRegistry?
+
+    init(journeyRegistry: OwnedWindowControlRegistry? = nil) {
+        self.journeyRegistry = journeyRegistry
+    }
 
     func present(scribe: ScribeController) {
         if let panel { panel.orderFrontRegardless(); return }
         let panel = EndPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 240),
                              styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        panel.contentView = NSHostingView(rootView: ScribeEndWindowView(scribe: scribe))
+        panel.contentView = NSHostingView(rootView: ScribeEndWindowView(scribe: scribe, dismiss: { [weak self] in self?.hide() })
+            .environment(\.ownedWindowControlRegistry, journeyRegistry))
         panel.level = .statusBar
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
@@ -33,6 +39,14 @@ final class ScribeEndWindow {
 
     func hide() { panel?.orderOut(nil) }
 
+    /// Release the hosted controller as well as the native window. Isolated hosts use this at teardown;
+    /// merely hiding/closing an NSPanel leaves its content view retained.
+    func close() {
+        panel?.contentView = nil
+        panel?.close()
+        panel = nil
+    }
+
     private final class EndPanel: NSPanel {
         override var canBecomeKey: Bool { true }
         override var canBecomeMain: Bool { false }
@@ -41,6 +55,7 @@ final class ScribeEndWindow {
 
 private struct ScribeEndWindowView: View {
     let scribe: ScribeController
+    let dismiss: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -49,10 +64,11 @@ private struct ScribeEndWindowView: View {
                 Label("Meetings", systemImage: "waveform.and.mic")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Button { ScribeEndWindow.shared.hide() } label: { Image(systemName: "xmark") }
+                Button(action: dismiss) { Image(systemName: "xmark") }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Hide meeting window")
                     .accessibilityHint("The current recording or save operation continues.")
+                    .ownedJourneyControl("scribe.endWindow.hide")
             }
             content
             Spacer(minLength: 0)
@@ -77,7 +93,9 @@ private struct ScribeEndWindowView: View {
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             HStack {
                 Button("End meeting now") { scribe.confirmEnd() }.buttonStyle(.borderedProminent)
+                    .ownedJourneyControl("scribe.endWindow.endNow")
                 Button("Keep recording") { scribe.keepRecording() }.buttonStyle(.bordered)
+                    .ownedJourneyControl("scribe.endWindow.keep")
             }
             .disabled(scribe.endStopRequested)
         case .processing:
@@ -86,6 +104,7 @@ private struct ScribeEndWindowView: View {
                     .font(.system(size: 17, weight: .semibold)).accessibilityAddTraits(.isHeader)
                 Text(issue).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(4)
                 Button("Retry save") { scribe.retrySave(id) }.buttonStyle(.borderedProminent)
+                    .ownedJourneyControl("scribe.endWindow.retrySave")
             } else {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
@@ -105,11 +124,12 @@ private struct ScribeEndWindowView: View {
             Button("Open notes") {
                 guard let panel = NotchControllerBridge.controller, let topBar = panel.topBar,
                       scribe.openRecap(id) else { return }
-                ScribeEndWindow.shared.hide()
+                dismiss()
                 topBar.selectedTab = .scribe
                 panel.show(.panel)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("scribe.endWindow.openNotes")
         default:
             Text("Meeting recording").font(.system(size: 18, weight: .semibold))
         }

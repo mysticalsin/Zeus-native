@@ -298,6 +298,14 @@ import Testing
         #expect(MicConflict.counts(bundleID: "com.apple.FaceTime", pid: 600, ownPID: 100))
     }
 
+    @Test func micConflictCountsCallHelperProcessesAndOtherBrowsers() {
+        for helper in ["com.google.Chrome.helper", "com.apple.WebKit.GPU", "com.microsoft.teams2.helper",
+                       "com.microsoft.edgemac.helper", "org.mozilla.firefox", "company.thebrowser.Browser.helper"] {
+            #expect(MicConflict.counts(bundleID: helper, pid: 700, ownPID: 100), "\(helper) should pause Hey Zeus")
+        }
+        #expect(!MicConflict.counts(bundleID: "com.apple.universalaccessd", pid: 400, ownPID: 100))
+    }
+
     @Test func gateRules() {
         var gate = WakeGate()
         #expect(gate.pauseReason == "needs microphone and speech recognition")
@@ -422,10 +430,10 @@ import Testing
     }
 
     @Test func personaLinesNameTheThing() {
-        let line = AckLines.persona.line(.opening("Spotify")) ?? ""
+        let line = AckLines.persona(personality: .ultron).line(.opening("Spotify")) ?? ""
         #expect(!line.isEmpty)
-        #expect(AckLines.persona.line(.volume(.up)) == nil)
-        #expect(AckLines.persona.line(.timer(seconds: 300)) == "Timer set for 5 minutes.")
+        #expect(AckLines.persona(personality: .ultron).line(.volume(.up)) == nil)
+        #expect(AckLines.persona(personality: .ultron).line(.timer(seconds: 300)) == "Timer set for 5 minutes.")
     }
 
     @Test func plainTimerEndsWithoutABreakAndRestoresFocusLength() {

@@ -38,7 +38,7 @@ import Testing
 
     @Test func freshInstallDefaults() {
         let d = defaults()
-        #expect(ShortcutStore.loadTalk(d) == .optionCommand)
+        #expect(ShortcutStore.loadTalk(d) == .controlOption)
         #expect(ShortcutStore.loadDictation(d) == .rightCommand)
     }
 
@@ -51,11 +51,11 @@ import Testing
     }
 
     @Test func oldSavedKeysMigrate() {
-        // Tony's earlier build forced Right Command for talk and dictation: talk moves to Option+Command, dictation keeps it.
+        // Tony's earlier build forced Right Command for talk and dictation: talk moves to Control+Option, dictation keeps it.
         let forced = defaults()
         forced.set("rightCommand", forKey: "pushToTalk")
         forced.set("rightCommand", forKey: "dictation.key")
-        #expect(ShortcutStore.loadTalk(forced) == .optionCommand)
+        #expect(ShortcutStore.loadTalk(forced) == .controlOption)
         #expect(ShortcutStore.loadDictation(forced) == .rightCommand)
         // A deliberate other choice survives, and dictation "off" stays off.
         let chosen = defaults()
@@ -266,7 +266,9 @@ import Testing
         #expect(ShortcutConflicts.warnings(for: anyCommand, other: .rightCommand, otherName: "Dictation").contains { $0.contains("Overlaps") })
         #expect(ShortcutConflicts.warnings(for: .rightCommand, other: .rightCommand, otherName: "Dictation").contains { $0.contains("double-tap") })
         #expect(ShortcutConflicts.warnings(for: .optionCommand, other: .function, otherName: "Dictation").isEmpty)
-        #expect(ShortcutConflicts.warnings(for: .controlOption, other: nil, otherName: "").contains { $0.contains("VoiceOver") })
+        // Control+Option is the talk key: VoiceOver is mentioned only while VoiceOver is on.
+        #expect(ShortcutConflicts.warnings(for: .controlOption, other: nil, otherName: "").isEmpty)
+        #expect(ShortcutConflicts.warnings(for: .controlOption, other: nil, otherName: "", voiceOverOn: true).contains { $0.contains("VoiceOver") })
     }
 }
 

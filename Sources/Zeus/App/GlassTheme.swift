@@ -80,19 +80,40 @@ enum Glass {
 
 /// ZEUS's own SwiftPM resource bundle (avatar art, fonts), in the app or beside the binary.
 enum ZeusResources {
-    static let bundle: Bundle? = {
+    static var candidates: [URL] {
+        candidateURLs(resourceURL: Bundle.main.resourceURL, executableURL: Bundle.main.executableURL,
+            mainBundleURL: Bundle.main.bundleURL, moduleBundleURL: Bundle(for: ZeusResourceBundleAnchor.self).bundleURL)
+    }
+
+    /// SwiftPM puts the resource bundle beside its loaded .xctest bundle, not inside Contents/MacOS.
+    /// Only that explicit test-host shape gains a sibling candidate; installed app lookup stays contained.
+    static func candidateURLs(resourceURL: URL?, executableURL: URL?, mainBundleURL: URL,
+                              moduleBundleURL: URL) -> [URL] {
         let name = "Zeus_Zeus.bundle"
-        let candidates = [
-            Bundle.main.resourceURL?.appendingPathComponent(name),
-            Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(name),
-            Bundle.main.bundleURL.appendingPathComponent(name),
-        ].compactMap { $0 }
+        var urls = [resourceURL?.appendingPathComponent(name),
+                    executableURL?.deletingLastPathComponent().appendingPathComponent(name),
+                    mainBundleURL.appendingPathComponent(name)].compactMap { $0 }
+        for host in [mainBundleURL, moduleBundleURL] where host.pathExtension.lowercased() == "xctest" {
+            urls.append(host.deletingLastPathComponent().appendingPathComponent(name))
+        }
+        var seen = Set<URL>()
+        return urls.map(\.standardizedFileURL).filter { seen.insert($0).inserted }
+    }
+
+    static var lookupDescription: String {
+        "main=\(Bundle.main.bundleURL.path); module=\(Bundle(for: ZeusResourceBundleAnchor.self).bundleURL.path); candidates="
+            + candidates.map(\.path).joined(separator: ", ")
+    }
+
+    static let bundle: Bundle? = {
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
             if let bundle = Bundle(url: url) { return bundle }
         }
         return nil
     }()
 }
+
+private final class ZeusResourceBundleAnchor: NSObject {}
 
 enum GlassFonts {
     static let family = "Plus Jakarta Sans"

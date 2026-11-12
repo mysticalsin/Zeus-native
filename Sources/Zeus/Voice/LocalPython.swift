@@ -1,4 +1,5 @@
 import Foundation
+import ZeusCore
 
 /// A private Python environment under Application Support/Zeus/Python, shared by the local
 /// speech tools (faster-whisper, Kokoro). Zeus creates it once when the person asks, and never
@@ -25,28 +26,8 @@ enum LocalPython {
 
     @discardableResult
     static func run(_ launch: String, _ arguments: [String], input: Data? = nil, timeout: TimeInterval = 600) -> (status: Int32, output: String, error: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: launch)
-        process.arguments = arguments
-        let out = Pipe(), err = Pipe()
-        process.standardOutput = out
-        process.standardError = err
-        let inPipe = Pipe()
-        process.standardInput = inPipe
-        var collected = (Data(), Data())
-        let group = DispatchGroup()
-        do { try process.run() } catch { return (-1, "", error.localizedDescription) }
-        group.enter(); group.enter()
-        DispatchQueue.global().async { collected.0 = out.fileHandleForReading.readDataToEndOfFile(); group.leave() }
-        DispatchQueue.global().async { collected.1 = err.fileHandleForReading.readDataToEndOfFile(); group.leave() }
-        if let input { inPipe.fileHandleForWriting.write(input) }
-        try? inPipe.fileHandleForWriting.close()
-        let killer = DispatchWorkItem { if process.isRunning { process.terminate() } }
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-        process.waitUntilExit()
-        killer.cancel()
-        group.wait()
-        return (process.terminationStatus, String(decoding: collected.0, as: UTF8.self), String(decoding: collected.1, as: UTF8.self))
+        let result = BoundedSubprocess.run(launch, arguments, input: input, timeout: timeout)
+        return (result.status, result.output, result.error)
     }
 
     /// Creates the environment and installs `packages` into it. Blocking; call off the main thread.

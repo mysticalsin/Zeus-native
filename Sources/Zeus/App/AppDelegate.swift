@@ -38,16 +38,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var teleprompter: TeleprompterController!
     private let keepAwake = KeepAwake()
     private let chatWindow: ChatWindowController?
+    private var explanation: ExplanationController?
+    private var pointing: PointingController?
+    private var pointingProviders: PointingProviders?
+    private var pointingSettingsObserver: NSObjectProtocol?
+    private var explanationQuitToken: UUID?
+    private var explanationDeletionTasks: [UUID: Task<Void, Never>] = [:]
+    /// History UUID -> conversation UUID. Retained until exact deletion succeeds.
+    private var failedExplanationDeletions: [UUID: UUID] = [:]
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let chat = on(.chatWindow) ? ChatModel.shared : nil
+        chat?.retryVisualConversationLinks()
+        for (historyID, id) in failedExplanationDeletions where explanationDeletionTasks[historyID] == nil {
+            deleteExplanationHistory(id, historyID: historyID)
+        }
+        explanation?.beginClosing()
+        let pending = {
+            self.explanation?.hasUnsavedHistory == true || chat?.hasUnsavedVisualLinks == true
+                || !self.failedExplanationDeletions.isEmpty || !self.explanationDeletionTasks.isEmpty
+        }
+        guard pending() else { return .terminateNow }
+        guard explanationQuitToken == nil else { return .terminateLater }
+        let token = UUID(); explanationQuitToken = token
+        Task { @MainActor [weak self] in
+            await self?.explanation?.flushPendingSaves()
+            guard let self, self.explanationQuitToken == token else { return }
+            for deletion in Array(self.explanationDeletionTasks.values) { await deletion.value }
+            guard self.explanationQuitToken == token else { return }
+            chat?.retryVisualConversationLinks()
+            self.explanationQuitToken = nil
+            if pending() {
+                self.explanation?.resumeAfterCancelledQuit()
+                self.topBar.show(.hint("Zeus is waiting for explanation saves or deletions. Resolve the storage error before quitting."))
+            }
+            sender.reply(toApplicationShouldTerminate: !pending())
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, self.explanationQuitToken == token else { return }
+            self.explanationQuitToken = nil
+            self.explanation?.resumeAfterCancelledQuit()
+            self.topBar.show(.hint("Saving the explanation is taking longer than expected. Zeus stayed open to preserve it."))
+            sender.reply(toApplicationShouldTerminate: false)
+        }
+        return .terminateLater
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Quitting while Zeus listens or speaks must not leave the Mac's output at the lowered volume.
+        SystemAudioDucker.end()
+        explanation?.stop()
+        pointing?.stop()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
-        if on(.layaShutdown) { LayaHelper.shared.shutdown() }
         // A Memory edit typed inside its 600 ms pause is written before Zeus goes.
         if on(.panelUI) { WikiController.shared.flushEdit() }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Load the Keychain cache off the main thread early; every later read is a dictionary lookup.
+        Task.detached(priority: .userInitiated) { Keychain.store.load() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
             button.image = Brand.menuBarImage
@@ -101,6 +152,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             dictation.rewrite = { prompt in try await ClaudeRewriter.rewrite(prompt) }
             dictation.start()
+            // Continue language packs the owner chose earlier. Returns at once; installs run off the main actor.
+            LanguagePackController.shared.resumeOnLaunch()
         }
         // Teleprompter under the camera, hidden from screen shares while it runs.
         if on(.teleprompter) {
@@ -124,7 +177,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         topBar.openPermissions = { [weak self] in self?.showPermissions() }
         // Typed chat: one store behind the notch Chat tab and the floating window.
         if on(.chatBrain) { ChatModel.shared.brain = ClaudeCLIProvider() }
-        if on(.chatWindow) { ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() } }
+        if on(.chatWindow) {
+            ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() }
+            chatWindow?.makeExplanation = { [weak self] in self?.visualExplanation() }
+            chatWindow?.stopExplanation = { [weak self] in self?.explanation?.stop() }
+            ChatModel.shared.onDeleteConversation = { [weak self] id, historyID in
+                self?.deleteExplanationHistory(id, historyID: historyID)
+            }
+        }
         if on(.chatHotkey) { ChatHotkeyMonitor.shared.start { [weak self] in self?.chatWindow?.toggle() } }
         // Usage and limits from the agents' local logs; a cue when a limit gets close.
         if on(.usage) {
@@ -213,7 +273,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
+            // ⌃⌥Space, ⌃⌥C and other chords built on the talk keys cancel the hold instead of sending it.
+            hotkey.cancelsWhenSpoiled = true
+            hotkey.onCancel = { [weak self] in
+                WakeWordController.shared.talkKeyHeld = false
+                self?.voice?.cancelListening()
+            }
             hotkey.start()
+        }
+        if on(.pointingHotkey) {
+            syncPointing()
+            // The setting can change while Zeus runs; the hold monitor starts or stops with it.
+            pointingSettingsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncPointing() }
+            }
         }
         if on(.polyglotHotkey) {
             PolyglotController.shared.onHint = { [weak self] text in self?.topBar.show(.hint(text)) }
@@ -246,11 +320,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // First launch: a short setup that asks for each permission with an explanation.
         // The demo never plays by itself; it's in the panel, the menu and the last setup step.
-        if on(.autoOnboarding), !OnboardingFlow.isCompleted || OnboardingParity.requestedStep != nil {
+        if on(.autoOnboarding), OnboardingProgress.opensAtLaunch(OnboardingFlow.launchProgress, explicitStepRequested: OnboardingParity.requestedStep != nil) {
             showOnboarding(restart: false)
         }
         if on(.demoArg), CommandLine.arguments.contains("--demo") { demo.play() }
         if on(.motionOpenArg) { motionOpenIfRequested() }
+        // An "Allow all" sweep that macOS interrupted (Screen Recording's Quit and Reopen) picks up where it
+        // stopped. Only a sweep the person started minutes ago resumes; nothing is asked twice.
+        if on(.settingsWindow) { permissionSweep.resumeIfSaved { [weak self] in self?.showPermissions() } }
     }
 
     private var sensitiveCueTask: Task<Void, Never>?
@@ -486,10 +563,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func talkKeyPressed() {
         guard on(.talkHotkey), voice != nil else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
         buddy.call()
         VoiceLog.log("key", "talk shortcut pressed (access \(VoicePermissions.access))")
+        NotificationCenter.default.post(name: Speaker.talkKeyPressed, object: nil)
         // First use asks once (macOS shows its prompt the first time only); a refusal gets the
         // notch cue with a button. While a prompt is up the key can't start a turn, so press again.
         guard VoicePermissions.access == .ready else {
@@ -501,6 +580,141 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         voice?.press()
+    }
+
+    /// Desktop pointing: on by default (`docs/FIRST-RUN-DEFAULTS.md`). Starting it only installs the key
+    /// listener (gated by the owner's own Accessibility/Input Monitoring grant); no capture and no
+    /// prompt happens until the keys are held, and a screenshot needs Screen Recording already granted.
+    private func syncPointing() {
+        guard on(.pointingHotkey) else { return }
+        syncDictationPreset()
+        if PointingSettings.enabled { pointingController().start() }
+        else if let pointing { pointing.stop(); self.pointing = nil; pointingProviders = nil }
+    }
+
+    /// The optional Fn+Control dictation key. Off by default; turning it off restores the previous key.
+    private func syncDictationPreset() {
+        let defaults = UserDefaults.standard
+        let current = Shortcut.stored(ShortcutStore.loadDictation(defaults))
+        guard let step = DictationFnControlPreset.next(wanted: PointingSettings.dictationFnControl, current: current,
+                                                       saved: defaults.string(forKey: DictationFnControlPreset.savedKey)) else { return }
+        let next: Shortcut? = Shortcut.parse(step.key)
+        guard next != nil || step.key == "off" else { return }
+        if let saved = step.saved { defaults.set(saved, forKey: DictationFnControlPreset.savedKey) }
+        else { defaults.removeObject(forKey: DictationFnControlPreset.savedKey) }
+        DictationSettings.shared.key = next
+    }
+
+    private func pointingController() -> PointingController {
+        if let pointing { return pointing }
+        let acquire: () throws -> Void = { [weak self] in
+            guard let self, !self.topBar.isDictating, self.voice?.isListening != true,
+                  !ScribeController.shared.phase.isActive,
+                  ![RecordlyController.Phase.starting, .recording, .stopping].contains(RecordlyController.shared.phase) else {
+                throw ExplanationMicrophoneError.busy
+            }
+            self.voice?.stopSpeaking()
+            WakeWordController.shared.talkKeyHeld = true
+            ExplanationAudioArbitration.onTakeover = { [weak self] in self?.pointing?.interrupt() }
+        }
+        let release = {
+            ExplanationAudioArbitration.onTakeover = nil
+            WakeWordController.shared.talkKeyHeld = false
+        }
+        let providers = PointingProviders(
+            anyLLM: { (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount)) },
+            localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) },
+            anyLLMComplete: { AIConnections.shared.anyLLM.isComplete })
+        // In memory only: a desktop session is never written to disk.
+        let controller = ExplanationController(provider: providers.model, speechProvider: providers.speech,
+            microphone: ExplanationMicrophone(acquire: acquire, release: release), acquireAudio: acquire, releaseAudio: release)
+        controller.localInput = dictation?.whisperKit
+        let marker = PointingController.Marker(
+            listen: { [weak self] in self?.buddy.listen() },
+            think: { [weak self] in self?.buddy.think() },
+            idle: { [weak self] in self?.buddy.idle() },
+            flight: { [weak self] point, label in self?.buddy.flight(to: point, label: label) != nil })
+        let pointing = PointingController(explanation: controller, marker: marker,
+            prepare: { await providers.prepareTurn() },
+            recordAudio: { providers.recordFirstAudio(secondsSinceRelease: $0) })
+        pointing.onNotice = { [weak self] notice in
+            switch notice {
+            case .hint(let text): self?.topBar.show(.hint(text))
+            case .permission(let text, let pane): self?.topBar.show(.permission(text, pane: pane))
+            }
+        }
+        pointing.hotkey.onUnavailable = { [weak self] in
+            self?.topBar.show(.permission("Pointing needs Input Monitoring or Accessibility to see the hold keys.", pane: "Privacy_ListenEvent"))
+        }
+        self.pointing = pointing; pointingProviders = providers
+        return pointing
+    }
+
+    private func visualExplanation() -> ExplanationController? {
+        guard on(.chatWindow), FeatureSettings.bool("explanation.enabled", default: false) else { return nil }
+        if let explanation { return explanation }
+        let acquire: () throws -> Void = { [weak self] in
+            guard let self, !self.topBar.isDictating, self.voice?.isListening != true,
+                  !ScribeController.shared.phase.isActive,
+                  ![RecordlyController.Phase.starting, .recording, .stopping].contains(RecordlyController.shared.phase) else {
+                throw ExplanationMicrophoneError.busy
+            }
+            self.voice?.stopSpeaking()
+            WakeWordController.shared.talkKeyHeld = true
+            ExplanationAudioArbitration.onTakeover = { [weak self] in self?.explanation?.stop() }
+        }
+        let release = {
+            ExplanationAudioArbitration.onTakeover = nil
+            WakeWordController.shared.talkKeyHeld = false
+        }
+        let provider = ExplanationHTTPProvider(configuration: {
+            (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount))
+        }, localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) })
+        let storeFactory: () throws -> ExplanationHistoryStore = {
+            guard let root = ExplanationHistoryStore.productionRootURL() else { throw CocoaError(.fileNoSuchFile) }
+            return try ExplanationHistoryStore(root: root)
+        }
+        let store = try? storeFactory()
+        let microphone = ExplanationMicrophone(acquire: acquire, release: release)
+        let controller = ExplanationController(provider: provider, speechProvider: SystemExplanationSpeechOutput(),
+            microphone: microphone, store: store, storeFactory: storeFactory, acquireAudio: acquire, releaseAudio: release)
+        controller.localInput = dictation?.whisperKit
+        controller.onSubmission = { [weak controller] text in
+            guard let history = controller?.history else { return }
+            ChatModel.shared.retainVisualConversation(title: text, explanationID: history.id,
+                                                     conversationID: history.canonicalScene.sessionID)
+        }
+        explanation = controller
+        return controller
+    }
+
+    private func deleteExplanationHistory(_ id: UUID, historyID: UUID) {
+        guard explanationDeletionTasks[historyID] == nil else { return }
+        // Admission is synchronous: delete→quit in the same run loop cannot
+        // outrun the asynchronous deletion task and silently retain the record.
+        failedExplanationDeletions[historyID] = id
+        explanationDeletionTasks[historyID] = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let removed: Bool
+            if let explanation = self.explanation { removed = await explanation.deleteConversation(id, expectedHistoryID: historyID) }
+            else if let root = ExplanationHistoryStore.productionRootURL(), let store = try? ExplanationHistoryStore(root: root) {
+                do {
+                    do { try await store.delete(id: historyID) }
+                    catch ExplanationHistoryStore.StoreError.notFound { /* Exact target is already absent. */ }
+                    let list: ExplanationHistoryStore.Listing?
+                    do { list = try await store.list() }
+                    catch ExplanationHistoryStore.StoreError.notFound { list = nil }
+                    for record in list?.records ?? [] where record.sessionID == id {
+                        do { try await store.delete(id: record.id) }
+                        catch ExplanationHistoryStore.StoreError.notFound { /* Already removed. */ }
+                    }
+                    removed = true
+                } catch { removed = false }
+            } else { removed = false }
+            if removed { self.failedExplanationDeletions[historyID] = nil }
+            else { self.topBar.show(.hint("Linked explanation history could not be deleted. Zeus will retry before quitting.")) }
+            self.explanationDeletionTasks[historyID] = nil
+        }
     }
 
     private func playDemo() {
@@ -538,8 +752,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Teleprompter Window", action: #selector(openPrompterFromMenu), keyEquivalent: "").target = self
         let stop = menu.addItem(withTitle: "Stop Speaking", action: #selector(stopSpeakingFromMenu), keyEquivalent: "")
         stop.target = self
-        stop.isEnabled = voice?.isSpeaking ?? false
+        stop.isEnabled = voice?.isSpeaking == true || explanation?.isBusy == true
         menu.autoenablesItems = false
+        menu.addItem(.separator())
+        menu.addItem(ScreenShareQuickToggle.menuItem(target: self, action: #selector(toggleScreenShareFromMenu)))
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit ZEUS", action: #selector(quitFromMenu), keyEquivalent: "").target = self
@@ -558,15 +774,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard on(.teleprompter) else { return }
         PrompterHub.shared.toggle()
     }
-    @objc private func stopSpeakingFromMenu() { voice?.stopSpeaking() }
+    @objc private func stopSpeakingFromMenu() { explanation?.stop(); voice?.stopSpeaking() }
     @objc private func openSettingsFromMenu() { showSettings() }
+    @objc private func toggleScreenShareFromMenu() { ScreenShareQuickToggle.toggle() }
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 
     /// The welcome guide (Sources/Zeus/Onboarding), Glance's seven steps.
-    private lazy var guide: OnboardingWindowController = {
+    private lazy var guideServices: OnboardingServices = {
         let services = OnboardingServices(permissions: permissions)
         services.prepareDictationModel = { [weak self] in self?.dictation.prepareModel() }
-        let guide = OnboardingWindowController(services: services)
+        return services
+    }()
+
+    private lazy var guide: OnboardingWindowController = {
+        let guide = OnboardingWindowController(services: guideServices)
         guide.onFinish = { [weak self] in self?.permissions.refresh() }
         return guide
     }()
@@ -579,9 +800,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guide.show(restart: restart && OnboardingParity.requestedStep == nil)
     }
 
+    /// "Allow all" (Settings > Permissions). One per app so a sweep macOS interrupts can resume at launch.
+    private lazy var permissionSweep = PermissionSweepRunner(services: guideServices)
+
     /// Settings (Sources/Zeus/Settings), Glance's window and sections.
     private lazy var glanceSettings: GlanceSettingsWindowController = {
-        let context = GSContext(services: guide.services)
+        let context = GSContext(services: guideServices)
         context.restartConnection = { [weak self] in
             self?.agentServer.stop()
             self?.agentServer.start()
@@ -591,6 +815,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         context.openGuide = { [weak self] in self?.showOnboarding() }
         context.showLicenses = { [weak self] in self?.showThirdPartyLicenses() }
         context.topBar = topBar
+        context.sweep = permissionSweep
         context.continuityTabShown = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
         context.setContinuityTabShown = { [weak self] on in
             guard let layout = self?.topBar.layout, layout.contains(.continuity) != on else { return }

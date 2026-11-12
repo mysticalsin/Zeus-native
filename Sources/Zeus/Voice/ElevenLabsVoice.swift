@@ -9,11 +9,11 @@ import ZeusCore
 struct ElevenLabsVoice: Sendable {
     static let service = "com.zeus.app"
     static let model = "eleven_flash_v2_5"
-    /// A stock ElevenLabs voice, used until a voice ID is saved.
+    /// A stock ElevenLabs voice, used until the designed Ultron voice id is saved.
     static let defaultVoiceID = "JBFqnCBsd6RMkjVDRZzb"
     /// Offline fallback when ElevenLabs is unavailable (matches the Obsidian orb preset).
-    static let offlineKokoroVoice = "am_michael"
-    static let offlineKokoroSpeed = 0.94
+    static let offlineKokoroVoice = UltronCloudVoice.kokoroVoice
+    static let offlineKokoroSpeed = UltronCloudVoice.kokoroSpeed
 
     /// Where the ElevenLabs key lives. Tony's setup keeps it as the worker secret
     /// `ELEVENLABS_API_KEY`, so with no key on this Mac ZEUS streams through the worker's `/tts`
@@ -30,24 +30,36 @@ struct ElevenLabsVoice: Sendable {
     var description: String {
         switch route {
         case .direct: "ElevenLabs voice (\(Self.model), streaming, system voice as fallback)"
-        case .worker: "ElevenLabs voice via your ZEUS worker (streaming, system voice as fallback)"
+        case .worker: "ElevenLabs voice via your Zeus worker (streaming, system voice as fallback)"
         }
     }
 
     /// Delivery for each personality (docs/PERSONA.md, section 6). Plain is a natural, steady read.
     /// Ultron is more expressive: lower stability for range, some style exaggeration (supported by
     /// the flash model, at a small latency cost), speaker boost on, and a touch unhurried.
-    static func voiceSettings(for personality: ZeusPersonality) -> [String: Any] {
+    static func voiceSettings(for personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
+        // Studio (UNVERIFIED model, see `ElevenLabsQuality.studioModel`): only the settings every model takes.
+        if model == ElevenLabsQuality.studioModel {
+            let studio: [String: Any] = ["stability": 0.5, "similarity_boost": 0.8, "use_speaker_boost": true]
+            return studio
+        }
         switch personality {
-        case .plain: ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
-        case .ultron: ["stability": 0.35, "similarity_boost": 0.8, "style": 0.3, "use_speaker_boost": true, "speed": 0.95]
+        case .plain:
+            let plain: [String: Any] = ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
+            return plain
+        case .ultron:
+            return UltronCloudVoice.elevenLabsSettings.reduce(into: ["use_speaker_boost": true] as [String: Any]) { $0[$1.key] = $1.value }
         }
     }
 
     /// The JSON body of a direct text to speech request.
-    static func speechBody(text: String, personality: ZeusPersonality) -> [String: Any] {
-        ["text": text, "model_id": model, "voice_settings": voiceSettings(for: personality)]
+    static func speechBody(text: String, personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
+        ["text": text, "model_id": model, "voice_settings": voiceSettings(for: personality, model: model)]
     }
+
+    /// 24 kHz 16-bit mono PCM, played without decoding. `pcm_44100` needs the Pro tier (ElevenLabs docs);
+    /// the tier rules for `pcm_32000` and `pcm_48000` are not stated there, so they are not used.
+    static let pcmOutputFormat = "pcm_24000"
 
     static func isKeyRejection(_ status: Int) -> Bool { status == 401 || status == 402 || status == 429 }
 
@@ -89,6 +101,9 @@ struct ElevenLabsVoice: Sendable {
     /// The first route ZEUS tries.
     static func load() -> ElevenLabsVoice? { loadRoutes().first }
 
+    /// True when a key or a worker route exists. Cheap enough to ask before every reply.
+    static var hasRoute: Bool { !loadRoutes().isEmpty }
+
     /// Every ElevenLabs route on this Mac, in order: the key in the Keychain straight from the Mac
     /// (no worker needed), then the ZEUS worker `/tts`. The system voice comes after both.
     static func loadRoutes() -> [ElevenLabsVoice] {
@@ -110,12 +125,12 @@ struct ElevenLabsVoice: Sendable {
         return nil
     }
 
-    func request(for text: String) -> URLRequest {
+    func request(for text: String, model: String = ElevenLabsVoice.model) -> URLRequest {
         switch route {
         case .direct(let apiKey):
             let voice = Self.savedVoiceID() ?? voiceID ?? Self.defaultVoiceID
             var components = URLComponents(string: "https://api.elevenlabs.io/v1/text-to-speech/\(voice)/stream")!
-            components.queryItems = [URLQueryItem(name: "output_format", value: "pcm_24000"),
+            components.queryItems = [URLQueryItem(name: "output_format", value: Self.pcmOutputFormat),
                                      URLQueryItem(name: "optimize_streaming_latency", value: "3")]
             var request = URLRequest(url: components.url!)
             request.httpMethod = "POST"
@@ -123,7 +138,7 @@ struct ElevenLabsVoice: Sendable {
             request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("audio/pcm", forHTTPHeaderField: "Accept")
-            request.httpBody = try? JSONSerialization.data(withJSONObject: Self.speechBody(text: text, personality: .current()))
+            request.httpBody = try? JSONSerialization.data(withJSONObject: Self.speechBody(text: text, personality: .current(), model: model))
             return request
         case .worker(let url, let token):
             var request = URLRequest(url: url.appendingPathComponent("tts"))
@@ -139,65 +154,3 @@ struct ElevenLabsVoice: Sendable {
     }
 }
 
-
-/// Plays 16-bit little-endian mono PCM chunks as they stream in.
-@MainActor
-final class StreamingPCMPlayer {
-    private let engine = AVAudioEngine()
-    private let node = AVAudioPlayerNode()
-    private let format: AVAudioFormat
-    private var pending = 0
-    private var carry: UInt8?
-    private var started = false
-    private var sampleOffset: Double = 0
-
-    init(sampleRate: Double = 24_000) {
-        format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
-        engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: format)
-    }
-
-    var isPlaying: Bool { pending > 0 }
-
-    func enqueue(_ data: Data) {
-        var bytes = data
-        if let carry { bytes.insert(carry, at: 0); self.carry = nil }
-        if bytes.count % 2 == 1 { carry = bytes.removeLast() }
-        let frames = bytes.count / 2
-        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)),
-              let out = buffer.floatChannelData?[0] else { return }
-        buffer.frameLength = AVAudioFrameCount(frames)
-        bytes.withUnsafeBytes { raw in
-            for index in 0..<frames {
-                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self))
-                out[index] = Float(sample) / 32_768
-            }
-        }
-        if UltronVoiceEffect.enabled, let channel = buffer.floatChannelData?[0] {
-            let count = Int(buffer.frameLength)
-            var samples = (0..<count).map { channel[$0] }
-            samples = UltronVoiceEffect.process(samples, sampleRate: format.sampleRate, sampleOffset: sampleOffset)
-            for index in 0..<count { channel[index] = samples[index] }
-        }
-        if !started {
-            do { try engine.start(); started = true } catch { return }
-        }
-        sampleOffset += Double(frames)
-        pending += 1
-        node.scheduleBuffer(buffer) { [weak self] in
-            Task { @MainActor in if let self { self.pending = max(0, self.pending - 1) } }
-        }
-        if !node.isPlaying { node.play() }
-    }
-
-    func drained() async {
-        while pending > 0, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
-    }
-
-    func stop() {
-        node.stop()
-        pending = 0
-        carry = nil
-        sampleOffset = 0
-    }
-}

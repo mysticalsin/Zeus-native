@@ -81,14 +81,39 @@ final class RecordlyController {
     var lastMediaURL: URL?
     private var sourcePicker = RecordlySourcePicker()
     private let catalogProvider: any RecordlySourceCatalogProvider
+    @ObservationIgnored private let displayLister: any RecordlyDisplayListing
+    @ObservationIgnored private let defaults: UserDefaults
+    static let rememberedDisplayKey = "recordly.lastDisplayUUID"
+
+    /// Connected displays, main first. Always current, independent of the picker's catalog state.
+    private(set) var displays: [RecordlySourceSelection.CatalogSnapshot.Display] = []
+    /// Why the selection moved on its own (for example the chosen monitor was unplugged).
+    private(set) var displayNotice: String?
+    /// Preflight only, refreshed on page open, source load and app activation. Never prompts.
+    private(set) var screenRecordingGranted = false
+    /// A still of the selected display. Only taken when Screen Recording is already granted, on open and on selection.
+    private(set) var thumbnail: CGImage?
+    @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
+    @ObservationIgnored private var thumbnailDisplayID: UInt32?
+
+    private(set) var countdown = RecordlyCountdown()
+    /// When the current countdown began, for the ring. Nil while no countdown runs.
+    private(set) var countdownBeganAt: Date?
+    var isCountingDown: Bool { countdown.isCounting }
+    var countdownRemaining: Int? { countdown.remaining }
+    @ObservationIgnored private var countdownTimer: Timer?
+    @ObservationIgnored private weak var countdownTopBar: TopBarModel?
+    @ObservationIgnored private var screenObservers: [NSObjectProtocol] = []
     var pickerState: RecordlySourcePicker.State { sourcePicker.state }
     var selectionIntent: RecordlySourceSelection.SelectionIntent? { sourcePicker.selectionIntent }
     var selectionNotice: String? { sourcePicker.selectionNotice }
     var failureReason: String? { if case .failed(let reason) = phase { reason } else { nil } }
     var canStart: Bool { sourcePicker.canStart && phase == .idle }
+    /// Record is live only with a valid source and Screen Recording already granted. The page explains the rest.
+    var canRecord: Bool { canStart && screenRecordingGranted && !isCountingDown }
     var isStarting: Bool { phase == .starting }
     var isStopping: Bool { phase == .stopping }
-    var canChooseSource: Bool { phase == .idle }
+    var canChooseSource: Bool { phase == .idle && !isCountingDown }
     var isLoadingSources: Bool { if case .loading = sourcePicker.state { true } else { false } }
     /// The running page stays up while a recording that was running is stopping, so Stop shows as disabled.
     var showsRunning: Bool { isRecording || (isStopping && startedAt != nil) }
@@ -116,6 +141,8 @@ final class RecordlyController {
     @ObservationIgnored private var exportGeneration = 0
 
     private let engine: RecordlyCaptureEngine
+    /// Latest system-audio peak for the live meter, 0...1. Read on the meter's own frame clock, never observed.
+    func systemAudioPeak() -> Float { engine.currentLevel() }
     private let session: RecordlyRecordingSession
     private var tickTimer: Timer?
     /// What one attempt needs when its recording finishes, kept by attempt until that result is handled, so a finish
@@ -150,8 +177,12 @@ final class RecordlyController {
         return (id, space)
     }
 
-    init(catalogProvider: any RecordlySourceCatalogProvider = RecordlyScreenCaptureCatalogProvider()) {
+    init(catalogProvider: any RecordlySourceCatalogProvider = RecordlyScreenCaptureCatalogProvider(),
+         displayLister: any RecordlyDisplayListing = RecordlySystemDisplays(),
+         defaults: UserDefaults = .standard) {
         self.catalogProvider = catalogProvider
+        self.displayLister = displayLister
+        self.defaults = defaults
         let engine = RecordlyCaptureEngine()
         self.engine = engine
         self.session = RecordlyRecordingSession(port: engine)
@@ -236,7 +267,7 @@ final class RecordlyController {
     }
 
     func selectSourceKind(_ kind: RecordlyCaptureSource.Kind) {
-        guard phase == .idle else { return }
+        guard phase == .idle, !isCountingDown else { return }
         sourceKind = kind
         sourcePicker.clearSelection()
     }
@@ -246,6 +277,12 @@ final class RecordlyController {
         if restoreCheckpointIfNeeded() { return }
         guard phase == .idle, sourceKind != .region else { return }
         actionNotice = nil
+        screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
+        if sourceKind == .display {
+            // Displays come from AppKit, so they need no Screen Recording permission and no click.
+            refreshDisplays()
+            return
+        }
         let generation = sourcePicker.beginLoading()
         // A catalog that never answers moves the picker to a visible failure; a late answer is then ignored by generation.
         let timeout = Task { @MainActor [weak self] in
@@ -276,9 +313,232 @@ final class RecordlyController {
             return
         }
         actionNotice = nil
+        displayNotice = nil
         if case .catalogUnavailable = sourcePicker.selectSource(intent) {
             actionNotice = "The source list was out of date, so it is reloading. Choose the source again."
             Task { await loadSourceCatalog() }
+        } else if case .display(let id) = intent, sourcePicker.canStart {
+            // Remember the owner's explicit choice by stable identity, never by the raw display id.
+            if let stable = displays.first(where: { $0.id == id })?.stableID {
+                defaults.set(stable, forKey: Self.rememberedDisplayKey)
+            }
+            refreshThumbnail(force: false)
+        }
+    }
+
+    /// Name of the selected source for captions: the display's name, or the window's title.
+    var selectedSourceName: String? {
+        guard sourcePicker.canStart, let intent = sourcePicker.selectionIntent else { return nil }
+        switch intent {
+        case .display(let id):
+            return Self.displayName(id, in: displays)
+        case .window(let number, _):
+            let title = sourcePicker.catalog?.windows.first { $0.number == number }?.title?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return title.isEmpty ? "Window \(number)" : title
+        case .region:
+            return nil
+        }
+    }
+
+    // MARK: Displays
+
+    /// Called when the Record page opens: watch for monitors coming and going, then load the sources. Displays
+    /// list and the main one is selected without a click and without Screen Recording permission.
+    func pageAppeared() {
+        installScreenObservers()
+        Task {
+            await loadSourceCatalog()
+            refreshThumbnail(force: true)
+        }
+    }
+
+    private func installScreenObservers() {
+        guard screenObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        // The blocks run on the main queue but are Sendable closures, so they hop to the main actor explicitly
+        // instead of touching this isolated type directly (see test_source_lint.py).
+        for name in [NSApplication.didChangeScreenParametersNotification, NSApplication.didBecomeActiveNotification] {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.screensMayHaveChanged() }
+            }
+            screenObservers.append(token)
+        }
+    }
+
+    private func screensMayHaveChanged() {
+        screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
+        if phase == .idle, sourceKind == .display {
+            refreshDisplays()
+        } else {
+            displays = displayLister.displays()
+        }
+    }
+
+    /// Lists displays and keeps the selection valid: the owner's current choice, else the remembered display
+    /// (by stable identity), else the main display. A choice that was unplugged moves to the fallback with a notice,
+    /// and a countdown that was running for it stops.
+    private func refreshDisplays() {
+        let before = displays
+        let listed = displayLister.displays()
+        displays = listed
+        guard phase == .idle, sourceKind == .display else { return }
+        var currentID: UInt32?
+        if case .display(let id)? = sourcePicker.selectionIntent { currentID = id }
+        let decision = RecordlyDisplayChoice.decide(
+            displays: listed, current: currentID, remembered: defaults.string(forKey: Self.rememberedDisplayKey)
+        )
+        if decision.lostCurrent {
+            var message = "\(Self.displayName(currentID, in: before)) was disconnected."
+            if let fallback = decision.selected { message += " Using \(Self.displayName(fallback, in: listed))." }
+            if isCountingDown {
+                perform(countdown.send(.sourceUnavailable(reason: message)))
+            } else {
+                displayNotice = message
+            }
+        }
+        let generation = sourcePicker.beginLoading()
+        sourcePicker.finishLoading(.loaded(.init(displays: listed, windows: [])), generation: generation)
+        if sourcePicker.resolvedSource == nil, let id = decision.selected {
+            _ = sourcePicker.selectSource(.display(id: id))
+        }
+        refreshThumbnail(force: false)
+    }
+
+    private static func displayName(_ id: UInt32?, in list: [RecordlySourceSelection.CatalogSnapshot.Display]) -> String {
+        guard let index = list.firstIndex(where: { $0.id == id }) else { return "The selected display" }
+        return RecordlyDisplayChoice.title(list[index], position: index)
+    }
+
+    /// One still of the selected display. Skipped without Screen Recording already granted; never requests it.
+    private func refreshThumbnail(force: Bool) {
+        guard screenRecordingGranted, case .display(let id)? = sourcePicker.selectionIntent else {
+            thumbnailTask?.cancel()
+            thumbnail = nil
+            thumbnailDisplayID = nil
+            return
+        }
+        if !force, thumbnailDisplayID == id, thumbnail != nil { return }
+        if thumbnailDisplayID != id { thumbnail = nil }
+        thumbnailDisplayID = id
+        thumbnailTask?.cancel()
+        thumbnailTask = Task { @MainActor [weak self] in
+            let image = await RecordlyDisplays.thumbnail(displayID: id)
+            guard !Task.isCancelled, let self, self.thumbnailDisplayID == id else { return }
+            self.thumbnail = image
+        }
+    }
+
+    // MARK: Countdown
+
+    /// The capture control while idle: starts the 3, 2, 1, or cancels it when pressed again.
+    func pressRecord(topBar: TopBarModel?) {
+        guard phase == .idle else { return }
+        countdownTopBar = topBar
+        if !isCountingDown {
+            screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
+            guard screenRecordingGranted else {
+                actionNotice = "Screen Recording is off for Zeus. Open Screen Recording settings to turn it on."
+                return
+            }
+            actionNotice = nil
+            displayNotice = nil
+        }
+        perform(countdown.send(.press(sourceReady: canStart)))
+    }
+
+    /// Escape, or a second press of the control.
+    func cancelCountdown() {
+        perform(countdown.send(.cancel))
+    }
+
+    private func countdownTick(_ token: UInt64) {
+        guard phase == .idle else {
+            perform(countdown.send(.cancel))
+            return
+        }
+        perform(countdown.send(.tick(token: token, sourceReady: canStart)))
+    }
+
+    /// The Record page went away (another page, the notch closed): a countdown must not start a capture the owner can
+    /// no longer see or cancel with Escape.
+    func pageDisappeared() {
+        perform(countdown.send(.cancel))
+        thumbnailTask?.cancel()
+    }
+
+    private func perform(_ effects: [RecordlyCountdown.Effect]) {
+        if countdown.isCounting, countdownBeganAt == nil { countdownBeganAt = Date() }
+        for effect in effects {
+            switch effect {
+            case .scheduleTick(let token):
+                scheduleCountdownTick(token)
+            case .cancelTick:
+                stopCountdownTimer()
+            case .startCapture:
+                stopCountdownTimer()
+                Task { await self.start(topBar: self.countdownTopBar) }
+            case .notice(let text):
+                actionNotice = text
+            }
+        }
+        if !countdown.isCounting { countdownBeganAt = nil }
+    }
+
+    /// One one-shot timer per step, aimed at an absolute time so steps do not drift. No timer exists while idle.
+    private func scheduleCountdownTick(_ token: UInt64) {
+        guard let began = countdownBeganAt, let remaining = countdown.remaining else { return }
+        stopCountdownTimer()
+        let fire = began.addingTimeInterval(Double(RecordlyCountdown.seconds - remaining + 1))
+        let timer = Timer(fire: fire, interval: 0, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.countdownTick(token) }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        countdownTimer = timer
+    }
+
+    private func stopCountdownTimer() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+    }
+
+    // MARK: Snapshot harness
+
+    enum SnapshotState {
+        case idle
+        case countdown(Int)
+        case recording(elapsed: TimeInterval)
+        case saved
+    }
+
+    /// Offscreen QA only: puts a controller built with a fake display lister into one visible state, with no
+    /// timers, no capture and no permission request.
+    func seedForSnapshot(granted: Bool, thumbnail: CGImage?, state: SnapshotState) {
+        screenRecordingGranted = granted
+        refreshDisplays()
+        self.thumbnail = granted ? thumbnail : nil
+        switch state {
+        case .idle:
+            break
+        case .countdown(let remaining):
+            _ = countdown.send(.press(sourceReady: canStart))
+            for _ in 0..<(RecordlyCountdown.seconds - max(1, min(remaining, RecordlyCountdown.seconds))) {
+                if case .counting(_, let token) = countdown.state { _ = countdown.send(.tick(token: token)) }
+            }
+            countdownBeganAt = Date().addingTimeInterval(-Double(RecordlyCountdown.seconds - remaining) - 0.4)
+        case .recording(let elapsed):
+            capturePhase = .recording(RecordlyRecordingAttempt(id: 1))
+            startedAt = Date().addingTimeInterval(-elapsed)
+            self.elapsed = elapsed
+        case .saved:
+            project = RecordlyProject(
+                source: .display(id: displays.first?.id ?? 1), audio: audio, rawMediaPath: "/Users/fixture/Movies/Zeus Recordings/clip.mp4",
+                cursorSamples: []
+            )
+            projectPhase = .editor
+            self.elapsed = 74
+            lastMediaURL = URL(fileURLWithPath: "/Users/fixture/Movies/Zeus Recordings/clip.mp4")
+            previewUnavailableReason = "Preview unavailable in this snapshot."
         }
     }
 
@@ -302,6 +562,7 @@ final class RecordlyController {
 
     func start(topBar: TopBarModel?) async {
         guard canStart, let selectionIntent = sourcePicker.selectionIntent else { return }
+        ExplanationAudioArbitration.yieldToNewCapture()
         guard RecordlyPermissionGate.screenRecordingReady() else {
             let reason = RecordlyCaptureError.permissionDenied.localizedDescription
             sourcePicker.markDenied(reason: reason)
@@ -442,7 +703,7 @@ final class RecordlyController {
     /// authority and a visible reason; the editor still opens and nothing is copied or deleted.
     private func acquireMediaAuthority(for project: RecordlyProject) {
         guard let store = Self.checkpointStore() else {
-            setMediaAuthority(nil, reason: "Zeus's Recordly folder is unavailable, so this recording cannot be previewed.")
+            setMediaAuthority(nil, reason: "Zeus's recordings folder is unavailable, so this recording cannot be previewed.")
             return
         }
         do {
@@ -572,6 +833,20 @@ final class RecordlyController {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    func openMedia(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Puts the clip file itself on the pasteboard, so it pastes into Finder, Mail or Slack as a file.
+    func copyMedia(_ url: URL) {
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.writeObjects([url as NSURL])
+    }
+
+    /// Size of the pinned recording, for the saved clip card.
+    var mediaByteCount: Int64? { mediaAuthority.map { Int64($0.byteCount) } }
+
     private func applyExportProgress(_ value: Double, generation: Int) {
         guard generation == exportGeneration, case .exporting(let current) = exportState, value > current else { return }
         exportState = .exporting(min(value, 1))
@@ -639,7 +914,7 @@ final class RecordlyController {
     func discardRecording(deleteMedia: Bool) {
         guard phase == .editor, !isExporting else { return }
         guard let store = Self.checkpointStore() else {
-            checkpointWarning = "Zeus's Recordly folder is unavailable, so the saved recording could not be discarded."
+            checkpointWarning = "Zeus's recordings folder is unavailable, so the saved recording could not be discarded."
             isConfirmingNew = false
             return
         }
@@ -659,6 +934,7 @@ final class RecordlyController {
     func reset() {
         // A capture that is starting, recording or stopping is never reset out from under its teardown.
         guard session.reset() else { return }
+        perform(countdown.send(.cancel))
         isConfirmingNew = false
         actionNotice = nil
         recoveryNotice = nil
@@ -719,7 +995,7 @@ final class RecordlyController {
             let gifRequested = plan.exportFormats.contains(.gif)
             var lines = ["ok=\(mp4Report.ok && !gifRequested) mp4=\(mp4.path)", mp4Report.detail]
             if plan.exportFormats.contains(.gif) {
-                lines.append("gifExport=not-run: use the Recordly editor to verify a real GIF export.")
+                lines.append("gifExport=not-run: use the Record editor to verify a real GIF export.")
             }
             // The replaced project's authority, pending save and warning must not outlive it.
             discardProjectBindings(reason: "Debug captures are not pinned for preview.")
