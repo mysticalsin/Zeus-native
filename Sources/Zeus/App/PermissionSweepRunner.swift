@@ -245,7 +245,8 @@ final class PermissionSweepRunner {
 }
 
 /// The small floating guide shown while the sweep runs. It stays above System Settings and does not
-/// activate Zeus. It does become key, so Return and Escape reach Done and Skip.
+/// activate Zeus or take the keyboard. Return and Escape reach Done and Skip only after the person
+/// focuses the guide. A step change orders the panel front and leaves the key window alone.
 @MainActor
 final class PermissionSweepGuide {
     private final class Panel: NSPanel {
@@ -264,7 +265,8 @@ final class PermissionSweepGuide {
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.becomesKeyOnlyIfNeeded = false
+        // True until the guide itself is focused, so ordering it front does not steal Return and Escape.
+        panel.becomesKeyOnlyIfNeeded = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let host = NSHostingView(rootView: PermissionSweepGuideView(runner: runner))
         host.frame = NSRect(origin: .zero, size: Self.size)
@@ -277,7 +279,6 @@ final class PermissionSweepGuide {
             panel.setFrameOrigin(NSPoint(x: visible.midX - Self.size.width / 2, y: visible.maxY - Self.size.height - 12))
         }
         panel.orderFrontRegardless()
-        panel.makeKey()
     }
 
     func close() {
