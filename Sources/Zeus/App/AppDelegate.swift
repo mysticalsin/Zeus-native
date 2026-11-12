@@ -325,6 +325,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if on(.demoArg), CommandLine.arguments.contains("--demo") { demo.play() }
         if on(.motionOpenArg) { motionOpenIfRequested() }
+        // An "Allow all" sweep that macOS interrupted (Screen Recording's Quit and Reopen) picks up where it
+        // stopped. Only a sweep the person started minutes ago resumes; nothing is asked twice.
+        if on(.settingsWindow) { permissionSweep.resumeIfSaved { [weak self] in self?.showPermissions() } }
     }
 
     private var sensitiveCueTask: Task<Void, Never>?
@@ -797,6 +800,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guide.show(restart: restart && OnboardingParity.requestedStep == nil)
     }
 
+    /// "Allow all" (Settings > Permissions). One per app so a sweep macOS interrupts can resume at launch.
+    private lazy var permissionSweep = PermissionSweepRunner(services: guideServices)
+
     /// Settings (Sources/Zeus/Settings), Glance's window and sections.
     private lazy var glanceSettings: GlanceSettingsWindowController = {
         let context = GSContext(services: guideServices)
@@ -809,6 +815,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         context.openGuide = { [weak self] in self?.showOnboarding() }
         context.showLicenses = { [weak self] in self?.showThirdPartyLicenses() }
         context.topBar = topBar
+        context.sweep = permissionSweep
         context.continuityTabShown = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
         context.setContinuityTabShown = { [weak self] on in
             guard let layout = self?.topBar.layout, layout.contains(.continuity) != on else { return }

@@ -215,17 +215,21 @@ final class PermissionsModel {
         case .calendar, .reminders:
             let type: EKEntityType = kind == .calendar ? .event : .reminder
             guard EKEventStore.authorizationStatus(for: type) == .notDetermined else { return open(kind) }
-            Task { @MainActor in
-                await PermissionPrompts.shared.run(kind.rawValue) {
-                    let store = EKEventStore()
-                    if kind == .calendar { _ = try? await store.requestFullAccessToEvents() }
-                    else { _ = try? await store.requestFullAccessToReminders() }
-                }
-                self.refresh()
-            }
+            Task { @MainActor in await self.requestEventAccess(kind) }
         case .automation:
             requestAutomation()
         }
+    }
+
+    /// Calendar or Reminders full access, one prompt at a time. Returns once macOS has an answer
+    /// (Allow all waits for it before the next prompt).
+    func requestEventAccess(_ kind: Kind) async {
+        await PermissionPrompts.shared.run(kind.rawValue) {
+            let store = EKEventStore()
+            if kind == .calendar { _ = try? await store.requestFullAccessToEvents() }
+            else { _ = try? await store.requestFullAccessToReminders() }
+        }
+        refresh()
     }
 
     /// Automation can only be asked about a running app. With none running, say so instead of doing nothing;
