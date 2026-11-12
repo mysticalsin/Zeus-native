@@ -77,7 +77,7 @@
     },
     {
       "id": "REG-007",
-      "failure": "Unknown external microphone owner was silently ignored.",
+      "failure": "Unknown external microphone owner was silently ignored. Superseded on 2026-11-11 by the owner decision in REG-360: another app using the microphone never withholds it, so the guard now proves the microphone still gets through.",
       "features": [
         "F03",
         "S01"
@@ -85,7 +85,7 @@
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-        "function": "anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition"
+        "function": "anUnsupportedMicrophoneOwnerStillLetsTheMicrophoneThrough"
       }
     },
     {
@@ -420,7 +420,7 @@
     },
     {
       "id": "REG-035",
-      "failure": "Positively active microphone input with unresolved PID or bundle identity was discarded, allowing a later empty scan to restore capture.",
+      "failure": "Positively active microphone input with unresolved PID or bundle identity was discarded, allowing a later empty scan to restore capture. Superseded on 2026-11-11 by REG-361: such an owner is still noticed but never excludes the microphone.",
       "features": [
         "F03",
         "S01"
@@ -428,7 +428,7 @@
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
-        "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
+        "function": "anUnidentifiedMicrophoneOwnerNeverExcludesTheMicrophone"
       }
     },
     {
