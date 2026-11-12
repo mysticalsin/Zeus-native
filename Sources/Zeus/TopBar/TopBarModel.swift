@@ -261,8 +261,9 @@ final class TopBarModel {
         let addScribe = !defaults.bool(forKey: "topBar.row12.v1")
         if addScribe, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row12.v1") }
         if addScribe { upgraded = upgraded.upgradedToScribeRow() }
-        let addAgents = !defaults.bool(forKey: "topBar.row13.v1")
-        if addAgents, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row13.v1") }
+        // v2: v1 set its flag without saving the moved row, so Agents fell back past the visible end on relaunch.
+        let addAgents = !defaults.bool(forKey: "topBar.row13.v2")
+        if addAgents, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row13.v2") }
         if addAgents { upgraded = upgraded.upgradedToAgentsRow() }
         // Repair, once per version: an earlier launch saved the flags above without the upgraded row, so on
         // this launch none of them is true and the row would stay old. Only a row that was saved is repaired.
@@ -277,7 +278,7 @@ final class TopBarModel {
         // Property observers don't run inside init, so save the upgraded row here. Otherwise the
         // one-time flags above stop the upgrade from running again while the old row stays saved.
         if !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA {
-            if reorder || addPolyglot || addRecordly || addScribe || repairedRow {
+            if reorder || addPolyglot || addRecordly || addScribe || addAgents || repairedRow {
                 defaults.set(upgraded.encoded(), forKey: "topBar.tabs")
                 defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
             }

@@ -74,6 +74,15 @@ def strip_trailing_comment(line):
 
 
 class SourceLint(unittest.TestCase):
+    def test_every_one_time_tab_upgrade_saves_the_row(self):
+        # A row upgrade that sets its flag but is missing from the save condition is lost on relaunch.
+        text = (APP / "TopBar/TopBarModel.swift").read_text()
+        flags = re.findall(r"let (add\w+|reorder) = !defaults\.bool\(forKey: \"topBar\.row", text)
+        save = re.search(r"if (reorder \|\|[^{]+)\{", text)
+        self.assertTrue(flags and save, "tab upgrade flags or save condition not found")
+        saved = {name.strip() for name in save.group(1).split("||")}
+        self.assertEqual(sorted(set(flags) - saved), [])
+
     def test_app_target_never_uses_swiftpm_bundle_module(self):
         offenders = [f"{p.relative_to(ROOT)}:{n}" for p in swift_files() for n, line in code_lines(p)
                      if re.search(r"\bBundle\.module\b", line)]
