@@ -29,6 +29,13 @@ import Testing
         #expect(DeepTrigger.reason(for: "think deeper about this", task: .quickAnswer) == .explicit)
     }
 
+    @Test func talkToZeusIsControlOption() {
+        let (defaults, cleanup) = fresh(); defer { cleanup() }
+        let talk = ShortcutStore.loadTalk(defaults)
+        #expect(talk == .controlOption)
+        #expect(!VoiceKey.pointingStartsTurns(talk: talk, pointing: .controlOption, pointingEnabled: true))
+    }
+
     @Test func pointingIsOnWithControlOptionAndDrawWhileHeld() {
         let (defaults, cleanup) = fresh(); defer { cleanup() }
         #expect(FeatureSettings.pointingEnabled(defaults: defaults))

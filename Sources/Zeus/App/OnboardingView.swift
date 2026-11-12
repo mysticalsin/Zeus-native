@@ -262,7 +262,7 @@ struct OnboardingView: View {
     private var murmureStep: some View {
         OnboardStep(title: "Try Murmure",
                     text: "Hold \(preferences.pushToTalk.title) and say anything. Zeus listens live. Speech stays on this Mac unless you pick a cloud engine later.") {
-            ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.pushToTalk = $0 }, accessibilityName: "Talk key")
+            ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
             PermissionLine(name: "Microphone", granted: permissions.granted[.microphone] == true)
             PermissionLine(name: "Speech Recognition", granted: permissions.granted[.speech] == true)
             PermissionLine(name: "Accessibility", granted: permissions.granted[.accessibility] == true)

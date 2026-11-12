@@ -288,7 +288,7 @@ struct SettingsView: View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Talk to ZEUS") {
                 GlassRow(title: "Talk key", note: (DictationSettings.shared.enabled && DictationSettings.shared.key == preferences.pushToTalk ? "Double-tap it, then speak. Holding the same key dictates." : "Hold it, ask, let go. ZEUS answers out loud and points.")) {
-                    ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.pushToTalk = $0 }, accessibilityName: "Talk key")
+                    ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
                 }
                 GlassDivider()
                 GlassRow(title: "Show captions next to the bolt") {

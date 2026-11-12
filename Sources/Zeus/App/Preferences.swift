@@ -9,7 +9,8 @@ final class Preferences {
     static let shared = Preferences()
     private let defaults = UserDefaults.standard
 
-    /// "Talk to Zeus": hold to talk, double-tap to latch. Option+Command until you record another.
+    /// "Talk to Zeus": hold to talk, double-tap to latch. Control+Option until you record another
+    /// (docs/VOICE-KEY.md). Settings and onboarding set it through `chooseTalkKey`.
     var pushToTalk: Shortcut {
         didSet { defaults.set(Shortcut.stored(pushToTalk), forKey: ShortcutStore.talkKey) }
     }
@@ -44,6 +45,12 @@ final class Preferences {
 }
 
 extension Preferences {
+    /// The owner picked a talk key: saved and marked as a choice, so no later migration moves it.
+    func chooseTalkKey(_ shortcut: Shortcut) {
+        pushToTalk = shortcut
+        ShortcutStore.recordTalkChoice(shortcut, in: defaults)
+    }
+
     /// One line for `zeus status` and hints: what the talk key does right now.
     var talkKeyHint: String {
         let d = DictationSettings.shared

@@ -273,6 +273,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
+            // ⌃⌥Space, ⌃⌥C and other chords built on the talk keys cancel the hold instead of sending it.
+            hotkey.cancelsWhenSpoiled = true
+            hotkey.onCancel = { [weak self] in
+                WakeWordController.shared.talkKeyHeld = false
+                self?.voice?.cancelListening()
+            }
             hotkey.start()
         }
         if on(.pointingHotkey) {

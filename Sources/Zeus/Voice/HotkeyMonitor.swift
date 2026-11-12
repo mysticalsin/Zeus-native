@@ -69,9 +69,15 @@ final class HotkeyMonitor {
     var onRelease: (() -> Void)?
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
-    /// Which shortcut this monitor listens for; nil turns it off. Push-to-talk by default,
-    /// dictation supplies its own.
-    var keyProvider: () -> Shortcut? = { Preferences.shared.pushToTalk }
+    /// Which shortcut this monitor listens for; nil turns it off. Push-to-talk by default (moved off
+    /// Control+Option while VoiceOver uses it, `VoiceKey.effectiveTalkKey`); dictation supplies its own.
+    var keyProvider: () -> Shortcut? = {
+        let dictation = DictationSettings.shared
+        return VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk,
+                                         dictation: dictation.enabled ? dictation.key : nil,
+                                         pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
+                                         voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled)
+    }
     /// Dedicated dictation keys can toggle on each key-down instead of using TalkKeyLatch's
     /// hold/double-tap timing. Shared keys always use the existing gesture arbitration.
     var directPressProvider: () -> Bool = { false }
@@ -82,6 +88,9 @@ final class HotkeyMonitor {
     var sharedProvider: () -> Bool = { DictationSettings.shared.enabled && Preferences.shared.pushToTalk == DictationSettings.shared.key }
     /// A held dictation interrupted by a shortcut (the press became ⌘C). Defaults to release.
     var onCancel: (() -> Void)?
+    /// The talk key: a hold of a modifier-only key that another key joins (⌃⌥Space for Chat) became a
+    /// different shortcut, so the turn is cancelled through `onCancel` and nothing is sent.
+    var cancelsWhenSpoiled = false
 
     private var keyMonitors: [Any] = []
     private var gesture = SharedKeyGesture()
@@ -128,7 +137,7 @@ final class HotkeyMonitor {
         state.apply(event)
         if case .keyDown(let code, _) = event {
             // Only to spot shortcuts made with the shared key (⌘C): never reads or keeps the key.
-            if keyProvider()?.keyCode != code { otherKeyPressed() }
+            if keyProvider()?.keyCode != code { otherKeyPressed(); spoilHold() }
         }
         evaluate()
     }
@@ -137,6 +146,18 @@ final class HotkeyMonitor {
         guard sharedDown else { return }
         if gesture.otherKey() == .holdCancelled { (onCancel ?? onRelease)?() }
         holdTimer?.cancel()
+    }
+
+    /// A held modifier-only talk key met another key: that press was a shortcut, not a question.
+    /// `ShortcutState` keeps the chord unheld until every modifier is up, so it cannot restart mid-chord.
+    private func spoilHold() {
+        guard cancelsWhenSpoiled, role == .talk, isDown, let key = keyProvider(), key.isModifierOnly, !sharedProvider() else { return }
+        isDown = false
+        pendingStop?.cancel()
+        pendingStop = nil
+        latch = TalkKeyLatch()
+        VoiceLog.log("key", "talk shortcut became another shortcut (\(key.title) + a key): cancelled, nothing sent")
+        (onCancel ?? onRelease)?()
     }
 
     /// Shared-key path: raw down/up of the key plus "another modifier joined in".

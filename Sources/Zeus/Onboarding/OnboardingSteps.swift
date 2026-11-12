@@ -354,7 +354,7 @@ private struct ReachStep: View {
             StepHeading(title: "Keys and displays.", subtitle: "")
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
-                OBRow(symbol: "mic", title: "Hold to talk, double-tap to latch", text: "") { keys(options.talkKey) }
+                OBRow(symbol: "mic", title: "Hold to talk to Zeus, point if you want", text: "") { keys(options.talkKey) }
                 OBRow(symbol: "keyboard", title: "Answer from the keyboard", text: "") { keys("\u{2303}\u{2325}Y  \u{2303}\u{2325}N  \u{2303}\u{2325}O") }
                 OBRow(symbol: "display.2", title: "Every display", text: "") {
                     OBPopup(selection: options.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue))

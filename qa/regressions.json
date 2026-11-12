@@ -4125,6 +4125,67 @@
         "file": "Tests/ZeusCoreTests/TopBarLayoutUpgradeTests.swift",
         "function": "agentsUpgradePutsAgentsAfterHomeOnce"
       }
+    },
+    {
+      "id": "REG-380",
+      "failure": "Holding Control and Option started the pointing turn with a different voice and model, not a Zeus talk turn, because the talk key had been migrated to Option and Command.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "aFreshInstallTalksOnControlOption"
+      }
+    },
+    {
+      "id": "REG-381",
+      "failure": "A talk key auto-written as Option and Command by an earlier build stayed there forever; it must move to Control and Option once, and a recorded key must never move.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theMigrationRunsOnce"
+      }
+    },
+    {
+      "id": "REG-382",
+      "failure": "One hold of the shared talk and pointing key could start both a talk turn and a pointing turn (two microphones, two listen sounds).",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "everyHoldHasAtMostOneOwner"
+      }
+    },
+    {
+      "id": "REG-383",
+      "failure": "The pointing monitor started its own turn on the talk key instead of standing down for the talk turn.",
+      "features": [
+        "F09",
+        "F11"
+      ],
+      "check": "native-PointingHotkeyMonitorTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift",
+        "function": "theTalkKeyHoldStartsNoPointingTurn"
+      }
+    },
+    {
+      "id": "REG-384",
+      "failure": "Settings flagged the same talk and pointing key, and Control and Option itself, as conflicts on the shipped defaults.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theShippedVoiceKeysDoNotWarn"
+      }
     }
   ]
 }

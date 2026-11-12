@@ -105,6 +105,8 @@ struct ShortcutRecorderRow: View {
     var allowsOff = false
     var otherName = ""
     var other: Shortcut?
+    /// The key that stands in for Control+Option while VoiceOver is on (the talk key has one).
+    var voiceOverFallback: Shortcut?
     let set: (Shortcut?) -> Void
 
     var body: some View {
@@ -121,7 +123,9 @@ struct ShortcutRecorderRow: View {
             }
         }
         if let shortcut {
-            ForEach(ShortcutConflicts.warnings(for: shortcut, other: other, otherName: otherName), id: \.self) { warning in
+            ForEach(ShortcutConflicts.warnings(for: shortcut, other: other, otherName: otherName,
+                                               voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled,
+                                               voiceOverFallback: voiceOverFallback), id: \.self) { warning in
                 HStack(alignment: .firstTextBaseline, spacing: 9) {
                     Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
                     Text(warning).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)

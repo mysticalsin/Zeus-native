@@ -23,6 +23,15 @@ public enum ScreenAwareness {
         "what do you see", "what can you see on my screen",
     ]
 
+    /// The pointer (AppKit global point, bottom-left origin) as screenshot pixels (top-left origin), clamped
+    /// to the image. `frame` is the display's AppKit frame, `width`/`height` the screenshot's pixel size.
+    public static func cursorPixel(_ mouse: CGPoint, frame: CGRect, width: Int, height: Int) -> CGPoint {
+        guard frame.width > 0, frame.height > 0 else { return .zero }
+        let x = (mouse.x - frame.minX) * CGFloat(width) / frame.width
+        let y = (frame.maxY - mouse.y) * CGFloat(height) / frame.height
+        return CGPoint(x: min(max(x, 0), CGFloat(width)), y: min(max(y, 0), CGFloat(height)))
+    }
+
     public static func isScreenQuestion(_ transcript: String) -> Bool {
         let t = transcript.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
         guard !t.isEmpty else { return false }
