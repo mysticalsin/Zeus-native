@@ -4113,6 +4113,18 @@
         "file": "Tests/ZeusCoreTests/RecordlyRecordNavigationTests.swift",
         "function": "doubleClickSelectsAndOpensTheDetail"
       }
+    },
+    {
+      "id": "REG-390",
+      "failure": "The Agents tab never showed in the top bar row: the twelve default tabs filled the row and Agents sat past its end, so it appeared only while Control+Option+Space selected it.",
+      "features": [
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarLayoutUpgradeTests.swift",
+        "function": "agentsUpgradePutsAgentsAfterHomeOnce"
+      }
     }
   ]
 }

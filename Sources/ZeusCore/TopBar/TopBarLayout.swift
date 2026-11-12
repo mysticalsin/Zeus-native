@@ -85,10 +85,10 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
     /// Glance's seven, as the live app labels them when selected (glance-clone-proof/parity/tabs):
     /// Home, Chat, Alerts, Clipboard, Shelf, then Zeus To-do and Murmure.
     public static let glanceSeven: [TopBarTab] = [.home, .chat, .notifications, .clipboard, .shelf, .todo, .dictation]
-    /// The row Tony asked for: Glance's seven, then Teleprompter, Insomnia and Polyglot. The row shows
-    /// these ten, then Recordly and Scribe; the rest stay one click away in Settings › Top Bar.
-    public static let defaultRow: [TopBarTab] = glanceSeven + [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
-    public static let standard = TopBarLayout(tabs: defaultRow + [.reminders, .today, .agents, .music, .calendar, .focus, .usage])
+    /// The row Tony asked for: Home, Agents, then Chat, Alerts, Clipboard, Shelf, To-do, Murmure, Teleprompter,
+    /// Insomnia, Polyglot, Recordly and Scribe. The rest stay one click away in Settings › Top Bar.
+    public static let defaultRow: [TopBarTab] = [.home, .agents] + glanceSeven.dropFirst() + [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
+    public static let standard = TopBarLayout(tabs: defaultRow + [.reminders, .today, .music, .calendar, .focus, .usage])
 
     /// A saved layout with Glance's seven moved to the front (in Glance's order), every other
     /// tab kept in its order after them. Tabs the person turned off stay off.
@@ -117,6 +117,11 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
     /// One-time upgrade: Scribe joins the default row after Recordly.
     public func upgradedToScribeRow() -> TopBarLayout {
         TopBarLayout(tabs: tabs + [.scribe].filter { !tabs.contains($0) }).defaultRowOrdered()
+    }
+
+    /// One-time upgrade: Agents joins the default row right after Home (it was only shown while selected).
+    public func upgradedToAgentsRow() -> TopBarLayout {
+        TopBarLayout(tabs: tabs + [.agents].filter { !tabs.contains($0) }).defaultRowOrdered()
     }
 
     private func ordered(first order: [TopBarTab]) -> TopBarLayout {

@@ -400,8 +400,8 @@ private func journal(end: Date? = start.addingTimeInterval(3600), changes: [Inso
 
 @Suite struct InsomniaTabTests {
     @Test func defaultTabOrder() {
-        #expect(TopBarLayout.defaultRow == [.home, .chat, .notifications, .clipboard, .shelf, .todo, .dictation, .teleprompter, .insomnia, .polyglot, .recordly, .scribe])
-        #expect(Array(TopBarLayout.standard.tabs.prefix(12)) == TopBarLayout.defaultRow)
+        #expect(TopBarLayout.defaultRow == [.home, .agents, .chat, .notifications, .clipboard, .shelf, .todo, .dictation, .teleprompter, .insomnia, .polyglot, .recordly, .scribe])
+        #expect(Array(TopBarLayout.standard.tabs.prefix(13)) == TopBarLayout.defaultRow)
         #expect(GlanceTabRow.visible(TopBarLayout.standard.tabs, selected: .home) == TopBarLayout.defaultRow)
         #expect(TopBarTab.insomnia.title == "Insomnia")
         #expect(TopBarTab.insomnia.symbol == "moon.zzz.fill")

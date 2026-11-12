@@ -151,7 +151,7 @@ public struct TodoSync: Sendable {
 public enum TopBarLayoutRepair {
     public static let version = 1
     /// The tabs the one-time row upgrades switch on.
-    public static let upgradeTabs: [TopBarTab] = [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
+    public static let upgradeTabs: [TopBarTab] = [.agents, .teleprompter, .insomnia, .polyglot, .recordly, .scribe]
 
     /// Adds each upgrade tab the row lacks and the person never had the chance to turn off (it is not in
     /// the `known` list saved with the row), then puts the default row in front. Tabs they removed

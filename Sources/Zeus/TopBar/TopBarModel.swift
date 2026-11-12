@@ -261,6 +261,9 @@ final class TopBarModel {
         let addScribe = !defaults.bool(forKey: "topBar.row12.v1")
         if addScribe, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row12.v1") }
         if addScribe { upgraded = upgraded.upgradedToScribeRow() }
+        let addAgents = !defaults.bool(forKey: "topBar.row13.v1")
+        if addAgents, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row13.v1") }
+        if addAgents { upgraded = upgraded.upgradedToAgentsRow() }
         // Repair, once per version: an earlier launch saved the flags above without the upgraded row, so on
         // this launch none of them is true and the row would stay old. Only a row that was saved is repaired.
         let needsRepair = defaults.integer(forKey: "topBar.layoutRepair") < TopBarLayoutRepair.version
