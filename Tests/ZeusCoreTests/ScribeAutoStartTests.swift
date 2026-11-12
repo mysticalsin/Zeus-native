@@ -730,6 +730,22 @@ struct ScribeAutoStartTests {
 
     // MARK: A tap is never lost
 
+    /// 30s is the longest a hover may pause the ask. `askTimeout` stays 20s.
+    private let hoverCap: TimeInterval = 30
+
+    @Test func aHoverCannotHoldTheAskForeverAndNeverStartsRecording() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        let cap = 15 + hoverCap
+        #expect(machine.handle(.tick(now: cap)).isEmpty)
+        let gone = machine.handle(.tick(now: cap + 8))
+        #expect(gone == [.hideBanner])
+        #expect(!gone.contains { if case .startRecording = $0 { return true }; return false })
+        if case .recording = machine.state {
+            Issue.record("hover cap started a recording")
+        }
+    }
+
     @Test func askMeNeverTimesOutUnderThePointer() {
         var machine = asPrompting()
         machine.handle(.pointer(inside: true, now: 15))

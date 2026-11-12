@@ -56,6 +56,31 @@ struct ScribePopupLifecycleTests {
         #expect(card.phase == .starting)
     }
 
+    /// 30s is the longest a hover may pause dismissal. The lifetime passed to `present` stays 45s.
+    private let hoverCap: TimeInterval = 30
+
+    @Test func aHoverCannotHoldTheCardPastTheCapAndNeverStartsRecording() {
+        var card = shownCard()
+        card.handle(.pointer(inside: true, now: 40))
+        let cap = 40 + hoverCap
+        #expect(card.handle(.tick(now: cap)).isEmpty)
+        let gone = card.handle(.tick(now: cap + 5))
+        #expect(gone == [.hide, .timedOut])
+        #expect(card.phase == .expired)
+    }
+
+    @Test func aFailureHoverCannotHoldTheCardPastTheCap() {
+        var card = shownCard()
+        card.handle(.click(now: 1, scribe: .idle, microphoneBlocked: true))
+        #expect(card.phase == .failed(.microphoneOff))
+        card.handle(.pointer(inside: true, now: 2))
+        let cap = 2 + hoverCap
+        #expect(card.handle(.tick(now: cap)).isEmpty)
+        let gone = card.handle(.tick(now: cap + 59))
+        #expect(gone == [.hide])
+        #expect(card.phase == .expired)
+    }
+
     @Test func theCardNeverExpiresUnderThePointer() {
         var card = shownCard()
         card.handle(.pointer(inside: true, now: 40))
