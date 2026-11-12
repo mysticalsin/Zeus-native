@@ -236,10 +236,12 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// then only once it has been gone for `rearmAfterAbsence`.
     public var cooldown: TimeInterval
     public var rearmAfterAbsence: TimeInterval
+    /// "Ask me" never leaves while the pointer is over it, and stays at least this long after the pointer leaves.
+    public var hoverGrace: TimeInterval
 
     public init(debounce: TimeInterval = 3, askTimeout: TimeInterval = 20, countdown: TimeInterval = 5,
                 callEndedAfter: TimeInterval = 8, endingGrace: TimeInterval = 3, startGrace: TimeInterval = 10,
-                cooldown: TimeInterval = 60, rearmAfterAbsence: TimeInterval = 30) {
+                cooldown: TimeInterval = 60, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4) {
         self.debounce = debounce
         self.askTimeout = askTimeout
         self.countdown = countdown
@@ -248,6 +250,7 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
         self.startGrace = startGrace
         self.cooldown = cooldown
         self.rearmAfterAbsence = rearmAfterAbsence
+        self.hoverGrace = hoverGrace
     }
 
     public static let standard = ScribeAutoStartTiming()
@@ -317,6 +320,12 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case accept(now: TimeInterval)
         /// Not now, or Cancel.
         case decline(now: TimeInterval)
+        /// The pointer entered or left the banner. "Ask me" does not time out under the pointer.
+        case pointer(inside: Bool, now: TimeInterval)
+        /// The person tapped Start on the card showing `meeting`, but the card's question is no longer pending
+        /// (it timed out or was replaced at the same moment). An explicit tap still starts, unless Scribe is
+        /// already recording a meeting.
+        case startNow(ScribeMeeting, now: TimeInterval)
     }
 
     public enum Effect: Equatable, Sendable {
@@ -339,6 +348,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private var lastEvidence: ScribeMeetingEvidence?
     /// The person chose "Switch" on the next-meeting card: the next meeting may trigger without the cooldown.
     private var switching = false
+    /// The pointer is over the banner.
+    public private(set) var pointerInside = false
 
     public init(timing: ScribeAutoStartTiming = .standard) {
         self.timing = timing
@@ -401,6 +412,21 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 return [.hideBanner]
             default:
                 return []
+            }
+        case .pointer(let inside, let now):
+            pointerInside = inside
+            if !inside, case .prompting(let meeting, let deadline) = state {
+                state = .prompting(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
+            }
+            return []
+        case .startNow(let meeting, let now):
+            switch state {
+            case .prompting, .countingDown:
+                return handle(.accept(now: now))
+            case .recording, .endingSuggested:
+                return []
+            case .idle, .armed, .cooldown:
+                return [.hideBanner] + begin(meeting, now: now)
             }
         }
     }
@@ -526,6 +552,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     /// consent: Zeus never starts capture from the detector without both, so it asks. The first automatic start asks
     /// in words that also record the consent.
     private mutating func ask(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence?, now: TimeInterval) -> [Effect] {
+        // A fresh card: an old "pointer inside" from a card that was taken down must not hold this one.
+        pointerInside = false
         state = .prompting(meeting: meeting, deadline: now + timing.askTimeout)
         if let evidence, evidence.mode == .automatic, evidence.micPermissionGranted, !evidence.autoConsentGiven {
             return [.showConsentAsk(meeting)]
@@ -535,7 +563,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
 
     private mutating func expire(now: TimeInterval) -> [Effect] {
         switch state {
-        case .prompting(let meeting, let deadline) where now >= deadline:
+        case .prompting(let meeting, let deadline) where now >= deadline && !pointerInside:
             state = cooling(meeting.key, now: now)
             return [.hideBanner]
         case .countingDown(let meeting, let deadline) where now >= deadline:

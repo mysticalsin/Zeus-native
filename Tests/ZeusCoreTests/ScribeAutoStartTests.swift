@@ -727,4 +727,61 @@ struct ScribeAutoStartTests {
         #expect(ScribeActivity(.complete(id)) == .idle)
         #expect(ScribeActivity(.failed(id, reason: "x")) == .idle)
     }
+
+    // MARK: A tap is never lost
+
+    @Test func askMeNeverTimesOutUnderThePointer() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        let held = machine.handle(.tick(now: 40))
+        #expect(held.isEmpty)
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
+        let start = machine.handle(.accept(now: 41))
+        #expect(start == [.hideBanner, .startRecording(asTeams)])
+    }
+
+    @Test func leavingTheBannerGivesAShortGraceThenItTimesOut() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        machine.handle(.pointer(inside: false, now: 30))
+        let grace = machine.handle(.tick(now: 33))
+        #expect(grace.isEmpty)
+        let gone = machine.handle(.tick(now: 34))
+        #expect(gone == [.hideBanner])
+    }
+
+    @Test func aTapThatArrivesJustAfterTheTimeoutStillStarts() {
+        var machine = asPrompting()
+        machine.handle(.tick(now: 23))
+        let late = machine.handle(.accept(now: 23.1))
+        #expect(late.isEmpty)
+        let start = machine.handle(.startNow(asTeams, now: 23.1))
+        #expect(start == [.hideBanner, .startRecording(asTeams)])
+        let isRecording: Bool
+        if case .recording = machine.state { isRecording = true } else { isRecording = false }
+        #expect(isRecording)
+    }
+
+    @Test func startNowWhilePromptingIsTheSameAsAccept() {
+        var machine = asPrompting()
+        let start = machine.handle(.startNow(asTeams, now: 5))
+        #expect(start == [.hideBanner, .startRecording(asTeams)])
+    }
+
+    @Test func startNowNeverStartsASecondRecording() {
+        var machine = asRecordingTeams()
+        let effects = machine.handle(.startNow(asTeams, now: 12))
+        #expect(effects.isEmpty)
+    }
+
+    @Test func aFreshBannerIsNotHeldByAPointerFromTheLastOne() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 4))
+        machine.handle(.decline(now: 5))
+        machine.handle(asEvidence(70, mic: [.zoom]))
+        machine.handle(asEvidence(73, mic: [.zoom]))
+        #expect(!machine.pointerInside)
+        let gone = machine.handle(.tick(now: 93))
+        #expect(gone == [.hideBanner])
+    }
 }
