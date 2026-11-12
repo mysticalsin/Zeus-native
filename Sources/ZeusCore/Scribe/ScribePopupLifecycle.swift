@@ -154,6 +154,8 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
         case .present(let key, let lifetime, let now):
             // A tap in flight wins over a fresh prompt: never reset "Starting..." back to the question.
             if phase == .starting || phase == .started { return [] }
+            // A card that was not already showing, or a different card, must not inherit a stuck hover.
+            let keepPointer = phase.isVisible && self.key == key
             self.key = key
             phase = .shown
             session = nil
@@ -161,6 +163,7 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
             deadline = lifetime.map { now + $0 }
             hoverSince = nil
             pausedRemaining = nil
+            if !keepPointer { pointerInside = false }
             if pointerInside, let lifetime {
                 hoverSince = now
                 pausedRemaining = lifetime
@@ -317,6 +320,8 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
         }
         self.hoverSince = nil
         pausedRemaining = nil
+        // The cap ended the hover. The next card starts from a normal lifetime, not another 30s pause.
+        pointerInside = false
     }
 
     private mutating func succeed(_ id: ScribeSessionID, now: TimeInterval) {
