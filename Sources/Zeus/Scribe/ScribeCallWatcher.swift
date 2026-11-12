@@ -54,16 +54,13 @@ struct ScribeDetectedCall: Equatable, Sendable {
 struct ScribeCallScan: Equatable, Sendable {
     /// Calls in progress: a known call app (or a browser on a Meet tab) capturing the microphone.
     var calls: [ScribeDetectedCall]
-    /// What the mute detector needs: incomplete when any process couldn't be read, browser state unknown unless
-    /// window titles were read. Never "no call" by default.
-    var inputScan: ScribeInputScan
     /// Known call apps that are running (or a browser showing a Meet tab) whether or not they use the
     /// microphone right now. A call app that stopped capturing while muted still shows up here.
     var runningCallApps: [ScribeDetectedCall] = []
-    /// A known call app is running or browser call evidence exists, even when `inputScan` is `.incomplete`
-    /// (an unreadable process). Never used to admit the microphone.
+    /// A known call app is capturing or browser call evidence exists, even when a process couldn't be read.
+    /// Never used to withhold the microphone; it only drives the "shared" note.
     var callPresent: Bool = false
-    /// Includes unsupported owners: releasing input later must not silently restore Zeus's microphone.
+    /// Any other process capturing the microphone right now, identified or not. Never withholds Zeus's microphone.
     var externalInputDetected: Bool = false
     /// Whether each running call app's call window is on screen. Unknown unless window titles are readable.
     var callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]
@@ -71,14 +68,14 @@ struct ScribeCallScan: Equatable, Sendable {
 
 /// Finds calls in progress: a known call app (or a browser on a Meet tab) that is capturing the microphone.
 /// A running call app alone does not prove a call (Teams is always open), so `calls` follows microphone
-/// capture; `inputScan` and `runningCallApps` are reported for the mute detector, which fails closed on them.
+/// capture. Another app using the microphone never withholds Zeus's own microphone; the mute detector only
+/// reports it.
 enum ScribeCallProbe {
     static func scan() -> ScribeCallScan {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let titles = windowTitlesByPID()
         let running = runningApps(titles: titles)
         let reads = inputReads()
-        let inputScan = reads.map { ScribeScanReducer.reduce(reads: $0, running: running, ownPID: ownPID) } ?? .incomplete
         var calls: [ScribeDetectedCall] = []
         for case .input(let pid, let bundleID) in reads ?? [] where pid != ownPID {
             guard let appBundleID = ScribeCallDetection.appBundleID(for: bundleID) else { continue }
@@ -92,7 +89,7 @@ enum ScribeCallProbe {
         calls.sort { rank($0.app) != rank($1.app) ? rank($0.app) < rank($1.app) : ScribeCallDetection.displayName($0.app) < ScribeCallDetection.displayName($1.app) }
         let callPresent = ScribeScanReducer.callPresence(reads: reads ?? [], running: running, ownPID: ownPID)
         let externalInput = (reads ?? []).contains { $0.isExternalInput(excluding: ownPID) }
-        return ScribeCallScan(calls: calls, inputScan: inputScan, runningCallApps: runningCallApps(from: running),
+        return ScribeCallScan(calls: calls, runningCallApps: runningCallApps(from: running),
                               callPresent: callPresent, externalInputDetected: externalInput,
                               callWindows: callWindows(running: running, titles: titles))
     }

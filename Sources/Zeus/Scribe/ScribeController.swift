@@ -116,7 +116,7 @@ struct ScribeRecap: Identifiable, Equatable {
     var transcript: [ScribeTranscriptSegment]
     /// Set when part of the meeting couldn't be transcribed, so the notes may be missing speech.
     var transcriptionNote: String? = nil
-    /// Set when the microphone was left out while a call app was open (saved with the meeting).
+    /// Set on meetings saved by an older Zeus that left the microphone out while a call app was open.
     var micExcludedDuringCall = false
     /// Where each speaker's name came from and how sure Zeus is (saved with the meeting).
     var speakerBook: ScribeSpeakerBook?
@@ -270,10 +270,10 @@ final class ScribeController {
     private(set) var transcriptionIssues: [String] = []
     /// Seconds of microphone audio withheld this session because the mute state couldn't be established.
     private(set) var microphoneUnknownSeconds: Double = 0
-    /// The microphone is being dropped right now because a call was detected.
-    private(set) var micCallExcludedNow = false
-    /// The microphone was dropped because of a call at some point this session; kept with the meeting.
-    private(set) var micExcludedDuringCall = false
+    /// Another app is using the microphone right now; Zeus keeps recording it. Clears when that app lets go.
+    private(set) var micSharedNow = false
+    /// The shared note was already announced this session (announced once, shown while it lasts).
+    private var micSharedAnnounced = false
     /// Why capture stopped before the person ended the meeting (what was captured is still kept and saved).
     private(set) var stoppedEarlyReason: String?
     /// Set when the notes couldn't be written or were cancelled; the transcript is saved without them.
@@ -477,10 +477,11 @@ final class ScribeController {
     /// True while a failed save or a failed cleanup can be retried.
     var storageRetryAvailable: Bool { !unsavedMeetings.isEmpty || !pendingCleanup.isEmpty }
 
-    /// Shown while recording when the microphone is being dropped because its mute state is unknown.
+    /// Shown while recording: the microphone is being dropped because its mute state is unknown, or another
+    /// app is using it too (Zeus still records it).
     var microphoneNote: String? {
-        if micCallExcludedNow { return ScribeMicCallText.excludedNotice }
-        return micMute == .unknown ? Self.microphoneUnknownNote : nil
+        if micMute == .unknown { return Self.microphoneUnknownNote }
+        return micSharedNow ? ScribeMicCallText.sharedNotice : nil
     }
 
     /// All transcription problems of this session as one sentence, or nil.
@@ -574,8 +575,8 @@ final class ScribeController {
         systemAudioReceiving = false
         transcriptionIssues = []
         microphoneUnknownSeconds = 0
-        micCallExcludedNow = false
-        micExcludedDuringCall = false
+        micSharedNow = false
+        micSharedAnnounced = false
         stoppedEarlyReason = nil
         notesIssue = nil
         systemAudioStalled = false
@@ -1039,11 +1040,11 @@ final class ScribeController {
                 noteTranscriptionIssue(Self.audioLostMessage, session: id)
             case .microphone(let state):
                 publishMic(state, session: id)
-            case .microphoneExcludedByCall(let excluded):
-                micCallExcludedNow = excluded
-                if excluded, !micExcludedDuringCall {
-                    micExcludedDuringCall = true
-                    announce(ScribeMicCallText.excludedNotice)
+            case .microphoneShared(let shared):
+                micSharedNow = shared
+                if shared, !micSharedAnnounced {
+                    micSharedAnnounced = true
+                    announce(ScribeMicCallText.sharedNotice)
                 }
             case .microphoneWithheld(let state, let seconds):
                 // A muted microphone withheld on purpose isn't missing speech; an unknown one might be.
@@ -1268,8 +1269,7 @@ final class ScribeController {
             dismissedAt: dismissedAt,
             transcriptionNote: ScribeRecapNote.compose(
                 issues: transcriptionIssues, stoppedEarly: stoppedEarlyReason, notesIssue: ScribeRecapNote.checkpointNote
-            ),
-            micExcludedDuringCall: micExcludedDuringCall
+            )
         )
     }
 
@@ -1348,7 +1348,6 @@ final class ScribeController {
             transcriptionNote: ScribeRecapNote.compose(
                 issues: transcriptionIssues, stoppedEarly: stoppedEarlyReason, notesIssue: notesIssue
             ),
-            micExcludedDuringCall: micExcludedDuringCall,
             speakerBook: sessionSpeakerBook
         )
         if let index = recaps.firstIndex(where: { $0.id == id }) { recaps[index] = recap }
@@ -1800,8 +1799,8 @@ final class ScribeController {
         systemAudioReceiving = false
         transcriptionIssues = []
         microphoneUnknownSeconds = 0
-        micCallExcludedNow = false
-        micExcludedDuringCall = false
+        micSharedNow = false
+        micSharedAnnounced = false
     }
 
     // MARK: Clock text (display only)

@@ -132,7 +132,9 @@ public enum MicConflict {
         guard pid != ownPID else { return false }
         guard !bundleID.isEmpty else { return false }
         guard !bundleID.hasPrefix("app.zeus") else { return false }
-        return callApps.contains(bundleID)
+        // Calls usually capture through helper processes (a browser's audio or WebKit GPU helper, a call
+        // app's helper), whose bundle IDs never match exactly. Map them to their app as Scribe does.
+        return callApps.contains(bundleID) || ScribeCallDetection.appBundleID(for: bundleID) != nil
     }
 }
 

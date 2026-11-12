@@ -7,7 +7,7 @@ struct TodoPage: View {
     let topBar: TopBarModel
     let todo: TodoController
 
-    var body: some View { list }
+    var body: some View { list.onDisappear { todo.endVoice() } }
     private var list: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {

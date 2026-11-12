@@ -212,18 +212,19 @@ private final class BlockingTranscriber: ScribeTranscriber, @unchecked Sendable 
 
 @Suite("Scribe mic gate and router")
 struct ScribeMicGateRouterTests {
-    @Test func anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition() {
+    @Test func anUnsupportedMicrophoneOwnerStillLetsTheMicrophoneThrough() {
         let scan = ScribeScanReducer.reduce(
             reads: [.input(pid: 50, bundleID: "com.example.unsupported-call")],
             running: [], ownPID: 1
         )
-        let state = ScribeMuteResolver.resolve(device: .noSwitch, scan: scan)
-        let rig = RouterRig(mute: state)
-        #expect(rig.router.route(rig.frame(.microphone, 0)) == .droppedMicrophone(.muteUnknown))
-        #expect(rig.store.stored.isEmpty)
-        #expect(rig.transcriber.ingested.isEmpty)
-        // Remote participants remain independent of the microphone admission verdict.
+        #expect(scan == .incomplete)
+        // Another app sharing the input never withholds the person's microphone; only the device's mute does.
+        let rig = RouterRig(mute: ScribeMuteResolver.resolve(device: .noSwitch))
+        #expect(rig.router.route(rig.frame(.microphone, 0)) == .delivered)
         #expect(rig.router.route(rig.frame(.system, 1)) == .delivered)
+        let muted = RouterRig(mute: ScribeMuteResolver.resolve(device: .muted))
+        #expect(muted.router.route(muted.frame(.microphone, 0)) != .delivered)
+        #expect(muted.store.stored.isEmpty)
     }
 
     @Test func mutedAndUnknownMicFramesReachNeitherStoreNorTranscriber() {

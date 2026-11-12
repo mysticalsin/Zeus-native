@@ -19,8 +19,9 @@ enum ScribeCaptureIssue: Sendable {
     case microphone(ScribeMuteState)
     /// Microphone audio withheld, in seconds, while the verdict was `state` (`.muted` or `.unknown`).
     case microphoneWithheld(ScribeMuteState, seconds: Double)
-    /// Whether the microphone is currently dropped because a call was detected (reported on change only).
-    case microphoneExcludedByCall(Bool)
+    /// Whether another app is using the microphone at the same time (reported on change only). Zeus keeps
+    /// recording it either way; this only drives the note, which clears when that app lets go.
+    case microphoneShared(Bool)
 }
 
 /// A capture provider that also reports `ScribeCaptureIssue`s.
@@ -160,8 +161,8 @@ private final class ScribeCaptureRun: @unchecked Sendable {
     /// The microphone verdict last reported, and the audio withheld under it since.
     private var micVerdict: ScribeMuteState?
     private var micWithheldSeconds = 0.0
-    /// Whether the last report said the microphone is dropped because of a call.
-    private var micCallExcluded = false
+    /// Zeus's hold on the input and whether another app shares it. Never withholds the microphone.
+    private var ownership = MicInputOwnership()
 
     /// Ring size in seconds of audio, and how often the worker drains. A stall longer than the ring drops
     /// (and counts) audio rather than growing without bound.
@@ -237,6 +238,7 @@ private final class ScribeCaptureRun: @unchecked Sendable {
                         timer = nil
                         drainAll()
                         reportMicrophoneWithheld()
+                        reportOwnership(ownership.apply(.zeusStopped))
                     }
                 case .closeDelivery:
                     // Behind the final drain on the same queue, so no frame is in flight past this point.
@@ -292,6 +294,7 @@ private final class ScribeCaptureRun: @unchecked Sendable {
             let startedAt = ScribeHostClock.now()
             guard monitor.ingress.acknowledge(session: session, at: startedAt) else { return false }
             captureStartedAt = startedAt
+            _ = ownership.apply(.zeusStarted)
             // The worker is serial and its timer has not started, so no delivery can overtake this
             // callback. Invoke it outside the lock to avoid reentrant lifecycle callbacks deadlocking.
             events(.captureAcknowledged(session))
@@ -404,6 +407,9 @@ private final class ScribeCaptureRun: @unchecked Sendable {
     /// new format; if that fails, end the capture with a reason rather than keep listening to nothing.
     private func micConfigurationChanged() {
         guard !lock.withLock({ stopRequested }) else { return }
+        // Only while Zeus holds the input: a change after stop must never reopen the microphone.
+        let effects = worker.sync { ownership.apply(.defaultInputChanged) }
+        guard effects.contains(.reopenInput) else { return }
         do {
             try startMic()
         } catch {
@@ -519,10 +525,15 @@ private final class ScribeCaptureRun: @unchecked Sendable {
             if lock.withLock({ delivering }) { issues(.microphone(verdict)) }
         }
         if verdict != .unmuted { micWithheldSeconds += seconds }
-        let excluded = verdict != .unmuted && monitor.callDetected(start: start, seconds: seconds)
-        if excluded != micCallExcluded {
-            micCallExcluded = excluded
-            issues(.microphoneExcludedByCall(excluded))
+        let otherApp = monitor.otherAppUsingMicrophone(start: start, seconds: seconds)
+        reportOwnership(ownership.apply(.otherApp(active: otherApp)))
+    }
+
+    /// Worker queue only. Passes on a change of "shared with another app" while delivering.
+    private func reportOwnership(_ effects: [MicInputOwnership.Effect]) {
+        guard lock.withLock({ delivering }) else { return }
+        for case .sharedChanged(let shared) in effects {
+            issues(.microphoneShared(shared))
         }
     }
 

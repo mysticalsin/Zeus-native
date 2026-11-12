@@ -905,7 +905,7 @@ private struct ScribeNotesView: View {
             endedAt: endedAt,
             notes: scribe.notes ?? ScribeMeetingNotes(),
             transcript: scribe.transcript?.finalSegments ?? [],
-            warnings: [note, scribe.micExcludedDuringCall ? ScribeMicCallText.excludedNotice : nil].compactMap { $0 },
+            warnings: [note].compactMap { $0 },
             focusToken: scribe.focusToken,
             closeTitle: "Done",
             speakerTools: namingTools(id),

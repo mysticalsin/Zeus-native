@@ -632,9 +632,6 @@ struct ScribeLiveLogicTests {
         #expect(start(now: 13, taken: 9, flight: 9.5))
     }
 
-    private func resolve(device: ScribeDeviceMute = .noSwitch, _ scan: ScribeInputScan) -> ScribeMuteState {
-        ScribeMuteResolver.resolve(device: device, scan: scan)
-    }
 
     private func native(_ pid: Int32 = 100, _ kind: String = "Zoom") -> ScribeCallIdentity {
         ScribeCallIdentity(pid: pid, kind: kind, source: .native)
@@ -648,37 +645,29 @@ struct ScribeLiveLogicTests {
         .completed(calls: calls, browserUnknown: browserUnknown)
     }
 
-    @Test func anIncompleteScanIsUnknownNeverUnmuted() {
-        #expect(resolve(.incomplete) == .unknown)
-        #expect(resolve(device: .notMuted, .incomplete) == .unknown)
-        #expect(resolve(device: .noSwitch, .incomplete) == .unknown)
-    }
-
     @Test func aMutedOrUnreadableDeviceNeverReadsUnmuted() {
-        #expect(resolve(device: .muted, .incomplete) == .muted)
-        #expect(resolve(device: .muted, completed()) == .muted)
-        #expect(resolve(device: .unreadable, completed()) == .unknown)
-        #expect(resolve(device: .notMuted, completed()) == .unmuted)
-        #expect(resolve(device: .noSwitch, completed()) == .unmuted)
+        #expect(ScribeMuteResolver.resolve(device: .muted) == .muted)
+        #expect(ScribeMuteResolver.resolve(device: .unreadable) == .unknown)
+        #expect(ScribeMuteResolver.resolve(device: .notMuted) == .unmuted)
+        #expect(ScribeMuteResolver.resolve(device: .noSwitch) == .unmuted)
     }
 
-    @Test func anyDetectedCallIsUnknownSoAccessibilityCanNeverAdmitTheMicrophone() {
-        // There is no way to supply per-app mute evidence any more: a call identity is `.unknown`, full stop.
-        for call in [native(100, "Zoom"), native(101, "Teams"), native(102, "Slack"), native(103, "Webex"), native(104, "FaceTime"), web()] {
-            #expect(resolve(device: .notMuted, completed([call])) == .unknown)
-            #expect(resolve(device: .noSwitch, completed([call])) == .unknown)
+    @Test func anotherAppUsingTheMicrophoneNeverExcludesIt() {
+        // A call, a browser that might be in one, or an owner Zeus can't identify: the person's microphone is
+        // still recorded, because only the device's own mute decides. Each still counts as call evidence.
+        for call in [native(100, "Zoom"), native(101, "Teams"), native(104, "FaceTime"), web()] {
+            let scan = completed([call])
+            #expect(ScribeMuteResolver.callDetected(scan: scan))
+            #expect(ScribeMuteResolver.sample(device: .notMuted, callPresent: true)
+                == ScribeMuteSample(admission: .unmuted, callPresent: true))
         }
-        #expect(resolve(completed([native(), web()])) == .unknown)
-        #expect(resolve(completed([web(200, "Zoom Meeting")])) == .unknown)
-    }
-
-    @Test func browserUncertaintyIsUnknown() {
-        #expect(resolve(completed(browserUnknown: true)) == .unknown)
-        #expect(resolve(completed([native()], browserUnknown: true)) == .unknown)
-    }
-
-    @Test func zeroIdentitiesOnACompleteScanWithAnUnmutedDeviceIsAdmitted() {
-        #expect(resolve(device: .notMuted, completed()) == .unmuted)
+        #expect(ScribeMuteResolver.callDetected(scan: completed(browserUnknown: true)))
+        let unknownOwner = ScribeScanReducer.reduce(reads: [.input(pid: 50, bundleID: "com.example.unsupported-call")],
+                                                    running: [], ownPID: 1)
+        #expect(unknownOwner == .incomplete)
+        #expect(ScribeMuteResolver.sample(device: .noSwitch, callPresent: false).admission == .unmuted)
+        // Muting the device itself still withholds it, call or not.
+        #expect(ScribeMuteResolver.sample(device: .muted, callPresent: true).admission == .muted)
     }
 
     @Test func aCallIsReportedAsTheReasonOnlyForACompleteScanWithAnIdentityOrBrowserDoubt() {
@@ -696,9 +685,10 @@ struct ScribeLiveLogicTests {
         #expect(Set([first, second]).count == 2)
     }
 
-    @Test func theExcludedNoticeSaysWhatHappenedAndWhatIsStillRecorded() {
-        #expect(ScribeMicCallText.excludedNotice
-            == "Your microphone stays excluded after another app uses it, because Zeus can't confirm its mute state. System audio is still recorded.")
+    @Test func theSharedNoticeSaysZeusKeepsRecordingTheMicrophone() {
+        #expect(ScribeMicCallText.sharedNotice
+            == "Another app is using your microphone too. Zeus keeps recording it, so muting in that app does not mute Zeus.")
+        #expect(!ScribeMicCallText.sharedNotice.contains("\u{2014}"))
     }
 
     // MARK: Scan reduction
@@ -725,14 +715,13 @@ struct ScribeLiveLogicTests {
         #expect(scan == completed())
     }
 
-    @Test func anUnknownActiveMicrophoneOwnerFailsClosedWithoutInventingACall() {
+    @Test func anUnknownActiveMicrophoneOwnerNeverInventsACallOrExcludesTheMicrophone() {
         for bundleID in ["com.example.unsupported-call", "com.example.new-browser", "", "com.apple.Music"] {
             let reads: [ScribeProcessRead] = [.input(pid: 50, bundleID: bundleID)]
             let running = [app(bundleID, pid: 50)]
             let scan = ScribeScanReducer.reduce(reads: reads, running: running, ownPID: ownPID)
             #expect(scan == .incomplete)
-            #expect(resolve(device: .noSwitch, scan) == .unknown)
-            #expect(resolve(device: .notMuted, scan) == .unknown)
+            #expect(ScribeMuteResolver.sample(device: .noSwitch, callPresent: false).admission == .unmuted)
             #expect(!ScribeScanReducer.callPresence(reads: reads, running: running, ownPID: ownPID))
         }
     }
@@ -748,10 +737,10 @@ struct ScribeLiveLogicTests {
     }
 
     @Test func aNativeCallAppIsAnIdentityOnlyWhileItCapturesTheMic() {
-        // Idle in the background (no call): not a call, so the microphone can be admitted.
+        // Idle in the background (no call): not a call.
         let idle = ScribeScanReducer.reduce(reads: [.idle], running: [app("us.zoom.xos", pid: 100)], ownPID: ownPID)
         #expect(idle == completed())
-        #expect(resolve(device: .notMuted, idle) == .unmuted)
+        #expect(!ScribeMuteResolver.callDetected(scan: idle))
         // The same app also capturing through a helper is still one identity.
         let both = ScribeScanReducer.reduce(
             reads: [.input(pid: 101, bundleID: "us.zoom.xos.helper")], running: [app("us.zoom.xos", pid: 100)], ownPID: ownPID
@@ -779,10 +768,10 @@ struct ScribeLiveLogicTests {
             reads: [.input(pid: 7, bundleID: "com.google.Chrome.helper")], running: [app("com.google.Chrome", titles: ["Inbox"], complete: false)], ownPID: ownPID
         )
         #expect(scan == completed(browserUnknown: true))
-        #expect(resolve(scan) == .unknown)
-        // Complete titles with no call are still positive evidence.
+        #expect(ScribeMuteResolver.callDetected(scan: scan))
+        // Complete titles with no call name no call.
         let plain = ScribeScanReducer.reduce(reads: [.idle], running: [app("com.google.Chrome", titles: ["Inbox"])], ownPID: ownPID)
-        #expect(resolve(plain) == .unmuted)
+        #expect(!ScribeMuteResolver.callDetected(scan: plain))
     }
 
     @Test func browserTitlesDecideCallOrNoCall() {
@@ -811,7 +800,7 @@ struct ScribeLiveLogicTests {
             ownPID: ownPID
         )
         #expect(scan == completed([web(200, "Zoom Meeting", window: 41), web(200, "Zoom Meeting", window: 42)]))
-        #expect(resolve(scan) == .unknown)
+        #expect(ScribeMuteResolver.callDetected(scan: scan))
     }
 
     @Test func aMissingWindowNumberStillKeepsIdenticalTitlesApart() {
@@ -834,7 +823,7 @@ struct ScribeLiveLogicTests {
             ownPID: ownPID
         )
         #expect(scan == completed([native(100, "Zoom"), web(200, "Webex Meetings")]))
-        #expect(resolve(scan) == .unknown)
+        #expect(ScribeMuteResolver.callDetected(scan: scan))
     }
 
     @Test func everyKnownCallAppCapturingTheMicIsAnIdentity() {
@@ -844,9 +833,9 @@ struct ScribeLiveLogicTests {
         ] {
             let scan = ScribeScanReducer.reduce(reads: [.input(pid: 78, bundleID: bundle)], running: [app(bundle, pid: 77)], ownPID: ownPID)
             #expect(scan == completed([native(77, kind)]))
-            #expect(resolve(device: .notMuted, scan) == .unknown)
+            #expect(ScribeMuteResolver.callDetected(scan: scan))
             let idle = ScribeScanReducer.reduce(reads: [.idle], running: [app(bundle, pid: 77)], ownPID: ownPID)
-            #expect(resolve(device: .notMuted, idle) == .unmuted)
+            #expect(!ScribeMuteResolver.callDetected(scan: idle))
         }
     }
 
@@ -972,60 +961,64 @@ struct ScribeLiveLogicTests {
         #expect(!ScribeMuteTimeline().callDetected(start: 1, seconds: 1))
     }
 
-    /// Mirrors the controller: a reading whose call evidence is present while the microphone is dropped sets the
-    /// session flag, which is then saved with the meeting.
-    private func flagAfterRecording(readings: [ScribeMuteSample]) throws -> Bool? {
+    /// Mirrors the capture run: each reading joins the timeline, the next microphone interval is admitted or
+    /// dropped against it, and the ownership machine reports "shared with another app" on change.
+    private func recordDuringCall(_ readings: [ScribeMuteSample]) -> (admitted: [Bool], shared: [Bool]) {
         var timeline = ScribeMuteTimeline(timeToLive: 1.5)
-        var flagged = false
+        var ownership = MicInputOwnership()
+        var admitted: [Bool] = []
+        var shared: [Bool] = []
+        _ = ownership.apply(.zeusStarted)
         for (index, reading) in readings.enumerated() {
             let start = Double(index) * 10
             timeline.record(state: reading.admission, readStart: start, readEnd: start + 0.1, callDetected: reading.callPresent)
             let coverage = timeline.coverage(start: start + 0.2, seconds: 0.1)
-            let dropped = coverage != .admitted
-            if dropped, timeline.callDetected(start: start + 0.2, seconds: 0.1) { flagged = true }
+            admitted.append(coverage == .admitted)
+            let otherApp = timeline.callDetected(start: start + 0.2, seconds: 0.1)
+            for case .sharedChanged(let value) in ownership.apply(.otherApp(active: otherApp)) { shared.append(value) }
         }
-        let directory = try temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory.deletingLastPathComponent()) }
-        let store = ScribeMeetingStore(directory: directory)
-        var record = sampleRecord()
-        record.micExcludedDuringCall = flagged ? true : nil
-        try store.save(record)
-        return store.loadAll().records.first?.micExcludedDuringCall
+        for case .sharedChanged(let value) in ownership.apply(.zeusStopped) { shared.append(value) }
+        return (admitted, shared)
     }
 
-    @Test func zoomInACallWithTheInputMutedStillReportsACallAndPersistsTheFlag() throws {
+    @Test func zoomInACallKeepsTheMicrophoneUnlessTheDeviceItselfIsMuted() {
         let reads: [ScribeProcessRead] = [.input(pid: 101, bundleID: "us.zoom.xos")]
-        let scan = ScribeScanReducer.reduce(reads: reads, running: [app("us.zoom.xos", pid: 100)], ownPID: ownPID)
         let present = ScribeScanReducer.callPresence(reads: reads, running: [app("us.zoom.xos", pid: 100)], ownPID: ownPID)
-        let sample = ScribeMuteResolver.sample(device: .muted, scan: scan, callPresent: present)
-        #expect(sample == ScribeMuteSample(admission: .muted, callPresent: true))
-        let persisted = try flagAfterRecording(readings: [sample, sample])
-        #expect(persisted == true)
+        let muted = ScribeMuteResolver.sample(device: .muted, callPresent: present)
+        let open = ScribeMuteResolver.sample(device: .notMuted, callPresent: present)
+        #expect(muted == ScribeMuteSample(admission: .muted, callPresent: true))
+        #expect(open == ScribeMuteSample(admission: .unmuted, callPresent: true))
+        let run = recordDuringCall([open, muted, open])
+        #expect(run.admitted == [true, false, true])
+        #expect(run.shared == [true, false])
     }
 
-    @Test func anUnreadableProcessWithAKnownCallAppStillReportsACallAndPersistsTheFlag() throws {
+    @Test func anUnreadableProcessWithAKnownCallAppStillReportsACallAndKeepsTheMicrophone() {
         let reads: [ScribeProcessRead] = [.input(pid: 101, bundleID: "us.zoom.xos"), .unreadable]
         let running = [app("us.zoom.xos", pid: 100)]
-        let scan = ScribeScanReducer.reduce(reads: reads, running: running, ownPID: ownPID)
-        #expect(scan == .incomplete)
+        #expect(ScribeScanReducer.reduce(reads: reads, running: running, ownPID: ownPID) == .incomplete)
         let present = ScribeScanReducer.callPresence(reads: reads, running: running, ownPID: ownPID)
-        let sample = ScribeMuteResolver.sample(device: .notMuted, scan: scan, callPresent: present)
-        // Admission still fails closed; only the call evidence is kept.
-        #expect(sample == ScribeMuteSample(admission: .unknown, callPresent: true))
-        let persisted = try flagAfterRecording(readings: [sample])
-        #expect(persisted == true)
+        let sample = ScribeMuteResolver.sample(device: .notMuted, callPresent: present)
+        #expect(sample == ScribeMuteSample(admission: .unmuted, callPresent: true))
+        #expect(recordDuringCall([sample]).admitted == [true])
     }
 
-    @Test func callPresenceIsFalseWithoutCallEvidenceAndNeverAdmitsAnything() throws {
+    @Test func theSharedStateClearsAsSoonAsTheOtherAppLetsGo() {
+        let inCall = ScribeMuteResolver.sample(device: .noSwitch, callPresent: true)
+        let afterCall = ScribeMuteResolver.sample(device: .noSwitch, callPresent: false)
+        let run = recordDuringCall([afterCall, inCall, inCall, afterCall, afterCall])
+        #expect(run.admitted == [true, true, true, true, true])
+        #expect(run.shared == [true, false])
+    }
+
+    @Test func callPresenceIsFalseWithoutCallEvidence() {
         let reads: [ScribeProcessRead] = [.idle, .unreadable]
         let running = [app("com.apple.Music")]
         let present = ScribeScanReducer.callPresence(reads: reads, running: running, ownPID: ownPID)
         #expect(!present)
-        let scan = ScribeScanReducer.reduce(reads: reads, running: running, ownPID: ownPID)
-        let sample = ScribeMuteResolver.sample(device: .noSwitch, scan: scan, callPresent: present)
-        #expect(sample == ScribeMuteSample(admission: .unknown, callPresent: false))
-        let persisted = try flagAfterRecording(readings: [sample])
-        #expect(persisted == nil)
+        let sample = ScribeMuteResolver.sample(device: .noSwitch, callPresent: present)
+        #expect(sample == ScribeMuteSample(admission: .unmuted, callPresent: false))
+        #expect(recordDuringCall([sample]).shared.isEmpty)
         // Presence is also ignorant of own-process entries.
         #expect(!ScribeScanReducer.callPresence(reads: [], running: [app("us.zoom.xos", pid: ownPID)], ownPID: ownPID))
     }

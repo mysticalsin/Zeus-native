@@ -105,20 +105,20 @@ struct ScribeMuteReadSchedulerTests {
         let ingress = ScribeMicrophoneIngress()
         let session = ScribeSessionID()
         ingress.begin(session: session)
-        ingress.record(state: .unmuted, readStart: 10, readEnd: 10.1, externalInputDetected: false)
+        ingress.record(state: .unmuted, readStart: 10, readEnd: 10.1)
         #expect(ingress.acknowledge(session: session, at: 10.1))
         let release = ReadGate()
         defer { release.open() }
         #expect(scheduler.schedule(now: 10.5, evidenceTakenAt: 10, interval: 0.5, watchdog: 3) {
             release.wait()
-            ingress.record(state: .unmuted, readStart: 10.5, readEnd: 13.7, externalInputDetected: false)
+            ingress.record(state: .unmuted, readStart: 10.5, readEnd: 13.7)
         })
         #expect(ingress.currentState(now: 12) == .unknown)
         #expect(!ingress.admit(session: session, start: 11.8, duration: 0.1, now: 12) {
             Issue.record("An expired reading touched microphone sample memory"); return true
         })
         #expect(scheduler.schedule(now: 13.5, evidenceTakenAt: 10, interval: 0.5, watchdog: 3) {
-            ingress.record(state: .muted, readStart: 13.5, readEnd: 13.6, externalInputDetected: false)
+            ingress.record(state: .muted, readStart: 13.5, readEnd: 13.6)
         })
         try await eventually { scheduler.activeReadCount == 1 && ingress.currentState(now: 13.7) == .muted }
         release.open()

@@ -27,8 +27,19 @@ final class PrompterRecorder: NSObject {
     var onFinish: (Result<URL, Error>) -> Void = { _ in }
 
     var isRecording: Bool { output?.isRecording == true }
+    /// Between Record and the camera and microphone actually running (permission prompts, startRunning).
+    private(set) var isStarting = false
+    /// Set when the window closed or Record was pressed again while starting: the session is then stopped
+    /// as soon as it runs, so the camera and microphone are never left open with nothing to stop them.
+    private var cancelRequested = false
 
-    func start() async throws {
+    /// Returns false when the start was cancelled before recording began (nothing is left running).
+    @discardableResult
+    func start() async throws -> Bool {
+        guard !isStarting, session == nil else { return false }
+        isStarting = true
+        cancelRequested = false
+        defer { isStarting = false }
         guard await Self.access(.video) else { throw RecorderError.cameraDenied }
         guard await Self.access(.audio) else { throw RecorderError.micDenied }
         guard let camera = AVCaptureDevice.default(for: .video) else { throw RecorderError.noCamera }
@@ -58,15 +69,27 @@ final class PrompterRecorder: NSObject {
                 continuation.resume()
             }
         }
+        if cancelRequested {
+            cancelRequested = false
+            Self.queue.async { box.session.stopRunning() }
+            return false
+        }
         output.startRecording(to: url, recordingDelegate: self)
         self.session = session
         self.output = output
         fileURL = url
         startedAt = Date()
+        return true
     }
 
     func stop() {
         output?.stopRecording()
+    }
+
+    /// Stops a recording, or a start still in progress. Safe to call at any time.
+    func cancel() {
+        if isStarting { cancelRequested = true }
+        if output != nil { stop() }
     }
 
     private func tearDown() {

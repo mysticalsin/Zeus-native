@@ -1064,7 +1064,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ScribeMicrophoneIngressTests.swift",
-              "function": "positivelyActiveButUnresolvedOwnerRemainsExcludedAfterItReleasesInput"
+              "function": "anUnidentifiedMicrophoneOwnerNeverExcludesTheMicrophone"
             }
           ]
         },
@@ -1078,7 +1078,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "anUnsupportedMicrophoneOwnerCannotReachStorageOrRecognition"
+              "function": "anUnsupportedMicrophoneOwnerStillLetsTheMicrophoneThrough"
             }
           ],
           "id": "F03.1"
@@ -5132,7 +5132,7 @@
       "obligations": [
         {
           "check": "portable-scribe",
-          "acceptance": "Idle apps cannot count as a call; unknown owners block admission.",
+          "acceptance": "Idle apps cannot count as a call; unknown owners never invent a call and never exclude the microphone.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
@@ -5140,7 +5140,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ScribeLiveLogicTests.swift",
-              "function": "anUnknownActiveMicrophoneOwnerFailsClosedWithoutInventingACall"
+              "function": "anUnknownActiveMicrophoneOwnerNeverInventsACallOrExcludesTheMicrophone"
             }
           ],
           "id": "S01.1"
