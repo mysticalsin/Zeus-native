@@ -167,17 +167,21 @@ final class OnboardingServices: OnboardingServing {
     // MARK: Actions
 
     func allowNotifications() {
+        Task { @MainActor in await requestNotifications() }
+    }
+
+    /// Asks once, or opens the Notifications pane when macOS already has an answer. Returns after the
+    /// answer (Allow all waits for it before the next prompt).
+    func requestNotifications() async {
         guard Self.hasBundle else { return }
-        Task { @MainActor in
-            let center = UNUserNotificationCenter.current()
-            let settings = await center.notificationSettings()
-            if settings.authorizationStatus == .notDetermined {
-                _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-            } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
-                NSWorkspace.shared.open(url)
-            }
-            refresh()
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        if settings.authorizationStatus == .notDetermined {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+        } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
         }
+        refresh()
     }
 
     /// macOS has no prompt for Full Disk Access: open its pane, the row turns green on return.
