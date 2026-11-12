@@ -554,7 +554,11 @@ final class ScribeController {
     // MARK: Actions
 
     func start() {
-        guard !machine.phase.isActive else { return }
+        guard !machine.phase.isActive else {
+            NSLog("[ZEUS] scribe: start refused, already %@", ScribePopupDriver.describe(machine.phase))
+            FlightRecorder.shared.record("scribe", "start refused", ScribePopupDriver.describe(machine.phase))
+            return
+        }
         ExplanationAudioArbitration.yieldToNewCapture()
         clearCompletedNotice()
         hideEndWindow()
@@ -643,7 +647,13 @@ final class ScribeController {
             transcriber: transcriber
         )
         self.router = router
-        guard run({ $0.start(id, now: nowSeconds()) }).isApplied else { return }
+        guard run({ $0.start(id, now: nowSeconds()) }).isApplied else {
+            NSLog("[ZEUS] scribe: start not applied")
+            FlightRecorder.shared.record("scribe", "start not applied")
+            return
+        }
+        NSLog("[ZEUS] scribe: start session")
+        FlightRecorder.shared.record("scribe", "start session")
         // The prompt has done its job; the watcher won't offer another while a session is active.
         ScribeCallWatcher.shared.recordingDidStart()
         let frames: @Sendable (ScribeAudioFrame) -> Void = { [weak self] frame in

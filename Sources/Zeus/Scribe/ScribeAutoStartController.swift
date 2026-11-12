@@ -17,6 +17,7 @@ final class ScribeAutoStartController {
         let banner = ScribeMeetingBanner.shared.model
         banner.onPrimary = { [weak self] in self?.accept() }
         banner.onSecondary = { [weak self] in self?.decline() }
+        banner.onPointer = { [weak self] inside in self?.pointer(inside: inside) }
     }
 
     /// The monotonic clock the machine's deadlines use.
@@ -39,8 +40,23 @@ final class ScribeAutoStartController {
         syncTimer()
     }
 
+    /// Start (or Switch) was tapped. A Start tap always starts: if the question stopped pending at the same moment
+    /// (it timed out, or a poll replaced it), the meeting on the card starts anyway.
     func accept() {
-        perform(machine.handle(.accept(now: now)))
+        var effects = machine.handle(.accept(now: now))
+        if !effects.contains(where: { if case .startRecording = $0 { return true } else { return false } }),
+           !effects.contains(where: { if case .requestEnd = $0 { return true } else { return false } }),
+           let meeting = ScribeMeetingBanner.shared.meeting {
+            ScribePopupDriver.log("late tap", "meeting banner: question no longer pending, starting \(meeting.key)")
+            effects += machine.handle(.startNow(meeting, now: now))
+        }
+        perform(effects)
+        syncTimer()
+    }
+
+    /// The pointer is over the banner: "Ask me" does not time out under it.
+    func pointer(inside: Bool) {
+        perform(machine.handle(.pointer(inside: inside, now: now)))
         syncTimer()
     }
 
@@ -95,7 +111,11 @@ final class ScribeAutoStartController {
 
     private func startScribe(for meeting: ScribeMeeting) {
         let controller = ScribeController.shared
-        guard !controller.phase.isActive else { return }
+        guard !controller.phase.isActive else {
+            ScribePopupDriver.log("start skipped", "meeting \(meeting.key): Scribe is already \(ScribePopupDriver.describe(controller.phase))")
+            return
+        }
+        ScribePopupDriver.log("start", "meeting \(meeting.key)")
         controller.meetingTitleHint = ScribeCallPromptText.meetingTitle(for: meeting.promptDecision)
         if let slot = meeting.slot { controller.meetingAttendeeHint = slot.attendeeNames }
         controller.meetingCallHint = ScribeCallWatcher.shared.recordingIdentity(for: .callDetected(meeting.callApp))

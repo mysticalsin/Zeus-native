@@ -11,8 +11,16 @@ final class ScribeMeetingBannerModel {
     /// Empty hides the primary button (the countdown only offers Cancel).
     var primaryTitle = ""
     var secondaryTitle = ""
+    /// Only for the Start questions: after a tap, "Starting...", the confirmation, or why it could not start.
+    var card: ScribePopupPhase = .shown
+    /// Set by `ScribeAutoStartController`.
     @ObservationIgnored var onPrimary: () -> Void = {}
     @ObservationIgnored var onSecondary: () -> Void = {}
+    @ObservationIgnored var onPointer: (Bool) -> Void = { _ in }
+    /// Set by `ScribeMeetingBanner`: the buttons go through it so a Start tap is tracked to its outcome.
+    @ObservationIgnored var primaryTapped: () -> Void = {}
+    @ObservationIgnored var secondaryTapped: () -> Void = {}
+    @ObservationIgnored var closeTapped: () -> Void = {}
 }
 
 private struct ScribeMeetingBannerView: View {
@@ -28,7 +36,11 @@ private struct ScribeMeetingBannerView: View {
             Text(model.detail)
                 .font(TopBarStyle.label(11, .regular))
                 .foregroundStyle(Theme.cloudSecondary)
-            buttons
+            if case .shown = model.card {
+                buttons
+            } else {
+                ScribePopupStatusView(phase: model.card, onAction: model.primaryTapped, onClose: model.closeTapped)
+            }
         }
         .padding(14)
         .frame(width: ScribeMeetingBanner.width, alignment: .leading)
@@ -41,11 +53,11 @@ private struct ScribeMeetingBannerView: View {
     private var buttons: some View {
         HStack(spacing: 8) {
             if !model.primaryTitle.isEmpty {
-                Button(model.primaryTitle) { model.onPrimary() }
+                Button(model.primaryTitle) { model.primaryTapped() }
                     .buttonStyle(.borderedProminent)
                     .accessibilityHint("Starts taking notes for this meeting.")
             }
-            Button(model.secondaryTitle) { model.onSecondary() }
+            Button(model.secondaryTitle) { model.secondaryTapped() }
                 .buttonStyle(.bordered)
                 .accessibilityHint("Closes this without recording.")
         }
@@ -67,13 +79,34 @@ final class ScribeMeetingBanner {
     static let width: CGFloat = 340
     private static let margin: CGFloat = 16
 
+    private enum Kind {
+        case ask, consent, nextMeeting, countdown
+
+        /// The Start questions, whose primary tap starts Scribe and is tracked to its outcome.
+        var startsScribe: Bool { self == .ask || self == .consent }
+    }
+
     let model = ScribeMeetingBannerModel()
+    private let driver = ScribePopupDriver(name: "meeting banner")
     private var panel: NSPanel?
-    private var hostingView: NSHostingView<ScribeMeetingBannerView>?
+    private var hostingView: ScribeCardHostingView<ScribeMeetingBannerView>?
+    private var kind: Kind = .ask
+    /// The meeting the card is about.
+    private(set) var meeting: ScribeMeeting?
 
     var isVisible: Bool { panel?.isVisible ?? false }
 
+    private init() {
+        model.primaryTapped = { [weak self] in self?.primaryTapped() }
+        model.secondaryTapped = { [weak self] in self?.secondaryTapped() }
+        model.closeTapped = { [weak self] in self?.closeTapped() }
+        driver.onStart = { [weak self] in self?.model.onPrimary() }
+        driver.onHide = { [weak self] in self?.panel?.orderOut(nil) }
+        driver.onPhase = { [weak self] phase in self?.phaseChanged(phase) }
+    }
+
     func showAsk(_ meeting: ScribeMeeting) {
+        guard begin(.ask, meeting) else { return }
         model.headline = ScribeAutoStartText.askHeadline(meeting)
         model.detail = ScribeAutoStartText.askDetail
         model.primaryTitle = "Start"
@@ -83,6 +116,7 @@ final class ScribeMeetingBanner {
 
     /// The first time "Start automatically" would fire: one question, and the answer is remembered.
     func showConsent(_ meeting: ScribeMeeting) {
+        guard begin(.consent, meeting) else { return }
         model.headline = ScribeAutoStartText.askHeadline(meeting)
         model.detail = ScribeAutoStartText.consentDetail
         model.primaryTitle = "Start and allow"
@@ -92,6 +126,7 @@ final class ScribeMeetingBanner {
 
     /// Another meeting is about to start while this one records.
     func showNextMeeting(_ meeting: ScribeMeeting) {
+        guard begin(.nextMeeting, meeting) else { return }
         model.headline = ScribeAutoStartText.nextMeetingHeadline(meeting)
         model.detail = ScribeAutoStartText.nextMeetingDetail
         model.primaryTitle = "Switch"
@@ -100,6 +135,7 @@ final class ScribeMeetingBanner {
     }
 
     func showCountdown(_ meeting: ScribeMeeting, seconds: Int) {
+        guard begin(.countdown, meeting) else { return }
         model.headline = ScribeAutoStartText.countdownHeadline(meeting, seconds: seconds)
         model.detail = ScribeAutoStartText.countdownDetail
         model.primaryTitle = ""
@@ -109,27 +145,84 @@ final class ScribeMeetingBanner {
 
     /// Updates the number without bringing the card forward or announcing again.
     func updateCountdown(_ meeting: ScribeMeeting, seconds: Int) {
-        guard isVisible else { return }
+        guard isVisible, kind == .countdown else { return }
         model.headline = ScribeAutoStartText.countdownHeadline(meeting, seconds: seconds)
     }
 
+    /// The machine takes the banner down. A Start tap still in flight, or its failure, stays on screen until it
+    /// resolves (the machine hides the banner the moment it decides to start).
     func hide() {
+        guard !driver.isBusy else { return }
+        driver.meetingGone()
         panel?.orderOut(nil)
     }
 
+    /// False while a Start tap is in flight: Scribe is starting, so a new question would only cover the answer.
+    private func begin(_ kind: Kind, _ meeting: ScribeMeeting) -> Bool {
+        if driver.phase == .starting || driver.phase == .started { return false }
+        self.kind = kind
+        self.meeting = meeting
+        if kind.startsScribe {
+            // The machine owns the 20 second timeout (held while the pointer is over the card).
+            driver.present(key: meeting.key, lifetime: nil)
+        } else {
+            driver.dismiss()
+        }
+        model.card = .shown
+        return true
+    }
+
+    private func primaryTapped() {
+        guard kind.startsScribe else {
+            ScribePopupDriver.log("click", "meeting banner \(kind)")
+            model.onPrimary()
+            return
+        }
+        driver.click()
+    }
+
+    private func secondaryTapped() {
+        if kind.startsScribe { driver.dismiss() }
+        model.onSecondary()
+    }
+
+    /// Close on a failure: the person is done with this meeting's question.
+    private func closeTapped() {
+        driver.dismiss()
+        model.onSecondary()
+    }
+
+    private func pointer(inside: Bool) {
+        if kind.startsScribe { driver.pointer(inside: inside) }
+        model.onPointer(inside)
+    }
+
+    private func phaseChanged(_ phase: ScribePopupPhase) {
+        guard kind.startsScribe else { return }
+        model.card = phase.isVisible ? phase : .shown
+        guard phase.isVisible, let panel else { return }
+        Task { @MainActor [weak self] in self?.layout(panel) }
+    }
+
     private func present(announce: String) {
-        let (panel, host) = ensurePanel()
-        let size = host.fittingSize
-        panel.setContentSize(size)
-        panel.setFrameOrigin(origin(for: size))
+        let (panel, _) = ensurePanel()
+        layout(panel)
         // Front without activating Zeus: whatever the person is typing in keeps the keyboard.
         panel.orderFrontRegardless()
         AccessibilityNotification.Announcement(announce).post()
     }
 
-    private func ensurePanel() -> (NSPanel, NSHostingView<ScribeMeetingBannerView>) {
+    private func layout(_ panel: NSPanel) {
+        guard let hostingView else { return }
+        let size = hostingView.fittingSize
+        panel.setContentSize(size)
+        panel.setFrameOrigin(origin(for: size))
+    }
+
+    private func ensurePanel() -> (NSPanel, ScribeCardHostingView<ScribeMeetingBannerView>) {
         if let panel, let hostingView { return (panel, hostingView) }
-        let host = NSHostingView(rootView: ScribeMeetingBannerView(model: model))
+        let host = ScribeCardHostingView(rootView: ScribeMeetingBannerView(model: model))
+        host.onPointer = { [weak self] inside in self?.pointer(inside: inside) }
         let panel = ScribeBannerPanel(
             contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 110),
             styleMask: [.borderless, .nonactivatingPanel],

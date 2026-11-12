@@ -681,5 +681,39 @@ class MicReleaseTests(unittest.TestCase):
         self.assertIn(".defaultInputChanged", rebuild)
 
 
+
+class ScribeMeetingCardTests(unittest.TestCase):
+    def test_scribe_meeting_cards_take_the_first_click(self):
+        driver = mic_read("Scribe/ScribePopupDriver.swift")
+        host = mic_body(driver, "final class ScribeCardHostingView", "final class ScribePopupDriver")
+        self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", host)
+        self.assertIn(".activeAlways", host)
+        for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingBanner.swift"):
+            text = mic_read(card)
+            self.assertIn("ScribeCardHostingView(rootView:", text, card)
+            self.assertNotIn("NSHostingView(rootView:", text, card)
+
+    def test_scribe_meeting_card_taps_go_through_the_lifecycle(self):
+        popup = mic_read("Scribe/ScribeCallPopup.swift")
+        self.assertIn("model.onRecord = { [weak self] in self?.driver.click() }", popup)
+        self.assertNotIn("autoHide", popup)
+        hide = mic_body(popup, "    func hide() {", "    func refresh(")
+        self.assertIn("guard !driver.isBusy else { return }", hide)
+        banner = mic_read("Scribe/ScribeMeetingBanner.swift")
+        self.assertIn("Button(model.primaryTitle) { model.primaryTapped() }", banner)
+        hide = mic_body(banner, "    func hide() {", "    private func begin(")
+        self.assertIn("guard !driver.isBusy else { return }", hide)
+        controller = mic_read("Scribe/ScribeAutoStartController.swift")
+        accept = mic_body(controller, "    func accept() {", "    func decline() {")
+        self.assertIn(".startNow(meeting, now: now)", accept)
+
+    def test_scribe_meeting_card_taps_are_logged(self):
+        driver = mic_read("Scribe/ScribePopupDriver.swift")
+        for stage in ('"click"', '"start requested"', '"start ok"', '"start failed"'):
+            self.assertIn(stage, driver)
+        self.assertIn('NSLog("[ZEUS] scribe popup: %@ %@"', driver)
+        self.assertIn("FlightRecorder.shared.record(", driver)
+
+
 if __name__ == "__main__":
     unittest.main()
