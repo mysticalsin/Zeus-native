@@ -9,7 +9,8 @@ those ship as a ticked, visible choice in onboarding instead.
 | Voice | Ultron persona and Ultron voice effect on, intensity 60 % | Owner request. Best engine available automatically, never Samantha |
 | Talk to Zeus | Fast tier race (Haiku, fast OpenAI model) with Sonnet deep follow-up | Owner request, first word target under 1.5 s |
 | Instant commands | Rules then Jev; Jev active once a key exists | Money: the Jev monthly limit defaults to US$10 (also the ceiling) until the owner saves a different number; a saved limit is never overwritten, and Remove keeps it off |
-| Pointing | Control+Option hold to talk, draw while held | Owner decisions 2026-11-10 |
+| Talk key | Control+Option: hold, speak (point if you want), let go; Zeus answers aloud in the Zeus voice and marks the screen when the answer is about it. Earlier auto-written Option+Command or Right Command keys move to Control+Option once; a key you record is kept. While VoiceOver is on, talk moves to Option+Command | Owner request 2026-11-11, docs/VOICE-KEY.md |
+| Pointing | On, Control+Option, draw while held. Because Control+Option is also the talk key, that hold is one Zeus talk turn; pick Right Option or Fn for a separate pointing turn that draws | Owner decisions 2026-11-10 and 2026-11-11 |
 | Language packs | English, French, Spanish, Portuguese ticked in onboarding, installed after setup | Download consent = visible ticked step |
 | Scribe speakers | Speaker recognition model ticked in onboarding with the language packs; names from call window on when Accessibility already granted | Download consent; no permission prompt |
 | Scribe saved voices | Off; per person, opt-in | Biometric data of other people |
