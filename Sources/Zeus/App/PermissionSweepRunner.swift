@@ -244,8 +244,8 @@ final class PermissionSweepRunner {
     }
 }
 
-/// The small floating guide shown while the sweep runs. It stays above System Settings and never
-/// takes focus from it.
+/// The small floating guide shown while the sweep runs. It stays above System Settings and does not
+/// activate Zeus. It does become key, so Return and Escape reach Done and Skip.
 @MainActor
 final class PermissionSweepGuide {
     private final class Panel: NSPanel {
@@ -264,7 +264,7 @@ final class PermissionSweepGuide {
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.becomesKeyOnlyIfNeeded = true
+        panel.becomesKeyOnlyIfNeeded = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let host = NSHostingView(rootView: PermissionSweepGuideView(runner: runner))
         host.frame = NSRect(origin: .zero, size: Self.size)
@@ -277,10 +277,39 @@ final class PermissionSweepGuide {
             panel.setFrameOrigin(NSPoint(x: visible.midX - Self.size.width / 2, y: visible.maxY - Self.size.height - 12))
         }
         panel.orderFrontRegardless()
+        panel.makeKey()
     }
 
     func close() {
         panel.orderOut(nil)
+    }
+}
+
+private struct PermissionSweepGuideLabel: ViewModifier {
+    var label: String
+    var order: Int
+
+    func body(content: Content) -> some View {
+        content
+            .accessibilityLabel(label)
+            .accessibilitySortPriority(Double(100 - order))
+    }
+}
+
+@ViewBuilder
+private func permissionSweepGuideButton(_ spec: PermissionSweep.GuideButton, action: @escaping () -> Void) -> some View {
+    switch spec.keyAction {
+    case .defaultAction:
+        Button(spec.title, action: action)
+            .keyboardShortcut(.defaultAction)
+            .modifier(PermissionSweepGuideLabel(label: spec.voiceOverLabel, order: spec.focusOrder))
+    case .cancelAction:
+        Button(spec.title, action: action)
+            .keyboardShortcut(.cancelAction)
+            .modifier(PermissionSweepGuideLabel(label: spec.voiceOverLabel, order: spec.focusOrder))
+    case nil:
+        Button(spec.title, action: action)
+            .modifier(PermissionSweepGuideLabel(label: spec.voiceOverLabel, order: spec.focusOrder))
     }
 }
 
@@ -297,11 +326,15 @@ private struct PermissionSweepGuideView: View {
                 Text(runner.progressLine).font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            if case .guiding(let item) = phase, item.mayNeedRestart {
-                Button("Done") { runner.done() }.accessibilityLabel("Done, \(item.title) is on")
+            ForEach(PermissionSweep.guideButtons(phase), id: \.role) { spec in
+                permissionSweepGuideButton(spec) {
+                    switch spec.role {
+                    case .done: runner.done()
+                    case .skip: runner.skip()
+                    case .stop: runner.cancel()
+                    }
+                }
             }
-            Button("Skip") { runner.skip() }.accessibilityLabel("Skip this one")
-            Button("Stop") { runner.cancel() }.accessibilityLabel("Stop allowing")
         }
         .padding(.horizontal, 16)
         .frame(width: PermissionSweepGuide.size.width, height: PermissionSweepGuide.size.height)

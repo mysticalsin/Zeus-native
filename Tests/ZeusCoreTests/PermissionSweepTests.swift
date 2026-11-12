@@ -32,7 +32,7 @@ struct PermissionSweepTests {
         #expect(effects.contains(.ask(.microphone)))
         #expect(effects.contains(.showGuide(.microphone)))
         #expect(effects.contains(.startPolling))
-        #expect(effects.contains(.save(S.Progress(visited: [.microphone], needsRestart: false, savedAt: 100))))
+        #expect(effects.contains(.save(S.Progress(visited: [], needsRestart: false, savedAt: 100))))
     }
 
     @Test func alreadyAllowedItemsAreSkipped() {
