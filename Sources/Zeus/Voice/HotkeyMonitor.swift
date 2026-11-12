@@ -55,7 +55,7 @@ enum KeyListenAccess {
 /// invisible to them). Pure so the message and startup check are unit-testable.
 enum KeyAccessNotice {
     static func cue(granted: Bool) -> (text: String, pane: String)? {
-        granted ? nil : ("Hold-to-talk and dictation need Accessibility or Input Monitoring.", "Privacy_Accessibility")
+        granted ? nil : ("Hold Control + Option to talk. That needs Accessibility or Input Monitoring.", "Privacy_Accessibility")
     }
 }
 
@@ -67,6 +67,12 @@ enum KeyAccessNotice {
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
+    /// Control+Option hold, after the debounce. Separate from `onPress` so other shortcuts keep their path.
+    var onTalkBegin: (() -> Void)?
+    var onTalkEnd: (() -> Void)?
+    /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
+    var onListenAccessMissing: (() -> Void)?
+    var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
     /// Which shortcut this monitor listens for; nil turns it off. Push-to-talk by default (moved off
@@ -104,8 +110,12 @@ final class HotkeyMonitor {
     private var directPressActive = false
 
     private var state = ShortcutState()
+    private var talkHold = TalkHold()
+    private var talkCheck: DispatchWorkItem?
 
     func start() {
+        // The local monitor is installed below either way. Without trust, flags from other apps never arrive.
+        if !KeyListenAccess.granted { onListenAccessMissing?() }
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
@@ -139,7 +149,82 @@ final class HotkeyMonitor {
             // Only to spot shortcuts made with the shared key (⌘C): never reads or keeps the key.
             if keyProvider()?.keyCode != code { otherKeyPressed(); spoilHold() }
         }
+        // Control+Option is this machine. Every other shortcut still goes through evaluate().
+        if controlOptionOwned() {
+            driveControlOption(event)
+            return
+        }
         evaluate()
+    }
+
+    /// The talk key is the modifier-only Control+Option chord, and it is not shared with another role.
+    private func controlOptionOwned() -> Bool {
+        role == .talk && !sharedProvider() && keyProvider() == .controlOption
+    }
+
+    private func driveControlOption(_ event: ShortcutEvent) {
+        if NSWorkspace.shared.isVoiceOverEnabled {
+            let wasTalking = talkHold.phase == .talking
+            talkCheck?.cancel()
+            applyTalk(talkHold.cancel())
+            if !wasTalking, case .flags = event, state.modifiers == [.control, .option] {
+                onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
+            }
+            return
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        switch event {
+        case .flags:
+            applyTalk(talkHold.flags(Self.talkModifiers(state.modifiers), at: now))
+        case .keyDown:
+            talkCheck?.cancel()
+            applyTalk(talkHold.cancel())
+        case .keyUp:
+            break
+        }
+    }
+
+    private func applyTalk(_ signals: [TalkHold.Signal]) {
+        for signal in signals {
+            switch signal {
+            case .preload:
+                cues?.preload()
+            case .schedule(let at):
+                talkCheck?.cancel()
+                let delay = max(0, at - ProcessInfo.processInfo.systemUptime)
+                let work = DispatchWorkItem { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.talkCheck = nil
+                        self.applyTalk(self.talkHold.advance(at: ProcessInfo.processInfo.systemUptime))
+                    }
+                }
+                talkCheck = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+            case .cancelSchedule:
+                talkCheck?.cancel()
+                talkCheck = nil
+            case .begin:
+                cues?.playStart()
+                (onTalkBegin ?? onPress)?()
+            case .end:
+                (onTalkEnd ?? onRelease)?()
+                cues?.playEnd()
+            case .abort:
+                onCancel?()
+                cues?.playEnd()
+            }
+        }
+    }
+
+    private static func talkModifiers(_ modifiers: ShortcutModifiers) -> TalkModifiers {
+        var out: TalkModifiers = []
+        if modifiers.contains(.control) { out.insert(.control) }
+        if modifiers.contains(.option) { out.insert(.option) }
+        if modifiers.contains(.shift) { out.insert(.shift) }
+        if modifiers.contains(.command) { out.insert(.command) }
+        if modifiers.contains(.function) { out.insert(.function) }
+        return out
     }
 
     private func otherKeyPressed() {

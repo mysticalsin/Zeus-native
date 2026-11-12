@@ -57,7 +57,9 @@ extension Preferences {
         if d.enabled, d.key == pushToTalk {
             return "double-tap \(pushToTalk.title) to talk, hold it to dictate"
         }
-        var line = "hold \(pushToTalk.title) to talk, double-tap to latch"
+        var line = pushToTalk == .controlOption
+            ? "hold \(pushToTalk.title) to talk, let go to send"
+            : "hold \(pushToTalk.title) to talk, double-tap to latch"
         if d.enabled { line += "; dictation: " + (d.key.map { "hold \($0.title)" } ?? "off") }
         return line
     }

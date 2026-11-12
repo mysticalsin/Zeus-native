@@ -272,6 +272,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.release()
             }
+            // Control+Option plays the installed cues itself, so this path does not also play listenStart.
+            hotkey.onTalkBegin = { [weak self] in self?.talkKeyPressed(builtinCue: false) }
+            hotkey.onTalkEnd = { [weak self] in
+                WakeWordController.shared.talkKeyHeld = false
+                self?.voice?.release(builtinCue: false)
+            }
+            hotkey.onListenAccessMissing = { [weak self] in
+                if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue)) }
+            }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
             // ⌃⌥Space, ⌃⌥C and other chords built on the talk keys cancel the hold instead of sending it.
             hotkey.cancelsWhenSpoiled = true
@@ -561,7 +570,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    private func talkKeyPressed() {
+    private func talkKeyPressed(builtinCue: Bool = true) {
         guard on(.talkHotkey), voice != nil else { return }
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
@@ -575,11 +584,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
             Task { @MainActor in
                 let access = await VoicePermissions.ensure(explicit: true)
-                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: press the talk key again")) }
+                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: hold Control + Option again")) }
             }
             return
         }
-        voice?.press()
+        voice?.press(builtinCue: builtinCue)
     }
 
     /// Desktop pointing: on by default (`docs/FIRST-RUN-DEFAULTS.md`). Starting it only installs the key

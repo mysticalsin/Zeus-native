@@ -125,7 +125,7 @@ final class VoiceTurnController {
     }
 
     @discardableResult
-    func press() -> Bool {
+    func press(builtinCue: Bool = true) -> Bool {
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
         BrainWarmScheduler.shared.talkKeyDown()
@@ -163,7 +163,7 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
-        ZeusSound.play(.listenStart)
+        if builtinCue { ZeusSound.play(.listenStart) }
         SystemAudioDucker.begin()
         lastPartialAt = nil
         heardSomething = false
@@ -179,13 +179,13 @@ final class VoiceTurnController {
         return true
     }
 
-    func release() {
+    func release(builtinCue: Bool = true) {
         guard listening else { return }
         listening = false
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
-        ZeusSound.play(.listenStop)
+        if builtinCue { ZeusSound.play(.listenStop) }
         SystemAudioDucker.end()
         handsFreeTask?.cancel()
         handsFreeTask = nil

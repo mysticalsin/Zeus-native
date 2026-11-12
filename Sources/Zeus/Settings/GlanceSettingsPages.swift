@@ -683,7 +683,7 @@ private struct ShortcutsPage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
             ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus",
-                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean.",
+                                text: "Hold Control + Option to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean.",
                                 shortcut: Preferences.shared.pushToTalk, defaultValue: ShortcutStore.talkDefault,
                                 otherName: "Dictation", other: DictationSettings.shared.key,
                                 voiceOverFallback: VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk,
