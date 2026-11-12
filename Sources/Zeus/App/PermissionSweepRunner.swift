@@ -36,15 +36,23 @@ final class PermissionSweepRunner {
     private static var now: Double { Date().timeIntervalSinceReferenceDate }
 
     var isRunning: Bool { state.isRunning }
-    var progressLine: String { PermissionSweep.progressLine(access) }
+    /// Empty means the read has not returned yet. "0 of 12 allowed" is only shown once every access
+    /// has actually been read, so a slow TCC check cannot look like nothing is granted.
+    var progressLine: String {
+        guard !access.isEmpty else { return "Checking permissions…" }
+        return PermissionSweep.progressLine(access)
+    }
+    /// Tests substitute this so Allow all can be exercised with no TCC prompt. Production leaves it nil.
+    @ObservationIgnored var testingAsk: ((Item) -> Void)?
     var allAllowed: Bool { PermissionSweep.allowedCount(access) == Item.allCases.count }
     var needsRestart: Bool { state.phase == .finished(needsRestart: true) }
 
     // MARK: Actions
 
-    /// The "Allow all" button.
+    /// The "Allow all" button. Uses the access already on screen. A fresh read is what the page polls;
+    /// waiting for it here is what made the click look like it did nothing.
     func start() {
-        Task { await send { .start(access: $0, resumed: nil, now: Self.now) } }
+        perform(apply(.start(access: access, resumed: nil, now: Self.now)))
     }
 
     func skip() {
@@ -114,14 +122,18 @@ final class PermissionSweepRunner {
                 Task { await ask(item) }
             case .openSettings(let item, let request):
                 openSettings(item, request: request)
-            case .showGuide:
+            case .showGuide(let item):
                 if guide == nil { guide = PermissionSweepGuide(runner: self) }
                 guide?.show()
+                if state.current != item {
+                    NSLog("[ZEUS] permissions: guide for %@ while the sweep is on %@",
+                          item.rawValue, state.current?.rawValue ?? "nothing")
+                }
             case .hideGuide:
                 guide?.close()
                 guide = nil
             case .startPolling:
-                startPolling()
+                if testingAsk == nil { startPolling() }
             case .stopPolling:
                 polling?.cancel()
                 polling = nil
@@ -153,6 +165,10 @@ final class PermissionSweepRunner {
     // MARK: Requests (the same calls as each row's Allow button)
 
     private func ask(_ item: Item) async {
+        if let testingAsk {
+            testingAsk(item)
+            return
+        }
         switch item {
         case .microphone, .speech:
             // One "voice" request asks for both; the second step joins it instead of asking again.
