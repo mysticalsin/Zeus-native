@@ -7,7 +7,7 @@ import Testing
 @MainActor
 @Suite("Permission sweep guide keyboard", .serialized)
 struct PermissionSweepGuideTests {
-    @Test func aStepChangeWhileAnotherAppIsFrontmostDoesNotMakeThePanelKey() {
+    @Test func aStepChangeWhileAnotherAppIsFrontmostDoesNotMakeThePanelKey() throws {
         let application = NSApplication.shared
         let wasActive = application.isActive
         let front = KeyStandInWindow(contentRect: NSRect(x: 40, y: 40, width: 80, height: 40),
@@ -27,11 +27,48 @@ struct PermissionSweepGuideTests {
         guide.show()
         guide.show()
         let panel = try #require(Mirror(reflecting: guide).descendant("panel") as? NSPanel)
-        #expect(panel.becomesKeyOnlyIfNeeded)
+        #expect(!panel.becomesKeyOnlyIfNeeded)
         #expect(panel.canBecomeKey)
         #expect(panel.styleMask.contains(.nonactivatingPanel))
         #expect(!panel.isKeyWindow)
         if frontWasKey { #expect(front.isKeyWindow) }
+        #expect(application.isActive == wasActive)
+    }
+
+    @Test func aClickInTheGuideArmsTheKeyboardWithoutShowTakingKey() throws {
+        let application = NSApplication.shared
+        let wasActive = application.isActive
+        let front = KeyStandInWindow(contentRect: NSRect(x: 40, y: 40, width: 80, height: 40),
+                                     styleMask: [.borderless],
+                                     backing: .buffered,
+                                     defer: false)
+        front.orderFrontRegardless()
+        front.makeKey()
+        let runner = PermissionSweepRunner(services: OnboardingServices(permissions: PermissionsModel()))
+        let guide = PermissionSweepGuide(runner: runner)
+        defer {
+            guide.close()
+            front.orderOut(nil)
+        }
+        guide.show()
+        guide.show()
+        let panel = try #require(Mirror(reflecting: guide).descendant("panel") as? NSPanel)
+        let content = try #require(panel.contentView)
+        #expect(!panel.isKeyWindow)
+        #expect(panel.canBecomeKey)
+        #expect(!panel.becomesKeyOnlyIfNeeded)
+        #expect(panel.styleMask.contains(.nonactivatingPanel))
+        let point = NSPoint(x: content.bounds.midX, y: content.bounds.midY)
+        let down = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: point,
+                                                    modifierFlags: [],
+                                                    timestamp: ProcessInfo.processInfo.systemUptime,
+                                                    windowNumber: panel.windowNumber,
+                                                    context: nil,
+                                                    eventNumber: 1,
+                                                    clickCount: 1,
+                                                    pressure: 1))
+        panel.sendEvent(down)
+        #expect(panel.isKeyWindow)
         #expect(application.isActive == wasActive)
     }
 }
