@@ -4002,6 +4002,18 @@
         "file": "Tests/ZeusCoreTests/TopBarPositionTests.swift",
         "function": "noDropUntilTheOwnerMovesTheSlider"
       }
+    },
+    {
+      "id": "REG-370",
+      "failure": "Dictation start and stop sounds were missing or late: the start cue played only after the microphone had opened, the stop cue only after transcription and paste, and meeting mode counted Zeus's own microphone as a call and muted both.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationCueRuleTests.swift",
+        "function": "everyKeyPathPlaysStartBeforeTheMicAndStopOnRelease"
+      }
     }
   ]
 }

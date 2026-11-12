@@ -15,22 +15,25 @@ struct DictationCueTests {
         return count
     }
 
-    @Test func airyIsTheDefault() {
-        #expect(DictationCueStyle.defaultStyle == .airy)
-        #expect(DictationCueStyle(saved: nil) == .airy)
-        #expect(DictationCueStyle(saved: "Not a style") == .airy)
+    @Test func crystalIsTheDefault() {
+        #expect(DictationCueStyle.defaultStyle == .crystal)
+        #expect(DictationCueStyle(saved: nil) == .crystal)
+        #expect(DictationCueStyle(saved: "Not a style") == .crystal)
         #expect(DictationCueStyle(saved: "Glass") == .glass)
+        #expect(DictationCueStyle(saved: "Airy") == .airy)
+        #expect(DictationCueStyle(saved: "None") == DictationCueStyle.none)
     }
 
-    @Test func presetsAreTheFiveRequested() {
-        #expect(DictationCueStyle.allCases.map(\.title) == ["Soft click", "Glass", "Pop", "Airy", "None"])
+    @Test func crystalLeadsAndEveryOtherStyleStaysSelectable() {
+        #expect(DictationCueStyle.allCases.map(\.title) == ["Crystal", "Soft click", "Glass", "Pop", "Airy", "None"])
     }
 
-    @Test func softClickAndNoneMakeNoSynthesizedAudio() {
-        for style in [DictationCueStyle.softClick, .none] {
+    @Test func bundledStylesAndNoneMakeNoSynthesizedAudio() {
+        for style in [DictationCueStyle.crystal, .softClick, .none] {
             #expect(DictationCueSynth.samples(style, .start).isEmpty)
             #expect(DictationCueSynth.wav(style, .stop) == nil)
         }
+        for style in synthesized { #expect(DictationCueSynth.samples(style, .cancel).isEmpty) }
     }
 
     @Test func everySynthesizedSoundIsShortAudibleAndWithinRange() {

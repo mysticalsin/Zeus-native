@@ -71,6 +71,13 @@ in Settings › Murmure; cloud engines run only when chosen and only with the pe
 - Parakeet realtime EOU 120M (NVIDIA Open Model License): English only and emits lowercase text
   without punctuation, so not a dictation engine.
 
+## Sounds (Sources/Zeus/Sounds)
+- Original to Zeus, no third-party audio. Every file is synthesized from sine partials by scripts in
+  this repo, Python standard library only: `tools/sounds/make_sounds.py` (the AAC set) and
+  `scripts/gen-dictation-sounds.py` (the Crystal dictation cues `dictation_crystal_start.wav`,
+  `dictation_crystal_stop.wav` and `dictation_cancel.wav`, deterministic, rerun to reproduce them).
+  Nothing is sampled, downloaded or extracted from another app.
+
 ## Polyglot (Tony's own project)
 
 Zeus's Polyglot tab reuses design ideas from Tony's Polyglot (README.md and DESIGN.md): the

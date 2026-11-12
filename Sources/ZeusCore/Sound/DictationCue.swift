@@ -2,6 +2,8 @@ import Foundation
 
 /// The sound that marks the start and the end of a dictation (Settings > Dictation).
 public enum DictationCueStyle: String, CaseIterable, Sendable {
+    /// Two soft glass notes, rising on start and falling on stop (scripts/gen-dictation-sounds.py).
+    case crystal = "Crystal"
     /// The bundled click Zeus has always used.
     case softClick = "Soft click"
     case glass = "Glass"
@@ -10,7 +12,7 @@ public enum DictationCueStyle: String, CaseIterable, Sendable {
     case airy = "Airy"
     case none = "None"
 
-    public static let defaultStyle: DictationCueStyle = .airy
+    public static let defaultStyle: DictationCueStyle = .crystal
 
     /// An unknown or missing saved value means the default.
     public init(saved: String?) {
@@ -19,11 +21,73 @@ public enum DictationCueStyle: String, CaseIterable, Sendable {
 
     public var title: String { rawValue }
 
-    /// Whether `DictationCueSynth` makes this sound (Soft click is a bundled file, None is silence).
+    /// Whether `DictationCueSynth` makes this sound (Crystal and Soft click are bundled files, None is silence).
     public var isSynthesized: Bool { self == .glass || self == .pop || self == .airy }
 }
 
-public enum DictationCuePhase: Sendable { case start, stop }
+/// Start and stop of a dictation; cancel also marks a turn that ended with an error (no speech, no mic).
+public enum DictationCuePhase: Sendable, CaseIterable { case start, stop, cancel }
+
+/// Where one cue's audio comes from.
+public enum DictationCueSource: Equatable, Sendable {
+    case silent
+    /// Made in code by `DictationCueSynth`.
+    case synthesized(DictationCueStyle, DictationCuePhase)
+    /// A file in the app's Sounds folder, listed in `SoundCatalog`.
+    case bundled(SoundSlot, style: String)
+
+    /// Every style shares one gentle low blip for cancel and errors; None is silent throughout.
+    public static func resolve(_ style: DictationCueStyle, _ phase: DictationCuePhase) -> DictationCueSource {
+        if style == .none { return .silent }
+        if phase == .cancel { return .bundled(.dictationCancel, style: "Dictation cancel") }
+        let slot: SoundSlot = phase == .start ? .dictationBegin : .dictationEnd
+        switch style {
+        case .crystal: return .bundled(slot, style: style.rawValue)
+        case .softClick: return .bundled(slot, style: phase == .start ? "Dictation begin" : "Dictation end")
+        case .glass, .pop, .airy: return .synthesized(style, phase)
+        case .none: return .silent
+        }
+    }
+}
+
+/// Which dictation moments make a sound. Every trigger (hold, double-tap, press to toggle, Fn or
+/// Command keys, the top bar button, links) ends in the controller's begin, finish and cancel,
+/// which run through `DictationFlow`; this rule maps those flow events to cues.
+public enum DictationCueRule {
+    /// The cue an event asks for, given the flow state before it. The start cue is not here: it
+    /// sounds before the microphone opens (`beginCapture`), not when the flow hears about it.
+    public static func cue(for event: DictationFlow.Event, before state: DictationFlow.State) -> DictationCuePhase? {
+        switch event {
+        case .finishRequested:
+            // Key released or pressed again: the stop cue sounds now, not after transcription.
+            return state.isListening ? .stop : nil
+        case .cancelRequested:
+            return isLiveTurn(state) ? .cancel : nil
+        case .startFailed:
+            return state.canStartJob ? .cancel : nil
+        case .failed(let turn, _):
+            // A live turn that heard nothing; files and history re-runs stay quiet.
+            return isLiveTurn(state) && state.turn == turn ? .cancel : nil
+        case .micOpened, .fileRequested, .rewriteStarted, .succeeded, .dismissed:
+            return nil
+        }
+    }
+
+    /// Key down: the start cue first, then the microphone. The cue is never late behind a slow
+    /// device start, and it is already playing before the first sample is captured.
+    public static func beginCapture<T>(cue: (DictationCuePhase) -> Void, open: () throws -> T) rethrows -> T {
+        cue(.start)
+        return try open()
+    }
+
+    private static func isLiveTurn(_ state: DictationFlow.State) -> Bool {
+        switch state {
+        case .listening: true
+        case .transcribing(_, let source), .rewriting(_, let source): source == .live
+        case .idle, .done, .failed: false
+        }
+    }
+}
 
 /// Zeus's own start and stop sounds, made from sine waves in code. Nothing is sampled or copied
 /// from another app; every value below is a plain tone, a pitch glide and a volume envelope.
@@ -33,13 +97,14 @@ public enum DictationCueSynth {
 
     public static func clampedVolume(_ percent: Int) -> Int { min(100, max(0, percent)) }
 
-    /// Mono samples in -1...1; empty for Soft click and None.
+    /// Mono samples in -1...1; empty for the bundled styles, None and the shared cancel blip.
     public static func samples(_ style: DictationCueStyle, _ phase: DictationCuePhase) -> [Float] {
-        switch style {
+        guard phase != .cancel else { return [] }
+        return switch style {
         case .airy: airy(phase)
         case .glass: glass(phase)
         case .pop: pop(phase)
-        case .softClick, .none: []
+        case .crystal, .softClick, .none: []
         }
     }
 
