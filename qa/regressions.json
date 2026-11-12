@@ -3990,6 +3990,18 @@
         "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
         "function": "hintAppearsOnlyWhenNoEnhancedOrPremiumVoiceIsUsable"
       }
+    },
+    {
+      "id": "REG-350",
+      "failure": "The Record section needed scrolling at the normal top bar size and a double click on a window did nothing; a setup screen opened from a source has to start at its top.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyRecordNavigationTests.swift",
+        "function": "doubleClickSelectsAndOpensTheDetail"
+      }
     }
   ]
 }
