@@ -4246,6 +4246,126 @@
         "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
         "function": "afterARelaunchTheSweepResumesWithoutAskingVisitedItemsAgain"
       }
+    },
+    {
+      "id": "REG-400",
+      "failure": "The meeting card's Start button lost the first click while another app was active: the non-activating panel's hosting view did not accept the first mouse.",
+      "features": [
+        "F04"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_scribe_meeting_cards_take_the_first_click"
+      }
+    },
+    {
+      "id": "REG-401",
+      "failure": "A Start tap on the meeting card closed it before anything confirmed the start, and the card owner could take it down mid-start.",
+      "features": [
+        "F04"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_scribe_meeting_card_taps_go_through_the_lifecycle"
+      }
+    },
+    {
+      "id": "REG-402",
+      "failure": "A double tap on the meeting card could ask Scribe to start twice.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "function": "aDoubleTapStartsScribeOnlyOnce"
+      }
+    },
+    {
+      "id": "REG-403",
+      "failure": "A tap while the automatic start was already running did nothing visible instead of confirming Scribe is recording.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "function": "aTapWhileTheAutomaticStartIsRunningConfirmsInsteadOfStartingTwice"
+      }
+    },
+    {
+      "id": "REG-404",
+      "failure": "The meeting card timed out under the pointer of the person about to tap it.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "function": "theCardNeverExpiresUnderThePointer"
+      }
+    },
+    {
+      "id": "REG-405",
+      "failure": "When Scribe could not start (capture failed), the card had already closed and the reason was never shown.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "function": "aCaptureFailureIsShownWithItsReason"
+      }
+    },
+    {
+      "id": "REG-406",
+      "failure": "With Microphone access off, a tap on the meeting card silently failed instead of saying so and offering Allow.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "function": "theMicrophoneBeingOffIsSaidAndAllowOpensSettings"
+      }
+    },
+    {
+      "id": "REG-407",
+      "failure": "A failure left over from the previous meeting was taken as the result of a new tap.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "function": "aStaleFailureFromThePreviousMeetingIsNotThisTapsFailure"
+      }
+    },
+    {
+      "id": "REG-408",
+      "failure": "The Meeting started banner timed out under the pointer, and a Start tap arriving as it timed out was dropped.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "askMeNeverTimesOutUnderThePointer"
+      }
+    },
+    {
+      "id": "REG-409",
+      "failure": "A Start tap that arrived just after the banner question stopped pending started nothing.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
+      }
     }
   ]
 }
