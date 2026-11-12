@@ -33,8 +33,9 @@ struct GlanceTopBarTests {
     }
 
     @Test func tabCapsuleMatchesTheLivePair() {
-        // Glance (parity/N4): 411 wide with Home selected, Clipboard "39" (+15.5) and Shelf "7" (+9).
-        #expect(abs(Double(GlanceTopBar.capsuleWidth(tabs: 7, countsExtra: 24.5)) - 411) <= 1)
+        // Measured live (parity/N4): 411 wide with Home selected, Clipboard "39" (+15.5) and Shelf "7" (+9),
+        // at 14 pt between tabs. Zeus uses 12 pt so thirteen tabs fit: 2 pt less for each of the 6 gaps.
+        #expect(abs(Double(GlanceTopBar.capsuleWidth(tabs: 7, countsExtra: 24.5)) - (411 - 6 * 2)) <= 1)
         #expect(GlanceTopBar.capsuleWidth(tabs: 0) == 0)
         // Top 38, 34 tall (centre 55), and the cards still start at 82.
         #expect(Double(GlanceTopBar.tabRowTop) == 38 && Double(GlanceTopBar.tabRowTop + GlanceTopBar.tabRowHeight / 2) == 55)
@@ -63,7 +64,8 @@ struct GlanceTopBarTests {
     }
 
     @Test func glanceSevenComeFirst() {
-        #expect(Array(TopBarLayout.standard.tabs.prefix(7)) == TopBarLayout.glanceSeven)
+        // The default row starts with Home and Agents, then the other six of the seven in their order.
+        #expect(Array(TopBarLayout.standard.tabs.prefix(8)) == [TopBarTab.home, .agents] + Array(TopBarLayout.glanceSeven.dropFirst()))
         let saved = TopBarLayout(tabs: [.home, .today, .agents, .music, .clipboard, .usage, .chat])
         #expect(saved.glanceOrdered().tabs == [.home, .chat, .clipboard, .today, .agents, .music, .usage])
         // Nothing turned on that was off.
