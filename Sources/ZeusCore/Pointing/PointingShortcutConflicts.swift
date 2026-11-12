@@ -10,9 +10,12 @@ extension ShortcutConflicts {
     /// `showMeKey` is the show-me hold (left Command by default).
     public static func pointingWarnings(pointing: Shortcut, talk: Shortcut, dictation: Shortcut?, chat: ChatHotkey,
                                         doubleControlTextEntry: Bool,
-                                        showMeKey: Shortcut = Shortcut(modifiers: .command, side: .left)) -> [String] {
-        var out = warnings(for: pointing, other: nil, otherName: "")
-        out += keyed(pointing, against: talk, name: "Talk to Zeus")
+                                        showMeKey: Shortcut = Shortcut(modifiers: .command, side: .left),
+                                        voiceOverOn: Bool = false) -> [String] {
+        var out = warnings(for: pointing, other: nil, otherName: "", voiceOverOn: voiceOverOn)
+        // The same key as Talk to Zeus is the shipped design, not a conflict: the talk turn owns that hold
+        // (`VoiceKey.pointingStartsTurns`), so one hold is one turn.
+        if pointing != talk { out += keyed(pointing, against: talk, name: "Talk to Zeus") }
         if let dictation { out += keyed(pointing, against: dictation, name: "Dictation") }
         out += keyed(pointing, against: showMeKey, name: "Show me")
         if chat != .off, let chatModifiers = chatShortcutModifiers(chat), pointing.isModifierOnly,

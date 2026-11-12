@@ -3370,7 +3370,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
-              "function": "shippedDefaultsOnlyWarnAboutVoiceOver"
+              "function": "shippedDefaultsDoNotWarn"
             },
             {
               "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
@@ -3378,7 +3378,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",
-              "function": "theSameKeyAsTalkIsFlagged"
+              "function": "theSameKeyAsTalkIsOneTurnNotAConflict"
             },
             {
               "file": "Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift",

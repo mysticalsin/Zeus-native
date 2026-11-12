@@ -54,7 +54,7 @@ struct QA21ShortcutTests {
         let d = defaults()
         let talk = ShortcutStore.loadTalk(d)
         let dictation = ShortcutStore.loadDictation(d)
-        #expect(talk == .optionCommand)
+        #expect(talk == .controlOption)
         #expect(dictation == .rightCommand)
         #expect(ShortcutConflicts.warningsForShippedDefaults(talk: talk, dictation: dictation).isEmpty)
     }

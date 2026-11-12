@@ -4,15 +4,19 @@ import Testing
 
 @Suite("Pointing shortcut conflicts")
 struct ShortcutConflictsPointingTests {
-    private func warnings(pointing: Shortcut = .controlOption, talk: Shortcut = .optionCommand,
+    private func warnings(pointing: Shortcut = .controlOption, talk: Shortcut = .controlOption,
                           dictation: Shortcut? = .rightCommand, chat: ChatHotkey = .off,
-                          doubleControl: Bool = false) -> [String] {
+                          doubleControl: Bool = false, voiceOver: Bool = false) -> [String] {
         ShortcutConflicts.pointingWarnings(pointing: pointing, talk: talk, dictation: dictation, chat: chat,
-                                           doubleControlTextEntry: doubleControl)
+                                           doubleControlTextEntry: doubleControl, voiceOverOn: voiceOver)
     }
 
-    @Test func shippedDefaultsOnlyWarnAboutVoiceOver() {
-        let result = warnings()
+    @Test func shippedDefaultsDoNotWarn() {
+        #expect(warnings().isEmpty)
+    }
+
+    @Test func voiceOverIsMentionedOnlyWhileItIsOn() {
+        let result = warnings(voiceOver: true)
         #expect(result.count == 1)
         #expect(result.first?.contains("VoiceOver") == true)
     }
@@ -23,8 +27,13 @@ struct ShortcutConflictsPointingTests {
         #expect(!warnings(chat: .commandShiftSpace).contains { $0.contains("Chat shortcut") })
     }
 
-    @Test func theSameKeyAsTalkIsFlagged() {
-        #expect(warnings(pointing: .optionCommand).contains { $0.contains("Same key as Talk to Zeus") })
+    @Test func theSameKeyAsTalkIsOneTurnNotAConflict() {
+        #expect(!warnings(pointing: .controlOption, talk: .controlOption).contains { $0.contains("Talk to Zeus") })
+        #expect(!warnings(pointing: .rightOption, talk: .rightOption).contains { $0.contains("Talk to Zeus") })
+    }
+
+    @Test func theSameKeyAsDictationIsStillFlagged() {
+        #expect(warnings(pointing: .rightOption, dictation: .rightOption).contains { $0.contains("Same key as Dictation") })
     }
 
     @Test func anOverlappingShowMeKeyIsFlagged() {
