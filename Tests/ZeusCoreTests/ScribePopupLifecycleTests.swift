@@ -207,6 +207,23 @@ struct ScribePopupLifecycleTests {
         #expect(card.phase == .starting)
     }
 
+    @Test func aReplacedCardAndTheHoverCapClearAStuckPointer() {
+        var card = shownCard()
+        card.handle(.pointer(inside: true, now: 10))
+        #expect(card.handle(.meetingGone(now: 12)) == [.hide])
+        card.handle(.present(key: "m2", lifetime: 45, now: 20))
+        // No pointer event on the new card. It must leave at 45s, not after another 30s cap plus 45s.
+        #expect(!card.pointerInside)
+        #expect(card.handle(.tick(now: 64)).isEmpty)
+        #expect(card.handle(.tick(now: 65)) == [.hide, .timedOut])
+
+        var held = shownCard()
+        held.handle(.pointer(inside: true, now: 10))
+        let cap = 10 + held.timing.hoverCap
+        _ = held.handle(.tick(now: cap))
+        #expect(!held.pointerInside)
+    }
+
     @Test func failureWordsUsePlainPunctuation() {
         let failures: [ScribePopupFailure] = [.microphoneOff, .stillSaving, .captureFailed("x"), .noResponse]
         for failure in failures {
