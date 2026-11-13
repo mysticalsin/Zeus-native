@@ -262,13 +262,17 @@ private struct AppearancePage: View {
                 runningTheme("Essentials", "")
             }
             GSDivider()
-            GSRow(symbol: "hand.point.up.left", title: "Open the notch on hover", text: "How long the pointer rests before it opens.") {
-                GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Open the notch on hover")
-            }
-            GSDivider()
             GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens it after the delay. Click opens it only when you click the notch.") {
                 GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
             }
+            GSDivider()
+            // The delay only applies to hover, so it is subdued while the trigger is Click.
+            let clickTrigger = SettingsStore.shared.string("notch.openTrigger") == "Click"
+            GSRow(symbol: "hand.point.up.left", title: "Hover delay", text: "How long the pointer rests before it opens. Used when the notch opens on hover.") {
+                GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Hover delay")
+            }
+            .disabled(clickTrigger)
+            .opacity(clickTrigger ? 0.5 : 1)
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
