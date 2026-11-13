@@ -43,35 +43,93 @@ import Testing
 
     @Test func notchedScreenWithANegativeOriginKeepsTheNotchAtTheTop() {
         let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
-        let zone = NotchOpenRules.clickZone(screenFrame: screen, notchSize: notch, topOffset: 12)
-        // The hardware notch does not move when the bar is lowered.
+        let zone = NotchOpenRules.clickZone(screenFrame: screen, notchSize: notch, topOffset: 0)
         #expect(zone == CGRect(x: -756 - 92, y: 1182 - 32, width: 184, height: 32))
+    }
+
+    @Test func loweredBarOnANotchedScreenExtendsTheZoneDownToTheVisibleIsland() {
+        let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
+        let zone = NotchOpenRules.clickZone(screenFrame: screen, notchSize: notch, topOffset: 12)
+        // Still only notch-wide, so menu bar items stay clear; 12 pt taller, so the lowered island is covered.
+        #expect(zone == CGRect(x: -756 - 92, y: 1182 - 32 - 12, width: 184, height: 32 + 12))
+        let island = CGPoint(x: -756, y: 1182 - 32 - 6)
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: island, zone: zone))
+    }
+
+    @Test func aNegativeTopOffsetNeverShrinksTheNotchedZone() {
+        let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: -8)
+        #expect(zone == CGRect(x: 664, y: 950, width: 184, height: 32))
+    }
+
+    @Test func aNotchWithNoHeightOrNoWidthFallsBackToThePillZone() {
+        let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+        let pill = NotchOpenRules.clickZone(screenFrame: screen, notchSize: .zero, topOffset: 0)
+        #expect(NotchOpenRules.clickZone(screenFrame: screen, notchSize: CGSize(width: 184, height: 0), topOffset: 0) == pill)
+        #expect(NotchOpenRules.clickZone(screenFrame: screen, notchSize: CGSize(width: 0, height: 32), topOffset: 0) == pill)
     }
 
     @Test func clickInsideTheZoneOpensWhenClosedAndTheTriggerIsClick() {
         let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: 0)
         let inside = CGPoint(x: 756, y: 970)
-        #expect(NotchOpenRules.opensOnClick(trigger: .click, isClosed: true, point: inside, zone: zone))
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: inside, zone: zone))
         // The top row of the screen counts, like the hover zone.
-        #expect(NotchOpenRules.opensOnClick(trigger: .click, isClosed: true, point: CGPoint(x: 756, y: 982), zone: zone))
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 756, y: 982), zone: zone))
     }
 
     @Test func clickOutsideTheZoneDoesNotOpen() {
         let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: 0)
-        #expect(!NotchOpenRules.opensOnClick(trigger: .click, isClosed: true, point: CGPoint(x: 600, y: 970), zone: zone))
-        #expect(!NotchOpenRules.opensOnClick(trigger: .click, isClosed: true, point: CGPoint(x: 900, y: 970), zone: zone))
-        #expect(!NotchOpenRules.opensOnClick(trigger: .click, isClosed: true, point: CGPoint(x: 756, y: 900), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 600, y: 970), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 900, y: 970), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 756, y: 900), zone: zone))
         // The bottom edge is outside, as it is for the hover zone.
-        #expect(!NotchOpenRules.opensOnClick(trigger: .click, isClosed: true, point: CGPoint(x: 756, y: 950), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 756, y: 950), zone: zone))
+    }
+
+    @Test func theLeftAndRightEdgesCountAndJustOutsideDoesNot() {
+        let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: 0)
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.minX, y: 970), zone: zone))
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.maxX, y: 970), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.minX - 0.5, y: 970), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.maxX + 0.5, y: 970), zone: zone))
+    }
+
+    @Test func clickOnThePillZoneOfADisplayWithoutANotch() {
+        let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+        let zone = NotchOpenRules.clickZone(screenFrame: screen, notchSize: .zero, topOffset: 0)
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 960, y: 1070), zone: zone))
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.minX, y: 1070), zone: zone))
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.maxX, y: 1070), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.minX - 1, y: 1070), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: zone.maxX + 1, y: 1070), zone: zone))
+        // Below the 14 pt zone, where menu bar items live.
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 960, y: 1060), zone: zone))
+    }
+
+    @Test func clickOnThePillZoneOfALoweredBarOnANegativeOriginDisplay() {
+        let screen = CGRect(x: -1920, y: -1080, width: 1920, height: 1080)
+        let zone = NotchOpenRules.clickZone(screenFrame: screen, notchSize: .zero, topOffset: 10)
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: -960, y: -15), zone: zone))
+        // The 10 pt gap above the lowered pill is not the pill.
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: -960, y: -5), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: -960, y: -30), zone: zone))
+    }
+
+    @Test func aClickOpensFromThePeekBecauseOnlyThePanelCountsAsOpen() {
+        let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: 0)
+        let inside = CGPoint(x: 756, y: 970)
+        // The controller passes `presentation == .panel`: a peek is not the panel.
+        let peekIsPanel = false
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: peekIsPanel, point: inside, zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: true, point: inside, zone: zone))
     }
 
     @Test func noOpenWhenTheNotchIsAlreadyOpen() {
         let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: 0)
-        #expect(!NotchOpenRules.opensOnClick(trigger: .click, isClosed: false, point: CGPoint(x: 756, y: 970), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: true, point: CGPoint(x: 756, y: 970), zone: zone))
     }
 
     @Test func noOpenForHoverEvenInsideTheZone() {
         let zone = NotchOpenRules.clickZone(screenFrame: notched, notchSize: notch, topOffset: 0)
-        #expect(!NotchOpenRules.opensOnClick(trigger: .hover, isClosed: true, point: CGPoint(x: 756, y: 970), zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .hover, panelIsOpen: false, point: CGPoint(x: 756, y: 970), zone: zone))
     }
 }
