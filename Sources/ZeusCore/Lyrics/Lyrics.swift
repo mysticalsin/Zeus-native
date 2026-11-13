@@ -33,12 +33,30 @@ public enum LRC {
                     offset = ms / 1000
                 } // other metadata tags (ar, ti, al, by...) are ignored
             }
-            let words = rest.trimmingCharacters(in: .whitespaces)
+            let words = strippingWordTags(rest).trimmingCharacters(in: .whitespaces)
             for time in stamps { lines.append(LyricLine(time: time, text: words)) }
         }
         // A positive offset makes the lyrics appear sooner.
         let shifted = lines.map { LyricLine(time: max(0, $0.time - offset), text: $0.text) }
         return shifted.enumerated().sorted { ($0.element.time, $0.offset) < ($1.element.time, $1.offset) }.map(\.element)
+    }
+
+    /// Drops inline word tags (`<mm:ss.xx>`, as in enhanced `.lrc` files) so they never show as text.
+    /// Angle brackets that do not hold a timestamp stay.
+    static func strippingWordTags(_ text: Substring) -> String {
+        var kept = ""
+        var rest = text
+        while let open = rest.firstIndex(of: "<") {
+            kept += rest[..<open]
+            let inside = rest.index(after: open)
+            if let close = rest[inside...].firstIndex(of: ">"), stamp(String(rest[inside..<close])) != nil {
+                rest = rest[rest.index(after: close)...]
+            } else {
+                kept.append("<")
+                rest = rest[inside...]
+            }
+        }
+        return kept + rest
     }
 
     /// "01:02.34", "1:02", "00:12.5" in seconds; nil for anything else (a metadata tag).
