@@ -170,6 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The optional display hold that lasts only while music plays. Separate from the cup and sessions.
         topBar.onMusicPlaying = { playing in MusicAwakeHold.shared.setPlaying(playing) }
         MusicAwakeHold.shared.setEnabled(SettingsStore.shared.bool(MusicAwakeHold.settingID))
+        // The hold shares the session's battery floor and heat setting, so a change there re-runs its rule.
+        KeepAwakeSession.shared.onRulesChange = { MusicAwakeHold.shared.evaluate() }
         topBar.onOpenTab = { [weak self] tab in guard let self else { return }; self.topBar.selectedTab = tab; self.notch.show(.panel) }
         // A session that ends (time, battery, heat) also lets the Home cup's display hold go.
         KeepAwakeSession.shared.onEnd = { [weak self] in self?.topBar.keepAwake = false }
