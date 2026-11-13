@@ -65,8 +65,10 @@ public enum MusicModeRules {
         return MusicModes(shuffle: shuffle, repeatMode: mode)
     }
 
+    /// Set scripts start with the same `is not running` check as the read script: a press can sit behind a
+    /// slow read, and a tell that reaches a player that quit meanwhile would launch it again.
     public static func setShuffleScript(player: NowPlaying.Player, on: Bool) -> String {
-        "tell application id \"\(player.bundleID)\" to set \(properties(player).shuffle) to \(on)"
+        guardedSet(player: player, property: properties(player).shuffle, value: "\(on)")
     }
 
     /// `one` on Spotify turns repeating on: it has nothing finer.
@@ -75,7 +77,42 @@ public enum MusicModeRules {
         case .music: mode.rawValue
         case .spotify: mode == .off ? "false" : "true"
         }
-        return "tell application id \"\(player.bundleID)\" to set \(properties(player).repeating) to \(value)"
+        return guardedSet(player: player, property: properties(player).repeating, value: value)
+    }
+
+    /// Whether the modes should be read for this update: a new player or track, or modes still unknown
+    /// (Automation was not confirmed yet, or was just granted). Play and pause on a known track do not.
+    public static func shouldRead(previous: NowPlaying?, current: NowPlaying, modes: MusicModes) -> Bool {
+        guard let previous else { return true }
+        if previous.player != current.player || previous.title != current.title || previous.artist != current.artist {
+            return true
+        }
+        return modes.shuffle == nil || modes.repeatMode == nil
+    }
+
+    /// The modes after a read. An answer replaces them, an unreadable one leaves them unknown. A read that
+    /// failed outright changes nothing, except right after a press: the control then holds a guess the player
+    /// never confirmed, so it goes back to unknown.
+    public static func resolved(output: String?, player: NowPlaying.Player, current: MusicModes, afterPress: Bool) -> MusicModes {
+        guard let output else { return afterPress ? MusicModes() : current }
+        return parse(output, player: player) ?? MusicModes()
+    }
+
+    /// What VoiceOver says for the shuffle control: unknown is told apart from off.
+    public static func spokenShuffle(_ shuffle: Bool?) -> String {
+        shuffle.map { $0 ? "on" : "off" } ?? "unknown"
+    }
+
+    /// What VoiceOver says for the repeat control: unknown is told apart from off.
+    public static func spokenRepeat(_ mode: RepeatMode?) -> String {
+        mode?.rawValue ?? "unknown"
+    }
+
+    private static func guardedSet(player: NowPlaying.Player, property: String, value: String) -> String {
+        "if application id \"\(player.bundleID)\" is not running then return \"\"\n"
+            + "tell application id \"\(player.bundleID)\"\n"
+            + "set \(property) to \(value)\n"
+            + "end tell"
     }
 
     /// The scripting dictionary's names for shuffle and repeat.
