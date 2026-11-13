@@ -3,20 +3,28 @@ import SwiftUI
 import ZeusCore
 
 /// Time-synced lyrics from LRCLIB for what is playing. Off until Settings > Privacy > Synced lyrics is on,
-/// because asking sends the title and artist to lrclib.net. Answers (and misses) are cached on disk.
+/// because asking sends the title and artist to lrclib.net. Answers (and misses) are cached on disk; a service
+/// failure is never cached, shows `.unavailable`, and holds back every request until the shared wait is over.
 @MainActor
 @Observable
 final class LyricsStore {
     static let shared = LyricsStore()
 
     enum State: Equatable {
-        case off, idle, loading, ready([LyricLine]), plain(String), instrumental, none
+        case off, idle, loading, ready([LyricLine]), plain(String), instrumental
+        /// The service answered and has no lyrics for this track.
+        case none
+        /// The service did not answer (offline, 429, 5xx). Not cached; Zeus asks again when the wait ends.
+        case unavailable
     }
 
     private(set) var state: State = .idle
     private(set) var currentKey: String?
 
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var retryTask: Task<Void, Never>?
+    /// The wait after a failure. One for the whole service, so a new track does not skip it.
+    @ObservationIgnored private var backoff = LyricsBackoff()
     @ObservationIgnored private let cache: LyricsCache
     @ObservationIgnored private let session: URLSession
 
@@ -38,28 +46,73 @@ final class LyricsStore {
     }
 
     func load(for playing: NowPlaying?) {
-        guard Self.enabled else { state = .off; return }
+        guard Self.enabled else {
+            task?.cancel(); retryTask?.cancel()
+            currentKey = nil
+            state = .off
+            return
+        }
         guard let playing else { return }
         let query = LRCLIBQuery(playing)
         guard currentKey != query.cacheKey else { return }
         currentKey = query.cacheKey
-        task?.cancel()
+        task?.cancel(); retryTask?.cancel()
         guard query.isAskable else { state = .none; return }
         if let cached = cache.load(query) { state = Self.state(from: cached); return }
         if TopBarStyle.isSnapshot { state = .none; return }
+        ask(query)
+    }
+
+    /// Sends the lookup, or shows `.unavailable` and waits first while the back-off is running.
+    private func ask(_ query: LRCLIBQuery) {
+        guard backoff.canAsk(now: Date()) else {
+            state = .unavailable
+            scheduleRetry(query)
+            return
+        }
         state = .loading
+        task = Task { [weak self] in await self?.run(query) }
+    }
+
+    /// The three-step lookup, one request at a time. Any failure stops it and starts the wait; only
+    /// answers (a body, or a 404 on every step) are cached.
+    private func run(_ query: LRCLIBQuery) async {
         let key = query.cacheKey
-        task = Task { [weak self, session, cache] in
-            var answer = await Self.fetch(query.url, session: session)
-            if answer == LyricsResult.none, !Task.isCancelled { answer = await Self.fetch(query.looseURL, session: session) }
-            guard !Task.isCancelled else { return }
-            // A network failure (nil) is shown as "none" but never cached, so the next play asks again.
-            if let answer { cache.save(answer, for: query) }
-            let result = answer ?? LyricsResult.none
-            await MainActor.run {
-                guard let self, self.currentKey == key else { return }
-                self.state = Self.state(from: result)
+        var result = LyricsResult.none
+        lookup: for request in query.requests {
+            let reply = await Self.fetch(request.url, session: session)
+            guard !Task.isCancelled, currentKey == key else { return }
+            switch LyricsStatus.outcome(status: reply.status, retryAfter: reply.retryAfter) {
+            case .failed(let retryAfter):
+                backoff.recordFailure(now: Date(), retryAfter: retryAfter)
+                state = .unavailable
+                scheduleRetry(query)
+                return
+            case .notFound:
+                continue
+            case .found:
+                let found = request.result(from: reply.data, query: query)
+                if found != LyricsResult.none { result = found; break lookup }
             }
+        }
+        backoff.recordSuccess()
+        cache.save(result, for: query)
+        state = Self.state(from: result)
+    }
+
+    /// When the wait ends and this track is still the current one, ask once.
+    private func scheduleRetry(_ query: LRCLIBQuery) {
+        retryTask?.cancel()
+        let key = query.cacheKey
+        retryTask = Task { [weak self] in
+            while let wait = self?.backoff.remaining(now: Date()), wait > 0 {
+                try? await Task.sleep(for: .seconds(wait))
+                if Task.isCancelled { return }
+            }
+            guard let self, !Task.isCancelled, currentKey == key, state == .unavailable else { return }
+            // Lyrics were switched off during the wait: send nothing, and let the next load start over.
+            guard Self.enabled else { currentKey = nil; return }
+            ask(query)
         }
     }
 
@@ -78,14 +131,21 @@ final class LyricsStore {
         }
     }
 
-    /// nil: the request failed (offline, server error). `.none`: LRCLIB answered 404.
-    private nonisolated static func fetch(_ url: URL?, session: URLSession) async -> LyricsResult? {
-        guard let url else { return LyricsResult.none }
+    private struct Reply: Sendable {
+        var status: Int
+        var data: Data
+        var retryAfter: TimeInterval?
+    }
+
+    /// One request. Status 0 means no answer at all (offline, timeout); the rules in ZeusCore decide what every status means.
+    private nonisolated static func fetch(_ url: URL, session: URLSession) async -> Reply {
         var request = URLRequest(url: url)
         request.setValue("Zeus (https://zeus.app)", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await session.data(for: request), let status = (response as? HTTPURLResponse)?.statusCode else { return nil }
-        if status == 404 { return LyricsResult.none }
-        return status == 200 ? LRCLIBResponse.parse(data) : nil
+        guard let (data, response) = try? await session.data(for: request), let http = response as? HTTPURLResponse else {
+            return Reply(status: 0, data: Data(), retryAfter: nil)
+        }
+        return Reply(status: http.statusCode, data: data,
+                     retryAfter: LyricsStatus.retryAfter(header: http.value(forHTTPHeaderField: "Retry-After"), now: Date()))
     }
 }
 
@@ -125,6 +185,8 @@ struct LyricsView: View {
             note("Looking for lyrics", detail: nil)
         case .none:
             note("No synced lyrics for this track", detail: nil)
+        case .unavailable:
+            note("Lyrics service is not answering", detail: "Zeus will try again shortly.")
         }
     }
 
