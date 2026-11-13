@@ -55,6 +55,18 @@ struct LiveDiagnosticsTests {
         #expect(fixture(cpu: -3).rows[0].value == "0.0%")
     }
 
+    @Test func aHugeFiniteCpuValueNeitherTrapsNorReadsAsSmall() {
+        // A bad sample can be finite and enormous; converting it to a whole number once trapped.
+        for huge in [1e300, Double.greatestFiniteMagnitude, 9.3e17, 1e9] {
+            let row = fixture(cpu: huge).rows[0]
+            #expect(row.isHigh)
+            #expect(row.value.hasSuffix("%"))
+            #expect(row.value != "Unknown")
+        }
+        #expect(LiveDiagnostics.isHigh(cpu: 1e300))
+        #expect(fixture(cpu: 1e300).summaryText.contains("CPU: "))
+    }
+
     // MARK: Heat
 
     @Test func thermalWords() {
@@ -65,11 +77,12 @@ struct LiveDiagnosticsTests {
         #expect(fixture(thermal: .serious).rows[2].value == "Hot")
     }
 
+    /// One mapping for the whole app: Keep Awake and Diagnostics both read it.
     @Test func thermalStateMapsOneToOne() {
-        #expect(LiveDiagnostics.thermal(from: .nominal) == .nominal)
-        #expect(LiveDiagnostics.thermal(from: .fair) == .fair)
-        #expect(LiveDiagnostics.thermal(from: .serious) == .serious)
-        #expect(LiveDiagnostics.thermal(from: .critical) == .critical)
+        #expect(KeepAwakeRules.Thermal(.nominal) == .nominal)
+        #expect(KeepAwakeRules.Thermal(.fair) == .fair)
+        #expect(KeepAwakeRules.Thermal(.serious) == .serious)
+        #expect(KeepAwakeRules.Thermal(.critical) == .critical)
     }
 
     // MARK: Audio and player
