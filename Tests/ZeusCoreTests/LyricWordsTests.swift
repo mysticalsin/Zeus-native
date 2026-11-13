@@ -184,11 +184,13 @@ import Testing
         [ar:Someone]
         [00:01.00]<00:01.00>One <00:01.40>two <00:01.80>
         [00:05.00]<00:05.00>Three
+        [00:07.00]<00:07.00> Four <00:07.40> five<00:07.80> six
         [00:09.00]<00:09.00>
         """
         let lines = LRC.parse(lrc)
-        #expect(lines.map(\.text) == ["One two", "Three", ""])
-        #expect(lines.map(\.time) == [1, 5, 9])
+        // A tag with spaces on both sides leaves one space, not two.
+        #expect(lines.map(\.text) == ["One two", "Three", "Four five six", ""])
+        #expect(lines.map(\.time) == [1, 5, 7, 9])
     }
 
     @Test func tagsThatAreNotTimestampsStayInTheText() {

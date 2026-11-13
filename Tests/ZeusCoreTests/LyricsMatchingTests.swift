@@ -88,9 +88,37 @@ import Testing
             ("Prefix", "Prefix"),
             ("Leftfield", "Leftfield"),
             ("", ""),
+            // Known trade-off: this rule only feeds the search step, which the length check backs up.
+            // The /api/get step uses withoutFeaturedArtists, so these names reach it whole.
+            ("Simon & Garfunkel", "Simon"),
+            ("Earth, Wind & Fire", "Earth"),
+            ("Tyler, The Creator", "Tyler"),
         ]
         for (input, expected) in table {
             #expect(LyricsTitle.primaryArtist(input) == expected, "\(input)")
+        }
+    }
+
+    @Test func onlyAFeaturedCreditIsCutFromTheArtist() {
+        let table: [(String, String)] = [
+            ("Queen", "Queen"),
+            ("Artist A feat. Artist B", "Artist A"),
+            ("Artist A Feat Artist B", "Artist A"),
+            ("Artist A ft. Artist B", "Artist A"),
+            ("Artist A FT Artist B", "Artist A"),
+            ("Artist A featuring Artist B", "Artist A"),
+            ("Queen & David Bowie", "Queen & David Bowie"),
+            ("Earth, Wind & Fire", "Earth, Wind & Fire"),
+            ("Simon & Garfunkel", "Simon & Garfunkel"),
+            ("Artist A; Artist B", "Artist A; Artist B"),
+            ("Earth, Wind & Fire feat. Someone", "Earth, Wind & Fire"),
+            ("Leftfield", "Leftfield"),
+            ("Prefix", "Prefix"),
+            (" feat. Someone", " feat. Someone"),
+            ("", ""),
+        ]
+        for (input, expected) in table {
+            #expect(LyricsTitle.withoutFeaturedArtists(input) == expected, "\(input)")
         }
     }
 
@@ -184,9 +212,13 @@ import Testing
         let exactSynced = candidate(4, "Song", duration: 150, synced: Self.lrc)
         let exactSyncedLater = candidate(5, "Song", duration: 151, synced: Self.lrc)
         #expect(LyricsMatch.best([exact, exactSyncedLater, exactSynced], duration: 0, title: "song")?.id == 5)
-        // The title is compared after the version suffixes are stripped from both sides.
+        // Only the title as the player reports it counts: a version suffix on either side is a different recording.
         let remastered = candidate(6, "Song - Remastered 2011", duration: 200, synced: Self.lrc)
-        #expect(LyricsMatch.best([remastered], duration: 0, title: "Song")?.id == 6)
+        #expect(LyricsMatch.best([remastered], duration: 0, title: "Song") == nil)
+        let single = candidate(7, "Song (Single Version)", duration: 200, synced: Self.lrc)
+        #expect(LyricsMatch.best([single], duration: 0, title: "Song") == nil)
+        #expect(LyricsMatch.best([single], duration: 0, title: "Song (Single Version)")?.id == 7)
+        #expect(LyricsMatch.best([candidate(8, "Song", duration: 200, synced: Self.lrc)], duration: 0, title: "Song (Single Version)") == nil)
     }
 
     @Test func candidatesWithoutLyricsAreSkipped() {
@@ -227,7 +259,8 @@ import Testing
         let request = try #require(version.cleanedRequest)
         #expect(request.step == .cleaned)
         #expect(request.url.path == "/api/get")
-        #expect(items(request.url) == ["artist_name": "Queen", "track_name": "Under Pressure", "duration": "248"])
+        // The title changed and the artist did not: the credited artist stays whole.
+        #expect(items(request.url) == ["artist_name": "Queen & David Bowie", "track_name": "Under Pressure", "duration": "248"])
     }
 
     @Test func searchRequestCarriesOnlyTitleAndArtist() throws {
@@ -247,9 +280,44 @@ import Testing
         #expect(plain.requests.map(\.step) == [.exact, .search])
     }
 
-    @Test func cleanedRequestRunsWhenOnlyTheArtistChanged() throws {
-        let query = LRCLIBQuery(artist: "Artist A, Artist B", title: "Hello", album: "25", duration: 295)
+    @Test func cleanedRequestRunsWhenOnlyAFeaturedArtistIsCredited() throws {
+        let query = LRCLIBQuery(artist: "Artist A feat. Artist B", title: "Hello", album: "25", duration: 295)
         #expect(items(try #require(query.cleanedRequest).url) == ["artist_name": "Artist A", "track_name": "Hello", "duration": "295"])
+    }
+
+    @Test func cleanedRequestKeepsAGroupNameWhole() throws {
+        // Only a feat. or ft. credit is cut from the artist; "&" and "," stay, so a band is not split in two.
+        let table = ["Simon & Garfunkel", "Earth, Wind & Fire", "Tyler, The Creator", "Florence + the Machine"]
+        for artist in table {
+            let remaster = LRCLIBQuery(artist: artist, title: "September - Remastered", album: "", duration: 215)
+            #expect(items(try #require(remaster.cleanedRequest).url)["artist_name"] == artist, artist)
+            let plain = LRCLIBQuery(artist: artist, title: "September", album: "", duration: 215)
+            #expect(plain.cleanedRequest == nil, artist)
+        }
+        let both = LRCLIBQuery(artist: "Earth, Wind & Fire ft. Someone", title: "September (Remastered)", duration: 215)
+        #expect(items(try #require(both.cleanedRequest).url)["artist_name"] == "Earth, Wind & Fire")
+    }
+
+    @Test func lengthsLrclibCannotTakeAreNeverSent() throws {
+        // /api/get answers 400 for a duration outside 1 to 3600: leave it out, and skip the step that needs it.
+        let tooShort = LRCLIBQuery(artist: "Queen", title: "Under Pressure - Remastered 2011", album: "Hot Space", duration: 0.3)
+        #expect(items(tooShort.exactRequest?.url)["duration"] == nil)
+        #expect(tooShort.cleanedRequest == nil)
+        #expect(tooShort.requests.map(\.step) == [.exact, .search])
+        let mix = LRCLIBQuery(artist: "Some DJ", title: "Live Mix - Remastered", album: "Mixes", duration: 3720)
+        #expect(items(mix.exactRequest?.url)["duration"] == nil)
+        #expect(mix.cleanedRequest == nil)
+        #expect(mix.requests.map(\.step) == [.exact, .search])
+        for duration in [Double.nan, .infinity, -5, 1e12] {
+            let odd = LRCLIBQuery(artist: "Queen", title: "Under Pressure - Remastered 2011", album: "Hot Space", duration: duration)
+            #expect(items(odd.exactRequest?.url)["duration"] == nil, "\(duration)")
+            #expect(odd.cleanedRequest == nil, "\(duration)")
+        }
+        // The edges that LRCLIB takes stay.
+        #expect(items(LRCLIBQuery(artist: "A", title: "B", duration: 3600).exactRequest?.url)["duration"] == "3600")
+        #expect(items(LRCLIBQuery(artist: "A", title: "B", duration: 0.5).exactRequest?.url)["duration"] == "1")
+        #expect(items(LRCLIBQuery(artist: "A", title: "B", duration: 1).exactRequest?.url)["duration"] == "1")
+        #expect(items(LRCLIBQuery(artist: "A", title: "B", duration: 0.4).exactRequest?.url)["duration"] == nil)
     }
 
     @Test func noLooseRequestWithoutADuration() {
@@ -293,6 +361,18 @@ import Testing
         #expect(search.result(from: Data("[]".utf8), query: version) == LyricsResult.none)
     }
 
+    @Test func theSearchStepWithoutALengthTakesOnlyTheTitleAsPlayed() throws {
+        let query = LRCLIBQuery(artist: "Artist", title: "Song (Single Version)", album: "", duration: 0)
+        let search = try #require(query.searchRequest)
+        let list = """
+        [{"id":1,"trackName":"Song","artistName":"Artist","duration":240,"plainLyrics":null,"syncedLyrics":"[00:01.00] album"},
+         {"id":2,"trackName":"Song (Single Version)","artistName":"Artist","duration":200,"plainLyrics":null,"syncedLyrics":"[00:01.00] single"}]
+        """
+        #expect(search.result(from: Data(list.utf8), query: query) == .synced([LyricLine(time: 1, text: "single")]))
+        let onlyAlbum = #"[{"id":1,"trackName":"Song","artistName":"Artist","duration":240,"plainLyrics":"x"}]"#
+        #expect(search.result(from: Data(onlyAlbum.utf8), query: query) == LyricsResult.none)
+    }
+
     // MARK: HTTP status
 
     @Test func statusCodesMapToOutcomes() {
@@ -303,8 +383,15 @@ import Testing
         for status in [500, 502, 503, 504, 599] {
             #expect(LyricsStatus.outcome(status: status, retryAfter: 5) == .failed(retryAfter: 5), "\(status)")
         }
+        // A request the service refuses as invalid (400, 401, 403, 410, 422...) is an answer for this step: it says
+        // nothing about the service being down, so it never starts the shared wait.
+        for status in [400, 401, 403, 410, 422, 451] {
+            #expect(LyricsStatus.outcome(status: status, retryAfter: 5) == .notFound, "\(status)")
+        }
+        // Timeouts and rate limits are failures.
+        #expect(LyricsStatus.outcome(status: 408, retryAfter: nil) == .failed(retryAfter: nil))
         // Anything unexpected is a failure, never a cached "no lyrics".
-        for status in [0, -1, 204, 301, 400, 401, 403, 410] {
+        for status in [0, -1, 100, 204, 301, 302] {
             #expect(LyricsStatus.outcome(status: status, retryAfter: nil) == .failed(retryAfter: nil), "\(status)")
         }
         // The wait is only carried by failures.
