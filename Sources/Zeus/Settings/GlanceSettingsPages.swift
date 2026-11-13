@@ -360,7 +360,20 @@ private struct AppearancePage: View {
         // One child, so the page body stays within ViewBuilder's ten-view limit.
         Group {
             hudCard
+            screenCard
             TopBarTabsCard(context: context)
+        }
+    }
+
+    private var screenCard: some View {
+        GSCard("Screen") {
+            GSToggleRow(symbol: "rectangle.roundedbottom", title: "Round the bottom screen corners",
+                        text: "Rounds the two bottom corners of a notched display to match the top. Click-through.",
+                        isOn: bool("screen.roundBottomCorners"))
+            GSDivider()
+            GSRow(symbol: "circle.bottomhalf.filled", title: "Corner size") {
+                GSPopup(selection: SettingsStore.binding("screen.cornerRadius"), options: SettingsCatalog.option("screen.cornerRadius")?.choices ?? []).popupLabel("Corner size")
+            }
         }
     }
 

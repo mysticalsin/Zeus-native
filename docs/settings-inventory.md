@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 173 of 173 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 173 in scope). 162 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 175 of 175 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 175 in scope). 164 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 122.
+**Before this round:** has 19, partial 27, missing 124.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -86,6 +86,8 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |
 | Everyday lights | Glow when AirDrop arrives | toggle | off | Blue intake glow and drops the file on the shelf. | missing | live | `lights.airDrop` | Gated by Downloads folder access. |
 | Everyday lights | Screenshot cue | toggle | off | Camera cue and shelf drop for new screenshots. | missing | live | `lights.screenshot` | Gated by Desktop folder access. |
+| Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
+| Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 
 ## Notifications
 

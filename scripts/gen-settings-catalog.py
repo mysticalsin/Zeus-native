@@ -80,6 +80,8 @@ o(S,'Everyday lights','Glow when a reminder is added','toggle','on','Blue crests
 o(S,'Everyday lights','Glow when an event is added','toggle','on','Cyan ribbon after you add an event.','partial','lights.eventGlow','toggle',[],'true','live','Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm".')
 o(S,'Everyday lights','Glow when AirDrop arrives','toggle','off','Blue intake glow and drops the file on the shelf.','missing','lights.airDrop','toggle',[],'false','live','Gated by Downloads folder access.')
 o(S,'Everyday lights','Screenshot cue','toggle','off','Camera cue and shelf drop for new screenshots.','missing','lights.screenshot','toggle',[],'false','live','Gated by Desktop folder access.')
+o(S,'Screen','Round the bottom screen corners','toggle','off','Rounds the two bottom corners of a notched display to match the top. Click-through.','missing','screen.roundBottomCorners','toggle',[],'false','live','Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes.')
+o(S,'Screen','Corner size','segmented','Medium','How large the rounded corners are.','missing','screen.cornerRadius','choice',['Small','Medium','Large'],'Medium','live','Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt.')
 
 S='notifications'
 o(S,'Agent notifications','Permission requests','toggle','on','Alert when an agent asks.','has','notify.approvals','toggle',[],'true','custom','')
