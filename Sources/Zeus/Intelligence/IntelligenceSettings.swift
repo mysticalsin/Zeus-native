@@ -59,6 +59,9 @@ final class EnergyMonitor {
     private var timer: Timer?
     private var viewers = 0
 
+    /// True while the 2 s timer exists, that is while at least one viewer holds the monitor.
+    var isSampling: Bool { timer != nil }
+
     func start() {
         viewers += 1
         guard timer == nil else { return }
@@ -77,7 +80,7 @@ final class EnergyMonitor {
         timer?.invalidate(); timer = nil
     }
 
-    private func sample() {
+    func sample() {
         let now = Date(), s = ProcessEnergy.sample()
         cpu = ProcessEnergy.cpuPercent(from: last.0, to: s, over: now.timeIntervalSince(last.1))
         memory = s.residentMB

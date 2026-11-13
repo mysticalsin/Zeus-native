@@ -3,14 +3,18 @@ import SwiftUI
 import ZeusCore
 
 /// Settings > Diagnostics > "Zeus right now": Zeus's own CPU, memory, heat and audio state, and a Copy button
-/// for a bug report. Samples through the shared `EnergyMonitor` only while the card is on screen, so nothing
-/// runs when it is closed. Snapshots show fixed values and start nothing.
+/// for a bug report. Samples through the shared `EnergyMonitor` only while the card is on screen in a window
+/// that can be seen, so nothing runs when the page is left or the Settings window is closed or minimised.
+/// Snapshots show fixed values and start nothing.
 struct LiveDiagnosticsCard: View {
     let context: GSContext
-    var monitor = EnergyMonitor.shared
+    private let monitor = EnergyMonitor.shared
     private var audio = AudioSpectrumService.shared
     @State private var copied = false
     @State private var resetCopied: Task<Void, Never>?
+    /// The Mac's heat, refreshed when the system says it changed rather than only when a sample happens to move.
+    @State private var thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
+    @State private var hold = SamplingHold(start: { EnergyMonitor.shared.start() }, stop: { EnergyMonitor.shared.stop() })
 
     init(context: GSContext) {
         self.context = context
@@ -18,6 +22,7 @@ struct LiveDiagnosticsCard: View {
 
     var body: some View {
         let live = current
+        let hold = hold
         GSCard("Zeus right now") {
             ForEach(Array(live.rows.enumerated()), id: \.offset) { index, row in
                 if index > 0 { GSDivider() }
@@ -33,11 +38,24 @@ struct LiveDiagnosticsCard: View {
                 .accessibilityLabel(copied ? "Copied the diagnostics summary" : "Copy the diagnostics summary")
             }
         }
-        .onAppear { if !TopBarStyle.isSnapshot { monitor.start() } }
+        // The probe is an NSView; ImageRenderer (snapshots) would draw it as a yellow placeholder.
+        .background {
+            if !TopBarStyle.isSnapshot {
+                // Deferred a turn: the reader can report while SwiftUI is still updating this view.
+                WindowVisibilityReader { visible in Task { @MainActor in hold.windowVisibility(visible) } }
+            }
+        }
+        .onAppear {
+            thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
+            if !TopBarStyle.isSnapshot { hold.appear() }
+        }
         .onDisappear {
             resetCopied?.cancel()
             copied = false
-            if !TopBarStyle.isSnapshot { monitor.stop() }
+            hold.disappear()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in
+            thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
         }
     }
 
@@ -56,7 +74,7 @@ struct LiveDiagnosticsCard: View {
             // No CPU number until the monitor has taken its first sample, and none for a failed memory read.
             cpuPercent: monitor.hasCPUSample ? monitor.cpu : nil,
             memoryBytes: monitor.memory > 0 ? UInt64(monitor.memory * 1_048_576) : nil,
-            thermal: LiveDiagnostics.thermal(from: ProcessInfo.processInfo.thermalState),
+            thermal: thermal,
             audio: LiveDiagnostics.AudioCapture(running: audio.running, permission: audio.permission),
             nowPlaying: context.topBar?.nowPlaying,
             appVersion: version, build: build, osVersion: osText)
@@ -77,7 +95,8 @@ struct LiveDiagnosticsCard: View {
 
     /// A number reads as text with "High" beside it when over budget; a status reads as a symbol and a word.
     @ViewBuilder private func value(_ row: LiveDiagnostics.Row) -> some View {
-        let spoken = row.isHigh ? "\(row.label) \(row.value), high" : "\(row.label) \(row.value)"
+        // The row already speaks its title, so the value is read alone.
+        let spoken = row.isHigh ? "\(row.value), high" : row.value
         switch row.field {
         case .cpu, .memory:
             HStack(spacing: 10) {
