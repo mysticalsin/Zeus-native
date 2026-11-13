@@ -54,7 +54,7 @@ import Testing
     @Test func sharesSumToTheSungSpan() {
         let line = LyricLine(time: 3, text: "Somewhere over the rainbow way up high")
         let words = LyricWordTiming.words(in: line, lineEnd: 60)
-        let units = 3 + 2 + 1 + 2 + 1 + 1 + 1   // some-where, o-ver, the, rain-bow, way, up, high
+        let units = 4 + 2 + 1 + 2 + 1 + 1 + 1   // vowel groups: somewhere 4, over 2, the, rainbow 2, way, up, high
         let span = Double(units) * 0.45
         let shares = words.map { $0.end - $0.start }
         #expect(abs(shares.reduce(0, +) - span) < 1e-9)
