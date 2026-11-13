@@ -22,6 +22,16 @@ struct SettingsCatalogTests {
         #expect(SettingsCatalog.option("assistant.model") != nil)
     }
 
+    @Test func wordByWordLyricsIsALiveToggleThatDefaultsOn() {
+        let option = SettingsCatalog.option("lyrics.wordByWord")
+        #expect(option?.section == .appearance)
+        #expect(option?.group == "Everyday lights")
+        #expect(option?.kind == .toggle)
+        #expect(option?.defaultValue == "true")
+        #expect(option?.state == .live)
+        #expect(option?.title == "Light lyrics word by word")
+    }
+
     @Test func dictationLanguageIsCatalogued() {
         #expect(SettingsCatalog.option("dictation.language")?.title == "Dictation language")
         #expect(SettingsCatalog.option("dictation.behavior")?.isShown == true)

@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 173 of 173 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 173 in scope). 162 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 174 of 174 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 174 in scope). 163 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 122.
+**Before this round:** has 19, partial 27, missing 123.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -64,6 +64,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Halo | Light wave to the screen edges | toggle | on | A wave of light crosses the screen on agent events. | partial | live | `halo.edgeWave` | A click-through overlay on every Space, left out of captures; fronts run round the screen edge. |
 | Everyday lights | Light wave while music plays | toggle | on | Artwork-tinted wave on the closed notch. | has | custom | `topBar.musicWings` |  |
 | Everyday lights | Progress outline on the music preview | toggle | on | Outline empties as the track plays. | missing | live | `lights.musicProgress` | Tracks media progress around the music wings. |
+| Everyday lights | Light lyrics word by word | toggle | on | Each word lights as it is sung. Word timing is estimated from the line timing. | missing | live | `lyrics.wordByWord` | Estimated word timing in the lyric views. Off lights the whole line at once. |
 | Everyday lights | React to real sound (live spectrum) | toggle | off | The music light follows the sound your Mac is playing. | missing | live | `lights.liveSpectrum` | CoreAudio process tap of system output, listen only. Asks for System Audio Recording once, when this is turned on or the Waves tab opens. Runs only while music plays. |
 | Everyday lights | Waves style (Bars, Wave, Mirror) | segmented | Bars | How the Waves tab draws the spectrum. | missing | live | `waves.style` | Zeus addition. The Waves tab is off by default; add it in Settings > Appearance > Top bar tabs. |
 | Everyday lights | Waves sensitivity | slider | 100 % | How strongly the bars react to quiet sound. | missing | live | `waves.sensitivity` | Zeus addition. A gain on the live band levels. |
