@@ -83,21 +83,14 @@ public struct LiveDiagnostics: Equatable, Sendable {
         }
     }
 
-    /// The same four levels `ProcessInfo` reports.
-    public static func thermal(from state: ProcessInfo.ThermalState) -> KeepAwakeRules.Thermal {
-        switch state {
-        case .nominal: .nominal
-        case .fair: .fair
-        case .serious: .serious
-        case .critical: .critical
-        @unknown default: .nominal
-        }
-    }
+    /// The largest CPU percent shown. A bad sample can be finite and enormous; clamping keeps the whole-number
+    /// conversion safe and the value stays far over the idle budget, so it still reads High.
+    static let cpuCeilingPercent = 100_000.0
 
     /// CPU in tenths of a percent as shown, nil when there is no usable number.
     private static func cpuTenths(_ cpu: Double?) -> Int? {
         guard let cpu, cpu.isFinite else { return nil }
-        return Int((max(0, cpu) * 10).rounded())
+        return Int((min(max(0, cpu), cpuCeilingPercent) * 10).rounded())
     }
 
     /// Memory in whole megabytes as shown.
