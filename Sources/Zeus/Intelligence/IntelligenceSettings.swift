@@ -53,6 +53,8 @@ final class EnergyMonitor {
     static let shared = EnergyMonitor()
     private(set) var cpu = 0.0
     private(set) var memory = 0.0
+    /// False from a fresh start until the first 2 s sample, so a reader can say Unknown rather than 0.
+    private(set) var hasCPUSample = false
     private var last = (ProcessEnergy.sample(), Date())
     private var timer: Timer?
     private var viewers = 0
@@ -62,6 +64,7 @@ final class EnergyMonitor {
         guard timer == nil else { return }
         last = (ProcessEnergy.sample(), Date())
         memory = last.0.residentMB
+        hasCPUSample = false
         let t = Timer(timeInterval: 2, repeats: true) { _ in Task { @MainActor in EnergyMonitor.shared.sample() } }
         t.tolerance = 0.5
         RunLoop.main.add(t, forMode: .common)
@@ -78,6 +81,7 @@ final class EnergyMonitor {
         let now = Date(), s = ProcessEnergy.sample()
         cpu = ProcessEnergy.cpuPercent(from: last.0, to: s, over: now.timeIntervalSince(last.1))
         memory = s.residentMB
+        hasCPUSample = true
         last = (s, now)
     }
 }
