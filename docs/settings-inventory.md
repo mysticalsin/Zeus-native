@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 173 of 173 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 173 in scope). 162 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 174 of 174 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 174 in scope). 163 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 122.
+**Before this round:** has 19, partial 27, missing 123.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -21,6 +21,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. Screens without a notch get a slim pill. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
 | Day to day | Launch at login | toggle | on | Starts the app when you log in. | missing | live | `general.launchAtLogin` | SMAppService, bundled app only. |
 | Day to day | Keep the Mac awake while agents work | toggle | off | Blocks idle sleep while an agent runs; the screen can still lock. | missing | live | `general.keepAwake` | Power assertion held only while a session is working. |
+| Day to day | Keep the display awake while music plays | toggle | - | Holds the display on only while Music or Spotify is playing. Stops on low battery or heat. | missing | live | `keepAwake.whileMusic` | M4. Display assertion with a two minute lease, renewed each minute, held only while a track plays (20 second grace). Uses the Keep awake battery floor and heat rule. Separate from sessions and the Home cup. |
 | Day to day | Welcome back recap (Recap and return) | toggle | on | After 10 minutes or more away, the notch shows what agents finished, failed or are waiting on, and Zeus says one line about it when voice answers are on. | missing | live | `general.welcomeBack` | Away is system idle time (no keys or mouse). Only agent events since you left are listed; waiting ones only while still waiting. |
 | Day to day | Meeting mode (discreet during calls and screen sharing) | toggle | on | When another app uses the mic or camera, or the display is mirrored: leave captures, mute sounds, hide details. | partial | live | `general.meetingMode` | Detects the mic in use by another app and mirrored displays. Camera detection TODO. |
 | Day to day | Show in screen sharing | toggle | - |  | missing | live | `general.showInScreenSharing` | N1. Every Zeus window uses the shared sharing helper. |
