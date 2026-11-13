@@ -9,16 +9,23 @@ import ZeusCore
 final class PowerMonitor {
     static let shared = PowerMonitor()
 
+    /// Who is listening. The readings stay on until the last client stops.
+    enum Client { case keepAwake, music }
+
     private(set) var power = KeepAwakeRules.Power()
-    /// Called after every change, on the main thread.
+    /// The keep-awake session's callback. Called after every change, on the main thread.
     @ObservationIgnored var onChange: () -> Void = {}
+    /// The music hold's callback. Called right after `onChange`.
+    @ObservationIgnored var onMusicChange: () -> Void = {}
 
     @ObservationIgnored private var source: CFRunLoopSource?
     @ObservationIgnored private var thermalObserver: NSObjectProtocol?
+    @ObservationIgnored private var clients: Set<Client> = []
 
     var isRunning: Bool { source != nil || thermalObserver != nil }
 
-    func start() {
+    func start(for client: Client = .keepAwake) {
+        clients.insert(client)
         guard !isRunning else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
         if let made = IOPSNotificationCreateRunLoopSource({ context in
@@ -39,7 +46,9 @@ final class PowerMonitor {
         refresh()
     }
 
-    func stop() {
+    func stop(for client: Client = .keepAwake) {
+        clients.remove(client)
+        guard clients.isEmpty else { return }
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode) }
         source = nil
         if let thermalObserver { NotificationCenter.default.removeObserver(thermalObserver) }
@@ -52,6 +61,7 @@ final class PowerMonitor {
         guard next != power else { return }
         power = next
         onChange()
+        onMusicChange()
     }
 
     /// The internal battery, if there is one. A desktop Mac reads as on AC with no percent.
