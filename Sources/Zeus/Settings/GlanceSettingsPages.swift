@@ -265,6 +265,10 @@ private struct AppearancePage: View {
             GSRow(symbol: "hand.point.up.left", title: "Open the notch on hover", text: "How long the pointer rests before it opens.") {
                 GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Open the notch on hover")
             }
+            GSDivider()
+            GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens it after the delay. Click opens it only when you click the notch.") {
+                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
+            }
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
