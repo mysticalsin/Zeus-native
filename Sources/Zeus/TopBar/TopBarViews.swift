@@ -510,7 +510,7 @@ struct MusicControls: View {
         HStack(spacing: 4) {
             Spacer(minLength: 0)
             GlyphButton(symbol: "shuffle", size: size, tint: modes.shuffle == nil ? unknown : known, label: "Shuffle",
-                        active: modes.shuffle == true, value: modes.shuffle.map { $0 ? "on" : "off" }) { topBar.musicCommand(.toggleShuffle) }
+                        active: modes.shuffle == true, value: MusicModeRules.spokenShuffle(modes.shuffle)) { topBar.musicCommand(.toggleShuffle) }
             GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
             GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
                 topBar.musicCommand(.playPause)
@@ -518,7 +518,7 @@ struct MusicControls: View {
             GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
             GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
                         tint: modes.repeatMode == nil ? unknown : known, label: "Repeat",
-                        active: modes.repeatMode.map { $0 != .off } ?? false, value: modes.repeatMode?.rawValue) { topBar.musicCommand(.cycleRepeat) }
+                        active: modes.repeatMode.map { $0 != .off } ?? false, value: MusicModeRules.spokenRepeat(modes.repeatMode)) { topBar.musicCommand(.cycleRepeat) }
             Spacer(minLength: 0)
         }
     }
