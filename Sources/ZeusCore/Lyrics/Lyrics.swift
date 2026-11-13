@@ -70,7 +70,7 @@ public extension Array where Element == LyricLine {
     }
 }
 
-/// The LRCLIB request (https://lrclib.net/api/get): free, no key.
+/// The LRCLIB lookup (https://lrclib.net/api): free, no key. The requests built from it are in LyricsMatching.swift.
 public struct LRCLIBQuery: Equatable, Sendable {
     public var artist: String
     public var title: String
@@ -87,21 +87,6 @@ public struct LRCLIBQuery: Equatable, Sendable {
 
     /// Needs at least a title; LRCLIB matches on artist too, so a track with neither is not asked about.
     public var isAskable: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty && !artist.trimmingCharacters(in: .whitespaces).isEmpty }
-
-    public var url: URL? { build(withAlbumAndDuration: true) }
-    /// For a 404: the same track without album and duration, which LRCLIB then matches loosely.
-    public var looseURL: URL? { build(withAlbumAndDuration: false) }
-
-    private func build(withAlbumAndDuration: Bool) -> URL? {
-        var parts = URLComponents(string: "https://lrclib.net/api/get")
-        var items = [URLQueryItem(name: "artist_name", value: artist), URLQueryItem(name: "track_name", value: title)]
-        if withAlbumAndDuration {
-            items.append(URLQueryItem(name: "album_name", value: album))
-            if duration > 0 { items.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded())))) }
-        }
-        parts?.queryItems = items
-        return parts?.url
-    }
 
     /// A stable file name for the cache.
     public var cacheKey: String {

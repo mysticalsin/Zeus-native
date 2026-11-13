@@ -255,7 +255,7 @@ import Testing
     @Test func noLooseRequestWithoutADuration() {
         let query = LRCLIBQuery(artist: "Queen", title: "Under Pressure (Remastered 2011)", album: "Hot Space", duration: 0)
         #expect(query.requests.map(\.step) == [.exact, .search])
-        #expect(!items(query.exactRequest?.url).keys.contains("duration"))
+        #expect(items(query.exactRequest?.url)["duration"] == nil)
     }
 
     @Test func aTrackWithoutTitleOrArtistIsNotAsked() {
