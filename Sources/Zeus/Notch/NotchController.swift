@@ -399,12 +399,13 @@ final class NotchController {
         show(.closed)
     }
 
-    /// Click mode: a left click on the click zone opens the closed notch, like a completed hover. The click
-    /// is only observed; the closed window stays click-through. Returns true when it opened the notch.
+    /// Click mode: a left click on the click zone opens the panel from the closed notch or a peek, like a
+    /// completed hover. The click is only observed; the closed window stays click-through. Returns true when
+    /// it opened the panel.
     private func openOnClick() -> Bool {
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
         let zone = NotchOpenRules.clickZone(screenFrame: screen.frame, notchSize: notchSize, topOffset: topOffset)
-        guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, isClosed: model.presentation == .closed,
+        guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
                                           point: NSEvent.mouseLocation, zone: zone) else { return false }
         hoverTask?.cancel()
         hoverTask = nil
