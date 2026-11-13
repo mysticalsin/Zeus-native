@@ -172,7 +172,8 @@ struct LyricsView: View {
             if let playing {
                 TickingView(interval: 1, paused: TopBarStyle.isSnapshot) { context in
                     LyricWindow(lines: lines, index: LyricTiming.index(lines, elapsed: playing.elapsed(at: context.date)),
-                                rows: rows, rowHeight: rowHeight, fontSize: fontSize, alignment: alignment)
+                                rows: rows, rowHeight: rowHeight, fontSize: fontSize, alignment: alignment,
+                                playing: playing, tick: context.date)
                 }
             }
         case .plain(let text):
@@ -213,15 +214,19 @@ private struct LyricWindow: View {
     let rowHeight: CGFloat
     let fontSize: CGFloat
     let alignment: Alignment
+    /// What is playing and when this tick fired, for lighting the current line word by word.
+    var playing: NowPlaying?
+    var tick = Date.distantPast
 
     var body: some View {
+        let wordByWord = SettingsStore.shared.bool("lyrics.wordByWord")
         let before = (rows - 1) / 2
         let visible = Array(max(0, index - before - 1)...max(0, min(lines.count - 1, index + rows)))
         ZStack {
             ForEach(visible, id: \.self) { i in
                 let distance = i - index
                 let current = distance == 0
-                Text(lines[i].text.isEmpty ? "\u{266A}" : lines[i].text)
+                rowText(i, current: current, wordByWord: wordByWord)
                     .font(.system(size: current ? fontSize + 1.5 : fontSize, weight: current ? .semibold : .regular))
                     .foregroundStyle(current ? Color.white : Color.white.opacity(distance < 0 ? 0.28 : 0.42))
                     .lineLimit(2).minimumScaleFactor(0.8)
@@ -239,5 +244,68 @@ private struct LyricWindow: View {
         .animation(Motion.reduced ? nil : .easeInOut(duration: 0.45), value: index)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(index >= 0 && index < lines.count ? lines[index].text : "Lyrics")
+    }
+
+    /// A line's text. The current line is lit word by word while the setting is on and the line has words.
+    @ViewBuilder
+    private func rowText(_ i: Int, current: Bool, wordByWord: Bool) -> some View {
+        if current, wordByWord, let playing, !lines[i].text.trimmingCharacters(in: .whitespaces).isEmpty {
+            WordLitText(line: lines[i], lineEnd: lines.lineEnd(at: i, trackEnd: playing.duration), playing: playing, tick: tick)
+        } else {
+            Text(lines[i].text.isEmpty ? "\u{266A}" : lines[i].text)
+        }
+    }
+}
+
+/// The current line as one Text built from word runs, so wrapping, the two-line limit and the row height are
+/// the same as the whole-line Text. Sung words and the word being sung are white, words to come the next-line tone.
+/// It wakes at word changes with a sleeping task, not a fast timer: the task covers the stretch until the next
+/// once-a-second tick (which restarts it and re-reads the playback position), and it does nothing while
+/// paused, in snapshots, or after the view goes away. The row's accessibility label already reads the whole line.
+private struct WordLitText: View {
+    let line: LyricLine
+    let lineEnd: Double
+    let playing: NowPlaying
+    let tick: Date
+    /// Bumped at each word change to redraw this view.
+    @State private var revision = 0
+
+    /// How long one wake-up task runs at most; the next tick replaces it.
+    private static let window: TimeInterval = 1.5
+    private static let upcoming = Color.white.opacity(0.42)
+
+    var body: some View {
+        let _ = revision
+        let words = LyricWordTiming.words(in: line, lineEnd: lineEnd)
+        let lit = LyricWordTiming.index(words, at: playing.elapsed() + LyricTiming.lead)
+        Text(runs(words, lit: lit))
+            .contentTransition(Motion.reduced ? .identity : .opacity)
+            .animation(Motion.reduced ? nil : .easeOut(duration: 0.18), value: lit)
+            .task(id: tick) { await wake(words) }
+    }
+
+    private func runs(_ words: [LyricWord], lit: Int?) -> AttributedString {
+        var text = AttributedString()
+        for (i, word) in words.enumerated() {
+            var run = AttributedString(word.text)
+            run.foregroundColor = lit.map { i <= $0 } == true ? Color.white : Self.upcoming
+            text.append(run)
+        }
+        return text
+    }
+
+    /// Sleeps to each word change inside this tick's window and redraws there.
+    private func wake(_ words: [LyricWord]) async {
+        guard playing.isPlaying, !TopBarStyle.isSnapshot else { return }
+        let began = Date()
+        while !Task.isCancelled {
+            let position = playing.elapsed() + LyricTiming.lead
+            guard let next = LyricWordTiming.nextChange(words, after: position) else { return }
+            let wait = max(next - position, 0.02)
+            guard wait <= Self.window - Date().timeIntervalSince(began) else { return }
+            try? await Task.sleep(for: .seconds(wait))
+            if Task.isCancelled { return }
+            revision &+= 1
+        }
     }
 }
