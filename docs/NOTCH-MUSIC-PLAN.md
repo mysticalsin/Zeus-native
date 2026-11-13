@@ -191,6 +191,9 @@ line, index and nextChange at and between boundaries, CJK splitting, and tag str
   and is not taken again until power or heat recovers.
 - It is separate from keep-awake sessions and the Home cup: it never extends, shortens or ends them.
 - The assertion has a two-minute lease renewed each minute, so a hung Zeus cannot keep the display on.
+- A locked screen is not treated specially in this wave: music playing after a lock keeps the lock screen lit until it
+  stops or a battery or heat rule trips. If that is unwanted, add a `screenLocked` input to `MusicAwakeRule.decide`
+  fed by the `com.apple.screenIsLocked` and `com.apple.screenIsUnlocked` notifications.
 
 ### Rules (ZeusCore, pure)
 
