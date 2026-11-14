@@ -21,6 +21,15 @@ final class ScribeAutoStartController {
         banner.onPointer = { [weak self] inside in self?.pointer(inside: inside) }
     }
 
+    /// Once per launch, before anything reads the opt-in stamp or touches `ScribeController.shared`: carries an
+    /// old consent over only while "Start automatically" is the choice, removes a stale stamp, and notes that a
+    /// Mac that already holds a saved meeting has recorded before. Reads the meetings folder, never loads a meeting.
+    static func migrateOptInAtLaunch() {
+        let saved = (try? FileManager.default.contentsOfDirectory(atPath: ScribeMeetingStore.standard.directory.path))?
+            .contains { $0.hasSuffix(".json") } ?? false
+        ScribeAutoStartOptIn.migrate(mode: ScribeAutoStartMode.current(), hasSavedMeetings: saved)
+    }
+
     /// The monotonic clock the machine's deadlines use.
     private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 

@@ -349,6 +349,8 @@ final class ScribeController {
     @ObservationIgnored private let monotonicClock: () -> TimeInterval
     @ObservationIgnored private let store: ScribeMeetingStore?
     @ObservationIgnored private let cancellationDefaults: UserDefaults
+    /// Where the first recording on this Mac is noted for the automatic start readiness.
+    @ObservationIgnored private let optInDefaults: UserDefaults
     @ObservationIgnored private let transcriptionEngine: () -> TranscriptionEngineKind
     @ObservationIgnored private let writeMeeting: (ScribeMeetingRecord) throws -> Void
     @ObservationIgnored private let muteSourceFactory: () -> any ScribeMicMuteSource
@@ -400,6 +402,7 @@ final class ScribeController {
         showsEndWindow: Bool = false,
         writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil,
         cancellationDefaults: UserDefaults = .standard,
+        optInDefaults: UserDefaults = .standard,
         endWindow: ScribeEndWindow? = nil,
         transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine },
         motionReduced: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
@@ -410,6 +413,7 @@ final class ScribeController {
         self.monotonicClock = monotonicClock
         self.store = store
         self.cancellationDefaults = cancellationDefaults
+        self.optInDefaults = optInDefaults
         self.transcriptionEngine = transcriptionEngine
         self.motionReduced = motionReduced
         self.writeMeeting = writeMeeting ?? { record in try store?.save(record) }
@@ -1216,6 +1220,7 @@ final class ScribeController {
     private func react(to event: ScribeLifecycleEvent) {
         switch event {
         case .recordingStarted:
+            ScribeAutoStartOptIn.noteRecordingBegan(defaults: optInDefaults)
             recordingSince = nowSeconds()
             elapsed = 0
             startClock()

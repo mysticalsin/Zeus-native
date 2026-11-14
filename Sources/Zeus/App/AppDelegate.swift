@@ -99,6 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Load the Keychain cache off the main thread early; every later read is a dictionary lookup.
         Task.detached(priority: .userInitiated) { Keychain.store.load() }
+        // Before anything can touch ScribeController.shared: the automatic start opt-in is decided by its stamp.
+        if on(.settingsCatalog) { ScribeAutoStartController.migrateOptInAtLaunch() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
             button.image = Brand.menuBarImage
