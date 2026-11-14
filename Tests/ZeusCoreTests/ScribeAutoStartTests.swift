@@ -10,6 +10,22 @@ private func asSlot(_ id: String = "s1", title: String = "Design review", start:
                        end: end.map { asBase.addingTimeInterval($0) }, hasCallLink: link, callApp: app)
 }
 
+private let asSession = ScribeSessionID()
+
+private func asPhase(_ activity: ScribeActivity) -> ScribePhase {
+    switch activity {
+    case .idle: return .idle
+    case .starting: return .starting(asSession)
+    case .recording: return .recording(asSession, since: 0)
+    case .ending: return .ending(asSession, deadline: 0)
+    case .processing: return .processing(asSession)
+    }
+}
+
+private func asContext(_ activity: ScribeActivity = .idle, ready: ScribeAutoStartReadiness = .ready) -> ScribeStartContext {
+    ScribeStartContext(scribe: asPhase(activity), microphone: .allowed, automatic: ready)
+}
+
 private func asEvidence(
     _ now: TimeInterval, mic: [ScribeCallApp] = [], present: [ScribeCallApp] = [], slots: [ScribeCalendarSlot] = [],
     mode: ScribeAutoStartMode = .ask, ready: ScribeAutoStartReadiness? = nil, activity: ScribeActivity = .idle,
@@ -18,12 +34,34 @@ private func asEvidence(
     // Without an explicit answer, automatic is fully ready and every other choice is simply not chosen.
     let automatic = ready ?? (mode == .automatic ? .ready : .blocked(.notChosen))
     return .evidence(ScribeMeetingEvidence(date: asBase.addingTimeInterval(now), slots: slots, micApps: mic, presentApps: present,
-                                           mode: mode, activity: activity, automatic: automatic, callWindows: windows), now: now)
+                                           mode: mode, context: asContext(activity, ready: automatic),
+                                           callWindows: windows), now: now)
+}
+
+private func asTick(_ now: TimeInterval, activity: ScribeActivity = .idle,
+                    ready: ScribeAutoStartReadiness = .ready) -> ScribeAutoStartMachine.Event {
+    .tick(now: now, context: asContext(activity, ready: ready))
+}
+
+private func asTap(_ card: ScribeMeetingCard, _ now: TimeInterval, activity: ScribeActivity = .idle) -> ScribeAutoStartMachine.Event {
+    .primary(on: card, now: now, context: asContext(activity))
 }
 
 private let asTeams = ScribeMeeting(key: "call:Teams", title: "Call", callApp: .teams, isLive: true)
 
-/// A machine whose Teams call has been seen at 0 and again at 3, so the "Ask me" banner is up.
+private func asOffer(_ meeting: ScribeMeeting = asTeams) -> ScribeMeetingCard { .offer(meeting, blocked: nil) }
+
+/// The card Cancel is tapped on during a countdown.
+private func asCountdownCard(_ meeting: ScribeMeeting = asTeams) -> ScribeMeetingCard {
+    .countdown(meeting, seconds: 5, deadline: 0, total: 5)
+}
+
+/// Whether the effects hold a start.
+private func asStarts(_ effects: [ScribeAutoStartMachine.Effect]) -> Bool {
+    effects.contains { if case .start = $0 { return true } else { return false } }
+}
+
+/// A machine whose Teams call has been seen at 0 and again at 3, so the "Ask me" card is up.
 private func asPrompting(mode: ScribeAutoStartMode = .ask, ready: ScribeAutoStartReadiness? = nil) -> ScribeAutoStartMachine {
     var machine = ScribeAutoStartMachine()
     machine.handle(asEvidence(0, mic: [.teams], mode: mode, ready: ready))
@@ -31,10 +69,11 @@ private func asPrompting(mode: ScribeAutoStartMode = .ask, ready: ScribeAutoStar
     return machine
 }
 
-/// A machine recording a Teams call that began at 10, with the call app seen holding the microphone at 11.
+/// A machine recording a Teams call, started by a tap at 9, with the call app seen holding the microphone at 11.
 private func asRecordingTeams() -> ScribeAutoStartMachine {
     var machine = asPrompting()
-    machine.handle(.accept(now: 10))
+    machine.handle(asTap(asOffer(), 9))
+    machine.handle(.scribe(.recording(asSession, since: 9), now: 9))
     machine.handle(asEvidence(11, mic: [.teams], activity: .recording))
     return machine
 }
@@ -187,8 +226,9 @@ struct ScribeAutoStartTests {
         let second = machine.handle(asEvidence(1, mic: [.teams]))
         #expect(second.isEmpty)
         let third = machine.handle(asEvidence(3, mic: [.teams]))
-        #expect(third == [.showAsk(asTeams)])
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
+        #expect(third.isEmpty)
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
+        #expect(machine.card(now: 3) == .offer(asTeams, blocked: .notChosen))
     }
 
     @Test func aSignalThatVanishesBeforeTheDebounceStartsOver() {
@@ -201,7 +241,8 @@ struct ScribeAutoStartTests {
         let tooSoon = machine.handle(asEvidence(4, mic: [.teams]))
         #expect(tooSoon.isEmpty)
         let ready = machine.handle(asEvidence(5, mic: [.teams]))
-        #expect(ready == [.showAsk(asTeams)])
+        #expect(ready.isEmpty)
+        #expect(machine.card(now: 5) == .offer(asTeams, blocked: .notChosen))
     }
 
     @Test func aDifferentMeetingWhileArmedRestartsTheDebounce() {
@@ -215,26 +256,27 @@ struct ScribeAutoStartTests {
     @Test func aTickNeverPromotesAnArmedMeeting() {
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.teams]))
-        let tick = machine.handle(.tick(now: 100))
+        let tick = machine.handle(asTick(100))
         #expect(tick.isEmpty)
         #expect(machine.state == .armed(meeting: asTeams, since: 0))
-        #expect(!machine.needsTick)
+        #expect(machine.nextWake(now: 100) == nil)
     }
 
     @Test func zeroDebounceShowsOnTheFirstSighting() {
         var machine = ScribeAutoStartMachine(timing: ScribeAutoStartTiming(debounce: 0))
         let effects = machine.handle(asEvidence(0, mic: [.teams]))
-        #expect(effects == [.showAsk(asTeams)])
+        #expect(effects.isEmpty)
+        #expect(machine.card(now: 0) == .offer(asTeams, blocked: .notChosen))
     }
 
     @Test func oneMeetingTriggersOnlyOnceHoweverLongTheSignalLasts() {
         var machine = asPrompting()
-        machine.handle(.decline(now: 5))
+        machine.handle(.dismiss(on: asOffer(), now: 5))
         var shown = 0
         var now: TimeInterval = 6
         while now < 600 {
-            let effects = machine.handle(asEvidence(now, mic: [.teams]))
-            if effects.contains(.showAsk(asTeams)) || effects.contains(.showCountdown(asTeams)) { shown += 1 }
+            machine.handle(asEvidence(now, mic: [.teams]))
+            if machine.card(now: now) != .hidden { shown += 1 }
             now += 5
         }
         #expect(shown == 0)
@@ -242,7 +284,7 @@ struct ScribeAutoStartTests {
 
     @Test func aFlickerOfTheMicrophoneDoesNotMakeANewMeeting() {
         var machine = asPrompting()
-        machine.handle(.decline(now: 5))
+        machine.handle(.dismiss(on: asOffer(), now: 5))
         machine.handle(asEvidence(10, present: [.teams]))
         machine.handle(asEvidence(20, mic: [.teams], present: [.teams]))
         machine.handle(asEvidence(35, present: [.teams]))
@@ -258,16 +300,16 @@ struct ScribeAutoStartTests {
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.meet], present: [.meet]))
         machine.handle(asEvidence(3, mic: [.meet], present: [.meet]))
-        #expect(machine.state == .prompting(meeting: meet, deadline: 23))
-        machine.handle(.decline(now: 5))
+        #expect(machine.state == .prompting(meeting: meet, deadline: 23, blocked: .notChosen))
+        machine.handle(.dismiss(on: asOffer(meet), now: 5))
         // Another tab is in front: the Meet title is read from neither list.
         machine.handle(asEvidence(10))
         machine.handle(asEvidence(20))
         var shown = 0
         var now: TimeInterval = 23
         while now < 120 {
-            let effects = machine.handle(asEvidence(now, mic: [.meet], present: [.meet]))
-            if effects.contains(.showAsk(meet)) { shown += 1 }
+            machine.handle(asEvidence(now, mic: [.meet], present: [.meet]))
+            if machine.card(now: now) != .hidden { shown += 1 }
             now += 3
         }
         #expect(shown == 0)
@@ -277,7 +319,7 @@ struct ScribeAutoStartTests {
 
     @Test func anUnansweredCallStaysQuietWhenItsCalendarWindowOpensAndTheMicrophoneIsMuted() {
         var machine = asPrompting()
-        machine.handle(.tick(now: 23))
+        machine.handle(asTick(23))
         #expect(machine.state == .idle)
         let slot = asSlot("s1", start: 150, end: 1_800, app: .teams)
         let opened = machine.handle(asEvidence(40, mic: [.teams], present: [.teams], slots: [slot]))
@@ -287,8 +329,8 @@ struct ScribeAutoStartTests {
         machine.handle(asEvidence(75, present: [.teams], slots: [slot]))
         var shown = 0
         for now in stride(from: 80.0, through: 120.0, by: 3.0) {
-            let effects = machine.handle(asEvidence(now, mic: [.teams], present: [.teams], slots: [slot]))
-            if effects.contains(where: { if case .showAsk = $0 { return true } else { return false } }) { shown += 1 }
+            machine.handle(asEvidence(now, mic: [.teams], present: [.teams], slots: [slot]))
+            if machine.card(now: now) != .hidden { shown += 1 }
         }
         #expect(shown == 0)
         #expect(machine.state == .idle)
@@ -298,29 +340,30 @@ struct ScribeAutoStartTests {
 
     @Test func askMeStartsWhenTheBannerIsAccepted() {
         var machine = asPrompting()
-        let effects = machine.handle(.accept(now: 8))
-        #expect(effects == [.hideBanner, .startRecording(asTeams)])
-        #expect(machine.state == .recording(ScribeAutoStartRecording(meeting: asTeams, since: 8, micReleasedAt: nil, sawMic: false)))
+        let effects = machine.handle(asTap(asOffer(), 8))
+        #expect(effects == [.start(asTeams)])
+        #expect(machine.state == .starting(ScribeStartAttempt(meeting: asTeams, since: 8, origin: .tap,
+                                                              previousSession: nil, session: nil)))
     }
 
     @Test func notNowHidesTheBannerAndStaysQuiet() {
         var machine = asPrompting()
-        let effects = machine.handle(.decline(now: 8))
-        #expect(effects == [.hideBanner])
+        let effects = machine.handle(.dismiss(on: asOffer(), now: 8))
+        #expect(effects.isEmpty)
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .declined)
     }
 
     @Test func theAskBannerLeavesAfterTwentySecondsAndCountsAsNotNow() {
         var machine = asPrompting()
-        let early = machine.handle(.tick(now: 22.9))
+        let early = machine.handle(asTick(22.9))
         #expect(early.isEmpty)
-        #expect(machine.needsTick)
-        let timeout = machine.handle(.tick(now: 23))
-        #expect(timeout == [.hideBanner])
+        #expect(machine.nextWake(now: 22.9) == 23)
+        let timeout = machine.handle(asTick(23))
+        #expect(timeout.isEmpty)
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .asked)
-        #expect(!machine.needsTick)
+        #expect(machine.nextWake(now: 23) == nil)
         let again = machine.handle(asEvidence(30, mic: [.teams]))
         #expect(again.isEmpty)
     }
@@ -329,7 +372,7 @@ struct ScribeAutoStartTests {
         var machine = asPrompting()
         let muted = machine.handle(asEvidence(8))
         #expect(muted.isEmpty)
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
     }
 
     @Test func offNeverShowsAnythingAndTurningItOffHidesTheBanner() {
@@ -341,7 +384,8 @@ struct ScribeAutoStartTests {
 
         var machine = asPrompting()
         let hidden = machine.handle(asEvidence(8, mic: [.teams], mode: .off))
-        #expect(hidden == [.hideBanner])
+        #expect(hidden.isEmpty)
+        #expect(machine.card(now: 8) == .hidden)
         #expect(machine.state == .idle)
     }
 
@@ -357,56 +401,57 @@ struct ScribeAutoStartTests {
     @Test func automaticCountsDownFiveSecondsThenStarts() {
         var machine = asPrompting(mode: .automatic)
         #expect(machine.state == .countingDown(meeting: asTeams, deadline: 8))
-        let early = machine.handle(.tick(now: 7))
+        let early = machine.handle(asTick(7))
         #expect(early.isEmpty)
-        let start = machine.handle(.tick(now: 8))
-        #expect(start == [.hideBanner, .startRecording(asTeams)])
-        guard case .recording = machine.state else {
-            Issue.record("expected recording, got \(machine.state)")
+        let start = machine.handle(asTick(8))
+        #expect(start == [.start(asTeams)])
+        guard case .starting = machine.state else {
+            Issue.record("expected starting, got \(machine.state)")
             return
         }
     }
 
     @Test func cancelDuringTheCountdownNeverStarts() {
         var machine = asPrompting(mode: .automatic)
-        let cancel = machine.handle(.decline(now: 5))
-        #expect(cancel == [.hideBanner])
-        let later = machine.handle(.tick(now: 60))
+        let cancel = machine.handle(.cancel(on: asCountdownCard(), now: 5))
+        #expect(cancel.isEmpty)
+        let later = machine.handle(asTick(60))
         #expect(later.isEmpty)
         let evidenceLater = machine.handle(asEvidence(70, mic: [.teams], mode: .automatic))
         #expect(evidenceLater.isEmpty)
     }
 
-    @Test func startNowDuringTheCountdownStartsAtOnce() {
+    @Test func aTapDuringTheCountdownIsIgnored() {
         var machine = asPrompting(mode: .automatic)
-        let effects = machine.handle(.accept(now: 5))
-        #expect(effects == [.hideBanner, .startRecording(asTeams)])
+        let effects = machine.handle(asTap(asOffer(), 5))
+        #expect(effects.isEmpty)
+        #expect(machine.state == .countingDown(meeting: asTeams, deadline: 8))
     }
 
     @Test func automaticWithoutMicrophonePermissionAsksInstead() {
         let machine = asPrompting(mode: .automatic, ready: .blocked(.microphoneNotAsked))
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .microphoneNotAsked))
     }
 
     @Test func automaticNeverStartsWithoutPermissionEvenAfterTheDeadline() {
         var machine = asPrompting(mode: .automatic, ready: .blocked(.microphoneNotAsked))
-        let tick = machine.handle(.tick(now: 23))
-        #expect(tick == [.hideBanner])
-        #expect(!tick.contains(.startRecording(asTeams)))
+        let tick = machine.handle(asTick(23))
+        #expect(tick.isEmpty)
+        #expect(!asStarts(tick))
     }
 
     @Test func permissionWithdrawnDuringTheCountdownFallsBackToAskingAtOnce() {
         var machine = asPrompting(mode: .automatic)
         let effects = machine.handle(asEvidence(5, mic: [.teams], mode: .automatic, ready: .blocked(.microphoneNotAsked)))
-        #expect(effects == [.showAsk(asTeams)])
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 25))
-        #expect(machine.handle(.tick(now: 8)).isEmpty)
+        #expect(effects.isEmpty)
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 25, blocked: .microphoneNotAsked))
+        #expect(machine.handle(asTick(8)).isEmpty)
     }
 
     @Test func startingRecordingByHandWhileTheBannerIsUpHidesIt() {
         var machine = asPrompting()
         let effects = machine.handle(asEvidence(6, mic: [.teams], activity: .starting))
-        #expect(effects == [.hideBanner])
+        #expect(effects.isEmpty)
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .started)
     }
@@ -442,7 +487,8 @@ struct ScribeAutoStartTests {
 
     @Test func noEndIsSuggestedBeforeTheCallAppEverHeldTheMicrophone() {
         var machine = asPrompting()
-        machine.handle(.accept(now: 10))
+        machine.handle(asTap(asOffer(), 10))
+        machine.handle(.scribe(.recording(asSession, since: 10), now: 10))
         var all: [ScribeAutoStartMachine.Effect] = []
         for now in stride(from: 11.0, through: 200.0, by: 5.0) { all += machine.handle(asEvidence(now, activity: .recording)) }
         #expect(all.isEmpty)
@@ -486,7 +532,7 @@ struct ScribeAutoStartTests {
         let ending = machine.handle(asEvidence(22, activity: .ending))
         #expect(ending.isEmpty)
         let saved = machine.handle(asEvidence(40, activity: .idle))
-        #expect(saved == [.hideBanner])
+        #expect(saved.isEmpty)
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .started)
     }
@@ -507,17 +553,12 @@ struct ScribeAutoStartTests {
         #expect(again == [.suggestEnd(asTeams)])
     }
 
-    @Test func stoppingByHandAfterTheGraceReturnsToIdle() {
+    @Test func stoppingByHandReturnsToIdle() {
         var machine = asPrompting()
-        machine.handle(.accept(now: 10))
-        let within = machine.handle(asEvidence(15, activity: .idle))
-        #expect(within.isEmpty)
-        guard case .recording = machine.state else {
-            Issue.record("expected recording, got \(machine.state)")
-            return
-        }
-        let after = machine.handle(asEvidence(20, activity: .idle))
-        #expect(after == [.hideBanner])
+        machine.handle(asTap(asOffer(), 10))
+        machine.handle(.scribe(.recording(asSession, since: 10), now: 10))
+        let after = machine.handle(asEvidence(15, activity: .idle))
+        #expect(after.isEmpty)
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .started)
     }
@@ -526,30 +567,32 @@ struct ScribeAutoStartTests {
 
     @Test func theSameCallStaysQuietUntilItHasBeenGoneAWhile() {
         var machine = asPrompting()
-        machine.handle(.decline(now: 5))
+        machine.handle(.dismiss(on: asOffer(), now: 5))
         machine.handle(asEvidence(10, present: [.teams]))
         machine.handle(asEvidence(41, present: [.teams]))
         let back = machine.handle(asEvidence(70, mic: [.teams], present: [.teams]))
         #expect(back.isEmpty)
         #expect(machine.state == .armed(meeting: asTeams, since: 70))
         let shown = machine.handle(asEvidence(73, mic: [.teams], present: [.teams]))
-        #expect(shown == [.showAsk(asTeams)])
+        #expect(shown.isEmpty)
+        #expect(machine.card(now: 73) == .offer(asTeams, blocked: .notChosen))
     }
 
     @Test func aDifferentMeetingArmsWithoutWaiting() {
         var machine = asPrompting()
-        machine.handle(.decline(now: 5))
+        machine.handle(.dismiss(on: asOffer(), now: 5))
         let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
         let early = machine.handle(asEvidence(6, mic: [.zoom]))
         #expect(early.isEmpty)
         #expect(machine.state == .armed(meeting: zoom, since: 6))
         let shown = machine.handle(asEvidence(9, mic: [.zoom]))
-        #expect(shown == [.showAsk(zoom)])
+        #expect(shown.isEmpty)
+        #expect(machine.card(now: 9) == .offer(zoom, blocked: .notChosen))
     }
 
     @Test func anAnsweredMeetingIsNeverArmedAgain() {
         var machine = asPrompting()
-        machine.handle(.decline(now: 5))
+        machine.handle(.dismiss(on: asOffer(), now: 5))
         let effects = machine.handle(asEvidence(6, mic: [.teams]))
         #expect(effects.isEmpty)
         #expect(machine.state == .idle)
@@ -562,12 +605,12 @@ struct ScribeAutoStartTests {
             machine.handle(asEvidence(now, present: [.teams], slots: [event], mode: .automatic))
         }
         #expect(machine.state == .prompting(meeting: ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event),
-                                            deadline: 23))
-        let tick = machine.handle(.tick(now: 8))
+                                            deadline: 23, blocked: nil))
+        let tick = machine.handle(asTick(8))
         #expect(tick.isEmpty)
-        let late = machine.handle(.tick(now: 23))
-        #expect(late == [.hideBanner])
-        #expect(!late.contains { if case .startRecording = $0 { return true } else { return false } })
+        let late = machine.handle(asTick(23))
+        #expect(late.isEmpty)
+        #expect(!asStarts(late))
     }
 
     @Test func aCalendarMeetingIsOfferedAtItsStartWithNoCallAppOpen() {
@@ -575,7 +618,9 @@ struct ScribeAutoStartTests {
         let event = asSlot(start: 0)
         machine.handle(asEvidence(0, slots: [event]))
         let shown = machine.handle(asEvidence(3, slots: [event]))
-        #expect(shown == [.showAsk(ScribeMeeting(key: "s1", title: "Design review", callApp: nil, slot: event))])
+        #expect(shown.isEmpty)
+        #expect(machine.card(now: 3) == .offer(ScribeMeeting(key: "s1", title: "Design review", callApp: nil, slot: event),
+                                               blocked: .notChosen))
         var early = ScribeAutoStartMachine()
         let notYet = asSlot(start: 30)
         early.handle(asEvidence(0, present: [.teams], slots: [notYet]))
@@ -588,13 +633,13 @@ struct ScribeAutoStartTests {
         let event = asSlot(start: 0, app: .teams)
         machine.handle(asEvidence(0, slots: [event], mode: .automatic))
         machine.handle(asEvidence(3, slots: [event], mode: .automatic))
-        machine.handle(.tick(now: 23))
+        machine.handle(asTick(23))
         #expect(machine.state == .idle)
         let live = ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event, isLive: true)
         machine.handle(asEvidence(30, mic: [.teams], slots: [event], mode: .automatic))
         #expect(machine.state == .armed(meeting: live, since: 30))
         let counting = machine.handle(asEvidence(33, mic: [.teams], slots: [event], mode: .automatic))
-        #expect(counting == [.showCountdown(live)])
+        #expect(counting.isEmpty)
         #expect(machine.state == .countingDown(meeting: live, deadline: 38))
     }
 
@@ -603,7 +648,7 @@ struct ScribeAutoStartTests {
         let event = asSlot(start: 0, app: .teams)
         machine.handle(asEvidence(0, slots: [event]))
         machine.handle(asEvidence(3, slots: [event]))
-        machine.handle(.tick(now: 23))
+        machine.handle(asTick(23))
         let live = machine.handle(asEvidence(30, mic: [.teams], slots: [event]))
         #expect(live.isEmpty)
         #expect(machine.state == .idle)
@@ -614,7 +659,8 @@ struct ScribeAutoStartTests {
         let event = asSlot(start: 0, app: .teams)
         machine.handle(asEvidence(0, mic: [.teams], slots: [event]))
         machine.handle(asEvidence(3, mic: [.teams], slots: [event]))
-        machine.handle(.decline(now: 4))
+        machine.handle(.dismiss(on: asOffer(ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event,
+                                                         isLive: true)), now: 4))
         var effects: [ScribeAutoStartMachine.Effect] = []
         for now in stride(from: 5.0, through: 600.0, by: 5.0) {
             effects += machine.handle(asEvidence(now, mic: [.teams], slots: [event]))
@@ -628,7 +674,8 @@ struct ScribeAutoStartTests {
         let event = asSlot(start: 0, app: .teams)
         machine.handle(asEvidence(0, slots: [event]))
         machine.handle(asEvidence(3, slots: [event]))
-        machine.handle(.accept(now: 4))
+        machine.handle(asTap(asOffer(ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event)), 4))
+        machine.handle(.scribe(.recording(asSession, since: 4), now: 4))
         guard case .recording(let before) = machine.state else {
             Issue.record("expected recording, got \(machine.state)")
             return
@@ -653,25 +700,25 @@ struct ScribeAutoStartTests {
             var machine = ScribeAutoStartMachine()
             machine.handle(asEvidence(0, mic: [.teams], mode: .automatic, ready: .blocked(block)))
             let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .automatic, ready: .blocked(block)))
-            #expect(shown == [.showAsk(asTeams)], "\(block)")
-            #expect(machine.state == .prompting(meeting: asTeams, deadline: 23), "\(block)")
-            let timeout = machine.handle(.tick(now: 23))
-            #expect(timeout == [.hideBanner], "\(block)")
-            #expect(!timeout.contains(.startRecording(asTeams)), "\(block)")
+            #expect(shown.isEmpty, "\(block)")
+            #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: block), "\(block)")
+            let timeout = machine.handle(asTick(23))
+            #expect(timeout.isEmpty, "\(block)")
+            #expect(!asStarts(timeout), "\(block)")
         }
     }
 
     @Test func aBlockedMachineStartsOnlyOnATap() {
         var machine = asPrompting(mode: .automatic, ready: .blocked(.firstRecordingOwed))
-        let tap = machine.handle(.accept(now: 6))
-        #expect(tap == [.hideBanner, .startRecording(asTeams)])
+        let tap = machine.handle(asTap(.offer(asTeams, blocked: .firstRecordingOwed), 6))
+        #expect(tap == [.start(asTeams)])
     }
 
     @Test func readyCountsDownOnTheFirstLiveMeeting() {
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.teams], mode: .automatic, ready: .ready))
         let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .automatic, ready: .ready))
-        #expect(shown == [.showCountdown(asTeams)])
+        #expect(shown.isEmpty)
         #expect(machine.state == .countingDown(meeting: asTeams, deadline: 8))
     }
 
@@ -681,52 +728,55 @@ struct ScribeAutoStartTests {
         machine.handle(asEvidence(0, present: [.teams], slots: [event], mode: .automatic, ready: .ready))
         let shown = machine.handle(asEvidence(3, present: [.teams], slots: [event], mode: .automatic, ready: .ready))
         let meeting = ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event)
-        #expect(shown == [.showAsk(meeting)])
+        #expect(shown.isEmpty)
+        #expect(machine.card(now: 3) == .offer(meeting, blocked: nil))
     }
 
     @Test func readyIsNotEnoughWhenTheChoiceIsNotAutomatic() {
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.teams], mode: .ask, ready: .ready))
         let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .ask, ready: .ready))
-        #expect(shown == [.showAsk(asTeams)])
+        #expect(shown.isEmpty)
+        #expect(machine.card(now: 3) == .offer(asTeams, blocked: nil))
     }
 
     @Test func leavingAutomaticDuringTheCountdownAsksInstead() {
         var toAsk = asPrompting(mode: .automatic)
         #expect(toAsk.state == .countingDown(meeting: asTeams, deadline: 8))
         let asked = toAsk.handle(asEvidence(6, mic: [.teams], mode: .ask))
-        #expect(asked == [.showAsk(asTeams)])
-        #expect(toAsk.state == .prompting(meeting: asTeams, deadline: 26))
-        let later = toAsk.handle(.tick(now: 8))
+        #expect(asked.isEmpty)
+        #expect(toAsk.state == .prompting(meeting: asTeams, deadline: 26, blocked: .notChosen))
+        let later = toAsk.handle(asTick(8))
         #expect(later.isEmpty)
 
         var toOff = asPrompting(mode: .automatic)
         let hidden = toOff.handle(asEvidence(6, mic: [.teams], mode: .off))
-        #expect(hidden == [.hideBanner])
+        #expect(hidden.isEmpty)
         #expect(toOff.state == .idle)
-        #expect(toOff.handle(.tick(now: 8)).isEmpty)
+        #expect(toOff.handle(asTick(8)).isEmpty)
     }
 
     @Test func readinessLostAtTheEndOfTheCountdownAsksInsteadOfStarting() {
         var machine = asPrompting(mode: .automatic)
         let effects = machine.handle(asEvidence(8, mic: [.teams], mode: .automatic, ready: .blocked(.microphoneDenied)))
-        #expect(effects == [.showAsk(asTeams)])
-        #expect(!effects.contains(.startRecording(asTeams)))
+        #expect(effects.isEmpty)
+        #expect(machine.card(now: 8) == .offer(asTeams, blocked: .microphoneDenied))
         var stillReady = asPrompting(mode: .automatic)
         let start = stillReady.handle(asEvidence(8, mic: [.teams], mode: .automatic, ready: .ready))
-        #expect(start == [.hideBanner, .startRecording(asTeams)])
+        #expect(start == [.start(asTeams)])
     }
 
     @Test func aCallThatEndsDuringTheCountdownAsksInsteadOfStarting() {
         var machine = asPrompting(mode: .automatic)
         let effects = machine.handle(asEvidence(6, present: [.teams], mode: .automatic))
-        #expect(effects == [.showAsk(asTeams)])
-        #expect(machine.handle(.tick(now: 8)).isEmpty)
+        #expect(effects.isEmpty)
+        #expect(machine.card(now: 6) == .offer(asTeams, blocked: nil))
+        #expect(machine.handle(asTick(8)).isEmpty)
     }
 
     @Test func acceptingNeverAddsAnythingForTheOptIn() {
         var machine = asPrompting(mode: .automatic, ready: .blocked(.noOptIn))
-        #expect(machine.handle(.accept(now: 6)) == [.hideBanner, .startRecording(asTeams)])
+        #expect(machine.handle(asTap(.offer(asTeams, blocked: .noOptIn), 6)) == [.start(asTeams)])
     }
 
     // MARK: Auto-stop: Zoom breakouts, call window
@@ -735,7 +785,8 @@ struct ScribeAutoStartTests {
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.zoom]))
         machine.handle(asEvidence(3, mic: [.zoom]))
-        machine.handle(.accept(now: 10))
+        machine.handle(asTap(asOffer(ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)), 10))
+        machine.handle(.scribe(.recording(asSession, since: 10), now: 10))
         machine.handle(asEvidence(11, mic: [.zoom], activity: .recording))
         return machine
     }
@@ -757,11 +808,11 @@ struct ScribeAutoStartTests {
 
     @Test func theEndTimerRunsOnlyWhileTheMicrophoneIsReleased() {
         var machine = asRecordingTeams()
-        #expect(!machine.needsTick)
+        #expect(machine.nextWake(now: 11) == nil)
         machine.handle(asEvidence(12, activity: .recording))
-        #expect(machine.needsTick)
+        #expect(machine.nextWake(now: 12) == 13)
         machine.handle(asEvidence(14, mic: [.teams], activity: .recording))
-        #expect(!machine.needsTick)
+        #expect(machine.nextWake(now: 14) == nil)
     }
 
     @Test func aClosedCallWindowEndsTheCallEvenWhileTheMicrophoneIsStillHeld() {
@@ -784,7 +835,7 @@ struct ScribeAutoStartTests {
             all += machine.handle(asEvidence(now, activity: .recording))
         }
         #expect(all == [.suggestEnd(asTeams)])
-        #expect(!all.contains(.requestEnd(asTeams)))
+        #expect(!all.contains(.endNow))
     }
 
     @Test func aClosedCallWindowSuggestsAnEndAndNeverRequestsOne() {
@@ -882,14 +933,14 @@ struct ScribeAutoStartTests {
         let next = asSlot("n1", title: "Standup", start: 80)
         let nextMeeting = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams, slot: next)
         let offered = machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
-        #expect(offered == [.showNextMeeting(nextMeeting)])
-        #expect(machine.bannerDeadline == 40)
-        #expect(machine.needsTick)
+        #expect(offered.isEmpty)
+        #expect(machine.card(now: 20) == .next(nextMeeting))
+        #expect(machine.nextWake(now: 20) == 40)
         let again = machine.handle(asEvidence(25, mic: [.teams], slots: [next], activity: .recording))
         #expect(again.isEmpty)
-        let keep = machine.handle(.decline(now: 26))
-        #expect(keep == [.hideBanner])
-        #expect(machine.bannerDeadline == nil)
+        let keep = machine.handle(.dismiss(on: .next(nextMeeting), now: 26))
+        #expect(keep.isEmpty)
+        #expect(machine.card(now: 26) == .hidden)
         let afterKeep = machine.handle(asEvidence(30, mic: [.teams], slots: [next], activity: .recording))
         #expect(afterKeep.isEmpty)
     }
@@ -898,10 +949,10 @@ struct ScribeAutoStartTests {
         var machine = asRecordingTeams()
         let next = asSlot("n1", title: "Standup", start: 80)
         machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
-        let early = machine.handle(.tick(now: 39))
+        let early = machine.handle(asTick(39))
         #expect(early.isEmpty)
-        let gone = machine.handle(.tick(now: 40))
-        #expect(gone == [.hideBanner])
+        let gone = machine.handle(asTick(40))
+        #expect(gone.isEmpty)
         guard case .recording(let recording) = machine.state else {
             Issue.record("expected recording, got \(machine.state)")
             return
@@ -919,32 +970,15 @@ struct ScribeAutoStartTests {
         #expect(effects.isEmpty)
     }
 
-    @Test func switchingEndsThisRecordingAndLetsTheNextMeetingStartAtOnce() {
+    @Test func switchEndsTheRecordingAtOnceAndNeverSuggestsAnEnd() {
         var machine = asRecordingTeams()
         let next = asSlot("n1", title: "Standup", start: 80)
         machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
-        let switchNow = machine.handle(.accept(now: 22))
-        #expect(switchNow == [.hideBanner, .requestEnd(asTeams)])
-        #expect(machine.state == .endingSuggested(meeting: asTeams, since: 22))
-        let saved = machine.handle(asEvidence(40, mic: [.teams], slots: [next], activity: .idle))
-        #expect(saved == [.hideBanner])
-        #expect(machine.state == .idle)
-        #expect(machine.ledger.mark(of: asTeams) == .started)
-        let nextMeeting = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams, slot: next, isLive: true)
-        #expect(machine.ledger.mark(of: nextMeeting) == .headsUp)
-        let seen = machine.handle(asEvidence(41, mic: [.teams], slots: [next], activity: .idle))
-        #expect(seen.isEmpty)
-        let shown = machine.handle(asEvidence(44, mic: [.teams], slots: [next], activity: .idle))
-        #expect(shown == [.showAsk(nextMeeting)])
-    }
-
-    @Test func switchStillRequestsAnEndAndNeverSuggestsOne() {
-        var machine = asRecordingTeams()
-        let next = asSlot("n1", title: "Standup", start: 80)
-        machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
-        let switchNow = machine.handle(.accept(now: 22))
-        #expect(switchNow.contains(.requestEnd(asTeams)))
+        let nextMeeting = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams, slot: next)
+        let switchNow = machine.handle(.primary(on: .next(nextMeeting), now: 22, context: asContext(.recording)))
+        #expect(switchNow == [.endNow])
         #expect(!switchNow.contains(.suggestEnd(asTeams)))
+        #expect(machine.state == .held(meeting: nextMeeting, startOwed: true))
     }
 
     @Test func theCallEndingTakesTheNextMeetingCardDown() {
@@ -953,17 +987,19 @@ struct ScribeAutoStartTests {
         machine.handle(asEvidence(12, slots: [], activity: .recording))
         machine.handle(asEvidence(14, slots: [next], activity: .recording))
         let ended = machine.handle(asEvidence(20, slots: [next], activity: .recording))
-        #expect(ended == [.hideBanner, .suggestEnd(asTeams)])
+        #expect(ended == [.suggestEnd(asTeams)])
+        #expect(machine.card(now: 20) == .hidden)
     }
 
     @Test func theNextMeetingCardNeedsARecording() {
+        let standup = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams)
         var machine = ScribeAutoStartMachine()
-        let accept = machine.handle(.accept(now: 1))
-        let decline = machine.handle(.decline(now: 2))
-        #expect(accept.isEmpty)
-        #expect(decline.isEmpty)
+        let switchNow = machine.handle(.primary(on: .next(standup), now: 1, context: asContext()))
+        let keep = machine.handle(.dismiss(on: .next(standup), now: 2))
+        #expect(switchNow.isEmpty)
+        #expect(keep.isEmpty)
         var recording = asRecordingTeams()
-        let noCard = recording.handle(.accept(now: 30))
+        let noCard = recording.handle(.primary(on: .next(standup), now: 30, context: asContext(.recording)))
         #expect(noCard.isEmpty)
     }
 
@@ -971,7 +1007,7 @@ struct ScribeAutoStartTests {
         var machine = asRecordingTeams()
         let next = asSlot("n1", title: "Standup", start: 80)
         machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
-        machine.handle(.decline(now: 26))
+        machine.handle(.dismiss(on: .next(ScribeMeeting(key: "n1", title: "Standup", callApp: .teams, slot: next)), now: 26))
         machine.handle(asEvidence(40, mic: [.teams], slots: [next], activity: .idle))
         var effects: [ScribeAutoStartMachine.Effect] = []
         for now in stride(from: 45.0, through: 200.0, by: 5.0) {
@@ -980,34 +1016,15 @@ struct ScribeAutoStartTests {
         #expect(effects.isEmpty)
     }
 
-    @Test func newBannerWordingIsPlain() {
-        let next = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams)
-        #expect(ScribeAutoStartText.nextMeetingHeadline(next) == "Next meeting: Standup is starting. Switch notes to it?")
-        for text in [ScribeAutoStartText.nextMeetingDetail,
-                     ScribeAutoStartText.nextMeetingHeadline(next)] {
-            #expect(!text.contains("\u{2014}"))
-        }
-    }
-
     // MARK: Banner
 
-    @Test func acceptAndDeclineDoNothingOutsideABanner() {
+    @Test func cancelAndDismissDoNothingOutsideACard() {
         var machine = ScribeAutoStartMachine()
-        let accept = machine.handle(.accept(now: 1))
-        let decline = machine.handle(.decline(now: 2))
-        #expect(accept.isEmpty)
-        #expect(decline.isEmpty)
+        let cancel = machine.handle(.cancel(on: asCountdownCard(), now: 1))
+        let dismiss = machine.handle(.dismiss(on: .failed(asTeams, .noResponse), now: 2))
+        #expect(cancel.isEmpty)
+        #expect(dismiss.isEmpty)
         #expect(machine.state == .idle)
-    }
-
-    @Test func bannerWordingIsPlain() {
-        #expect(ScribeAutoStartText.askHeadline(asTeams) == "Meeting started: Call. Take notes?")
-        #expect(ScribeAutoStartText.countdownHeadline(asTeams, seconds: 3) == "Meeting started: Call. Taking notes in 3.")
-        #expect(ScribeAutoStartText.countdownHeadline(asTeams, seconds: -1).hasSuffix("in 0."))
-        for text in [ScribeAutoStartText.askDetail, ScribeAutoStartText.countdownDetail,
-                     ScribeAutoStartText.askHeadline(asTeams)] {
-            #expect(!text.contains("\u{2014}"))
-        }
     }
 
     @Test func activityFollowsTheScribePhase() {
@@ -1026,55 +1043,48 @@ struct ScribeAutoStartTests {
     @Test func askMeNeverTimesOutUnderThePointer() {
         var machine = asPrompting()
         machine.handle(.pointer(inside: true, now: 15))
-        let held = machine.handle(.tick(now: 40))
+        let held = machine.handle(asTick(40))
         #expect(held.isEmpty)
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
-        let start = machine.handle(.accept(now: 41))
-        #expect(start == [.hideBanner, .startRecording(asTeams)])
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
+        let start = machine.handle(asTap(asOffer(), 41))
+        #expect(start == [.start(asTeams)])
     }
 
     @Test func leavingTheBannerGivesAShortGraceThenItTimesOut() {
         var machine = asPrompting()
         machine.handle(.pointer(inside: true, now: 15))
         machine.handle(.pointer(inside: false, now: 30))
-        let grace = machine.handle(.tick(now: 33))
+        let grace = machine.handle(asTick(33))
         #expect(grace.isEmpty)
-        let gone = machine.handle(.tick(now: 34))
-        #expect(gone == [.hideBanner])
+        let gone = machine.handle(asTick(34))
+        #expect(gone.isEmpty)
+        #expect(machine.state == .idle)
     }
 
     @Test func aTapThatArrivesJustAfterTheTimeoutStillStarts() {
         var machine = asPrompting()
-        machine.handle(.tick(now: 23))
-        let late = machine.handle(.accept(now: 23.1))
-        #expect(late.isEmpty)
-        let start = machine.handle(.startNow(asTeams, now: 23.1))
-        #expect(start == [.hideBanner, .startRecording(asTeams)])
-        let isRecording: Bool
-        if case .recording = machine.state { isRecording = true } else { isRecording = false }
-        #expect(isRecording)
+        machine.handle(asTick(23))
+        #expect(machine.state == .idle)
+        let start = machine.handle(asTap(asOffer(), 23.1))
+        #expect(start == [.start(asTeams)])
+        guard case .starting = machine.state else {
+            Issue.record("expected starting, got \(machine.state)")
+            return
+        }
     }
 
-    @Test func startNowWhilePromptingIsTheSameAsAccept() {
-        var machine = asPrompting()
-        let start = machine.handle(.startNow(asTeams, now: 5))
-        #expect(start == [.hideBanner, .startRecording(asTeams)])
-    }
-
-    @Test func startNowNeverStartsASecondRecording() {
+    @Test func aTapNeverStartsASecondRecording() {
         var machine = asRecordingTeams()
-        let effects = machine.handle(.startNow(asTeams, now: 12))
+        let effects = machine.handle(asTap(asOffer(), 12, activity: .recording))
         #expect(effects.isEmpty)
     }
 
     @Test func aNotNowTapThatArrivesJustAfterTheTimeoutIsStillAnAnswer() {
         var machine = asPrompting()
-        machine.handle(.tick(now: 23))
+        machine.handle(asTick(23))
         #expect(machine.ledger.mark(of: asTeams) == .asked)
-        let late = machine.handle(.decline(now: 23.1))
-        #expect(late.isEmpty)
-        let effects = machine.handle(.declineNow(asTeams))
-        #expect(effects == [.hideBanner])
+        let effects = machine.handle(.dismiss(on: asOffer(), now: 23.1))
+        #expect(effects.isEmpty)
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .declined)
         let later = machine.handle(asEvidence(30, mic: [.teams], mode: .automatic))
@@ -1084,20 +1094,20 @@ struct ScribeAutoStartTests {
 
     @Test func aLateNotNowTapForAnotherMeetingLeavesTheArmedOneArmed() {
         var machine = asPrompting()
-        machine.handle(.tick(now: 23))
+        machine.handle(asTick(23))
         let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
         machine.handle(asEvidence(24, mic: [.zoom]))
         #expect(machine.state == .armed(meeting: zoom, since: 24))
-        let effects = machine.handle(.declineNow(asTeams))
+        let effects = machine.handle(.dismiss(on: asOffer(), now: 24.1))
         #expect(effects.isEmpty)
         #expect(machine.state == .armed(meeting: zoom, since: 24))
         #expect(machine.ledger.mark(of: asTeams) == .declined)
         #expect(machine.ledger.mark(of: zoom) == nil)
     }
 
-    @Test func declineNowNeverAnswersAMeetingWhileScribeRecordsIt() {
+    @Test func aLateNotNowNeverAnswersAMeetingWhileScribeRecordsIt() {
         var machine = asRecordingTeams()
-        let effects = machine.handle(.declineNow(asTeams))
+        let effects = machine.handle(.dismiss(on: asOffer(), now: 12))
         #expect(effects.isEmpty)
         #expect(machine.ledger.mark(of: asTeams) == .started)
     }
@@ -1105,11 +1115,12 @@ struct ScribeAutoStartTests {
     @Test func aFreshBannerIsNotHeldByAPointerFromTheLastOne() {
         var machine = asPrompting()
         machine.handle(.pointer(inside: true, now: 4))
-        machine.handle(.decline(now: 5))
+        machine.handle(.dismiss(on: asOffer(), now: 5))
         machine.handle(asEvidence(70, mic: [.zoom]))
         machine.handle(asEvidence(73, mic: [.zoom]))
         #expect(!machine.pointerInside)
-        let gone = machine.handle(.tick(now: 93))
-        #expect(gone == [.hideBanner])
+        let gone = machine.handle(asTick(93))
+        #expect(gone.isEmpty)
+        #expect(machine.card(now: 93) == .hidden)
     }
 }

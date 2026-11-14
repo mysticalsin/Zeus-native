@@ -96,7 +96,7 @@ GROUPS = {
               "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
               "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
               "ScribePopupLifecycleTests", "ScribeMeetingCardTests", "ScribeAutoStartTests", "ScribeMeetingLedgerTests",
-              "ScribeMeetingContextTests", "ScribeAutoStartOptInTests"),
+              "ScribeMeetingContextTests", "ScribeAutoStartOptInTests", "ScribeMeetingStartOutcomeTests"),
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
