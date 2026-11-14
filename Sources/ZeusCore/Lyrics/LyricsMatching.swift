@@ -25,8 +25,12 @@ public enum LyricsTitle {
     ]
 
     /// The title without version suffixes. Unchanged (the very same text) when no rule applies, and never empty.
+    /// A title over `LyricsLimits.maxTitleCharacters` is never cleaned up. Each run of whitespace counts as one
+    /// space while the rules run, which keeps the regular expressions from backtracking over long runs; a title
+    /// that did lose a suffix comes back with its whitespace collapsed.
     public static func stripped(_ title: String) -> String {
-        var current = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard title.count <= LyricsLimits.maxTitleCharacters else { return title }
+        var current = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         var removed = false
         var rounds = 0
         search: while rounds < 6 {
@@ -119,14 +123,24 @@ public enum LyricsMatch {
     /// How far a candidate's length may be from the track's: 2 seconds, or 3 percent of the track if that is larger.
     public static func window(for duration: Double) -> Double { max(2, duration * 3 / 100) }
 
-    private static func plain(_ title: String) -> String { title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+    /// A title for comparing: trimmed, lower case, curly apostrophes straight so "Don\u{2019}t" matches "Don't".
+    private static func plain(_ title: String) -> String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            .replacingOccurrences(of: "\u{2018}", with: "'").replacingOccurrences(of: "\u{2019}", with: "'")
+    }
+
+    /// The title with release suffixes removed, for comparing a candidate with the playing track when the length is
+    /// known: a remaster tag on either side still matches, "Live" never does.
+    private static func base(_ title: String) -> String { plain(LyricsTitle.stripped(title)) }
 
     /// Synced before plain before instrumental, inside the duration window, then the nearest duration (the earlier one
-    /// on a tie). With an unknown duration (0) only a candidate whose title equals `title`, the title as the player
-    /// reports it, ignoring case, is taken: a version suffix on either side is a different recording. Candidates with
-    /// nothing to show are skipped.
+    /// on a tie). With a known duration the candidate's title must also match the track's once release suffixes are
+    /// removed, ignoring case, so a live or remix take of the right length is refused. With an unknown duration (0)
+    /// only a candidate whose title equals `title`, the title as the player reports it, ignoring case, is taken: a
+    /// version suffix on either side is a different recording. Candidates with nothing to show are skipped.
     public static func best(_ candidates: [LyricsCandidate], duration: Double, title: String) -> LyricsCandidate? {
         let wanted = Self.plain(title)
+        let wantedBase = duration > 0 ? Self.base(title) : ""
         var pick: (rank: Int, distance: Double, index: Int)?
         for (index, candidate) in candidates.enumerated() {
             let rank: Int
@@ -139,7 +153,7 @@ public enum LyricsMatch {
             var distance = 0.0
             if duration > 0 {
                 distance = abs(candidate.duration - duration)
-                guard candidate.duration > 0, distance <= window(for: duration) else { continue }
+                guard candidate.duration > 0, distance <= window(for: duration), Self.base(candidate.title) == wantedBase else { continue }
             } else if Self.plain(candidate.title) != wanted {
                 continue
             }
@@ -246,10 +260,11 @@ public enum LyricsFetchOutcome: Equatable, Sendable {
 public enum LyricsStatus {
     /// Maps an HTTP status code. 200 is a body, and a 4xx other than 408 and 429 is the service refusing this request
     /// (404 has nothing, 400 is a value it cannot take): both are answers. Everything else is a failure, so it is
-    /// never cached as "no lyrics" and it starts the shared wait.
-    public static func outcome(status: Int, retryAfter: TimeInterval?) -> LyricsFetchOutcome {
+    /// never cached as "no lyrics" and it starts the shared wait. So is a reply over the size limit.
+    /// `bodyBytes` is the size of the body read; a 200 whose body is over `LyricsLimits.maxReplyBytes` is a failure.
+    public static func outcome(status: Int, retryAfter: TimeInterval?, bodyBytes: Int = 0) -> LyricsFetchOutcome {
         switch status {
-        case 200: .found
+        case 200: bodyBytes > LyricsLimits.maxReplyBytes ? .failed(retryAfter: retryAfter) : .found
         case 408, 429: .failed(retryAfter: retryAfter)
         case 400...499: .notFound
         default: .failed(retryAfter: retryAfter)
