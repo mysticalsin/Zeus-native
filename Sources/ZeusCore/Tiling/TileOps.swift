@@ -70,10 +70,13 @@ public enum TileOps {
         return TileTree(displayID: tree.displayID, root: root.removing(window), order: tree.order)
     }
 
-    /// Exchanges the two windows' slots. Shape, ratios, pins and insertion order stay as they were.
+    /// Exchanges the two windows' slots. Shape, ratios and pins stay as they were. The order is exchanged too,
+    /// because it records slots: the newest slot stays the newest after a swap, so the next window still
+    /// splits toward the right and bottom.
     public static func swap(_ a: TileWindowID, _ b: TileWindowID, in tree: TileTree) -> TileTree {
         guard let root = tree.root, a != b, tree.contains(a), tree.contains(b) else { return tree }
-        return TileTree(displayID: tree.displayID, root: root.swapping(a, b), order: tree.order)
+        let order = tree.order.map { $0 == a ? b : ($0 == b ? a : $0) }
+        return TileTree(displayID: tree.displayID, root: root.swapping(a, b), order: order)
     }
 
     /// Turns the split that directly holds `window` from columns to rows or back, and pins it: a pinned axis is

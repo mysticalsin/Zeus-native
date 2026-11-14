@@ -94,8 +94,9 @@ public indirect enum TileNode: Equatable, Sendable {
 
 /// The split tree of one display, and the order its windows were added in.
 ///
-/// `order` always holds exactly the windows in `root`, oldest first. It is what "the last added slot" means,
-/// so a swap does not change it and a removal only drops one id.
+/// `order` always holds exactly the windows in `root`, oldest slot first. It is what "the last added slot"
+/// means. It tracks slots, not windows: a swap trades the two ids in it, so the newest slot stays the newest,
+/// and a removal only drops one id.
 public struct TileTree: Equatable, Sendable {
     public let displayID: UInt32
     public let root: TileNode?
