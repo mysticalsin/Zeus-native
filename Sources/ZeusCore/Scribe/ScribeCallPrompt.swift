@@ -9,15 +9,19 @@ public struct ScribeCalendarSlot: Equatable, Sendable {
     public var attendeeNames: [String]
     /// The event carries a call link (Teams, Zoom, Meet, Webex...). Only the meeting-start detector reads it.
     public var hasCallLink: Bool
+    /// The call link itself, when the calendar event holds one. Only the meeting card's Join action reads it;
+    /// it is never logged or stored.
+    public var callLink: URL?
 
     public init(id: String, title: String, start: Date, end: Date? = nil, attendeeNames: [String] = [],
-                hasCallLink: Bool = false) {
+                hasCallLink: Bool = false, callLink: URL? = nil) {
         self.id = id
         self.title = title
         self.start = start
         self.end = end
         self.attendeeNames = ScribeAttendeeNames.clean(attendeeNames)
         self.hasCallLink = hasCallLink
+        self.callLink = callLink
     }
 }
 
