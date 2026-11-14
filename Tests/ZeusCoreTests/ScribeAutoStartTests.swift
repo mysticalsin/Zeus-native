@@ -977,6 +977,28 @@ struct ScribeAutoStartTests {
         #expect(effects.isEmpty)
     }
 
+    @Test func aNotNowTapThatArrivesJustAfterTheTimeoutIsStillAnAnswer() {
+        var machine = asPrompting(mode: .automatic, granted: true, consent: true)
+        machine.handle(.tick(now: 23))
+        #expect(machine.ledger.mark(of: asTeams) == .asked)
+        let late = machine.handle(.decline(now: 23.1))
+        #expect(late.isEmpty)
+        let effects = machine.handle(.declineNow(asTeams))
+        #expect(effects == [.hideBanner])
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .declined)
+        let later = machine.handle(asEvidence(30, mic: [.teams], mode: .automatic, granted: true, consent: true))
+        #expect(later.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func declineNowNeverAnswersAMeetingWhileScribeRecordsIt() {
+        var machine = asRecordingTeams()
+        let effects = machine.handle(.declineNow(asTeams))
+        #expect(effects.isEmpty)
+        #expect(machine.ledger.mark(of: asTeams) == .started)
+    }
+
     @Test func aFreshBannerIsNotHeldByAPointerFromTheLastOne() {
         var machine = asPrompting()
         machine.handle(.pointer(inside: true, now: 4))
