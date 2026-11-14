@@ -129,7 +129,8 @@ final class NowPlayingHub {
                 ports.readModes(player)
             }
             if updated == shown.source, announce, shown.isPlaying, previous?.title != shown.title {
-                ports.showCue(.trackChanged(title: shown.title, artist: shown.artist))
+                ports.showCue(.trackChanged(title: shown.title, artist: shown.artist, source: shown.source,
+                                            sourceChanged: NowPlayingDisplay.sourceChanged(from: previous?.source, to: shown.source)))
             }
         }
         publishCommandTarget()

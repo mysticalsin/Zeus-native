@@ -234,7 +234,9 @@ public enum NotchCue: Equatable, Sendable {
     case volume(Double, muted: Bool)
     case charging(Int)
     case lowBattery(Int)
-    case trackChanged(title: String, artist: String)
+    /// `source` is where the track plays; `sourceChanged` is true when the notch showed another source before, and the
+    /// cue then names the source (`NowPlayingDisplay.cueText`).
+    case trackChanged(title: String, artist: String, source: NowPlayingSource?, sourceChanged: Bool)
     case shelfAdded(Int)
     case focusFinished(String)
     case dictation(String)

@@ -101,17 +101,6 @@ struct GlyphButton: View {
 struct AlbumTile: View {
     let playing: NowPlaying?
 
-    /// The placeholder glyph for a source; every case is named, so a new source stops the build here.
-    private static func glyph(for source: NowPlayingSource) -> String {
-        switch source {
-        case .player(let player):
-            switch player {
-            case .music: "music.note"
-            case .spotify: "dot.radiowaves.left.and.right"
-            }
-        case .browser: "globe"
-        }
-    }
     /// Glance Home Music art tile is 48 pt (TOPBAR-SPEC §4); empty state keeps the quiet grey fill.
     var size: CGFloat = 48
 
@@ -127,7 +116,7 @@ struct AlbumTile: View {
                                                   Color(hue: (hue + 0.12).truncatingRemainder(dividingBy: 1), saturation: 0.8, brightness: 0.45)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .overlay(
-                        Image(systemName: Self.glyph(for: playing.source))
+                        Image(systemName: NowPlayingDisplay.glyph(for: playing.source))
                             .font(.system(size: size * 0.35, weight: .medium))
                             .foregroundStyle(.white.opacity(art == nil ? 0.9 : 0))
                     )
@@ -1511,7 +1500,7 @@ struct ClosedWings: View {
         case .volume(let level, let muted): (muted || level == 0 ? "speaker.slash.fill" : level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill", Theme.cloudPrimary)
         case .charging: ("battery.100percent.bolt", Theme.leaf)
         case .lowBattery: ("battery.25percent", Theme.danger)
-        case .trackChanged: ("music.note", Theme.leaf)
+        case .trackChanged(_, _, let source, _): (NowPlayingDisplay.cueGlyph(for: source), Theme.leaf)
         case .shelfAdded: ("tray.and.arrow.down.fill", Theme.bolt)
         case .focusFinished: ("timer", TopBarStyle.violet)
         case .dictation: ("waveform", TopBarStyle.rec)
@@ -1569,8 +1558,8 @@ struct ClosedWings: View {
                 .buttonStyle(.plain).font(TopBarStyle.label(10.5, .bold)).foregroundStyle(Theme.bolt)
                 .accessibilityLabel("Open System Settings")
             }.frame(width: 250, alignment: .trailing)
-        case .trackChanged(let title, let artist):
-            Text(artist.isEmpty ? title : "\(title) · \(artist)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
+        case .trackChanged(let title, let artist, let source, let sourceChanged):
+            Text(NowPlayingDisplay.cueText(title: title, artist: artist, source: source, sourceChanged: sourceChanged)).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(1).frame(width: 190, alignment: .trailing)
         }
     }
