@@ -83,23 +83,22 @@ public struct ScribeMeetingEvidence: Equatable, Sendable {
     /// Known call apps running, or a browser showing a call tab, whether or not they use the microphone.
     public var presentApps: [ScribeCallApp]
     public var mode: ScribeAutoStartMode
-    public var activity: ScribeActivity
-    /// Whether an automatic start may count down, or what is missing. The detector never asks for a permission.
-    public var automatic: ScribeAutoStartReadiness
+    /// What the app read at this moment to decide a start: Scribe's phase, Microphone access, and whether an
+    /// automatic start may count down. The detector never asks for a permission.
+    public var context: ScribeStartContext
     /// Whether each call app's call window is still on screen. Missing means unknown, which never ends a call.
     public var callWindows: [ScribeCallApp: ScribeCallWindowState]
 
     public init(date: Date, slots: [ScribeCalendarSlot] = [], micApps: [ScribeCallApp] = [],
                 presentApps: [ScribeCallApp] = [], mode: ScribeAutoStartMode = .ask,
-                activity: ScribeActivity = .idle, automatic: ScribeAutoStartReadiness = .blocked(.notChosen),
+                context: ScribeStartContext = ScribeStartContext(),
                 callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]) {
         self.date = date
         self.slots = slots
         self.micApps = micApps
         self.presentApps = presentApps
         self.mode = mode
-        self.activity = activity
-        self.automatic = automatic
+        self.context = context
         self.callWindows = callWindows
     }
 
