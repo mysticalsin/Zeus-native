@@ -30,7 +30,8 @@ class SettingsGenerationTests(unittest.TestCase):
 
     def test_capture_and_input_default_regressions_fail_before_any_output(self):
         for key in ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts', 'lights.liveSpectrum',
-                    'general.showInScreenSharing', 'present.physicalPointer', 'explanation.enabled'):
+                    'general.showInScreenSharing', 'present.physicalPointer', 'explanation.enabled',
+                    'tiling.enabled'):
             with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
                 module = generator()
                 index = next(i for i, row in enumerate(module.R) if row[7] == key)
@@ -40,6 +41,25 @@ class SettingsGenerationTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'explicit opt-in'):
                         writer(output)
                     self.assertFalse(output.exists())
+
+    def test_tiling_rows_are_live_and_use_our_own_wording(self):
+        module = generator()
+        rows = [row for row in module.R if row[0] == 'tiling']
+        self.assertEqual([row[7] for row in rows], ['tiling.enabled', 'tiling.keyBase', 'tiling.innerGap', 'tiling.outerGap',
+                                                    'tiling.splitRatio', 'tiling.focusBorder', 'tiling.excludedApps'])
+        self.assertEqual(module.SECTION_TITLES['tiling'], 'Tiling')
+        for row in rows:
+            with self.subTest(key=row[7]):
+                self.assertEqual(row[11], 'live')
+                self.assertEqual((row[3], row[4]), ('-', '-'))
+                self.assertTrue(row[12].startswith('Zeus addition.'))
+
+    def test_tiling_enabled_default_cannot_be_removed_or_made_true(self):
+        module = generator()
+        index = next(i for i, row in enumerate(module.R) if row[7] == 'tiling.enabled')
+        module.R.pop(index)
+        with self.assertRaisesRegex(ValueError, 'tiling.enabled must remain an explicit opt-in'):
+            module.validate_table()
 
     def test_debug_mic_bypass_cannot_be_exposed_or_silently_removed(self):
         module = generator()
