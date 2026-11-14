@@ -14,23 +14,32 @@ public enum PeerSigning {
 
     #if canImport(Darwin)
     /// True when the process behind `auditToken` is this app's own program.
-    public static func verifyApp(auditToken: Data?) -> PeerVerdict {
+    /// `expectedPeerIdentifier` is the signing identifier the peer must carry, for a server whose only client is the app.
+    public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil) -> PeerVerdict {
         guard let token = auditToken, token.count == 32 else { return .deny("peer audit token unavailable") }
         guard let peer = describePeer(auditToken: token) else { return .deny("peer code signature unreadable") }
         let own = OwnApp.current
-        // An installed helper has no bundle of its own: the app that shipped it is the peer, and its bundle's
-        // helper hashes are what tie the two together. Read only for that case, never at idle.
-        var peerBundleHashes = Set<String>()
-        if own.bundlePath == nil, own.signature?.teamIdentifier?.isEmpty ?? true, own.signature?.cdHash?.isEmpty == false,
+        // An installed ad hoc helper has no bundle of its own: the app that shipped it is the peer, and the names of
+        // the valid ad hoc programs in that bundle's Helpers are what tie the two together. Read only for that case,
+        // never at idle, and never for a signed build, which compares its team or certificate instead.
+        var peerBundleHelpers = Set<String>()
+        if own.bundlePath == nil, own.signature?.isAdHoc == true, own.signature?.identifier?.isEmpty == false,
            let path = peer.path, let bundle = AppBundleLocator.bundlePath(forExecutable: path) {
-            peerBundleHashes = helperCDHashes(bundle: bundle, folders: ["Contents/Helpers"], requireValid: true)
+            peerBundleHelpers = Set(signatures(bundle: bundle, folders: ["Contents/Helpers"], requireValid: true)
+                .filter(\.isAdHoc).compactMap(\.identifier))
         }
         let installed = resolve(ZeusPaths.binDirectory.path) ?? ZeusPaths.binDirectory.path
         return PeerBinaryRule.decide(own: own.signature, peer: peer.signature, peerExecutablePath: peer.path,
                                      ownBundlePath: own.bundlePath, ownExecutableDirectory: own.executableDirectory,
-                                     ownBundleCDHashes: own.bundleCDHashes, peerBundleCDHashes: peerBundleHashes,
-                                     installedHelpersDirectory: installed)
+                                     ownBundleCDHashes: own.bundleCDHashes, peerBundleHelperIdentifiers: peerBundleHelpers,
+                                     installedHelpersDirectory: installed, expectedPeerIdentifier: expectedPeerIdentifier)
     }
+
+    /// Reads this program's own identity now and keeps it. A long-running program (the bridge Chrome keeps alive
+    /// while the app is rebuilt or updated) must call this at start: once the file on disk has been replaced the
+    /// signature of the running copy can no longer be validated against it, and every peer would be refused.
+    @discardableResult
+    public static func captureOwnIdentity() -> CodeSignature? { OwnApp.current.signature }
 
     // MARK: This program
 
@@ -40,7 +49,8 @@ public enum PeerSigning {
         var executableDirectory: String?
         var bundleCDHashes: Set<String>
 
-        /// Read on the first verification, then kept. A process that never serves a signed-peer command never reads it.
+        /// Read on the first use, then kept: a program that never serves a signed-peer command never reads it, and
+        /// `captureOwnIdentity` reads it at start for one that does.
         static let current: OwnApp = read()
 
         private static func read() -> OwnApp {
@@ -55,7 +65,8 @@ public enum PeerSigning {
             // Cdhashes of the bundled programs only matter when the app has no team to compare.
             var hashes = Set<String>()
             if signature?.teamIdentifier?.isEmpty ?? true, let bundle {
-                hashes = PeerSigning.helperCDHashes(bundle: bundle, folders: ["Contents/MacOS", "Contents/Helpers"], requireValid: false)
+                hashes = Set(PeerSigning.signatures(bundle: bundle, folders: ["Contents/MacOS", "Contents/Helpers"], requireValid: false)
+                    .compactMap(\.cdHash))
             }
             return OwnApp(signature: signature, bundlePath: bundle, executableDirectory: directory, bundleCDHashes: hashes)
         }
@@ -63,11 +74,11 @@ public enum PeerSigning {
 
     // MARK: Reading a signature
 
-    /// The cdhashes the signatures of the programs in `folders` declare. For this app's own bundle the declared
-    /// hash is enough (the peer must still pass its own check, which hashes its real content). For a peer's
-    /// bundle each program must also pass a static validity check, so a hash is only listed for intact code.
-    fileprivate static func helperCDHashes(bundle: String, folders: [String], requireValid: Bool) -> Set<String> {
-        var hashes = Set<String>()
+    /// The signatures of the programs in `folders` of `bundle`. For this app's own bundle the declared signature
+    /// is enough (the peer must still pass its own check, which hashes its real content). For a peer's bundle
+    /// each program must also pass a static validity check, so a signature is only listed for intact code.
+    fileprivate static func signatures(bundle: String, folders: [String], requireValid: Bool) -> [CodeSignature] {
+        var found: [CodeSignature] = []
         for folder in folders {
             let directory = bundle + "/" + folder
             for name in (try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? [] {
@@ -78,10 +89,10 @@ public enum PeerSigning {
                     let flags = SecCSFlags(rawValue: UInt32(kSecCSDoNotValidateResources))
                     guard SecStaticCodeCheckValidity(staticCode, flags, nil) == errSecSuccess else { continue }
                 }
-                if let hash = describe(staticCode: staticCode, valid: true)?.signature.cdHash { hashes.insert(hash) }
+                if let signature = describe(staticCode: staticCode, valid: true)?.signature { found.append(signature) }
             }
         }
-        return hashes
+        return found
     }
 
     private struct Described {
@@ -142,6 +153,7 @@ public enum PeerSigning {
         return String(cString: buffer)
     }
     #else
-    public static func verifyApp(auditToken: Data?) -> PeerVerdict { .deny("peer signatures are not available on this platform") }
+    /// `expectedPeerIdentifier` is the signing identifier the peer must carry, for a server whose only client is the app.
+    public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil) -> PeerVerdict { .deny("peer signatures are not available on this platform") }
     #endif
 }

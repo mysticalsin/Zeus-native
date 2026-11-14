@@ -66,30 +66,38 @@ public enum AppBundleLocator {
 /// that ties it to this app, never by the name of its file.
 public enum PeerBinaryRule {
     /// - Parameters:
-    ///   - own: this program's signature (the server side).
+    ///   - own: this program's signature (the server side), as read when the program started.
     ///   - peer: the peer's signature, nil when it could not be read.
     ///   - peerExecutablePath: the peer's executable after symlink resolution.
     ///   - ownBundlePath: the `.app` folder this program runs from, if any.
     ///   - ownExecutableDirectory: the folder holding this program (the build products folder for a loose binary).
     ///   - ownBundleCDHashes: cdhashes of the programs shipped inside this app, so an installed copy of a bundled helper still matches.
-    ///   - peerBundleCDHashes: cdhashes of the helpers shipped inside the peer's own `.app`, each one checked
-    ///     valid. Only read when this program has no bundle (the installed bridge) and the peer runs inside one.
+    ///   - peerBundleHelperIdentifiers: signing identifiers of the ad hoc programs shipped in the peer's own
+    ///     `Contents/Helpers`, each one checked valid. Only read when this program is an ad hoc build with no
+    ///     bundle (the installed bridge) and the peer runs inside an `.app`.
     ///   - installedHelpersDirectory: the folder the app copies its helpers into. Any program of this user can
     ///     write there, so it is never trusted as a build products folder.
+    ///   - expectedPeerIdentifier: the signing identifier the peer must carry (the app's bundle identifier),
+    ///     for a server whose only client is the app. Nil leaves the rest of the rule alone.
     ///
-    /// When this app is signed with a team identifier the peer must carry the same one. When it is ad hoc
-    /// or locally signed (development builds, the test host) the peer must live inside this app's bundle or
-    /// next to this loose program, be an exact copy of a bundled helper, share this build's signing
-    /// certificate, or (for an installed helper that has no bundle) run from an app whose bundle holds an
-    /// exact copy of this helper. An ad hoc build has no identity beyond that: a same-user program could
-    /// still assemble such a bundle, which is why a team-signed build compares teams instead.
+    /// Identity is a stable requirement, never the code directory hash of one build, because a long-running
+    /// program (the bridge Chrome keeps alive) outlives the app build that shipped it. When this app is
+    /// signed with a team identifier the peer must carry the same one. When it is locally signed (a
+    /// certificate without a team) the peer must be signed with the same certificate, or live inside this
+    /// app's bundle or next to this loose program, or be an exact copy of a bundled helper. An ad hoc build has
+    /// no identity beyond a location, so it also trusts an installed helper's app (a peer inside an `.app`
+    /// whose Helpers hold a valid ad hoc program of this program's name): a same-user program could still
+    /// assemble such a bundle, which is why a signed build compares teams or certificates instead.
     /// Every other case, and every missing input, refuses.
     public static func decide(own: CodeSignature?, peer: CodeSignature?, peerExecutablePath: String?,
                               ownBundlePath: String?, ownExecutableDirectory: String?,
-                              ownBundleCDHashes: Set<String> = [], peerBundleCDHashes: Set<String> = [],
-                              installedHelpersDirectory: String? = nil) -> PeerVerdict {
+                              ownBundleCDHashes: Set<String> = [], peerBundleHelperIdentifiers: Set<String> = [],
+                              installedHelpersDirectory: String? = nil, expectedPeerIdentifier: String? = nil) -> PeerVerdict {
         guard let own, own.isValid else { return .deny("own code signature unavailable") }
         guard let peer, peer.isValid else { return .deny("peer code signature missing or invalid") }
+        if let expected = expectedPeerIdentifier {
+            guard let identifier = peer.identifier, identifier == expected else { return .deny("peer is not the app") }
+        }
         if let team = own.team {
             guard !peer.isAdHoc, peer.team == team else { return .deny("peer is not signed by this app's team") }
             return .allow
@@ -103,9 +111,9 @@ public enum PeerBinaryRule {
         }
         if let hash = peer.cdHash, !hash.isEmpty, ownBundleCDHashes.contains(hash) { return .allow }
         if !own.isAdHoc, let certificate = own.certificateHash, !certificate.isEmpty, peer.certificateHash == certificate { return .allow }
-        // The installed bridge: no bundle of its own, so the peer must be the app that shipped this exact copy.
-        if ownBundlePath == nil, let path, AppBundleLocator.bundlePath(forExecutable: path) != nil,
-           let hash = own.cdHash, !hash.isEmpty, peerBundleCDHashes.contains(hash) { return .allow }
+        // The installed ad hoc bridge: no bundle of its own, so the peer must be an app that ships a bridge of this name.
+        if own.isAdHoc, ownBundlePath == nil, let path, AppBundleLocator.bundlePath(forExecutable: path) != nil,
+           let name = own.identifier, !name.isEmpty, peerBundleHelperIdentifiers.contains(name) { return .allow }
         return .deny("peer is not this app's program")
     }
 

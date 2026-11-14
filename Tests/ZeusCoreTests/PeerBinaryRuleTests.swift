@@ -168,7 +168,7 @@ struct PeerBinaryRuleTests {
         let copy = signature(identifier: appIdentifier, adHoc: true, cdHash: "copy-1")
         for path in ["/tmp/Zeus", "/tmp/Zeus/Contents/MacOS/Zeus", installedBin + "/Zeus", "/Users/me/Downloads/Zeus"] {
             #expect(!decideForBridge(own: bridge(), peer: copy, path: path, peerBundleHelpers: ["zeus-bridge"],
-                                     expectedPeerIdentifier: appIdentifier).isAllowed, path)
+                                     expectedPeerIdentifier: appIdentifier).isAllowed, "\(path)")
         }
     }
 
@@ -179,7 +179,7 @@ struct PeerBinaryRuleTests {
         for build in ["app-1", "app-2", "app-3"] {
             let app = signature(identifier: appIdentifier, adHoc: true, cdHash: build)
             #expect(decideForBridge(own: running, peer: app, path: devApp, peerBundleHelpers: ["zeus-bridge", "zeus-hook"],
-                                    expectedPeerIdentifier: appIdentifier) == .allow, build)
+                                    expectedPeerIdentifier: appIdentifier) == .allow, "\(build)")
         }
     }
 

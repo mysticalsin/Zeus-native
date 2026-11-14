@@ -150,6 +150,12 @@ public enum PeerCheck {
 public enum ChromeSocketPeers {
     public static let allowedExecutables: Set<String> = ["Zeus"]
 
+    /// The signing identifier of the app: its bundle identifier. The bridge's only client carries it.
+    public static let expectedPeerIdentifier = ZeusPaths.bundleIdentifier
+
+    /// The verifier the bridge's socket uses: the peer must be this app's program and carry the app's identifier.
+    public static let verifier: PeerVerifier = { PeerSigning.verifyApp(auditToken: $0, expectedPeerIdentifier: expectedPeerIdentifier) }
+
     /// The policy for this bridge process. A bridge started with `ZEUS_SUPPORT_DIR` set serves a
     /// relocated socket (tests, a second build) that the installed app never talks to, so only the
     /// same-user rule applies there. Whoever can set the bridge's environment can already move the socket.
