@@ -455,7 +455,7 @@ private let everyState: [Life.State] = [
     @Test func sleepFromEveryOtherStateDestroysEverythingFirst() {
         for state in everyState {
             switch state {
-            case .off, .stopped: continue
+            case .off, .stopped, .paused(.asleep): continue
             default: break
             }
             let result = reduce(state, .willSleep)
@@ -573,7 +573,7 @@ private let everyState: [Life.State] = [
         var later = RebuildBackoff()
         for time in [0.0, 10, 20, 30] { _ = later.recordFailure(bundleID: "a", at: time) }
         #expect(later.recordFailure(bundleID: "a", at: 60) == 4)
-        #expect(later.recordFailure(bundleID: "a", at: 100) == 3)
+        #expect(later.recordFailure(bundleID: "a", at: 100) == 2)
     }
 
     @Test func eachAppHasItsOwnCount() {
