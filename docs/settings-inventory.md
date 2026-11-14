@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 173 of 173 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 173 in scope). 162 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 178 of 178 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 178 in scope). 167 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 122.
+**Before this round:** has 19, partial 27, missing 127.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -21,6 +21,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. Screens without a notch get a slim pill. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
 | Day to day | Launch at login | toggle | on | Starts the app when you log in. | missing | live | `general.launchAtLogin` | SMAppService, bundled app only. |
 | Day to day | Keep the Mac awake while agents work | toggle | off | Blocks idle sleep while an agent runs; the screen can still lock. | missing | live | `general.keepAwake` | Power assertion held only while a session is working. |
+| Day to day | Keep the display awake while music plays | toggle | - | Holds the display on only while Music or Spotify is playing. Stops on low battery or heat. | missing | live | `keepAwake.whileMusic` | M4. Display assertion with a two minute lease, renewed each minute, held only while a track plays (20 second grace). Uses the Keep awake battery floor and heat rule. Separate from sessions and the Home cup. |
 | Day to day | Welcome back recap (Recap and return) | toggle | on | After 10 minutes or more away, the notch shows what agents finished, failed or are waiting on, and Zeus says one line about it when voice answers are on. | missing | live | `general.welcomeBack` | Away is system idle time (no keys or mouse). Only agent events since you left are listed; waiting ones only while still waiting. |
 | Day to day | Meeting mode (discreet during calls and screen sharing) | toggle | on | When another app uses the mic or camera, or the display is mirrored: leave captures, mute sounds, hide details. | partial | live | `general.meetingMode` | Detects the mic in use by another app and mirrored displays. Camera detection TODO. |
 | Day to day | Show in screen sharing | toggle | - |  | missing | live | `general.showInScreenSharing` | N1. Every Zeus window uses the shared sharing helper. |
@@ -52,7 +53,8 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Agents | Agent status icon (Glyphs, Lumi, Lumi Pixel, Creatures) | picture cards | Glyphs | Symbol or a character for each agent state. | partial | custom | `avatar.alwaysInNotch` | ZEUS answer: the Mini ZEUS mascot (13 states) on General. |
 | Notch behavior | Hide the notch automatically | toggle | on | Closes when the pointer leaves. | partial | live | `notch.autoHide` | Off: it stays open until the shortcut or a click elsewhere. |
 | Notch behavior | Delay before closing | menu | Short | How long it waits after the pointer leaves. | missing | live | `notch.closeDelay` | the reference app closes about 0.53 s after the pointer leaves (private reference notes). |
-| Notch behavior | Show the notch (hover dwell) | menu | On hover | How quickly hovering opens it. | partial | live | `notch.openDelay` | 0.1 s, 0.25 s or 0.6 s. |
+| Notch behavior | Hover delay | menu | On hover | How quickly hovering opens it. | partial | live | `notch.openDelay` | 0.1 s, 0.25 s or 0.6 s. |
+| Notch behavior | Open the notch on | menu | - | Hover opens it after the delay. Click opens it only when you click the notch. | missing | live | `notch.openTrigger` | S1. Click opens the panel from the closed notch or a peek, from the hardware notch (or the pill, grown 12 pt each side, on a display without one); hover never opens it. |
 | Notch behavior | Show Zeus next to cursor | toggle | off | When summoned, Zeus anchors beside the mouse pointer instead of the notch. | missing | live | `presence.nearCursor` | P0 item I. Offset 18 pt right and down from the pointer, clamped and flipped at screen edges, multi-display aware, 60 fps with a light spring; off keeps the notch/top-bar placement. Also in the menu bar menu and `zeus debug presence`. |
 | Halo | Halo style | menu | Classic halo | The closed-notch glow while an agent works or needs you. One setting: the notch, Settings and the welcome guide all read it. | partial | custom | `halo.style` | Stable ids; titles come from ZeusCore.HaloStyle. Replaces the old topBar.halo key (migrated at launch). |
 | Halo | Halo entrance | menu | Sweep | Animation as the halo lights up. | partial | custom | `halo.entrance` | Stable ids; titles come from ZeusCore.HaloEntrance. Each has its own choreography. |
@@ -64,6 +66,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Halo | Light wave to the screen edges | toggle | on | A wave of light crosses the screen on agent events. | partial | live | `halo.edgeWave` | A click-through overlay on every Space, left out of captures; fronts run round the screen edge. |
 | Everyday lights | Light wave while music plays | toggle | on | Artwork-tinted wave on the closed notch. | has | custom | `topBar.musicWings` |  |
 | Everyday lights | Progress outline on the music preview | toggle | on | Outline empties as the track plays. | missing | live | `lights.musicProgress` | Tracks media progress around the music wings. |
+| Everyday lights | Light lyrics word by word | toggle | on | Each word lights as it is sung. Word timing is estimated from the line timing. | missing | live | `lyrics.wordByWord` | Zeus addition. Estimated word timing in the lyric views. Off lights the whole line at once. |
 | Everyday lights | React to real sound (live spectrum) | toggle | off | The music light follows the sound your Mac is playing. | missing | live | `lights.liveSpectrum` | CoreAudio process tap of system output, listen only. Asks for System Audio Recording once, when this is turned on or the Waves tab opens. Runs only while music plays. |
 | Everyday lights | Waves style (Bars, Wave, Mirror) | segmented | Bars | How the Waves tab draws the spectrum. | missing | live | `waves.style` | Zeus addition. The Waves tab is off by default; add it in Settings > Appearance > Top bar tabs. |
 | Everyday lights | Waves sensitivity | slider | 100 % | How strongly the bars react to quiet sound. | missing | live | `waves.sensitivity` | Zeus addition. A gain on the live band levels. |
@@ -86,6 +89,8 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |
 | Everyday lights | Glow when AirDrop arrives | toggle | off | Blue intake glow and drops the file on the shelf. | missing | live | `lights.airDrop` | Gated by Downloads folder access. |
 | Everyday lights | Screenshot cue | toggle | off | Camera cue and shelf drop for new screenshots. | missing | live | `lights.screenshot` | Gated by Desktop folder access. |
+| Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
+| Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 
 ## Notifications
 

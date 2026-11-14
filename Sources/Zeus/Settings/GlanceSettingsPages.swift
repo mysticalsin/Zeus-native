@@ -104,6 +104,8 @@ private struct GeneralPage: View {
             GSDivider()
             GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working. Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
             GSDivider()
+            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while Music or Spotify is playing. Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
+            GSDivider()
             GSToggleRow(symbol: "person.2.wave.2", title: "Meeting mode", text: "Quiet sounds and private previews during calls and screen sharing.", isOn: bool("general.meetingMode"))
             GSDivider()
             GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus windows out of screen shares and recordings.", isOn: bool("general.showInScreenSharing"))
@@ -262,9 +264,17 @@ private struct AppearancePage: View {
                 runningTheme("Essentials", "")
             }
             GSDivider()
-            GSRow(symbol: "hand.point.up.left", title: "Open the notch on hover", text: "How long the pointer rests before it opens.") {
-                GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Open the notch on hover")
+            GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens it after the delay. Click opens it only when you click the notch.") {
+                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
             }
+            GSDivider()
+            // The delay only applies to hover, so it is subdued while the trigger is Click.
+            let clickTrigger = SettingsStore.shared.string("notch.openTrigger") == "Click"
+            GSRow(symbol: "hand.point.up.left", title: "Hover delay", text: "How long the pointer rests before it opens. Used when the notch opens on hover.") {
+                GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Hover delay")
+            }
+            .disabled(clickTrigger)
+            .opacity(clickTrigger ? 0.5 : 1)
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
@@ -344,6 +354,7 @@ private struct AppearancePage: View {
             GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
+            light("lyrics.wordByWord", "music.note.list", "Light lyrics word by word", "Each word lights as it is sung. Word timing is estimated from the line timing.")
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
             GSDivider()
             GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum. Add the tab under Top bar tabs, further down this page.") {
@@ -360,7 +371,20 @@ private struct AppearancePage: View {
         // One child, so the page body stays within ViewBuilder's ten-view limit.
         Group {
             hudCard
+            screenCard
             TopBarTabsCard(context: context)
+        }
+    }
+
+    private var screenCard: some View {
+        GSCard("Screen") {
+            GSToggleRow(symbol: "rectangle.roundedbottom", title: "Round the bottom screen corners",
+                        text: "Rounds the two bottom corners of a notched display to match the top. Click-through.",
+                        isOn: bool("screen.roundBottomCorners"))
+            GSDivider()
+            GSRow(symbol: "circle.bottomhalf.filled", title: "Corner size") {
+                GSPopup(selection: SettingsStore.binding("screen.cornerRadius"), options: SettingsCatalog.option("screen.cornerRadius")?.choices ?? []).popupLabel("Corner size")
+            }
         }
     }
 
@@ -1152,6 +1176,7 @@ private struct DiagnosticsPage: View {
                 GSStatus(ok: up, text: up ? "Connected" : "Offline")
             }
         }
+        LiveDiagnosticsCard(context: context)
         DiagnosticsLogsCard()
         GSCard("Restart the local connection") {
             GSRow(symbol: "arrow.clockwise", title: "Restart the connection", text: "Agents and running tasks keep going in their own apps.") {

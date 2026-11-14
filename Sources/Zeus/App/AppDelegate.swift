@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notch.topBar = topBar
         notch.onPresentationChange = { [weak self] presentation in self?.buddy.setHiddenForPanel(presentation == .panel) }
         if on(.notchUI) { notch.start() }
+        if on(.notchUI) { ScreenCornerOverlay.shared.start() }
         // A permission cue is eligible for a system notification, which reads SettingsStore.shared (migration
         // writes), so a QA startup never wires it.
         if on(.systemNotifications) {
@@ -167,6 +168,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PrompterHub.shared.updateWatcher()
         }
         topBar.onKeepAwake = { [weak self] on in self?.keepAwake.set(on) }
+        // The optional display hold that lasts only while music plays. Separate from the cup and sessions.
+        topBar.onMusicPlaying = { playing in MusicAwakeHold.shared.setPlaying(playing) }
+        MusicAwakeHold.shared.setEnabled(SettingsStore.shared.bool(MusicAwakeHold.settingID))
+        // The hold shares the session's battery floor and heat setting, so a change there re-runs its rule.
+        KeepAwakeSession.shared.onRulesChange = { MusicAwakeHold.shared.evaluate() }
         topBar.onOpenTab = { [weak self] tab in guard let self else { return }; self.topBar.selectedTab = tab; self.notch.show(.panel) }
         // A session that ends (time, battery, heat) also lets the Home cup's display hold go.
         KeepAwakeSession.shared.onEnd = { [weak self] in self?.topBar.keepAwake = false }
@@ -508,6 +514,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotchControllerBridge.controller?.boostCaptureVisibility(for: captureBoost)
             ScreenEdgeGlowController.shared.boostCaptureVisibility(for: captureBoost)
             EdgeWaveController.shared.boostCaptureVisibility(for: captureBoost)
+            ScreenCornerOverlay.shared.boostCaptureVisibility(for: captureBoost)
             return NotchDebugAnimator.run(lower, topBar: self.topBar)
         }
     }
@@ -874,12 +881,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "general.launchAtLogin": LaunchAtLogin.set(store.bool(id))
             case "shortcut.answerKeys": self?.registerShortcuts()
             case "notch.displays": self?.notch.refreshDisplays(force: true)
+            case MusicAwakeHold.settingID: MusicAwakeHold.shared.setEnabled(store.bool(id))
             case ZeusScreenSharePolicy.showInSharingKey:
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: self?.teleprompterPrivate ?? false)
             case "about.autoUpdate", "about.updateFeedURL":
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
+            case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break
             }
         }

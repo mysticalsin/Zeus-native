@@ -54,6 +54,7 @@ enum ZeusWindowSharing {
         MarkOverlay.shared.applyScreenSharePolicy(visibleInShare: visible)
         ScreenEdgeGlowController.shared.applyScreenSharePolicy(visibleInShare: visible)
         EdgeWaveController.shared.applyScreenSharePolicy(visibleInShare: visible)
+        ScreenCornerOverlay.shared.applyScreenSharePolicy(visibleInShare: visible)
         PolyglotCaptionBridge.shared?.applyScreenSharePolicy(visibleInShare: visible)
     }
 

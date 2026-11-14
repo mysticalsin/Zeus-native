@@ -126,8 +126,15 @@ final class TopBarModel {
     // MARK: Live data
 
     var nowPlaying: NowPlaying? {
-        didSet { if oldValue?.isPlaying != nowPlaying?.isPlaying { AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true) } }
+        didSet {
+            guard oldValue?.isPlaying != nowPlaying?.isPlaying else { return }
+            AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true)
+            onMusicPlaying(nowPlaying?.isPlaying == true)
+        }
     }
+    /// What the player says about shuffle and repeat. Kept apart from `nowPlaying` so a playback
+    /// notification never wipes it; unknown when the player has not answered.
+    var musicModes = MusicModes()
     var events: [CalendarItem] = []
     var reminders: [ReminderItem] = []
     var calendarAccess: Access = .unknown
@@ -218,6 +225,8 @@ final class TopBarModel {
     var editScript: () -> Void = {}
     var setPrompterVoice: (Bool) -> Void = { _ in }
     var onKeepAwake: (Bool) -> Void = { _ in }
+    /// A track started or stopped playing (the music display hold listens).
+    var onMusicPlaying: (Bool) -> Void = { _ in }
     /// Selects a tab and opens the panel on it (the wings' Stop uses this for Scribe's confirmation).
     var onOpenTab: (TopBarTab) -> Void = { _ in }
     /// Speaks the daily brief in ZEUS's voice.
@@ -230,7 +239,7 @@ final class TopBarModel {
     /// The notch's dictation button: click to start, click again to stop and type it where you were.
     var toggleDictation: () -> Void = {}
 
-    enum MusicCommand { case playPause, next, previous, open }
+    enum MusicCommand { case playPause, next, previous, open, toggleShuffle, cycleRepeat }
 
     /// Jumps the current track to this many seconds (the progress line's drag).
     var seek: (Double) -> Void = { _ in }

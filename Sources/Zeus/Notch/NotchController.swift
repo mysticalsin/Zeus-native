@@ -62,8 +62,15 @@ final class NotchController {
         dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.dragChangeCount = NSPasteboard(name: .drag).changeCount
+                // A click that opens the notch is not also a click outside it.
+                if self?.openOnClick() == true { return }
                 self?.clickedOutside()
             }
+        } as Any)
+        // Click mode: the global monitor misses clicks while a Zeus window is frontmost.
+        dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated { _ = self?.openOnClick() }
+            return event
         } as Any)
         dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] _ in
             MainActor.assumeIsolated { self?.mouseDragged() }
@@ -315,6 +322,8 @@ final class NotchController {
                 if !over, model.alerts.isHovered { setAlertHovered(false) }
                 if over { return }
             }
+            // Click mode: hovering never opens it (openOnClick does).
+            guard NotchOpenRules.opensOnHover(Self.openTrigger) else { hoverTask?.cancel(); hoverTask = nil; return }
             guard inHotZone(screen) else { hoverTask?.cancel(); hoverTask = nil; return }
             guard topBar != nil else { show(.panel); return }
             guard hoverTask == nil else { return }
@@ -390,6 +399,20 @@ final class NotchController {
         show(.closed)
     }
 
+    /// Click mode: a left click on the click zone opens the panel from the closed notch or a peek, like a
+    /// completed hover. The click is only observed; the closed window stays click-through. Returns true when
+    /// it opened the panel.
+    private func openOnClick() -> Bool {
+        guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
+        let zone = NotchOpenRules.clickZone(screenFrame: screen.frame, notchSize: notchSize, topOffset: topOffset)
+        guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
+                                          point: NSEvent.mouseLocation, zone: zone) else { return false }
+        hoverTask?.cancel()
+        hoverTask = nil
+        show(.panel)
+        return true
+    }
+
     /// With auto-hide off the panel stays open until a click elsewhere (global monitors only see other apps).
     private func clickedOutside() {
         guard model.presentation == .panel, !SettingsStore.shared.bool("notch.autoHide"), topBar?.prompterActive != true, model.picker == nil else { return }
@@ -399,6 +422,10 @@ final class NotchController {
     /// Settings > Appearance > Notch behavior.
     static var openDelayMilliseconds: Int {
         switch SettingsStore.shared.string("notch.openDelay") { case "Fast": 100; case "Relaxed": 600; default: 250 }
+    }
+    /// Settings > Appearance > Notch behavior > Open the notch on.
+    static var openTrigger: NotchOpenTrigger {
+        NotchOpenTrigger(label: SettingsStore.shared.string("notch.openTrigger"))
     }
     static var closeDelayMilliseconds: Int {
         switch SettingsStore.shared.string("notch.closeDelay") { case "0.5 s": 500; case "1 s": 1000; case "2 s": 2000; default: 0 }

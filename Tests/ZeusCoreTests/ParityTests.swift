@@ -34,7 +34,9 @@ import Testing
         let query = LRCLIBQuery(artist: "M83", title: "Midnight City", album: "Hurry Up", duration: 243.4)
         let url = try #require(query.url).absoluteString
         #expect(url.contains("artist_name=M83") && url.contains("track_name=Midnight%20City") && url.contains("album_name=Hurry%20Up") && url.contains("duration=243"))
-        #expect(query.looseURL?.absoluteString.contains("duration") == false)
+        // The loose request without a duration is gone; a title with nothing to clean skips the cleaned step.
+        #expect(query.cleanedRequest == nil)
+        #expect(query.requests.map(\.step) == [.exact, .search])
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lyr-\(UUID())")
         defer { try? FileManager.default.removeItem(at: dir) }
         let cache = LyricsCache(directory: dir)
