@@ -689,6 +689,28 @@
       "suite": "ScreenCornerPanelTests",
       "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
       "scope": "Actual panel flag value and an unshown owned NSPanel; no display ordering, capture or device acceptance."
+    },
+    {
+      "id": "native-ScreenLockTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ScreenLockTests",
+      "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+      "scope": "Actual ScreenLock event-free call with an injected lock function: a missing function fails, a zero result succeeds, any other result fails. The real login framework is never called, so nothing locks and no event is posted."
+    },
+    {
+      "id": "missing-F14-contract",
+      "kind": "unimplemented",
+      "tier": "contract",
+      "scope": "Face presence rules in ZeusCore (landmark math, face selection, spoof cues, face match, vault records, presence machine) run through a portable group with injected inputs and no camera.",
+      "reason": "The Core rules arrive in tickets FP-2 to FP-6 of docs/FACE-PRESENCE-PLAN.md; the lint guards REG-600 to REG-602 run as closed-loop selftests meanwhile."
+    },
+    {
+      "id": "missing-F14-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "On an owner-run Mac: the camera opens only after the switch is on, the system camera indicator shows, the camera stops on lock, sleep and switch off, an absent owner locks the Mac after the chosen time, and a present owner never is locked.",
+      "reason": "No Mac executor can enrol a face or sit in front of a camera in CI; only a person at the Mac can check it."
     }
   ],
   "features": [
@@ -5298,6 +5320,43 @@
               "function": "aBuiltPanelCarriesTheFlagsAndTheCapturePolicy"
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "title": "Face presence locks when the owner is away",
+      "obligations": [
+        {
+          "id": "F14.1",
+          "check": "native-ScreenLockTests",
+          "acceptance": "The event-free lock call reports failure when the login framework's lock function is missing and never falls back to a posted shortcut; success follows the function's zero result. An injected function stands in, so no test locks the Mac.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+              "function": "aMissingLockFunctionReportsFailureAndPostsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+              "function": "aLockFunctionThatSucceedsReportsSuccess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+              "function": "aLockFunctionThatFailsReportsFailure"
+            }
+          ]
+        },
+        {
+          "id": "F14.2",
+          "check": "missing-F14-device",
+          "acceptance": "Owner-run proof on the exact binary: camera consent, camera off at launch, camera stops on lock, sleep and switch off, an absent enrolled owner locks the Mac after the chosen time, an unlock stays with the system.",
+          "cases": []
+        },
+        {
+          "id": "F14.3",
+          "check": "missing-F14-contract",
+          "acceptance": "Presence rules (selection, spoof cues, match, vault, machine) hold with injected inputs and no camera, run through a portable group once the Core files exist.",
+          "cases": []
         }
       ]
     },
