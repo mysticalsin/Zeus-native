@@ -300,9 +300,6 @@ final class ScribeController {
     private(set) var incomingWordsRevealUntil: Date?
     /// The person pressed the trash button and hasn't confirmed throwing the recording away yet.
     private(set) var discardRequested = false
-    @ObservationIgnored var meetingTitleHint: String?
-    /// Display names from the calendar invite the call popup matched; for the next recording only.
-    @ObservationIgnored var meetingAttendeeHint: [String] = []
     /// This recording's attendee names, and each finished meeting's (display names only). Saved with the meeting file.
     @ObservationIgnored private var sessionAttendees: [String] = []
     @ObservationIgnored private var attendeesByMeeting: [UUID: [String]] = [:]
@@ -322,7 +319,6 @@ final class ScribeController {
     @ObservationIgnored private var speakerHistories: [UUID: ScribeSpeakerEditHistory] = [:]
     /// Bumps when an undo entry is added or used, so the recap redraws its Undo button.
     private(set) var speakerHistoryRevision = 0
-    @ObservationIgnored var meetingCallHint: ScribeCallProcessIdentity?
     private var endWorkflow = ScribeEndWorkflow()
     private(set) var endingRemaining: Int?
     var endingReason: ScribeEndWorkflow.Reason? { endWorkflow.reason }
@@ -553,7 +549,8 @@ final class ScribeController {
 
     // MARK: Actions
 
-    func start() {
+    /// Starts a recording. `context` is the meeting it is for, if any; a refused start keeps nothing of it.
+    func start(context: ScribeMeetingContext? = nil) {
         guard !machine.phase.isActive else {
             NSLog("[ZEUS] scribe: start refused, already %@", ScribePopupDriver.describe(machine.phase))
             FlightRecorder.shared.record("scribe", "start refused", ScribePopupDriver.describe(machine.phase))
@@ -567,8 +564,7 @@ final class ScribeController {
         checkpointIssue = nil
         retryCleanup()
         let id = ScribeSessionID()
-        endWorkflow.begin(session: id, boundCall: meetingCallHint)
-        meetingCallHint = nil
+        endWorkflow.begin(session: id, boundCall: context?.callIdentity)
         endingRemaining = nil
         transcript = ScribeTranscript(session: id)
         notes = nil
@@ -595,10 +591,8 @@ final class ScribeController {
         flushPendingSaves()
         openedRecapID = nil
         pendingDeleteID = nil
-        sessionTitle = meetingTitleHint
-        meetingTitleHint = nil
-        sessionAttendees = meetingAttendeeHint
-        meetingAttendeeHint = []
+        sessionTitle = context?.title
+        sessionAttendees = context?.attendeeNames ?? []
         liveTurns = []
         liveNaming = ScribeLiveNaming()
         streamingUsed = false

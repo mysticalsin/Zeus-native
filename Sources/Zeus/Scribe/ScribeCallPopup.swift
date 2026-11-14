@@ -142,10 +142,17 @@ final class ScribeCallPopup {
     private func startScribe() {
         let decision = shown
         let controller = ScribeController.shared
-        controller.meetingTitleHint = ScribeCallPromptText.meetingTitle(for: decision)
-        if case .upcoming(let slot) = decision { controller.meetingAttendeeHint = slot.attendeeNames }
-        controller.meetingCallHint = ScribeCallWatcher.shared.recordingIdentity(for: decision)
-        controller.start()
+        let meeting: ScribeMeeting
+        switch decision {
+        case .upcoming(let slot):
+            meeting = ScribeMeeting(key: slot.id, title: slot.title, callApp: slot.callApp, slot: slot)
+        case .callDetected(let app):
+            meeting = ScribeMeeting(key: "call:\(ScribeCallDetection.displayName(app))", title: "Call", callApp: app, isLive: true)
+        case .none:
+            controller.start()
+            return
+        }
+        controller.start(context: meeting.context(callIdentity: ScribeCallWatcher.shared.recordingIdentity(for: decision)))
     }
 
     private func notNow() {

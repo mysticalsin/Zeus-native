@@ -166,9 +166,8 @@ private struct ScribeUpNextContent: View {
     }
 
     private func startWith(_ meeting: ScribeUpNextMeeting) {
-        scribe.meetingTitleHint = meeting.slot.title
-        scribe.meetingAttendeeHint = meeting.slot.attendeeNames
-        scribe.start()
+        let upNext = ScribeMeeting(key: meeting.slot.id, title: meeting.slot.title, callApp: meeting.app, slot: meeting.slot)
+        scribe.start(context: upNext.context(callIdentity: nil))
     }
 }
 

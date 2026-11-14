@@ -122,10 +122,8 @@ final class ScribeAutoStartController {
             return
         }
         ScribePopupDriver.log("start", "meeting \(meeting.key)")
-        controller.meetingTitleHint = ScribeCallPromptText.meetingTitle(for: meeting.promptDecision)
-        if let slot = meeting.slot { controller.meetingAttendeeHint = slot.attendeeNames }
-        controller.meetingCallHint = meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: .callDetected($0)) }
-        controller.start()
+        let identity = meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: .callDetected($0)) }
+        controller.start(context: meeting.context(callIdentity: identity))
     }
 
     /// Whole seconds left, counting the one in progress (5, 4, 3, 2, 1).

@@ -562,19 +562,6 @@ public enum ScribeCallPromptText {
             return "Starts in \(minutes) min: \(name)"
         }
     }
-
-    /// Meeting title for the recap when recording starts from this prompt.
-    public static func meetingTitle(for decision: ScribePromptDecision) -> String? {
-        switch decision {
-        case .upcoming(let slot):
-            let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            return title.isEmpty ? nil : title
-        case .callDetected(let app):
-            return "\(ScribeCallDetection.displayName(app)) call"
-        case .none:
-            return nil
-        }
-    }
 }
 
 // MARK: - Mute evidence (fail closed)
