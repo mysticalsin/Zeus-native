@@ -416,5 +416,34 @@ class NativeBuildBarrierTests(unittest.TestCase):
                 self.assertEqual({r["status"] for r in result["checks"]}, {"not-run" if mode == "development" else "blocked"})
 
 
+class DeclaredTestCacheTests(unittest.TestCase):
+    """The gate asks which tests a file declares once per case, so the answer is kept per file version."""
+
+    def write(self, path, names):
+        path.write_text("".join(f"    @Test func {name}() {{}}\n" for name in names))
+
+    def test_second_ask_for_the_same_file_does_not_read_it_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SampleTests.swift"
+            self.write(path, ["first", "second"])
+            self.assertEqual(c.declared_tests(path), ("first", "second"))
+            with patch.object(Path, "read_text", side_effect=AssertionError("read again")):
+                self.assertEqual(c.declared_tests(path), ("first", "second"))
+
+    def test_a_changed_file_is_read_and_scanned_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SampleTests.swift"
+            self.write(path, ["first"])
+            self.assertEqual(c.declared_tests(path), ("first",))
+            self.write(path, ["first", "added"])
+            self.assertEqual(c.declared_tests(path), ("first", "added"))
+
+    def test_python_files_list_their_test_methods(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "test_sample.py"
+            path.write_text("class T:\n    def test_one(self): pass\n    def helper(self): pass\n")
+            self.assertEqual(c.declared_tests(path), ("test_one",))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
