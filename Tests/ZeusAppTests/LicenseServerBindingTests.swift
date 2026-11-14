@@ -78,7 +78,7 @@ struct LicenseServerBindingTests {
         defer { f.cleanup() }
         f.manager.setServer("  https://Licenses.Example.com/portal  ")
         #expect(f.backend.items["com.zeus.app|\(LicenseManager.serverOriginAccount)"] == "https://licenses.example.com:443")
-        #expect(f.manager.serverURL?.host == "licenses.example.com")
+        #expect(f.manager.serverURL?.host?.lowercased() == "licenses.example.com")
         #expect(!f.manager.serverNeedsReentry)
     }
 

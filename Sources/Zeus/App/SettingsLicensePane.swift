@@ -54,7 +54,9 @@ struct LicenseSettings: View {
                 }
             }
             GlassCard(title: "License server") {
-                GlassRow(title: "Server", note: license.serverURL == nil
+                GlassRow(title: "Server", note: license.serverNeedsReentry
+                         ? "The saved address was not set here, so Zeus does not use it and sends nothing to it. Press Save to use it."
+                         : license.serverURL == nil
                          ? "Not set: keys are checked on this Mac only and nothing goes over the network."
                          : "Claims a seat when you activate and checks once a day for keys that were turned off.") {
                     HStack(spacing: 6) {

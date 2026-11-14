@@ -69,18 +69,42 @@ final class LicenseManager {
 
     var isLicensed: Bool { status.isLicensed }
 
-    /// The license server, from Settings (`license.server`) or the built-in default.
+    /// Keychain account holding the origin of the server saved in Settings. The license key is only sent
+    /// to a server whose origin equals it, so a `license.server` value written by another program is ignored.
+    static let serverOriginAccount = "license.server.origin"
+
+    /// The license server saved in Settings (`license.server`) or the built-in default. A saved address
+    /// counts only while its origin matches the one bound when the owner saved it.
     var serverURL: URL? {
-        let text = (defaults.string(forKey: "license.server") ?? Self.defaultServer ?? "").trimmingCharacters(in: .whitespaces)
+        let saved = defaults.string(forKey: "license.server")
+        let text = (saved ?? Self.defaultServer ?? "").trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty, let url = URL(string: text), let scheme = url.scheme, ["https", "http"].contains(scheme) else { return nil }
         // Plain http only to this Mac (the local portal).
         if scheme == "http", !["127.0.0.1", "localhost"].contains(url.host ?? "") { return nil }
+        // The built-in default is compiled in; anything from preferences must be bound.
+        if saved == nil { return url }
+        guard let bound = credentials.get(Self.serverOriginAccount).flatMap(CredentialOrigin.init(storedValue:)), bound.matches(url) else { return nil }
         return url
+    }
+
+    /// A server address is saved but is not the one the owner bound (written elsewhere, or saved by an
+    /// earlier build). Nothing is sent to it; saving the address again in Settings fixes it.
+    var serverNeedsReentry: Bool {
+        guard let text = defaults.string(forKey: "license.server")?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return false }
+        return serverURL == nil
     }
 
     func setServer(_ text: String) {
         credentialRevision &+= 1
-        defaults.set(text.trimmingCharacters(in: .whitespaces), forKey: "license.server")
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        defaults.set(trimmed, forKey: "license.server")
+        // Bind the origin the owner just saved. An address that cannot carry the key (plain http off this
+        // Mac, a user name in the URL, no host) leaves nothing bound, so it is never used.
+        if let origin = URL(string: trimmed).flatMap(CredentialOrigin.init(url:)) {
+            _ = credentials.set(origin.storedValue, for: Self.serverOriginAccount)
+        } else {
+            credentials.remove(Self.serverOriginAccount)
+        }
         Task { await syncWithServer(force: true) }
     }
 

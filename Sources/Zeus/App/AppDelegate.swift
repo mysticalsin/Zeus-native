@@ -630,7 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
         }
         let providers = PointingProviders(
-            anyLLM: { (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount)) },
+            anyLLM: { (AIConnections.shared.anyLLM, AIConnections.shared.anyLLMCredential()) },
             localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) },
             anyLLMComplete: { AIConnections.shared.anyLLM.isComplete })
         // In memory only: a desktop session is never written to disk.
@@ -676,7 +676,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
         }
         let provider = ExplanationHTTPProvider(configuration: {
-            (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount))
+            (AIConnections.shared.anyLLM, AIConnections.shared.anyLLMCredential())
         }, localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) })
         let storeFactory: () throws -> ExplanationHistoryStore = {
             guard let root = ExplanationHistoryStore.productionRootURL() else { throw CocoaError(.fileNoSuchFile) }

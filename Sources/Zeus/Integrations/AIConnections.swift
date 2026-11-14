@@ -35,10 +35,19 @@ final class AIConnections {
     var anyLLM: AnyLLMConfig {
         didSet {
             Self.save(anyLLM)
-            if oldValue != anyLLM { endpointEdited() }
+            if oldValue != anyLLM {
+                endpointEdited()
+                // A new address no longer matches the one the key was saved for.
+                refreshAnyLLMKeyState()
+            }
         }
     }
-    private(set) var anyLLMKeySaved = false
+    /// Whether a key is saved and whether it is bound to the configured address.
+    private(set) var anyLLMKeyState: CredentialBinding.State = .absent
+    var anyLLMKeySaved: Bool { anyLLMKeyState != .absent }
+    /// A key is saved but not for this address (saved before keys were bound, or the address changed):
+    /// it is not sent anywhere until it is pasted again here.
+    var anyLLMKeyNeedsReentry: Bool { anyLLMKeyState == .needsReentry }
     private var endpointValidation = AnyLLMEndpointValidation()
     var anyLLMTest: TestState { endpointValidation.state }
     /// The key being typed; cleared once saved (this toolchain has no SwiftUI `@State` macro).
@@ -56,7 +65,7 @@ final class AIConnections {
     private init() {
         anyLLM = UserDefaults.standard.data(forKey: AnyLLMConfig.defaultsKey)
             .flatMap { try? JSONDecoder().decode(AnyLLMConfig.self, from: $0) } ?? AnyLLMConfig()
-        anyLLMKeySaved = Keychain.get(AnyLLMConfig.keyAccount) != nil
+        refreshAnyLLMKeyState()
         // Remove credential-bearing URL values saved by earlier builds without using them.
         Self.save(anyLLM)
     }
@@ -218,7 +227,19 @@ final class AIConnections {
 
     // MARK: Any LLM
 
-    /// Saves a pasted key. An empty value removes the saved key, so callers that submit a draft
+    private func refreshAnyLLMKeyState() {
+        anyLLMKeyState = AnyLLMConfig.credentialState(secret: Keychain.get(AnyLLMConfig.keyAccount),
+                                                      boundOrigin: Keychain.get(AnyLLMConfig.originAccount), config: anyLLM)
+    }
+
+    /// The key to send to the configured endpoint, or nil. The single way requests get the key: it is
+    /// returned only when it was saved for this address, so a changed stored address cannot redirect it.
+    func anyLLMCredential() -> String? {
+        AnyLLMConfig.credential(secret: Keychain.get(AnyLLMConfig.keyAccount),
+                                boundOrigin: Keychain.get(AnyLLMConfig.originAccount), config: anyLLM)
+    }
+
+    /// Saves a pasted key for the address configured now. An empty value removes the saved key, so callers that submit a draft
     /// (Return in the field) check for empty first. False when the Keychain refused: the caller keeps the draft.
     @discardableResult
     func saveAnyLLMKey(_ key: String) -> Bool {
@@ -229,14 +250,21 @@ final class AIConnections {
                 endpointRejected("Couldn't remove the key. Check Keychain access and try again.")
                 return false
             }
-            anyLLMKeySaved = false
+            Keychain.remove(AnyLLMConfig.originAccount)
         } else {
-            guard Keychain.set(trimmed, for: AnyLLMConfig.keyAccount) else {
+            // A key is saved for one address. Without a usable address there is nothing to bind it to.
+            guard let origin = AnyLLMConfig.boundOrigin(for: anyLLM) else {
+                endpointRejected("Add the base URL first. A key is saved for one address only.")
+                return false
+            }
+            // Key first, origin second: if the second write fails the key stays unbound and is never sent.
+            guard Keychain.set(trimmed, for: AnyLLMConfig.keyAccount), Keychain.set(origin, for: AnyLLMConfig.originAccount) else {
+                refreshAnyLLMKeyState()
                 endpointRejected("Couldn't save the key to your Keychain. It is still in the field.")
                 return false
             }
-            anyLLMKeySaved = true
         }
+        refreshAnyLLMKeyState()
         return true
     }
 
@@ -263,13 +291,14 @@ final class AIConnections {
         guard let generation = endpointValidation.begin() else { return }
         defaults.set(false, forKey: enabledKey(.anyLLM))
         var request = URLRequest(url: url, timeoutInterval: 10)
-        if let key = Keychain.get(AnyLLMConfig.keyAccount) { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+        if let key = anyLLMCredential() { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+        let needsKey = anyLLMKeyNeedsReentry
         let result: TestState
         do {
             let (_, response) = try await AnyLLMHTTPTransport.data(for: request)
             switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
             case 200..<300: result = .passed("Connected to \(url.host ?? "the endpoint").")
-            case 401, 403: result = .failed("The endpoint refused the key.")
+            case 401, 403: result = .failed(needsKey ? "No key is saved for this address. Paste the key again." : "The endpoint refused the key.")
             case 300..<400: result = .failed("The endpoint redirected. Save its final address, then test again.")
             case 404: result = .failed("The endpoint did not expose a models list. Check its API base URL.")
             case let code: result = .failed("The endpoint answered \(code).")
@@ -284,7 +313,7 @@ final class AIConnections {
 
     /// One answer from the endpoint, for routing a question to it.
     func askAnyLLM(_ prompt: String) async -> String? {
-        guard let request = anyLLM.request(prompt: prompt, key: Keychain.get(AnyLLMConfig.keyAccount)),
+        guard let request = anyLLM.request(prompt: prompt, key: anyLLMCredential()),
               let (data, response) = try? await AnyLLMHTTPTransport.data(for: request),
               let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { return nil }
         return AnyLLMConfig.answer(from: data)
