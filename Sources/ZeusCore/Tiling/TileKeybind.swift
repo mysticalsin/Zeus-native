@@ -74,14 +74,23 @@ public struct TileKeymap: Equatable, Sendable {
         bindings.append(Binding(shortcut: chord, action: action))
     }
 
-    /// The action bound to `shortcut`, or nil. macOS adds the fn flag to arrow and function key presses on
-    /// its own, so when the exact chord has no bind and the event carries fn, the chord without fn is tried
-    /// (the same rule as `ShortcutState.isHeld`). A chord bound with fn wins over the stripped lookup.
+    /// The key codes macOS marks with the fn flag on its own: the four arrows, F1 to F20, and Home, End, Page Up,
+    /// Page Down and Forward Delete. Any other key with fn held is a deliberate Globe chord.
+    public static let fnMarkedKeyCodes: Set<UInt16> = [
+        123, 124, 125, 126,
+        122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, 105, 107, 113, 106, 64, 79, 80, 90,
+        115, 119, 116, 121, 117,
+    ]
+
+    /// The action bound to `shortcut`, or nil. macOS adds the fn flag to arrow, function and navigation key presses
+    /// on its own, so for those keys, when the exact chord has no bind and the event carries fn, the chord without
+    /// fn is tried. Any other key keeps fn: Globe plus the base plus a letter is another chord and passes through.
+    /// A chord bound with fn wins over the stripped lookup.
     public func action(for shortcut: Shortcut) -> TileAction? {
         let chord = Self.normalized(shortcut)
         if let hit = lookup[chord] { return hit }
-        guard chord.keyCode != nil, chord.modifiers.contains(.function) else { return nil }
-        return lookup[Shortcut(keyCode: chord.keyCode, modifiers: chord.modifiers.subtracting(.function))]
+        guard let code = chord.keyCode, Self.fnMarkedKeyCodes.contains(code), chord.modifiers.contains(.function) else { return nil }
+        return lookup[Shortcut(keyCode: code, modifiers: chord.modifiers.subtracting(.function))]
     }
 
     /// The first chord bound to `action`, for a key list.
