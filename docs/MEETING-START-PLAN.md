@@ -396,7 +396,9 @@ Other end-window wording is out of scope.
 
 `ScribeAutoStart.swift`: the detector path emits `Effect.suggestEnd(ScribeMeeting)`; `requestEnd` stays for
 Switch only. `ScribeAutoStartRecording.endSuggested`; when the call app holds the microphone again it emits
-`Effect.withdrawEnd`.
+`Effect.withdrawEnd`. Built so that `withdrawEnd` is emitted when no signal is left (microphone held and window
+not gone), so a suggestion made for a closed call window is not withdrawn by a microphone that never dropped.
+`suggestEnd` hides a next-meeting card, and none is offered while the call looks over.
 
 App side: `ScribeController.suggestEnd()` (phase stays `.recording`, the end window opens),
 `withdrawEndSuggestion()`, `var endSuggested: Bool`. End meeting now on a suggestion runs `requestEnd()` then
