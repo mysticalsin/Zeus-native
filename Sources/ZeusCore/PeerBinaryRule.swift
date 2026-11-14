@@ -128,7 +128,9 @@ public enum PeerBinaryRule {
     /// app's bundle or next to this loose program, or be an exact copy of a bundled helper. An ad hoc build has
     /// no identity beyond a location, so it also trusts an installed helper's app (a peer inside an `.app`
     /// whose Helpers hold a valid ad hoc program of this program's name): a same-user program could still
-    /// assemble such a bundle, which is why a signed build compares teams or certificates instead.
+    /// assemble such a bundle, which is why a signed build compares teams or certificates instead. So "a same-named
+    /// binary elsewhere is refused" holds for a team-signed or locally signed build only; an ad hoc build, such as the
+    /// preview DMG from `scripts/package.sh`, must never be given to users.
     /// Every other case, and every missing input, refuses.
     public static func decide(own: CodeSignature?, peer: CodeSignature?, peerExecutablePath: String?,
                               ownBundlePath: String?, ownExecutableDirectory: String?,
