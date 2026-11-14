@@ -302,9 +302,11 @@ New file `Sources/ZeusCore/Scribe/ScribeMeetingLedger.swift`:
   the slot it belongs to.
 - `mark(of meeting:)`: for a meeting with a slot, its slot entry. If it has none and it is live, a call entry
   for its app that belongs to no slot yet adopts this slot, and that mark is returned (a call answered before
-  its calendar window opened stays answered). For a call with no slot, the call entry of its app.
-- `observe(_ evidence:now:)`: slot entries leave at their date. A call entry leaves when its app left
-  `presentApps` or has not held the microphone for `rearmAfterAbsence` (30 s).
+  its calendar window opened stays answered). For a call with no slot, the call entry of its app. The ledger
+  only reads here: the machine writes the mark onto the meeting (`note`) each time it looks, so the slot keeps it.
+- `observe(_ evidence:now:)`: slot entries leave at their date. A call entry leaves when its app has not held the
+  microphone for `rearmAfterAbsence` (30 s). An app missing from the scan counts as absent, never as gone at
+  once: a browser call is seen only while its window title says so.
 
 In `ScribeAutoStart.swift`:
 
