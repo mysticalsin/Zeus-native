@@ -13,6 +13,7 @@ final class TopBarServices {
     /// What the notch shows from Music, Spotify and later sources, and where a music command goes.
     let nowPlayingHub: NowPlayingHub
     private let musicFeed: MusicPlayerFeed
+    private let browserFeed: BrowserMediaFeed
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
     var onTimerFinished: () -> Void = {}
     private var timers: [Timer] = []
@@ -36,6 +37,7 @@ final class TopBarServices {
         self.model = model
         nowPlayingHub = NowPlayingHub(model: model, ports: NowPlayingHub.livePorts(model: model))
         musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
+        browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
     }
 
     func start() {
@@ -47,6 +49,7 @@ final class TopBarServices {
         model.createEvent = { [weak self] parsed in await self?.saveEvent(parsed) ?? .failed("Calendar isn't available.") }
 
         musicFeed.start()
+        browserFeed.start()
         observeClipboard()
         observeCapsLock()
         observeVolume()
@@ -74,8 +77,9 @@ final class TopBarServices {
         })
     }
 
-    /// Removes the music observers, stops pending music reads and takes the players off the notch.
+    /// Removes the music observers, stops pending music reads and takes the players and tabs off the notch.
     func stop() {
+        browserFeed.stop()
         musicFeed.stop()
     }
 
