@@ -16,7 +16,8 @@ final class NotchController {
     var debugWindow: NSWindow? { window }
     /// The display the pointer and the open panel work on.
     private(set) var screen: NSScreen?
-    private(set) var notchSize: CGSize = .zero
+    /// The closed shape on the active display.
+    private(set) var footprint: NotchFootprint = .pill
     /// How far the closed bar and the peek card sit below the screen top on the active display
     /// (Settings > Appearance > Top bar position); 0 while the panel is open.
     private var topOffset: CGFloat {
@@ -340,7 +341,7 @@ final class NotchController {
             if topBar?.menuOpen == true { return }
             let mouse = NSEvent.mouseLocation
             let top = screen.frame.maxY
-            let barHeight = max(notchSize.height, 30)
+            let barHeight = max(footprint.layoutSize.height, 30)
             let size: CGSize
             if topBar != nil {
                 size = NotchView.topBarPanelSize(barHeight: barHeight, hasApproval: model.approval != nil,
@@ -404,7 +405,7 @@ final class NotchController {
     /// it opened the panel.
     private func openOnClick() -> Bool {
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
-        let zone = NotchOpenRules.clickZone(screenFrame: screen.frame, notchSize: notchSize, topOffset: topOffset)
+        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: screen.frame, topOffset: topOffset)
         guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
                                           point: NSEvent.mouseLocation, zone: zone) else { return false }
         hoverTask?.cancel()
@@ -434,12 +435,11 @@ final class NotchController {
     /// Glance's trigger (TOPBAR-SPEC §6): the closed island plus the 27.5 pt ears either side, as
     /// tall as the bar. With wings showing, the island is the notch and both wings.
     private func inHotZone(_ screen: NSScreen) -> Bool {
-        var island = max(notchSize.width, 160)
-        if let topBar, ClosedWings.kind(of: topBar) != .none {
-            island += 2 * (ClosedWings.wingWidth + 8) + ClosedWings.extraWidth(for: topBar)
-        }
-        return GlanceTopBar.inHoverZone(NSEvent.mouseLocation, screen: screen.frame,
-                                        notch: CGSize(width: island, height: max(notchSize.height, 30) + topOffset))
+        let zone = NotchFootprintRules.hoverZone(footprint, screenFrame: screen.frame, topOffset: topOffset,
+                                                 wings: topBar.map(ClosedWingsFacts.init(of:)))
+        let mouse = NSEvent.mouseLocation
+        // The top edge counts (the pointer can rest on the screen's top row) and the bottom edge does not.
+        return mouse.x >= zone.minX && mouse.x <= zone.maxX && mouse.y > zone.minY && mouse.y <= zone.maxY
     }
 
     private func mouseDragged() {
@@ -478,9 +478,9 @@ final class NotchController {
         // multi-line change preview by its own height.
         let detailHeight = model.approval?.detail?.height ?? 0
         let wide = detailHeight > 0
-        let peekWidth = max(notchSize.width + 16 + 240, wide ? 520 : 440)
+        let peekWidth = max(footprint.layoutSize.width + 16 + 240, wide ? 520 : 440)
         let rowOffset: CGFloat = 55 + (wide ? detailHeight + 8 : 0) + (model.approval?.previewHeight ?? 0)
-        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(notchSize.height, 30) - rowOffset)
+        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - rowOffset)
     }
 
     // MARK: Window
@@ -502,7 +502,7 @@ final class NotchController {
 
     static func describe(_ screen: NSScreen) -> DisplayDescriptor {
         let number = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.intValue ?? 0
-        return DisplayDescriptor(id: number, frame: screen.frame, hasNotch: screen.safeAreaInsets.top > 0,
+        return DisplayDescriptor(id: number, frame: screen.frame, hasNotch: NotchFootprintRules.hardwareSize(Self.facts(of: screen)) != nil,
                                  isBuiltIn: number != 0 && CGDisplayIsBuiltin(CGDirectDisplayID(number)) != 0)
     }
 
@@ -545,7 +545,6 @@ final class NotchController {
         let byID = Dictionary(NSScreen.screens.map { (Self.describe($0).id, $0) }, uniquingKeysWith: { first, _ in first })
         for display in targets {
             guard let target = byID[display.id] else { continue }
-            let size = Self.notchSize(of: target)
             // Glance's window: as wide as the screen (room for the halo arms and the edge wave), 470 tall,
             // at the status-bar layer; transparent areas pass clicks through.
             let frame = GlanceTopBar.windowFrame(screen: target.frame)
@@ -562,8 +561,7 @@ final class NotchController {
             panel.ignoresMouseEvents = true
             panel.acceptsMouseMovedEvents = true
             ZeusWindowSharing.apply(to: panel, visibleInShare: !hiddenFromCapture, surface: .zeusStandard)
-            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, notch: size,
-                                                                slimPill: DisplaySelection.showsPill(display)))
+            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, footprint: Self.footprint(of: target)))
             // The panel's frame is set here, never from the content: without this the hosting view
             // re-measures the whole notch tree on every animation frame (≈30% of the main thread in QA).
             hosting.sizingOptions = []
@@ -574,7 +572,7 @@ final class NotchController {
         }
         let primary = panels.first
         screen = primary?.screen ?? NSScreen.main ?? NSScreen.screens.first
-        notchSize = screen.map(Self.notchSize(of:)) ?? .zero
+        footprint = screen.map(Self.footprint(of:)) ?? .pill
         setIgnoresMouse(model.presentation == .closed)
     }
 
@@ -582,7 +580,7 @@ final class NotchController {
     private func activate(_ target: NSScreen) {
         guard screen != target else { return }
         screen = target
-        notchSize = Self.notchSize(of: target)
+        footprint = Self.footprint(of: target)
     }
 
     // MARK: Notification line
@@ -680,7 +678,7 @@ final class NotchController {
 
     /// Where the line sits, in screen coordinates: centred under the notch.
     private func notificationLineRect(_ screen: NSScreen) -> CGRect {
-        let top = screen.frame.maxY - topOffset - max(notchSize.height, 30) - 6
+        let top = screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - 6
         // Room for the fanned stack and the hover actions, so the pointer stays on the capsule while it grows.
         let height = AlertCapsule.actionHeight + 24
         return CGRect(x: screen.frame.midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)
@@ -723,11 +721,15 @@ final class NotchController {
         return true
     }
 
-    static func notchSize(of screen: NSScreen) -> CGSize {
-        guard screen.safeAreaInsets.top > 0,
-              let left = screen.auxiliaryTopLeftArea,
-              let right = screen.auxiliaryTopRightArea else { return .zero }
-        return CGSize(width: screen.frame.width - left.width - right.width, height: screen.safeAreaInsets.top)
+    /// What a display reports about its top edge; a missing side area counts as width 0.
+    static func facts(of screen: NSScreen) -> NotchDisplayFacts {
+        NotchDisplayFacts(frame: screen.frame, safeAreaTop: screen.safeAreaInsets.top,
+                          leftAreaWidth: screen.auxiliaryTopLeftArea?.width ?? 0,
+                          rightAreaWidth: screen.auxiliaryTopRightArea?.width ?? 0)
+    }
+
+    static func footprint(of screen: NSScreen) -> NotchFootprint {
+        NotchFootprintRules.resolve(facts(of: screen))
     }
 }
 

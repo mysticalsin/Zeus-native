@@ -1018,7 +1018,7 @@ private struct NotchStage: View {
         ZStack(alignment: .top) {
             LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
             Rectangle().fill(Color.black.opacity(0.35)).frame(height: notch.height)
-            NotchView(model: model, topBar: topBar, notch: notch, topOffsetOverride: topOffset)
+            NotchView(model: model, topBar: topBar, footprint: .hardware(notch), topOffsetOverride: topOffset)
         }
     }
 }
