@@ -24,7 +24,8 @@ enum DebugScreenshot {
         for (name, window) in windows where matches(name: name, filter: filter) {
             guard let png = pngData(for: window) else { continue }
             let url = URL(fileURLWithPath: ScreenshotCapturePlan.outputPath(base: expanded, windowName: name, filter: filter))
-            if (try? png.write(to: url)) != nil { paths.append(url.path) }
+            // Atomic: a link already sitting at this name is replaced, never written through.
+            if (try? png.write(to: url, options: .atomic)) != nil { paths.append(url.path) }
         }
         return paths
     }

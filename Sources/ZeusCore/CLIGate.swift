@@ -1,0 +1,80 @@
+import Foundation
+
+/// Which `zeus` commands need "Allow command-line control", and who may use them once it is on.
+public enum CLIGate {
+    /// Debug hooks that capture, inject input, change privacy settings, write files, import keys, or
+    /// open and render Zeus's own panels (Calendar, Reminders and clipboard content included).
+    static let sensitiveDebug: Set<String> = [
+        "dictate-file", "wake-file", "record", "hands", "hands-live", "selection", "on-device-speech",
+        "import-assistant-key", "engine-logos",
+        "screenshot", "tab", "open-settings", "onboarding", "animate", "presence", "hud-state",
+    ]
+    /// The subset that starts capturing audio or screen content.
+    static let capturingDebug: Set<String> = ["dictate-file", "wake-file", "record", "on-device-speech"]
+
+    public static func isSensitive(op: ZeusCommand.Op, debugSubcommand: String, argument: String) -> Bool {
+        switch op {
+        case .listen, .browse, .code, .term: return true
+        case .debug:
+            if debugSubcommand == "screen-share" { return argument.lowercased() != "state" }
+            return sensitiveDebug.contains(debugSubcommand)
+        default: return false
+        }
+    }
+
+    public static func startsCapture(op: ZeusCommand.Op, debugSubcommand: String) -> Bool {
+        op == .listen || (op == .debug && capturingDebug.contains(debugSubcommand))
+    }
+
+    public enum Verdict: Equatable, Sendable {
+        case allowed
+        /// "Allow command-line control" is off.
+        case gateOff
+        /// The switch is on, but the request did not come from this app's own `zeus` command.
+        case peerRejected(String)
+    }
+
+    /// The switch and the peer rule must both pass. The peer closure runs only when the switch is on,
+    /// so a Mac that never turned the switch on never reads a signature. A peer that was not identified
+    /// at all (nil) is refused.
+    public static func verdict(gateEnabled: Bool, peer: () -> PeerVerdict?) -> Verdict {
+        guard gateEnabled else { return .gateOff }
+        switch peer() {
+        case .allow?: return .allowed
+        case .deny(let reason)?: return .peerRejected(reason)
+        case nil: return .peerRejected("peer not verified")
+        }
+    }
+}
+
+/// Where the switch is kept. A same-user program can write any UserDefaults value but cannot write a
+/// Keychain item that Zeus created, so the switch lives in the Keychain and only the Settings toggle sets it.
+public enum CLIGateStore {
+    /// The Keychain account (under the app service) that holds the switch. Present means on.
+    public static let account = "cli.control.enabled"
+    /// The old UserDefaults key. Never read as a switch again.
+    public static let legacyDefaultsKey = "cli.sensitiveCommands.enabled"
+    static let migratedKey = "cli.control.migrated.v1"
+    static let noticeKey = "cli.control.reenableNotice"
+
+    public static func isEnabled(_ keychain: KeychainStore) -> Bool { keychain.get(account) == "1" }
+
+    /// Turns the switch on or off. False when the Keychain refused, in which case nothing changed.
+    @discardableResult
+    public static func setEnabled(_ on: Bool, keychain: KeychainStore) -> Bool {
+        on ? keychain.set("1", for: account) : keychain.remove(account)
+    }
+
+    /// Runs once. An old `true` does not carry over: the owner turns it on again, and a notice says so
+    /// until it is dismissed. The writable copy is removed either way.
+    public static func migrateLegacy(defaults: UserDefaults) {
+        guard !defaults.bool(forKey: migratedKey) else { return }
+        if defaults.bool(forKey: legacyDefaultsKey) { defaults.set(true, forKey: noticeKey) }
+        defaults.removeObject(forKey: legacyDefaultsKey)
+        defaults.set(true, forKey: migratedKey)
+    }
+
+    public static func noticePending(defaults: UserDefaults) -> Bool { defaults.bool(forKey: noticeKey) }
+
+    public static func dismissNotice(defaults: UserDefaults) { defaults.removeObject(forKey: noticeKey) }
+}

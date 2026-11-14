@@ -1,17 +1,41 @@
 import Foundation
+import Observation
 import ZeusCore
 
-/// Which CLI commands may use the microphone, screen, input or launch agents, and whether the user
-/// allowed that (Settings ▸ Privacy, off by default). Read-only commands never need the setting.
+/// Which CLI commands may use the microphone, screen or input, launch agents or open Zeus's private
+/// panels, and whether the user allowed that (Settings ▸ Privacy, off by default). The switch lives in the
+/// Keychain, where another program running as the user cannot write it, and even with it on the request must
+/// come from the `zeus` command that ships with this app. Read-only commands never need the setting.
 enum CLIAccess {
-    static let defaultsKey = "cli.sensitiveCommands.enabled"
+    static let refusal = "Refused: this command can use the microphone, screen or input, open Zeus's panels, or launch agents. Turn on 'Allow command-line control' in Zeus Settings ▸ Privacy to allow it."
+    static let peerRefusal = "Refused: Zeus could not confirm this request came from the zeus command that ships inside Zeus.app. Reinstall that command and try again ('Allow command-line control' in Settings ▸ Privacy must also be on)."
 
-    static let refusal = "Refused: this command can use the microphone, screen or input, or launch agents. Turn on 'Allow command-line control' in Zeus Settings ▸ Privacy to allow it."
+    /// The only reader of the switch.
+    static var enabled: Bool { CLIGateStore.isEnabled(Keychain.store) }
 
-    static var enabled: Bool { UserDefaults.standard.bool(forKey: defaultsKey) }
+    /// The only writer of the switch, called by the Settings toggle. False when the Keychain refused.
+    @discardableResult
+    static func setEnabled(_ on: Bool) -> Bool { CLIGateStore.setEnabled(on, keychain: Keychain.store) }
 
-    /// True inside a CLI-originated turn while 'Allow command-line control' is off. Task-locals flow into
-    /// child tasks, so capture and action boundaries anywhere in the turn can refuse to run.
+    /// Once at launch: the old UserDefaults value is dropped, never carried over.
+    static func migrateLegacyDefault() { CLIGateStore.migrateLegacy(defaults: .standard) }
+
+    /// The switch and the peer rule, for one command. A nil peer (no socket context) never passes.
+    static func verdict(peer: PeerContext?) -> CLIGate.Verdict {
+        CLIGate.verdict(gateEnabled: enabled, peer: { peer?.verifiedApp() })
+    }
+
+    static func reply(for verdict: CLIGate.Verdict) -> String? {
+        switch verdict {
+        case .allowed: nil
+        case .gateOff: refusal
+        case .peerRejected: peerRefusal
+        }
+    }
+
+    /// True inside a CLI-originated turn while 'Allow command-line control' is off or the request is not from
+    /// the bundled command. Task-locals flow into child tasks, so capture and action boundaries anywhere in the
+    /// turn can refuse to run.
     @TaskLocal static var turnRestricted = false
 
     /// Words that only make sense with the screen or with input: refused up front for restricted asks.
@@ -19,26 +43,50 @@ enum CLIAccess {
         ScreenAwareness.isScreenQuestion(text) ? refusal : nil
     }
 
-    /// Debug hooks that capture, inject input, change privacy settings, write files or import keys.
-    private static let sensitiveDebug: Set<String> = [
-        "dictate-file", "wake-file", "record", "hands", "hands-live", "selection", "on-device-speech",
-        "import-assistant-key", "engine-logos",
-    ]
-    /// The subset that starts capturing audio or screen content.
-    private static let capturingDebug: Set<String> = ["dictate-file", "wake-file", "record", "on-device-speech"]
-
     static func isSensitive(op: ZeusCommand.Op, debugSubcommand: String, argument: String) -> Bool {
-        switch op {
-        case .listen, .browse, .code, .term: return true
-        case .debug:
-            if debugSubcommand == "screen-share" { return argument.lowercased() != "state" }
-            return sensitiveDebug.contains(debugSubcommand)
-        default: return false
-        }
+        CLIGate.isSensitive(op: op, debugSubcommand: debugSubcommand, argument: argument)
     }
 
     static func startsCapture(op: ZeusCommand.Op, debugSubcommand: String) -> Bool {
-        op == .listen || (op == .debug && capturingDebug.contains(debugSubcommand))
+        CLIGate.startsCapture(op: op, debugSubcommand: debugSubcommand)
+    }
+
+    /// Folders `debug screenshot` may write to: the app's caches folder and, if the owner launched Zeus with
+    /// `ZEUS_DEBUG_SCREENSHOT_DIR`, that folder.
+    static var screenshotFolders: [String] {
+        DebugOutputPath.allowedFolders(cachesDirectory: cachesDirectory, environment: ProcessInfo.processInfo.environment)
+    }
+
+    static var cachesDirectory: String {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.path
+            ?? NSHomeDirectory() + "/Library/Caches"
+    }
+}
+
+/// What the Privacy page shows for the command-line switch.
+@MainActor
+@Observable
+final class CLIAccessModel {
+    static let shared = CLIAccessModel()
+    private(set) var enabled = false
+    /// An old "on" was not carried over; true until the owner dismisses the explanation.
+    private(set) var noticePending = false
+    private(set) var failed = false
+
+    init() {
+        if !TopBarStyle.isSnapshotSafe { CLIAccess.migrateLegacyDefault() }
+        enabled = CLIAccess.enabled
+        noticePending = CLIGateStore.noticePending(defaults: .standard)
+    }
+
+    func set(_ on: Bool) {
+        failed = !CLIAccess.setEnabled(on)
+        enabled = CLIAccess.enabled
+    }
+
+    func dismissNotice() {
+        CLIGateStore.dismissNotice(defaults: .standard)
+        noticePending = false
     }
 }
 
@@ -92,26 +140,28 @@ final class CommandCenter {
         self.voice = voice
     }
 
-    func handle(_ line: Data) async -> Data? {
+    /// `peer` is what the socket knows about whoever sent the line; nil (no socket) is treated as unverified.
+    func handle(_ line: Data, peer: PeerContext? = nil) async -> Data? {
         guard let command = try? JSONDecoder().decode(ZeusCommand.self, from: line) else {
             return try? JSONEncoder().encode(ZeusCommandReply(id: "unknown", ok: false, text: "Zeus couldn't read that command."))
         }
-        return try? JSONEncoder().encode(await reply(to: command))
+        return try? JSONEncoder().encode(await reply(to: command, peer: peer))
     }
 
-    private func reply(to command: ZeusCommand) async -> ZeusCommandReply {
+    private func reply(to command: ZeusCommand, peer: PeerContext?) async -> ZeusCommandReply {
         let text = command.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let gateParts = text.split(separator: " ", maxSplits: 1).map(String.init)
         let gateSub = command.op == .debug ? (gateParts.first ?? "") : ""
         let gateArg = gateParts.count > 1 ? gateParts[1].trimmingCharacters(in: .whitespacesAndNewlines) : ""
-        if CLIAccess.isSensitive(op: command.op, debugSubcommand: gateSub, argument: gateArg) {
-            guard CLIAccess.enabled else {
-                return ZeusCommandReply(id: command.id, ok: false, text: CLIAccess.refusal)
-            }
+        // The switch, then (only when it is on) the peer's signature. Asked only by commands that need it,
+        // so `status` and the like never read a signature.
+        let gate = { CLIAccess.verdict(peer: peer) }
+        if CLIAccess.isSensitive(op: command.op, debugSubcommand: gateSub, argument: gateArg), let refusal = CLIAccess.reply(for: gate()) {
+            return ZeusCommandReply(id: command.id, ok: false, text: refusal)
         }
         // Each capture command holds its own token; the cue clears only when the last one ends.
         let captureToken = UUID()
-        if CLIAccess.enabled, CLIAccess.startsCapture(op: command.op, debugSubcommand: gateSub) {
+        if CLIAccess.startsCapture(op: command.op, debugSubcommand: gateSub), gate() == .allowed {
             activeCaptures.insert(captureToken)
             onSensitiveCue?("A command-line request is capturing audio or screen")
         }
@@ -148,9 +198,10 @@ final class CommandCenter {
         case .ask:
             guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask Zeus something.") }
             let deep = command.deep, speak = command.speak
-            let restricted = !CLIAccess.enabled
+            let verdict = gate()
+            let restricted = verdict != .allowed
             if restricted, let refusal = CLIAccess.restrictedAskRefusal(text) {
-                return ZeusCommandReply(id: command.id, ok: false, text: refusal)
+                return ZeusCommandReply(id: command.id, ok: false, text: CLIAccess.reply(for: verdict) ?? refusal)
             }
             // Restricted turns run with capture and actions disabled (see CLIAccess.turnRestricted).
             return await CLIAccess.$turnRestricted.withValue(restricted) {
@@ -185,7 +236,7 @@ final class CommandCenter {
         case .research:
             guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask Zeus something to research.") }
             let depth: ResearchDepth = command.deep ? .deep : .quick, speak = command.speak
-            let restricted = !CLIAccess.enabled
+            let restricted = gate() != .allowed
             return await track(command, label: "research: \(text)") { _, _ in
                 guard let outcome = await ResearchRunner.shared.start(question: text, depth: depth, speak: speak, restricted: restricted) else {
                     return TurnResult(error: "Zeus is already researching something. Stop it first.")
@@ -228,7 +279,18 @@ final class CommandCenter {
                     return ZeusCommandReply(id: command.id, ok: false, text: "Onboarding handler not wired.")
                 }
             case "screenshot":
-                let argument = rest.isEmpty ? nil : rest
+                // Where the PNG goes is checked here, before anything is created: only the app's caches
+                // folder or a folder the owner chose at launch, with no traversal and no symlink escape.
+                let (requested, window) = DebugScreenshot.parseArgument(rest.isEmpty ? nil : rest)
+                let base = requested ?? DebugOutputPath.defaultBase(cachesDirectory: CLIAccess.cachesDirectory, token: UUID().uuidString)
+                let checked: String
+                switch DebugOutputPath.validate(base, allowedFolders: CLIAccess.screenshotFolders) {
+                case .success(let path): checked = path
+                case .failure:
+                    return ZeusCommandReply(id: command.id, ok: false,
+                                            text: "Screenshots can only be saved inside Zeus's caches folder or a folder chosen at launch with \(DebugOutputPath.ownerFolderVariable).")
+                }
+                let argument = checked + (window.map { " --window \($0)" } ?? "")
                 if let onDebugScreenshot {
                     let paths = await onDebugScreenshot(argument)
                     return ZeusCommandReply(id: command.id, ok: !paths.isEmpty,

@@ -264,9 +264,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.updates) { syncMenuBarUpdateBadge() }
         if on(.voiceTurn) { wireDebugCommands() }
         if on(.agentServer) {
-            agentServer.commandHandler = { [weak self] line in
+            CLIAccess.migrateLegacyDefault()
+            agentServer.commandHandler = { [weak self] line, peer in
                 guard let self, let commands = self.commands else { return nil }
-                return await commands.handle(line)
+                return await commands.handle(line, peer: peer)
             }
             agentServer.start()
         }

@@ -1124,7 +1124,7 @@ private struct PermissionsPage: View {
 private struct PrivacyPage: View {
     let context: GSContext
     @AppStorage(DriveAutonomy.settingsKey) private var driveAutonomy = DriveAutonomy.default.rawValue
-    @AppStorage(CLIAccess.defaultsKey) private var cliSensitive = false
+    private var cliAccess: CLIAccessModel { CLIAccessModel.shared }
 
     /// The pop-up shows titles; the setting stores the raw value.
     private var autonomyTitle: Binding<String> {
@@ -1155,9 +1155,18 @@ private struct PrivacyPage: View {
             }
         }
         GSCard("Command line") {
+            if cliAccess.noticePending {
+                GSRow(symbol: "info.circle", title: "Command-line control was reset",
+                      text: "This setting now lives in your Keychain, so no other program can switch it on. Zeus turned it off once; turn it on again below if you use the zeus command.") {
+                    Button("Got it") { cliAccess.dismissNotice() }.buttonStyle(GSButtonStyle())
+                }
+                GSDivider()
+            }
             GSToggleRow(symbol: "terminal", title: "Allow command-line control of sensitive actions",
-                        text: "Lets the zeus command (and any program on this Mac running as you) listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, and import keys. Off by default; read-only commands such as status always work.",
-                        isOn: $cliSensitive)
+                        text: cliAccess.failed
+                            ? "Zeus could not change this in your Keychain. Check Keychain access and try again."
+                            : "Lets the zeus command that ships inside Zeus.app listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, import keys, and open or capture Zeus's own panels. Off by default and kept in your Keychain; read-only commands such as status always work.",
+                        isOn: Binding(get: { cliAccess.enabled }, set: { cliAccess.set($0) }))
         }
     }
 }
