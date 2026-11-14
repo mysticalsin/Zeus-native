@@ -17,41 +17,66 @@ struct ScribeMeetingCardMotionTests {
         ScribeMeetingCardMotion.sweep(deadline: deadline, uptime: began + elapsed, total: total, reduceMotion: reduceMotion)
     }
 
-    @Test func theRingStartsFullAndDrainsLinearlyOverTheWholeCountdown() throws {
+    @Test func theSweepStartsFullAndRunsForTheWholeCountdown() throws {
         let plan = try #require(sweep(at: 0))
         #expect(plan.from == 1)
         #expect(plan.duration == 5)
-        for (elapsed, share) in [(0.0, 1.0), (1.5, 0.7), (3.0, 0.4), (4.9, 0.02), (5.0, 0.0), (6.0, 0.0)] {
-            #expect(abs(ScribeMeetingCardMotion.share(plan, elapsed: elapsed) - share) < 1e-9, "at \(elapsed) s")
+    }
+
+    /// The share of the ring stroke that is drawn, read from the pixels of the ring view in its still form.
+    @MainActor
+    private func drawn(at elapsed: TimeInterval, reduceMotion: Bool = false) throws -> Double {
+        func inked(_ uptime: TimeInterval) throws -> Int {
+            let ring = ScribeMeetingCardRing(deadline: deadline, uptime: uptime, total: total,
+                                             reduceMotion: reduceMotion, still: true)
+                .frame(width: 90, height: 40)
+                .background(Color.black)
+                .transaction { $0.animation = nil }
+            let renderer = ImageRenderer(content: ring)
+            renderer.scale = 2
+            renderer.isOpaque = true
+            let image = try #require(renderer.cgImage)
+            let context = try #require(CGContext(data: nil, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            let bytes = try #require(context.data).assumingMemoryBound(to: UInt8.self)
+            // The track is a faint grey; the stroke is the bright primary colour.
+            return (0..<image.width * image.height).filter { bytes[$0 * 4] > 160 }.count
+        }
+        return Double(try inked(began + elapsed)) / Double(try inked(began))
+    }
+
+    @MainActor
+    @Test func theRingDrawsTheShareLeftAtZeroOnePointFiveThreeAndFourPointNineSeconds() throws {
+        for (elapsed, share) in [(0.0, 1.0), (1.5, 0.7), (3.0, 0.4), (4.9, 0.02)] {
+            let got = try drawn(at: elapsed)
+            #expect(abs(got - share) < 0.05, "at \(elapsed) s the ring drew \(got), expected \(share)")
         }
     }
 
-    @Test func theShareFallsAtOneSteadyRateAcrossEveryPerSecondRedraw() throws {
-        let plan = try #require(sweep(at: 0))
-        var previous = ScribeMeetingCardMotion.share(plan, elapsed: 0)
+    @MainActor
+    @Test func theDrawnShareFallsAtOneSteadyRateAcrossEveryRedraw() throws {
+        var previous = try drawn(at: 0)
         var steps: [Double] = []
-        for tenth in 1...49 {
-            let share = ScribeMeetingCardMotion.share(plan, elapsed: Double(tenth) / 10)
+        for half in 1...9 {
+            let share = try drawn(at: Double(half) / 2)
             steps.append(previous - share)
             previous = share
         }
-        #expect(steps.allSatisfy { abs($0 - 0.02) < 1e-9 }, "the ring must neither jump nor stall at a redraw")
-        // The digit changes at each whole second while the ring plan stays the one made at the start.
+        // 0.5 s of a 5 s countdown is a tenth of the ring; neither a jump nor a stall at a redraw.
+        #expect(steps.allSatisfy { abs($0 - 0.1) < 0.04 }, "steps were \(steps)")
+        // The digit changes at each whole second while the ring keeps its line.
         let digits = [0.0, 0.4, 1.0, 1.5, 2.0, 3.0, 4.0, 4.9].map {
             ScribeMeetingCardText.seconds(deadline: deadline, now: began + $0)
         }
         #expect(digits == [5, 5, 4, 4, 3, 2, 1, 1])
     }
 
-    @Test func aRingBornPartWayThroughContinuesTheSameLine() throws {
-        let first = try #require(sweep(at: 0))
+    @Test func aRingBornPartWayThroughStartsFromTheShareLeftAndEndsWithTheDeadline() throws {
         for born in [1.0, 2.5, 3.0, 4.2] {
             let late = try #require(sweep(at: born))
-            for step in [0.0, 0.3, 0.8] where born + step < 5 {
-                let continued = ScribeMeetingCardMotion.share(late, elapsed: step)
-                let original = ScribeMeetingCardMotion.share(first, elapsed: born + step)
-                #expect(abs(continued - original) < 1e-9, "born at \(born) s, \(step) s later")
-            }
+            #expect(abs(late.from - (total - born) / total) < 1e-9, "born at \(born) s")
             #expect(abs(late.duration - (total - born)) < 1e-9)
         }
     }
@@ -73,6 +98,14 @@ struct ScribeMeetingCardMotionTests {
         }
         for (got, want) in zip(shares, [1.0, 0.8, 0.6, 0.4, 0.2]) { #expect(abs(got - want) < 1e-9) }
         #expect(digits == [5, 4, 3, 2, 1])
+    }
+
+    @MainActor
+    @Test func reduceMotionStillDrawsTheShareLeftAtEveryRedraw() throws {
+        for (elapsed, share) in [(0.0, 1.0), (1.5, 0.7), (3.0, 0.4), (4.9, 0.02)] {
+            let got = try drawn(at: elapsed, reduceMotion: true)
+            #expect(abs(got - share) < 0.05, "at \(elapsed) s the ring drew \(got), expected \(share)")
+        }
     }
 
     @Test func withMotionTheDrawnShareIsTheStartingShareOfTheSweep() throws {

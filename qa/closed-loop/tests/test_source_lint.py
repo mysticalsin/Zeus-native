@@ -808,8 +808,8 @@ class MicReleaseTests(unittest.TestCase):
 
 class ScribeMeetingCardTests(unittest.TestCase):
     def test_scribe_meeting_cards_take_the_first_click(self):
-        driver = mic_read("Scribe/ScribePopupDriver.swift")
-        host = mic_body(driver, "final class ScribeCardHostingView", "final class ScribePopupDriver")
+        panel = mic_read("Scribe/ScribeMeetingCardPanel.swift")
+        host = mic_body(panel, "final class ScribeCardHostingView", "private final class ScribeMeetingCardWindow")
         self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", host)
         self.assertIn(".activeAlways", host)
         for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingBanner.swift"):

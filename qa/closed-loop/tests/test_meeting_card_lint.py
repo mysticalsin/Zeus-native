@@ -104,6 +104,36 @@ class MeetingCardLint(unittest.TestCase):
             self.assertIsNone(DASH.search("\n".join(line for _, line in code_lines(text))), path.name)
         self.assertIn(".alertGlass(", self.read(VIEW))
 
+    def test_a_tap_carries_the_card_the_person_saw(self):
+        view = self.read(VIEW)
+        for action in ("onPrimary", "onCancel", "onDismiss"):
+            self.assertIn(f"var {action}: (ScribeMeetingCard) -> Void", view)
+            self.assertRegex(view, rf"\b{action}\(card\)")
+            self.assertNotRegex(view, rf"Button\(action: {action}\)")
+        panel = self.read(PANEL)
+        for action in ("primary", "cancel", "dismiss"):
+            self.assertIn(f"var {action}: (ScribeMeetingCard) -> Void", panel)
+
+    def test_the_panel_takes_the_card_down_by_render_generation_not_by_alpha(self):
+        text = self.read(PANEL)
+        self.assertNotRegex(text, r"alphaValue\s*==")
+        self.assertIn("ignoresMouseEvents", text)
+        _, body = function_body(text, "func render(_ card: ScribeMeetingCard) {")
+        self.assertRegex(body, r"generation")
+
+    def test_the_card_is_one_voiceover_element_for_title_and_status_plus_its_buttons(self):
+        text = self.read(VIEW)
+        self.assertNotIn(".accessibilityElement(children: .contain)", text)
+        self.assertEqual(len(re.findall(r"\.accessibilityLabel\(ScribeMeetingCardText\.label\(", text)), 1)
+        self.assertIn(".accessibilityElement(children: .ignore)", text)
+
+    def test_the_panel_owns_the_first_click_hosting_view(self):
+        panel = self.read(PANEL)
+        self.assertIn("final class ScribeCardHostingView<Content: View>: NSHostingView<Content>", panel)
+        self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", panel)
+        driver = ROOT / "Sources/Zeus/Scribe/ScribePopupDriver.swift"
+        self.assertNotIn("class ScribeCardHostingView", self.read(driver))
+
     def test_the_lint_detects_its_failure_shapes(self):
         self.assertTrue(clocks("TimelineView(.animation) { _ in }"))
         self.assertTrue(clocks("let t = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in }"))
