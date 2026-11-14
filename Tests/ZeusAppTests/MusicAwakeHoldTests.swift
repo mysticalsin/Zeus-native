@@ -350,7 +350,7 @@ private final class Scheduled {
     /// common mode stands in for them, so the test does not depend on AppKit having registered its own.
     @Test func realTimersFireWhileTheRunLoopIsInACommonNonDefaultMode() {
         let mode = RunLoop.Mode(rawValue: "zeus.test.tracking")
-        CFRunLoopAddCommonMode(CFRunLoopGetMain(), mode.rawValue as CFString)
+        CFRunLoopAddCommonMode(CFRunLoopGetMain(), CFRunLoopMode(rawValue: mode.rawValue as CFString))
         final class Flag: @unchecked Sendable { var fired = false }
         let flag = Flag()
         let cancel = MusicAwakeHold.timerSchedule(after: 0.05, repeats: false) { flag.fired = true }
