@@ -147,11 +147,14 @@ public enum UnixSocket {
 public final class UnixSocketServer: @unchecked Sendable {
     public typealias Reply = @Sendable (Data?) -> Void
     public typealias Handler = @Sendable (Data, @escaping Reply) -> Void
+    /// Like `Handler`, plus what the handler may ask about the peer that sent the line.
+    public typealias ContextHandler = @Sendable (Data, PeerContext, @escaping Reply) -> Void
     static let maximumConnections = 32
 
     private let path: String
     private let peerPolicy: PeerPolicy
-    private let handler: Handler
+    private let peerVerifier: PeerVerifier
+    private let handler: ContextHandler
     private let lock = NSLock()
     private let acceptQueue = DispatchQueue(label: "zeus.socket.accept")
     private var listener: DispatchSourceRead?
@@ -160,10 +163,20 @@ public final class UnixSocketServer: @unchecked Sendable {
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
 
-    public init(path: String, peerPolicy: PeerPolicy = .sameUser, handler: @escaping Handler) {
+    public init(path: String, peerPolicy: PeerPolicy = .sameUser, peerVerifier: @escaping PeerVerifier = PeerSigning.defaultVerifier,
+                handler: @escaping Handler) {
         self.path = path
         self.peerPolicy = peerPolicy
-        self.handler = handler
+        self.peerVerifier = peerVerifier
+        self.handler = { line, _, reply in handler(line, reply) }
+    }
+
+    public init(path: String, peerPolicy: PeerPolicy = .sameUser, peerVerifier: @escaping PeerVerifier = PeerSigning.defaultVerifier,
+                contextHandler: @escaping ContextHandler) {
+        self.path = path
+        self.peerPolicy = peerPolicy
+        self.peerVerifier = peerVerifier
+        self.handler = contextHandler
     }
 
     deinit { stop() }
@@ -224,13 +237,18 @@ public final class UnixSocketServer: @unchecked Sendable {
             guard UnixSocket.prepare(client) else { close(client); continue }
             // Refuse before any byte is read: only the owner (and, where set, the named program) may talk.
             let peer = PeerCheck.identify(fd: client)
-            if case .deny(let reason) = PeerCheck.decide(peerPolicy, ownUID: UInt32(geteuid()), peer: peer) {
+            var verdict = PeerCheck.decide(peerPolicy, ownUID: UInt32(geteuid()), peer: peer)
+            // A file name proves nothing: a program that must be this app's own is judged by its signature too.
+            if verdict.isAllowed, peerPolicy.requiresSignedApp { verdict = peerVerifier(peer?.auditToken) }
+            if case .deny(let reason) = verdict {
                 NSLog("[ZEUS] socket %@: connection refused (%@, pid %d)", (path as NSString).lastPathComponent, reason, peer?.pid ?? -1)
                 close(client)
                 continue
             }
+            let verifier = peerVerifier, token = peer?.auditToken
+            let context = PeerContext { verifier(token) }
             let id = UUID()
-            let connection = Connection(fd: client) { [weak self] in
+            let connection = Connection(fd: client, context: context) { [weak self] in
                 guard let self else { return }
                 _ = self.lock.withLock { self.connections.removeValue(forKey: id) }
             }
@@ -246,14 +264,19 @@ public final class UnixSocketServer: @unchecked Sendable {
     private final class Connection: @unchecked Sendable {
         private enum State { case reading, waiting, writing, closed }
         private let fd: Int32
+        private let context: PeerContext
         private let lock = NSLock()
         private let onClose: @Sendable () -> Void
         private var state = State.waiting
         private var cancelled = false
 
-        init(fd: Int32, onClose: @escaping @Sendable () -> Void) { self.fd = fd; self.onClose = onClose }
+        init(fd: Int32, context: PeerContext, onClose: @escaping @Sendable () -> Void) {
+            self.fd = fd
+            self.context = context
+            self.onClose = onClose
+        }
 
-        func receive(_ handler: @escaping Handler) {
+        func receive(_ handler: @escaping ContextHandler) {
             let start = lock.withLock { () -> Bool in
                 guard !cancelled, state == .waiting else { return false }
                 state = .reading
@@ -268,7 +291,7 @@ public final class UnixSocketServer: @unchecked Sendable {
                     return true
                 }
                 guard deliver else { finish(); return }
-                handler(line) { [self] in reply($0) }
+                handler(line, context) { [self] in reply($0) }
             }
         }
 

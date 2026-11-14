@@ -111,7 +111,7 @@ struct PeerBinaryRuleTests {
         let own = signature(certificate: "cert-1")
         #expect(decide(own: own, peer: signature(certificate: "cert-1"), path: "/Users/me/Library/Application Support/Zeus/bin/zeus-bridge") == .allow)
         #expect(!decide(own: own, peer: signature(certificate: "cert-2"), path: "/Users/me/bin/zeus-bridge").isAllowed)
-        #expect(!decide(own: own, peer: signature(certificate: nil, adHoc: true), path: "/Users/me/bin/zeus-bridge").isAllowed)
+        #expect(!decide(own: own, peer: signature(adHoc: true, certificate: nil), path: "/Users/me/bin/zeus-bridge").isAllowed)
         #expect(!decide(own: signature(adHoc: true), peer: signature(certificate: "cert-1"), path: "/Users/me/bin/x").isAllowed,
                 "an ad hoc app has no certificate to compare")
     }

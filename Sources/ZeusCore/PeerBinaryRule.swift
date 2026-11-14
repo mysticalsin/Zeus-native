@@ -1,0 +1,98 @@
+import Foundation
+
+/// What the Security framework says about one program's code signature. The adapter in
+/// `PeerSigning` fills it in; the rule below only reads it, so every decision is testable.
+public struct CodeSignature: Equatable, Sendable {
+    /// The signature is intact (`SecCodeCheckValidity` passed). Unsigned or tampered code is never valid.
+    public var isValid: Bool
+    public var identifier: String?
+    /// The Apple team that signed it. Nil for ad hoc, locally signed and Apple platform programs.
+    public var teamIdentifier: String?
+    public var isAdHoc: Bool
+    /// SHA-256 of the leaf signing certificate, hex. Nil for ad hoc signatures.
+    public var certificateHash: String?
+    /// The code directory hash (cdhash), hex: the identity of one exact build of one program.
+    public var cdHash: String?
+
+    public init(isValid: Bool, identifier: String? = nil, teamIdentifier: String? = nil, isAdHoc: Bool = false,
+                certificateHash: String? = nil, cdHash: String? = nil) {
+        self.isValid = isValid
+        self.identifier = identifier
+        self.teamIdentifier = teamIdentifier
+        self.isAdHoc = isAdHoc
+        self.certificateHash = certificateHash
+        self.cdHash = cdHash
+    }
+
+    fileprivate var team: String? {
+        guard let teamIdentifier, !teamIdentifier.isEmpty else { return nil }
+        return teamIdentifier
+    }
+}
+
+/// Component-wise path containment. A prefix test would accept `/Applications/Zeus.app.evil`.
+public enum PathContainment {
+    /// True when `path` is strictly below `root`. Both must be absolute and free of `..`; the
+    /// filesystem root is never a usable root. Callers pass paths that are already symlink-resolved.
+    public static func isInside(_ path: String, root: String) -> Bool {
+        guard let path = components(path), let root = components(root), !root.isEmpty, path.count > root.count else { return false }
+        return Array(path.prefix(root.count)) == root
+    }
+
+    /// The components of an absolute path with no `..`; nil otherwise.
+    static func components(_ text: String) -> [String]? {
+        guard text.hasPrefix("/"), !text.contains("\u{0}") else { return nil }
+        let parts = text.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard !parts.contains("..") else { return nil }
+        return parts.filter { $0 != "." }
+    }
+}
+
+public enum AppBundleLocator {
+    /// The `.app` folder an executable runs from (`Zeus.app` for `Zeus.app/Contents/MacOS/Zeus` and for
+    /// the helpers in `Contents/Helpers`), or nil for a loose binary such as a SwiftPM build product.
+    public static func bundlePath(forExecutable path: String) -> String? {
+        guard let parts = PathContainment.components(path), parts.count >= 3 else { return nil }
+        // The executable itself never counts, and the folder after `.app` must be `Contents`.
+        for index in stride(from: parts.count - 2, through: 0, by: -1) where parts[index].hasSuffix(".app") && parts[index].count > 4 {
+            guard index + 1 < parts.count - 1, parts[index + 1] == "Contents" else { continue }
+            return "/" + parts[0...index].joined(separator: "/")
+        }
+        return nil
+    }
+}
+
+/// Decides whether a socket peer is this app's own program, by what it is: a valid code signature
+/// that ties it to this app, never by the name of its file.
+public enum PeerBinaryRule {
+    /// - Parameters:
+    ///   - own: this program's signature (the server side).
+    ///   - peer: the peer's signature, nil when it could not be read.
+    ///   - peerExecutablePath: the peer's executable after symlink resolution.
+    ///   - ownBundlePath: the `.app` folder this program runs from, if any.
+    ///   - ownExecutableDirectory: the folder holding this program (the build products folder for a loose binary).
+    ///   - ownBundleCDHashes: cdhashes of the programs shipped inside this app, so an installed copy of a bundled helper still matches.
+    ///
+    /// When this app is signed with a team identifier the peer must carry the same one. When it is ad hoc
+    /// or locally signed (development builds, the test host) the peer must live inside this app's bundle or
+    /// next to this program, be an exact copy of a bundled helper, or share this build's signing certificate.
+    /// Every other case, and every missing input, refuses.
+    public static func decide(own: CodeSignature?, peer: CodeSignature?, peerExecutablePath: String?,
+                              ownBundlePath: String?, ownExecutableDirectory: String?,
+                              ownBundleCDHashes: Set<String> = []) -> PeerVerdict {
+        guard let own, own.isValid else { return .deny("own code signature unavailable") }
+        guard let peer, peer.isValid else { return .deny("peer code signature missing or invalid") }
+        if let team = own.team {
+            guard !peer.isAdHoc, peer.team == team else { return .deny("peer is not signed by this app's team") }
+            return .allow
+        }
+        if let path = peerExecutablePath, !path.isEmpty {
+            for root in [ownBundlePath, ownExecutableDirectory] {
+                if let root, PathContainment.isInside(path, root: root) { return .allow }
+            }
+        }
+        if let hash = peer.cdHash, !hash.isEmpty, ownBundleCDHashes.contains(hash) { return .allow }
+        if !own.isAdHoc, let certificate = own.certificateHash, !certificate.isEmpty, peer.certificateHash == certificate { return .allow }
+        return .deny("peer is not this app's program")
+    }
+}
