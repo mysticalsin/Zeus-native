@@ -136,7 +136,7 @@ struct ScribeAutoStartTests {
     }
 
     @Test func aSlotWithAnUnknownLinkPairsWithTheFirstAppHoldingTheMicrophone() {
-        let event = asSlot("w", start: -10, app: .other("whereby.com"))
+        let event = asSlot("w", start: -10, app: .other("calls.example"))
         let meeting = ScribeMeetingEvidence(date: asBase, slots: [event], micApps: [.zoom, .teams]).candidate
         #expect(meeting?.key == "w")
         #expect(meeting?.callApp == .zoom)
