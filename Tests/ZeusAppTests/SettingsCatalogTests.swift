@@ -57,7 +57,7 @@ struct SettingsCatalogTests {
         #expect(ScreenCornerSize(label: option.defaultValue) == .medium)
     }
 
-    @Test func theCornerAndMusicAwakeTogglesAreLiveAndDefaultOff() throws {
+    @MainActor @Test func theCornerAndMusicAwakeTogglesAreLiveAndDefaultOff() throws {
         let corners = try #require(SettingsCatalog.option("screen.roundBottomCorners"))
         #expect(corners.section == .appearance)
         #expect(corners.group == "Screen")
