@@ -66,7 +66,7 @@ public struct ScribeMeeting: Equatable, Sendable {
         self.isLive = isLive
     }
 
-    /// The decision the existing call popup and `ScribeController` hints already understand.
+    /// The decision the heads-up popup still reads, until it takes the meeting context.
     public var promptDecision: ScribePromptDecision {
         if let slot { return .upcoming(slot) }
         return callApp.map { .callDetected($0) } ?? .none
