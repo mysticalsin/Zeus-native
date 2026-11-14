@@ -4279,7 +4279,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aDoubleTapStartsScribeOnlyOnce"
       }
     },
@@ -4291,7 +4291,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aTapWhileTheAutomaticStartIsRunningConfirmsInsteadOfStartingTwice"
       }
     },
@@ -4303,7 +4303,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "theCardNeverExpiresUnderThePointer"
       }
     },
@@ -4315,7 +4315,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aCaptureFailureIsShownWithItsReason"
       }
     },
@@ -4327,7 +4327,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "theMicrophoneBeingOffIsSaidAndAllowOpensSettings"
       }
     },
@@ -4339,7 +4339,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aStaleFailureFromThePreviousMeetingIsNotThisTapsFailure"
       }
     },
@@ -4461,6 +4461,66 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+      }
+    },
+    {
+      "id": "REG-418",
+      "failure": "An automatic start that did not begin capture failed silently: the card was gone and nothing said why.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "anAutomaticStartThatFailsShowsItsReason"
+      }
+    },
+    {
+      "id": "REG-419",
+      "failure": "The card said Recording before Scribe had begun capture, while it was still starting or already ending.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "recordingAppearsOnlyForTheRecordingPhase"
+      }
+    },
+    {
+      "id": "REG-420",
+      "failure": "A Cancel that arrived after the countdown timer fired was dropped, so an automatic start could not be taken back.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "cancelAfterExpiryAbandonsTheAutomaticStart"
+      }
+    },
+    {
+      "id": "REG-421",
+      "failure": "A meeting sighted while Scribe was still saving the last one was dropped with no card and never offered again.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "aMeetingHeldWhileSavingIsShownAndStartsWhenFree"
+      }
+    },
+    {
+      "id": "REG-422",
+      "failure": "Switch on the next meeting card asked a second question before the next meeting could start.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "switchStartsTheNextMeetingOnceWithoutAskingAgain"
       }
     }
   ]

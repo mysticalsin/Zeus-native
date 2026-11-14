@@ -812,7 +812,7 @@ class ScribeMeetingCardTests(unittest.TestCase):
         host = mic_body(panel, "final class ScribeCardHostingView", "private final class ScribeMeetingCardWindow")
         self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", host)
         self.assertIn(".activeAlways", host)
-        for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingBanner.swift"):
+        for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingCardPanel.swift"):
             text = mic_read(card)
             self.assertIn("ScribeCardHostingView(rootView:", text, card)
             self.assertNotIn("NSHostingView(rootView:", text, card)
@@ -823,13 +823,27 @@ class ScribeMeetingCardTests(unittest.TestCase):
         self.assertNotIn("autoHide", popup)
         hide = mic_body(popup, "    func hide() {", "    func refresh(")
         self.assertIn("guard !driver.isBusy else { return }", hide)
-        banner = mic_read("Scribe/ScribeMeetingBanner.swift")
-        self.assertIn("Button(model.primaryTitle) { model.primaryTapped() }", banner)
-        hide = mic_body(banner, "    func hide() {", "    private func begin(")
-        self.assertIn("guard !driver.isBusy else { return }", hide)
+        # The meeting card: the panel leaves only through `render`, the controller draws the machine's card after
+        # every event, and the late tap is decided in the core.
+        panel = mic_read("Scribe/ScribeMeetingCardPanel.swift")
+        self.assertEqual(panel.count("orderOut("), 1)
+        render = mic_body(panel, "    func render(_ card: ScribeMeetingCard) {", "    private func view(")
+        self.assertIn("window.orderOut(nil)", render)
+        self.assertNotIn("func hide(", panel)
         controller = mic_read("Scribe/ScribeAutoStartController.swift")
-        accept = mic_body(controller, "    func accept() {", "    func decline() {")
-        self.assertIn(".startNow(meeting, now: now)", accept)
+        send = mic_body(controller, "    private func send(", "    /// Scribe's phase changed.")
+        self.assertIn("refresh()", send)
+        changed = mic_body(controller, "    private func scribeChanged(", "    private func perform(")
+        self.assertIn("refresh()", changed)
+        refresh = mic_body(controller, "    private func refresh() {", "    private func render() {")
+        self.assertIn("render()", refresh)
+        render_card = mic_body(controller, "    private func render() {", "    private static func log(")
+        self.assertIn("machine.card(now: clock())", render_card)
+        self.assertIn("panel.render(drawn)", render_card)
+        core = (ROOT / "Sources/ZeusCore/Scribe/ScribeAutoStart.swift").read_text()
+        self.assertIn("case primary(on: ScribeMeetingCard", core)
+        late = mic_body(core, "    private mutating func primary(", "    private mutating func cancel(")
+        self.assertIn("The offer ended in the same instant", late)
 
     def test_scribe_meeting_card_taps_are_logged(self):
         driver = mic_read("Scribe/ScribePopupDriver.swift")
@@ -837,6 +851,12 @@ class ScribeMeetingCardTests(unittest.TestCase):
             self.assertIn(stage, driver)
         self.assertIn('NSLog("[ZEUS] scribe popup: %@ %@"', driver)
         self.assertIn("FlightRecorder.shared.record(", driver)
+        # The meeting card's own machine logs each state change once, and the taps that were ignored.
+        controller = mic_read("Scribe/ScribeAutoStartController.swift")
+        self.assertIn('NSLog("[ZEUS] scribe meeting: %@", line)', controller)
+        self.assertIn('FlightRecorder.shared.record("scribe", "meeting state", line)', controller)
+        self.assertIn('Self.log("tap ignored"', controller)
+        self.assertIn('Self.log("start"', controller)
 
 
 if __name__ == "__main__":

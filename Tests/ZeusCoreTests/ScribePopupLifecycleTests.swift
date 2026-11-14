@@ -29,7 +29,7 @@ struct ScribePopupLifecycleTests {
         #expect(card.isBusy)
     }
 
-    @Test func aDoubleTapStartsScribeOnlyOnce() {
+    @Test func aDoubleTapStartsScribeOnlyOnceForTheHeadsUp() {
         var card = shownCard()
         let first = card.handle(.click(now: 1, scribe: .idle, microphoneBlocked: false))
         let second = card.handle(.click(now: 1.2, scribe: .starting(fresh), microphoneBlocked: false))
@@ -38,7 +38,7 @@ struct ScribePopupLifecycleTests {
         #expect(card.phase == .starting)
     }
 
-    @Test func aTapWhileTheAutomaticStartIsRunningConfirmsInsteadOfStartingTwice() {
+    @Test func aTapWhileTheAutomaticStartIsRunningConfirmsInsteadOfStartingTwiceForTheHeadsUp() {
         var card = shownCard()
         let effects = card.handle(.click(now: 1, scribe: .starting(fresh), microphoneBlocked: false))
         #expect(effects.isEmpty)
@@ -56,7 +56,7 @@ struct ScribePopupLifecycleTests {
         #expect(card.phase == .starting)
     }
 
-    @Test func theCardNeverExpiresUnderThePointer() {
+    @Test func theCardNeverExpiresUnderThePointerForTheHeadsUp() {
         var card = shownCard()
         card.handle(.pointer(inside: true, now: 40))
         let held = card.handle(.tick(now: 100))
@@ -86,7 +86,7 @@ struct ScribePopupLifecycleTests {
         #expect(card.phase == .shown)
     }
 
-    @Test func aCaptureFailureIsShownWithItsReason() {
+    @Test func aCaptureFailureIsShownWithItsReasonForTheHeadsUp() {
         var card = startingCard()
         card.handle(.scribe(.starting(fresh), now: 1.1))
         card.handle(.scribe(.failed(fresh, reason: "Screen Recording is off."), now: 2))
@@ -98,7 +98,7 @@ struct ScribePopupLifecycleTests {
         }
     }
 
-    @Test func theMicrophoneBeingOffIsSaidAndAllowOpensSettings() {
+    @Test func theMicrophoneBeingOffIsSaidAndAllowOpensSettingsForTheHeadsUp() {
         var card = shownCard()
         let tap = card.handle(.click(now: 1, scribe: .idle, microphoneBlocked: true))
         #expect(tap.isEmpty)
@@ -111,7 +111,7 @@ struct ScribePopupLifecycleTests {
         #expect(retry == [.requestStart])
     }
 
-    @Test func aStaleFailureFromThePreviousMeetingIsNotThisTapsFailure() {
+    @Test func aStaleFailureFromThePreviousMeetingIsNotThisTapsFailureForTheHeadsUp() {
         var card = startingCard()
         card.handle(.scribe(.failed(previous, reason: "old"), now: 1.1))
         #expect(card.phase == .starting)
