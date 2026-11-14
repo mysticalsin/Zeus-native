@@ -269,8 +269,23 @@ struct DisplaySelectionTests {
         #expect(DisplaySelection.targets(mode: .all, screens: [], pointer: .zero).isEmpty)
     }
 
-    @Test func slimPillOnlyWithoutANotch() {
-        #expect(!DisplaySelection.showsPill(notched) && DisplaySelection.showsPill(external))
+    /// A display as the controller describes it: a notch means the footprint rule found one.
+    private func described(id: Int, inset: CGFloat, areas: CGFloat, isBuiltIn: Bool) -> DisplayDescriptor {
+        let frame = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let facts = NotchDisplayFacts(frame: frame, safeAreaTop: inset, leftAreaWidth: areas, rightAreaWidth: areas)
+        return DisplayDescriptor(id: id, frame: frame, hasNotch: NotchFootprintRules.hardwareSize(facts) != nil, isBuiltIn: isBuiltIn)
+    }
+
+    @Test func anInsetOnlyBuiltInDisplayIsStillTheBuiltInTarget() {
+        let insetOnly = described(id: 7, inset: 32, areas: 0, isBuiltIn: true)
+        #expect(!insetOnly.hasNotch)
+        #expect(DisplaySelection.targets(mode: .builtIn, screens: [external, insetOnly], pointer: .zero) == [insetOnly])
+    }
+
+    @Test func anInsetOnlyDisplayThatIsNotBuiltInIsNotPickedAheadOfTheBuiltInPanel() {
+        let insetOnly = described(id: 8, inset: 32, areas: 0, isBuiltIn: false)
+        let panel = described(id: 9, inset: 0, areas: 0, isBuiltIn: true)
+        #expect(DisplaySelection.targets(mode: .builtIn, screens: [insetOnly, panel], pointer: .zero) == [panel])
     }
 
     @Test func rebuildWhenTheSetOrAFrameChanges() {
