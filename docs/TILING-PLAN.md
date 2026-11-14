@@ -413,8 +413,20 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   never restored.
 - The key sheet hides on a six second timer, on the next tiling key, and when tiling stops. It does not take Escape:
   the tap sees only chords the owner bound, and the rule that Zeus never consumes an unbound key is kept.
-- Not done here, still open: the conflict note against Talk, pointing, dictation and chat (owner decision list), and
-  the acceptance-map decision in `qa/feature-map.json`.
+- Key pair clash, closed in the review pass: `TileBaseConflicts.notes` names the talk, pointing or dictation key that
+  holds the chosen pair (same modifiers; a larger pair is clear) and a chat chord the keymap binds. The controller
+  checks it on every settings write, before any tap exists, and refuses a clashing pair: no tap, no observer, the
+  phase is Key clash, and the page and Settings show the note. The tap consumes a chord before the other keys'
+  monitors can see it spoil a hold, so refusing is the only fail-closed option. The default pair, Control-Option, is
+  also the default Talk key, so tiling reads Key clash until the owner picks another pair; changing the default
+  pair is still the owner's decision.
+- Other review fixes: the pause and key sheet chords work over a full-screen app; swap, flip, nudge and float do nothing
+  while an app tiling does not read has the keyboard; the ring follows its setting while running; a revoked
+  Accessibility is noticed on a settings change; `frontmost()` skips Zeus itself and has no protocol default; the undo
+  memory drops windows that are gone; an equal settings write does not notify the page; the key pair picker shows a
+  check on the chosen pair; the permission row reads again when Zeus is activated; quitting stops tiling only when the
+  startup service is allowed.
+- Not done here, still open: the acceptance-map decision in `qa/feature-map.json`.
 
 ### Fail-closed paths
 

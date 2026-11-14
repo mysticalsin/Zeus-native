@@ -26,9 +26,9 @@ Reading order is outcome first, then control, then detail (Stripe, Linear). Thre
 
 Rules the page keeps:
 
-- **Status is a word and a shape, never a colour alone.** Off, Needs Accessibility, Keys unavailable, Paused, On each
-  have their own symbol and word (`TilingPhase`). Colour only reinforces.
-- **One primary action per state** (Muji). Off: the switch. Needs Accessibility: "Open Permissions". On: Pause.
+- **Status is a word and a shape, never a colour alone.** Off, Key clash, Needs Accessibility, Keys unavailable, Paused, On
+  each have their own symbol and word (`TilingPhase`). Colour only reinforces.
+- **One primary action per state** (Muji). Off: the switch. Key clash: the key pair picker, with the note naming the key that holds the pair. Needs Accessibility: "Open Permissions". On: Pause.
 - **The page never asks for a permission.** The Accessibility row says what is true and opens the one existing place
   that asks. It makes no Accessibility call of its own.
 - **Gaps and the key pair edit the same settings as Settings.** There is one source of truth, `SettingsStore`.
@@ -63,7 +63,7 @@ Rules the page keeps:
 
 ## Copy
 
-Plain and short. No dashes, no filler. Examples: "Off", "Needs Accessibility", "Keys unavailable", "Paused", "On";
+Plain and short. No dashes, no filler. Examples: "Off", "Key clash", "Needs Accessibility", "Keys unavailable", "Paused", "On";
 "Allow Accessibility so Zeus can move windows."; "Windows stay where they are."; "Hold the keys and tap an arrow."
 
 ## Checked on a real Mac, not here
