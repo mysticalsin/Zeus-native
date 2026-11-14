@@ -47,7 +47,7 @@ extension ShortcutConflicts {
         return []
     }
 
-    private static func chatShortcutModifiers(_ chat: ChatHotkey) -> ShortcutModifiers? {
+    static func chatShortcutModifiers(_ chat: ChatHotkey) -> ShortcutModifiers? {
         guard chat != .off else { return nil }
         var mods: ShortcutModifiers = []
         if chat.modifiers.contains(.control) { mods.insert(.control) }
