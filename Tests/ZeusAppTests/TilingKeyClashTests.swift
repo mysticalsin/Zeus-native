@@ -103,4 +103,56 @@ struct TilingKeyClashTests {
         // The talk monitor's own provider is the default one in HotkeyMonitor.swift.
         #expect(providers == ["DictationController.swift", "PolyglotController.swift"], "\(providers.sorted())")
     }
+
+    // MARK: Hot keys registered through HotKeyCenter
+
+    private static let ansiLetterCodes: [String: UInt16] = ["Y": 16, "N": 45, "O": 31, "P": 35]
+
+    /// Every key that is registered with `HotKeyCenter` is a key the tiling tap would swallow if the keymap bound it.
+    /// The preset keys (Quick to-do, the notch) are read from their settings; the others are fixed letters with
+    /// Control and Option, and `Keys.live()` must list each one. A new raw binding provider, or a new fixed letter in
+    /// one, fails here until it is added to `Keys.others`.
+    @Test func everyHotKeyCenterBindingIsRepresentedInTheLiveKeys() throws {
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Zeus")
+        let files = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        var providers: Set<String> = []
+        var letters: Set<String> = []
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for chunk in text.components(separatedBy: "-> [(UInt32, UInt32, () -> Void)]").dropFirst() {
+                providers.insert(url.lastPathComponent)
+                let body = chunk.components(separatedBy: "\n    }\n").first ?? chunk
+                for part in body.components(separatedBy: "kVK_ANSI_").dropFirst() { letters.insert(String(part.prefix(1))) }
+            }
+        }
+        #expect(providers == ["AppDelegate.swift", "PrompterWindow.swift"], "\(providers.sorted())")
+        #expect(letters == ["Y", "N", "O", "P"], "a new fixed hot key letter: \(letters.sorted())")
+        let live = TilingKeyClash.Keys.live(answerKeysOn: true).others.map(\.shortcut)
+        for letter in letters {
+            let code = try #require(Self.ansiLetterCodes[letter], "add the key code of \(letter) to this test")
+            #expect(live.contains(Shortcut(keyCode: code, modifiers: [.control, .option])), "\(letter) is not in Keys.live()")
+        }
+    }
+
+    @Test func theApprovalAnswerKeysAreListedWhileTheSettingIsOnAndOnlyThen() {
+        let expected = [Shortcut(keyCode: 16, modifiers: [.control, .option]), Shortcut(keyCode: 45, modifiers: [.control, .option]),
+                        Shortcut(keyCode: 31, modifiers: [.control, .option])]
+        let on = TilingKeyClash.Keys.live(answerKeysOn: true).others.map(\.shortcut)
+        for key in expected { #expect(on.contains(key)) }
+        let off = TilingKeyClash.Keys.live(answerKeysOn: false).others.map(\.shortcut)
+        for key in expected { #expect(!off.contains(key)) }
+    }
+
+    @Test func aTilingKeyOnAnApprovalAnswerKeyIsRefusedWithThatKeysName() throws {
+        var keymap = TileKeymap()
+        try keymap.bind(Shortcut(keyCode: 16, modifiers: [.control, .option]), to: .retile)
+        let keys = TilingKeyClash.Keys(talk: .rightOption, dictation: nil, pointing: nil, polyglot: nil, chat: .off,
+                                       voiceOverOn: false, others: TilingKeyClash.Keys.approvalAnswers)
+        let found = TilingKeyClash.note(base: .controlOption, keymap: keymap, keys: keys)
+        #expect(found?.contains("Approve") == true, "\(String(describing: found))")
+        #expect(TilingKeyClash.note(base: .controlOption, keymap: keymap,
+                                    keys: TilingKeyClash.Keys(talk: .rightOption, dictation: nil, pointing: nil, polyglot: nil,
+                                                              chat: .off, voiceOverOn: false, others: [])) == nil)
+    }
 }

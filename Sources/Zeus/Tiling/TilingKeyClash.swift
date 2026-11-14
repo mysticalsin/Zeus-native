@@ -25,8 +25,8 @@ enum TilingKeyClash {
     /// The keys the rule compares, read at one moment. `talk` is the key the owner chose; the rule derives the key
     /// the talk monitor listens on (it moves while VoiceOver runs). Dictation and pointing are nil when off,
     /// exactly as `HotkeyMonitor` reads them. Polyglot is the same: its monitor is a `HotkeyMonitor` too, and it
-    /// hears every key the tap forwards. `TilingKeyClashTests` lists every monitor in the app, so a new global key
-    /// cannot be left out of this struct unnoticed.
+    /// hears every key the tap forwards. `TilingKeyClashTests` lists every monitor and every `HotKeyCenter` binding in
+    /// the app, so a new global key cannot be left out of this struct unnoticed.
     struct Keys: Equatable {
         var talk: Shortcut
         var dictation: Shortcut?
@@ -34,7 +34,7 @@ enum TilingKeyClash {
         var polyglot: Shortcut?
         var chat: ChatHotkey
         var voiceOverOn: Bool
-        /// The other global hot keys with a key: Quick to-do, the notch, and the prompter pause.
+        /// The other global hot keys with a key: Quick to-do, the notch, the prompter pause and the approval answer keys.
         var others: [TileBaseConflicts.NamedShortcut] = []
 
         /// The prompter's pause key (`PrompterHub.hotkeys`). It is registered only while the prompter shows, but it is
@@ -42,7 +42,17 @@ enum TilingKeyClash {
         static let prompterPause = TileBaseConflicts.NamedShortcut(
             name: "Prompter pause", shortcut: Shortcut(keyCode: UInt16(kVK_ANSI_P), modifiers: [.control, .option]))
 
-        @MainActor static func live() -> Keys {
+        /// The approval answer keys (`AppDelegate.answerKeys`): Control-Option Y, N and O answer a waiting request. They
+        /// are registered through `HotKeyCenter` only while a request waits, but they are fixed, so while the setting
+        /// is on the tiling keys must never bind them.
+        static let approvalAnswers: [TileBaseConflicts.NamedShortcut] = [
+            ("Approve request", kVK_ANSI_Y), ("Deny request", kVK_ANSI_N), ("Open request", kVK_ANSI_O),
+        ].map { name, code in
+            TileBaseConflicts.NamedShortcut(name: name, shortcut: Shortcut(keyCode: UInt16(code), modifiers: [.control, .option]))
+        }
+
+        /// `answerKeysOn` is the "Answer permissions from the keyboard" setting.
+        @MainActor static func live(answerKeysOn: Bool = SettingsStore.shared.bool("shortcut.answerKeys")) -> Keys {
             let dictation = DictationSettings.shared
             let extras = ExtraPreferences.shared
             let polyglot = PolyglotSettings.shared
@@ -55,7 +65,7 @@ enum TilingKeyClash {
                         voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled,
                         others: presets.compactMap { name, preset in
                             preset.tilingShortcut.map { TileBaseConflicts.NamedShortcut(name: name, shortcut: $0) }
-                        } + [prompterPause])
+                        } + [prompterPause] + (answerKeysOn ? approvalAnswers : []))
         }
     }
 
