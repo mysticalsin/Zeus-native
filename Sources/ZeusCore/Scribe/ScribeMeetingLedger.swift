@@ -69,12 +69,17 @@ public struct ScribeMeetingLedger: Equatable, Sendable {
     public func mark(ofSlot id: String) -> Mark? { slots[id]?.mark }
 
     /// Reads one piece of evidence: slot entries leave at their end, and a call entry leaves once its app has not
-    /// held the microphone for `rearmAfterAbsence`. A browser call is seen only while its window title says so, so an app missing from
-    /// the scan is not proof that the call ended: it is absent like one that is muted.
+    /// held the microphone for `rearmAfterAbsence`. A native app that is no longer running leaves at once. A
+    /// browser call is seen only while its window title says so, so a missing browser call is not proof that the
+    /// call ended: it is absent like one that is muted.
     public mutating func observe(_ evidence: ScribeMeetingEvidence, now: TimeInterval,
                                  rearmAfterAbsence: TimeInterval = ScribeAutoStartTiming.standard.rearmAfterAbsence) {
         slots = slots.filter { $0.value.expires > evidence.date }
         for (app, entry) in calls {
+            if app != .meet, !evidence.presentApps.contains(app), !evidence.micApps.contains(app) {
+                calls[app] = nil
+                continue
+            }
             var updated = entry
             updated.absentSince = evidence.micApps.contains(app) ? nil : (entry.absentSince ?? now)
             if let since = updated.absentSince, now - since >= rearmAfterAbsence {

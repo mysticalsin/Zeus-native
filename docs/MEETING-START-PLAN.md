@@ -91,6 +91,7 @@ Each finding was checked in the worktree. All were confirmed; the verdict stays 
 | System-audio dialog assumed absent | `ScribeLiveCapture.swift:607-612` (a process tap is created at start) | Fail closed: automatic start is blocked until one recording has run on this Mac (MS4) |
 | Ring could restart each second | plan | Ring keyed on the deadline, a lint check and a temporal test (MS5) |
 | Prune by presence; launch start | `ScribeCallWatcher.swift:207` | Ledger entries leave by slot end; launch start is decision D3 |
+| Ledger reads and the machine writes | `ScribeMeetingLedger.swift`, `ScribeAutoStart.swift` | Written in MS1 as a change to the MS1 rules: the machine writes each mark onto the meeting's slot (`note`), so an answer outlives its call entry. Owner sign-off for this wording is still to be recorded |
 | Item 8 overstated | `ScribeAutoStart.swift:459-462` | Reworded below: Off is handled on evidence; Ask me and the expiry path are not |
 
 ## What was found (verified in the worktree)
@@ -305,8 +306,8 @@ New file `Sources/ZeusCore/Scribe/ScribeMeetingLedger.swift`:
   its calendar window opened stays answered). For a call with no slot, the call entry of its app. The ledger
   only reads here: the machine writes the mark onto the meeting (`note`) each time it looks, so the slot keeps it.
 - `observe(_ evidence:now:)`: slot entries leave at their date. A call entry leaves when its app has not held the
-  microphone for `rearmAfterAbsence` (30 s). An app missing from the scan counts as absent, never as gone at
-  once: a browser call is seen only while its window title says so.
+  microphone for `rearmAfterAbsence` (30 s), or at once when a native app is no longer running. A browser call
+  is seen only while its window title says so, so a missing browser call counts as absent, never as gone at once.
 
 In `ScribeAutoStart.swift`:
 
