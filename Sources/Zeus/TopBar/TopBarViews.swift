@@ -507,21 +507,33 @@ struct MusicControls: View {
 
     var body: some View {
         let modes = topBar.musicModes
+        // A control the shown source cannot honour is not drawn; the rest keep their place and the row stays centred.
+        let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
         // Until the player has answered, a mode control is drawn subdued; it still takes a press.
         let known = Theme.cloudPrimary
         let unknown = Theme.cloudSecondary.opacity(0.5)
         HStack(spacing: 4) {
             Spacer(minLength: 0)
-            GlyphButton(symbol: "shuffle", size: size, tint: modes.shuffle == nil ? unknown : known, label: "Shuffle",
-                        active: modes.shuffle == true, value: MusicModeRules.spokenShuffle(modes.shuffle)) { topBar.musicCommand(.toggleShuffle) }
-            GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
-            GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
-                topBar.musicCommand(.playPause)
+            if shown.contains(.shuffle) {
+                GlyphButton(symbol: "shuffle", size: size, tint: modes.shuffle == nil ? unknown : known, label: "Shuffle",
+                            active: modes.shuffle == true, value: MusicModeRules.spokenShuffle(modes.shuffle)) { topBar.musicCommand(.toggleShuffle) }
             }
-            GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
-            GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
-                        tint: modes.repeatMode == nil ? unknown : known, label: "Repeat",
-                        active: modes.repeatMode.map { $0 != .off } ?? false, value: MusicModeRules.spokenRepeat(modes.repeatMode)) { topBar.musicCommand(.cycleRepeat) }
+            if shown.contains(.previous) {
+                GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
+            }
+            if shown.contains(.playPause) {
+                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
+                    topBar.musicCommand(.playPause)
+                }
+            }
+            if shown.contains(.next) {
+                GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
+            }
+            if shown.contains(.repeatMode) {
+                GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
+                            tint: modes.repeatMode == nil ? unknown : known, label: "Repeat",
+                            active: modes.repeatMode.map { $0 != .off } ?? false, value: MusicModeRules.spokenRepeat(modes.repeatMode)) { topBar.musicCommand(.cycleRepeat) }
+            }
             Spacer(minLength: 0)
         }
     }
@@ -538,22 +550,36 @@ struct MusicPage: View {
     let topBar: TopBarModel
     /// The SwiftUI @State macro is unavailable to this toolchain, so the toggle lives in an ObservableObject.
     @StateObject private var lyricsToggle = LyricsToggle()
-    private var showLyrics: Bool { lyricsToggle.show }
+    private static let buttonGap: CGFloat = 8
+    /// Output, Lyrics and Open: three 27 pt buttons (a 12 pt glyph and 15 pt of frame) and the gaps between them.
+    private static let trailingWidth: CGFloat = 3 * 27 + 2 * buttonGap
 
     var body: some View {
         let scrub = ScrubState.shared
+        let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
+        // Lyrics a source cannot give are not shown, even if the toggle was on for the last one.
+        let showLyrics = lyricsToggle.show && shown.contains(.lyrics)
         HStack(spacing: 14) {
             AlbumTile(playing: topBar.nowPlaying, size: 132)
             VStack(alignment: .leading, spacing: 8) {
-                if showLyrics {
-                    Text([topBar.nowPlaying?.title, topBar.nowPlaying?.artist].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
-                        .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
-                    LyricsView(playing: topBar.nowPlaying, rows: 3, rowHeight: 24, fontSize: 14)
-                } else {
-                    Text(topBar.nowPlaying?.title ?? "Nothing playing")
-                        .font(TopBarStyle.label(17, .bold)).foregroundStyle(Theme.cloudPrimary).lineLimit(2)
-                    Text([topBar.nowPlaying?.artist, topBar.nowPlaying?.album].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
-                        .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let playing = topBar.nowPlaying {
+                        Text(NowPlayingDisplay.sourceLine(playing.source))
+                            .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        if showLyrics {
+                            Text([topBar.nowPlaying?.title, topBar.nowPlaying?.artist].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
+                                .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                            LyricsView(playing: topBar.nowPlaying, rows: 3, rowHeight: 24, fontSize: 14)
+                        } else {
+                            Text(topBar.nowPlaying?.title ?? "Nothing playing")
+                                .font(TopBarStyle.label(17, .bold)).foregroundStyle(Theme.cloudPrimary).lineLimit(2)
+                            Text([topBar.nowPlaying?.artist, topBar.nowPlaying?.album].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
+                                .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                        }
+                    }
                 }
                 Spacer(minLength: 0)
                 if let playing = topBar.nowPlaying {
@@ -563,7 +589,7 @@ struct MusicPage: View {
                         VStack(spacing: 2) {
                             ProgressLine(fraction: MusicSeek.fraction(elapsed: playing.elapsed(at: context.date), duration: playing.duration),
                                          tint: tint,
-                                         onSeek: playing.duration > 0 ? { fraction in
+                                         onSeek: shown.contains(.scrub) ? { fraction in
                                              if let seconds = MusicSeek.seconds(fraction: fraction, duration: playing.duration) { topBar.seek(seconds) }
                                          } : nil)
                             HStack {
@@ -575,13 +601,20 @@ struct MusicPage: View {
                         }
                     }
                 }
-                HStack {
+                HStack(spacing: 0) {
                     MusicControls(topBar: topBar, size: 16)
-                    OutputDeviceMenu(topBar: topBar)
-                    GlyphButton(symbol: "quote.bubble", size: 12, tint: Theme.cloudSecondary, label: "Lyrics",
-                                active: showLyrics, value: ToggleOnLook.spoken(showLyrics)) { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
-                    GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
-                                label: "Open \(topBar.commandTarget.kindName)") { topBar.musicCommand(.open) }
+                    HStack(spacing: Self.buttonGap) {
+                        OutputDeviceMenu(topBar: topBar)
+                        if shown.contains(.lyrics) {
+                            GlyphButton(symbol: "quote.bubble", size: 12, tint: Theme.cloudSecondary, label: "Lyrics",
+                                        active: showLyrics, value: ToggleOnLook.spoken(showLyrics)) { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
+                        }
+                        GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
+                                    label: NowPlayingDisplay.openLabel(for: topBar.commandTarget)) { topBar.musicCommand(.open) }
+                    }
+                    // The trailing buttons keep the width of the full set, so the transport stays where it is when
+                    // the Lyrics button is not drawn.
+                    .frame(minWidth: Self.trailingWidth, alignment: .trailing)
                 }
             }
         }
@@ -1449,7 +1482,11 @@ struct ClosedWings: View {
                 }
             }
         case .music:
-            wings { AlbumTile(playing: topBar.nowPlaying, size: 18) } right: {
+            wings {
+                AlbumTile(playing: topBar.nowPlaying, size: 18)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
+            } right: {
                 LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
             }
         case .none:
