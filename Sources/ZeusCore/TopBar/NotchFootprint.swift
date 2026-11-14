@@ -16,16 +16,20 @@ public struct NotchDisplayFacts: Sendable, Equatable {
     }
 }
 
-/// The shape the closed notch takes on one display: the hardware notch, or the slim pill where there is none.
+/// The shape the closed notch takes on one display: the hardware notch, or where there is none the slim pill or
+/// the shape the owner drew.
 public enum NotchFootprint: Sendable, Equatable {
     case hardware(CGSize)
     case pill
+    /// A drawn notch, already fitted to its display. It is laid out as a hardware notch of that size.
+    case drawn(DrawnNotchShape)
 
     /// The hardware size, and zero for the pill: what the layout calls the notch.
     public var layoutSize: CGSize {
         switch self {
         case .hardware(let size): size
         case .pill: .zero
+        case .drawn(let shape): CGSize(width: shape.width, height: shape.height)
         }
     }
 
@@ -34,6 +38,7 @@ public enum NotchFootprint: Sendable, Equatable {
         switch self {
         case .hardware(let size): size
         case .pill: NotchClosedBodyLayout.slimPillSize
+        case .drawn(let shape): CGSize(width: shape.width, height: shape.height)
         }
     }
 
@@ -42,6 +47,7 @@ public enum NotchFootprint: Sendable, Equatable {
         switch self {
         case .hardware(let size): size.width
         case .pill: 40
+        case .drawn(let shape): CGFloat(shape.width)
         }
     }
 
@@ -104,10 +110,47 @@ public enum NotchFootprintRules {
         hardwareSize(facts).map(NotchFootprint.hardware) ?? .pill
     }
 
-    /// The island that opens the notch on hover: at least 160 wide, as tall as the bar plus the drop, and with a wing
-    /// kind showing both wings and their ears. A lit light alone widens the body and not this zone.
+    /// The hardware notch wins. Without one, the pill for the pill style or when the display cannot hold the
+    /// shape, else the shape fitted to the display's width.
+    public static func resolve(_ facts: NotchDisplayFacts, style: NotchlessStyle, shape: DrawnNotchShape) -> NotchFootprint {
+        if let size = hardwareSize(facts) { return .hardware(size) }
+        guard style == .drawn,
+              let fitted = DrawnNotchLimits.fitted(shape, screenWidth: Double(facts.frame.size.width)) else { return .pill }
+        return .drawn(fitted)
+    }
+
+    /// The closed body as `NotchView` draws it: the idle size, or the wings grown from the wing base. A drawn
+    /// notch has no shoulders while idle, like the hardware notch. Nil wings is a bare idle notch.
+    public static func closedSize(_ footprint: NotchFootprint, wings: ClosedWingsFacts?) -> CGSize {
+        let facts = wings ?? .noWings
+        let hasNotch = !footprint.isPill
+        let shoulder: CGFloat = hasNotch && !facts.kindIsNone ? 8 : 0
+        let size = footprint.layoutSize
+        if facts.showsWings {
+            let width = NotchClosedBodyLayout.bodyWidth(
+                notchWidth: footprint.wingBase, shoulder: shoulder, showWings: true, extraWidth: facts.extraWidth,
+                hasNotch: hasNotch, slimPill: footprint.isPill)
+            return CGSize(width: width, height: max(size.height, 30))
+        }
+        guard hasNotch else { return footprint.idleSize }
+        return CGSize(width: size.width + 2 * shoulder, height: size.height)
+    }
+
+    /// The closed body in screen coordinates: centred, hanging from the top offset.
+    public static func bodyRect(_ footprint: NotchFootprint, screenFrame: CGRect, topOffset: CGFloat,
+                                wings: ClosedWingsFacts?) -> CGRect {
+        let size = closedSize(footprint, wings: wings)
+        return CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - max(topOffset, 0) - size.height,
+                      width: size.width, height: size.height)
+    }
+
+    /// The island that opens the notch on hover. A drawn shape's zone is its body and nothing above it, so a lowered
+    /// shape never claims the menu bar strip over it. The hardware notch and the pill keep their zones: at least
+    /// 160 wide, as tall as the bar plus the drop, and with a wing kind showing both wings and their ears. A lit
+    /// light alone widens the body and not those zones.
     public static func hoverZone(_ footprint: NotchFootprint, screenFrame: CGRect, topOffset: CGFloat,
                                  wings: ClosedWingsFacts?) -> CGRect {
+        if case .drawn = footprint { return bodyRect(footprint, screenFrame: screenFrame, topOffset: topOffset, wings: wings) }
         let size = footprint.layoutSize
         var island = max(size.width, 160)
         if let wings, !wings.kindIsNone {
@@ -116,7 +159,19 @@ public enum NotchFootprintRules {
         return GlanceTopBar.hoverZone(screen: screenFrame, notch: CGSize(width: island, height: max(size.height, 30) + topOffset))
     }
 
-    public static func clickZone(_ footprint: NotchFootprint, screenFrame: CGRect, topOffset: CGFloat) -> CGRect {
-        NotchOpenRules.clickZone(screenFrame: screenFrame, notchSize: footprint.layoutSize, topOffset: topOffset)
+    /// Where a click opens the notch. A drawn shape's zone is its body; the other footprints ignore `wings`.
+    public static func clickZone(_ footprint: NotchFootprint, screenFrame: CGRect, topOffset: CGFloat,
+                                 wings: ClosedWingsFacts? = nil) -> CGRect {
+        if case .drawn = footprint { return bodyRect(footprint, screenFrame: screenFrame, topOffset: topOffset, wings: wings) }
+        return NotchOpenRules.clickZone(screenFrame: screenFrame, notchSize: footprint.layoutSize, topOffset: topOffset)
+    }
+
+    /// Whether the window takes the mouse at a point: only for a closed drawn notch, on its body. The top edge
+    /// counts and the bottom does not, as in `GlanceTopBar.inHoverZone`.
+    public static func takesMouse(_ footprint: NotchFootprint, closed: Bool, point: CGPoint, screenFrame: CGRect,
+                                  topOffset: CGFloat, wings: ClosedWingsFacts?) -> Bool {
+        guard closed, case .drawn = footprint else { return false }
+        let body = bodyRect(footprint, screenFrame: screenFrame, topOffset: topOffset, wings: wings)
+        return abs(point.x - body.midX) <= body.width / 2 && point.y > body.minY && point.y <= body.maxY
     }
 }
