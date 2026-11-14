@@ -297,7 +297,12 @@ It must not touch the top-bar or settings files.
   source to its own loop in `.commonModes` and turns the tap on. `stop()` asks the thread to tear down and waits for it to end
   (2 s at most, normally microseconds): on the thread's own loop, after any callback in flight, it turns the tap off,
   removes the source, calls `CFMachPortInvalidate` and ends the loop, so a callback never meets a freed port, and no key
-  is consumed once `stop()` has returned. Switching tiling off and on many times leaves no thread and no object behind.
+  is consumed once `stop()` has returned. A stop that reaches the thread before its first step still runs the teardown
+  there (the port is made before the thread starts and is enabled from the start), so no port is ever left enabled with no
+  loop. A second caller waits for the same thread. If the thread has not ended after the 2 s wait, `stop()` returns with
+  the life still `stopping` and the run kept, `start()` is refused, and a later `stop()` waits again, so a second tap is
+  never created beside an old one. The system calls (make the tap, turn it on or off) sit behind `TilingTapSystem`, so
+  a test can drive the real object on a stand-in source. Switching tiling off and on many times leaves no thread and no object behind.
   The life of the tap (off, starting, live, stopping, failed) is the pure `TileTapLife` in ZeusCore, and the lock only
   makes its decisions atomic. The tap is created only when `AccessibilityGate.trusted`, re-armed through
   `AccessibilityGate.whenTrusted(key: "tiling")`, and never left installed when tiling is off. The source lint fails
@@ -307,7 +312,12 @@ It must not touch the top-bar or settings files.
   or passes the event through, and makes no Accessibility call and waits on nothing. The matched action goes into a
   `TileActionMailbox` and a drain on the main queue runs it after the callback has returned its answer. A held focus
   key repeats faster than a window scan runs, so the mailbox keeps only the newest of a run of focus requests: at most
-  one scan waits behind a running one. Every other action is kept, in order.
+  one scan waits behind a running one. A held nudge key repeats too, but every step counts, so a run of equal nudges is
+  one entry with a step count (at most 16, the range a ratio can travel); the controller applies all the steps
+  (`TileResolver.resolve(_:times:...)`) and lays the windows out once. Every other action is kept, in order. The
+  consumed key reaches the other monitors through the main queue, while modifier changes reach them from the window
+  server, so the two are not ordered while main is busy; a smaller hold that forms in that gap is cancelled the moment
+  the key arrives and sends nothing.
 - It re-enables itself on `.tapDisabledByTimeout` and `.tapDisabledByUserInput` (`TileTapHealth` still counts them, and
   `TileTapLife` turns its verdict into an effect). It ignores autorepeat for the toggle
   actions and allows it for focus and ratio. It passes through every event that carries Zeus's own input tag
@@ -339,9 +349,11 @@ This is the only shared file T3 touches, and no other ticket edits it.
 The keymap tests are the pure ones already listed under T1 (unique defaults, invalid and duplicate chords rejected,
 conflicts reported). The lint sample proves a `CGEvent.tapCreate` in a non-`nonisolated` func under
 `Sources/Zeus/Tiling` fails the check. The tap's life and its mailbox are proved in ZeusCoreTests (`TileTapLifeTests`,
-`TileActionMailboxTests`); the thread (run on its own thread, stop during a callback, 300 start and stop cycles that
-release everything) and the real tap object (start and stop cycles, a burst of focus repeats while main is busy) are
-proved in `TilingRunLoopThreadTests` and `TilingKeyTapLifecycleTests`.
+`TileActionMailboxTests`); the thread (run on its own thread, stop during a callback, a stop that wins the race,
+300 start and stop cycles that release everything) and the real tap object (start and stop cycles, a burst of focus
+repeats while main is busy, and on a stand-in system: serviced on its own thread while main is blocked, a port
+invalidated on every stop path, a stop that times out) are proved in `TilingRunLoopThreadTests`,
+`TilingKeyTapLifecycleTests` and `TilingKeyTapStandInTests`.
 
 ---
 
@@ -444,11 +456,17 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
 - Key clash, closed in the review pass: `TileBaseConflicts.notes` compares the tiling keys with the keys the other
   monitors really use. The talk key is the effective one (`VoiceKey.effectiveTalkKey`), which moves off Control-Option
   while VoiceOver runs; a modifier-only talk, pointing, dictation or Polyglot key with the same modifiers as the chosen pair is a
-  clash (a larger pair is free, because every one of those holds, the shared talk and dictation key included, begins only
-  on exactly its own modifiers (`HotkeyMonitor.handleShared` arms on the exact match and only a running hold tolerates
-  extra ones, such as Shift meaning Return), and the tap forwards every key it consumes, key-down and key-up, to the talk,
-  dictation, Polyglot and pointing monitors through `TilingConsumedKey`, so a smaller hold that forms when the owner lets go of
-  the extra modifier first stays spoiled until every modifier is up); every bound tiling chord (base plus key) is
+  clash; a larger pair is free for a hold-style key, because the hold begins only on exactly its own modifiers
+  (`HotkeyMonitor.handleShared` arms on the exact match after its hold delay, and only a running hold tolerates extra
+  ones, such as Shift meaning Return), and a hold that Control, Option or Command joins is cancelled, not sent: the
+  talk and dictation hold in `HotkeyMonitor` (cancel through `onCancel`, and it cannot restart until every modifier is
+  up) and the pointing hold in `PointingKeyGesture` (which already did). That is the natural press order, Control and
+  Option first, then Command, so on the shipped defaults a tiling chord opens at most a talk turn that is cancelled and
+  never sent; Shift and Fn joining still end a hold the normal way. The tap also forwards every key it consumes,
+  key-down and key-up, to the talk, dictation, Polyglot and pointing monitors through `TilingConsumedKey`, so a smaller
+  hold that forms when the owner lets go of the extra modifier first stays spoiled until every modifier is up. A key
+  that acts on the first press has nothing to cancel, so a pair that strictly contains a press-to-toggle dictation key or a
+  modifier-only Polyglot key is a clash too (`dictationToggles` in the rule); every bound tiling chord (base plus key) is
   compared with every keyed talk, pointing, dictation and Polyglot shortcut, with the fn flag handled as the tap handles it; a
   chat chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch, the prompter pause or the approval
   answer keys (Control-Option Y, N and O while "Answer permissions from the keyboard" is on); and while
@@ -458,7 +476,7 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   note. VoiceOver writes no setting, so the controller watches it (key value observing on the workspace) from the
   first start with the switch on until the switch goes off, including while a clash holds tiling back, and checks the
   clash again when VoiceOver starts or stops. The tap consumes a chord before the other keys' monitors can see it
-  spoil a hold, so refusing is the only fail-closed option. The default pair is Control-Option-Command: no shipped key
+  spoil a hold, so refusing is the only fail-closed option for a key that is the same pair or a toggle inside it. The default pair is Control-Option-Command: no shipped key
   holds it (Talk to Zeus and pointing are Control-Option, dictation is Right Command, Talk to Zeus moves to
   Option-Command while VoiceOver runs), and `TileBaseConflictsTests` keeps it that way (while VoiceOver runs the pair is refused, with a note).
   An unknown stored pair reads
