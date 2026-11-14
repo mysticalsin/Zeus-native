@@ -51,7 +51,9 @@ class SettingsGenerationTests(unittest.TestCase):
         for row in rows:
             with self.subTest(key=row[7]):
                 self.assertEqual(row[11], 'live')
-                self.assertEqual((row[3], row[4]), ('-', '-'))
+                # No reference app to study: the reference default is '-' and the control names the row's own kind.
+                self.assertEqual(row[4], '-')
+                self.assertEqual(row[6], 'missing')
                 self.assertTrue(row[12].startswith('Zeus addition.'))
 
     def test_tiling_enabled_default_cannot_be_removed_or_made_true(self):
