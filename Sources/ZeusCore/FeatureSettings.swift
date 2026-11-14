@@ -48,8 +48,11 @@ public enum FeatureSettings {
     /// The gap between the tiles and the screen edge, in points.
     public static func tilingOuterGap(defaults: UserDefaults = .standard) -> Double { number("tiling.outerGap", default: 8, defaults: defaults) }
 
-    /// The default split as the percentage the page shows (50), not the engine's ratio (0.5).
+    /// The default split as the percentage the page shows (50). It is not the engine's ratio: pass `tilingDefaultRatio` to `TileConfig`.
     public static func tilingSplitRatio(defaults: UserDefaults = .standard) -> Double { number("tiling.splitRatio", default: 50, defaults: defaults) }
+
+    /// The default split as the engine's ratio (0.5), the percentage over 100. `TileConfig` clamps the range.
+    public static func tilingDefaultRatio(defaults: UserDefaults = .standard) -> Double { tilingSplitRatio(defaults: defaults) / 100 }
 
     /// A ring around the focused window.
     public static func tilingFocusBorder(defaults: UserDefaults = .standard) -> Bool { bool("tiling.focusBorder", default: true, defaults: defaults) }
@@ -59,11 +62,11 @@ public enum FeatureSettings {
         TileModifierBase(label: string("tiling.keyBase", default: "Control-Option", defaults: defaults))
     }
 
-    /// Bundle ids Zeus never tiles, separated by commas or new lines. Case is kept: a bundle id is compared as written.
+    /// Bundle ids Zeus never tiles, separated by commas or new lines (any kind, CRLF included). Case is kept: a bundle id is compared as written.
     public static func tilingExcludedApps(defaults: UserDefaults = .standard) -> Set<String> {
         Set(string("tiling.excludedApps", default: "", defaults: defaults)
-            .split(whereSeparator: { $0 == "," || $0 == "\n" })
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty })
     }
 
