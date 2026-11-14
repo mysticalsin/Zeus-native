@@ -842,5 +842,97 @@ class ScribeMeetingCardTests(unittest.TestCase):
         self.assertIn("FlightRecorder.shared.record(", driver)
 
 
+# Browser media (docs/NOTCH-SOURCES-PLAN.md, A3): a command reaches a tab only through the feed, and nothing here
+# listens to or taps audio.
+BROWSER_MEDIA_BRIDGE_FILE = "Chrome/ChromeBridge.swift"
+BROWSER_MEDIA_FEED_FILE = "Chrome/BrowserMediaFeed.swift"
+BROWSER_MEDIA_NEVER = ["Chrome/ChromeActions.swift", "../ZeusCore/ZeusTag.swift", "../ZeusCore/BrowserCommand.swift"]
+BROWSER_MEDIA_NEVER_DIRS = ["Intent", "Voice"]
+MEDIA_COMMAND_LITERAL = re.compile(r'"media\.command"')
+MEDIA_COMMAND_CALL = re.compile(r"ChromeBridge\.mediaCommand\(")
+MEDIA_WORDS = re.compile(r'"media\.command"|mediaCommand\(|"media\.state"')
+AUDIO_TAP_APIS = re.compile(r"AudioDeviceCreateIOProc|AudioHardwareCreateProcessTap|AudioHardwareCreateAggregateDevice|\.installTap\(")
+
+
+def code_text(text):
+    return "\n".join(line for line in text.splitlines() if not line.strip().startswith("//"))
+
+
+def media_literal_offenders(sources):
+    """`sources` maps a path under Sources/Zeus to its text. The command literal may appear only in the bridge file,
+    the call only in the feed, and the never-files and directories must not name either."""
+    offenders = []
+    for path, text in sources.items():
+        body = code_text(text)
+        if MEDIA_COMMAND_LITERAL.search(body) and path != BROWSER_MEDIA_BRIDGE_FILE:
+            offenders.append(f"{path}: media.command literal")
+        if MEDIA_COMMAND_CALL.search(body) and path != BROWSER_MEDIA_FEED_FILE:
+            offenders.append(f"{path}: mediaCommand call")
+        never = path in BROWSER_MEDIA_NEVER or any(path.startswith(d + "/") for d in BROWSER_MEDIA_NEVER_DIRS)
+        if never and MEDIA_WORDS.search(body):
+            offenders.append(f"{path}: names a media request")
+    return offenders
+
+
+def audio_tap_offenders(sources):
+    return [f"{path}" for path, text in sources.items() if AUDIO_TAP_APIS.search(code_text(text))]
+
+
+class BrowserMediaLint(unittest.TestCase):
+    def sources(self):
+        files = {str(p.relative_to(APP)): p.read_text() for p in swift_files()}
+        for rel in ["ZeusTag.swift", "BrowserCommand.swift"]:
+            files["../ZeusCore/" + rel] = (ROOT / "Sources/ZeusCore" / rel).read_text()
+        return files
+
+    def test_the_media_command_goes_out_only_through_the_bridge_and_the_feed(self):
+        self.assertEqual(media_literal_offenders(self.sources()), [])
+
+    def test_the_feed_and_bridge_files_exist_and_carry_their_halves(self):
+        self.assertTrue(MEDIA_COMMAND_LITERAL.search((APP / BROWSER_MEDIA_BRIDGE_FILE).read_text()))
+        self.assertTrue(MEDIA_COMMAND_CALL.search((APP / BROWSER_MEDIA_FEED_FILE).read_text()))
+
+    def test_the_feed_never_starts_the_call_watcher_and_the_watcher_gains_one_property(self):
+        feed = code_text((APP / BROWSER_MEDIA_FEED_FILE).read_text())
+        self.assertNotIn("ScribeCallWatcher.shared.start", feed)
+        self.assertNotIn("ScribeController", feed)
+        watcher = (APP / "Scribe/ScribeCallWatcher.swift").read_text()
+        self.assertEqual(watcher.count("var browserCallPresent: Bool"), 1)
+
+    def test_the_output_gate_listens_to_properties_and_never_taps_audio(self):
+        self.assertEqual(audio_tap_offenders({p.name: p.read_text() for p in (APP / "Chrome").glob("*.swift")}), [])
+        gate = code_text((APP / "Chrome/ChromeOutputActivity.swift").read_text())
+        self.assertIn("kAudioProcessPropertyIsRunningOutput", gate)
+        self.assertIn("kAudioDevicePropertyDeviceIsRunningSomewhere", gate)
+        self.assertNotIn("@MainActor", gate, "Core Audio calls these blocks off the main actor")
+
+    def test_the_feed_polls_only_what_the_rules_and_the_machine_allow(self):
+        feed = code_text((APP / BROWSER_MEDIA_FEED_FILE).read_text())
+        self.assertIn("BrowserPollMachine.next(", feed)
+        self.assertIn("BrowserMediaRules.usable(", feed)
+        self.assertEqual(feed.count('"media.state"'), 0, "the request type lives in ChromeBridge")
+
+    def test_the_media_toggle_is_never_turned_on_by_an_import(self):
+        text = (APP / "App/SettingsStore.swift").read_text()
+        block = text[text.index("static let neverEnabledByImport"):]
+        block = block[:block.index("]")]
+        self.assertIn('"music.browserMedia"', block)
+
+    def test_the_media_lint_detects_its_failure_shapes(self):
+        ok = {BROWSER_MEDIA_BRIDGE_FILE: 'send("media.command")', BROWSER_MEDIA_FEED_FILE: "ChromeBridge.mediaCommand(a)"}
+        self.assertEqual(media_literal_offenders(ok), [])
+        self.assertEqual(media_literal_offenders({**ok, "Chrome/Other.swift": 'let t = "media.command"'}), ["Chrome/Other.swift: media.command literal"])
+        self.assertEqual(media_literal_offenders({**ok, "TopBar/X.swift": "ChromeBridge.mediaCommand(a)"}), ["TopBar/X.swift: mediaCommand call"])
+        self.assertEqual(media_literal_offenders({**ok, "Voice/Say.swift": "ChromeBridge.mediaCommand(a)"}),
+                         ["Voice/Say.swift: mediaCommand call", "Voice/Say.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "Intent/Go.swift": 'let t = "media.state"'}), ["Intent/Go.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "Chrome/ChromeActions.swift": 'x = "media.command"'}),
+                         ["Chrome/ChromeActions.swift: media.command literal", "Chrome/ChromeActions.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "../ZeusCore/ZeusTag.swift": "mediaCommand(x)"}), ["../ZeusCore/ZeusTag.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "Chrome/Other.swift": '// "media.command" in a comment'}), [])
+        self.assertEqual(audio_tap_offenders({"a.swift": "AudioHardwareCreateProcessTap(d, &t)"}), ["a.swift"])
+        self.assertEqual(audio_tap_offenders({"a.swift": "// AudioDeviceCreateIOProcID"}), [])
+
+
 if __name__ == "__main__":
     unittest.main()
