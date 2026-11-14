@@ -207,7 +207,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Real agent events from Claude Code hooks. The socket starts only after `commandHandler`
         // is wired below so `zeus debug dictate-file` never runs while launch is still wiring handlers.
-        if on(.agentServer) { agentServer = AgentEventServer(notch: notch) }
+        if on(.agentServer) {
+            // Read this app's own signature now, off the main thread, before the socket opens: once Zeus.app is
+            // replaced on disk while this process runs, the running copy can no longer be validated, and every
+            // command that needs the peer check would be refused until the next launch.
+            Task.detached(priority: .utility) { _ = PeerSigning.captureOwnIdentity() }
+            agentServer = AgentEventServer(notch: notch)
+        }
         if on(.helperRefresh) {
             if ClaudeHookInstaller.isInstalled() { try? ClaudeHookInstaller.refreshHelper() }
             if ChromeInstaller.isInstalled() {
