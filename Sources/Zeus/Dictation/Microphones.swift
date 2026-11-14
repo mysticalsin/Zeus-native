@@ -36,7 +36,11 @@ enum Microphones {
         guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else { return [] }
         var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids) == noErr else { return [] }
-        return ids
+        // The aggregates Zeus builds for shaping and listening are never a microphone to choose.
+        return ids.filter { id in
+            !ZeusAudioDevices.isOwnAggregate(
+                uid: string(id, kAudioDevicePropertyDeviceUID) ?? "", name: string(id, kAudioObjectPropertyName) ?? "")
+        }
     }
 
     private static func defaultInputID() -> AudioDeviceID {
