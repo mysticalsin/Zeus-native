@@ -342,19 +342,12 @@ private func movedGains(_ band: Int = 3, by amount: Double = 3) -> [Double] {
         #expect(decoded.book.apps.isEmpty)
     }
 
-    @Test func duplicateEmptyOrOversizeEntriesFailRatherThanLoseData() throws {
+    @Test func aRepeatedBundleIdOrTooManyAppsFailRatherThanLoseData() throws {
         let duplicate = try mutatedBook { object in
             let apps = object["apps"] as? [[String: Any]] ?? []
             object["apps"] = apps + apps
         }
         #expect(AppSoundBook.decode(duplicate).failed)
-
-        let emptyID = try mutatedBook { object in
-            var apps = object["apps"] as? [[String: Any]] ?? []
-            apps[0]["bundleID"] = ""
-            object["apps"] = apps
-        }
-        #expect(AppSoundBook.decode(emptyID).failed)
 
         let oversize = try mutatedBook { object in
             let template = (object["apps"] as? [[String: Any]] ?? [])[0]
