@@ -100,6 +100,18 @@ struct GlyphButton: View {
 /// own colour that stays as the placeholder while it loads or when no cover can be found.
 struct AlbumTile: View {
     let playing: NowPlaying?
+
+    /// The placeholder glyph for a source; every case is named, so a new source stops the build here.
+    private static func glyph(for source: NowPlayingSource) -> String {
+        switch source {
+        case .player(let player):
+            switch player {
+            case .music: "music.note"
+            case .spotify: "dot.radiowaves.left.and.right"
+            }
+        case .browser: "globe"
+        }
+    }
     /// Glance Home Music art tile is 48 pt (TOPBAR-SPEC §4); empty state keeps the quiet grey fill.
     var size: CGFloat = 48
 
@@ -115,7 +127,7 @@ struct AlbumTile: View {
                                                   Color(hue: (hue + 0.12).truncatingRemainder(dividingBy: 1), saturation: 0.8, brightness: 0.45)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .overlay(
-                        Image(systemName: playing.player == .spotify ? "dot.radiowaves.left.and.right" : "music.note")
+                        Image(systemName: Self.glyph(for: playing.source))
                             .font(.system(size: size * 0.35, weight: .medium))
                             .foregroundStyle(.white.opacity(art == nil ? 0.9 : 0))
                     )
@@ -580,11 +592,13 @@ struct MusicPage: View {
                     GlyphButton(symbol: "quote.bubble", size: 12, tint: Theme.cloudSecondary, label: "Lyrics",
                                 active: showLyrics, value: ToggleOnLook.spoken(showLyrics)) { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
                     GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
-                                label: "Open \(topBar.nowPlaying?.player.rawValue ?? "Music")") { topBar.musicCommand(.open) }
+                                label: "Open \(topBar.nowPlaying?.source.kindName ?? topBar.commandTarget().kindName)") { topBar.musicCommand(.open) }
                 }
             }
         }
         .padding(.vertical, 6)
+        .onAppear { topBar.musicPageVisible = true }
+        .onDisappear { topBar.musicPageVisible = false }
     }
 }
 

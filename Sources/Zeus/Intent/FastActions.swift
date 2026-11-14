@@ -288,7 +288,7 @@ final class FastActions {
     private func playOnSpotify(_ query: String, intent: FastIntent) -> Plan {
         Plan(intent: intent, summary: "Spotify: \(query)", ack: acks.line(.searchingSpotify(query))) { [weak self] started in
             let outcome = await SpotifyPlayer.play(query, started: started) { [weak self] in
-                guard let playing = self?.topBar?.nowPlaying, playing.player == .spotify else { return nil }
+                guard let playing = self?.topBar?.nowPlaying, playing.source == .player(.spotify) else { return nil }
                 return playing.isPlaying
             }
             switch outcome {

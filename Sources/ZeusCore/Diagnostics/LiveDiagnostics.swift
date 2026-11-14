@@ -62,11 +62,12 @@ public struct LiveDiagnostics: Equatable, Sendable {
         self.osVersion = osVersion
     }
 
-    /// Takes the player's name and Playing or Paused from `nowPlaying` and drops the rest.
+    /// Takes the source's kind (Music, Spotify, Chrome) and Playing or Paused from `nowPlaying` and drops the rest:
+    /// never a host, a title or an address.
     public init(cpuPercent: Double?, memoryBytes: UInt64?, thermal: KeepAwakeRules.Thermal, audio: AudioCapture,
                 nowPlaying: NowPlaying?, appVersion: String, build: String, osVersion: String) {
         self.init(cpuPercent: cpuPercent, memoryBytes: memoryBytes, thermal: thermal, audio: audio,
-                  playerName: nowPlaying?.player.rawValue, isPlaying: nowPlaying?.isPlaying ?? false,
+                  playerName: nowPlaying?.source.kindName, isPlaying: nowPlaying?.isPlaying ?? false,
                   appVersion: appVersion, build: build, osVersion: osVersion)
     }
 
