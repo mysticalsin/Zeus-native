@@ -235,6 +235,12 @@ enum SnapshotRenderer {
                 save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: section,
                      to: directory.appendingPathComponent("gs-\(section.rawValue).png"))
             }
+            // The Chrome media switch with its reload hint, shown only while Chrome runs an older extension.
+            SettingsStore.shared.statusOverrides[BrowserMediaFeed.statusID] = (false, BrowserMediaFeed.reloadStatus)
+            nav.section = .privacy
+            save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: .privacy,
+                 to: directory.appendingPathComponent("gs-privacy-chrome-reload.png"))
+            SettingsStore.shared.statusOverrides[BrowserMediaFeed.statusID] = nil
         }
         let navigation = SettingsNavigation()
         let obServices = OnboardingServices(permissions: permissions)
