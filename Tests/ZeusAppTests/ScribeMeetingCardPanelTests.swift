@@ -9,7 +9,7 @@ import ZeusCore
 @MainActor
 @Suite("Meeting card panel")
 struct ScribeMeetingCardPanelTests {
-    private final class Fades {
+    @MainActor private final class Fades {
         var pending: [@MainActor @Sendable () -> Void] = []
         var targets: [CGFloat] = []
         func finishAll() {
