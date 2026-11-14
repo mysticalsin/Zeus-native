@@ -13,8 +13,7 @@ final class MusicAwakeHold {
     /// The catalog id of the setting.
     static let settingID = "keepAwake.whileMusic"
     /// How long one assertion lasts if Zeus stops renewing it.
-    static let lease: TimeInterval = 120
-    private static let renewEvery: TimeInterval = 60
+    static let lease: TimeInterval = MusicAwakeTiming.lease
 
     /// True while the assertion is held.
     var isHolding: Bool { assertion != nil }
@@ -125,20 +124,22 @@ final class MusicAwakeHold {
 
     // MARK: Timers and power
 
-    /// Real timers, with some slack so the system can batch the wake-ups. The lease is 120 seconds and
-    /// renewal runs every 60, so ten seconds late is still safe; the grace end may be half a second late.
+    /// Real timers, with some slack so the system can batch the wake-ups. `MusicAwakeTiming` keeps the
+    /// renewal early enough for that slack; the grace end may be half a second late. They run in the common
+    /// run-loop modes, so an open menu or modal panel does not stop the renewal and let the lease lapse.
     nonisolated static func timerSchedule(after delay: TimeInterval, repeats: Bool,
                                           fire: @escaping @MainActor () -> Void) -> () -> Void {
-        let timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: repeats) { _ in
+        let timer = Timer(timeInterval: delay, repeats: repeats) { _ in
             MainActor.assumeIsolated { fire() }
         }
-        timer.tolerance = repeats ? 10 : 0.5
+        timer.tolerance = repeats ? MusicAwakeTiming.renewTolerance : 0.5
+        RunLoop.main.add(timer, forMode: .common)
         return { timer.invalidate() }
     }
 
     private func startRenewTimer() {
         guard cancelRenew == nil else { return }
-        cancelRenew = schedule(Self.renewEvery, true) { [weak self] in self?.evaluate(renewLease: true) }
+        cancelRenew = schedule(MusicAwakeTiming.renewEvery, true) { [weak self] in self?.evaluate(renewLease: true) }
     }
 
     /// One shot for the moment the grace runs out, so a pause that never resumes lets go on time.

@@ -93,4 +93,33 @@ import Testing
         #expect(MusicAwakeRule.Verdict.hold.holds)
         #expect(!MusicAwakeRule.Verdict.release(.off).holds)
     }
+
+    // MARK: Lease and renewal timing
+
+    @Test func theShippedTimingIsSafe() {
+        #expect(MusicAwakeTiming.isSafe(lease: MusicAwakeTiming.lease, renewEvery: MusicAwakeTiming.renewEvery,
+                                        tolerance: MusicAwakeTiming.renewTolerance))
+    }
+
+    @Test func renewingAsOftenAsTheLeaseIsNotSafe() {
+        #expect(!MusicAwakeTiming.isSafe(lease: 120, renewEvery: 120, tolerance: 0))
+        #expect(!MusicAwakeTiming.isSafe(lease: 120, renewEvery: 130, tolerance: 0))
+    }
+
+    @Test func aLateTimerMustStillLandInsideTheLease() {
+        // Renewal can run a whole tolerance late; that and the margin must still fit before the lease ends.
+        #expect(!MusicAwakeTiming.isSafe(lease: 120, renewEvery: 60, tolerance: 60))
+        #expect(!MusicAwakeTiming.isSafe(lease: 120, renewEvery: 100, tolerance: 15, margin: 5))
+        #expect(MusicAwakeTiming.isSafe(lease: 120, renewEvery: 100, tolerance: 10, margin: 5))
+    }
+
+    @Test func aRenewalPeriodOfZeroOrLessIsNotSafe() {
+        #expect(!MusicAwakeTiming.isSafe(lease: 120, renewEvery: 0, tolerance: 0))
+        #expect(!MusicAwakeTiming.isSafe(lease: 120, renewEvery: -5, tolerance: 0))
+    }
+
+    @Test func theLeaseIsTwoMinutesRenewedEachMinute() {
+        #expect(MusicAwakeTiming.lease == 120)
+        #expect(MusicAwakeTiming.renewEvery == 60)
+    }
 }
