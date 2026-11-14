@@ -171,7 +171,7 @@ struct SettingsCatalogTests {
             store.askForMicrophone = { [unowned self] in self.prompts += 1 }
         }
 
-        deinit { defaults.removePersistentDomain(forName: suiteName) }
+        func cleanup() { defaults.removePersistentDomain(forName: suiteName) }
 
         var stamp: Date? { ScribeAutoStartOptIn.date(defaults: defaults) }
         var mode: String { store.string(ScribeAutoStartMode.settingID) }
@@ -185,6 +185,7 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func choosingStartAutomaticallyIsTheOptInAndAsksOnlyWhenMacOSHasNotAsked() throws {
         let fresh = AutoStartRig(access: .notAsked)
+        defer { fresh.cleanup() }
         fresh.store.set("scribe.autoStart", "Start automatically")
         #expect(fresh.mode == "Start automatically")
         #expect(fresh.stamp != nil)
@@ -192,6 +193,7 @@ struct SettingsCatalogTests {
 
         for access in [ScribeMicrophoneAccess.allowed, .denied] {
             let rig = AutoStartRig(access: access)
+            defer { rig.cleanup() }
             rig.store.set("scribe.autoStart", "Start automatically")
             #expect(rig.stamp != nil, "\(access)")
             #expect(rig.prompts == 0, "\(access)")
@@ -200,6 +202,7 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func theOtherChoicesNeverAskMacOSAndNeverStamp() throws {
         let rig = AutoStartRig(access: .notAsked)
+        defer { rig.cleanup() }
         rig.store.set("scribe.autoStart", "Off")
         rig.store.set("scribe.autoStart", "Ask me")
         #expect(rig.prompts == 0)
@@ -209,6 +212,7 @@ struct SettingsCatalogTests {
     @MainActor @Test func choosingAnotherModeWithdrawsTheOptIn() throws {
         for other in ["Ask me", "Off"] {
             let rig = AutoStartRig()
+            defer { rig.cleanup() }
             rig.store.set("scribe.autoStart", "Start automatically")
             #expect(rig.stamp != nil)
             rig.store.set("scribe.autoStart", other)
@@ -220,6 +224,7 @@ struct SettingsCatalogTests {
     @MainActor @Test func clickingTheChoiceThatAlreadyShowsStillGivesTheOptIn() throws {
         // A raw defaults write can leave the choice automatic with no stamp; the click is what gives it.
         let rig = AutoStartRig(stored: "Start automatically")
+        defer { rig.cleanup() }
         #expect(rig.stamp == nil)
         rig.store.set("scribe.autoStart", "Start automatically")
         #expect(rig.stamp != nil)
@@ -227,6 +232,7 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func anImportNeverChoosesStartAutomatically() throws {
         let rig = AutoStartRig(access: .notAsked)
+        defer { rig.cleanup() }
         let changed = try rig.importFile("Start automatically")
         #expect(changed == 0)
         #expect(rig.mode == "Ask me")
@@ -237,6 +243,7 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func anImportAskingForStartAutomaticallyLeavesAnExistingOptInAlone() throws {
         let rig = AutoStartRig()
+        defer { rig.cleanup() }
         rig.store.set("scribe.autoStart", "Start automatically")
         let stamp = rig.stamp
         #expect(try rig.importFile("Start automatically") == 0)
@@ -246,11 +253,13 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func anImportWithOffAppliesAndRemovesTheStamp() throws {
         let rig = AutoStartRig()
+        defer { rig.cleanup() }
         rig.store.set("scribe.autoStart", "Start automatically")
         #expect(try rig.importFile("Off") == 1)
         #expect(rig.mode == "Off")
         #expect(rig.stamp == nil)
         let other = AutoStartRig()
+        defer { other.cleanup() }
         other.store.set("scribe.autoStart", "Start automatically")
         #expect(try other.importFile("Ask me") == 1)
         #expect(other.stamp == nil)
@@ -262,6 +271,7 @@ struct SettingsCatalogTests {
             #expect(!keys.contains(key), "\(key)")
         }
         let rig = AutoStartRig()
+        defer { rig.cleanup() }
         rig.store.set("scribe.autoStart", "Start automatically")
         let text = String(decoding: try rig.store.exportJSON(), as: UTF8.self)
         #expect(!text.contains("optInAt"))
@@ -270,6 +280,7 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func aSectionResetWithdrawsTheOptIn() throws {
         let rig = AutoStartRig()
+        defer { rig.cleanup() }
         rig.store.set("scribe.autoStart", "Start automatically")
         #expect(rig.stamp != nil)
         rig.store.reset(.agents)
@@ -280,6 +291,7 @@ struct SettingsCatalogTests {
 
     @MainActor @Test func aResetOfAChoiceThatAlreadyShowsAskMeStillClearsAStaleStamp() throws {
         let rig = AutoStartRig()
+        defer { rig.cleanup() }
         rig.defaults.set(1_000.0, forKey: ScribeAutoStartOptIn.key)
         rig.store.reset(.agents)
         #expect(rig.stamp == nil)
