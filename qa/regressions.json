@@ -4366,6 +4366,42 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-410",
+      "failure": "The meeting card read \"Meeting started\" and automatic recording could begin up to two minutes before the calendar meeting started.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "aLinkMeetingIsNotStartedBeforeItsStartTime"
+      }
+    },
+    {
+      "id": "REG-411",
+      "failure": "Automatic start counted down for a calendar meeting whose call app was merely open, and could record a room nobody had joined.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "automaticNeverCountsDownWithoutALiveCall"
+      }
+    },
+    {
+      "id": "REG-412",
+      "failure": "One meeting had two names, its calendar id and its call app, so a dismissed meeting was offered again when its calendar window closed.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingLedgerTests.swift",
+        "function": "aDismissedMeetingStaysQuietWhenItRunsOver"
+      }
     }
   ]
 }

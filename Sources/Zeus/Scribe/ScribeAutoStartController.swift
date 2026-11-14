@@ -118,7 +118,7 @@ final class ScribeAutoStartController {
         ScribePopupDriver.log("start", "meeting \(meeting.key)")
         controller.meetingTitleHint = ScribeCallPromptText.meetingTitle(for: meeting.promptDecision)
         if let slot = meeting.slot { controller.meetingAttendeeHint = slot.attendeeNames }
-        controller.meetingCallHint = ScribeCallWatcher.shared.recordingIdentity(for: .callDetected(meeting.callApp))
+        controller.meetingCallHint = meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: .callDetected($0)) }
         controller.start()
     }
 

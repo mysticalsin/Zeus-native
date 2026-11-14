@@ -65,23 +65,20 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
     public var endingGrace: TimeInterval
     /// After a start, Scribe may take this long to show as active before "not active" counts as stopped.
     public var startGrace: TimeInterval
-    /// After a meeting is handled (started, declined, timed out) it cannot trigger again for this long, and
-    /// then only once it has been gone for `rearmAfterAbsence`.
-    public var cooldown: TimeInterval
+    /// A call the ledger remembers is forgotten once its app has not held the microphone for this long.
     public var rearmAfterAbsence: TimeInterval
     /// "Ask me" never leaves while the pointer is over it, and stays at least this long after the pointer leaves.
     public var hoverGrace: TimeInterval
 
     public init(debounce: TimeInterval = 3, askTimeout: TimeInterval = 20, countdown: TimeInterval = 5,
                 callEndedAfter: TimeInterval = 8, endingGrace: TimeInterval = 3, startGrace: TimeInterval = 10,
-                cooldown: TimeInterval = 60, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4) {
+                rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4) {
         self.debounce = debounce
         self.askTimeout = askTimeout
         self.countdown = countdown
         self.callEndedAfter = callEndedAfter
         self.endingGrace = endingGrace
         self.startGrace = startGrace
-        self.cooldown = cooldown
         self.rearmAfterAbsence = rearmAfterAbsence
         self.hoverGrace = hoverGrace
     }
@@ -103,12 +100,10 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
     /// "Next meeting" card: the meeting offered and when the card leaves.
     public var nextMeeting: ScribeMeeting?
     public var nextDeadline: TimeInterval?
-    /// Calendar events already offered during this recording, so each is offered once.
-    public var nextOffered: Set<String>
 
     init(meeting: ScribeMeeting, since: TimeInterval, micReleasedAt: TimeInterval? = nil, sawMic: Bool = false,
          sawWindow: Bool = false, windowGoneAt: TimeInterval? = nil, nextMeeting: ScribeMeeting? = nil,
-         nextDeadline: TimeInterval? = nil, nextOffered: Set<String> = []) {
+         nextDeadline: TimeInterval? = nil) {
         self.meeting = meeting
         self.since = since
         self.micReleasedAt = micReleasedAt
@@ -117,17 +112,7 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
         self.windowGoneAt = windowGoneAt
         self.nextMeeting = nextMeeting
         self.nextDeadline = nextDeadline
-        self.nextOffered = nextOffered
     }
-}
-
-public struct ScribeAutoStartCooldown: Equatable, Sendable {
-    public var key: String
-    public var until: TimeInterval
-    /// Since when this meeting has not been seen (a different meeting counts as not seen).
-    public var absentSince: TimeInterval?
-    /// The meeting was gone long enough that it coming back is a new meeting.
-    public var gapSeen: Bool
 }
 
 public enum ScribeAutoStartState: Equatable, Sendable {
@@ -141,7 +126,6 @@ public enum ScribeAutoStartState: Equatable, Sendable {
     case recording(ScribeAutoStartRecording)
     /// The call ended; Scribe's own end window (with Keep recording) is up.
     case endingSuggested(meeting: ScribeMeeting, since: TimeInterval)
-    case cooldown(ScribeAutoStartCooldown)
 }
 
 public struct ScribeAutoStartMachine: Equatable, Sendable {
@@ -179,8 +163,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     public private(set) var state: ScribeAutoStartState = .idle
     public let timing: ScribeAutoStartTiming
     private var lastEvidence: ScribeMeetingEvidence?
-    /// The person chose "Switch" on the next-meeting card: the next meeting may trigger without the cooldown.
-    private var switching = false
+    /// What was done about each meeting: asked, declined, started. The machine keeps no other memory of it.
+    public private(set) var ledger = ScribeMeetingLedger()
     /// The pointer is over the banner.
     public private(set) var pointerInside = false
 
@@ -212,6 +196,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         switch event {
         case .evidence(let evidence, let now):
             lastEvidence = evidence
+            ledger.observe(evidence, now: now, rearmAfterAbsence: timing.rearmAfterAbsence)
             return step(evidence, now: now)
         case .tick(let now):
             return expire(now: now)
@@ -225,8 +210,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 return effects + begin(meeting, now: now)
             case .recording(let recording):
                 guard recording.nextMeeting != nil else { return [] }
-                // Switch: end this recording (the end window can still be cancelled) and let the next meeting start.
-                switching = true
+                // Switch: end this recording (the end window can still be cancelled); the next meeting is a
+                // different meeting, so it is offered as soon as this one is saved.
                 state = .endingSuggested(meeting: recording.meeting, since: now)
                 return [.hideBanner, .requestEnd(recording.meeting)]
             default:
@@ -235,10 +220,12 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case .decline(let now):
             switch state {
             case .prompting(let meeting, _), .countingDown(let meeting, _):
-                state = cooling(meeting.key, now: now)
+                note(meeting, .declined)
+                state = .idle
                 return [.hideBanner]
             case .recording(var recording):
-                guard recording.nextMeeting != nil else { return [] }
+                guard let next = recording.nextMeeting else { return [] }
+                note(next, .declined)
                 recording.nextMeeting = nil
                 recording.nextDeadline = nil
                 state = .recording(recording)
@@ -258,7 +245,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 return handle(.accept(now: now))
             case .recording, .endingSuggested:
                 return []
-            case .idle, .armed, .cooldown:
+            case .idle, .armed:
                 return [.hideBanner] + begin(meeting, now: now)
             }
         }
@@ -272,16 +259,18 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             guard evidence.mode != .off, let meeting = evidence.candidate else { return [] }
             if evidence.activity != .idle {
                 // The person is already recording by hand: this meeting is handled.
-                state = cooling(meeting.key, now: now)
+                note(meeting, .started)
                 return []
             }
+            guard offerable(meeting, evidence) else { return [] }
             state = .armed(meeting: meeting, since: now)
             return armed(meeting, since: now, evidence: evidence, now: now)
 
         case .armed(let meeting, let since):
             guard evidence.mode != .off else { state = .idle; return [] }
             guard let current = evidence.candidate else { state = .idle; return [] }
-            if evidence.activity != .idle { state = cooling(current.key, now: now); return [] }
+            if evidence.activity != .idle { note(current, .started); state = .idle; return [] }
+            guard offerable(current, evidence) else { state = .idle; return [] }
             if current.key != meeting.key {
                 state = .armed(meeting: current, since: now)
                 return armed(current, since: now, evidence: evidence, now: now)
@@ -291,7 +280,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
 
         case .prompting(let meeting, _), .countingDown(let meeting, _):
             if evidence.mode == .off || evidence.activity != .idle {
-                state = cooling(meeting.key, now: now)
+                // Turned off, or recording began by hand: the card goes, and only a recording is an answer.
+                note(meeting, evidence.mode == .off ? .asked : .started)
+                state = .idle
                 return [.hideBanner]
             }
             return expire(now: now)
@@ -300,7 +291,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             switch evidence.activity {
             case .idle:
                 guard now - recording.since >= timing.startGrace else { return [] }
-                state = cooling(recording.meeting.key, now: now)
+                note(recording.meeting, .started)
+                state = .idle
                 return [.hideBanner]
             case .ending, .processing:
                 return []
@@ -308,14 +300,20 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 break
             }
             var effects = expireNextMeeting(&recording, now: now)
-            let micHeld = evidence.micApps.contains(recording.meeting.callApp)
+            if !recording.meeting.isLive, let live = evidence.candidate, live.isLive, live.key == recording.meeting.key {
+                // The call began: the recording now follows the app that holds the microphone.
+                recording.meeting = live
+                note(live, .started)
+            }
+            let callApp = recording.meeting.callApp
+            let micHeld = callApp.map { evidence.micApps.contains($0) } ?? false
             if micHeld {
                 recording.micReleasedAt = nil
                 recording.sawMic = true
             } else if recording.sawMic, recording.micReleasedAt == nil {
                 recording.micReleasedAt = now
             }
-            switch evidence.callWindows[recording.meeting.callApp] ?? .unknown {
+            switch callApp.flatMap({ evidence.callWindows[$0] }) ?? .unknown {
             case .present:
                 recording.sawWindow = true
                 recording.windowGoneAt = nil
@@ -338,35 +336,16 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case .endingSuggested(let meeting, let since):
             switch evidence.activity {
             case .idle:
-                state = cooling(meeting.key, now: now)
-                switching = false
+                note(meeting, .started)
+                state = .idle
                 return [.hideBanner]
             case .recording where now - since >= timing.endingGrace:
                 // Keep recording was chosen (or the end window never opened): wait for the call to come back.
-                switching = false
                 state = .recording(ScribeAutoStartRecording(meeting: meeting, since: now))
                 return []
             default:
                 return []
             }
-
-        case .cooldown(var cooldown):
-            let candidate = evidence.candidate
-            let absent = candidate == nil || candidate?.key != cooldown.key
-            if absent {
-                let since = cooldown.absentSince ?? now
-                cooldown.absentSince = since
-                if now - since >= timing.rearmAfterAbsence { cooldown.gapSeen = true }
-            } else {
-                cooldown.absentSince = nil
-            }
-            let differentMeeting = candidate != nil && candidate?.key != cooldown.key
-            if now >= cooldown.until, cooldown.gapSeen || differentMeeting {
-                state = .idle
-                return step(evidence, now: now)
-            }
-            state = .cooldown(cooldown)
-            return []
         }
     }
 
@@ -374,11 +353,31 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private mutating func armed(_ meeting: ScribeMeeting, since: TimeInterval, evidence: ScribeMeetingEvidence,
                                 now: TimeInterval) -> [Effect] {
         guard now - since >= timing.debounce else { return [] }
-        if evidence.mode == .automatic, evidence.micPermissionGranted, evidence.autoConsentGiven {
+        if countsDown(meeting, evidence) {
             state = .countingDown(meeting: meeting, deadline: now + timing.countdown)
             return [.showCountdown(meeting)]
         }
         return ask(meeting, evidence, now: now)
+    }
+
+    /// Automatic start counts down only for a live call, with Microphone allowed and the consent given.
+    private func countsDown(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
+        meeting.isLive && evidence.mode == .automatic && evidence.micPermissionGranted && evidence.autoConsentGiven
+    }
+
+    /// An answered meeting is never shown again; the answer follows it to its calendar slot. A meeting whose
+    /// question timed out is shown again only when it would count down.
+    private mutating func offerable(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
+        guard let mark = ledger.mark(of: meeting) else { return true }
+        if mark.isAnswered {
+            note(meeting, mark)
+            return false
+        }
+        return mark != .asked || countsDown(meeting, evidence)
+    }
+
+    private mutating func note(_ meeting: ScribeMeeting, _ mark: ScribeMeetingLedger.Mark) {
+        ledger.note(meeting, mark, date: lastEvidence?.date ?? .distantPast)
     }
 
     /// "Ask me", or "Start automatically" without Microphone permission already granted or without the one-time
@@ -397,7 +396,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private mutating func expire(now: TimeInterval) -> [Effect] {
         switch state {
         case .prompting(let meeting, let deadline) where now >= deadline && !pointerInside:
-            state = cooling(meeting.key, now: now)
+            note(meeting, .asked)
+            state = .idle
             return [.hideBanner]
         case .countingDown(let meeting, let deadline) where now >= deadline:
             guard lastEvidence?.micPermissionGranted == true, lastEvidence?.autoConsentGiven == true else {
@@ -415,13 +415,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     }
 
     private mutating func begin(_ meeting: ScribeMeeting, now: TimeInterval) -> [Effect] {
+        note(meeting, .started)
         state = .recording(ScribeAutoStartRecording(meeting: meeting, since: now))
         return [.startRecording(meeting)]
-    }
-
-    private func cooling(_ key: String, now: TimeInterval) -> ScribeAutoStartState {
-        let until = switching ? now : now + timing.cooldown
-        return .cooldown(ScribeAutoStartCooldown(key: key, until: until, absentSince: nil, gapSeen: false))
     }
 
     /// Takes the "next meeting" card down once its time is up. It counts as "Keep recording".
@@ -432,18 +428,19 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         return [.hideBanner]
     }
 
-    /// While recording, another calendar meeting with a call link is about to start: offer it once.
-    private func offerNextMeeting(_ recording: inout ScribeAutoStartRecording, _ evidence: ScribeMeetingEvidence,
+    /// While recording, another calendar meeting with a call link is about to start: offer it once. The ledger
+    /// remembers the offer, so it is not repeated and the meeting is still new when this recording ends.
+    private mutating func offerNextMeeting(_ recording: inout ScribeAutoStartRecording, _ evidence: ScribeMeetingEvidence,
                                   now: TimeInterval) -> [Effect] {
         guard recording.nextMeeting == nil, evidence.mode != .off else { return [] }
-        let excluded = recording.nextOffered.union([recording.meeting.key])
+        let known = evidence.slots.map(\.id).filter { ledger.mark(ofSlot: $0) != nil }
+        let excluded = Set(known).union([recording.meeting.key])
         guard let slot = ScribeMeetingStartPolicy.nextSlot(in: evidence.slots, excluding: excluded, at: evidence.date) else { return [] }
-        let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let next = ScribeMeeting(key: slot.id, title: title.isEmpty ? "Meeting" : title,
-                                 callApp: evidence.presentApps.first ?? recording.meeting.callApp, slot: slot)
+        let next = ScribeMeeting(key: slot.id, title: ScribeMeetingEvidence.title(of: slot),
+                                 callApp: slot.callApp ?? evidence.presentApps.first ?? recording.meeting.callApp, slot: slot)
+        note(next, .headsUp)
         recording.nextMeeting = next
         recording.nextDeadline = now + timing.askTimeout
-        recording.nextOffered.insert(slot.id)
         return [.showNextMeeting(next)]
     }
 }

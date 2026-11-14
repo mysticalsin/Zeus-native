@@ -369,8 +369,8 @@ final class ScribeCallWatcher {
         return eventStore.events(matching: predicate).compactMap { event in
             guard !event.isAllDay, event.status != .canceled, let start = event.startDate else { return nil }
             // A meeting, not a reminder to yourself: it has guests or a call link.
-            let hasLink = MeetingLink.find(in: [event.url?.absoluteString, event.location, event.notes]) != nil
-            guard event.hasAttendees || hasLink else { return nil }
+            let link = MeetingLink.find(in: [event.url?.absoluteString, event.location, event.notes])
+            guard event.hasAttendees || link != nil else { return nil }
             let base = event.eventIdentifier ?? event.title ?? "event"
             return ScribeCalendarSlot(
                 id: "\(base)@\(Int(start.timeIntervalSince1970))",
@@ -379,7 +379,8 @@ final class ScribeCallWatcher {
                 end: event.endDate,
                 // Display names only; the slot drops anything that looks like an address.
                 attendeeNames: (event.attendees ?? []).filter { !$0.isCurrentUser }.compactMap(\.name),
-                hasCallLink: hasLink
+                hasCallLink: link != nil,
+                callApp: ScribeUpNext.callApp(link: link)
             )
         }
     }

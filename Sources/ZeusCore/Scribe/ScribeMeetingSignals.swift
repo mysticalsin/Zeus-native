@@ -31,15 +31,18 @@ public struct ScribeCalendarSlot: Equatable, Sendable {
     public var attendeeNames: [String]
     /// The event carries a call link (Teams, Zoom, Meet, Webex...). Only the meeting-start detector reads it.
     public var hasCallLink: Bool
+    /// The call app of the event's link, set by the calendar reader. Nil without a link.
+    public var callApp: ScribeCallApp?
 
     public init(id: String, title: String, start: Date, end: Date? = nil, attendeeNames: [String] = [],
-                hasCallLink: Bool = false) {
+                hasCallLink: Bool = false, callApp: ScribeCallApp? = nil) {
         self.id = id
         self.title = title
         self.start = start
         self.end = end
         self.attendeeNames = ScribeAttendeeNames.clean(attendeeNames)
         self.hasCallLink = hasCallLink
+        self.callApp = callApp
     }
 }
 
@@ -48,20 +51,25 @@ public struct ScribeMeeting: Equatable, Sendable {
     /// The calendar slot id when a calendar event matched, else "call:<app>".
     public var key: String
     public var title: String
-    public var callApp: ScribeCallApp
+    /// The app of the call: the one holding the microphone for a live meeting, else the app of the event's link.
+    public var callApp: ScribeCallApp?
     public var slot: ScribeCalendarSlot?
+    /// A call app holds the microphone for this meeting now.
+    public var isLive: Bool
 
-    public init(key: String, title: String, callApp: ScribeCallApp, slot: ScribeCalendarSlot? = nil) {
+    public init(key: String, title: String, callApp: ScribeCallApp?, slot: ScribeCalendarSlot? = nil,
+                isLive: Bool = false) {
         self.key = key
         self.title = title
         self.callApp = callApp
         self.slot = slot
+        self.isLive = isLive
     }
 
     /// The decision the existing call popup and `ScribeController` hints already understand.
     public var promptDecision: ScribePromptDecision {
         if let slot { return .upcoming(slot) }
-        return .callDetected(callApp)
+        return callApp.map { .callDetected($0) } ?? .none
     }
 }
 
@@ -98,19 +106,26 @@ public struct ScribeMeetingEvidence: Equatable, Sendable {
         self.callWindows = callWindows
     }
 
-    /// A meeting is under way when a call app holds the microphone, or when a calendar event with a call link is
-    /// starting (a few minutes either side) and its call app is open. A calendar event alone, or an open app
-    /// alone (Teams is always open), is not enough.
+    /// A live meeting: a call app holds the microphone. It is the calendar meeting that call belongs to, else a
+    /// call with no calendar behind it. Otherwise a scheduled meeting: a calendar event that has started and
+    /// whose call, if any, has not begun. An open app alone (Teams is always open) is not a meeting.
     public var candidate: ScribeMeeting? {
-        let slot = ScribeMeetingStartPolicy.slot(in: slots, at: date)
-        guard let app = micApps.first ?? (slot == nil ? nil : presentApps.first) else { return nil }
-        if let slot {
-            let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            return ScribeMeeting(key: slot.id, title: title.isEmpty ? "Meeting" : title, callApp: app, slot: slot)
+        if let app = micApps.first {
+            if let slot = ScribeMeetingStartPolicy.liveSlot(in: slots, micApps: micApps, at: date) {
+                return ScribeMeeting(key: slot.id, title: Self.title(of: slot),
+                                     callApp: ScribeMeetingStartPolicy.pairedApp(for: slot, micApps: micApps),
+                                     slot: slot, isLive: true)
+            }
+            return ScribeMeeting(key: "call:\(ScribeCallDetection.displayName(app))", title: "Call", callApp: app,
+                                 isLive: true)
         }
-        return ScribeMeeting(key: "call:\(ScribeCallDetection.displayName(app))",
-                             title: ScribeCallPromptText.meetingTitle(for: .callDetected(app)) ?? "Meeting",
-                             callApp: app)
+        guard let slot = ScribeMeetingStartPolicy.startedSlot(in: slots, at: date) else { return nil }
+        return ScribeMeeting(key: slot.id, title: Self.title(of: slot), callApp: slot.callApp, slot: slot)
+    }
+
+    static func title(of slot: ScribeCalendarSlot) -> String {
+        let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? "Meeting" : title
     }
 }
 
@@ -120,18 +135,43 @@ public enum ScribeMeetingStartPolicy {
     /// ...until this long after.
     public static let lateWindow: TimeInterval = ScribeCallPrompt.lateWindow
 
-    /// The slot with a call link whose start is closest to `date`, within the window and not yet over.
-    public static func slot(in slots: [ScribeCalendarSlot], at date: Date) -> ScribeCalendarSlot? {
-        slots.filter { slot in
-            guard slot.hasCallLink else { return false }
-            if let end = slot.end, date >= end { return false }
-            let untilStart = slot.start.timeIntervalSince(date)
-            return untilStart <= leadWindow && -untilStart <= lateWindow
-        }.min { lhs, rhs in
-            let l = abs(lhs.start.timeIntervalSince(date))
-            let r = abs(rhs.start.timeIntervalSince(date))
-            return l != r ? l < r : lhs.id < rhs.id
+    /// The app of a call app holding the microphone that belongs to this slot. A slot whose link is Teams, Zoom
+    /// or Meet pairs only with that app; any other slot pairs with the first app that holds the microphone.
+    public static func pairedApp(for slot: ScribeCalendarSlot, micApps: [ScribeCallApp]) -> ScribeCallApp? {
+        if let app = slot.callApp, [.teams, .zoom, .meet].contains(app) {
+            return micApps.contains(app) ? app : nil
         }
+        return micApps.first
+    }
+
+    /// The calendar meeting a live call belongs to: a slot with a link, from `leadWindow` before its start until
+    /// its end (or `lateWindow` after the start when it has no end), whose app holds the microphone. Among slots
+    /// already started the latest start wins; a slot not yet started pairs only when none has started.
+    public static func liveSlot(in slots: [ScribeCalendarSlot], micApps: [ScribeCallApp], at date: Date) -> ScribeCalendarSlot? {
+        let paired = slots.filter { slot in
+            guard slot.hasCallLink, pairedApp(for: slot, micApps: micApps) != nil else { return false }
+            let end = slot.end ?? slot.start.addingTimeInterval(lateWindow)
+            return date >= slot.start.addingTimeInterval(-leadWindow) && date < end
+        }
+        let started = paired.filter { $0.start <= date }
+        if started.isEmpty {
+            return paired.min { lhs, rhs in lhs.start != rhs.start ? lhs.start < rhs.start : lhs.id < rhs.id }
+        }
+        return latestStart(started)
+    }
+
+    /// A calendar meeting that has started, with or without a call: `lateWindow` from its start, not ended. The
+    /// calendar reader already keeps only events with guests or a link. The latest start wins.
+    public static func startedSlot(in slots: [ScribeCalendarSlot], at date: Date) -> ScribeCalendarSlot? {
+        latestStart(slots.filter { slot in
+            let since = date.timeIntervalSince(slot.start)
+            if let end = slot.end, date >= end { return false }
+            return since >= 0 && since <= lateWindow
+        })
+    }
+
+    private static func latestStart(_ slots: [ScribeCalendarSlot]) -> ScribeCalendarSlot? {
+        slots.max { lhs, rhs in lhs.start != rhs.start ? lhs.start < rhs.start : lhs.id > rhs.id }
     }
 }
 

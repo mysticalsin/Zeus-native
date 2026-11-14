@@ -176,12 +176,6 @@ struct ScribeAutoStartTests {
         #expect(meeting?.key == "s1")
     }
 
-    @Test func theClosestCalendarEventWins() {
-        let near = asSlot("near", start: 10)
-        let far = asSlot("far", start: -100)
-        #expect(ScribeMeetingStartPolicy.slot(in: [far, near], at: asBase)?.id == "near")
-    }
-
     // MARK: Debounce and single trigger
 
     @Test func nothingShowsOnFirstSightingAndTheBannerComesAfterTheDebounce() {

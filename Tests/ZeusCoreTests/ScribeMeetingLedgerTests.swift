@@ -64,7 +64,8 @@ struct ScribeMeetingLedgerTests {
         let meeting = try mlMeeting(opened)
         #expect(meeting.key == "s1")
         #expect(ledger.mark(of: meeting) == .declined)
-        // The answer now belongs to the meeting, so it outlives the call app's own entry.
+        // The machine writes the answer onto the meeting it now belongs to, so it outlives the call app's entry.
+        ledger.note(meeting, .declined, date: opened.date)
         let silent = mlEvidence(1_010, slots: [slot], present: [.teams])
         ledger.observe(silent, now: 1_010)
         ledger.observe(mlEvidence(1_050, slots: [slot], present: [.teams]), now: 1_050)

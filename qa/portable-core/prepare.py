@@ -89,11 +89,12 @@ GROUPS = {
              "Scribe/ScribePresentation.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeSpeakerStats.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift",
              "Scribe/ScribeMuteReadScheduler.swift", "Scribe/ScribeIncomingWordLayout.swift", "Scribe/MicInputOwnership.swift",
-             "Scribe/ScribePopupLifecycle.swift", "Scribe/ScribeMeetingCard.swift"),
+             "Scribe/ScribePopupLifecycle.swift", "Scribe/ScribeMeetingCard.swift", "Scribe/ScribeAutoStart.swift",
+             "Scribe/ScribeMeetingSignals.swift", "Scribe/ScribeMeetingLedger.swift"),
         tests("ScribeCoreTests", "ScribePresentationTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
               "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
               "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
-              "ScribePopupLifecycleTests", "ScribeMeetingCardTests"),
+              "ScribePopupLifecycleTests", "ScribeMeetingCardTests", "ScribeAutoStartTests", "ScribeMeetingLedgerTests"),
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
@@ -176,10 +177,9 @@ def write_excerpts(root, group, manifest):
             text, evidence = section(path, start, end)
             pieces.append(text)
             manifest["excerpts"].append(evidence)
-        text, evidence = section(CORE + "Scribe/ScribeMeetingSignals.swift",
-                                 "public struct ScribeCalendarSlot: Equatable, Sendable {",
-                                 "/// Everything the detector knows at one moment.")
-        pieces.append(text)
+        # The meeting-start rules read two Settings helpers; the whole file needs types this group does not carry.
+        text, evidence = section(CORE + "FeatureSettings.swift", "public enum FeatureSettings {", "    // MARK: Fast path")
+        pieces.append(text + "}\n")
         manifest["excerpts"].append(evidence)
         text, evidence = section(TESTS + "ScribeLiveLogicTests.swift",
                                  "    @Test func freshEvidenceIsServedAndExpiredEvidenceIsUnknown()",
