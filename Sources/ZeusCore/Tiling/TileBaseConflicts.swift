@@ -32,6 +32,10 @@ public enum TileBaseConflicts {
     /// The pair VoiceOver holds while it runs.
     public static let voiceOverPair: ShortcutModifiers = [.control, .option]
 
+    /// How long a hold key waits before it acts while the tiling tap is installed, when its modifiers are strictly inside a bound
+    /// chord's. Zero for every other key.
+    public static func confirm(for key: Shortcut, keymap: TileKeymap) -> TimeInterval { 0 }
+
     /// A keyed Zeus shortcut other than talk, pointing, dictation and chat (Quick to-do, the notch, the prompter), named for the note.
     public struct NamedShortcut: Equatable, Sendable {
         public var name: String

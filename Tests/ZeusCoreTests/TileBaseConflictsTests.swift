@@ -271,6 +271,102 @@ import Testing
                 "Z is not a tiling key")
     }
 
+    // MARK: Every modifier set the keymap binds
+
+    /// A keymap with one chord, on `modifiers`.
+    private func keymap(_ modifiers: ShortcutModifiers...) throws -> TileKeymap {
+        var map = TileKeymap()
+        for set in modifiers { try map.bind(chord(keyJ, set), to: .flipSplit) }
+        return map
+    }
+
+    private let pairShift: ShortcutModifiers = [.control, .option, .command, .shift]
+
+    @Test func aHoldKeyOnThePairPlusShiftIsRefused() {
+        let found = notes(.controlOptionCommand, talk: Shortcut(modifiers: pairShift), dictation: nil)
+        #expect(found.count == 1 && found[0].contains("Control-Option-Command-Shift is also your Talk to Zeus key"), "\(found)")
+        let pointing = notes(.controlOptionCommand, talk: .rightOption, dictation: nil, pointing: Shortcut(modifiers: pairShift))
+        #expect(pointing.count == 1 && pointing[0].contains("Pointing"), "\(pointing)")
+    }
+
+    @Test func aKeyThatDiffersFromABoundSetOnlyByFnCountsAsEqual() {
+        let withFn = Shortcut(modifiers: [.control, .option, .command, .function])
+        let found = notes(.controlOptionCommand, talk: withFn, dictation: nil)
+        #expect(found.count == 1 && found[0].contains("also your Talk to Zeus key"), "\(found)")
+        let shifted = Shortcut(modifiers: [.control, .option, .command, .shift, .function])
+        #expect(notes(.controlOptionCommand, talk: shifted, dictation: nil).count == 1, "the pair plus Shift plus Fn")
+    }
+
+    @Test func aToggleKeyOnThePairPlusShiftIsRefused() {
+        let found = notes(.controlOptionCommand, talk: .rightOption, dictation: Shortcut(modifiers: pairShift), dictationToggles: true)
+        #expect(found.count == 1 && found[0].contains("Control-Option-Command-Shift is also your Dictation key"), "\(found)")
+        let polyglot = notes(.controlOptionCommand, talk: .rightOption, dictation: nil, polyglot: Shortcut(modifiers: pairShift))
+        #expect(polyglot.count == 1 && polyglot[0].contains("Polyglot"), "\(polyglot)")
+    }
+
+    @Test func aToggleKeyInsideThePairPlusShiftOnlyIsRefused() {
+        let controlShift = Shortcut(modifiers: [.control, .shift])
+        let found = notes(.controlOptionCommand, talk: .rightOption, dictation: controlShift, dictationToggles: true)
+        #expect(found.count == 1 && found[0].contains("Control-Option-Command-Shift also holds your Dictation key"), "\(found)")
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: controlShift, dictationToggles: false).isEmpty,
+                "a hold key there waits out the confirm instead")
+    }
+
+    @Test func aHoldKeyStrictlyInsideABoundSetIsFreeAndWaitsOutTheConfirm() throws {
+        let map = TileKeymap.defaults(base: .controlOptionCommand)
+        for key in [Shortcut.controlOption, .rightCommand, .optionCommand, Shortcut(modifiers: [.control, .shift])] {
+            #expect(TileBaseConflicts.confirm(for: key, keymap: map) == 0.15, "\(key.symbol)")
+        }
+        #expect(notes(.controlOptionCommand, talk: .controlOption, dictation: .rightCommand, pointing: .controlOption).isEmpty)
+        #expect(TileBaseConflicts.confirm(for: .controlOption, keymap: TileKeymap()) == 0, "no chord is bound")
+    }
+
+    @Test func aKeyEqualToABoundSetOrOutsideEveryOneHasNoConfirm() throws {
+        let map = TileKeymap.defaults(base: .controlOptionCommand)
+        #expect(TileBaseConflicts.confirm(for: Shortcut(modifiers: [.control, .option, .command]), keymap: map) == 0, "refused, not delayed")
+        #expect(TileBaseConflicts.confirm(for: .controlOption, keymap: TileKeymap.defaults(base: .optionCommand)) == 0, "inside no bound set")
+        #expect(TileBaseConflicts.confirm(for: .function, keymap: map) == 0, "Fn alone")
+        #expect(TileBaseConflicts.confirm(for: chord(leftArrow, [.control]), keymap: map) == 0, "a keyed key is not a hold key")
+    }
+
+    @Test func fnAloneIsFreeAgainstEveryKeymap() throws {
+        let map = try keymap([.command], [.control, .option])
+        #expect(notes(.controlOption, talk: .function, dictation: nil, pointing: .function, keymap: map).isEmpty)
+        #expect(notes(.controlOption, talk: .rightOption, dictation: .function, polyglot: .function, keymap: map).isEmpty)
+        #expect(notes(.controlOption, talk: .rightOption, dictation: .function, keymap: map, dictationToggles: true).isEmpty)
+    }
+
+    @Test func aDictationHoldKeyOneShiftShortOfABoundSetIsRefusedAndATalkKeyThereIsFree() throws {
+        let map = try keymap([.control, .option, .shift])
+        let dictation = notes(.controlOption, talk: .rightOption, dictation: .controlOption, keymap: map)
+        #expect(dictation.count == 1 && dictation[0].contains("Control-Option-Shift is also your Dictation key"), "\(dictation)")
+        #expect(notes(.controlOption, talk: .controlOption, dictation: nil, keymap: map).isEmpty, "Shift joining talk cancels it")
+        #expect(TileBaseConflicts.confirm(for: .controlOption, keymap: map) == 0.15)
+        let pointing = notes(.controlOption, talk: .rightOption, dictation: nil, pointing: .controlOption, keymap: map)
+        #expect(pointing.isEmpty)
+    }
+
+    @Test func aKeymapWithAChordOnOneModifierIsReadAsBound() throws {
+        let map = try keymap([.command])
+        let hold = notes(.controlOption, talk: .rightCommand, dictation: nil, keymap: map)
+        #expect(hold.count == 1 && hold[0].contains("Command is also your Talk to Zeus key"), "\(hold)")
+        let toggle = notes(.controlOption, talk: .rightOption, dictation: .rightCommand, keymap: map, dictationToggles: true)
+        #expect(toggle.count == 1 && toggle[0].contains("Command is also your Dictation key"), "\(toggle)")
+        #expect(notes(.controlOption, talk: .controlOption, dictation: nil, keymap: map).isEmpty, "Control-Option is not inside Command")
+    }
+
+    @Test func aKeyNamedByTheChordItMeetsNotByTheBase() throws {
+        let map = try keymap([.option, .shift])
+        let found = notes(.controlOptionCommand, talk: .rightOption, dictation: nil, polyglot: Shortcut(modifiers: [.option, .shift]), keymap: map)
+        #expect(found.count == 1 && found[0].contains("Option-Shift") && !found[0].contains("Control-Option-Command"), "\(found)")
+    }
+
+    @Test func theChordNoteHasNoDashesOtherThanTheHyphensOfTheNames() {
+        let found = notes(.controlOptionCommand, talk: Shortcut(modifiers: pairShift), dictation: nil)
+        #expect(found.count == 1)
+        for text in found { #expect(!text.contains("\u{2014}") && !text.contains("\u{2013}"), "\(text)") }
+    }
+
     // MARK: Defaults
 
     @Test func theShippedDefaultPairClashesWithNoShippedDefaultKey() {
