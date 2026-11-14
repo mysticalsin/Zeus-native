@@ -23,7 +23,8 @@ private final class FakeTilingDriver: TilingWindowDriver {
     var trusted = true
     var screens: [TileDisplay] = [FakeTilingDriver.mainDisplay()]
     var candidates: [Candidate] = []
-    var complete = true
+    /// Apps whose windows the pass cannot read in time: left out of the listing, named in `unreadPIDs`.
+    var unreadApps: Set<Int32> = []
     var front = TileFrontmost.none
     var refuse: Set<TileWindowID> = []
 
@@ -60,19 +61,21 @@ private final class FakeTilingDriver: TilingWindowDriver {
 
     var isTrusted: Bool { trusted }
     func displays() -> [TileDisplay] { screens }
-    var lastPassComplete: Bool { complete }
+    private(set) var unreadPIDs: Set<Int32> = []
 
     func windows(config: TileConfig) -> [TileWindowRef] {
         windowReads += 1
+        unreadPIDs = unreadApps
         guard trusted else { return [] }
         let policy = TileAdmissionPolicy(config: config, zeusPID: Self.zeusPID, zeusBundleID: Self.zeusBundle)
-        let onScreen = candidates.compactMap { candidate -> TileOnScreenWindow? in
+        let readable = candidates.filter { !unreadApps.contains($0.facts.pid) }
+        let onScreen = readable.compactMap { candidate -> TileOnScreenWindow? in
             guard candidate.onScreen, let frame = candidate.facts.frame else { return nil }
             return TileOnScreenWindow(pid: candidate.facts.pid, frame: frame, layer: 0, ownerName: nil)
         }
-        let verdicts = TileAdmission.rejections(candidates.map(\.facts), onScreen: onScreen, policy: policy)
+        let verdicts = TileAdmission.rejections(readable.map(\.facts), onScreen: onScreen, policy: policy)
         var out: [TileWindowRef] = []
-        for (candidate, verdict) in zip(candidates, verdicts) where verdict == nil {
+        for (candidate, verdict) in zip(readable, verdicts) where verdict == nil {
             if let frame = candidate.facts.frame, let bundle = candidate.facts.bundleID {
                 out.append(TileWindowRef(id: candidate.id, bundleID: bundle, frame: frame))
             }
@@ -388,20 +391,43 @@ struct TilingControllerTests {
         #expect(rig.driver.frame(of: id(1)) == wholeTile)
     }
 
-    @Test func aWindowMissingFromAnIncompleteListingKeepsItsSlotAndIsNotWritten() {
+    @Test func aWindowOfAnAppThatDidNotAnswerKeepsItsSlotAndIsNotWritten() {
         let rig = Rig()
         rig.driver.add(id(1))
-        rig.driver.add(id(2))
+        rig.driver.add(id(2, pid: 901))
         rig.controller.start()
         rig.settle()
         let writes = rig.driver.writes.count
-        rig.driver.remove(id(2))
-        rig.driver.complete = false
+        rig.driver.unreadApps = [901]
         rig.controller.handle(.retile)
         rig.settle()
-        #expect(rig.controller.layoutWindows(on: 1) == [id(1), id(2)], "an app that did not answer is unknown, not gone")
+        #expect(rig.controller.layoutWindows(on: 1) == [id(1), id(2, pid: 901)], "an app that did not answer is unknown, not gone")
         #expect(rig.driver.writes.count == writes, "nothing is written to the slot of the missing window or around it")
         #expect(rig.driver.frame(of: id(1)) == leftTile)
+    }
+
+    @Test func oneSlowAppDoesNotPinTheSlotsOfWindowsThatClosedInOtherApps() {
+        let rig = Rig()
+        rig.driver.add(id(1))
+        rig.driver.add(id(2, pid: 901))
+        rig.driver.add(id(3, pid: 902))
+        rig.controller.start()
+        rig.settle()
+        #expect(Set(rig.controller.layoutWindows(on: 1)) == [id(1), id(2, pid: 901), id(3, pid: 902)])
+        rig.driver.remove(id(3, pid: 902))
+        rig.driver.unreadApps = [901]
+        rig.controller.handle(.retile)
+        rig.settle()
+        #expect(Set(rig.controller.layoutWindows(on: 1)) == [id(1), id(2, pid: 901)],
+                "the closed window of an app that answered is gone; the slow app's window keeps its slot")
+        #expect(rig.controller.preTilingFrame(of: id(2, pid: 901)) != nil, "the slow app's undo memory stays")
+        #expect(rig.controller.preTilingFrame(of: id(3, pid: 902)) == nil, "the closed window's undo memory is dropped in the same pass")
+        rig.driver.remove(id(2, pid: 901))
+        rig.driver.unreadApps = []
+        rig.controller.handle(.retile)
+        rig.settle()
+        #expect(rig.controller.layoutWindows(on: 1) == [id(1)], "once the app answers, the slot of its closed window goes")
+        #expect(rig.controller.preTilingFrame(of: id(2, pid: 901)) == nil)
     }
 
     @Test func aFullScreenAppInFrontPausesEveryWriteUntilItEnds() {

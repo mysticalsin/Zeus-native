@@ -348,6 +348,36 @@ extension TilingDriverTests {
             #expect(TilePlanner.eligible([a, b, c], config: TileConfig(), displays: displays).map(\.id) == [id(3), id(1), id(2)])
         }
 
+        // MARK: Slots kept for an app the pass could not read
+
+        @Test func onlyTheSlotsOfAnUnreadAppAreKept() {
+            let old = [id(1, pid: 10), id(2, pid: 20), id(3, pid: 10), id(4, pid: 30)]
+            let kept = TilePlanner.slotsToKeep(old: old, listed: [id(1, pid: 10)], floating: [], unreadPIDs: [20])
+            #expect(kept == [id(2, pid: 20)], "the window of the slow app is unknown; the closed windows of the apps that answered are gone")
+        }
+
+        @Test func aCompletePassKeepsNoSlot() {
+            let old = [id(1, pid: 10), id(2, pid: 20)]
+            #expect(TilePlanner.slotsToKeep(old: old, listed: [], floating: [], unreadPIDs: []).isEmpty)
+        }
+
+        @Test func everyAppUnreadKeepsEverySlotThatIsNotListed() {
+            let old = [id(1, pid: 10), id(2, pid: 20), id(3, pid: 30)]
+            let kept = TilePlanner.slotsToKeep(old: old, listed: [id(3, pid: 30)], floating: [], unreadPIDs: [10, 20, 30])
+            #expect(kept == [id(1, pid: 10), id(2, pid: 20)])
+        }
+
+        @Test func aFloatingWindowOfAnUnreadAppIsNotGivenASlot() {
+            let old = [id(1, pid: 10), id(2, pid: 10)]
+            #expect(TilePlanner.slotsToKeep(old: old, listed: [], floating: [id(2, pid: 10)], unreadPIDs: [10]) == [id(1, pid: 10)])
+        }
+
+        @Test func aListedWindowIsNeverReportedAsKept() {
+            let old = [id(1, pid: 10)]
+            #expect(TilePlanner.slotsToKeep(old: old, listed: [id(1, pid: 10)], floating: [], unreadPIDs: [10]).isEmpty,
+                    "a window that was read is placed by the listing, not kept as unknown")
+        }
+
         private let display = TileDisplay(id: 1, appKitFrame: rect(0, 0, 1920, 1080), appKitVisibleFrame: rect(0, 0, 1920, 1080),
                                           engineFrame: rect(0, 0, 1920, 1080))
         private var config: TileConfig { TileConfig(innerGap: 8, outerGap: 16, maxDepth: 3, minTileSize: 200) }
@@ -429,16 +459,16 @@ extension TilingDriverTests {
     var focused: [TileWindowID] = []
     var onWrite: () -> Void = {}
     var configs: [TileConfig] = []
-    /// Windows the last pass could not read: left out of the listing, and the pass reports itself incomplete.
-    var unread: Set<TileWindowID> = []
-    private(set) var lastPassComplete = true
+    /// Apps the last pass could not read: their windows are left out of the listing and the pass names them.
+    var unreadApps: Set<Int32> = []
+    private(set) var unreadPIDs: Set<Int32> = []
 
     func displays() -> [TileDisplay] { screens }
 
     func windows(config: TileConfig) -> [TileWindowRef] {
         configs.append(config)
-        lastPassComplete = unread.isEmpty
-        return isTrusted ? refs.filter { !unread.contains($0.id) } : []
+        unreadPIDs = unreadApps
+        return isTrusted ? refs.filter { !unreadApps.contains($0.pid) } : []
     }
 
     func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool {
@@ -534,30 +564,33 @@ extension TilingDriverTests {
         }
 
         @Test func aWindowTheLatestPassCouldNotReadIsReportedMissingAndNeverWritten() {
-            let fake = driver(2)
-            fake.unread = [id(1)]
+            let slow = id(1, pid: 500), quick = id(2, pid: 501)
+            let fake = FakeDriver()
+            fake.refs = [TileWindowRef(id: slow, bundleID: "com.example.editor", frame: rect(0, 500, 50, 50)),
+                         TileWindowRef(id: quick, bundleID: "com.example.editor", frame: rect(0, 500, 50, 50))]
+            fake.unreadApps = [500]
             let visible = TileDisplay(id: 1, appKitFrame: rect(0, 0, 1920, 1080), appKitVisibleFrame: rect(0, 0, 1920, 1080),
                                       engineFrame: rect(0, 0, 1920, 1080))
             let config = TileConfig(innerGap: 8, outerGap: 16, maxDepth: 3, minTileSize: 200)
             var tree = TileTree(displayID: 1)
-            for n in 1...2 {
-                guard case .inserted(let next) = TileOps.insert(id(n), into: tree, focused: nil, display: visible.visibleFrame, config: config) else {
-                    Issue.record("window \(n) was refused")
+            for window in [slow, quick] {
+                guard case .inserted(let next) = TileOps.insert(window, into: tree, focused: nil, display: visible.visibleFrame, config: config) else {
+                    Issue.record("window \(window) was refused")
                     return
                 }
                 tree = next
             }
             let listing = fake.windows(config: config)
-            #expect(!fake.lastPassComplete, "the pass says it did not read every window")
-            #expect(listing.map(\.id) == [id(2)], "an unread window is not handed back as if it had just been read")
+            #expect(fake.unreadPIDs == [500], "the pass names the app it did not read, not just that something was missed")
+            #expect(listing.map(\.id) == [quick], "an unread window is not handed back as if it had just been read")
             let plan = TilePlanner.plan(tree: tree, display: visible, config: config, windows: listing)
-            #expect(plan.missing == [id(1)])
+            #expect(plan.missing == [slow])
             let outcome = TileApplier.apply(plan, with: fake)
-            #expect(fake.writes.map(\.window) == [id(2)], "the unread window is never written")
+            #expect(fake.writes.map(\.window) == [quick], "the unread window is never written")
             #expect(outcome.refused.isEmpty, "and it is not blamed as a refusal")
-            fake.unread = []
+            fake.unreadApps = []
             _ = fake.windows(config: config)
-            #expect(fake.lastPassComplete)
+            #expect(fake.unreadPIDs.isEmpty)
         }
 
         @Test func focusAndWindowListGoThroughTheDriver() {
