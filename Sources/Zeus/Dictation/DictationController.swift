@@ -362,7 +362,7 @@ final class DictationController {
         }
         hotkey.directPressProvider = { [weak self] in self?.settings.selectedBehavior == .pressToToggle }
         hotkey.role = .dictation
-        hotkey.onPress = { [weak self] in self?.handleDictationKeyPress() }
+        hotkey.onPress = { [weak self] in self?.handleDictationKeyPress() ?? false }
         hotkey.onRelease = { [weak self] in self?.handleDictationKeyRelease() }
         hotkey.onCancel = { [weak self] in self?.cancel() }
         hotkey.start()
@@ -389,10 +389,15 @@ final class DictationController {
         settings.selectedBehavior
     }
 
-    private func handleDictationKeyPress() {
+    /// Whether the press took: a begin that left the flow listening did, and so did a finish.
+    private func handleDictationKeyPress() -> Bool {
         switch effectiveBehavior.actionOnPress(isDictating: topBar.isDictating) {
-        case .begin: begin()
-        case .finish: finish()
+        case .begin:
+            begin()
+            return flow.isListening
+        case .finish:
+            finish()
+            return true
         }
     }
 

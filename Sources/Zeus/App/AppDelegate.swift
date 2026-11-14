@@ -277,14 +277,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.cliInstall) { CLIInstaller.install() }
         if on(.assistantKeyImport) { AssistantKeyImporter.importDefaultIfNeeded() }
         if on(.talkHotkey) {
-            hotkey.onPress = { [weak self] in self?.talkKeyPressed() }
+            hotkey.onPress = { [weak self] in self?.talkKeyPressed() ?? false }
             hotkey.onRelease = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
-            // ⌃⌥Space, ⌃⌥C and other chords built on the talk keys cancel the hold instead of sending it.
-            hotkey.cancelsWhenSpoiled = true
+            // A chord or a key that joins the talk keys cancels the hold instead of sending it.
             hotkey.onCancel = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.cancelListening()
@@ -582,8 +581,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    private func talkKeyPressed() {
-        guard on(.talkHotkey), voice != nil else { return }
+    /// Whether a turn opened: false tells the key machine nothing is listening, so no release or cancel is owed.
+    private func talkKeyPressed() -> Bool {
+        guard on(.talkHotkey), voice != nil else { return false }
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
@@ -598,9 +598,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let access = await VoicePermissions.ensure(explicit: true)
                 if access == .ready { self.topBar.show(.hint("Zeus can hear you now: press the talk key again")) }
             }
-            return
+            return false
         }
-        voice?.press()
+        let took = voice?.press() ?? false
+        // No release follows a press that opened nothing, so the wake word listener must not stay held off.
+        if !took { WakeWordController.shared.talkKeyHeld = false }
+        return took
     }
 
     /// Desktop pointing: on by default (`docs/FIRST-RUN-DEFAULTS.md`). Starting it only installs the key

@@ -59,16 +59,21 @@ enum KeyAccessNotice {
     }
 }
 
-/// Push-to-talk: fires while the shortcut chosen in Settings is held. Modifier chords, single
-/// modifiers (Right Command, Fn) and keys with modifiers (⌥Space) are tracked from the event
-/// stream by `ShortcutState`. Global monitoring needs Accessibility or Input Monitoring; the
-/// local monitor covers ZEUS's own windows.
+/// The adapter of the voice key machine (`VoiceKeyMachine`, docs/VOICE-KEY-MACHINE-PLAN.md): it turns keyboard events,
+/// keys the tiling tap consumed and timer firings into machine events and runs the effects that come back. It keeps no
+/// state of its own: after `start()` only `machine` changes. Modifier chords, single modifiers (Right Command, Fn) and
+/// keys with modifiers (Option-Space) are read from the event stream by the machine. Global monitoring needs
+/// Accessibility or Input Monitoring; the local monitor covers Zeus's own windows.
 @MainActor
 final class HotkeyMonitor {
-    var onPress: (() -> Void)?
+    /// A press the machine starts a turn for. Answers whether the owner took it: false (a transcribing job, a failed
+    /// start) tells the machine the turn never opened, so no release or cancel follows.
+    var onPress: (() -> Bool)?
     var onRelease: (() -> Void)?
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
+    /// A turn the key ended without sending it: a shortcut or a larger chord took the press over.
+    var onCancel: (() -> Void)?
     /// Which shortcut this monitor listens for; nil turns it off. Push-to-talk by default (moved off
     /// Control+Option while VoiceOver uses it, `VoiceKey.effectiveTalkKey`); dictation supplies its own.
     var keyProvider: () -> Shortcut? = {
@@ -78,39 +83,29 @@ final class HotkeyMonitor {
                                          pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
                                          voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled)
     }
-    /// Dedicated dictation keys can toggle on each key-down instead of using TalkKeyLatch's
-    /// hold/double-tap timing. Shared keys always use the existing gesture arbitration.
+    /// Dedicated dictation keys can toggle on each press instead of holding. Shared keys never toggle.
     var directPressProvider: () -> Bool = { false }
     /// When talk and dictation share one key, each monitor reacts to its own gesture of it:
     /// dictation to a hold, talk (command mode) to a double-tap.
     enum Role { case talk, dictation }
     var role: Role = .talk
     var sharedProvider: () -> Bool = { DictationSettings.shared.enabled && Preferences.shared.pushToTalk == DictationSettings.shared.key }
-    /// A held dictation interrupted by a shortcut (the press became ⌘C). Defaults to release.
-    var onCancel: (() -> Void)?
-    /// The talk key: a hold of a modifier-only key that another key joins (⌃⌥Space for Chat) became a
-    /// different shortcut, so the turn is cancelled through `onCancel` and nothing is sent.
-    var cancelsWhenSpoiled = false
+    var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
+    /// How long a hold key must be down alone before it acts: 0 unless a tiling chord holds its modifiers.
+    var confirmProvider: () -> TimeInterval = { 0 }
+    /// The modifiers the system reports right now, to find a release no event told the machine about.
+    var liveModifiers: () -> ShortcutModifiers? = {
+        ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
+    }
+    var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
-    private var gesture = SharedKeyGesture()
-    private var sharedDown = false
-    private var holdTimer: DispatchWorkItem?
-    private var commandLatched = false
+    private var machine = VoiceKeyMachine()
 
-    private var isDown = false
-    /// A hold was cancelled because a larger chord ended it. It cannot begin again until every modifier is up.
-    private var cancelledByLargerChord = false
-    private var latch = TalkKeyLatch()
-    private var pendingStop: DispatchWorkItem?
-    private var directPressActive = false
-
-    private var state = ShortcutState()
-
-    /// Keys the tiling tap consumes never reach the event monitors. Feeding them here keeps a hold spoiled until every
-    /// modifier is up, as the same chord unconsumed would: without it, letting go of the extra modifier first would
-    /// leave exactly this key's modifiers down and start a turn. Idempotent.
+    /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
+    /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
+    /// unconsumed give the same callbacks. Idempotent.
     func observeConsumedKeys() {
         guard consumedKeys == nil else { return }
         consumedKeys = NotificationCenter.default.addObserver(
@@ -148,176 +143,53 @@ final class HotkeyMonitor {
         }
     }
 
-    /// One keyboard event from either monitor (also the entry point for tests and the self-test).
-    func feed(_ event: ShortcutEvent) {
-        state.apply(event)
-        if case .keyDown(let code, _) = event {
-            // Only to spot shortcuts made with the shared key (⌘C): never reads or keeps the key.
-            if keyProvider()?.keyCode != code { otherKeyPressed(); spoilHold() }
-        }
-        evaluate()
-    }
+    // MARK: Entries
 
-    private func otherKeyPressed() {
-        guard sharedDown else { return }
-        if gesture.otherKey() == .holdCancelled { (onCancel ?? onRelease)?() }
-        holdTimer?.cancel()
-    }
+    /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests).
+    func feed(_ event: ShortcutEvent) { send(.key(event, at: now())) }
 
-    /// A held modifier-only talk key met another key: that press was a shortcut, not a question.
-    /// `ShortcutState` keeps the chord unheld until every modifier is up, so it cannot restart mid-chord.
-    private func spoilHold() {
-        guard cancelsWhenSpoiled, role == .talk, isDown, let key = keyProvider(), key.isModifierOnly, !sharedProvider() else { return }
-        isDown = false
-        pendingStop?.cancel()
-        pendingStop = nil
-        latch = TalkKeyLatch()
-        VoiceLog.log("key", "talk shortcut became another shortcut (\(key.title) + a key): cancelled, nothing sent")
-        (onCancel ?? onRelease)?()
-    }
+    /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it.
+    func turnEnded() { send(.abandon) }
 
-    /// Shared-key path: raw down/up of the key plus "another modifier joined in".
-    ///
-    /// A hold begins only when the key's own modifiers are the ones down, with nothing else held and the chord not
-    /// spoiled: the exact rule every other monitor uses, so a larger chord that contains this key (a tiling chord
-    /// built on the same modifiers, or Command pressed first) never starts a hold. Once the hold is running, extra
-    /// modifiers are allowed: Shift joining a running dictation means Return, and it must not end the hold.
-    private func handleShared(_ key: Shortcut) {
-        let now = ProcessInfo.processInfo.systemUptime
-        let down = state.isHeld(key, exact: !sharedDown)
-        let extra = state.modifiers.subtracting(key.modifiers).subtracting(.function)
-        if down, !gesture.isHolding, !extra.isEmpty { otherKeyPressed() }
-        if down, !sharedDown {
-            sharedDown = true
-            if commandLatched, role == .talk {
-                // Any tap ends a hands-free command.
-                commandLatched = false
-                onRelease?()
-            }
-            gesture.keyDown(at: now)
-            holdTimer?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    if self.gesture.holdTimerFired(at: ProcessInfo.processInfo.systemUptime) == .holdBegan, self.role == .dictation { self.onPress?() }
-                }
-            }
-            holdTimer = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + gesture.holdDelay, execute: work)
-        } else if !down, sharedDown {
-            sharedDown = false
-            holdTimer?.cancel()
-            switch gesture.keyUp(at: now) {
-            case .holdEnded?: if role == .dictation { onRelease?() }
-            case .doubleTap?: if role == .talk { commandLatched = true; onPress?() }
-            default: break
-            }
-        }
-    }
+    /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
+    func interrupt() { send(.interrupt(live: liveModifiers())) }
 
-    private func evaluate() {
-        guard let key = keyProvider() else {
-            if isDown { isDown = false; onRelease?() }
-            return
-        }
+    private func tick() { send(.tick(at: now(), live: liveModifiers())) }
+
+    // MARK: Effects
+
+    private var config: VoiceKeyMachine.Config {
+        let key = keyProvider()
         let shared = sharedProvider()
-        let directPress = role == .dictation && !shared && directPressProvider()
-        if directPress != directPressActive {
-            directPressActive = directPress
-            pendingStop?.cancel()
-            pendingStop = nil
-            latch = TalkKeyLatch()
-            isDown = false
-        }
-        if shared {
-            handleShared(key)
-            return
-        }
-        if state.modifiers.isEmpty { cancelledByLargerChord = false }
-        let pressed = state.isHeld(key, exact: true) && !cancelledByLargerChord
-        if directPress {
-            if pressed, !isDown {
-                if key == .controlOption, NSWorkspace.shared.isVoiceOverEnabled {
-                    onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
-                    return
-                }
-                isDown = true
-                onPress?()
-            } else if !pressed, isDown {
-                isDown = false
-            }
-            return
-        }
-        if pressed, !isDown {
-            if key == .controlOption, NSWorkspace.shared.isVoiceOverEnabled {
+        let toggle = role == .dictation && !shared && directPressProvider()
+        return VoiceKeyMachine.Config(key: key,
+                                      role: role == .talk ? .talk : .dictation,
+                                      mode: shared ? .shared : toggle ? .toggle : .hold,
+                                      voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
+                                      confirm: confirmProvider())
+    }
+
+    /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
+    /// inside a callback meets the machine in its new state.
+    private func send(_ event: VoiceKeyMachine.Event) {
+        let config = config
+        for effect in machine.handle(event, config: config) {
+            switch effect {
+            case .start:
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(config.key?.title ?? "none"))")
+                if onPress?() == false { send(.abandon) }
+            case .send:
+                onRelease?()
+            case .cancel:
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut became another shortcut: cancelled, nothing sent")
+                onCancel?()
+            case .refused:
                 onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
-                return
-            }
-            isDown = true
-            VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(key.title))")
-            fire(latch.keyDown(at: ProcessInfo.processInfo.systemUptime))
-        } else if !pressed, isDown {
-            isDown = false
-            if endedByLargerChord(key) {
-                if latch.isEnding {
-                    finishEndedTurn()
-                } else {
-                    cancelHold(key)
-                }
-            } else {
-                fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
-            }
-        }
-    }
-
-    /// The hold ended because Control, Option or Command joined it, not because a key of it was let go: the owner was
-    /// pressing a larger chord (the tiling pair is Control-Option-Command, and Control-Option comes first). Shift and Fn
-    /// are not counted: Shift joining a hold is how the owner asks for Return after dictation. A press that began or
-    /// continued a turn is cancelled (`cancelHold`); the press that ended a hands-free turn is not (`finishEndedTurn`).
-    private func endedByLargerChord(_ key: Shortcut) -> Bool {
-        guard key.isModifierOnly, state.modifiers.isSuperset(of: key.modifiers) else { return false }
-        return !state.modifiers.subtracting(key.modifiers).isDisjoint(with: [.control, .option, .command])
-    }
-
-    /// The press that ended a hands-free turn became a larger chord. The key-down already finished that turn (its text
-    /// is on the way), so nothing is cancelled: the latch takes the key-up as it does for any ended press. The smaller
-    /// hold that is left when the extra modifier is let go first stays blocked until every modifier is up.
-    private func finishEndedTurn() {
-        cancelledByLargerChord = true
-        fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
-    }
-
-    /// The hold became a larger chord: end the turn without sending it, as a key joining the hold does (`spoilHold`),
-    /// and keep it ended until every modifier is up.
-    private func cancelHold(_ key: Shortcut) {
-        cancelledByLargerChord = true
-        pendingStop?.cancel()
-        pendingStop = nil
-        latch = TalkKeyLatch()
-        VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut became a larger chord (\(key.title) + modifiers): cancelled, nothing sent")
-        (onCancel ?? onRelease)?()
-    }
-
-    /// Hold to talk; double-tap to keep listening hands-free until the next tap.
-    private func fire(_ action: TalkKeyLatch.Action?) {
-        switch action {
-        case .start?: onPress?()
-        case .stop?: onRelease?()
-        case .stopLater(let gap)?:
-            pendingStop?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.pendingStop = nil
-                    self.fire(self.latch.pendingStopFired())
+            case .wake(let after):
+                DispatchQueue.main.asyncAfter(deadline: .now() + after) { [weak self] in
+                    MainActor.assumeIsolated { self?.tick() }
                 }
             }
-            pendingStop = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + gap, execute: work)
-        case .cancelPendingStop?:
-            pendingStop?.cancel()
-            pendingStop = nil
-        case nil: break
         }
     }
 }
