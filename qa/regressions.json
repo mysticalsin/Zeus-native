@@ -4402,6 +4402,42 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_face_presence_locks_only_through_the_event_free_call"
       }
+    },
+    {
+      "id": "REG-610",
+      "failure": "A phone or screen showing the owner, seen through a latched spoof cue, still read as the owner and held the Mac awake.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
+        "function": "aSpoofCueTurnsAMatchIntoNotOwner"
+      }
+    },
+    {
+      "id": "REG-615",
+      "failure": "A face the owner switched off in Settings still matched and read as the owner.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
+        "function": "aSwitchedOffFaceNeverMatches"
+      }
+    },
+    {
+      "id": "REG-616",
+      "failure": "Samples taken with another Vision feature print revision were compared with the current one and produced a confident wrong match.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
+        "function": "samplesFromAnotherRevisionNeverMatch"
+      }
     }
   ]
 }
