@@ -55,10 +55,14 @@ struct LiveDiagnosticsCard: View {
             copied = false
             hold.disappear()
         }
-        .onReceive(Self.thermalChanges()) { _ in
+        .onReceive(Self.thermalPublisher) { _ in
             thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
         }
     }
+
+    /// One publisher for every render: `AnyPublisher` is not Equatable, so building it inside `body` would
+    /// resubscribe on each update and could drop a notification that lands during the hop.
+    private static let thermalPublisher = thermalChanges()
 
     /// The system says the Mac's heat changed. Foundation posts this on a global queue, so it is handed to
     /// the main queue before the view's state is written.
