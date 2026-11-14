@@ -83,6 +83,17 @@ private struct ScribeEndWindowView: View {
 
     @ViewBuilder private var content: some View {
         switch scribe.phase {
+        case .recording where scribe.endSuggested:
+            // A detector signal only suggests an end: no countdown, and nothing stops until a button is tapped.
+            Text("The call looks over")
+                .font(.system(size: 20, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+            HStack {
+                Button("End meeting now") { scribe.confirmEnd() }.buttonStyle(.borderedProminent)
+                    .ownedJourneyControl("scribe.endWindow.endNow")
+                Button("Keep recording") { scribe.keepRecording() }.buttonStyle(.bordered)
+                    .ownedJourneyControl("scribe.endWindow.keep")
+            }
         case .ending:
             Text(scribe.endStopRequested ? "Finishing recording…" : "Meeting ending in \(scribe.endingRemaining ?? 9)s")
                 .font(.system(size: 20, weight: .semibold)).monospacedDigit()
