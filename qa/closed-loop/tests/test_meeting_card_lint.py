@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 VIEW = ROOT / "Sources/Zeus/Scribe/ScribeMeetingCardView.swift"
 PANEL = ROOT / "Sources/Zeus/Scribe/ScribeMeetingCardPanel.swift"
+GLASS = ROOT / "Sources/Zeus/Scribe/ScribeMeetingCardGlass.swift"
 FORBIDDEN = re.compile(r"\bTimer\b|\bTimelineView\b|\.repeatForever\b|\bCVDisplayLink\b|\bCADisplayLink\b")
 DASH = re.compile("[" + chr(0x2013) + chr(0x2014) + "]")
 
@@ -115,13 +116,26 @@ class MeetingCardLint(unittest.TestCase):
         self.assertNotIn("visibleFrame()", body)
 
     def test_the_panel_places_the_card_with_the_core_rule(self):
-        self.assertIn("ScribeMeetingCardPlacement.origin(", self.read(PANEL))
+        self.assertIn("ScribeMeetingCardPlacement.windowOrigin(", self.read(PANEL))
 
-    def test_the_card_sources_have_no_dash_and_use_the_shared_material(self):
-        for path in (VIEW, PANEL):
+    def test_the_card_sources_have_no_dash_and_draw_on_the_card_glass(self):
+        for path in (VIEW, PANEL, GLASS):
             text = self.read(path)
             self.assertIsNone(DASH.search("\n".join(line for _, line in code_lines(text))), path.name)
-        self.assertIn(".alertGlass(", self.read(VIEW))
+        self.assertIn(".scribeCardGlass(", self.read(VIEW))
+        glass = self.read(GLASS)
+        self.assertIn(".behindWindow", glass)
+        self.assertIn("static func resolve(reduceTransparency: Bool)", glass)
+
+    def test_the_card_never_has_a_field_to_type_in(self):
+        for path in (VIEW, GLASS):
+            self.assertNotRegex(self.read(path), r"\b(TextField|TextEditor|SecureField|NSTextField|NSTextView)\b", path.name)
+
+    def test_the_orb_breathes_only_inside_the_keyed_countdown_and_never_in_a_loop(self):
+        text = self.read(VIEW)
+        self.assertRegex(text, r"ScribeMeetingCardGlow\(breath: still[^)]*\)[^.]*\)?\s*\.id\(\s*deadline\s*\)")
+        self.assertIn(".repeatCount(breath.count, autoreverses: true)", text)
+        self.assertEqual(clocks(text), [])
 
     def test_a_tap_carries_the_card_the_person_saw(self):
         view = self.read(VIEW)
@@ -129,9 +143,12 @@ class MeetingCardLint(unittest.TestCase):
             self.assertIn(f"var {action}: (ScribeMeetingCard) -> Void", view)
             self.assertRegex(view, rf"\b{action}\(card\)")
             self.assertNotRegex(view, rf"Button\(action: {action}\)")
+        self.assertIn("var onJoin: (ScribeMeetingCard, ScribeJoinApp) -> Void", view)
+        self.assertRegex(view, r"\bonJoin\(card, ")
         panel = self.read(PANEL)
         for action in ("primary", "cancel", "dismiss"):
             self.assertIn(f"var {action}: (ScribeMeetingCard) -> Void", panel)
+        self.assertIn("var join: (ScribeMeetingCard, ScribeJoinApp) -> Void", panel)
 
     def test_the_panel_takes_the_card_down_by_render_generation_not_by_alpha(self):
         text = self.read(PANEL)

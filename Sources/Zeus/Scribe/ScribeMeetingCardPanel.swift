@@ -55,19 +55,24 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
         var primary: (ScribeMeetingCard) -> Void = { _ in }
         var cancel: (ScribeMeetingCard) -> Void = { _ in }
         var dismiss: (ScribeMeetingCard) -> Void = { _ in }
+        /// Join, or one of the other apps in the menu: opens the card's call link in that app.
+        var join: (ScribeMeetingCard, ScribeJoinApp) -> Void = { card, app in
+            MainActor.assumeIsolated { ScribeJoinAppResolver.shared.open(card, in: app) }
+        }
         var pointer: (Bool) -> Void = { _ in }
     }
 
     /// Moves the panel's alpha to `alpha`, then calls `completion`. A test replaces it to decide when a fade ends.
     typealias Fade = @MainActor (NSPanel, CGFloat, (@MainActor @Sendable () -> Void)?) -> Void
 
-    private static let margin: CGFloat = 16
-
     private let actions: Actions
     private let now: () -> Date
     private let uptime: () -> TimeInterval
     private let visibleFrame: () -> CGRect
+    private let joinApps: @MainActor (ScribeMeeting) -> [ScribeJoinApp]
     private let fade: Fade
+    /// The pointer is over the card. The close button follows it, so the panel draws the card again when it moves.
+    private var pointerInside = false
     /// The visible frame of the screen the card appeared on. It is read when the card goes from hidden to
     /// visible and when the screens change, so a card on screen never jumps to another display.
     private var placement = CGRect.zero
@@ -87,11 +92,13 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
          visibleFrame: @escaping () -> CGRect = {
              (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
          },
+         joinApps: @escaping @MainActor (ScribeMeeting) -> [ScribeJoinApp] = { ScribeJoinAppResolver.shared.apps(for: $0) },
          fade: Fade? = nil) {
         self.actions = actions
         self.now = now
         self.uptime = uptime
         self.visibleFrame = visibleFrame
+        self.joinApps = joinApps
         self.fade = fade ?? Self.animatedFade
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil
@@ -126,7 +133,10 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
         }
         let (panel, host) = ensurePanel()
         let wasVisible = panel.isVisible
-        if !wasVisible { placement = visibleFrame() }
+        if !wasVisible {
+            placement = visibleFrame()
+            pointerInside = false
+        }
         panel.ignoresMouseEvents = false
         host.rootView = view(card)
         layout(panel, host)
@@ -141,15 +151,30 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
 
     private func view(_ card: ScribeMeetingCard) -> ScribeMeetingCardView {
         ScribeMeetingCardView(card: card, now: now(), uptime: uptime(),
+                              joinApps: card.meeting.map(joinApps) ?? [], hovered: pointerInside,
                               onPrimary: actions.primary, onCancel: actions.cancel,
-                              onDismiss: actions.dismiss)
+                              onDismiss: actions.dismiss, onJoin: actions.join)
     }
 
+    private func pointerMoved(_ inside: Bool) {
+        actions.pointer(inside)
+        guard inside != pointerInside, let host else { return }
+        pointerInside = inside
+        // Only a card on screen changes with the pointer; a hidden one keeps the flag for its next appearance.
+        let card = host.rootView.card
+        if card != .hidden { host.rootView = view(card) }
+    }
+
+    /// Fades to `alpha`. Leaving also drifts up a few points, so the card goes the way it came from; Reduce
+    /// Motion only fades.
     private static let animatedFade: Fade = { panel, alpha, completion in
         let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = reduced ? AlertMotion.reducedFade : AlertMotion.collapseContentFade
+            context.duration = reduced ? AlertMotion.reducedFade : AlertMotion.stretchResponse / 2
             panel.animator().alphaValue = alpha
+            if alpha == 0, !reduced {
+                panel.animator().setFrameOrigin(NSPoint(x: panel.frame.origin.x, y: panel.frame.origin.y + 8))
+            }
         }, completionHandler: {
             MainActor.assumeIsolated { completion?() }
         })
@@ -158,16 +183,15 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     private func layout(_ panel: NSPanel, _ host: NSView) {
         let size = host.fittingSize
         panel.setContentSize(size)
-        panel.setFrameOrigin(ScribeMeetingCardPlacement.origin(size: size, visibleFrame: placement,
-                                                               margin: Self.margin))
+        panel.setFrameOrigin(ScribeMeetingCardPlacement.windowOrigin(windowSize: size, visibleFrame: placement))
     }
 
     private func ensurePanel() -> (NSPanel, ScribeCardHostingView<ScribeMeetingCardView>) {
         if let panel = window, let host { return (panel, host) }
         let host = ScribeCardHostingView(rootView: view(.hidden))
-        host.onPointer = { [weak self] inside in self?.actions.pointer(inside) }
+        host.onPointer = { [weak self] inside in self?.pointerMoved(inside) }
         let panel = ScribeMeetingCardWindow(
-            contentRect: NSRect(x: 0, y: 0, width: ScribeMeetingCardView.width, height: 72),
+            contentRect: NSRect(origin: .zero, size: ScribeMeetingCardMetrics.windowSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: true
@@ -180,7 +204,8 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        // The card draws its own wide shadow inside the room the window gives it.
+        panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window = panel
         self.host = host

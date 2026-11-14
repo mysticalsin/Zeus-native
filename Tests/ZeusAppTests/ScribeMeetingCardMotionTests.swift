@@ -59,13 +59,30 @@ struct ScribeMeetingCardMotionTests {
         }
     }
 
-    @Test func entranceUsesTheAlertSpringAndDropAndReduceMotionOnlyFades() {
+    @Test func entranceUsesTheAlertSpringScaleAndDropAndReduceMotionOnlyFades() {
         let moving = ScribeMeetingCardMotion.entrance(reduceMotion: false)
         #expect(moving.animation == AlertStyle.stretch)
         #expect(moving.drop == 6)
+        #expect(moving.scale == 0.96, "a soft scale in from 0.96")
         let still = ScribeMeetingCardMotion.entrance(reduceMotion: true)
         #expect(still.animation == .easeInOut(duration: AlertMotion.reducedFade))
         #expect(still.drop == 0)
+        #expect(still.scale == 1, "Reduce Motion fades only")
+    }
+
+    @Test func theGlowBreathesTwoSlowHalfCyclesAcrossTheCountdownAndNeverLoops() throws {
+        let plan = try #require(ScribeMeetingCardMotion.breath(deadline: deadline, uptime: began, total: total, reduceMotion: false))
+        #expect(plan.count == 2)
+        #expect(abs(plan.halfCycle * Double(plan.count) - total) < 1e-9, "the whole breath fits inside the countdown")
+        #expect(plan.halfCycle >= 2, "very slowly")
+        let late = try #require(ScribeMeetingCardMotion.breath(deadline: deadline, uptime: began + 3, total: total, reduceMotion: false))
+        #expect(abs(late.halfCycle * Double(late.count) - 2) < 1e-9, "a glow born part way ends with the deadline")
+    }
+
+    @Test func theGlowDoesNotBreatheWithReduceMotionOrOncePastTheDeadline() {
+        #expect(ScribeMeetingCardMotion.breath(deadline: deadline, uptime: began, total: total, reduceMotion: true) == nil)
+        #expect(ScribeMeetingCardMotion.breath(deadline: deadline, uptime: deadline, total: total, reduceMotion: false) == nil)
+        #expect(ScribeMeetingCardMotion.breath(deadline: deadline, uptime: deadline + 2, total: total, reduceMotion: false) == nil)
     }
 
     @Test func aStateChangeInsideTheCardIsTheShortCrossfade() {
@@ -108,20 +125,32 @@ struct ScribeMeetingCardHostedMotionTests {
         return (window, host)
     }
 
-    /// The light in the right edge of a view (the ring and Cancel; the words never reach it).
-    private func light(_ view: NSView) throws -> Double {
+    /// The white light in the thin band where the ring runs, read from the pixels of a view. `center` is the ring's
+    /// centre in the view's own points, from the top left. Only white counts (the lowest of red, green and blue),
+    /// so the blue glow of the orb behind the ring never reads as ring.
+    private func light(_ view: NSView, center: CGPoint) throws -> Double {
         view.layoutSubtreeIfNeeded()
         let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: rep)
+        let scale = Double(rep.pixelsWide) / Double(view.bounds.width)
+        let radius = Double(ScribeMeetingCardMetrics.ringDiameter - ScribeMeetingCardMetrics.ringWidth) / 2
         var sum = 0.0
-        let edge = Int(90 * Double(rep.pixelsWide) / Double(view.bounds.width))
-        for x in max(0, rep.pixelsWide - edge)..<rep.pixelsWide {
+        for x in 0..<rep.pixelsWide {
             for y in 0..<rep.pixelsHigh {
+                let dx = (Double(x) + 0.5) / scale - Double(center.x)
+                let dy = (Double(y) + 0.5) / scale - Double(center.y)
+                guard abs((dx * dx + dy * dy).squareRoot() - radius) <= 1.6 else { continue }
                 guard let color = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
-                sum += Double(color.redComponent * color.alphaComponent)
+                sum += Double(min(color.redComponent, color.greenComponent, color.blueComponent) * color.alphaComponent)
             }
         }
         return sum
+    }
+
+    /// The ring's centre in a hosted card: the orb's centre inside the slab, inside the room the window adds.
+    private var cardRingCenter: CGPoint {
+        CGPoint(x: ScribeMeetingCardMetrics.shadowRoom + ScribeMeetingCardMetrics.orbCenter.x,
+                y: ScribeMeetingCardMetrics.shadowRoom + ScribeMeetingCardMetrics.orbCenter.y)
     }
 
     /// The same card at rest with the ring full and with it empty: the two ends a reading is placed between.
@@ -131,7 +160,7 @@ struct ScribeMeetingCardHostedMotionTests {
             let (window, host) = offscreen(ScribeMeetingCardView(card: card(deadline), now: now,
                                                                  uptime: deadline - total * share, settled: true))
             defer { window.close() }
-            return try light(host)
+            return try light(host, center: cardRingCenter)
         }
         return (try rest(1), try rest(0))
     }
@@ -184,7 +213,7 @@ struct ScribeMeetingCardHostedMotionTests {
         let marks: [TimeInterval] = [0.1, 0.6, 1.1, 1.5, 2.1, 2.6, 3.0, 3.6, 4.1, 4.6, 4.9]
         let shares = try await watch(began: began, deadline: deadline, marks: marks,
                                      render: { card.render(countdown(deadline: $0)) },
-                                     read: { share(try light(try #require(card.window?.contentView)), reference) })
+                                     read: { share(try light(try #require(card.window?.contentView), center: cardRingCenter), reference) })
         expectSteadyFall(shares, at: marks)
         for (before, after) in zip(shares, shares.dropFirst()) {
             #expect(after < before + 0.04, "the ring must never refill: \(shares)")
@@ -201,21 +230,21 @@ struct ScribeMeetingCardHostedMotionTests {
         let marks: [TimeInterval] = [0.9, 1.5, 3.0, 4.9]
         let shares = try await watch(began: began, deadline: deadline, marks: marks,
                                      render: { card.render(countdown(deadline: $0)) },
-                                     read: { share(try light(try #require(card.window?.contentView)), reference) })
+                                     read: { share(try light(try #require(card.window?.contentView), center: cardRingCenter), reference) })
         expectSteadyFall(shares, at: marks)
     }
 
     @Test func withReduceMotionTheRingStepsDownAtEachRedrawAndTheDigitStillCounts() async throws {
+        let ringCenter = CGPoint(x: ScribeMeetingCardMetrics.ringDiameter / 2, y: ScribeMeetingCardMetrics.ringDiameter / 2)
         func ring(_ deadline: TimeInterval, uptime: TimeInterval, still: Bool) -> some View {
             ScribeMeetingCardRing(deadline: deadline, uptime: uptime, total: total, reduceMotion: true, still: still)
                 .id(deadline)
-                .frame(width: 68, height: 34)
                 .background(Color.black)
         }
         func rest(_ share: Double) throws -> Double {
             let (window, host) = offscreen(ring(1_000, uptime: 1_000 - total * share, still: true))
             defer { window.close() }
-            return try light(host)
+            return try light(host, center: ringCenter)
         }
         let reference = (full: try rest(1), empty: try rest(0))
         let began = uptime()
@@ -228,7 +257,7 @@ struct ScribeMeetingCardHostedMotionTests {
                                      render: { host.rootView = ring($0, uptime: uptime(), still: false) },
                                      read: {
             digits.append(ScribeMeetingCardText.seconds(deadline: deadline, now: uptime()))
-            return share(try light(host), reference)
+            return share(try light(host, center: ringCenter), reference)
         })
         // One step per redraw and nothing in between: no sweep runs.
         for (got, want) in zip(shares, [1.0, 1.0, 0.8, 0.8, 0.6]) {
