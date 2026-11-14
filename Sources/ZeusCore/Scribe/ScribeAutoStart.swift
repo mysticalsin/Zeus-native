@@ -100,10 +100,13 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
     /// "Next meeting" card: the meeting offered and when the card leaves.
     public var nextMeeting: ScribeMeeting?
     public var nextDeadline: TimeInterval?
+    /// An end was suggested and the call has not come back since. One suggestion per quiet spell: the person's
+    /// answer (Keep recording) is not read here, so nothing is suggested again until the call returns.
+    public var endSuggested: Bool
 
     init(meeting: ScribeMeeting, since: TimeInterval, micReleasedAt: TimeInterval? = nil, sawMic: Bool = false,
          sawWindow: Bool = false, windowGoneAt: TimeInterval? = nil, nextMeeting: ScribeMeeting? = nil,
-         nextDeadline: TimeInterval? = nil) {
+         nextDeadline: TimeInterval? = nil, endSuggested: Bool = false) {
         self.meeting = meeting
         self.since = since
         self.micReleasedAt = micReleasedAt
@@ -112,6 +115,7 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
         self.windowGoneAt = windowGoneAt
         self.nextMeeting = nextMeeting
         self.nextDeadline = nextDeadline
+        self.endSuggested = endSuggested
     }
 }
 
@@ -124,7 +128,7 @@ public enum ScribeAutoStartState: Equatable, Sendable {
     /// "Start automatically": the banner is up with a Cancel button.
     case countingDown(meeting: ScribeMeeting, deadline: TimeInterval)
     case recording(ScribeAutoStartRecording)
-    /// The call ended; Scribe's own end window (with Keep recording) is up.
+    /// Switch was tapped: the recording is ending and Scribe's own end window (with Keep recording) is up.
     case endingSuggested(meeting: ScribeMeeting, since: TimeInterval)
 }
 
@@ -159,8 +163,13 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case showNextMeeting(ScribeMeeting)
         case hideBanner
         case startRecording(ScribeMeeting)
-        /// Open Scribe's end window, which stops and saves unless the person taps Keep recording.
+        /// Switch only: open Scribe's end window, which stops and saves unless the person taps Keep recording.
         case requestEnd(ScribeMeeting)
+        /// The call looks over (microphone released, call window closed). Open Scribe's end window with no
+        /// countdown. Nothing stops until a button is tapped.
+        case suggestEnd(ScribeMeeting)
+        /// The call came back: close the suggestion.
+        case withdrawEnd
     }
 
     public private(set) var state: ScribeAutoStartState = .idle
@@ -184,8 +193,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         }
     }
 
-    /// The call looks over and the end timer is running: the app should read fresh signals each second, because
-    /// the timer only advances on evidence.
+    /// The call looks over or is about to: the app should read fresh signals each second, because the end timer
+    /// only advances on evidence and a suggestion is withdrawn only when the call is seen coming back.
     public var needsFreshEvidence: Bool {
         guard case .recording(let recording) = state else { return false }
         return recording.micReleasedAt != nil || recording.windowGoneAt != nil
@@ -340,12 +349,26 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             }
             let micEnded = recording.micReleasedAt.map { now - $0 >= timing.callEndedAfter } ?? false
             let windowEnded = recording.windowGoneAt.map { now - $0 >= timing.callEndedAfter } ?? false
-            if (micEnded || windowEnded), evidence.activity == .recording {
-                if recording.nextMeeting != nil { effects.append(.hideBanner) }
-                state = .endingSuggested(meeting: recording.meeting, since: now)
-                return effects + [.requestEnd(recording.meeting)]
+            let callLooksOver = micEnded || windowEnded
+            if callLooksOver, evidence.activity == .recording, !recording.endSuggested {
+                // Advisory only: the recording keeps its state and Scribe keeps its phase.
+                recording.endSuggested = true
+                if recording.nextMeeting != nil {
+                    recording.nextMeeting = nil
+                    recording.nextDeadline = nil
+                    effects.append(.hideBanner)
+                }
+                state = .recording(recording)
+                return effects + [.suggestEnd(recording.meeting)]
             }
-            effects += offerNextMeeting(&recording, evidence, now: now)
+            if !callLooksOver {
+                // The call came back: the suggestion goes, and another one may follow a later quiet spell.
+                if recording.endSuggested {
+                    recording.endSuggested = false
+                    effects.append(.withdrawEnd)
+                }
+                effects += offerNextMeeting(&recording, evidence, now: now)
+            }
             state = .recording(recording)
             return effects
 

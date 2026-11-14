@@ -323,6 +323,12 @@ final class ScribeController {
     private(set) var endingRemaining: Int?
     var endingReason: ScribeEndWorkflow.Reason? { endWorkflow.reason }
     var endStopRequested: Bool { endWorkflow.stopRequested }
+    /// The call looks over and the end window asks. Capture keeps running: only a tap or the bound call app
+    /// closing stops it.
+    var endSuggested: Bool {
+        if case .recording = machine.phase { return endWorkflow.isSuggested }
+        return false
+    }
     @ObservationIgnored private var levelBox: ScribeLevelBox?
     @ObservationIgnored private var levelTimer: Timer?
     @ObservationIgnored private var wordReveals: [String: ScribeWordRevealEntry] = [:]
@@ -680,6 +686,21 @@ final class ScribeController {
         endWindow?.present(scribe: self)
     }
 
+    /// A detector signal (the call app let go of the microphone, its call window closed): opens the end window with
+    /// "The call looks over". The phase stays `.recording` and there is no deadline.
+    func suggestEnd() {
+        guard case .recording(let id, _) = machine.phase,
+              endWorkflow.suggestEnd(session: id, now: nowSeconds()) else { return }
+        announce("The call looks over")
+        endWindow?.present(scribe: self)
+    }
+
+    /// The call took the microphone again: the suggestion closes by itself.
+    func withdrawEndSuggestion() {
+        guard case .recording(let id, _) = machine.phase, endWorkflow.withdrawSuggestion(session: id) else { return }
+        hideEndWindow()
+    }
+
     /// Positive termination of the exact native call-app instance bound when Record was chosen.
     /// This reports that the app closed; it does not pretend to detect a remote participant hanging up.
     func boundCallApplicationDidTerminate(_ identity: ScribeCallProcessIdentity) {
@@ -718,15 +739,26 @@ final class ScribeController {
     }
 
     func confirmEnd() {
+        // End meeting now on a suggestion is an explicit stop: it takes the same path as Stop, then confirms.
+        if endSuggested { requestEnd() }
         guard case .ending(let id, _) = machine.phase, endWorkflow.endNow(session: id) else { return }
         provider.stop(session: id)
     }
 
     func keepRecording() {
-        guard case .ending(let id, _) = machine.phase, endWorkflow.keepRecording(session: id) else { return }
-        run { $0.keepRecording(id) }
-        endingRemaining = nil
-        hideEndWindow()
+        switch machine.phase {
+        case .recording(let id, _):
+            // Only a suggestion can be kept here; with nothing suggested the workflow refuses.
+            guard endWorkflow.keepRecording(session: id) else { return }
+            hideEndWindow()
+        case .ending(let id, _):
+            guard endWorkflow.keepRecording(session: id) else { return }
+            run { $0.keepRecording(id) }
+            endingRemaining = nil
+            hideEndWindow()
+        default:
+            return
+        }
     }
 
     func cancel() {

@@ -4,8 +4,9 @@ import ZeusCore
 
 /// Performs what the core `ScribeAutoStartMachine` decides. It reads the signals the call watcher already
 /// gathers (calendar, running call apps, which process holds the microphone), asks the machine, and then
-/// shows the banner, starts Scribe or opens the end window. It never asks for any permission: automatic start
-/// needs Microphone to be allowed already, otherwise the machine asks instead.
+/// shows the banner, starts Scribe or opens the end window. A detector signal only suggests an end; it never
+/// stops a recording. It never asks for any permission: automatic start needs Microphone to be allowed already,
+/// otherwise the machine asks instead.
 @MainActor
 final class ScribeAutoStartController {
     static let shared = ScribeAutoStartController()
@@ -111,6 +112,10 @@ final class ScribeAutoStartController {
                 startScribe(for: meeting)
             case .requestEnd:
                 ScribeController.shared.requestEnd()
+            case .suggestEnd:
+                ScribeController.shared.suggestEnd()
+            case .withdrawEnd:
+                ScribeController.shared.withdrawEndSuggestion()
             }
         }
     }
