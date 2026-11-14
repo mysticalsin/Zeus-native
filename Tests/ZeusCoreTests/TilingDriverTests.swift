@@ -597,6 +597,29 @@ extension TilingDriverTests {
             #expect(fake.writes.count == 3)
         }
 
+        @Test func oneDeadlineCoversEveryPlanOfAPass() {
+            let fake = driver(4)
+            var now = 0.0
+            fake.onWrite = { now += 0.4 }
+            let all = moves(4).moves
+            let first = TileMovePlan(moves: Array(all[0..<2]), inPlace: [], missing: [])
+            let second = TileMovePlan(moves: Array(all[2..<4]), inPlace: [], missing: [])
+            let deadline = 1.0
+            let one = TileApplier.apply(first, with: fake, until: deadline, clock: { now })
+            let two = TileApplier.apply(second, with: fake, until: deadline, clock: { now })
+            #expect(one.moved == [id(1), id(2)])
+            #expect(two.moved == [id(3)], "a move starts only while the shared deadline has not passed (0.8 yes, 1.2 no)")
+            #expect(two.deferred == [id(4)])
+            #expect(fake.writes.count == 3, "a second plan does not get a fresh budget")
+        }
+
+        @Test func aDeadlineThatHasAlreadyPassedStartsNothingAndDefersEveryMove() {
+            let fake = driver(2)
+            let outcome = TileApplier.apply(moves(2), with: fake, until: 5, clock: { 6 })
+            #expect(outcome.moved.isEmpty && outcome.refused.isEmpty && fake.writes.isEmpty)
+            #expect(outcome.deferred == [id(1), id(2)])
+        }
+
         @Test func theSkippedListIsTheInPlaceListAndPassesStillRunMoves() {
             let fake = driver(2)
             let plan = TileMovePlan(moves: [TileMove(id: id(2), target: rect(5, 5, 90, 90), current: rect(0, 500, 50, 50))],

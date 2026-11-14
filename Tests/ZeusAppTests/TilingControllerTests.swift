@@ -356,9 +356,28 @@ struct TilingControllerTests {
         #expect(attempts == 1)
     }
 
+    @Test func onePassHasOneTimeBudgetAcrossEveryDisplay() {
+        let rig = Rig()
+        rig.driver.screens = [FakeTilingDriver.mainDisplay(), FakeTilingDriver.rightDisplay()]
+        rig.clockStep = 0.6
+        rig.driver.add(id(1))
+        rig.driver.add(id(2))
+        rig.driver.add(id(3), frame: TileRect(x: 1600, y: 100, width: 800, height: 600))
+        rig.driver.add(id(4), frame: TileRect(x: 1700, y: 120, width: 800, height: 600))
+        rig.controller.start()
+        rig.runOnce()
+        #expect(rig.driver.writes.map(\.window) == [id(1), id(2)],
+                "the second display does not get a fresh budget: the pass defers its moves")
+        #expect(rig.controller.floatingWindows.isEmpty, "deferred is not floated")
+        #expect(rig.pending.count == 1, "a follow-up pass takes the rest")
+        rig.clockStep = 0
+        rig.settle()
+        #expect(Set(rig.driver.writes.map(\.window)) == [id(1), id(2), id(3), id(4)])
+    }
+
     @Test func windowsTheBudgetDeferredAreNotFloatedAndALaterPassTakesThem() {
         let rig = Rig()
-        rig.clockStep = 0.5
+        rig.clockStep = 0.7
         for n in 1...3 { rig.driver.add(id(n)) }
         rig.controller.start()
         rig.runOnce()
