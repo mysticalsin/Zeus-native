@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notch.topBar = topBar
         notch.onPresentationChange = { [weak self] presentation in self?.buddy.setHiddenForPanel(presentation == .panel) }
         if on(.notchUI) { notch.start() }
+        if on(.notchUI) { ScreenCornerOverlay.shared.start() }
         // A permission cue is eligible for a system notification, which reads SettingsStore.shared (migration
         // writes), so a QA startup never wires it.
         if on(.systemNotifications) {
@@ -513,6 +514,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotchControllerBridge.controller?.boostCaptureVisibility(for: captureBoost)
             ScreenEdgeGlowController.shared.boostCaptureVisibility(for: captureBoost)
             EdgeWaveController.shared.boostCaptureVisibility(for: captureBoost)
+            ScreenCornerOverlay.shared.boostCaptureVisibility(for: captureBoost)
             return NotchDebugAnimator.run(lower, topBar: self.topBar)
         }
     }
@@ -886,6 +888,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
+            case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break
             }
         }
