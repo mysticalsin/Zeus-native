@@ -123,6 +123,22 @@
       "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift"
     },
     {
+      "id": "native-EqualiserControllerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual EqualiserController against a fake tap factory, monitor, claim and clock; no tap, aggregate, listener or audio prompt.",
+      "suite": "EqualiserControllerTests",
+      "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift"
+    },
+    {
+      "id": "native-AppShapingRenderTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual render and probe blocks run on synthetic buffer lists; no device, tap or capture.",
+      "suite": "AppShapingRenderTests",
+      "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift"
+    },
+    {
       "id": "native-RecordlyDebugWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -1159,6 +1175,80 @@
             {
               "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
               "function": "invalidOrBackwardsTimingDoesNotLaunchReplacementReaders"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-controller",
+          "check": "native-EqualiserControllerTests",
+          "acceptance": "Per-app shaping probes before any muted tap, destroys every tap first on a call, a Zeus capture, sleep, an output change or a stall, never builds while another copy holds the claim, and keeps the raw copy of unreadable settings. Fakes only; no real tap.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aPlayingAppIsProbedThenTapped"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aCallStartingDestroysTheTapFirst"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "zeusCapturingPausesAndEndingResumes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "sleepTearsDownAndWakeRebuildsTwoSecondsLater"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "deviceRemovalDestroysTheTapThenRebuildsWithoutAProbe"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aHeldClaimBuildsNothingAndResumesWhenItFrees"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aStalledCallbackDestroysTheTapThenRebuilds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "zerosUnderAMutedTapDestroyTheTapBeforeAnythingElseThenProbe"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "theFifthBuildFailureStopsThatApp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "switchingOffLeavesNoTapProbeListenerOrTimer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aFailedDecodeKeepsTheRawCopyAndShapesNothing"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-render",
+          "check": "native-AppShapingRenderTests",
+          "acceptance": "The shaping render block routes channels to the device, counts frames and zeros, runs callbacks longer than its scratch in chunks, and writes nothing from the probe block. Synthetic buffers only.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "stereoInterleavedGoesToAStereoDeviceUnchangedWhenFlat"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "aStereoPairOnALargerDeviceLeavesTheOtherChannelsSilent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "aCallbackLongerThanTheScratchRunsInChunks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "theProbeBlockCountsAndWritesNothing"
             }
           ]
         }

@@ -4462,6 +4462,126 @@
         "file": "Tests/ZeusCoreTests/EqualiserLifecycleTests.swift",
         "function": "everyPauseFromARunningStateDestroysEverythingFirst"
       }
+    },
+    {
+      "id": "REG-438",
+      "failure": "A call starting left the muted tap in place for a moment, so call audio could be silent.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "aCallStartingDestroysTheTapFirst"
+      }
+    },
+    {
+      "id": "REG-439",
+      "failure": "A muted tap that stopped calling back left its app silent instead of being destroyed and rebuilt.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "aStalledCallbackDestroysTheTapThenRebuilds"
+      }
+    },
+    {
+      "id": "REG-440",
+      "failure": "A device removal kept a muted tap on the old output instead of destroying it before the rebuild.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "deviceRemovalDestroysTheTapThenRebuildsWithoutAProbe"
+      }
+    },
+    {
+      "id": "REG-441",
+      "failure": "A second copy of Zeus built taps while another held the single-shaper claim, so an app could be shaped twice.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "aHeldClaimBuildsNothingAndResumesWhenItFrees"
+      }
+    },
+    {
+      "id": "REG-442",
+      "failure": "Unreadable saved settings were overwritten before a raw copy was kept.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "aFailedDecodeKeepsTheRawCopyAndShapesNothing"
+      }
+    },
+    {
+      "id": "REG-443",
+      "failure": "The render callback allocated, locked, logged or hopped to the main actor.",
+      "features": [
+        "F03"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_shaping_render_has_no_allocation_or_main_hops"
+      }
+    },
+    {
+      "id": "REG-444",
+      "failure": "A test could create a real tap and raise the System Audio Recording prompt.",
+      "features": [
+        "F03"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_tests_never_create_a_tap"
+      }
+    },
+    {
+      "id": "REG-445",
+      "failure": "A Zeus aggregate device appeared in the output and microphone pickers.",
+      "features": [
+        "F03"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_device_pickers_never_offer_a_zeus_aggregate"
+      }
+    },
+    {
+      "id": "REG-446",
+      "failure": "A render callback longer than its scratch wrote past the buffer instead of running in chunks.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-AppShapingRenderTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+        "function": "aCallbackLongerThanTheScratchRunsInChunks"
+      }
+    },
+    {
+      "id": "REG-447",
+      "failure": "An IOProc block was created in a file that was never audited as free of main-actor isolation.",
+      "features": [
+        "F03"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_io_proc_blocks_only_in_audited_files"
+      }
     }
   ]
 }
