@@ -58,11 +58,6 @@ public protocol TilingWindowDriver: AnyObject {
     func frontmost() -> TileFrontmost
 }
 
-extension TilingWindowDriver {
-    /// A driver that cannot tell what is in front reports nothing: no window is focused and nothing is full screen.
-    public func frontmost() -> TileFrontmost { .none }
-}
-
 /// Gives each window of each app a number that is never used again in this session.
 public struct TileIDAllocator: Sendable {
     private var last: [Int32: Int] = [:]

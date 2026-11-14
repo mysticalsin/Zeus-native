@@ -451,6 +451,7 @@ extension TilingDriverTests {
     }
 
     func focus(_ window: TileWindowID) { focused.append(window) }
+    func frontmost() -> TileFrontmost { .none }
 }
 
 extension TilingDriverTests {

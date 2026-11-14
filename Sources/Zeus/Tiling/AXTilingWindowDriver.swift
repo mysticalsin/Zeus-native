@@ -234,10 +234,12 @@ final class AXTilingWindowDriver: TilingWindowDriver {
     }
 
     /// The front app's focused window, when the last listing admitted it, and whether that window is in full screen.
-    /// One app, two reads, with the same messaging timeout as everything else; anything unreadable is "not full
+    /// Zeus itself is never read: admission refuses its windows, and a read into this process from the main thread
+    /// can stall its own interface. One app, two reads, with the same messaging timeout as everything else; anything unreadable is "not full
     /// screen" and "no focused window", which leaves the layout as it is.
     func frontmost() -> TileFrontmost {
-        guard isTrusted, let app = NSWorkspace.shared.frontmostApplication, !app.isTerminated else { return .none }
+        guard isTrusted, let app = NSWorkspace.shared.frontmostApplication, !app.isTerminated,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return .none }
         let pid = app.processIdentifier
         let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(appElement, Self.messagingTimeout)
