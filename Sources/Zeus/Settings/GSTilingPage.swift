@@ -16,7 +16,7 @@ struct TilingSettingsPage: View {
                         isOn: store.boolBinding("tiling.enabled"))
             GSDivider()
             GSRow(symbol: "command", title: "Tiling keys",
-                  text: "Hold these with a letter or an arrow. Control-Option is also Talk to Zeus, so pick another pair if they clash.") {
+                  text: "Hold these with a letter or an arrow. Control-Option is also Talk to Zeus and pointing, so pick another pair if they clash.") {
                 GSPopup(selection: store.stringBinding("tiling.keyBase"),
                         options: SettingsCatalog.option("tiling.keyBase")?.choices ?? [], label: "Tiling keys")
             }
@@ -39,7 +39,7 @@ struct TilingSettingsPage: View {
         GSCard("Left out") {
             GSRow(symbol: "minus.circle", title: "Apps Zeus never tiles",
                   text: "Bundle ids, separated by commas. Their windows are left where they are.") {
-                GSTextInput(text: store.stringBinding("tiling.excludedApps"), placeholder: "e.g. com.apple.finder", label: "Apps Zeus never tiles")
+                GSTextInput(text: store.stringBinding("tiling.excludedApps"), placeholder: "e.g. com.example.app", label: "Apps Zeus never tiles")
             }
         }
     }
