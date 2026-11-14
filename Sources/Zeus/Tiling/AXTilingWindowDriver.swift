@@ -89,8 +89,8 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         return out
     }
 
-    /// The admitted windows of one app, or nil when the app did not answer in time. Nothing is guessed: the
-    /// caller leaves an unanswered app out of the listing.
+    /// The admitted windows of one app (none when it says it has none), or nil when the app did not answer in time.
+    /// Nothing is guessed: the caller leaves an unanswered app out of the listing.
     private func scan(_ app: NSRunningApplication, onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy,
                       deadline: TimeInterval) -> [TileWindowRef]? {
         guard ProcessInfo.processInfo.systemUptime <= deadline else { return nil }
@@ -98,8 +98,17 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(appElement, Self.messagingTimeout)
         var raw: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &raw) == .success,
-              let list = raw as? [AXUIElement] else { return nil }
+        let list: [AXUIElement]
+        switch TileWindowsAnswer.classify(axError: AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &raw).rawValue) {
+        case .answered:
+            guard let windows = raw as? [AXUIElement] else { return nil }
+            list = windows
+        case .noWindows:
+            // A definite "none" (an app that closed its last window): the app was read, so no slot of it is kept.
+            list = []
+        case .unread:
+            return nil
+        }
 
         var facts: [TileWindowFacts] = []
         for window in list {

@@ -12,7 +12,14 @@ public enum TileWindowsAnswer: Equatable, Sendable {
     public static let attributeUnsupportedCode: Int32 = -25205
     public static let noValueCode: Int32 = -25212
 
+    /// `success` is a list. "No value" and "unsupported" are definitive: an app that closed its last window answers
+    /// them, and it has no windows. A timeout, or any other failure, is no answer, and the caller keeps what it
+    /// knew about that app.
     public static func classify(axError code: Int32) -> TileWindowsAnswer {
-        .unread
+        switch code {
+        case 0: .answered
+        case noValueCode, attributeUnsupportedCode: .noWindows
+        default: .unread
+        }
     }
 }

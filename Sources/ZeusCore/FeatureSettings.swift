@@ -57,7 +57,7 @@ public enum FeatureSettings {
     /// A ring around the focused window.
     public static func tilingFocusBorder(defaults: UserDefaults = .standard) -> Bool { bool("tiling.focusBorder", default: true, defaults: defaults) }
 
-    /// The modifiers held for every tiling key. An unknown stored label is Control-Option.
+    /// The modifiers held for every tiling key. An unknown stored label reads as the default pair (Control-Option-Command).
     public static func tilingKeyBase(defaults: UserDefaults = .standard) -> TileModifierBase {
         TileModifierBase(label: string("tiling.keyBase", default: TileModifierBase.standard.label, defaults: defaults))
     }
