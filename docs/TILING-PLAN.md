@@ -217,7 +217,7 @@ in parallel with T3 and T5 after T1 lands.
   on `kAXPositionAttribute` then `kAXSizeAttribute` using `AXValueCreate`, and focuses by setting `kAXMainAttribute`
   and `kAXFocusedAttribute` and performing `kAXRaiseAction`. It reuses `AXFinder.frame(of:)`,
   `AXSnapshotter.quartzRect`, and `AXFinder.string`, `number` and `isSettable`. As shipped it reads and writes frames
-  in engine coordinates directly with type-checked values and uses only `AXFinder.isSettable`.
+  in engine coordinates directly with type-checked values and asks `AXUIElementIsAttributeSettable` itself, to keep the error.
 - Coordinate conversion lives here. The engine's `TileRect` (top-left, y down) converts to the AppKit frame per
   display using that display's own height, not the main screen's, so a display above or left of the main one with a
   negative origin converts correctly.
@@ -245,7 +245,11 @@ insert.
   was read is gone, so one slow app never pins the slots of windows that closed in other apps. An app that answers
   "no value" or "attribute unsupported" to the window list has no windows: it counts as read (`TileWindowsAnswer`), so
   only a timeout, another failure or the pass budget leaves an app unread. So does a window whose own attribute read
-  does not complete (`TileWindowsAnswer.windowRead`): that window is slow, not closed, so the whole app is unread.
+  does not complete (`TileWindowsAnswer.windowRead`): that window is slow, not closed, so the whole app is unread. The
+  size-settable check is part of that read: success gives the answer, "unsupported" means not resizable, and a timeout or
+  any other failure leaves the app unread (`TileWindowsAnswer.sizeSettable`).
+- Accessibility revoked part way through a plan: `TileApplier` checks trust again after a write that fails and stops with
+  `.accessibilityOff` and nothing in `refused`, so the controller never floats those windows for the session.
 - Two windows of one app at the same frame, one on another Space: the window list cannot tell them apart, so when more
   windows of the app could be the on-screen entry than the list has entries for it, none of the candidates is admitted.
   A window could be the entry when it sits at the frame whatever else is wrong with it (a panel, a fixed-size window,
@@ -286,15 +290,26 @@ It must not touch the top-bar or settings files.
   C function that reaches the owner through `userInfo` with `Unmanaged`. The tap and the callback are never inside a
   `@MainActor` type, because Swift 6 inserts an executor check and Zeus traps at run time on the first call.
 - `start()` and `stop()` are `nonisolated` and are the only places that call `CGEvent.tapCreate`
-  (`.cgSessionEventTap`, `.headInsertEventTap`, `.defaultTap`, because the tap must consume the chord). They add and
-  remove the source on `CFRunLoopGetMain()` in `.commonModes`; `stop()` disables the tap, removes the source and calls
-  `CFMachPortInvalidate`. The tap is created only when `AccessibilityGate.trusted`, re-armed through
-  `AccessibilityGate.whenTrusted(key: "tiling")`, and never left installed when tiling is off.
+  (`.cgSessionEventTap`, `.headInsertEventTap`, `.defaultTap`, because the tap must consume the chord). The tap is
+  serviced by a thread of its own with its own run loop (`TilingRunLoopThread`), never the main one: a consuming tap
+  makes the window server hold every keystroke in every app until the callback answers, and every Accessibility pass runs
+  on the main thread, where one slow app can take a second. `start()` creates the port and starts the thread, which adds the
+  source to its own loop in `.commonModes` and turns the tap on. `stop()` asks the thread to tear down and waits for it to end
+  (2 s at most, normally microseconds): on the thread's own loop, after any callback in flight, it turns the tap off,
+  removes the source, calls `CFMachPortInvalidate` and ends the loop, so a callback never meets a freed port, and no key
+  is consumed once `stop()` has returned. Switching tiling off and on many times leaves no thread and no object behind.
+  The life of the tap (off, starting, live, stopping, failed) is the pure `TileTapLife` in ZeusCore, and the lock only
+  makes its decisions atomic. The tap is created only when `AccessibilityGate.trusted`, re-armed through
+  `AccessibilityGate.whenTrusted(key: "tiling")`, and never left installed when tiling is off. The source lint fails
+  when any file under `Sources/Zeus/Tiling` names the main run loop.
 - The callback stays tiny: it builds a `ShortcutEvent` (`Sources/ZeusCore/Shortcut.swift`), masks modifiers as
   `PointingEventTap` does, looks the chord up in an immutable, lock-protected keymap snapshot, returns nil to consume
-  or passes the event through, and hands the matched action to the main actor (assume isolation when already on main,
-  else dispatch to main). All Accessibility work runs after the callback returns.
-- It re-enables itself on `.tapDisabledByTimeout` and `.tapDisabledByUserInput`. It ignores autorepeat for the toggle
+  or passes the event through, and makes no Accessibility call and waits on nothing. The matched action goes into a
+  `TileActionMailbox` and a drain on the main queue runs it after the callback has returned its answer. A held focus
+  key repeats faster than a window scan runs, so the mailbox keeps only the newest of a run of focus requests: at most
+  one scan waits behind a running one. Every other action is kept, in order.
+- It re-enables itself on `.tapDisabledByTimeout` and `.tapDisabledByUserInput` (`TileTapHealth` still counts them, and
+  `TileTapLife` turns its verdict into an effect). It ignores autorepeat for the toggle
   actions and allows it for focus and ratio. It passes through every event that carries Zeus's own input tag
   (`DriveInputAttribution.eventTag`). It consumes the key-up for every consumed key-down, tracked in a small set.
 - There is no fallback global monitor: a global monitor cannot consume, so on failure the tap reports unavailable and
@@ -305,8 +320,10 @@ It must not touch the top-bar or settings files.
 
 Extend `qa/closed-loop/tests/test_source_lint.py` so the nonisolated-callback check that scans `Sources/Zeus/Pointing`
 also scans `Sources/Zeus/Tiling`, and add `AXObserverCreate` to its watched callback APIs for the later observer
-upgrade. Add a fail-first sample as the file already does for the pointing case. This is the only shared file T3
-touches, and no other ticket edits it.
+upgrade. Add a fail-first sample as the file already does for the pointing case. A second check fails when any file
+under `Sources/Zeus/Tiling` names the main run loop (`CFRunLoopGetMain` or `RunLoop.main`), with its own fail-first
+sample, and the one bounded wait in `TilingRunLoopThread.stop()` is on the blocking-wait audit list with its reason.
+This is the only shared file T3 touches, and no other ticket edits it.
 
 ### Fail-closed paths
 
@@ -314,13 +331,17 @@ touches, and no other ticket edits it.
 - The tap is disabled by the system: it is re-enabled; if it keeps failing the controller pauses tiling and the
   section shows the state.
 - Tiling paused or off, or a secure input field active: every event passes through.
-- A slow callback would get the tap disabled, so no Accessibility work happens inside it.
+- A slow callback would get the tap disabled, so no Accessibility work happens inside it, and the tap is not serviced by
+  the main thread, which a slow pass can hold.
 
 ### Tests first (`Tests/ZeusCoreTests/TileKeymapTests.swift` plus a lint fail-first sample)
 
 The keymap tests are the pure ones already listed under T1 (unique defaults, invalid and duplicate chords rejected,
 conflicts reported). The lint sample proves a `CGEvent.tapCreate` in a non-`nonisolated` func under
-`Sources/Zeus/Tiling` fails the check.
+`Sources/Zeus/Tiling` fails the check. The tap's life and its mailbox are proved in ZeusCoreTests (`TileTapLifeTests`,
+`TileActionMailboxTests`); the thread (run on its own thread, stop during a callback, 300 start and stop cycles that
+release everything) and the real tap object (start and stop cycles, a burst of focus repeats while main is busy) are
+proved in `TilingRunLoopThreadTests` and `TilingKeyTapLifecycleTests`.
 
 ---
 
@@ -423,11 +444,14 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
 - Key clash, closed in the review pass: `TileBaseConflicts.notes` compares the tiling keys with the keys the other
   monitors really use. The talk key is the effective one (`VoiceKey.effectiveTalkKey`), which moves off Control-Option
   while VoiceOver runs; a modifier-only talk, pointing, dictation or Polyglot key with the same modifiers as the chosen pair is a
-  clash (a larger pair is free, because the tap forwards every key it consumes, key-down and key-up, to the talk,
+  clash (a larger pair is free, because every one of those holds, the shared talk and dictation key included, begins only
+  on exactly its own modifiers (`HotkeyMonitor.handleShared` arms on the exact match and only a running hold tolerates
+  extra ones, such as Shift meaning Return), and the tap forwards every key it consumes, key-down and key-up, to the talk,
   dictation, Polyglot and pointing monitors through `TilingConsumedKey`, so a smaller hold that forms when the owner lets go of
   the extra modifier first stays spoiled until every modifier is up); every bound tiling chord (base plus key) is
   compared with every keyed talk, pointing, dictation and Polyglot shortcut, with the fn flag handled as the tap handles it; a
-  chat chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch or the prompter pause; and while
+  chat chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch, the prompter pause or the approval
+  answer keys (Control-Option Y, N and O while "Answer permissions from the keyboard" is on); and while
   VoiceOver runs every bound chord that holds Control and Option is refused, which VoiceOver uses alone and with
   Command and a letter (the shipped pair included). The controller checks it on every settings write, before
   any tap exists, and refuses a clash: no tap, no observer, the phase is Key clash, and the page and Settings show the
