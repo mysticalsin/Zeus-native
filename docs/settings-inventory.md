@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 178 of 178 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 178 in scope). 167 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 181 of 181 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 181 in scope). 170 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 127.
+**Before this round:** has 19, partial 27, missing 130.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -18,7 +18,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Your defaults | Language | menu | System language | Pins the app language instead of following macOS. | missing | stub | `general.language` | ZEUS copy is English only today. TODO: localize, then honour the pin. |
 | Your defaults | Window appearance (System, Light, Dark) | segmented | System | Theme for Settings and the welcome guide. | missing | stub | `general.windowTheme` | Glass is drawn dark only. TODO: light glass palette. |
 | Your defaults | Default agent for new chats | menu | Claude Code | Agent used when you start a new chat from the notch. | missing | live | `general.defaultAgent` | Pre-selects the agent in Chat > New chat; falls back to the first offered agent. |
-| Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. Screens without a notch get a slim pill. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
+| Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
 | Day to day | Launch at login | toggle | on | Starts the app when you log in. | missing | live | `general.launchAtLogin` | SMAppService, bundled app only. |
 | Day to day | Keep the Mac awake while agents work | toggle | off | Blocks idle sleep while an agent runs; the screen can still lock. | missing | live | `general.keepAwake` | Power assertion held only while a session is working. |
 | Day to day | Keep the display awake while music plays | toggle | - | Holds the display on only while Music or Spotify is playing. Stops on low battery or heat. | missing | live | `keepAwake.whileMusic` | M4. Display assertion with a two minute lease, renewed each minute, held only while a track plays (20 second grace). Uses the Keep awake battery floor and heat rule. Separate from sessions and the Home cup. |
@@ -54,7 +54,10 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Notch behavior | Hide the notch automatically | toggle | on | Closes when the pointer leaves. | partial | live | `notch.autoHide` | Off: it stays open until the shortcut or a click elsewhere. |
 | Notch behavior | Delay before closing | menu | Short | How long it waits after the pointer leaves. | missing | live | `notch.closeDelay` | the reference app closes about 0.53 s after the pointer leaves (private reference notes). |
 | Notch behavior | Hover delay | menu | On hover | How quickly hovering opens it. | partial | live | `notch.openDelay` | 0.1 s, 0.25 s or 0.6 s. |
-| Notch behavior | Open the notch on | menu | - | Hover opens it after the delay. Click opens it only when you click the notch. | missing | live | `notch.openTrigger` | S1. Click opens the panel from the closed notch or a peek, from the hardware notch (or the pill, grown 12 pt each side, on a display without one); hover never opens it. |
+| Notch behavior | Open the notch on | menu | - | Hover opens it after the delay. Click opens it only when you click the notch. | missing | live | `notch.openTrigger` | S1. Click opens the panel from the closed notch or a peek, from the hardware notch, or on a display without one from the pill grown 12 pt each side, or from the rectangle of the drawn shape; hover never opens it. |
+| Displays without a notch | Shape (Pill, Notch) | segmented | Pill | The closed notch on a display without one: the slim pill, or a notch shape you size yourself. | missing | live | `notch.shapeWithoutNotch` | D3. One shape for every such display. Notch makes the closed window take clicks over its own shape, so an import can never select it. |
+| Displays without a notch | Width | slider | 185 pt | Width of the drawn notch, shown while calibrating. | missing | live | `notch.drawnWidth` | D3. Points, 140 to 280 in steps of 5. Never wider than a quarter of the display. |
+| Displays without a notch | Height | slider | 32 pt | Height of the drawn notch, shown while calibrating. | missing | live | `notch.drawnHeight` | D3. Points, 30 to 44 in steps of 1. Never under 30 because the closed wings are laid out for that bar. |
 | Notch behavior | Show Zeus next to cursor | toggle | off | When summoned, Zeus anchors beside the mouse pointer instead of the notch. | missing | live | `presence.nearCursor` | P0 item I. Offset 18 pt right and down from the pointer, clamped and flipped at screen edges, multi-display aware, 60 fps with a light spring; off keeps the notch/top-bar placement. Also in the menu bar menu and `zeus debug presence`. |
 | Halo | Halo style | menu | Classic halo | The closed-notch glow while an agent works or needs you. One setting: the notch, Settings and the welcome guide all read it. | partial | custom | `halo.style` | Stable ids; titles come from ZeusCore.HaloStyle. Replaces the old topBar.halo key (migrated at launch). |
 | Halo | Halo entrance | menu | Sweep | Animation as the halo lights up. | partial | custom | `halo.entrance` | Stable ids; titles come from ZeusCore.HaloEntrance. Each has its own choreography. |

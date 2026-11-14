@@ -88,7 +88,7 @@ private struct GeneralPage: View {
             .padding(.bottom, -GS.cardGap)
         // Window appearance and Language are not rows: the windows are drawn dark only and Zeus speaks English only.
         GSCard("Your defaults") {
-            GSRow(symbol: "display.2", title: "Show the notch on", text: "Displays without a notch get a slim pill.") {
+            GSRow(symbol: "display.2", title: "Show the notch on") {
                 GSPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue)).popupLabel("Show the notch on")
             }
             GSDivider()
