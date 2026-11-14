@@ -392,6 +392,30 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   `.statusBar` level, built from the same ZeusCore keybind table, dismissible by Escape through the tap. Write a
   `DESIGN.md` for the section and overlays before building, per the standing rule and `docs/DESIGN-DIRECTION.md`.
 
+### As shipped (T4)
+
+- Row capacity, option (a): `GlanceTopBar.maxTabs` is 14 and `tabSpacing` is 8, so the worst case (the widest label and
+  three 3-digit counts) is 796.75 of the 803 point row room. Tiling is second in `defaultRow`. `TopBarLayout.toggle`
+  keeps Tiling at its place after Home (a private canonical order), so a tab switched back on never lands in front of
+  it. The flag is `topBar.row14.v1`, saved with the row; `TopBarLayoutRepair.version` is 2.
+- Pure rules in ZeusCore (`Sources/ZeusCore/Tiling/`): `TilingPhase`, `TileGeneration`, `TileResolver` with
+  `TileLayoutState` and `TileEffect`, `TilingPicture`, `TileKeyList`, `TileConfig.fromSettings`, `TileFrontmost`, and
+  `TileModifierBase.label` and `glyphs`. They are tested by `TilingSectionTests`.
+- The driver protocol gained one requirement with a default (nothing in front): `frontmost() -> TileFrontmost`, the
+  focused admitted window and whether the front app is full screen. `AXTilingWindowDriver` reads it with two
+  Accessibility reads. The controller needs it to know which window the keys act on and to pause over a full-screen app.
+- `TilingController` takes its parts as `Services` (driver, key layer, config reader, scheduler, notification centres,
+  overlay closures, settings writer), so the controller suite runs against a fake driver that uses the real admission
+  filter. Seven system notifications are observed, only while Accessibility is on: screen parameters, Space, sleep,
+  wake, and app activate, launch and terminate. A display, Space, sleep or wake change advances the generation counter.
+- No Accessibility move observers and no `TileSelfWrites`: this slice re-reads on those seven events and after each
+  action, so the controller does not react to its own writes. The pre-tiling frames are kept for a later undo and are
+  never restored.
+- The key sheet hides on a six second timer, on the next tiling key, and when tiling stops. It does not take Escape:
+  the tap sees only chords the owner bound, and the rule that Zeus never consumes an unbound key is kept.
+- Not done here, still open: the conflict note against Talk, pointing, dictation and chat (owner decision list), and
+  the acceptance-map decision in `qa/feature-map.json`.
+
 ### Fail-closed paths
 
 - Accessibility denied: the section shows the off state and the permission row; no controller start, no tap, no

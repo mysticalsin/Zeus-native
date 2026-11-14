@@ -53,7 +53,7 @@ Rules the page keeps:
 
 ## The key sheet
 
-- A rounded card centred on the focused window's display, `.statusBar` level, click-through, never key.
+- A rounded card centred on the main screen, `.statusBar` level, click-through, never key.
 - One heading, "Tiling keys", then one row per action: the name on the left, the chord on the right in the system
   rounded face. Eight rows by default.
 - It is a quiet reminder, not a modal. It hides after a few seconds, on the next tiling key, and when tiling stops.
