@@ -44,6 +44,24 @@ def pointing_callback_offenders(text, label="sample"):
     return offenders
 
 
+# The tiling tap consumes keys, so the thread that services it must never be the main thread: the window server holds
+# every keystroke in every app until the tap callback runs, and Accessibility passes run on main.
+MAIN_RUN_LOOP = re.compile(r"CFRunLoopGetMain\s*\(|\bRunLoop\.main\b")
+
+
+def main_run_loop_offenders(text, label="sample"):
+    """Lines that name the main run loop, where a tap source could be added to it."""
+    return [f"{label}:{index + 1}" for index, line in enumerate(text.splitlines())
+            if not line.strip().startswith("//") and MAIN_RUN_LOOP.search(strip_trailing_comment(line))]
+
+
+def main_run_loop_offenders_under(directory):
+    offenders = []
+    for p in sorted(directory.rglob("*.swift")):
+        offenders += main_run_loop_offenders(p.read_text(), str(p.relative_to(directory.parent)))
+    return offenders
+
+
 def callback_offenders_under(directory):
     """Every system-callback install under `directory` that is not in a nonisolated function."""
     offenders = []
@@ -166,6 +184,20 @@ class SourceLint(unittest.TestCase):
     def test_tiling_system_callbacks_are_installed_from_nonisolated_functions(self):
         self.assertEqual(callback_offenders_under(TILING), [])
 
+    def test_the_tiling_tap_source_is_never_added_to_the_main_run_loop(self):
+        self.assertEqual(main_run_loop_offenders_under(TILING), [])
+
+    def test_main_run_loop_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: the exact shape the first tiling tap had, and the ones that mean the same thing.
+        bad = "nonisolated func start() {\n    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)\n}\n"
+        self.assertEqual(main_run_loop_offenders(bad), ["sample:2"])
+        self.assertEqual(main_run_loop_offenders("RunLoop.main.add(timer, forMode: .common)"), ["sample:1"])
+        self.assertEqual(main_run_loop_offenders("CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)"), ["sample:1"])
+        good = "nonisolated func install(on loop: CFRunLoop) {\n    CFRunLoopAddSource(loop, source, .commonModes)\n}\n"
+        self.assertEqual(main_run_loop_offenders(good), [])
+        self.assertEqual(main_run_loop_offenders("// never CFRunLoopGetMain() here\nlet loop = CFRunLoopGetCurrent()"), [])
+        self.assertEqual(main_run_loop_offenders("let loop = CFRunLoopGetCurrent() // not CFRunLoopGetMain()"), [])
+
     def test_pointing_lint_detects_its_failure_shapes(self):
         # Fail-first samples: the exact shapes the lint exists to catch.
         self.assertTrue(POINTING_FORBIDDEN.search("try await Task.sleep(for: .seconds(1))"))
@@ -276,6 +308,7 @@ AUDITED_BLOCKING_FILES = {
     "Zeus/Watch/ZeusWatchRunner.swift": "Child wait inside a continuation on a global queue, killed after 3 s.",
     "Zeus/App/KeychainSelfTest.swift": "Command-line self test: no window exists.",
     "Zeus/Voice/VoiceSample.swift": "Command-line sample mode: no window exists.",
+    "Zeus/Tiling/TilingRunLoopThread.swift": "stop() waits for the tap thread to remove its tap. That thread runs only the tap callback and the teardown, so it ends in microseconds, and the wait is bounded to 2 s.",
     "ZeusCore/Insomnia/InsomniaCommands.swift": "ProcessCommandRunner runs on the Insomnia serial queue; every wait has a timeout.",
     "ZeusCore/Diagnostics/FlightRecorder.swift": "The ditto zip is exported from Task.detached (GSDiagnosticsLogs).",
 }
