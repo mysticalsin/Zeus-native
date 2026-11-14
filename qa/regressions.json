@@ -4366,6 +4366,30 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-560",
+      "failure": "A display that reported a top inset but no side areas was called notched by the describe step and sized as not notched by the size step, so it got an empty closed notch instead of the pill.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "anInsetWithoutSideAreasIsNotANotch"
+      }
+    },
+    {
+      "id": "REG-561",
+      "failure": "The Built-in display target picked a display with only a top inset ahead of the built-in panel.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentHubTests.swift",
+        "function": "anInsetOnlyDisplayThatIsNotBuiltInIsNotPickedAheadOfTheBuiltInPanel"
+      }
     }
   ]
 }
