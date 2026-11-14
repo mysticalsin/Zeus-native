@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[3]
 VIEW = ROOT / "Sources/Zeus/Scribe/ScribeMeetingCardView.swift"
 PANEL = ROOT / "Sources/Zeus/Scribe/ScribeMeetingCardPanel.swift"
 FORBIDDEN = re.compile(r"\bTimer\b|\bTimelineView\b|\.repeatForever\b|\bCVDisplayLink\b|\bCADisplayLink\b")
-DASH = re.compile("[–—]")
+DASH = re.compile("[" + chr(0x2013) + chr(0x2014) + "]")
 
 
 def code_lines(text):
@@ -30,8 +30,10 @@ def state_declarations(text):
 
 
 def function_body(text, signature):
+    """The braces of the function whose declaration ends in `{`; a protocol requirement has no body."""
     start = text.index(signature)
-    open_brace = text.index("{", start)
+    open_brace = start + len(signature) - 1
+    assert text[open_brace] == "{", signature
     depth = 0
     for index in range(open_brace, len(text)):
         if text[index] == "{":
@@ -79,7 +81,7 @@ class MeetingCardLint(unittest.TestCase):
     def test_the_panel_orders_out_only_inside_render(self):
         text = self.read(PANEL)
         self.assertIn("protocol ScribeMeetingCardRendering", text)
-        start, body = function_body(text, "func render(_ card: ScribeMeetingCard)")
+        start, body = function_body(text, "func render(_ card: ScribeMeetingCard) {")
         outside = text[:start] + text[start + len(body):]
         self.assertIn("orderOut(", body)
         self.assertEqual(re.findall(r"\borderOut\(|\bclose\(\)|\.isVisible\s*=", outside), [])
@@ -110,7 +112,7 @@ class MeetingCardLint(unittest.TestCase):
         self.assertFalse(clocks("withAnimation(.linear(duration: 5)) { share = 0 }"))
         self.assertEqual(state_declarations("@State private var meeting: ScribeMeeting?"),
                          ["@State private var meeting: ScribeMeeting?"])
-        _, body = function_body("func render(_ card: X) {\n if a { b() }\n}\nfunc other() {}", "func render(_ card: X)")
+        _, body = function_body("func render(_ card: X) {\n if a { b() }\n}\nfunc other() {}", "func render(_ card: X) {")
         self.assertEqual(body, "{\n if a { b() }\n}")
 
 
