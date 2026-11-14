@@ -131,6 +131,10 @@ public enum PeerBinaryRule {
     /// assemble such a bundle, which is why a signed build compares teams or certificates instead. So "a same-named
     /// binary elsewhere is refused" holds for a team-signed or locally signed build only; an ad hoc build, such as the
     /// preview DMG from `scripts/package.sh`, must never be given to users.
+    /// Changing the kind of build is not covered, because the running bridge keeps the identity it had when Chrome
+    /// started it: an ad hoc bridge refuses a team-signed app (it keeps only ad hoc helpers), and a team-signed or locally
+    /// signed bridge refuses an app of the other kind. Chrome must start the bridge again then, so the not-connected
+    /// message of the app says so. Rebuilds and updates of the same kind need no restart.
     /// Every other case, and every missing input, refuses.
     public static func decide(own: CodeSignature?, peer: CodeSignature?, peerExecutablePath: String?,
                               ownBundlePath: String?, ownExecutableDirectory: String?,
