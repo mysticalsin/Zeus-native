@@ -191,6 +191,12 @@ final class TilingController {
         }
         if keyClashNote != nil { keyClashNote = nil }
         if running, appliedConfig == wanted {
+            // An equal write still tells the owner about a revoked permission: the tap and the observers must not
+            // outlive it, paused or not.
+            if active, !services.driver.isTrusted {
+                accessibilityLost()
+                return
+            }
             // The focus ring is not part of the config, so it is checked here.
             if services.focusBorderOn() != ringAllowed { updateRing(displays: lastDisplays) }
             refreshPhase()
@@ -344,7 +350,10 @@ final class TilingController {
             break
         case .focus(let window):
             driver.focus(window)
-            focusIsFront = true
+            // The neighbour came from the last listing, which can be minutes old: it may be minimized, on another
+            // Space, or an app that did not answer, and then the driver cannot give it the keyboard. The ring follows
+            // the keyboard as the system reports it after the call, not the request.
+            syncFocus(driver.frontmost())
             publish(displays: displays)
             queueRelayout(delay: 0.15)
         case .relayout:
