@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import ZeusCore
 
@@ -35,7 +36,7 @@ struct LiveDiagnosticsCard: View {
                     Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
                 .buttonStyle(GSButtonStyle())
-                .accessibilityLabel(copied ? "Copied the diagnostics summary" : "Copy the diagnostics summary")
+                .accessibilityLabel(copied ? Self.copiedAnnouncement : "Copy the diagnostics summary")
             }
         }
         // The probe is an NSView; ImageRenderer (snapshots) would draw it as a yellow placeholder.
@@ -54,9 +55,18 @@ struct LiveDiagnosticsCard: View {
             copied = false
             hold.disappear()
         }
-        .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in
+        .onReceive(Self.thermalChanges()) { _ in
             thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
         }
+    }
+
+    /// The system says the Mac's heat changed. Foundation posts this on a global queue, so it is handed to
+    /// the main queue before the view's state is written.
+    static func thermalChanges(center: NotificationCenter = .default) -> AnyPublisher<Void, Never> {
+        center.publisher(for: ProcessInfo.thermalStateDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .map { _ in () }
+            .eraseToAnyPublisher()
     }
 
     // MARK: Values
@@ -80,15 +90,24 @@ struct LiveDiagnosticsCard: View {
             appVersion: version, build: build, osVersion: osText)
     }
 
+    /// What VoiceOver says after a successful copy; the button's label change alone is not spoken.
+    static let copiedAnnouncement = "Copied the diagnostics summary"
+
     private func copy(_ live: LiveDiagnostics) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(live.summaryText, forType: .string)
+        Self.copy(live, to: .general)
         copied = true
         resetCopied?.cancel()
         resetCopied = Task {
             try? await Task.sleep(for: .seconds(2))
             if !Task.isCancelled { copied = false }
         }
+    }
+
+    static func copy(_ live: LiveDiagnostics, to pasteboard: NSPasteboard,
+                     announce: (String) -> Void = { AccessibilityNotification.Announcement($0).post() }) {
+        pasteboard.clearContents()
+        pasteboard.setString(live.summaryText, forType: .string)
+        announce(copiedAnnouncement)
     }
 
     // MARK: Drawing
