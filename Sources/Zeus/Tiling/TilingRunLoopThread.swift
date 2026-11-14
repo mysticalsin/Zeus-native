@@ -10,7 +10,11 @@ import Foundation
 /// `install` runs on the new thread, before its loop starts, and adds the source to `CFRunLoopGetCurrent()`.
 /// `teardown` runs on the same thread, in its loop, after a stop was asked for: it removes the source and invalidates
 /// the port there, so no callback is ever running while the port goes away (a callback and the teardown are two
-/// items of one loop). `teardown` runs exactly when `install` ran. When the loop has ended both closures are released.
+/// items of one loop). `teardown` runs exactly once for every thread, and never before `install` when both run. A
+/// stop that wins the race against the thread's first step skips `install`, and the thread runs `teardown` on its own
+/// before it ends: the owner made the port before the thread started, and a new tap starts enabled, so without the
+/// teardown the window server would route keystrokes to a tap that no loop services. When the loop has ended both
+/// closures are released.
 ///
 /// Nonisolated on purpose, like the tap itself: no `@MainActor` type may sit between a system callback and its owner.
 final class TilingRunLoopThread: @unchecked Sendable {
@@ -23,10 +27,16 @@ final class TilingRunLoopThread: @unchecked Sendable {
     private var thread: Thread?
     private let finished = DispatchGroup()
 
+    private let beforeRun: (@Sendable () -> Void)?
+
     /// Starts the thread. Call `stop()` to end it; dropping the object without a stop leaves the thread running.
-    init(name: String, install: @escaping @Sendable () -> Void, teardown: @escaping @Sendable () -> Void) {
+    /// `beforeRun` runs on the new thread before its first step. It exists for tests, to hold the thread back so a stop
+    /// reaches it first.
+    init(name: String, install: @escaping @Sendable () -> Void, teardown: @escaping @Sendable () -> Void,
+         beforeRun: (@Sendable () -> Void)? = nil) {
         self.install = install
         self.teardown = teardown
+        self.beforeRun = beforeRun
         finished.enter()
         let thread = Thread { [self] in run() }
         thread.name = name
@@ -48,7 +58,7 @@ final class TilingRunLoopThread: @unchecked Sendable {
         let onThread = thread != nil && thread === Thread.current
         lock.unlock()
         // With a loop, the teardown is queued on it and runs after the callback in flight, if any. Without one the
-        // thread has not started its loop yet: it sees the flag and ends without installing anything.
+        // thread has not started its loop yet: it sees the flag, runs the teardown itself without installing, and ends.
         if first, let loop {
             CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue) { [self] in tearDownOnLoop() }
             CFRunLoopWakeUp(loop)
@@ -60,18 +70,20 @@ final class TilingRunLoopThread: @unchecked Sendable {
     // MARK: On the thread
 
     private func run() {
+        beforeRun?()
         let loop = CFRunLoopGetCurrent()!
         lock.lock()
         if stopRequested {
             lock.unlock()
+            // The stop came first: nothing was installed, but what the owner made for this thread still has to go.
+            runTeardownWithoutInstall()
             end()
             return
         }
         runLoop = loop
-        let setup = install
         lock.unlock()
 
-        setup?()
+        runInstall()
         // A run loop with no source or timer returns at once. This timer, a thousand million seconds away, keeps it
         // alive for the tap source; the teardown removes it.
         let timer = CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + 1e9, 0, 0, 0) { _ in }
@@ -82,6 +94,23 @@ final class TilingRunLoopThread: @unchecked Sendable {
         // A stop that arrived while `install` ran is already queued on this loop and runs as soon as it does.
         CFRunLoopRun()
         end()
+    }
+
+    // These two take a closure into a local of their own, so no copy of it outlives them: `stop()` returns once `end()`
+    // has run, and by then the owner's captures must be released.
+    private func runInstall() {
+        lock.lock()
+        let work = install
+        lock.unlock()
+        work?()
+    }
+
+    private func runTeardownWithoutInstall() {
+        lock.lock()
+        let work = teardown
+        teardown = nil
+        lock.unlock()
+        work?()
     }
 
     /// Runs on the tap thread, inside its loop.

@@ -251,7 +251,9 @@ struct TilingKeyTapLifecycleTests {
         let sent = DispatchSemaphore(value: 0)
         DispatchQueue.global().async { for action in order { tap.deliver(action, joined: nil) }; sent.signal() }
         #expect(blockMain(until: sent))
-        try await Task.sleep(for: .seconds(0.3))
+        // Wait for the drains, not for a fixed time: other suites share the main thread and can hold it for a moment.
+        let deadline = Date().addingTimeInterval(5)
+        while seen.all.count < order.count, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
         #expect(seen.all == order)
     }
 }
@@ -385,7 +387,7 @@ struct TilingKeyTapStandInTests {
         tap.stop()
     }
 
-    @Test func twoStopsAtOnceBothReturnOnlyWhenTheTapIsGone() async {
+    @Test func twoStopsAtOnceBothReturnOnlyWhenTheTapIsGone() {
         let standin = Standin()
         standin.duringDisable = { Thread.sleep(forTimeInterval: 0.15) }
         let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())

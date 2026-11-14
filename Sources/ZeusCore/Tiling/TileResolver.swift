@@ -72,6 +72,21 @@ public enum TileResolver {
         }
     }
 
+    /// `action` run `times` times in a row, as one resolve. Only a nudge repeats (a held nudge key sends a run of them
+    /// and each step counts); every other action means the same however many times it was asked for. The effect is the
+    /// one a single step would give: the app lays the windows out once.
+    public static func resolve(_ action: TileAction, times: Int, in state: TileLayoutState, displays: [TileDisplay],
+                               config: TileConfig) -> (state: TileLayoutState, effect: TileEffect) {
+        var result = resolve(action, in: state, displays: displays, config: config)
+        guard case .nudge = action, times > 1 else { return result }
+        for _ in 1..<min(times, TileActionMailbox.maxNudgeSteps) {
+            let next = resolve(action, in: result.state, displays: displays, config: config)
+            result.state = next.state
+            if next.effect == .relayout { result.effect = .relayout }
+        }
+        return result
+    }
+
     // MARK: Frames
 
     /// The frames of every tree, on every display, in one map: focus moves across displays.

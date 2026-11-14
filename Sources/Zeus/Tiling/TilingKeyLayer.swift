@@ -40,8 +40,9 @@ final class TilingKeyLayer {
             makeTap: { sink, onFailure in TilingKeyTap(sink: sink, onFailure: onFailure) })
     }
 
-    /// A bound chord was pressed. Runs on the main actor, after the tap callback has returned.
-    var onAction: (TileAction) -> Void = { _ in }
+    /// A bound chord was pressed, and how many times it stands for (more than one only for a merged run of nudges).
+    /// Runs on the main actor, after the tap callback has returned.
+    var onAction: (TileAction, Int) -> Void = { _, _ in }
     /// The tap cannot be created, or the system keeps turning it off. The layer has stopped it and stays
     /// stopped until tiling is turned off and on again. The owner pauses tiling and shows the state.
     var onUnavailable: () -> Void = {}
@@ -94,7 +95,7 @@ final class TilingKeyLayer {
     private func install() {
         guard wanted, !failed, tap == nil, environment.isTrusted() else { return }
         let created = environment.makeTap(
-            { [weak self] action in self?.onAction(action) },
+            { [weak self] action, count in self?.onAction(action, count) },
             { [weak self] in self?.tapKeepsFailing() })
         created.update(keymap: keymap, enabled: true, paused: paused)
         guard created.start() else {

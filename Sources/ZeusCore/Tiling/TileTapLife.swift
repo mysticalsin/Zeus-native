@@ -83,44 +83,61 @@ public struct TileTapLife: Equatable, Sendable {
     }
 }
 
-/// Actions the key tap hands to the main actor. The tap thread pushes; the main actor pops one action per drain.
+/// Actions the key tap hands to the main actor. The tap thread pushes; the main actor pops one entry per drain.
 /// A held focus key repeats faster than a window scan runs, so a run of focus requests collapses to the newest one:
-/// at most one scan waits behind a running one. Every other action is kept, in order. Pure: the caller keeps it under
-/// its own lock.
+/// at most one scan waits behind a running one. A held nudge key repeats too, but each repeat moves the split a step
+/// that must not be lost, so a run of equal nudges collapses to one entry with a step count: the owner applies all the
+/// steps and lays the windows out once. Every other action is kept, in order. Pure: the caller keeps it under its own
+/// lock.
 public struct TileActionMailbox: Sendable {
-    public private(set) var pending: [TileAction] = []
+    /// The most steps one nudge entry carries: enough to cross the whole ratio range, so nothing a held key could still
+    /// move is lost, and a long wait on a busy main actor cannot grow the count without limit.
+    public static let maxNudgeSteps = 16
+
+    private struct Entry: Sendable {
+        var action: TileAction
+        var count = 1
+    }
+
+    private var entries: [Entry] = []
     /// A drain has been asked for and has not popped yet.
     private var scheduled = false
 
     public init() {}
 
+    /// The waiting actions, in the order they will run.
+    public var pending: [TileAction] { entries.map(\.action) }
+
     /// Adds `action`. Returns true when the caller must schedule one drain, false when one is already scheduled.
     public mutating func push(_ action: TileAction) -> Bool {
-        if case .focus = action, case .focus? = pending.last {
-            pending[pending.count - 1] = action
+        if case .focus = action, case .focus? = entries.last?.action {
+            entries[entries.count - 1] = Entry(action: action)
+        } else if case .nudge = action, entries.last?.action == action {
+            entries[entries.count - 1].count = min(entries[entries.count - 1].count + 1, Self.maxNudgeSteps)
         } else {
-            pending.append(action)
+            entries.append(Entry(action: action))
         }
         defer { scheduled = true }
         return !scheduled
     }
 
-    /// The next action, and whether another drain is needed for the ones behind it. Nil when nothing waits, which also
-    /// makes the mailbox idle, so the next push asks for a drain. The main actor runs the action after this returns:
-    /// a push that arrives meanwhile schedules a drain of its own and merges with the others behind it.
-    public mutating func pop() -> (action: TileAction, more: Bool)? {
-        guard !pending.isEmpty else {
+    /// The next action, how many steps it stands for (more than one only for nudges), and whether another drain is
+    /// needed for the ones behind it. Nil when nothing waits, which also makes the mailbox idle, so the next push asks
+    /// for a drain. The main actor runs the action after this returns: a push that arrives meanwhile schedules a drain
+    /// of its own and merges with the others behind it.
+    public mutating func pop() -> (action: TileAction, count: Int, more: Bool)? {
+        guard !entries.isEmpty else {
             scheduled = false
             return nil
         }
-        let action = pending.removeFirst()
-        scheduled = !pending.isEmpty
-        return (action, scheduled)
+        let entry = entries.removeFirst()
+        scheduled = !entries.isEmpty
+        return (entry.action, entry.count, scheduled)
     }
 
     /// Forgets every waiting action and is idle again. For a tap that stopped or restarted.
     public mutating func reset() {
-        pending.removeAll()
+        entries.removeAll()
         scheduled = false
     }
 }

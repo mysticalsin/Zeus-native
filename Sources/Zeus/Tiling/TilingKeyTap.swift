@@ -4,6 +4,33 @@ import CoreGraphics
 import Foundation
 import ZeusCore
 
+/// What the tap needs from the system: making the tap and its source, and switching it on or off. The live one is the
+/// session event tap. A test passes a run loop source in its place, to prove the tap is serviced on the tap thread, and
+/// that a stop leaves nothing behind, without Accessibility. Its closures are called from the tap thread and from the
+/// owner's thread, so they must be safe to call from both.
+struct TilingTapSystem: @unchecked Sendable {
+    /// Makes the port and the source for one run. The pointer is the run, which the callback reads through `userInfo`.
+    /// Nil when it cannot be made.
+    var create: (UnsafeMutableRawPointer) -> (port: CFMachPort, source: CFRunLoopSource)?
+    var setEnabled: (CFMachPort, Bool) -> Void
+
+    static let live = TilingTapSystem(create: createSessionTap, setEnabled: { port, on in CGEvent.tapEnable(tap: port, enable: on) })
+}
+
+/// The only place that creates the event tap. Nonisolated, like the callback it installs: no `@MainActor` type may sit
+/// between a system callback and its owner.
+private nonisolated func createSessionTap(run: UnsafeMutableRawPointer) -> (port: CFMachPort, source: CFRunLoopSource)? {
+    let types: [CGEventType] = [.keyDown, .keyUp]
+    let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << CGEventMask($1.rawValue)) }
+    guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                       eventsOfInterest: mask, callback: tilingTapCallback, userInfo: run) else { return nil }
+    guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else {
+        CFMachPortInvalidate(port)
+        return nil
+    }
+    return (port, source)
+}
+
 /// The keyboard tap for tiling: an active session event tap that consumes exactly the chords the keymap binds
 /// while tiling is on, and passes every other event through untouched.
 ///
@@ -13,8 +40,13 @@ import ZeusCore
 /// callback answers within microseconds whatever main is doing, so the system never disables the tap for being slow.
 /// `start()` and `stop()` are safe from any thread (the owner calls them on the main actor). `stop()` removes the source
 /// and invalidates the port on the tap thread's own loop, after any callback in flight, and waits for the thread to end,
-/// so a callback never meets a freed port and switching tiling off and on leaves nothing behind. The life of the tap
-/// (off, starting, live, stopping, failed) is the pure `TileTapLife`; the lock here only makes its decisions atomic.
+/// so a callback never meets a freed port and switching tiling off and on leaves nothing behind. That holds when the stop
+/// comes before the thread's first step (the thread then runs the teardown without installing), and a second caller
+/// waits for the same thread, so no caller returns while a tap may still consume keys. If the thread has not ended
+/// after `stopTimeout`, `stop()` returns and the tap stays in `stopping` with its run kept: `start()` is refused until a
+/// later `stop()` has seen the thread end, so a second tap is never created beside an old one that may still exist. The
+/// life of the tap (off, starting, live, stopping, failed) is the pure `TileTapLife`; the lock here only makes its
+/// decisions atomic.
 ///
 /// Isolation: the tap callback is a system callback. It is a file-private global function, and everything it
 /// reaches is nonisolated code here, never inside a `@MainActor` type, so it carries no main-actor executor
@@ -34,7 +66,8 @@ import ZeusCore
 /// Permission: this type never prompts. `start()` returns false when the tap cannot be created, and the owner
 /// shows a notice. There is no fallback global monitor, because a monitor cannot consume an event.
 final class TilingKeyTap: @unchecked Sendable {
-    typealias Sink = @MainActor @Sendable (TileAction) -> Void
+    /// The action and how many times it stands for: more than one only for a merged run of nudges.
+    typealias Sink = @MainActor @Sendable (TileAction, Int) -> Void
     typealias Failure = @MainActor @Sendable () -> Void
 
     private struct Snapshot {
@@ -62,10 +95,14 @@ final class TilingKeyTap: @unchecked Sendable {
     private var mailbox = TileActionMailbox()
     private let sink: Sink
     private let onFailure: Failure
+    private let system: TilingTapSystem
+    private let stopTimeout: TimeInterval
 
-    init(sink: @escaping Sink, onFailure: @escaping Failure) {
+    init(sink: @escaping Sink, onFailure: @escaping Failure, system: TilingTapSystem = .live, stopTimeout: TimeInterval = 2) {
         self.sink = sink
         self.onFailure = onFailure
+        self.system = system
+        self.stopTimeout = stopTimeout
     }
 
     deinit { stop() }
@@ -83,7 +120,7 @@ final class TilingKeyTap: @unchecked Sendable {
         case .createTap:
             return create()
         case .enableTap:
-            if let port = run?.port { CGEvent.tapEnable(tap: port, enable: true) }
+            if let port = run?.port { system.setEnabled(port, true) }
             return true
         case .none, .disableTap, .tearDown:
             return life.isRunning
@@ -93,36 +130,30 @@ final class TilingKeyTap: @unchecked Sendable {
     /// Creates the tap and starts its thread. The caller holds the lock and has moved the life to `starting`.
     private nonisolated func create() -> Bool {
         let run = Run(owner: self)
-        let types: [CGEventType] = [.keyDown, .keyUp]
-        let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << CGEventMask($1.rawValue)) }
-        guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                           eventsOfInterest: mask, callback: tilingTapCallback,
-                                           userInfo: Unmanaged.passUnretained(run).toOpaque()) else {
+        guard let made = system.create(Unmanaged.passUnretained(run).toOpaque()) else {
             _ = life.handle(.createFailed)
             return false
         }
-        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else {
-            CFMachPortInvalidate(port)
-            _ = life.handle(.createFailed)
-            return false
-        }
+        let port = made.port, source = made.source
         run.port = port
         run.source = source
         matcher.reset()
         health.reset()
         mailbox.reset()
         self.run = run
+        let system = system
         run.thread = TilingRunLoopThread(
             name: "app.zeus.tiling.keytap",
             install: { [run] in
                 guard let port = run.port, let source = run.source else { return }
                 CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-                CGEvent.tapEnable(tap: port, enable: true)
+                system.setEnabled(port, true)
                 run.owner?.installed(run)
             },
             teardown: { [run] in
+                // Also runs when a stop came before `install`: the port exists and is enabled from the moment it is made.
                 guard let port = run.port, let source = run.source else { return }
-                CGEvent.tapEnable(tap: port, enable: false)
+                system.setEnabled(port, false)
                 CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
                 CFMachPortInvalidate(port)
             })
@@ -135,19 +166,24 @@ final class TilingKeyTap: @unchecked Sendable {
         _ = life.handle(.installed)
     }
 
-    /// Removes the tap and ends its thread, and returns once both are gone. Safe to call again and from any thread.
+    /// Removes the tap and ends its thread, and returns once both are gone. Safe to call again and from any thread: a
+    /// second caller, while a stop is under way, waits for the same thread. If the thread has not ended after
+    /// `stopTimeout`, this returns with the tap still `stopping` and its run kept, so `start()` cannot make a second tap;
+    /// a later `stop()` waits again.
     nonisolated func stop() {
         lock.lock()
-        let effect = life.handle(.stopRequested)
+        _ = life.handle(.stopRequested)
         matcher.reset()
         mailbox.reset()
         let stopping = run
         lock.unlock()
         // The wait is outside the lock: the callback takes it, and the teardown waits for the callback.
-        guard effect == .tearDown, let stopping, let thread = stopping.thread else { return }
-        thread.stop()
+        guard let stopping, let thread = stopping.thread, thread.stop(timeout: stopTimeout) else { return }
         lock.lock(); defer { lock.unlock() }
-        if run === stopping { run = nil }
+        // The first caller to see the thread end clears the run. A later one finds it already gone, and a tap started
+        // since then is not touched.
+        guard run === stopping else { return }
+        run = nil
         _ = life.handle(.threadEnded)
     }
 
@@ -209,9 +245,9 @@ final class TilingKeyTap: @unchecked Sendable {
         guard let port = run.port else { return }
         switch effect {
         case .enableTap:
-            CGEvent.tapEnable(tap: port, enable: true)
+            system.setEnabled(port, true)
         case .disableTap:
-            CGEvent.tapEnable(tap: port, enable: false)
+            system.setEnabled(port, false)
             let report = onFailure
             DispatchQueue.main.async { MainActor.assumeIsolated { report() } }
         case .none, .createTap, .tearDown:
@@ -221,8 +257,13 @@ final class TilingKeyTap: @unchecked Sendable {
 
     /// Hands a consumed key to the other monitors and puts the action in the mailbox, scheduling the one drain that runs
     /// the waiting actions when none is scheduled yet. Everything hops to the main queue, even from the main thread, so
-    /// the callback returns before any work starts. The queue is first in, first out, so a monitor hears about a consumed
-    /// key before any later modifier change. Internal so a test can send actions without a system event.
+    /// the callback returns before any work starts.
+    ///
+    /// Order: a monitor learns of a consumed key through the main queue, but it learns of modifier changes from event
+    /// monitors that the window server feeds, which the queue does not order. While main is busy, the owner letting go of
+    /// Command can be heard before the forwarded key. That gap is bounded, not closed: a smaller hold that forms in it is
+    /// cancelled the moment the key arrives and sends nothing (`TilingConsumedKeyTests` covers the order). Internal so a
+    /// test can send actions without a system event.
     nonisolated func deliver(_ action: TileAction?, joined: ShortcutEvent?) {
         if let joined {
             DispatchQueue.main.async { MainActor.assumeIsolated { TilingConsumedKey.post(joined) } }
@@ -236,7 +277,7 @@ final class TilingKeyTap: @unchecked Sendable {
     /// arrive during a long scan merge behind it, and the next drain runs only the newest.
     private nonisolated func drain() {
         guard let next = lock.withLock({ mailbox.pop() }) else { return }
-        MainActor.assumeIsolated { sink(next.action) }
+        MainActor.assumeIsolated { sink(next.action, next.count) }
         if next.more { DispatchQueue.main.async { [self] in drain() } }
     }
 }

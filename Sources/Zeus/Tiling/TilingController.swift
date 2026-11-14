@@ -5,8 +5,8 @@ import ZeusCore
 /// What the key layer gives the controller. The real one is `TilingKeyLayer`; tests use a fake with no tap.
 @MainActor
 protocol TilingKeyControlling: AnyObject {
-    /// A bound chord was pressed.
-    var onAction: (TileAction) -> Void { get set }
+    /// A bound chord was pressed, and how many times it stands for (more than one only for a merged run of nudges).
+    var onAction: (TileAction, Int) -> Void { get set }
     /// The tap cannot run and has stopped itself.
     var onUnavailable: () -> Void { get set }
     /// Idempotent: installs, updates or removes the tap to match the three values.
@@ -150,7 +150,7 @@ final class TilingController {
         isFixture = fixture
         keymap = TileKeymap.defaults(base: TileConfig.defaults.base)
         keyRows = TileKeyList.rows(keymap: keymap)
-        services.keys.onAction = { [weak self] action in self?.handle(action) }
+        services.keys.onAction = { [weak self] action, times in self?.handle(action, times: times) }
         services.keys.onUnavailable = { [weak self] in self?.keysGaveUp() }
     }
 
@@ -311,8 +311,9 @@ final class TilingController {
 
     // MARK: Keys
 
-    /// A bound chord. Runs on the main actor after the tap callback has returned.
-    func handle(_ action: TileAction) {
+    /// A bound chord. Runs on the main actor after the tap callback has returned. `times` is more than one only for a
+    /// merged run of nudges: every step is applied and the windows are laid out once.
+    func handle(_ action: TileAction, times: Int = 1) {
         guard !isFixture, running, active, !sleeping else { return }
         if isPaused, action != .togglePause { return }
         if action != .showKeys { hideSheet() }
@@ -346,7 +347,7 @@ final class TilingController {
         }
         let displays = driver.displays()
         lastDisplays = displays
-        let outcome = TileResolver.resolve(action, in: layout, displays: displays, config: engineConfig)
+        let outcome = TileResolver.resolve(action, times: times, in: layout, displays: displays, config: engineConfig)
         layout = outcome.state
         switch outcome.effect {
         case .none:
@@ -658,7 +659,7 @@ extension TilingController {
     }
 
     @MainActor private final class FixtureKeys: TilingKeyControlling {
-        var onAction: (TileAction) -> Void = { _ in }
+        var onAction: (TileAction, Int) -> Void = { _, _ in }
         var onUnavailable: () -> Void = {}
         func apply(enabled: Bool, paused: Bool, keymap: TileKeymap) {}
     }
