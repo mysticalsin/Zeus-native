@@ -299,9 +299,11 @@ It must not touch the top-bar or settings files.
   removes the source, calls `CFMachPortInvalidate` and ends the loop, so a callback never meets a freed port, and no key
   is consumed once `stop()` has returned. A stop that reaches the thread before its first step still runs the teardown
   there (the port is made before the thread starts and is enabled from the start), so no port is ever left enabled with no
-  loop. A second caller waits for the same thread. If the thread has not ended after the 2 s wait, `stop()` returns with
-  the life still `stopping` and the run kept, `start()` is refused, and a later `stop()` waits again, so a second tap is
-  never created beside an old one. The system calls (make the tap, turn it on or off) sit behind `TilingTapSystem`, so
+  loop. A second caller waits for the same thread. If the thread has not ended after the 2 s wait, `stop()` returns false
+  with the life still `stopping` and the run kept, `start()` is refused, and a later `stop()` waits again, so a second tap is
+  never created beside an old one. `TilingKeyLayer` honours that across tiling off and on: it keeps a removed tap whose stop
+  returned false, stops it again before installing, and when it still has not ended it builds no second tap, reports the
+  tap unavailable once, and stays off until tiling is turned off and on (turning it off stops the old tap once more). The system calls (make the tap, turn it on or off) sit behind `TilingTapSystem`, so
   a test can drive the real object on a stand-in source. Switching tiling off and on many times leaves no thread and no object behind.
   The life of the tap (off, starting, live, stopping, failed) is the pure `TileTapLife` in ZeusCore, and the lock only
   makes its decisions atomic. The tap is created only when `AccessibilityGate.trusted`, re-armed through
@@ -458,9 +460,13 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   while VoiceOver runs; a modifier-only talk, pointing, dictation or Polyglot key with the same modifiers as the chosen pair is a
   clash; a larger pair is free for a hold-style key, because the hold begins only on exactly its own modifiers
   (`HotkeyMonitor.handleShared` arms on the exact match after its hold delay, and only a running hold tolerates extra
-  ones, such as Shift meaning Return), and a hold that Control, Option or Command joins is cancelled, not sent: the
+  ones, such as Shift meaning Return), and a dedicated hold that Control, Option or Command joins is cancelled, not sent: the
   talk and dictation hold in `HotkeyMonitor` (cancel through `onCancel`, and it cannot restart until every modifier is
-  up) and the pointing hold in `PointingKeyGesture` (which already did). That is the natural press order, Control and
+  up) and the pointing hold in `PointingKeyGesture` (which already did). Only a press that began or continued a turn is
+  cancelled: the press that ended a hands-free turn already finished it, so a modifier joining that press cancels nothing
+  (`TalkKeyLatch.isEnding`) and only keeps the smaller hold blocked until every modifier is up. On the shared talk and
+  dictation key a hold that is already running is not cancelled by a modifier joining it; the forwarded consumed key cancels
+  it (`otherKeyPressed`). That is the natural press order, Control and
   Option first, then Command, so on the shipped defaults a tiling chord opens at most a talk turn that is cancelled and
   never sent; Shift and Fn joining still end a hold the normal way. The tap also forwards every key it consumes,
   key-down and key-up, to the talk, dictation, Polyglot and pointing monitors through `TilingConsumedKey`, so a smaller

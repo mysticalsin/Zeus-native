@@ -41,6 +41,20 @@ joining the held chord cancels the talk turn (`HotkeyMonitor.cancelsWhenSpoiled`
 nothing is sent, and the chord cannot restart until every modifier is up. The listen sound can still play for the
 instant before the extra key lands, as the pointing hold did before.
 
+A modifier joining a hold works the same way, with tiling on or off. The talk key and a dedicated dictation key are
+holds of exactly their own modifiers: when Control, Option or Command joins a running hold (the owner is pressing a
+larger chord such as Control-Option-Command), the turn is cancelled and nothing is sent, and it cannot restart until every
+modifier is up (`HotkeyMonitor.cancelHold`). Shift and Fn joining still end the hold the normal way, because Shift is how
+dictation asks for Return. Only a press that began or continued a turn is cancelled. The press that ended a hands-free
+turn already finished it, so a modifier joining that press cancels nothing and the text is still inserted
+(`TalkKeyLatch.isEnding`, `HotkeyMonitor.finishEndedTurn`).
+
+When talk and dictation share one key, the hold begins only on an exact match: nothing else may be down when it is armed
+(Command pressed first, then Control and Option, starts nothing). A hold that is already running tolerates extra
+modifiers, which is why Shift can mean Return. The running shared hold is not cancelled by a modifier joining; it is
+cancelled when another key is pressed, which includes a tiling chord's key forwarded by the tiling tap
+(`TilingConsumedKey`, `HotkeyMonitor.otherKeyPressed`).
+
 ## VoiceOver
 
 VoiceOver uses Control+Option as its own modifier. While VoiceOver is on, Zeus leaves Control+Option to it and the
@@ -65,4 +79,8 @@ Control+Option is the talk key again.
 
 `Tests/ZeusCoreTests/VoiceKeyTests.swift` (default, migration matrix, single owner, VoiceOver, conflicts, pointer
 pixels), `Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift` (`theTalkKeyHoldStartsNoPointingTurn`),
-`Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift`. Rows REG-380 to REG-384 in `qa/regressions.json`.
+`Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift`, `Tests/ZeusCoreTests/ShortcutTests.swift`
+(`theTapThatEndsALatchedTurnIsEndingUntilItsKeyUp`), `Tests/ZeusAppTests/TilingConsumedKeyTests.swift` (modifier-join cancel:
+`aTalkTurnThatTheRestOfTheTilingPairEndsIsCancelledNotSent`, `aDedicatedDictationHoldThatTheRestOfThePairEndsIsCancelledNotInserted`,
+`aModifierJoiningThePressThatEndedAHandsFreeTurnDoesNotCancelIt`; exact start on the shared key:
+`aSharedHoldOfAPairInsideTheTilingPairDoesNotStartDictationWhenCommandComesFirst`). Rows REG-380 to REG-384 in `qa/regressions.json`.
