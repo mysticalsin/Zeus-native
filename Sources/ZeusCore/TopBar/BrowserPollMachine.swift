@@ -128,7 +128,11 @@ public enum BrowserPollMachine {
 
         case .followChanged(let followsAny):
             state.followsAny = followsAny
-            if !followsAny { return (state, [.cancelTimer, .dropEntries]) }
+            if !followsAny {
+                // The request that is out is dropped with the entries, so it no longer holds the loop.
+                state.inFlight = false
+                return (state, [.cancelTimer, .dropEntries])
+            }
             return (state, state.canPoll ? [.schedule(resumeDelay)] : [])
 
         case .outputActivity(let running):
