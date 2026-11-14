@@ -4486,6 +4486,30 @@
         "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
         "function": "choosingPillEndsCalibration"
       }
+    },
+    {
+      "id": "REG-570",
+      "failure": "Closing or minimising the Settings window left calibration running with no card to end it, so the notch stopped opening by pointer.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchCardTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+        "function": "closingAndMinimisingTheWindowSendTheirLosses"
+      }
+    },
+    {
+      "id": "REG-571",
+      "failure": "A settings file could switch the notch shape to Notch, which makes the closed window take clicks over its own shape, without the owner choosing it on this Mac.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchCardTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+        "function": "anImportHoldingNotchLeavesThePillInPlace"
+      }
     }
   ]
 }
