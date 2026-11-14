@@ -170,6 +170,12 @@ None of these blocks the start of work; each has a safe default written into a t
   open. In this plan every calendar meeting with guests or a link gets one card two minutes before and one at
   its start, with or without a call app. Automatic recording still needs a live call. Say no and MS1 keeps
   the app condition.
+- D6, the Reduce Transparency still. The plan listed it among the MS5 fixtures. The build dropped it: the
+  setting is read-only in SwiftUI and `AlertGlass` has no override, so a render cannot show it. Default: check it
+  by hand with the setting on. A still needs an override seam in `AlertGlass`, which is outside MS5.
+- D7, two-line status. The plan allowed two lines for a failure. The build also allows two for a blocked
+  reason, because those words wrap at 340 pt. Default: two lines for both. The alternative is shorter reason
+  words in `ScribeMeetingCardText`, which keeps the row one line.
 
 ## Privacy and consent (rules that do not move)
 
@@ -509,8 +515,8 @@ worktree while MS1 to MS4 land.
 ### Behaviour and design
 
 - One row on `alertGlass`, 340 pt wide: the symbol, the title (12.5 semibold, one line, tail truncation), under
-  it one status line (10, `monospacedDigit`, two lines at most for a failure), then one control, then a small
-  dismiss glyph where the card can be dismissed.
+  it one status line (10, `monospacedDigit`, two lines at most for a failure, and for a blocked reason as the
+  build has it: D7), then one control, then a small dismiss glyph where the card can be dismissed.
 - Offer: status "in 2 min" or "now", or the reason automatic start is blocked; button Record.
 - Countdown: status "Recording starts in 5"; the only control is Cancel, with a thin ring around it that drains
   over the 5 s. No dismiss glyph and no Record, so there is exactly one action. Escape cancels when the card is key.
@@ -525,7 +531,9 @@ worktree while MS1 to MS4 land.
   6 pt drop, out with a fade. The ring is one linear animation keyed on the deadline (`.id(deadline)`), started
   with the time left; the per-second redraw of the digit never restarts it. State changes inside the card
   crossfade in place. Reduce Motion: a 0.12 s crossfade, no spring, no ring sweep; the digit still counts.
-  Reduce Transparency comes from `AlertGlass`.
+  Reduce Transparency comes from `AlertGlass`. Its fixture is owed (D6): the setting is
+  read-only in SwiftUI and `AlertGlass` has no override, so a still cannot show it; check it by hand with the
+  setting on.
 - Keyboard: `.defaultAction` on the primary and `.cancelAction` on Cancel or dismiss, active when the card is
   key. The panel stays non-activating and never takes the keyboard from the call.
 - VoiceOver: one element labelled "<title>, <status>"; buttons named by their titles and "Dismiss"; no hints.
@@ -535,7 +543,8 @@ worktree while MS1 to MS4 land.
   the alert stack to host a card with a button, which is a separate plan.
 
 App files: `Sources/Zeus/Scribe/ScribeMeetingCardView.swift` (a function of one `ScribeMeetingCard`, the two
-clock readings, and four closures: primary, cancel, dismiss, pointer; it stores no meeting, string or phase) and
+clock readings, and three closures: primary, cancel and dismiss, each handed the card it drew; the pointer is
+reported by `ScribeCardHostingView`; it stores no meeting, string or phase) and
 `ScribeMeetingCardPanel.swift` (`protocol ScribeMeetingCardRendering { func render(_ card: ScribeMeetingCard) }`,
 one non-activating panel using `ScribeCardHostingView`; `render` shows, updates or orders out and is the only
 way the panel leaves). Controls carry `ownedJourneyControl` ids `scribe.meetingCard.primary`,
@@ -548,7 +557,7 @@ way the panel leaves). Controls carry `ownedJourneyControl` ids `scribe.meetingC
   deadline; the panel orders out only inside `render`; the panel hosts with `ScribeCardHostingView(rootView:`.
 - Snapshot fixtures through `SnapshotRenderer`, 1x and 2x: offer with a short and a long title, "in 2 min",
   "now" and a blocked reason, countdown at 5, 3 and 1, waiting, starting with and without Cancel, recording,
-  each failure, next meeting, Reduce Transparency.
+  each failure, next meeting. (Reduce Transparency has no still: D6.)
 - A temporal test in `Tests/ZeusAppTests/ScribeMeetingCardMotionTests.swift` (new): the countdown rendered at
   0, 1.5, 3 and 4.9 s with an injected animation clock; the ring share falls steadily across the per-second
   redraws; with Reduce Motion there is no sweep and the digit still counts.
@@ -693,8 +702,8 @@ QA in this ticket:
   the offer on screen while the debounce runs, then to `prompting` or `countingDown`.
 - `leadWindow` and `lateWindow` live in `ScribeMeetingStartPolicy`.
 
-Deleted: `ScribeCallPopup.swift`, `ScribePopupDriver.swift` (`ScribeCardHostingView` moves into
-`ScribeMeetingCardPanel.swift`), `ScribePopupLifecycle.swift`, `ScribeCallPrompt.swift`, `ScribePromptDecision`,
+Deleted: `ScribeCallPopup.swift`, `ScribePopupDriver.swift` (`ScribeCardHostingView` already moved into
+`ScribeMeetingCardPanel.swift` in MS5), `ScribePopupLifecycle.swift`, `ScribeCallPrompt.swift`, `ScribePromptDecision`,
 `ScribeCallPromptText`, and in the watcher `decision`, `dismissedIDs`, `dismissedApps`, `dismissedInstances`,
 `dismiss(_:)`, `recordingDidStart()` and the heads-up half of `apply`. `recordingIdentity(for:)` takes a
 `ScribeCallApp`. The two `ScribePopupDriver.describe` calls in `ScribeController.swift:558-559` move to a

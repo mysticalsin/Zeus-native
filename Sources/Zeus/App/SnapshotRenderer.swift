@@ -101,6 +101,10 @@ enum SnapshotRenderer {
         }
         // Alerts page: nothing to show.
         saveSurface(ZStack { Theme.storm; AlertsAllClear() }.environment(\.colorScheme, .dark), size: CGSize(width: 480, height: 236), name: "alerts-page-empty")
+        // The meeting card in every state, with synthetic meetings.
+        for entry in ScribeMeetingCardFixture.entries {
+            saveSurface(ScribeMeetingCardFixture.view(entry), size: ScribeMeetingCardFixture.size, name: entry.name)
+        }
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
         renderParityStates(into: directory, notch: notch)
