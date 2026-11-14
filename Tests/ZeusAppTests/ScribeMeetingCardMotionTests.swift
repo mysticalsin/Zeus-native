@@ -23,10 +23,11 @@ struct ScribeMeetingCardMotionTests {
         #expect(plan.duration == 5)
     }
 
-    /// The share of the ring stroke that is drawn, read from the pixels of the ring view in its still form.
+    /// The share of the ring stroke that is drawn, read from the pixels of the ring view in its still form: the
+    /// light it adds over an undrawn ring, against the light of a full one.
     @MainActor
     private func drawn(at elapsed: TimeInterval, reduceMotion: Bool = false) throws -> Double {
-        func inked(_ uptime: TimeInterval) throws -> Int {
+        func light(_ uptime: TimeInterval) throws -> Double {
             let ring = ScribeMeetingCardRing(deadline: deadline, uptime: uptime, total: total,
                                              reduceMotion: reduceMotion, still: true)
                 .frame(width: 90, height: 40)
@@ -41,10 +42,10 @@ struct ScribeMeetingCardMotionTests {
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             let bytes = try #require(context.data).assumingMemoryBound(to: UInt8.self)
-            // The track is a faint grey; the stroke is the bright primary colour.
-            return (0..<image.width * image.height).filter { bytes[$0 * 4] > 160 }.count
+            return (0..<image.width * image.height).reduce(0.0) { $0 + Double(bytes[$1 * 4]) }
         }
-        return Double(try inked(began + elapsed)) / Double(try inked(began))
+        let none = try light(deadline)
+        return (try light(began + elapsed) - none) / (try light(began) - none)
     }
 
     @MainActor
