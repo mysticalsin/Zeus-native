@@ -7,7 +7,7 @@ import ZeusCore
 /// of the track in its notification. Apple Music: the iTunes Search API. Both need no key and no permission; Apple
 /// Events (`artwork url of current track`, `data of artwork 1`) are only a fallback when Automation is already
 /// allowed. Covers are cached in ~/Library/Caches/Zeus/artwork (LRU, 50 MB). A browser page's cover is the page's
-/// own https link, fetched without cookies, kept in memory only and never read from or written to that folder.
+/// own https link, fetched without cookies (see `sessionConfiguration`), kept in memory only and never read from or written to that folder.
 @MainActor
 @Observable
 final class ArtworkStore {
@@ -26,12 +26,22 @@ final class ArtworkStore {
     @ObservationIgnored private let session: URLSession
     @ObservationIgnored private let directory: URL
 
-    /// `session` is for tests, which answer every request themselves.
-    init(directory: URL? = nil, session: URLSession? = nil) {
+    /// The one session for every cover request. It takes no cookie, keeps none and caches nothing, so a host named by
+    /// a page cannot recognise the owner on a later fetch. Tests start from this and swap the network for a stub.
+    nonisolated static func sessionConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
+        config.httpCookieAcceptPolicy = .never
+        config.httpShouldSetCookies = false
+        config.httpCookieStorage = nil
+        config.urlCache = nil
         config.timeoutIntervalForRequest = 8
         config.timeoutIntervalForResource = 20
-        self.session = session ?? URLSession(configuration: config)
+        return config
+    }
+
+    /// `session` is for tests, which answer every request themselves.
+    init(directory: URL? = nil, session: URLSession? = nil) {
+        self.session = session ?? URLSession(configuration: Self.sessionConfiguration())
         self.directory = directory ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Zeus/artwork", isDirectory: true)
     }
