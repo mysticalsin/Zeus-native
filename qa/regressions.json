@@ -4438,6 +4438,54 @@
         "file": "Tests/ZeusCoreTests/DrawnNotchTests.swift",
         "function": "aNonFiniteFieldTakesItsDefaultAndTheOthersKeepTheirValue"
       }
+    },
+    {
+      "id": "REG-566",
+      "failure": "Calibration kept running after the last display that shows the notch without one went away, so the notch stopped opening by pointer with no card left to end it.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "noTargetLeftEndsCalibrationAndWritesNothing"
+      }
+    },
+    {
+      "id": "REG-567",
+      "failure": "A pinned snapshot or preview read the stored rows, so a fixture changed with the owner's settings.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "snapshotsReadNoStore"
+      }
+    },
+    {
+      "id": "REG-568",
+      "failure": "A stored row that was missing or hostile reached the notch as a size, because the model did not clean what it read.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "storedRowsAreSanitizedAndAMissingRowTakesItsDefault"
+      }
+    },
+    {
+      "id": "REG-569",
+      "failure": "Choosing Pill left calibration running behind the scenes, so the pointer stopped opening a notch that shows no guide.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "choosingPillEndsCalibration"
+      }
     }
   ]
 }

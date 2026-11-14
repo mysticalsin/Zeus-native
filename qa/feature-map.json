@@ -659,6 +659,14 @@
       "scope": "Actual MusicAwakeHold with injected clock, power, rules, assertion and timer ports; a real PowerMonitor is started and stopped in a few cases. No real display assertion, no real timers, no capture or permission, no device acceptance."
     },
     {
+      "id": "native-DrawnNotchModelTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "DrawnNotchModelTests",
+      "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+      "scope": "Actual DrawnNotchModel with a fake store and fake notification centres: Done and Cancel writes, the footprint following the draft, hostile rows, the display and system losses, and a pinned view that reads no store. No real display, window, settings file or capture."
+    },
+    {
       "id": "native-LiveDiagnosticsCardTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -4527,6 +4535,33 @@
             {
               "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
               "function": "temporaryMeetingStoreCannotClearAnotherCancellationJournal"
+            }
+          ]
+        },
+        {
+          "id": "F13.drawn-notch-model",
+          "check": "native-DrawnNotchModelTests",
+          "acceptance": "The drawn notch model saves only on Done, follows the draft on a display without a notch, leaves a notched display alone, ends calibration when no display is left, and a pinned view never reads the store.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "doneWritesTheSizeRowsOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "cancelWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "theFootprintOnADisplayWithoutANotchFollowsTheDraft"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "noTargetLeftEndsCalibrationAndWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "snapshotsReadNoStore"
             }
           ]
         },
