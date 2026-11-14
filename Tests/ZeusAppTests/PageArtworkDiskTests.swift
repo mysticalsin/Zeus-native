@@ -62,11 +62,14 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
 @MainActor @Suite("Page covers never touch the disk", .serialized) struct PageArtworkDiskTests {
     private let coverURL = "https://img.example.com/cover.jpg"
 
+    /// A solid red square as PNG bytes.
     private static func png(side: Int) -> Data {
-        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
-                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-        for x in 0..<side { for y in 0..<side { rep.setColor(.red, atX: x, y: y) } }
-        return rep.representation(using: .png, properties: [:]) ?? Data()
+        guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return Data() }
+        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+        guard let image = context.makeImage() else { return Data() }
+        return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) ?? Data()
     }
 
     private func makeStore() throws -> (store: ArtworkStore, directory: URL) {

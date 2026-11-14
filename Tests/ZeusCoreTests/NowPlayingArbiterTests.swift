@@ -114,7 +114,8 @@ import Testing
         var arbiter = NowPlayingArbiter()
         arbiter.update(Self.music, item(Self.music), now: at(0))
         arbiter.update(Self.spotify, item(Self.spotify), now: at(5))
-        #expect(arbiter.update(Self.spotify, nil, now: at(6)))
+        let removed = arbiter.update(Self.spotify, nil, now: at(6))
+        #expect(removed)
         #expect(arbiter.entry(Self.spotify) == nil)
         #expect(shown(arbiter) == Self.music)
         arbiter.update(Self.music, nil, now: at(7))
@@ -212,11 +213,14 @@ import Testing
 
     @Test func aMismatchedUpdateIsRejectedWithNoChange() {
         var arbiter = NowPlayingArbiter()
-        #expect(!arbiter.update(Self.music, item(Self.spotify), now: at(0)))
+        let mismatched = arbiter.update(Self.music, item(Self.spotify), now: at(0))
+        #expect(!mismatched)
         #expect(arbiter.entry(Self.music) == nil && arbiter.entry(Self.spotify) == nil)
-        #expect(arbiter.update(Self.music, item(Self.music), now: at(1)))
+        let taken = arbiter.update(Self.music, item(Self.music), now: at(1))
+        #expect(taken)
         let before = arbiter
-        #expect(!arbiter.update(Self.music, item(Self.tab(1), "Other"), now: at(2)))
+        let crossed = arbiter.update(Self.music, item(Self.tab(1), "Other"), now: at(2))
+        #expect(!crossed)
         #expect(arbiter == before)
     }
 
