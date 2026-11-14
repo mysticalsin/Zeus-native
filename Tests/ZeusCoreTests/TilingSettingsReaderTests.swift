@@ -20,7 +20,7 @@ struct TilingSettingsReaderTests {
         #expect(FeatureSettings.tilingOuterGap(defaults: defaults) == 8)
         #expect(FeatureSettings.tilingSplitRatio(defaults: defaults) == 50)
         #expect(FeatureSettings.tilingFocusBorder(defaults: defaults) == true)
-        #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .controlOption)
+        #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .controlOptionCommand)
         #expect(FeatureSettings.tilingExcludedApps(defaults: defaults).isEmpty)
     }
 
@@ -101,9 +101,9 @@ struct TilingSettingsReaderTests {
         let (defaults, cleanup) = try isolated()
         defer { cleanup() }
         defaults.set("Hyper", forKey: "opt.tiling.keyBase")
-        #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .controlOption)
+        #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .controlOptionCommand)
         defaults.set("", forKey: "opt.tiling.keyBase")
-        #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .controlOption)
+        #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .controlOptionCommand)
     }
 
     @Test func anOutOfRangeNumberIsLeftForTheEngineToClamp() throws {

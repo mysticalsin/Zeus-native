@@ -21,7 +21,7 @@ private func chord(_ code: UInt16, _ modifiers: ShortcutModifiers) -> Shortcut {
         #expect(TileModifierBase.controlOptionCommand.modifiers == [.control, .option, .command])
     }
 
-    @Test func storedStringsMapToABaseAndUnknownOnesFallBackToControlOption() {
+    @Test func storedStringsMapToABaseAndUnknownOnesFallBackToTheShippedPair() {
         #expect(TileModifierBase(label: "controlOption") == .controlOption)
         #expect(TileModifierBase(label: "optionCommand") == .optionCommand)
         #expect(TileModifierBase(label: "controlOptionCommand") == .controlOptionCommand)
@@ -30,9 +30,10 @@ private func chord(_ code: UInt16, _ modifiers: ShortcutModifiers) -> Shortcut {
         #expect(TileModifierBase(label: "Option-Command") == .optionCommand)
         #expect(TileModifierBase(label: "Control-Option-Command") == .controlOptionCommand)
         #expect(TileModifierBase(label: " control + option + command ") == .controlOptionCommand)
-        #expect(TileModifierBase(label: "") == .controlOption)
-        #expect(TileModifierBase(label: "hyper") == .controlOption)
-        #expect(TileModifierBase(label: "optionShift") == .controlOption)
+        #expect(TileModifierBase(label: "") == .standard)
+        #expect(TileModifierBase(label: "hyper") == .standard)
+        #expect(TileModifierBase(label: "optionShift") == .standard)
+        #expect(TileModifierBase.standard == .controlOptionCommand)
         for base in allBases { #expect(TileModifierBase(label: base.rawValue) == base) }
     }
 

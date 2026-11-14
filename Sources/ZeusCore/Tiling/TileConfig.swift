@@ -34,7 +34,7 @@ public struct TileConfig: Equatable, Sendable {
     public init(enabled: Bool = false, paused: Bool = false,
                 innerGap: Double = TileConfig.defaultGap, outerGap: Double = TileConfig.defaultGap,
                 maxDepth: Int = TileConfig.defaultDepth, minTileSize: Double = TileConfig.defaultMinTileSize,
-                defaultRatio: Double = TileRatio.standard, base: TileModifierBase = .controlOption,
+                defaultRatio: Double = TileRatio.standard, base: TileModifierBase = .standard,
                 floating: Set<TileWindowID> = [], excludedBundleIDs: Set<String> = []) {
         self.enabled = enabled
         self.paused = paused

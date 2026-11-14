@@ -40,7 +40,7 @@ struct TilingSettingsCatalogTests {
         #expect(base.kind == .choice)
         #expect(base.title == "Tiling keys")
         #expect(base.choices == ["Control-Option", "Option-Command", "Control-Option-Command"])
-        #expect(base.defaultValue == "Control-Option")
+        #expect(base.defaultValue == "Control-Option-Command")
 
         for (id, title) in [("tiling.innerGap", "Gap between windows"), ("tiling.outerGap", "Gap to the screen edge")] {
             let gap = try #require(SettingsCatalog.option(id))
@@ -185,7 +185,7 @@ struct TilingSettingsCatalogTests {
             "tiling.focusBorder": "maybe",      // not a switch value
         ]))
         #expect(changed == 0)
-        #expect(store.string("tiling.keyBase") == "Control-Option")
+        #expect(store.string("tiling.keyBase") == "Control-Option-Command")
         #expect(store.string("tiling.innerGap") == "8")
         #expect(store.string("tiling.outerGap") == "8")
         #expect(store.string("tiling.splitRatio") == "50")

@@ -59,7 +59,7 @@ public enum FeatureSettings {
 
     /// The modifiers held for every tiling key. An unknown stored label is Control-Option.
     public static func tilingKeyBase(defaults: UserDefaults = .standard) -> TileModifierBase {
-        TileModifierBase(label: string("tiling.keyBase", default: "Control-Option", defaults: defaults))
+        TileModifierBase(label: string("tiling.keyBase", default: TileModifierBase.standard.label, defaults: defaults))
     }
 
     /// Bundle ids Zeus never tiles, separated by commas or new lines (any kind, CRLF included). Case is kept: a bundle id is compared as written.

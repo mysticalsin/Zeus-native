@@ -521,7 +521,7 @@ extension TilingSectionTests {
             let config = TileConfig.fromSettings(defaults: defaults)
             #expect(config.innerGap == TileConfig.defaultGap)
             #expect(config.outerGap == 64)
-            #expect(config.base == .controlOption)
+            #expect(config.base == .controlOptionCommand)
         }
     }
 }

@@ -963,7 +963,7 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         #expect(cfg.maxDepth == 3)
         #expect(cfg.minTileSize == 200)
         #expect(cfg.defaultRatio == 0.5)
-        #expect(cfg.base == .controlOption)
+        #expect(cfg.base == .controlOptionCommand)
         #expect(cfg.floating.isEmpty)
         #expect(cfg.excludedBundleIDs.isEmpty)
         #expect(TileConfig.defaults == cfg)

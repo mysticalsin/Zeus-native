@@ -145,7 +145,7 @@ final class TilingController {
     init(services: Services, fixture: Bool = false) {
         self.services = services
         isFixture = fixture
-        keymap = TileKeymap.defaults(base: .controlOption)
+        keymap = TileKeymap.defaults(base: TileConfig.defaults.base)
         keyRows = TileKeyList.rows(keymap: keymap)
         services.keys.onAction = { [weak self] action in self?.handle(action) }
         services.keys.onUnavailable = { [weak self] in self?.keysGaveUp() }

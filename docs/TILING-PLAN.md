@@ -414,13 +414,20 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   never restored.
 - The key sheet hides on a six second timer, on the next tiling key, and when tiling stops. It does not take Escape:
   the tap sees only chords the owner bound, and the rule that Zeus never consumes an unbound key is kept.
-- Key pair clash, closed in the review pass: `TileBaseConflicts.notes` names the talk, pointing or dictation key that
-  holds the chosen pair (same modifiers; a larger pair is clear) and a chat chord the keymap binds. The controller
-  checks it on every settings write, before any tap exists, and refuses a clashing pair: no tap, no observer, the
-  phase is Key clash, and the page and Settings show the note. The tap consumes a chord before the other keys'
-  monitors can see it spoil a hold, so refusing is the only fail-closed option. The default pair, Control-Option, is
-  also the default Talk key, so tiling reads Key clash until the owner picks another pair; changing the default
-  pair is still the owner's decision.
+- Key clash, closed in the review pass: `TileBaseConflicts.notes` compares the tiling keys with the keys the other
+  monitors really use. The talk key is the effective one (`VoiceKey.effectiveTalkKey`), which moves off Control-Option
+  while VoiceOver runs; a modifier-only talk, pointing or dictation key with the same modifiers as the chosen pair is a
+  clash (a larger pair is clear); every bound tiling chord (base plus key) is compared with every keyed talk, pointing
+  and dictation shortcut, with the fn flag handled as the tap handles it; a chat chord the keymap binds is a clash; and
+  the Control-Option pair is refused while VoiceOver runs. The controller checks it on every settings write, before
+  any tap exists, and refuses a clash: no tap, no observer, the phase is Key clash, and the page and Settings show the
+  note. VoiceOver writes no setting, so the controller watches it (key value observing on the workspace) from the
+  first start with the switch on until the switch goes off, including while a clash holds tiling back, and checks the
+  clash again when VoiceOver starts or stops. The tap consumes a chord before the other keys' monitors can see it
+  spoil a hold, so refusing is the only fail-closed option. The default pair is Control-Option-Command: no shipped key
+  holds it (Talk to Zeus and pointing are Control-Option, dictation is Right Command, Talk to Zeus moves to
+  Option-Command while VoiceOver runs), and `TileBaseConflictsTests` keeps it that way. An unknown stored pair reads
+  as the default.
 - Other review fixes: the pause and key sheet chords work over a full-screen app; swap, flip, nudge and float do nothing
   while an app tiling does not read has the keyboard; the ring follows its setting while running; a revoked
   Accessibility is noticed on a settings change; `frontmost()` skips Zeus itself and has no protocol default; the undo
@@ -458,7 +465,7 @@ it runs in parallel with them after T1. T4 reads the ids T5 creates, so T5 lands
 ### Rows (added to the table in `scripts/gen-settings-catalog.py`)
 
 - `tiling.enabled` (toggle, default `false`): "Arrange my windows from the keyboard".
-- `tiling.keyBase` (choice, Control-Option, Option-Command, Control-Option-Command, default Control-Option):
+- `tiling.keyBase` (choice, Control-Option, Option-Command, Control-Option-Command, default Control-Option-Command):
   "Tiling keys".
 - `tiling.innerGap` and `tiling.outerGap` (sliders, 0 to 64, default 8): "Gap between windows" and "Gap to the screen
   edge".
@@ -540,9 +547,10 @@ routes to the one existing place that prompts.
   feature entry with a portable or native check and an `unimplemented` device-proof entry for the real-Mac run that
   does not exist yet. If the owner prefers, bind the Tiling tests in `qa/regressions.json` instead and leave the
   acceptance map at 19.
-- The default modifier base. Control-Option is already Talk to Zeus and pointing, and Control-Option-Space is the chat
-  hotkey, so validate the chosen base with `ShortcutConflicts.warnings` against talk, pointing, dictation, chat and
-  VoiceOver, show a conflict note, and keep the base user-selectable.
+- The default modifier base, decided in the review pass: Control-Option-Command, because Control-Option is already
+  Talk to Zeus and pointing, VoiceOver uses it, and Control-Option-Space is the chat hotkey. The chosen base is
+  validated by `TileBaseConflicts` against talk, pointing, dictation, chat and VoiceOver, a conflict note is shown, and
+  the base stays user-selectable. Reverting to Control-Option is one commit if the owner prefers it.
 
 ## Verification for this slice
 

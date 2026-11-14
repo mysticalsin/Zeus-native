@@ -250,7 +250,7 @@ struct TilingControllerTests {
         #expect(rig.controller.isRunning)
         #expect(rig.controller.observerCount == 7)
         #expect(rig.keys.last?.enabled == true && rig.keys.last?.paused == false)
-        #expect(rig.keys.last?.keymap == TileKeymap.defaults(base: .controlOption))
+        #expect(rig.keys.last?.keymap == TileKeymap.defaults(base: TileConfig.defaults.base))
         rig.settle()
         #expect(rig.driver.frame(of: id(1)) == leftTile)
         #expect(rig.driver.frame(of: id(2)) == rightTile)
@@ -470,6 +470,7 @@ struct TilingControllerTests {
 
     @Test func aPairAnotherZeusKeyHoldsIsRefusedAndNothingExists() {
         let rig = Rig()
+        rig.config.base = .controlOption
         rig.clashNote = { $0 == .controlOption ? Self.talkNote : nil }
         rig.driver.add(id(1))
         rig.controller.start()
@@ -485,6 +486,7 @@ struct TilingControllerTests {
 
     @Test func choosingAnotherPairStartsTilingAndClearsTheNote() {
         let rig = Rig()
+        rig.config.base = .controlOption
         rig.clashNote = { $0 == .controlOption ? Self.talkNote : nil }
         rig.driver.add(id(1))
         rig.controller.start()
@@ -525,6 +527,7 @@ struct TilingControllerTests {
 
     @Test func voiceOverStartingWhileTilingRunsRemovesTheTapAndStoppingItBringsTilingBack() {
         let rig = Rig()
+        rig.config.base = .controlOption
         rig.clashNote = { [unowned rig] base in rig.voiceOverOn && base == .controlOption ? Self.voiceOverNote : nil }
         twoWindows(rig)
         #expect(rig.controller.isRunning && rig.keys.last?.enabled == true)
