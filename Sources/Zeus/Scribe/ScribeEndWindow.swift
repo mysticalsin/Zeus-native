@@ -85,7 +85,7 @@ private struct ScribeEndWindowView: View {
         switch scribe.phase {
         case .recording where scribe.endSuggested:
             // A detector signal only suggests an end: no countdown, and nothing stops until a button is tapped.
-            Text("The call looks over")
+            Label("The call looks over", systemImage: "phone.down")
                 .font(.system(size: 20, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
             HStack {
