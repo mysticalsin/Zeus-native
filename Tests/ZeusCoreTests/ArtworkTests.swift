@@ -131,6 +131,7 @@ import Testing
             "https://[fe80::1]/a.jpg", "https://2130706433/a.jpg", "https://0x7f.0.0.1/a.jpg", "https://0177.0.0.1/a.jpg",
             "https://localhost/a.jpg", "https://localhost./a.jpg", "https://LOCALHOST/a.jpg", "https://app.localhost/a.jpg",
             "https://printer.local/a.jpg", "https://printer.local./a.jpg", "https://intranet/a.jpg",
+            "https://nas.lan/a.jpg", "https://router.home.arpa/a.jpg", "https://wiki.corp.internal/a.jpg", "https://NAS.LAN./a.jpg",
         ] {
             #expect(try !allowed(refused), "\(refused) must be refused")
         }

@@ -58,6 +58,21 @@ import Testing
         #expect(shown(arbiter) == Self.spotify)
     }
 
+    @Test func whenNothingPlaysTheOneThatStoppedLastStaysWhateverStartedFirst() {
+        var arbiter = NowPlayingArbiter()
+        arbiter.update(Self.music, item(Self.music), now: at(0))
+        arbiter.update(Self.spotify, item(Self.spotify), now: at(10))
+        // Spotify stops first, so Music is shown again and plays.
+        arbiter.update(Self.spotify, item(Self.spotify, playing: false), now: at(20))
+        #expect(shown(arbiter) == Self.music)
+        // Music stops last: it stays, though Spotify started later.
+        arbiter.update(Self.music, item(Self.music, playing: false), now: at(30))
+        #expect(shown(arbiter) == Self.music)
+        // Another paused sample of the older stop does not take the notch back.
+        arbiter.update(Self.spotify, item(Self.spotify, playing: false), now: at(40))
+        #expect(shown(arbiter) == Self.music)
+    }
+
     @Test func aSourceFirstSeenPausedNeverDisplacesTheShownOne() {
         var arbiter = NowPlayingArbiter()
         arbiter.update(Self.music, item(Self.music), now: at(0))
