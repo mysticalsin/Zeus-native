@@ -126,7 +126,11 @@ final class TopBarModel {
     // MARK: Live data
 
     var nowPlaying: NowPlaying? {
-        didSet { if oldValue?.isPlaying != nowPlaying?.isPlaying { AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true) } }
+        didSet {
+            guard oldValue?.isPlaying != nowPlaying?.isPlaying else { return }
+            AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true)
+            onMusicPlaying(nowPlaying?.isPlaying == true)
+        }
     }
     /// What the player says about shuffle and repeat. Kept apart from `nowPlaying` so a playback
     /// notification never wipes it; unknown when the player has not answered.
@@ -221,6 +225,8 @@ final class TopBarModel {
     var editScript: () -> Void = {}
     var setPrompterVoice: (Bool) -> Void = { _ in }
     var onKeepAwake: (Bool) -> Void = { _ in }
+    /// A track started or stopped playing (the music display hold listens).
+    var onMusicPlaying: (Bool) -> Void = { _ in }
     /// Selects a tab and opens the panel on it (the wings' Stop uses this for Scribe's confirmation).
     var onOpenTab: (TopBarTab) -> Void = { _ in }
     /// Speaks the daily brief in ZEUS's voice.

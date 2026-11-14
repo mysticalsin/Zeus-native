@@ -104,6 +104,8 @@ private struct GeneralPage: View {
             GSDivider()
             GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working. Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
             GSDivider()
+            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while Music or Spotify is playing. Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
+            GSDivider()
             GSToggleRow(symbol: "person.2.wave.2", title: "Meeting mode", text: "Quiet sounds and private previews during calls and screen sharing.", isOn: bool("general.meetingMode"))
             GSDivider()
             GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus windows out of screen shares and recordings.", isOn: bool("general.showInScreenSharing"))
