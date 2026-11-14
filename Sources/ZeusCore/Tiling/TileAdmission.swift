@@ -115,15 +115,13 @@ public enum TileAdmission {
     }
 
     /// The answer of `rejection` for each of `windows`, in the same order, judged as one set. The window list says
-    /// only that some window of the process sits at a frame, so when more candidates share a frame than the list
-    /// has entries for it, which of them is on this Space is unknown and every one of them is `.unreadable`
-    /// (left alone). Candidates are the windows that pass every other check.
+    /// only that some window of the process sits at a frame, so when more windows of the process could be that
+    /// entry than the list has entries for it, which of them is on this Space is unknown and every candidate among
+    /// them is `.unreadable` (left alone). A candidate is a window that passes every other check. A window could be
+    /// the entry when it sits at the frame, whatever else is wrong with it (a panel, a fixed-size window, one in
+    /// full screen), or when its frame did not read. Only a minimized window is certainly not on screen.
     public static func rejections(_ windows: [TileWindowFacts], onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy) -> [TileRejection?] {
         let stages = windows.map { stage(of: $0, policy: policy) }
-        let candidates: [(pid: Int32, frame: TileRect)] = zip(windows, stages).compactMap { facts, stage in
-            if case .candidate(let frame) = stage { return (facts.pid, frame) }
-            return nil
-        }
         return zip(windows, stages).map { facts, stage in
             switch stage {
             case .rejected(let reason):
@@ -131,12 +129,19 @@ public enum TileAdmission {
             case .candidate(let frame):
                 let entries = onScreen.filter { $0.pid == facts.pid && $0.layer == 0 && TileReadBack.matches($0.frame, frame) }
                 guard let match = entries.first else { return .otherSpace }
-                let sharing = candidates.filter { $0.pid == facts.pid && TileReadBack.matches($0.frame, frame) }.count
+                let sharing = windows.filter { couldBeOnScreen($0, at: frame, pid: facts.pid) }.count
                 if sharing > entries.count { return .unreadable }
                 if let owner = match.ownerName, systemOwnerNames.contains(owner) { return .systemProcess }
                 return nil
             }
         }
+    }
+
+    /// Whether `window` could be the on-screen entry of `pid` at `frame`.
+    private static func couldBeOnScreen(_ window: TileWindowFacts, at frame: TileRect, pid: Int32) -> Bool {
+        guard window.pid == pid, window.isMinimized != true else { return false }
+        guard let own = window.frame, isReal(own) else { return true }
+        return TileReadBack.matches(own, frame)
     }
 
     /// Everything admission decides without the window list: a rejection, or the frame to look for in it.
