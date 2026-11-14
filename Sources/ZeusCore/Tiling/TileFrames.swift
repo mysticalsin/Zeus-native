@@ -64,7 +64,7 @@ public enum TileFrames {
     }
 
     /// The frames of `node` filling `rect`. A leaf takes the whole rect. A split removes the inner gap once
-    /// along its axis, gives the first child that length times the ratio, and the second child the rest after
+    /// along its axis (the gap is rounded to whole points first), gives the first child that length times the ratio, and the second child the rest after
     /// the gap. Edges are rounded to whole points once, at the end, so shared edges stay exact: frames never
     /// overlap and no length drifts. Every window gets a frame; with no room they are all empty.
     public static func frames(_ node: TileNode, in rect: TileRect, innerGap: Double) -> [TileWindowID: TileRect] {
@@ -75,7 +75,7 @@ public enum TileFrames {
             for window in node.windows { out[window] = origin }
             return out
         }
-        let gap = innerGap.isFinite ? max(innerGap, 0) : 0
+        let gap = innerGap.isFinite ? max(innerGap, 0).rounded() : 0
         let box = Box(minX: area.minX, minY: area.minY, maxX: area.maxX, maxY: area.maxY)
         layout(node, in: box, gap: gap, into: &out)
         return out

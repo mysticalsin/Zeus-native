@@ -14,7 +14,9 @@ public struct TileConfig: Equatable, Sendable {
     public var enabled: Bool
     /// Arranging is stopped for now; windows stay where they are.
     public var paused: Bool
+    /// Whole points, so neighbouring tiles are exactly this far apart.
     public private(set) var innerGap: Double
+    /// Whole points.
     public private(set) var outerGap: Double
     /// Splits allowed between the root and any window: 3 gives up to 8 tiles.
     public private(set) var maxDepth: Int
@@ -27,7 +29,7 @@ public struct TileConfig: Equatable, Sendable {
     public var floating: Set<TileWindowID>
     public var excludedBundleIDs: Set<String>
 
-    /// Gaps clamp to 0 ... 64, depth to 1 ... 4, minimum tile size to 120 ... 600 and the ratio to
+    /// Gaps clamp to 0 ... 64 and round to whole points, depth to 1 ... 4, minimum tile size to 120 ... 600 and the ratio to
     /// `TileRatio`'s bounds. A number that is not a number falls back to its default.
     public init(enabled: Bool = false, paused: Bool = false,
                 innerGap: Double = TileConfig.defaultGap, outerGap: Double = TileConfig.defaultGap,
@@ -36,8 +38,8 @@ public struct TileConfig: Equatable, Sendable {
                 floating: Set<TileWindowID> = [], excludedBundleIDs: Set<String> = []) {
         self.enabled = enabled
         self.paused = paused
-        self.innerGap = Self.clamp(innerGap, Self.gapRange, fallback: Self.defaultGap)
-        self.outerGap = Self.clamp(outerGap, Self.gapRange, fallback: Self.defaultGap)
+        self.innerGap = Self.clamp(innerGap, Self.gapRange, fallback: Self.defaultGap).rounded()
+        self.outerGap = Self.clamp(outerGap, Self.gapRange, fallback: Self.defaultGap).rounded()
         self.maxDepth = min(max(maxDepth, Self.depthRange.lowerBound), Self.depthRange.upperBound)
         self.minTileSize = Self.clamp(minTileSize, Self.minTileSizeRange, fallback: Self.defaultMinTileSize)
         self.defaultRatio = TileRatio.clamp(defaultRatio)
