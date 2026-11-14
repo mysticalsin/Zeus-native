@@ -93,7 +93,7 @@ import Testing
 
     @Test func onlyAWebPageIsAnItemNeverAFileOrAPrivateWindow() throws {
         for url in ["file:///Users/me/saved/page.html", "ftp://x.example/a", "chrome://settings", "blob:https://x.example/1", "data:text/html,hi"] {
-            #expect(try #require(BrowserMediaState.parse(reply([itemJSON(["url": .string(url)])]))).items.isEmpty, url)
+            #expect(try #require(BrowserMediaState.parse(reply([itemJSON(["url": .string(url)])]))).items.isEmpty, "\(url)")
         }
         #expect(try #require(BrowserMediaState.parse(reply([itemJSON(["incognito": .bool(true)])]))).items.isEmpty)
         #expect(try #require(BrowserMediaState.parse(reply([itemJSON(["incognito": .bool(false)])]))).items.count == 1)
@@ -102,7 +102,7 @@ import Testing
     @Test func theCoverMustBeAnHttpsLinkOfReasonableLength() throws {
         for link in ["data:image/png;base64,AAAA", "blob:https://x.example/1", "http://img.example.com/a.jpg", "javascript:alert(1)",
                      "https://img.example.com/" + String(repeating: "a", count: 2100), "https://"] {
-            #expect(try sample(["artworkURL": .string(link)]).artworkURL == nil, String(link.prefix(40)))
+            #expect(try sample(["artworkURL": .string(link)]).artworkURL == nil, "\(link.prefix(40))")
         }
         #expect(try sample(["artworkURL": .null]).artworkURL == nil)
     }
