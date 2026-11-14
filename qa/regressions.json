@@ -4402,6 +4402,18 @@
         "file": "Tests/ZeusCoreTests/ScribeMeetingLedgerTests.swift",
         "function": "aDismissedMeetingStaysQuietWhenItRunsOver"
       }
+    },
+    {
+      "id": "REG-413",
+      "failure": "A start refused while Scribe was busy left the meeting's title, guests and call binding behind, and the next unrelated recording took them.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ScribeLifecycleScenarioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+        "function": "aRefusedStartLeavesNoContextBehind"
+      }
     }
   ]
 }

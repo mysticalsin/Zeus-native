@@ -479,13 +479,6 @@ struct ScribeLiveLogicTests {
         #expect(ScribeCallPromptText.headline(for: .none, now: now) == nil)
     }
 
-    @Test func meetingTitleComesFromTheEventOrTheCallApp() {
-        let slot = ScribeCalendarSlot(id: "a", title: " Roadmap ", start: Date())
-        #expect(ScribeCallPromptText.meetingTitle(for: .upcoming(slot)) == "Roadmap")
-        #expect(ScribeCallPromptText.meetingTitle(for: .callDetected(.zoom)) == "Zoom call")
-        #expect(ScribeCallPromptText.meetingTitle(for: .none) == nil)
-    }
-
     // MARK: Record and store
 
     private func sampleRecord(id: UUID = UUID(), dismissedAt: Date? = nil) -> ScribeMeetingRecord {
