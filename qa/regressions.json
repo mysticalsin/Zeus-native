@@ -4366,6 +4366,18 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-430",
+      "failure": "The equaliser control protocol was not main-actor isolated, so a main-actor controller and a test fake could not both conform under Swift 6.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserTypesTests.swift",
+        "function": "aMainActorFakeConformsToTheControlProtocol"
+      }
     }
   ]
 }
