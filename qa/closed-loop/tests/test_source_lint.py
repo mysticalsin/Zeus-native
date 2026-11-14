@@ -850,6 +850,7 @@ EQ_MONITOR = EQ_DIR / "AudioProcessMonitor.swift"
 EQ_KERNEL = ROOT / "Sources/ZeusCore/Audio/EqualiserDSP.swift"
 EQ_RENDER_START = "// MARK: - Render (realtime)"
 EQ_RENDER_END = "// MARK: - End of render"
+KERNEL_CLASS_HEADER = "public final class EqualiserKernel"
 KERNEL_PROCESS_HEADER = "    public func process("
 IO_PROC_API = re.compile(r"\bAudioDeviceCreateIOProcID(?:WithBlock)?\b")
 AUDITED_IO_PROC_FILES = {"Audio/SystemAudioTap.swift", "Scribe/ScribeLiveCapture.swift", "Audio/Equaliser/AppShapingTap.swift"}
@@ -910,7 +911,7 @@ class EqualiserLint(unittest.TestCase):
         render = between(EQ_SHAPING_TAP.read_text(), EQ_RENDER_START, EQ_RENDER_END)
         self.assertIn("nonisolated static func makeRenderBlock(kernel:scratch:map:tapIndex:meter:)", render)
         self.assertIn("kernel.process(", render)
-        kernel = between(EQ_KERNEL.read_text(), KERNEL_PROCESS_HEADER)
+        kernel = between(between(EQ_KERNEL.read_text(), KERNEL_CLASS_HEADER), KERNEL_PROCESS_HEADER)
         self.assertIn("private func processChunk(", kernel)
         offenders = render_offenders(render, "AppShapingTap.swift") + render_offenders(kernel, "EqualiserDSP.swift")
         self.assertEqual(offenders, [], "no allocation, lock, log or main-actor hop on the render path")
