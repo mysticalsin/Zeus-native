@@ -31,7 +31,7 @@ struct TilingSettingsReaderTests {
         #expect(FeatureSettings.tilingEnabled(defaults: defaults) == engine.enabled)
         #expect(FeatureSettings.tilingInnerGap(defaults: defaults) == engine.innerGap)
         #expect(FeatureSettings.tilingOuterGap(defaults: defaults) == engine.outerGap)
-        #expect(FeatureSettings.tilingSplitRatio(defaults: defaults) / 100 == engine.defaultRatio)
+        #expect(FeatureSettings.tilingDefaultRatio(defaults: defaults) == engine.defaultRatio)
         #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == engine.base)
         #expect(Set(FeatureSettings.tilingExcludedApps(defaults: defaults)) == engine.excludedBundleIDs)
     }
@@ -53,6 +53,21 @@ struct TilingSettingsReaderTests {
         #expect(FeatureSettings.tilingFocusBorder(defaults: defaults) == false)
         #expect(FeatureSettings.tilingKeyBase(defaults: defaults) == .optionCommand)
         #expect(FeatureSettings.tilingExcludedApps(defaults: defaults) == ["com.example.One", "com.example.Two"])
+        #expect(abs(FeatureSettings.tilingDefaultRatio(defaults: defaults) - 0.6) < 1e-9)
+    }
+
+    @Test func theEngineRatioIsTheSplitPercentOverOneHundred() throws {
+        let (defaults, cleanup) = try isolated()
+        defer { cleanup() }
+        #expect(FeatureSettings.tilingDefaultRatio(defaults: defaults) == 0.5)
+        defaults.set("30", forKey: "opt.tiling.splitRatio")
+        #expect(abs(FeatureSettings.tilingDefaultRatio(defaults: defaults) - 0.3) < 1e-9)
+        defaults.set("wide", forKey: "opt.tiling.splitRatio")
+        #expect(FeatureSettings.tilingDefaultRatio(defaults: defaults) == 0.5)
+        // The percentage handed to the engine as a ratio would clamp to the maximum, the mistake the ratio reader prevents.
+        defaults.set("50", forKey: "opt.tiling.splitRatio")
+        #expect(TileConfig(defaultRatio: FeatureSettings.tilingSplitRatio(defaults: defaults)).defaultRatio == TileRatio.maximum)
+        #expect(TileConfig(defaultRatio: FeatureSettings.tilingDefaultRatio(defaults: defaults)).defaultRatio == 0.5)
     }
 
     @Test func everyKeyBaseChoiceMapsToItsOwnCase() throws {
@@ -99,7 +114,7 @@ struct TilingSettingsReaderTests {
         defaults.set("5", forKey: "opt.tiling.splitRatio")
         let config = TileConfig(innerGap: FeatureSettings.tilingInnerGap(defaults: defaults),
                                 outerGap: FeatureSettings.tilingOuterGap(defaults: defaults),
-                                defaultRatio: FeatureSettings.tilingSplitRatio(defaults: defaults) / 100)
+                                defaultRatio: FeatureSettings.tilingDefaultRatio(defaults: defaults))
         #expect(config.innerGap == 64)
         #expect(config.outerGap == 0)
         #expect(config.defaultRatio == TileRatio.minimum)
@@ -108,8 +123,12 @@ struct TilingSettingsReaderTests {
     @Test func excludedAppsKeepTheirCaseAndDropBlanks() throws {
         let (defaults, cleanup) = try isolated()
         defer { cleanup() }
-        defaults.set(" com.apple.Safari ,, com.example.App\n com.apple.Safari ,   ", forKey: "opt.tiling.excludedApps")
-        #expect(FeatureSettings.tilingExcludedApps(defaults: defaults) == ["com.apple.Safari", "com.example.App"])
+        defaults.set(" com.example.One ,, com.example.App\n com.example.One ,   ", forKey: "opt.tiling.excludedApps")
+        #expect(FeatureSettings.tilingExcludedApps(defaults: defaults) == ["com.example.One", "com.example.App"])
+        defaults.set("com.example.One\r\ncom.example.Two\rcom.example.Three\u{2028}com.example.Four,\t com.example.Five \r\n",
+                     forKey: "opt.tiling.excludedApps")
+        #expect(FeatureSettings.tilingExcludedApps(defaults: defaults) ==
+                ["com.example.One", "com.example.Two", "com.example.Three", "com.example.Four", "com.example.Five"])
         defaults.set("  ,\n ", forKey: "opt.tiling.excludedApps")
         #expect(FeatureSettings.tilingExcludedApps(defaults: defaults).isEmpty)
     }
