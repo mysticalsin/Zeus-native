@@ -978,7 +978,7 @@ struct ScribeAutoStartTests {
     }
 
     @Test func aNotNowTapThatArrivesJustAfterTheTimeoutIsStillAnAnswer() {
-        var machine = asPrompting(mode: .automatic, granted: true, consent: true)
+        var machine = asPrompting()
         machine.handle(.tick(now: 23))
         #expect(machine.ledger.mark(of: asTeams) == .asked)
         let late = machine.handle(.decline(now: 23.1))

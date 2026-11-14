@@ -64,7 +64,8 @@ struct ScribeMeetingLedgerTests {
         let meeting = try mlMeeting(opened)
         #expect(meeting.key == "s1")
         #expect(ledger.mark(of: meeting) == .declined)
-        // Reading the evidence wrote the answer onto the meeting it now belongs to, so it outlives the call app's entry.
+        // The machine writes the answer onto the meeting it now belongs to, so it outlives the call app's entry.
+        ledger.note(meeting, .declined, date: opened.date)
         let silent = mlEvidence(1_010, slots: [slot], present: [.teams])
         ledger.observe(silent, now: 1_010)
         ledger.observe(mlEvidence(1_050, slots: [slot], present: [.teams]), now: 1_050)
@@ -104,9 +105,9 @@ struct ScribeMeetingLedgerTests {
         ledger.observe(mlEvidence(5, present: [.zoom]), now: 5)
         #expect(ledger.mark(of: call) == .started)
         ledger.observe(mlEvidence(6), now: 6)
-        ledger.observe(mlEvidence(35), now: 35)
+        ledger.observe(mlEvidence(34), now: 34)
         #expect(ledger.mark(of: call) == .started)
-        ledger.observe(mlEvidence(36), now: 36)
+        ledger.observe(mlEvidence(35), now: 35)
         #expect(ledger.mark(of: call) == nil)
     }
 
@@ -126,7 +127,7 @@ struct ScribeMeetingLedgerTests {
         #expect(ledger.mark(of: call) == nil)
     }
 
-    @Test func anAskedCallMarkMovesOntoItsCalendarSlotWhenTheWindowOpens() throws {
+    @Test func anAskedCallMarkOutlivesTheCallEntryOnceNotedOnItsCalendarSlot() throws {
         var ledger = ScribeMeetingLedger()
         let call = try mlMeeting(mlEvidence(0, mic: [.teams], present: [.teams]))
         ledger.note(call, .asked, date: mlBase)
@@ -135,6 +136,8 @@ struct ScribeMeetingLedgerTests {
         ledger.observe(opened, now: 1_000)
         let meeting = try mlMeeting(opened)
         #expect(meeting.key == "s1")
+        #expect(ledger.mark(of: meeting) == .asked)
+        ledger.note(meeting, .asked, date: opened.date)
         ledger.observe(mlEvidence(1_010, slots: [slot], present: [.teams]), now: 1_010)
         ledger.observe(mlEvidence(1_040, slots: [slot], present: [.teams]), now: 1_040)
         #expect(ledger.mark(ofSlot: "s1") == .asked)
