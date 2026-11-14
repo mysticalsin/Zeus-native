@@ -33,7 +33,7 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>ZEUS turns what you say into text so it can answer your question.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch. It also finds the Terminal or iTerm tab where a coding agent is running, brings that tab forward, and types a reply you approve into it. For presentations it reads slide notes and moves to the next slide in Keynote or PowerPoint, and it clicks a menu bar item of a presentation tool through System Events.</string>
+	<string>ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch. It also finds the Terminal or iTerm tab where a coding agent is running, brings that tab forward, and types a reply you approve into it. For presentations it reads slide notes and moves to the next slide in Keynote or PowerPoint, and it reads and clicks items in the Beamer menu bar menu through System Events to share your keyboard and mouse.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>ZEUS shows your next events in the notch and lets you join calls in one click.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
