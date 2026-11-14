@@ -98,10 +98,15 @@ struct FeaturesSettingsPage: View {
     }
 
     private var scribeCard: some View {
-        GSCard("Scribe") {
-            GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts") {
-                GSPopup(selection: store.stringBinding(ScribeAutoStartMode.settingID), options: ScribeAutoStartMode.choices)
-            }
+        ScribeAutoStartCard(
+            selection: store.stringBinding(ScribeAutoStartMode.settingID),
+            block: store.autoStartBlock(),
+            allow: { block in
+                if block == .microphoneDenied { ScribeSettingsLink.open(pane: "Privacy_Microphone") } else { store.askForMicrophone() }
+            })
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // Coming back from System Settings after Allow: read the microphone again.
+            store.microphoneMayHaveChanged()
         }
     }
 
@@ -149,5 +154,37 @@ struct GSTextInput: View {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
             .accessibilityLabel(label)
+    }
+}
+
+/// Scribe's one row, "When a meeting starts", and the row that names what blocks an automatic start, if anything.
+/// It draws what it is given: the page supplies the choice, the block and the Allow action.
+struct ScribeAutoStartCard: View {
+    let selection: Binding<String>
+    let block: ScribeAutoStartBlock?
+    let allow: (ScribeAutoStartBlock) -> Void
+
+    var body: some View {
+        let mode = ScribeAutoStartMode.parse(selection.wrappedValue)
+        GSCard("Scribe") {
+            GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts") {
+                GlassSegmented(options: ScribeAutoStartMode.allCases.map { ($0.title, $0.title) }, selection: selection)
+                    .padding(.trailing, 13.5)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("When a meeting starts")
+                    .accessibilityValue(mode.title)
+            }
+            if mode == .automatic, let block, let words = ScribeMeetingCardText.reason(block) {
+                GSDivider()
+                GSRow(symbol: block == .firstRecordingOwed ? "record.circle" : "mic.slash", title: words) {
+                    if block == .microphoneNotAsked || block == .microphoneDenied {
+                        Button("Allow") { allow(block) }
+                            .buttonStyle(GSButtonStyle())
+                            .accessibilityLabel("Allow microphone")
+                            .padding(.trailing, 13.5)
+                    }
+                }
+            }
+        }
     }
 }

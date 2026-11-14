@@ -98,6 +98,17 @@ final class SettingsStore {
 
     func microphoneMayHaveChanged() { microphoneEpoch &+= 1 }
 
+    /// What stops an automatic start, or nil when nothing does or the choice is not automatic. Reads the epoch, so
+    /// a row that shows it refreshes when the microphone answer changes.
+    func autoStartBlock() -> ScribeAutoStartBlock? {
+        _ = microphoneEpoch
+        return ScribeAutoStartReadiness.resolve(
+            mode: ScribeAutoStartMode.parse(string(ScribeAutoStartMode.settingID)),
+            optIn: ScribeAutoStartOptIn.date(defaults: defaults) != nil,
+            microphone: microphoneAccess(),
+            hasRecorded: ScribeAutoStartOptIn.hasRecorded(defaults: defaults)).block
+    }
+
     /// Shows what macOS has registered, not the stored default. `SMAppService.status` is a synchronous
     /// round trip to the login-items daemon and can take seconds, so it is read off the main thread
     /// (once per call) and the switch draws from `values`, never from the service. Nothing is registered here.

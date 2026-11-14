@@ -35,6 +35,21 @@ private struct GSPageSnapshot: View {
     }
 }
 
+/// Scribe's card on the Settings panel background, with a fixed choice and block.
+private struct ScribeCardSnapshot: View {
+    let choice: String
+    let block: ScribeAutoStartBlock?
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
+            ScribeAutoStartCard(selection: .constant(choice), block: block, allow: { _ in })
+                .padding(.horizontal, GS.pagePadding)
+                .padding(.top, 25)
+        }
+        .background(GS.window)
+    }
+}
+
 /// `Zeus --snapshots <dir>` renders every notch and spark state to PNG and quits.
 /// Used to review the look without Screen Recording permission or a live demo.
 @MainActor
@@ -318,6 +333,19 @@ enum SnapshotRenderer {
             save(GSPageSnapshot(section: section, context: gsContext),
                  size: CGSize(width: GS.panelFrame.width, height: GlanceSettingsSnapshotHeight.height(for: section.rawValue)), pane: section,
                  to: directory.appendingPathComponent("settings-full-\(section.rawValue).png"))
+        }
+        // Scribe's "When a meeting starts" row alone: each choice, and each reason an automatic start is blocked.
+        let scribeRows: [(name: String, choice: String, block: ScribeAutoStartBlock?)] = [
+            ("ask", ScribeAutoStartMode.ask.title, nil),
+            ("off", ScribeAutoStartMode.off.title, nil),
+            ("automatic", ScribeAutoStartMode.automatic.title, nil),
+            ("not-asked", ScribeAutoStartMode.automatic.title, .microphoneNotAsked),
+            ("denied", ScribeAutoStartMode.automatic.title, .microphoneDenied),
+            ("first-recording", ScribeAutoStartMode.automatic.title, .firstRecordingOwed),
+        ]
+        for row in scribeRows {
+            save(ScribeCardSnapshot(choice: row.choice, block: row.block), size: CGSize(width: GS.panelFrame.width, height: 280),
+                 to: directory.appendingPathComponent("settings-scribe-\(row.name).png"))
         }
         // QA round 10 (report-10.md VISUAL section): this loop and the `GSSection.allCases` loop
         // just above it both used the bare name `"settings-\(section.rawValue)"`. `SettingsView`
