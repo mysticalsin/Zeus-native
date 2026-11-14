@@ -417,7 +417,7 @@ struct TilingControllerTests {
         rig.driver.front = .none
         rig.post(workspace: NSWorkspace.activeSpaceDidChangeNotification)
         rig.settle()
-        #expect(rig.controller.layoutWindows(on: 1).contains(id(3)))
+        #expect(rig.controller.layoutWindows(on: 1).contains(id(3, pid: 901)))
     }
 
     // MARK: Generation counter
