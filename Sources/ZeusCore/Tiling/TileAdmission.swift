@@ -108,28 +108,56 @@ public enum TileAdmission {
     }
 
     /// The first reason `facts` is not tiled, or nil when it is admitted. `onScreen` is the system's list of
-    /// windows on the current Space.
+    /// windows on the current Space. A window is judged alone here: use `rejections` for the windows of a pass,
+    /// where a frame shared by several windows is judged across all of them.
     public static func rejection(_ facts: TileWindowFacts, onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy) -> TileRejection? {
+        rejections([facts], onScreen: onScreen, policy: policy)[0]
+    }
+
+    /// The answer of `rejection` for each of `windows`, in the same order, judged as one set. The window list says
+    /// only that some window of the process sits at a frame, so when more candidates share a frame than the list
+    /// has entries for it, which of them is on this Space is unknown and every one of them is `.unreadable`
+    /// (left alone). Candidates are the windows that pass every other check.
+    public static func rejections(_ windows: [TileWindowFacts], onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy) -> [TileRejection?] {
+        let stages = windows.map { stage(of: $0, policy: policy) }
+        let candidates: [(pid: Int32, frame: TileRect)] = zip(windows, stages).compactMap { facts, stage in
+            if case .candidate(let frame) = stage { return (facts.pid, frame) }
+            return nil
+        }
+        return zip(windows, stages).map { facts, stage in
+            switch stage {
+            case .rejected(let reason):
+                return reason
+            case .candidate(let frame):
+                let entries = onScreen.filter { $0.pid == facts.pid && $0.layer == 0 && TileReadBack.matches($0.frame, frame) }
+                guard let match = entries.first else { return .otherSpace }
+                let sharing = candidates.filter { $0.pid == facts.pid && TileReadBack.matches($0.frame, frame) }.count
+                if sharing > entries.count { return .unreadable }
+                if let owner = match.ownerName, systemOwnerNames.contains(owner) { return .systemProcess }
+                return nil
+            }
+        }
+    }
+
+    /// Everything admission decides without the window list: a rejection, or the frame to look for in it.
+    private enum Stage {
+        case rejected(TileRejection)
+        case candidate(TileRect)
+    }
+
+    private static func stage(of facts: TileWindowFacts, policy: TileAdmissionPolicy) -> Stage {
         if let reason = appRejection(pid: facts.pid, bundleID: facts.bundleID, isRegularApp: facts.isRegularApp, policy: policy) {
-            return reason
+            return .rejected(reason)
         }
         guard let role = facts.role, let subrole = facts.subrole, let minimized = facts.isMinimized,
               let fullScreen = facts.isFullScreen, let settable = facts.isSizeSettable, let frame = facts.frame,
-              isReal(frame) else { return .unreadable }
-        if role != "AXWindow" || subrole != "AXStandardWindow" { return .notStandardWindow }
-        if minimized { return .minimized }
-        if fullScreen { return .fullScreen }
-        if !settable { return .notResizable }
-        if frame.width < policy.minimumSize || frame.height < policy.minimumSize { return .tooSmall }
-        guard let match = onScreenMatch(pid: facts.pid, frame: frame, in: onScreen) else { return .otherSpace }
-        if let owner = match.ownerName, systemOwnerNames.contains(owner) { return .systemProcess }
-        return nil
-    }
-
-    /// The on-screen entry for the same process with the same frame (within the read-back tolerance), on the
-    /// normal window level. Without a private call this is how a window is known to be on the current Space.
-    public static func onScreenMatch(pid: Int32, frame: TileRect, in list: [TileOnScreenWindow]) -> TileOnScreenWindow? {
-        list.first { $0.pid == pid && $0.layer == 0 && TileReadBack.matches($0.frame, frame) }
+              isReal(frame) else { return .rejected(.unreadable) }
+        if role != "AXWindow" || subrole != "AXStandardWindow" { return .rejected(.notStandardWindow) }
+        if minimized { return .rejected(.minimized) }
+        if fullScreen { return .rejected(.fullScreen) }
+        if !settable { return .rejected(.notResizable) }
+        if frame.width < policy.minimumSize || frame.height < policy.minimumSize { return .rejected(.tooSmall) }
+        return .candidate(frame)
     }
 
     private static func isReal(_ rect: TileRect) -> Bool {
