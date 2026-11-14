@@ -1,7 +1,8 @@
 import Foundation
 
-/// Title and artist clean-up for the lyric lookup. The suffix rules are a small subset ported from
-/// web-scrobbler/metadata-filter (MIT, see NOTICES.md). "Live" is never stripped: a live recording keeps its title.
+/// Title and artist clean-up for the lyric lookup. The suffix rules strip common release tags
+/// (remaster, edition, version, featured artist) so a tag does not hide a track's lyrics.
+/// "Live" is never stripped: a live recording keeps its title.
 public enum LyricsTitle {
     private static let year = "(?:19|20)[0-9]{2}"
     private static let remaster = "(?:\(year)\\s+)?(?:digital(?:ly)?\\s+)?remaster(?:ed)?(?:\\s+\(year))?(?:\\s+version)?"
