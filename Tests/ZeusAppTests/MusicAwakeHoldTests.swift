@@ -323,4 +323,43 @@ private final class Scheduled {
         rig.hold.setEnabled(false)
         #expect(monitor.isRunning, "a session is still using the readings")
     }
+
+    // MARK: Lease timing wiring
+
+    @Test func theHoldTakesTheSharedLeaseAndRenewsOnTheSharedPeriod() {
+        let rig = Rig()
+        rig.hold.setEnabled(true)
+        rig.hold.setPlaying(true)
+        #expect(rig.lastLease == MusicAwakeTiming.lease)
+        #expect(MusicAwakeHold.lease == MusicAwakeTiming.lease)
+        #expect(rig.renewTimers.count == 1)
+        #expect(rig.renewTimers.first?.delay == MusicAwakeTiming.renewEvery)
+    }
+
+    @Test func theWiredRenewalPeriodRenewsBeforeTheLeaseCanEnd() {
+        let rig = Rig()
+        rig.hold.setEnabled(true)
+        rig.hold.setPlaying(true)
+        let period = rig.renewTimers.first?.delay ?? .infinity
+        #expect(MusicAwakeTiming.isSafe(lease: rig.lastLease, renewEvery: period, tolerance: MusicAwakeTiming.renewTolerance))
+    }
+
+    // MARK: Real timers
+
+    /// Menu tracking and modal panels run the main loop in other modes that belong to the common set. A custom
+    /// common mode stands in for them, so the test does not depend on AppKit having registered its own.
+    @Test func realTimersFireWhileTheRunLoopIsInACommonNonDefaultMode() {
+        let mode = RunLoop.Mode(rawValue: "zeus.test.tracking")
+        CFRunLoopAddCommonMode(CFRunLoopGetMain(), mode.rawValue as CFString)
+        final class Flag: @unchecked Sendable { var fired = false }
+        let flag = Flag()
+        let cancel = MusicAwakeHold.timerSchedule(after: 0.05, repeats: false) { flag.fired = true }
+        defer { cancel() }
+        let deadline = Date(timeIntervalSinceNow: 1)
+        while !flag.fired, Date() < deadline {
+            RunLoop.main.run(mode: mode, before: Date(timeIntervalSinceNow: 0.05))
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        #expect(flag.fired, "a timer added in the default mode only would sleep through a menu")
+    }
 }
