@@ -4390,6 +4390,54 @@
         "file": "Tests/ZeusCoreTests/AgentHubTests.swift",
         "function": "anInsetOnlyDisplayThatIsNotBuiltInIsNotPickedAheadOfTheBuiltInPanel"
       }
+    },
+    {
+      "id": "REG-562",
+      "failure": "A calibration draft could be saved by Cancel or by the card going away, so a shape the owner never accepted stayed on the notch.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DrawnNotchCalibrationTests.swift",
+        "function": "noPathThroughCancelOrALossEmitsPersist"
+      }
+    },
+    {
+      "id": "REG-563",
+      "failure": "A drawn shape could be wider than a quarter of a narrow display, or shifted past the room the open panel leaves, so the notch crowded the menu bar or the panel went off screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DrawnNotchTests.swift",
+        "function": "aFittedShapeIsOnTheStepAndInsideEveryLimit"
+      }
+    },
+    {
+      "id": "REG-564",
+      "failure": "A lowered drawn notch could claim the menu bar strip above it, or its hover and click zones could differ from the body that is drawn.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "forADrawnShapeTheBodyHoverAndClickRectanglesAreOne"
+      }
+    },
+    {
+      "id": "REG-565",
+      "failure": "A stored shape that was not a number reached the layout as a size, because nothing replaced it with the default.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DrawnNotchTests.swift",
+        "function": "aNonFiniteFieldTakesItsDefaultAndTheOthersKeepTheirValue"
+      }
     }
   ]
 }
