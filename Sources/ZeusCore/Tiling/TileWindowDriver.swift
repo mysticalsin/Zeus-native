@@ -17,6 +17,22 @@ public struct TileWindowRef: Equatable, Sendable {
     public var pid: Int32 { id.pid }
 }
 
+/// What the driver can say about the front app. Read fresh, never kept.
+public struct TileFrontmost: Equatable, Sendable {
+    /// The front app's focused window, when the last `windows(config:)` returned it. A window that passed no
+    /// admission (an excluded app, Zeus itself) is nil, so is a front app with no focused window.
+    public var focused: TileWindowID?
+    /// The focused window of the front app is in full screen.
+    public var isFullScreen: Bool
+
+    public init(focused: TileWindowID?, isFullScreen: Bool) {
+        self.focused = focused
+        self.isFullScreen = isFullScreen
+    }
+
+    public static let none = TileFrontmost(focused: nil, isFullScreen: false)
+}
+
 /// What the layout needs from the system to arrange windows. The Accessibility version is the only real one;
 /// tests use a fake. Every frame crossing it is in engine coordinates.
 @MainActor
@@ -38,6 +54,13 @@ public protocol TilingWindowDriver: AnyObject {
     /// Brings `window` to the front and gives it keyboard focus. Does nothing for a window the last
     /// `windows(config:)` did not return.
     func focus(_ window: TileWindowID)
+    /// Which window has the keyboard, and whether the front app is in full screen. Empty without Accessibility.
+    func frontmost() -> TileFrontmost
+}
+
+extension TilingWindowDriver {
+    /// A driver that cannot tell what is in front reports nothing: no window is focused and nothing is full screen.
+    public func frontmost() -> TileFrontmost { .none }
 }
 
 /// Gives each window of each app a number that is never used again in this session.
