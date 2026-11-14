@@ -115,7 +115,7 @@ struct ScribeMeetingLedgerTests {
         // it from both lists for a while without ending the call.
         var ledger = ScribeMeetingLedger()
         let call = try mlMeeting(mlEvidence(0, mic: [.meet]))
-        #expect(call.key == "call:Meet")
+        #expect(call.callApp == .meet && call.slot == nil)
         ledger.note(call, .declined, date: mlBase)
         ledger.observe(mlEvidence(10), now: 10)
         ledger.observe(mlEvidence(20), now: 20)

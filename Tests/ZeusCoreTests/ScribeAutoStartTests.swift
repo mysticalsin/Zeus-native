@@ -252,8 +252,8 @@ struct ScribeAutoStartTests {
         #expect(machine.ledger.mark(of: asTeams) == .declined)
     }
 
-    @Test func aDeclinedBrowserCallStaysQuietWhenItsWindowTitleIsLostForAWhile() {
-        let meet = ScribeMeeting(key: "call:Meet", title: "Call", callApp: .meet, isLive: true)
+    @Test func aDeclinedBrowserCallStaysQuietWhenItsWindowTitleIsLostForAWhile() throws {
+        let meet = try #require(ScribeMeetingEvidence(date: asBase, micApps: [.meet]).candidate)
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.meet], present: [.meet]))
         machine.handle(asEvidence(3, mic: [.meet], present: [.meet]))
