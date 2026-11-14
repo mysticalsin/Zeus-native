@@ -70,7 +70,8 @@ struct GlyphButton: View {
     var size: CGFloat = 13
     var tint: Color = Theme.cloudPrimary
     let label: String
-    /// A toggle that is on: drawn on a filled capsule, so the state never rests on colour alone.
+    /// A toggle that is on: a filled, bordered capsule and the glyph in the primary tone, so the state
+    /// never rests on colour alone. Off has no capsule.
     var active = false
     /// Spoken state for a toggle ("on", "all"); none for a plain button.
     var value: String?
@@ -81,9 +82,10 @@ struct GlyphButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(tint)
+                .foregroundStyle(active ? Theme.cloudPrimary : tint)
                 .frame(width: size + 15, height: size + 15)
-                .background(Capsule().fill(Color.white.opacity(active ? 0.18 : 0)))
+                .background(Capsule().fill(Color.white.opacity(ToggleOnLook.fill(active: active))))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(ToggleOnLook.stroke(active: active)), lineWidth: 1))
                 .contentShape(Circle())
         }
         .buttonStyle(PressableStyle())
@@ -575,8 +577,8 @@ struct MusicPage: View {
                 HStack {
                     MusicControls(topBar: topBar, size: 16)
                     OutputDeviceMenu(topBar: topBar)
-                    GlyphButton(symbol: "quote.bubble", size: 12, tint: showLyrics ? Theme.glow : Theme.cloudSecondary,
-                                label: showLyrics ? "Hide lyrics" : "Show lyrics") { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
+                    GlyphButton(symbol: "quote.bubble", size: 12, tint: Theme.cloudSecondary, label: "Lyrics",
+                                active: showLyrics, value: ToggleOnLook.spoken(showLyrics)) { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
                     GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
                                 label: "Open \(topBar.nowPlaying?.player.rawValue ?? "Music")") { topBar.musicCommand(.open) }
                 }

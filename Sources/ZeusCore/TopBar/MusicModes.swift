@@ -239,3 +239,18 @@ public struct MusicModePress: Equatable, Sendable {
         }
     }
 }
+
+/// How a toggle that is on is drawn: a filled capsule with a border, so the state rests on shape and
+/// contrast, not on a tint alone. Off has neither. The glyph takes the primary tone when on.
+public enum ToggleOnLook {
+    /// White over the panel. At 0.30 the primary glyph (E9EDF2) keeps text-grade contrast on the capsule.
+    public static let fillOpacity = 0.30
+    /// The border, strong enough to separate the capsule from the dark panel.
+    public static let strokeOpacity = 0.50
+
+    public static func fill(active: Bool) -> Double { active ? fillOpacity : 0 }
+    public static func stroke(active: Bool) -> Double { active ? strokeOpacity : 0 }
+
+    /// What VoiceOver says for a plain on or off toggle.
+    public static func spoken(_ on: Bool) -> String { on ? "on" : "off" }
+}
