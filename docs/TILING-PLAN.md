@@ -108,7 +108,8 @@ No app file is touched. Files live under `Sources/ZeusCore/Tiling/`.
   `.refused`, and the caller floats the window. An empty tree takes the window as the root leaf.
 - `TileOps.remove(_ window:from tree:)`: replaces the parent split with the sibling subtree; a root leaf empties the
   tree. No other ratios change.
-- `TileOps.swap(_ a:_ b:in tree:)`: swaps the two leaves' window ids. Nothing else changes.
+- `TileOps.swap(_ a:_ b:in tree:)`: swaps the two leaves' window ids and the two ids in the tree's order, so the newest
+  slot stays the newest. Nothing else changes.
 - `TileOps.flip(at window:in tree:)`: toggles the focused leaf's parent split axis and sets its pinned flag.
 - `TileOps.nudgeRatio(at window:direction:step:in tree:)`: finds the nearest ancestor split whose axis matches the
   direction and in which the window lies on the matching side, adds or subtracts the step, clamps.
@@ -132,8 +133,10 @@ chord type is added):
   anything unknown falls back to `controlOption`; `modifiers` returns the `ShortcutModifiers` set.
 - `TileKeymap`: maps a `Shortcut` to a `TileAction`. `defaults(base:)` is the one function that builds the default
   table. `action(for:)` is a lookup over an immutable copy. It rejects duplicate chords and rejects a chord that
-  `Shortcut` reports invalid (a bare letter with no modifier). `encode`/`decode` use a stable `Codable` form and skip
-  unknown actions, so a newer file does not break an older build. `conflicts(with:)` returns the chords that collide
+  `Shortcut` reports invalid (a bare letter with no modifier), and any key chord without Control, Option or Command
+  (Shift or Fn plus a key, a bare F key), because the tap consumes what the keymap binds. `action(for:)` ignores the
+  fn flag that macOS adds to arrow and function keys, unless the chord was bound with it. `encode`/`decode` use a
+  stable `Codable` form and skip unknown actions, so a newer file does not break an older build. `conflicts(with:)` returns the chords that collide
   with a supplied set of reserved shortcuts.
 
 Default binds, base `B` (the chosen modifier set): `B` plus Left, Right, Up, Down is focus; `B` plus Shift plus an
