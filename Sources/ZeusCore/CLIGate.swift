@@ -53,6 +53,15 @@ public enum CLIGate {
 /// access rules for this app, while a development build keeps its items in a local keychain whose password
 /// is a file the user can read, so there the switch is a guard against mistakes and preference edits, not
 /// against a program that sets out to unlock that keychain. The item is "on" when it exists with value 1.
+///
+/// Open assumption, not yet probed: nothing here checks who wrote the item. Another program of this user may be
+/// able to add one with an access list open to all programs (`security add-generic-password -A`), and whether Zeus
+/// then reads it silently depends on the item's partition list, which is the Keychain's behaviour and not something
+/// this code proves. The saved origins of the model key and of the license server (`CredentialOrigin`) rest on the
+/// same assumption. The data protection keychain with a keychain access group would remove it, but it needs the
+/// keychain-access-groups entitlement and a provisioning profile. Until someone plants such an item by hand on a
+/// Developer ID build and reads it from Zeus, treat a same-user program that can write the login keychain as able
+/// to turn the switch on.
 public enum CLIGateStore {
     /// The Keychain account (under the app service) that holds the switch. Present means on.
     public static let account = "cli.control.enabled"
