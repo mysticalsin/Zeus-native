@@ -64,8 +64,7 @@ struct ScribeMeetingLedgerTests {
         let meeting = try mlMeeting(opened)
         #expect(meeting.key == "s1")
         #expect(ledger.mark(of: meeting) == .declined)
-        // The machine writes the answer onto the meeting it now belongs to, so it outlives the call app's entry.
-        ledger.note(meeting, .declined, date: opened.date)
+        // Reading the evidence wrote the answer onto the meeting it now belongs to, so it outlives the call app's entry.
         let silent = mlEvidence(1_010, slots: [slot], present: [.teams])
         ledger.observe(silent, now: 1_010)
         ledger.observe(mlEvidence(1_050, slots: [slot], present: [.teams]), now: 1_050)
@@ -98,14 +97,48 @@ struct ScribeMeetingLedgerTests {
         #expect(ledger.mark(of: call) == nil)
     }
 
-    @Test func aCallEntryLeavesAtOnceWhenItsAppIsGone() throws {
+    @Test func aCallEntryLeavesOnlyAfterTheAbsenceWhenItsAppIsGone() throws {
         var ledger = ScribeMeetingLedger()
         let call = try mlMeeting(mlEvidence(0, mic: [.zoom]))
         ledger.note(call, .started, date: mlBase)
         ledger.observe(mlEvidence(5, present: [.zoom]), now: 5)
         #expect(ledger.mark(of: call) == .started)
         ledger.observe(mlEvidence(6), now: 6)
+        ledger.observe(mlEvidence(35), now: 35)
+        #expect(ledger.mark(of: call) == .started)
+        ledger.observe(mlEvidence(36), now: 36)
         #expect(ledger.mark(of: call) == nil)
+    }
+
+    @Test func aCallThatDropsOutOfBothListsKeepsItsAnswerUntilTheAbsenceIsLong() throws {
+        // A browser call is only seen while its window title says so: a tab switch or a failed title read removes
+        // it from both lists for a while without ending the call.
+        var ledger = ScribeMeetingLedger()
+        let call = try mlMeeting(mlEvidence(0, mic: [.meet]))
+        #expect(call.key == "call:Meet")
+        ledger.note(call, .declined, date: mlBase)
+        ledger.observe(mlEvidence(10), now: 10)
+        ledger.observe(mlEvidence(20), now: 20)
+        ledger.observe(mlEvidence(23, mic: [.meet], present: [.meet]), now: 23)
+        #expect(ledger.mark(of: call) == .declined)
+        ledger.observe(mlEvidence(30), now: 30)
+        ledger.observe(mlEvidence(60), now: 60)
+        #expect(ledger.mark(of: call) == nil)
+    }
+
+    @Test func anAskedCallMarkMovesOntoItsCalendarSlotWhenTheWindowOpens() throws {
+        var ledger = ScribeMeetingLedger()
+        let call = try mlMeeting(mlEvidence(0, mic: [.teams], present: [.teams]))
+        ledger.note(call, .asked, date: mlBase)
+        let slot = mlSlot("s1", start: 1_100, end: 4_700)
+        let opened = mlEvidence(1_000, slots: [slot], mic: [.teams], present: [.teams])
+        ledger.observe(opened, now: 1_000)
+        let meeting = try mlMeeting(opened)
+        #expect(meeting.key == "s1")
+        ledger.observe(mlEvidence(1_010, slots: [slot], present: [.teams]), now: 1_010)
+        ledger.observe(mlEvidence(1_040, slots: [slot], present: [.teams]), now: 1_040)
+        #expect(ledger.mark(ofSlot: "s1") == .asked)
+        #expect(ledger.mark(of: meeting) == .asked)
     }
 
     @Test func marksNeverGoDown() throws {

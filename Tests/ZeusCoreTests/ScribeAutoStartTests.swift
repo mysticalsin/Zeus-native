@@ -252,6 +252,47 @@ struct ScribeAutoStartTests {
         #expect(machine.ledger.mark(of: asTeams) == .declined)
     }
 
+    @Test func aDeclinedBrowserCallStaysQuietWhenItsWindowTitleIsLostForAWhile() {
+        let meet = ScribeMeeting(key: "call:Meet", title: "Call", callApp: .meet, isLive: true)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, mic: [.meet], present: [.meet]))
+        machine.handle(asEvidence(3, mic: [.meet], present: [.meet]))
+        #expect(machine.state == .prompting(meeting: meet, deadline: 23))
+        machine.handle(.decline(now: 5))
+        // Another tab is in front: the Meet title is read from neither list.
+        machine.handle(asEvidence(10))
+        machine.handle(asEvidence(20))
+        var shown = 0
+        var now: TimeInterval = 23
+        while now < 120 {
+            let effects = machine.handle(asEvidence(now, mic: [.meet], present: [.meet]))
+            if effects.contains(.showAsk(meet)) { shown += 1 }
+            now += 3
+        }
+        #expect(shown == 0)
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: meet) == .declined)
+    }
+
+    @Test func anUnansweredCallStaysQuietWhenItsCalendarWindowOpensAndTheMicrophoneIsMuted() {
+        var machine = asPrompting()
+        machine.handle(.tick(now: 23))
+        #expect(machine.state == .idle)
+        let slot = asSlot("s1", start: 40, end: 1_800, app: .teams)
+        let opened = machine.handle(asEvidence(30, mic: [.teams], present: [.teams], slots: [slot]))
+        #expect(opened.isEmpty)
+        // Muted for longer than the call entry lives: the slot still remembers the question.
+        machine.handle(asEvidence(40, present: [.teams], slots: [slot]))
+        machine.handle(asEvidence(75, present: [.teams], slots: [slot]))
+        var shown = 0
+        for now in stride(from: 80.0, through: 120.0, by: 3.0) {
+            let effects = machine.handle(asEvidence(now, mic: [.teams], present: [.teams], slots: [slot]))
+            if effects.contains(where: { if case .showAsk = $0 { return true } else { return false } }) { shown += 1 }
+        }
+        #expect(shown == 0)
+        #expect(machine.state == .idle)
+    }
+
     // MARK: Ask me
 
     @Test func askMeStartsWhenTheBannerIsAccepted() {
