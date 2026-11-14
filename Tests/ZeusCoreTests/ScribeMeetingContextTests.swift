@@ -33,8 +33,8 @@ struct ScribeMeetingContextTests {
         let context = call.context(callIdentity: nil)
         #expect(context.title == "Synthetic call")
         #expect(context.attendeeNames.isEmpty)
-        let teams = ScribeMeeting(key: "call:Teams", title: "Call", callApp: .teams, isLive: true)
-        #expect(teams.context(callIdentity: nil).title == "Teams call")
+        let second = ScribeMeeting(key: "call:Fixture", title: "Call", callApp: .other("Fixture"), isLive: true)
+        #expect(second.context(callIdentity: nil).title == "Fixture call")
     }
 
     @Test func aMeetingWithNeitherSlotNorAppHasNoTitle() {
