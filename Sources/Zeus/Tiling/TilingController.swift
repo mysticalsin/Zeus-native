@@ -49,8 +49,11 @@ final class TilingController {
         var keys: any TilingKeyControlling
         var readConfig: () -> TileConfig
         var focusBorderOn: () -> Bool
-        /// Why the key pair for this base cannot be used (another Zeus key holds it), or nil when it is free.
+        /// Why the keys for this base cannot be used (another Zeus key or VoiceOver holds them), or nil when they are free.
         var keyClash: (TileModifierBase, TileKeymap) -> String? = { _, _ in nil }
+        /// Calls the work each time VoiceOver starts or stops and returns the way to stop watching. VoiceOver writes
+        /// no setting, and the key clash depends on it.
+        var watchVoiceOver: (@escaping TilingWork) -> () -> Void = { _ in {} }
         /// Runs the closure once Accessibility is on, without ever prompting.
         var whenTrusted: (@escaping () -> Void) -> Void
         var cancelTrustWait: () -> Void
@@ -71,6 +74,7 @@ final class TilingController {
                 readConfig: { TileConfig.fromSettings() },
                 focusBorderOn: { FeatureSettings.tilingFocusBorder() },
                 keyClash: { base, keymap in TilingKeyClash.note(base: base, keymap: keymap) },
+                watchVoiceOver: { TilingKeyClash.watchVoiceOver($0) },
                 whenTrusted: { work in AccessibilityGate.whenTrusted(key: TilingController.gateKey, work) },
                 cancelTrustWait: { AccessibilityGate.cancelWaiting(key: TilingController.gateKey) },
                 schedule: { delay, work in
@@ -105,7 +109,7 @@ final class TilingController {
     private(set) var accessibilityOn = false
     private(set) var isPaused = false
     private(set) var keysUnavailable = false
-    /// Why tiling is refused: another Zeus key already holds the chosen key pair. Nil when the pair is free.
+    /// Why tiling is refused: another Zeus key or VoiceOver already holds the chosen keys. Nil when they are free.
     private(set) var keyClashNote: String?
 
     // MARK: Inner state
@@ -117,6 +121,9 @@ final class TilingController {
     @ObservationIgnored private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     @ObservationIgnored private var cancelPending: (() -> Void)?
     @ObservationIgnored private var cancelSheetTimer: (() -> Void)?
+    /// Stops the VoiceOver watch. Present from the first start with the switch on until tiling is turned off, so a
+    /// clash that holds tiling back can end when VoiceOver does.
+    @ObservationIgnored private var cancelVoiceOverWatch: (() -> Void)?
     @ObservationIgnored private var appliedConfig: TileConfig?
     @ObservationIgnored private var keymap = TileKeymap()
     /// The switch is on.
@@ -167,15 +174,17 @@ final class TilingController {
             stop()
             return
         }
+        watchVoiceOver()
         let wantedKeymap = TileKeymap.defaults(base: wanted.base)
         if keymap != wantedKeymap {
             keymap = wantedKeymap
             keyRows = TileKeyList.rows(keymap: keymap)
         }
-        // Another Zeus key holds this pair: the tap would consume the chord before that key's monitor could cancel
-        // its hold. Nothing is installed until the owner picks another pair.
+        // Another Zeus key or VoiceOver holds these keys: the tap would consume the chord before that key's monitor
+        // could cancel its hold. Nothing is installed until the owner picks another pair. The VoiceOver watch stays,
+        // so tiling comes back when the clash ends.
         if let note = services.keyClash(wanted.base, wantedKeymap) {
-            stop()
+            shutDown()
             if keyClashNote != note { keyClashNote = note }
             refreshPhase()
             return
@@ -203,10 +212,17 @@ final class TilingController {
         refreshPhase()
     }
 
-    /// Removes everything: the observers, every queued item, the key tap, both overlays and the wait for
-    /// Accessibility. Windows are left where they are.
+    /// Removes everything: the observers, every queued item, the key tap, both overlays, the wait for
+    /// Accessibility and the VoiceOver watch. Windows are left where they are.
     func stop() {
         guard !isFixture else { return }
+        cancelVoiceOverWatch?()
+        cancelVoiceOverWatch = nil
+        shutDown()
+    }
+
+    /// `stop()` without the VoiceOver watch, for a clash that holds tiling back: the watch must outlive it.
+    private func shutDown() {
         if keyClashNote != nil { keyClashNote = nil }
         guard running || active else {
             refreshPhase()
@@ -231,6 +247,12 @@ final class TilingController {
         focusIsFront = false
         followUps = 0
         refreshPhase()
+    }
+
+    /// Watches VoiceOver once. When it starts or stops, the clash is checked again as it is on any settings write.
+    private func watchVoiceOver() {
+        guard cancelVoiceOverWatch == nil else { return }
+        cancelVoiceOverWatch = services.watchVoiceOver { [weak self] in self?.start() }
     }
 
     /// Reads the settings and the Accessibility state for the page. Reads a permission, never asks for one.
