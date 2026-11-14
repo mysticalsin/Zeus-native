@@ -76,6 +76,13 @@ extension AnyLLMConfig {
         config.chatURL.flatMap(CredentialOrigin.init(url:))?.storedValue
     }
 
+    /// Saves `key` for `origin`. The old origin goes first, then the key, then the new origin, so a failure at any
+    /// step leaves the key unbound (never sent) instead of paired with an address it was not saved for.
+    /// False when a step failed; whatever is stored is then unbound.
+    public static func saveBoundKey(_ key: String, origin: String, in store: KeychainStore) -> Bool {
+        store.remove(originAccount) && store.set(key, for: keyAccount) && store.set(origin, for: originAccount)
+    }
+
     public static func credential(secret: String?, boundOrigin: String?, config: AnyLLMConfig) -> String? {
         CredentialBinding.credential(secret: secret, boundOrigin: boundOrigin, requestURL: config.chatURL)
     }

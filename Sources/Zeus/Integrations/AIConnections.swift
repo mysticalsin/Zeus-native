@@ -257,8 +257,8 @@ final class AIConnections {
                 endpointRejected("Add the base URL first. A key is saved for one address only.")
                 return false
             }
-            // Key first, origin second: if the second write fails the key stays unbound and is never sent.
-            guard Keychain.set(trimmed, for: AnyLLMConfig.keyAccount), Keychain.set(origin, for: AnyLLMConfig.originAccount) else {
+            // The old origin goes first, then the key, then the new origin: a failure at any step leaves the key unbound.
+            guard AnyLLMConfig.saveBoundKey(trimmed, origin: origin, in: Keychain.store) else {
                 refreshAnyLLMKeyState()
                 endpointRejected("Couldn't save the key to your Keychain. It is still in the field.")
                 return false

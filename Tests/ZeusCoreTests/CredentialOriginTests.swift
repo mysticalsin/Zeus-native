@@ -138,4 +138,58 @@ struct CredentialOriginTests {
         #expect(AnyLLMConfig.keyAccount != AnyLLMConfig.originAccount)
         #expect(AnyLLMConfig.originAccount.hasPrefix(AnyLLMConfig.keyAccount))
     }
+
+    // MARK: Saving a key for an address
+
+    /// A Keychain that refuses writes (or deletes) for chosen accounts, to model a write that fails halfway.
+    private final class FlakyKeychain: KeychainBackend, @unchecked Sendable {
+        let inner: MemoryKeychain
+        var refusedWrites: Set<String> = []
+        init(_ items: [String: String]) { inner = MemoryKeychain(items) }
+        func accounts(service: String) -> [String] { inner.accounts(service: service) }
+        func read(service: String, account: String) -> String? { inner.read(service: service, account: account) }
+        func write(_ value: String, service: String, account: String) -> Bool {
+            refusedWrites.contains(account) ? false : inner.write(value, service: service, account: account)
+        }
+        func delete(service: String, account: String) -> Bool { inner.delete(service: service, account: account) }
+    }
+
+    private func storeWithKeyBoundToX() -> (FlakyKeychain, KeychainStore) {
+        let backend = FlakyKeychain(["com.zeus.app|\(AnyLLMConfig.keyAccount)": "key-A",
+                                     "com.zeus.app|\(AnyLLMConfig.originAccount)": "https://x.example.com:443"])
+        return (backend, KeychainStore(backend: backend, defaults: UserDefaults(suiteName: "zeus.origin.\(UUID().uuidString)")!))
+    }
+
+    @Test func aFailedOriginWriteLeavesTheNewKeyUnboundNotBoundToTheOldAddress() {
+        let (backend, store) = storeWithKeyBoundToX()
+        backend.refusedWrites = [AnyLLMConfig.originAccount]
+        #expect(!AnyLLMConfig.saveBoundKey("key-B", origin: "https://y.example.com:443", in: store))
+        #expect(store.get(AnyLLMConfig.originAccount) == nil, "the old address must not stay next to the new key")
+        // The owner points the address back at X: key B was meant for Y, so it must not be sent there.
+        let x = AnyLLMConfig(baseURL: "https://x.example.com/v1", model: "m")
+        #expect(AnyLLMConfig.credential(secret: store.get(AnyLLMConfig.keyAccount), boundOrigin: store.get(AnyLLMConfig.originAccount), config: x) == nil)
+    }
+
+    @Test func aFailedKeyWriteLeavesNothingBound() {
+        let (backend, store) = storeWithKeyBoundToX()
+        backend.refusedWrites = [AnyLLMConfig.keyAccount]
+        #expect(!AnyLLMConfig.saveBoundKey("key-B", origin: "https://y.example.com:443", in: store))
+        #expect(store.get(AnyLLMConfig.originAccount) == nil)
+    }
+
+    @Test func aSavedKeyIsBoundToTheAddressItWasSavedFor() {
+        let (_, store) = storeWithKeyBoundToX()
+        #expect(AnyLLMConfig.saveBoundKey("key-B", origin: "https://y.example.com:443", in: store))
+        let y = AnyLLMConfig(baseURL: "https://y.example.com/v1", model: "m")
+        #expect(AnyLLMConfig.credential(secret: store.get(AnyLLMConfig.keyAccount), boundOrigin: store.get(AnyLLMConfig.originAccount), config: y) == "key-B")
+        let x = AnyLLMConfig(baseURL: "https://x.example.com/v1", model: "m")
+        #expect(AnyLLMConfig.credential(secret: store.get(AnyLLMConfig.keyAccount), boundOrigin: store.get(AnyLLMConfig.originAccount), config: x) == nil)
+    }
+
+    @Test func anOriginThatCannotBeClearedStopsTheSaveBeforeTheKeyChanges() {
+        let (backend, store) = storeWithKeyBoundToX()
+        backend.inner.locked = ["com.zeus.app|\(AnyLLMConfig.originAccount)"]
+        #expect(!AnyLLMConfig.saveBoundKey("key-B", origin: "https://y.example.com:443", in: store))
+        #expect(store.get(AnyLLMConfig.keyAccount) == "key-A", "the key and its address still match")
+    }
 }
