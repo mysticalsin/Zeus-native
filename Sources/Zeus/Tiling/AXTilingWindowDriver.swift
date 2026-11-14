@@ -89,8 +89,9 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         return out
     }
 
-    /// The admitted windows of one app (none when it says it has none), or nil when the app did not answer in time.
-    /// Nothing is guessed: the caller leaves an unanswered app out of the listing.
+    /// The admitted windows of one app (none when it says it has none), or nil when the app did not answer in time,
+    /// on its list or on any one window. Nothing is guessed: the caller leaves an unanswered app out of the listing and
+    /// names it unread, so a window that is only slow never looks closed.
     private func scan(_ app: NSRunningApplication, onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy,
                       deadline: TimeInterval) -> [TileWindowRef]? {
         guard ProcessInfo.processInfo.systemUptime <= deadline else { return nil }
@@ -114,7 +115,8 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         for window in list {
             guard ProcessInfo.processInfo.systemUptime <= deadline else { return nil }
             AXUIElementSetMessagingTimeout(window, Self.messagingTimeout)
-            facts.append(Self.facts(of: window, app: app))
+            guard let read = Self.facts(of: window, app: app) else { return nil }
+            facts.append(read)
         }
         // The windows of one app are judged together, so two windows at one frame cannot both borrow one on-screen entry.
         let verdicts = TileAdmission.rejections(facts, onScreen: onScreen, policy: policy)
@@ -147,14 +149,16 @@ final class AXTilingWindowDriver: TilingWindowDriver {
                                            kAXPositionAttribute, kAXSizeAttribute]
 
     /// Everything admission needs, from one round trip plus the settable check. A property that does not read is nil.
-    /// A window with no full-screen attribute cannot be in full screen, so that one reads as false.
-    private static func facts(of window: AXUIElement, app: NSRunningApplication) -> TileWindowFacts {
+    /// A window with no full-screen attribute cannot be in full screen, so that one reads as false. The result is nil
+    /// when the round trip itself did not complete (`TileWindowsAnswer.windowRead`): then nothing is known about the window.
+    private static func facts(of window: AXUIElement, app: NSRunningApplication) -> TileWindowFacts? {
         var facts = TileWindowFacts(pid: app.processIdentifier, bundleID: app.bundleIdentifier,
                                     isRegularApp: app.activationPolicy == .regular, role: nil, subrole: nil,
                                     isMinimized: nil, isFullScreen: nil, isSizeSettable: nil, frame: nil)
         var raw: CFArray?
-        guard AXUIElementCopyMultipleAttributeValues(window, windowAttributes as CFArray, [], &raw) == .success,
-              let values = raw as? [AnyObject], values.count == windowAttributes.count else { return facts }
+        let error = AXUIElementCopyMultipleAttributeValues(window, windowAttributes as CFArray, [], &raw)
+        guard TileWindowsAnswer.windowRead(axError: error.rawValue) else { return nil }
+        guard let values = raw as? [AnyObject], values.count == windowAttributes.count else { return facts }
 
         func flag(_ index: Int) -> Bool? {
             let value = values[index]

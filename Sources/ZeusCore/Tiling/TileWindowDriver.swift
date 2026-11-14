@@ -45,7 +45,8 @@ public protocol TilingWindowDriver: AnyObject {
     /// A window the call could not read in time is left out, never reported from an earlier call. Empty without
     /// Accessibility.
     func windows(config: TileConfig) -> [TileWindowRef]
-    /// The apps (by process id) the last `windows(config:)` could not read. A window of such an app that is missing
+    /// The apps (by process id) the last `windows(config:)` could not read: the app did not answer its window list, or
+    /// one of its windows did not answer in time. A window of such an app that is missing
     /// from the listing is unknown, not gone: the caller keeps its slot and does not write to it. A window
     /// missing from an app that was read is gone. Without Accessibility every running app is unread.
     var unreadPIDs: Set<Int32> { get }
