@@ -222,7 +222,7 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         let root = build(6).root!
         let usable = TileFrames.usableRect(display: wide, outerGap: 16)
         #expect(TileFrames.frames(root, in: usable, innerGap: 8) == reference)
-        #expect(TileTree(displayID: 1, root: root) == build(6))
+        #expect(TileTree(displayID: 1, root: root, order: build(6).order) == build(6))
     }
 
     // MARK: 3. Insert dwindles along the longer side
