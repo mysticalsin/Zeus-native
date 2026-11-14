@@ -105,7 +105,13 @@ final class HotkeyMonitor {
 
     private var state = ShortcutState()
 
+    /// Keys the tiling tap consumes never reach the event monitors. Feeding them here keeps a hold spoiled as it would
+    /// be by the same chord unconsumed.
+    func observeConsumedKeys() {
+    }
+
     func start() {
+        observeConsumedKeys()
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)

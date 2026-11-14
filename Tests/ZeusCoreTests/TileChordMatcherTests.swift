@@ -292,3 +292,89 @@ private func release(_ code: UInt16, _ modifiers: ShortcutModifiers = [], own: B
         #expect(health.recordDisable(at: 0) == .reenable)
     }
 }
+
+/// The tap consumes a key before the other Zeus monitors can see it, so a modifier-only hold they track would never be
+/// spoiled by the chord. These events are what the tap hands them instead.
+@Suite struct TileConsumedKeyForwardingTests {
+    private let map = TileKeymap.defaults(base: .controlOptionCommand)
+    private let all: ShortcutModifiers = [.control, .option, .command]
+
+    @Test func aConsumedPressAndItsReleaseAreForwardedAsTheKeyboardEventsTheyWere() {
+        var matcher = TileKeyMatcher()
+        let down = press(left, all)
+        let decision = matcher.decide(down, keymap: map, gate: live)
+        #expect(decision.monitorEvent(for: down) == .keyDown(keyCode: left, modifiers: all))
+        let up = release(left, all)
+        let released = matcher.decide(up, keymap: map, gate: live)
+        #expect(released.monitorEvent(for: up) == .keyUp(keyCode: left), "a stuck key code would block every later hold")
+    }
+
+    @Test func nothingIsForwardedForAPassThroughARepeatOrZeusOwnInput() {
+        var matcher = TileKeyMatcher()
+        let plain = press(keyJ, [])
+        #expect(matcher.decide(plain, keymap: map, gate: live).monitorEvent(for: plain) == nil)
+        let first = press(left, all)
+        _ = matcher.decide(first, keymap: map, gate: live)
+        let again = press(left, all, repeating: true)
+        #expect(matcher.decide(again, keymap: map, gate: live).monitorEvent(for: again) == nil, "monitors skip repeats too")
+        let stray = release(keyZ, all)
+        #expect(matcher.decide(stray, keymap: map, gate: live).monitorEvent(for: stray) == nil, "an unconsumed key-up reaches them itself")
+        let own = press(left, all, own: true)
+        #expect(matcher.decide(own, keymap: map, gate: live).monitorEvent(for: own) == nil)
+    }
+
+    // MARK: A consumed chord must leave a smaller hold spoiled
+
+    private let controlOption: ShortcutModifiers = [.control, .option]
+
+    /// Hold Command, Control, Option, tap Left (consumed), let go of Command first. Replays the stream the monitors see
+    /// when the tap forwards what it consumed.
+    private func streamAfterReleasingCommandFirst(forwarding: Bool) -> [ShortcutEvent] {
+        var events: [ShortcutEvent] = [
+            .flags(keyCode: 55, modifiers: [.command]),
+            .flags(keyCode: 59, modifiers: [.command, .control]),
+            .flags(keyCode: 58, modifiers: all),
+        ]
+        if forwarding { events.append(.keyDown(keyCode: left, modifiers: all)) }
+        if forwarding { events.append(.keyUp(keyCode: left)) }
+        events += [
+            .flags(keyCode: 55, modifiers: controlOption),
+            .flags(keyCode: 58, modifiers: [.control]),
+            .flags(keyCode: 59, modifiers: []),
+        ]
+        return events
+    }
+
+    @Test func withoutTheForwardedKeyTheSmallerHoldFormsAgainWhenCommandIsReleasedFirst() {
+        var state = ShortcutState()
+        var formed = false
+        for event in streamAfterReleasingCommandFirst(forwarding: false) {
+            state.apply(event)
+            if state.isHeld(.controlOption, exact: true) { formed = true }
+        }
+        #expect(formed, "this is the bug the forwarding closes")
+    }
+
+    @Test func withTheForwardedKeyTheTalkHoldStaysSpoiledUntilEveryModifierIsUpThenWorksAgain() {
+        var state = ShortcutState()
+        for event in streamAfterReleasingCommandFirst(forwarding: true) {
+            state.apply(event)
+            #expect(!state.isHeld(.controlOption, exact: true), "\(event)")
+        }
+        #expect(state.keysDown.isEmpty && state.modifiers.isEmpty && !state.spoiled)
+        state.apply(.flags(keyCode: 59, modifiers: [.control]))
+        state.apply(.flags(keyCode: 58, modifiers: controlOption))
+        #expect(state.isHeld(.controlOption, exact: true), "the next plain hold is a hold again")
+    }
+
+    @Test func thePointingHoldStaysSpoiledToo() {
+        var gesture = PointingKeyGesture(shortcut: .controlOption)
+        var outputs: [PointingKeyGesture.Output?] = []
+        var time = 0.0
+        for event in streamAfterReleasingCommandFirst(forwarding: true) {
+            time += 0.05
+            outputs.append(gesture.feed(event, at: time))
+        }
+        #expect(!outputs.compactMap { $0 }.contains(.began), "\(outputs)")
+    }
+}

@@ -27,6 +27,11 @@ private final class FakeTilingDriver: TilingWindowDriver {
     var unreadApps: Set<Int32> = []
     var front = TileFrontmost.none
     var refuse: Set<TileWindowID> = []
+    /// Windows the driver cannot give the keyboard to (minimized or sent to another Space since the last pass): the
+    /// keyboard stays where it was.
+    var focusRefused: Set<TileWindowID> = []
+    /// Windows after which the keyboard is in an app tiling does not read.
+    var focusLeavesTiling: Set<TileWindowID> = []
 
     private(set) var windowReads = 0
     private(set) var listed: Set<TileWindowID> = []
@@ -97,7 +102,8 @@ private final class FakeTilingDriver: TilingWindowDriver {
 
     func focus(_ window: TileWindowID) {
         focusCalls.append(window)
-        front = TileFrontmost(focused: window, isFullScreen: false)
+        if focusRefused.contains(window) { return }
+        front = focusLeavesTiling.contains(window) ? .none : TileFrontmost(focused: window, isFullScreen: false)
     }
     func frontmost() -> TileFrontmost { front }
 
@@ -641,6 +647,38 @@ struct TilingControllerTests {
         #expect(rig.controller.observerCount == 7)
     }
 
+    @Test func aSettingsWriteThatChangesNothingStillNoticesRevokedAccessibility() {
+        let rig = Rig()
+        twoWindows(rig)
+        #expect(rig.controller.observerCount == 7)
+        let applies = rig.keys.applies.count
+        rig.driver.trusted = false
+        rig.controller.start()
+        #expect(rig.controller.observerCount == 0, "nothing observes once the permission is gone")
+        #expect(!rig.controller.accessibilityOn && rig.controller.phase == .needsAccessibility)
+        #expect(rig.keys.applies.count > applies && rig.keys.last?.enabled == true, "the key layer is told, and drops its tap itself")
+        #expect(!rig.trustWaiters.isEmpty, "it waits for the permission to come back")
+        #expect(rig.lastRing == nil)
+    }
+
+    @Test func aPausedControllerNoticesRevokedAccessibilityOnAnUnchangedSettingsWriteToo() {
+        let rig = Rig()
+        twoWindows(rig)
+        rig.controller.togglePause()
+        #expect(rig.controller.isPaused && rig.controller.observerCount == 7)
+        let applies = rig.keys.applies.count
+        rig.driver.trusted = false
+        rig.controller.start()
+        #expect(rig.controller.observerCount == 0)
+        #expect(!rig.controller.accessibilityOn)
+        #expect(rig.keys.applies.count > applies && rig.keys.last?.paused == true, "the pause is kept")
+        #expect(!rig.trustWaiters.isEmpty)
+        rig.driver.trusted = true
+        rig.trustWaiters.last?()
+        rig.settle()
+        #expect(rig.controller.accessibilityOn && rig.controller.isPaused && rig.controller.observerCount == 7)
+    }
+
     @Test func aWindowThatIsGoneLeavesTheUndoMemory() {
         let rig = Rig()
         twoWindows(rig)
@@ -778,6 +816,32 @@ struct TilingControllerTests {
         #expect(rig.driver.focusCalls == [id(2)])
         #expect(rig.lastRing?.frame == rightTile)
         #expect(rig.driver.writes.count == 2, "moving focus writes no frame")
+    }
+
+    @Test func aFocusTheWindowCannotTakeLeavesTheRingWhereTheKeyboardIs() {
+        let rig = Rig()
+        twoWindows(rig)
+        // The neighbour was minimized after the last pass: the listing is stale, the driver cannot focus it.
+        rig.driver.focusRefused = [id(2)]
+        rig.controller.handle(.focus(.right))
+        #expect(rig.driver.focusCalls == [id(2)])
+        #expect(rig.lastRing?.frame == leftTile, "the first window still has the keyboard, so it keeps the ring")
+        // The next pass drops the dead slot.
+        rig.driver.remove(id(2))
+        rig.settle()
+        #expect(rig.controller.layoutWindows(on: 1) == [id(1)])
+    }
+
+    @Test func aFocusAfterWhichTheKeyboardIsInAnUntiledAppDrawsNoRing() {
+        let rig = Rig()
+        twoWindows(rig)
+        rig.driver.focusLeavesTiling = [id(2)]
+        rig.controller.handle(.focus(.right))
+        #expect(rig.lastRing == nil, "the ring marks only a window that has the keyboard")
+        // The keys that act on the focused window wait until a tiled window has the keyboard.
+        let before = rig.controller.layoutWindows(on: 1)
+        rig.controller.handle(.swap(.left))
+        #expect(rig.controller.layoutWindows(on: 1) == before)
     }
 
     @Test func aFocusKeyWithNothingThatWayDoesNothing() {

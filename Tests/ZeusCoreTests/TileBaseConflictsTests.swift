@@ -8,9 +8,10 @@ import Testing
     /// `talk` is the key the owner chose; the rule works out the key the talk monitor really listens on.
     private func notes(_ base: TileModifierBase = .controlOption, talk: Shortcut = .controlOption,
                        dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, chat: ChatHotkey = .off,
-                       voiceOverOn: Bool = false, keymap: TileKeymap? = nil) -> [String] {
+                       voiceOverOn: Bool = false, keymap: TileKeymap? = nil,
+                       others: [TileBaseConflicts.NamedShortcut] = []) -> [String] {
         TileBaseConflicts.notes(base: base, keymap: keymap ?? TileKeymap.defaults(base: base), talk: talk,
-                                dictation: dictation, pointing: pointing, chat: chat, voiceOverOn: voiceOverOn)
+                                dictation: dictation, pointing: pointing, chat: chat, voiceOverOn: voiceOverOn, others: others)
     }
 
     /// A keyed chord on `modifiers`: left arrow, J and Space.
@@ -27,7 +28,9 @@ import Testing
         #expect(notes(.optionCommand).isEmpty)
     }
 
-    @Test func aLargerPairThanTheTalkKeyIsClearBecauseTheTalkHoldNeedsExactlyItsOwnModifiers() {
+    /// The rule leaves a larger pair free only because the tap tells the monitors about every key it consumes, so the
+    /// hold stays spoiled until every modifier is up (`TilingConsumedKeyTests` proves that half).
+    @Test func aLargerPairThanTheTalkKeyIsFreeBecauseTheMonitorsAreToldAboutEveryConsumedKey() {
         #expect(notes(.controlOptionCommand).isEmpty)
     }
 
@@ -71,7 +74,8 @@ import Testing
         let found = notes(.optionCommand, talk: .controlOption, dictation: .optionCommand, voiceOverOn: true)
         #expect(found.count == 1 && found[0].contains("Dictation") && !found[0].contains("Talk"), "talk moved on to Right Option: \(found)")
         #expect(notes(.optionCommand, talk: .controlOption, dictation: nil, pointing: .optionCommand, voiceOverOn: true).count == 1)
-        #expect(notes(.controlOptionCommand, talk: .controlOption, voiceOverOn: true).isEmpty, "a larger pair is clear whichever key the talk hold uses")
+        #expect(notes(.controlOptionCommand, talk: .controlOption, dictation: nil, voiceOverOn: true).count == 1,
+                "only the VoiceOver note: the talk key moved to Option-Command, which is a smaller pair")
     }
 
     @Test func aTalkKeyTheOwnerChoseIsNotMovedByVoiceOver() {
@@ -89,9 +93,27 @@ import Testing
         #expect(notes(.controlOption, talk: .rightOption, dictation: nil, voiceOverOn: false).isEmpty)
     }
 
-    @Test func voiceOverDoesNotRefuseTheOtherPairs() {
+    @Test func voiceOverDoesNotRefuseAPairWithoutControlAndOption() {
         #expect(notes(.optionCommand, talk: .rightOption, dictation: nil, voiceOverOn: true).isEmpty)
-        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: nil, voiceOverOn: true).isEmpty)
+    }
+
+    /// VoiceOver also owns its modifiers plus Command plus a letter (VO-Command-J, -T, -L, -H). The default table binds
+    /// J, T, P, R and K and the arrows on the pair, so a pair that holds Control and Option takes those from VoiceOver.
+    @Test func whileVoiceOverRunsAPairThatHoldsControlAndOptionIsRefusedWhateverElseItHolds() {
+        for base in [TileModifierBase.controlOptionCommand, .controlOption] {
+            let found = notes(base, talk: .rightOption, dictation: nil, voiceOverOn: true)
+            #expect(found.count == 1 && found[0].contains("VoiceOver") && found[0].contains(base.label), "\(base): \(found)")
+            #expect(notes(base, talk: .rightOption, dictation: nil, voiceOverOn: false).isEmpty, "\(base) with VoiceOver off")
+        }
+    }
+
+    @Test func aBoundChordWithControlAndOptionIsRefusedWhileVoiceOverRunsEvenOnAnotherBase() throws {
+        var keymap = TileKeymap.defaults(base: .optionCommand)
+        #expect(notes(.optionCommand, talk: .rightOption, dictation: nil, voiceOverOn: true, keymap: keymap).isEmpty)
+        try keymap.bind(chord(8, [.control, .option, .shift]), to: .retile)
+        let found = notes(.optionCommand, talk: .rightOption, dictation: nil, voiceOverOn: true, keymap: keymap)
+        #expect(found.count == 1 && found[0].contains("VoiceOver"), "\(found)")
+        #expect(notes(.optionCommand, talk: .rightOption, dictation: nil, voiceOverOn: false, keymap: keymap).isEmpty)
     }
 
     @Test func theVoiceOverNoteComesFirstSoThePageShowsIt() {
@@ -144,17 +166,44 @@ import Testing
         #expect(found.count == 1 && found[0].contains("Dictation") && found[0].contains("also your"), "\(found)")
     }
 
+    // MARK: The other global Zeus shortcuts
+
+    private func named(_ name: String, _ code: UInt16, _ modifiers: ShortcutModifiers) -> TileBaseConflicts.NamedShortcut {
+        TileBaseConflicts.NamedShortcut(name: name, shortcut: chord(code, modifiers))
+    }
+
+    @Test func aQuickTodoOrNotchShortcutTheKeymapBindsIsAClash() {
+        let todo = notes(.controlOption, talk: .rightOption, dictation: nil, others: [named("Quick to-do", keyT, [.control, .option])])
+        #expect(todo.count == 1 && todo[0].contains("Quick to-do") && todo[0].contains("tiling key"), "\(todo)")
+        let preset = notes(.optionCommand, talk: .rightOption, dictation: nil, others: [named("Quick to-do", keyT, [.option, .command])])
+        #expect(preset.count == 1 && preset[0].contains("Quick to-do"), "\(preset)")
+        let notch = notes(.controlOption, talk: .rightOption, dictation: nil, others: [named("Prompter pause", 35, [.control, .option])])
+        #expect(notch.count == 1 && notch[0].contains("Prompter pause"), "pause is bound on every pair: \(notch)")
+    }
+
+    @Test func anotherZeusShortcutTheKeymapDoesNotBindIsClear() {
+        let others = [named("Quick to-do", keyT, [.control, .option]), named("Open the notch", 6, [.option, .command]),
+                      named("Quick to-do", space, [.control, .option])]
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: nil, others: others).isEmpty, "the default pair binds none of them")
+        #expect(notes(.optionCommand, talk: .rightOption, dictation: nil, others: [named("Open the notch", 6, [.option, .command])]).isEmpty,
+                "Z is not a tiling key")
+    }
+
     // MARK: Defaults
 
     @Test func theShippedDefaultPairClashesWithNoShippedDefaultKey() {
         // Talk Control-Option, Dictation Right Command, Pointing Control-Option, Chat Control-Option-Space.
-        for voiceOver in [false, true] {
-            let base = TileConfig.defaults.base
-            let found = TileBaseConflicts.notes(base: base, keymap: TileKeymap.defaults(base: base),
-                                                talk: ShortcutStore.talkDefault, dictation: .rightCommand, pointing: .controlOption,
-                                                chat: .standard, voiceOverOn: voiceOver)
-            #expect(found.isEmpty, "voiceOver \(voiceOver): \(found)")
+        let base = TileConfig.defaults.base
+        let shippedOthers = [named("Quick to-do", keyT, [.control, .option]), named("Open the notch", 6, [.option, .command])]
+        func shipped(voiceOver: Bool) -> [String] {
+            TileBaseConflicts.notes(base: base, keymap: TileKeymap.defaults(base: base),
+                                    talk: ShortcutStore.talkDefault, dictation: .rightCommand, pointing: .controlOption,
+                                    chat: .standard, voiceOverOn: voiceOver, others: shippedOthers)
         }
+        #expect(shipped(voiceOver: false).isEmpty, "\(shipped(voiceOver: false))")
+        // With VoiceOver running the pair holds Control and Option, which VoiceOver owns: that note alone, nothing else.
+        let withVoiceOver = shipped(voiceOver: true)
+        #expect(withVoiceOver.count == 1 && withVoiceOver[0].contains("VoiceOver"), "\(withVoiceOver)")
     }
 
     @Test func theCopyIsPlainAndHasNoDashes() throws {
@@ -165,7 +214,8 @@ import Testing
         found += notes(.controlOption, talk: .rightOption, dictation: nil, voiceOverOn: true)
         found += notes(.optionCommand, talk: .controlOption, voiceOverOn: true)
         found += notes(.controlOption, talk: chord(leftArrow, [.control, .option]), dictation: nil)
-        #expect(found.count == 5)
+        found += notes(.controlOption, talk: .rightOption, dictation: nil, others: [named("Quick to-do", keyT, [.control, .option])])
+        #expect(found.count == 6)
         for text in found {
             #expect(!text.contains("\u{2014}") && !text.contains("\u{2013}"), "\(text)")
         }

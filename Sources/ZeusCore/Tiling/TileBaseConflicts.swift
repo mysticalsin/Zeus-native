@@ -19,11 +19,23 @@ public enum TileBaseConflicts {
     /// The pair VoiceOver holds while it runs.
     public static let voiceOverPair: ShortcutModifiers = [.control, .option]
 
+    /// A keyed Zeus shortcut other than talk, pointing, dictation and chat (Quick to-do, the notch, the prompter), named for the note.
+    public struct NamedShortcut: Equatable, Sendable {
+        public var name: String
+        public var shortcut: Shortcut
+
+        public init(name: String, shortcut: Shortcut) {
+            self.name = name
+            self.shortcut = shortcut
+        }
+    }
+
     /// Plain sentences naming each key that holds `base`, or a chord in `keymap`. Empty when the keys are free.
     /// `talk` is the key the owner chose; `dictation` and `pointing` are nil when off. The rule works out the key
     /// the talk monitor listens on from `voiceOverOn`. The VoiceOver sentence comes first.
     public static func notes(base: TileModifierBase, keymap: TileKeymap, talk: Shortcut, dictation: Shortcut?,
-                             pointing: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool) -> [String] {
+                             pointing: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool,
+                             others: [NamedShortcut] = []) -> [String] {
         var out: [String] = []
         if voiceOverOn, base.modifiers == voiceOverPair {
             out.append("\(base.label) is the VoiceOver key pair and VoiceOver is running, so tiling cannot use it.")

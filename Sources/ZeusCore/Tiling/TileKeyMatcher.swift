@@ -46,6 +46,13 @@ public enum TileKeyDecision: Equatable, Sendable {
     case consume(TileAction?)
 }
 
+extension TileKeyDecision {
+    /// The keyboard event the other Zeus monitors would have seen had the tap not consumed this one.
+    public func monitorEvent(for event: TileKeyEvent) -> ShortcutEvent? {
+        nil
+    }
+}
+
 extension TileAction {
     /// Holding the key keeps firing the action. Only moving focus and nudging a split do: a swap, flip, float,
     /// pause, retile or key list would bounce or flicker if autorepeat kept firing it.

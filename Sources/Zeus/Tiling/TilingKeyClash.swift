@@ -1,6 +1,21 @@
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 import ZeusCore
+
+extension ShortcutPreset {
+    /// The preset as a keyed shortcut, or nil when it is off. Quick to-do and the notch use these as global hot keys.
+    var tilingShortcut: Shortcut? {
+        guard let code = keyCode else { return nil }
+        var modifiers: ShortcutModifiers = []
+        let mask = self.modifiers
+        if mask & UInt32(controlKey) != 0 { modifiers.insert(.control) }
+        if mask & UInt32(optionKey) != 0 { modifiers.insert(.option) }
+        if mask & UInt32(shiftKey) != 0 { modifiers.insert(.shift) }
+        if mask & UInt32(cmdKey) != 0 { modifiers.insert(.command) }
+        return Shortcut(keyCode: UInt16(code), modifiers: modifiers)
+    }
+}
 
 /// Reads the owner's other global keys as the monitors use them and asks the pure rule whether the tiling keys
 /// collide with one. The controller refuses to install the tap on a clash, and the Settings page shows the same
@@ -16,14 +31,26 @@ enum TilingKeyClash {
         var pointing: Shortcut?
         var chat: ChatHotkey
         var voiceOverOn: Bool
+        /// The other global hot keys with a key: Quick to-do, the notch, and the prompter pause.
+        var others: [TileBaseConflicts.NamedShortcut] = []
+
+        /// The prompter's pause key (`PrompterHub.hotkeys`). It is registered only while the prompter shows, but it is
+        /// fixed, so the tiling keys must never bind it.
+        static let prompterPause = TileBaseConflicts.NamedShortcut(
+            name: "Prompter pause", shortcut: Shortcut(keyCode: UInt16(kVK_ANSI_P), modifiers: [.control, .option]))
 
         @MainActor static func live() -> Keys {
             let dictation = DictationSettings.shared
+            let extras = ExtraPreferences.shared
+            let presets: [(String, ShortcutPreset)] = [("Open the notch", extras.openNotch), ("Quick to-do", extras.quickTodo)]
             return Keys(talk: Preferences.shared.pushToTalk,
                         dictation: dictation.enabled ? dictation.key : nil,
                         pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
                         chat: ChatHotkey.stored(UserDefaults.standard.string(forKey: "chat.hotkey")),
-                        voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled)
+                        voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled,
+                        others: presets.compactMap { name, preset in
+                            preset.tilingShortcut.map { TileBaseConflicts.NamedShortcut(name: name, shortcut: $0) }
+                        } + [prompterPause])
         }
     }
 
@@ -34,7 +61,7 @@ enum TilingKeyClash {
         return TileBaseConflicts.notes(
             base: base, keymap: keymap ?? TileKeymap.defaults(base: base),
             talk: keys.talk, dictation: keys.dictation, pointing: keys.pointing, chat: keys.chat,
-            voiceOverOn: keys.voiceOverOn).first
+            voiceOverOn: keys.voiceOverOn, others: keys.others).first
     }
 
     /// Calls `changed` on the main actor each time VoiceOver starts or stops, and returns the way to stop watching.

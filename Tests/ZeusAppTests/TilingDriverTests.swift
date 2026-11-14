@@ -1,3 +1,4 @@
+import ApplicationServices
 import Foundation
 import Testing
 import ZeusCore
@@ -24,5 +25,14 @@ import ZeusCore
         let driver = AXTilingWindowDriver(isTrusted: { true })
         #expect(!driver.setFrame(TileRect(x: 0, y: 0, width: 500, height: 500), for: TileWindowID(pid: 999_999, index: 77)),
                 "no element is known for that id, so nothing is written")
+    }
+
+    @Test func theAnswerCodesThePureRuleReadsAreTheSystemsOwn() {
+        #expect(TileWindowsAnswer.cannotCompleteCode == AXError.cannotComplete.rawValue)
+        #expect(TileWindowsAnswer.attributeUnsupportedCode == AXError.attributeUnsupported.rawValue)
+        #expect(TileWindowsAnswer.noValueCode == AXError.noValue.rawValue)
+        #expect(TileWindowsAnswer.classify(axError: AXError.success.rawValue) == .answered)
+        #expect(TileWindowsAnswer.classify(axError: AXError.noValue.rawValue) == .noWindows)
+        #expect(TileWindowsAnswer.classify(axError: AXError.cannotComplete.rawValue) == .unread)
     }
 }

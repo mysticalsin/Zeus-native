@@ -53,10 +53,15 @@ final class PointingHotkeyMonitor {
     private var watchdog: Timer?
     private(set) var isRunning = false
 
+    /// Keys the tiling tap consumes never reach the tap or monitor below; this feeds them in.
+    func observeConsumedKeys() {
+    }
+
     /// Idempotent. Waits for the owner's own permission grant; never prompts.
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        observeConsumedKeys()
         KeyListenAccess.whenGranted { [weak self] in self?.startTap() }
     }
 

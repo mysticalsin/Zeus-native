@@ -1,0 +1,23 @@
+import Foundation
+import Testing
+@testable import ZeusCore
+
+/// How an app's answer to the window list question counts for the pass: a list, a clear "none", or no answer in time.
+@Suite struct TileWindowsAnswerTests {
+    @Test func successIsAList() {
+        #expect(TileWindowsAnswer.classify(axError: 0) == .answered)
+    }
+
+    @Test func noValueAndUnsupportedAreAnAnswerOfNoWindows() {
+        #expect(TileWindowsAnswer.classify(axError: TileWindowsAnswer.noValueCode) == .noWindows,
+                "an app that closed its last window may say it has no value")
+        #expect(TileWindowsAnswer.classify(axError: TileWindowsAnswer.attributeUnsupportedCode) == .noWindows)
+    }
+
+    @Test func aTimeoutAndEveryOtherFailureLeaveTheAppUnread() {
+        #expect(TileWindowsAnswer.classify(axError: TileWindowsAnswer.cannotCompleteCode) == .unread, "the app did not answer in time")
+        for code: Int32 in [-25200, -25201, -25202, -25203, -25206, -25207, -25208, -25209, -25210, -25211, 1, -1] {
+            #expect(TileWindowsAnswer.classify(axError: code) == .unread, "code \(code)")
+        }
+    }
+}
