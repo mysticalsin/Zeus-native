@@ -4402,6 +4402,30 @@
         "file": "Tests/ZeusCoreTests/EqualiserDSPTests.swift",
         "function": "aFullScaleSineWithEveryBandAtPlusTwelveNeverPassesFullScale"
       }
+    },
+    {
+      "id": "REG-433",
+      "failure": "A saved app list from a newer build or a damaged file was read as an empty list, so the next save erased the owner's per-app settings.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserModelTests.swift",
+        "function": "aFutureOrUnknownVersionFails"
+      }
+    },
+    {
+      "id": "REG-434",
+      "failure": "A full app list dropped a shaped app, or grew past its cap, when one more app was added.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserModelTests.swift",
+        "function": "aFullBookWithNoNeutralEntryRefusesAndStaysUnchanged"
+      }
     }
   ]
 }
