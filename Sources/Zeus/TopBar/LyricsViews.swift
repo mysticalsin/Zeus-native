@@ -29,6 +29,8 @@ final class LyricsStore {
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     /// The track the flow is on, for the effects that need its request URLs or its cache file.
     @ObservationIgnored private var query: LRCLIBQuery?
+    /// Whether the track's source lets its lyrics rest on disk. A browser page's never do: its lyrics stay in memory.
+    @ObservationIgnored private var persists = true
     @ObservationIgnored private let cache: LyricsCache
     @ObservationIgnored private let session: URLSession
 
@@ -58,7 +60,9 @@ final class LyricsStore {
         if let playing {
             let asked = LRCLIBQuery(playing)
             query = asked
-            track = LyricsFlow.Track(key: asked.cacheKey, isAskable: asked.isAskable, isPlaying: playing.isPlaying)
+            persists = playing.source.persistsDerivedData
+            // Asks only with the lyrics capability. For a player that is exactly `asked.isAskable`, as before.
+            track = LyricsFlow.Track(key: asked.cacheKey, isAskable: playing.capabilities.contains(.lyrics), isPlaying: playing.isPlaying)
         }
         send(.load(enabled: Self.enabled, track: track, now: Date()))
     }
@@ -81,14 +85,14 @@ final class LyricsStore {
             retryTask?.cancel(); retryTask = nil
         case .readCache:
             guard let query else { return }
-            send(.cacheRead(key: query.cacheKey, cached: cache.load(query), mayAsk: !TopBarStyle.isSnapshot, now: Date()))
+            send(.cacheRead(key: query.cacheKey, cached: persists ? cache.load(query) : nil, mayAsk: !TopBarStyle.isSnapshot, now: Date()))
         case .sendLookup:
             guard let query else { return }
             task = Task { [weak self] in await self?.run(query) }
         case .scheduleRetry:
             if let query { scheduleRetry(query) }
         case .saveCache(let result):
-            if let query { cache.save(result, for: query) }
+            if persists, let query { cache.save(result, for: query) }
         }
     }
 
