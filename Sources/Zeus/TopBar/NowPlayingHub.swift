@@ -74,9 +74,9 @@ final class NowPlayingHub {
         model.seek = { [weak self] in self?.seek(to: $0) }
         model.pauseForDictation = { [weak self] in self?.pauseForDictation() }
         model.resumeAfterDictation = { [weak self] in self?.resumeAfterDictation($0) }
-        model.commandTarget = { [weak self] in self?.commandTarget ?? .player(.music) }
         model.onMusicPageVisible = { [weak self] visible in self?.musicPageObservers.forEach { $0(visible) } }
         model.nowPlayingHub = self
+        publishCommandTarget()
         observeFollowSetting()
     }
 
@@ -115,22 +115,30 @@ final class NowPlayingHub {
     func followChanged() { publish(updated: nil, announce: false) }
 
     /// Shows what the arbiter says, once. The shuffle and repeat modes belong to the shown source: they reset when it
-    /// changes and are read only for the shown source and only when it is a scripted player.
+    /// changes and are read only for the shown source and only when it is a scripted player, whether the source
+    /// changed because it reported, the setting moved or another source left.
     private func publish(updated: NowPlayingSource?, announce: Bool) {
         let previous = model.nowPlaying
         let shown = arbiter.shown(follow: follow)?.playing
         if model.nowPlaying != shown { model.nowPlaying = shown }
-        if shown?.source != previous?.source { ports.resetModes() }
-        if let shown, updated == shown.source {
-            if let player = shown.source.scriptedPlayer,
+        let changed = shown?.source != previous?.source
+        if changed { ports.resetModes() }
+        if let shown {
+            if changed || updated == shown.source, let player = shown.source.scriptedPlayer,
                MusicModeRules.shouldRead(previous: previous, current: shown, modes: model.musicModes) {
                 ports.readModes(player)
             }
-            if announce, shown.isPlaying, previous?.title != shown.title {
+            if updated == shown.source, announce, shown.isPlaying, previous?.title != shown.title {
                 ports.showCue(.trackChanged(title: shown.title, artist: shown.artist))
             }
         }
+        publishCommandTarget()
         ports.requestArtwork(model.nowPlaying)
+    }
+
+    private func publishCommandTarget() {
+        let target = commandTarget
+        if model.commandTarget != target { model.commandTarget = target }
     }
 
     // MARK: Commands

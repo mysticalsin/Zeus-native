@@ -135,6 +135,9 @@ final class TopBarModel {
     /// What the shown source says about shuffle and repeat. Kept apart from `nowPlaying` so a playback
     /// notification never wipes it; unknown when the source has not answered or has no such controls.
     var musicModes = MusicModes()
+    /// Where a music command goes: the shown source, else the pinned player, else Music. The hub writes it, only when
+    /// it differs, so the Open label redraws when the setting moves while nothing is shown.
+    var commandTarget = NowPlayingSource.player(.music)
     /// The Music page is on screen. Set by the page; the hub tells whoever registered with `observeMusicPage`.
     var musicPageVisible = false {
         didSet { if musicPageVisible != oldValue { onMusicPageVisible(musicPageVisible) } }
@@ -219,8 +222,6 @@ final class TopBarModel {
     /// Pauses the shown source if it plays and returns it; dictation resumes that same source afterwards.
     var pauseForDictation: () -> NowPlayingSource? = { nil }
     var resumeAfterDictation: (NowPlayingSource) -> Void = { _ in }
-    /// Where a music command goes when nothing is shown: the pinned player, else Music.
-    var commandTarget: () -> NowPlayingSource = { .player(.music) }
     var onMusicPageVisible: (Bool) -> Void = { _ in }
     var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
     var copyText: (String) -> Void = { text in

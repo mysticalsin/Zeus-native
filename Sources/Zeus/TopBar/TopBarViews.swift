@@ -592,7 +592,7 @@ struct MusicPage: View {
                     GlyphButton(symbol: "quote.bubble", size: 12, tint: Theme.cloudSecondary, label: "Lyrics",
                                 active: showLyrics, value: ToggleOnLook.spoken(showLyrics)) { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
                     GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
-                                label: "Open \(topBar.nowPlaying?.source.kindName ?? topBar.commandTarget().kindName)") { topBar.musicCommand(.open) }
+                                label: "Open \(topBar.commandTarget.kindName)") { topBar.musicCommand(.open) }
                 }
             }
         }
