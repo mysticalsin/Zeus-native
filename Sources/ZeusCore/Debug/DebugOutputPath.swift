@@ -8,9 +8,10 @@ import Glibc
 /// Where `zeus debug screenshot` may write. A request may name any path, so the path is judged here
 /// before anything is created: absolute, no traversal, and (after resolving every symlink that
 /// exists) strictly inside the app's own caches folder or a folder the owner chose at launch.
-/// A chosen folder may not be the home folder, the Library folder, the login item folder or any
-/// folder above them or inside them, nor a hidden folder under home, because a PNG written to the
-/// right name there would replace a shell startup file, a login item or a key.
+/// A chosen folder may not be the home folder, `~/Library`, the login item folder (`~/Library/LaunchAgents`)
+/// or any folder above them, nor anything inside the login item folder, nor a hidden folder under home,
+/// because a PNG written to the right name there would replace a shell startup file, a login item or a
+/// key. Other folders inside home and `~/Library` (Documents, Library/Caches) are allowed.
 public enum DebugOutputPath {
     public enum Rejection: Error, Equatable, Sendable {
         case empty
@@ -33,8 +34,9 @@ public enum DebugOutputPath {
                                       resolve: (String) -> String? = realPath) -> [String] {
         var folders = [appCachesFolder(cachesDirectory: cachesDirectory)]
         if let chosen = environment[ownerFolderVariable], let parts = PathContainment.components(chosen), !parts.isEmpty {
-            let path = "/" + parts.joined(separator: "/")
-            if !isBroad(resolved(path, resolve: resolve), home: resolved(homeDirectory, resolve: resolve)) { folders.append(path) }
+            // The resolved path is both checked and kept, so the check judges the folder that is later used.
+            let path = resolved("/" + parts.joined(separator: "/"), resolve: resolve)
+            if !isBroad(path, home: resolved(homeDirectory, resolve: resolve)) { folders.append(path) }
         }
         return folders
     }
@@ -64,7 +66,9 @@ public enum DebugOutputPath {
 
     /// Accepts `requested` only when it ends up strictly inside one of `allowedFolders`. Returns the
     /// symlink-resolved path, which is what should be written, so a link swapped in later cannot move it.
-    public static func validate(_ requested: String, allowedFolders: [String],
+    /// Each allowed folder is resolved again here and must still not be a broad folder (see `isBroad`), because
+    /// a folder that was fine when the list was made can be replaced by a link before the request arrives.
+    public static func validate(_ requested: String, allowedFolders: [String], homeDirectory: String = NSHomeDirectory(),
                                 resolve: (String) -> String? = realPath) -> Result<String, Rejection> {
         let trimmed = requested.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .failure(.empty) }
@@ -72,9 +76,11 @@ public enum DebugOutputPath {
         if expanded.contains("\u{0}") || expanded.split(separator: "/").contains("..") { return .failure(.traversal) }
         guard let parts = PathContainment.components(expanded) else { return .failure(.notAbsolute) }
         let target = resolved("/" + parts.joined(separator: "/"), resolve: resolve)
+        let home = resolved(homeDirectory, resolve: resolve)
         for folder in allowedFolders {
             guard let folderParts = PathContainment.components(folder), !folderParts.isEmpty else { continue }
             let root = resolved("/" + folderParts.joined(separator: "/"), resolve: resolve)
+            if isBroad(root, home: home) { continue }
             if PathContainment.isInside(target, root: root) { return .success(target) }
         }
         return .failure(.outsideAllowedFolders)
