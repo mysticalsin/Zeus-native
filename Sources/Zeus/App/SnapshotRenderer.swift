@@ -1011,6 +1011,8 @@ private struct NotchStage: View {
     let model: NotchModel
     var topBar: TopBarModel? = nil
     let footprint: NotchFootprint
+    /// Pins the guide outline of a drawn notch under calibration.
+    var guide = false
     /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
     var topOffset: Double = 0
 
@@ -1018,7 +1020,7 @@ private struct NotchStage: View {
         ZStack(alignment: .top) {
             LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
             Rectangle().fill(Color.black.opacity(0.35)).frame(height: footprint.layoutSize.height)
-            NotchView(model: model, topBar: topBar, footprint: footprint, topOffsetOverride: topOffset)
+            NotchView(model: model, topBar: topBar, footprintOverride: footprint, guideOverride: guide, topOffsetOverride: topOffset)
         }
     }
 }

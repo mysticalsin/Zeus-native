@@ -16,8 +16,12 @@ final class NotchController {
     var debugWindow: NSWindow? { window }
     /// The display the pointer and the open panel work on.
     private(set) var screen: NSScreen?
-    /// The closed shape on the active display.
-    private(set) var footprint: NotchFootprint = .pill
+    /// The drawn notch: what a display without a hardware notch draws, and whether it is being calibrated.
+    var drawnNotch = DrawnNotchModel.shared
+    /// The closed shape on the active display, worked out on use so a Settings change reaches every zone at once.
+    var footprint: NotchFootprint {
+        screen.map { drawnNotch.footprint(for: Self.facts(of: $0)) } ?? .pill
+    }
     /// How far the closed bar and the peek card sit below the screen top on the active display
     /// (Settings > Appearance > Top bar position); 0 while the panel is open.
     private var topOffset: CGFloat {
@@ -143,7 +147,7 @@ final class NotchController {
         model.presentation = presentation
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
-        setIgnoresMouse(presentation == .closed)
+        setIgnoresMouse(presentation == .closed && ignoresMouseWhileClosed())
         // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
         model.alerts.setSuspended(presentation != .closed, now: now())
         alertsChanged()
@@ -316,15 +320,19 @@ final class NotchController {
         switch model.presentation {
         case .closed, .peek:
             if PointerZone.shared.overNotchPanel { PointerZone.shared.overNotchPanel = false }
+            // Closed, the window takes the mouse over a drawn notch's body and nowhere else.
+            if model.presentation == .closed { setIgnoresMouse(ignoresMouseWhileClosed()) }
             // The slim notification line takes the mouse only while the pointer is on it.
             if model.notificationLine != nil, model.presentation == .closed {
                 let over = notificationLineRect(screen).contains(NSEvent.mouseLocation)
-                setIgnoresMouse(!over)
+                setIgnoresMouse(!over && ignoresMouseWhileClosed())
                 if !over, model.alerts.isHovered { setAlertHovered(false) }
                 if over { return }
             }
             // Click mode: hovering never opens it (openOnClick does).
             guard NotchOpenRules.opensOnHover(Self.openTrigger) else { hoverTask?.cancel(); hoverTask = nil; return }
+            // Calibrating the drawn notch: the pointer never opens it, so the shape can be judged in place.
+            guard !drawnNotch.isCalibrating else { hoverTask?.cancel(); hoverTask = nil; return }
             guard inHotZone(screen) else { hoverTask?.cancel(); hoverTask = nil; return }
             guard topBar != nil else { show(.panel); return }
             guard hoverTask == nil else { return }
@@ -405,6 +413,7 @@ final class NotchController {
     /// it opened the panel.
     private func openOnClick() -> Bool {
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
+        guard !drawnNotch.isCalibrating else { return false }
         let zone = NotchFootprintRules.clickZone(footprint, screenFrame: screen.frame, topOffset: topOffset)
         guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
                                           point: NSEvent.mouseLocation, zone: zone) else { return false }
@@ -490,6 +499,14 @@ final class NotchController {
         NotchPanel.pickerKey = { [weak self] code in self?.pickerKey(code) ?? false }
     }
 
+    /// Whether the closed window passes the mouse through right now. It takes it only over a drawn notch's body,
+    /// so what the shape hides is not pressed; the hardware notch and the pill stay click-through.
+    private func ignoresMouseWhileClosed() -> Bool {
+        guard let screen else { return true }
+        return !NotchFootprintRules.takesMouse(footprint, closed: true, point: NSEvent.mouseLocation, screenFrame: screen.frame,
+                                               topOffset: topOffset, wings: topBar.map(ClosedWingsFacts.init(of:)))
+    }
+
     private func setIgnoresMouse(_ ignore: Bool) {
         for entry in panels {
             // Only the window on the active display ever takes the mouse.
@@ -561,7 +578,7 @@ final class NotchController {
             panel.ignoresMouseEvents = true
             panel.acceptsMouseMovedEvents = true
             ZeusWindowSharing.apply(to: panel, visibleInShare: !hiddenFromCapture, surface: .zeusStandard)
-            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, footprint: Self.footprint(of: target)))
+            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, facts: Self.facts(of: target)))
             // The panel's frame is set here, never from the content: without this the hosting view
             // re-measures the whole notch tree on every animation frame (≈30% of the main thread in QA).
             hosting.sizingOptions = []
@@ -572,15 +589,16 @@ final class NotchController {
         }
         let primary = panels.first
         screen = primary?.screen ?? NSScreen.main ?? NSScreen.screens.first
-        footprint = screen.map(Self.footprint(of:)) ?? .pill
-        setIgnoresMouse(model.presentation == .closed)
+        setIgnoresMouse(model.presentation == .closed && ignoresMouseWhileClosed())
+        let describes = NSScreen.screens.map(Self.describe)
+        drawnNotch.displaysChanged(targetsWithoutNotch: targets.filter { !$0.hasNotch }.count,
+                                   connectedWithoutNotch: describes.filter { !$0.hasNotch }.count)
     }
 
     /// With several displays the one under the pointer is the one that opens.
     private func activate(_ target: NSScreen) {
         guard screen != target else { return }
         screen = target
-        footprint = Self.footprint(of: target)
     }
 
     // MARK: Notification line
@@ -663,7 +681,7 @@ final class NotchController {
         alertWake?.cancel()
         alertWake = nil
         if model.alerts.isEmpty {
-            if model.presentation == .closed { setIgnoresMouse(true) }
+            if model.presentation == .closed { setIgnoresMouse(ignoresMouseWhileClosed()) }
             return
         }
         guard let deadline = model.alerts.nextDeadline() else { return }
@@ -728,9 +746,6 @@ final class NotchController {
                           rightAreaWidth: screen.auxiliaryTopRightArea?.width ?? 0)
     }
 
-    static func footprint(of screen: NSScreen) -> NotchFootprint {
-        NotchFootprintRules.resolve(facts(of: screen))
-    }
 }
 
 /// The notch panel never becomes key (so it never takes the keyboard from your app); its first

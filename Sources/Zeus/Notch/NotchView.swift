@@ -75,11 +75,30 @@ struct NotchView: View {
     let model: NotchModel
     /// The top bar (tabs, pages, closed wings). Nil keeps the classic agents-only notch.
     var topBar: TopBarModel? = nil
-    /// The closed shape on this display: the hardware notch, or a slim pill where there is none so the notch
-    /// still has a place to glow and open from.
-    let footprint: NotchFootprint
+    /// What this display reports about its top edge. The closed shape is resolved from it: the hardware notch,
+    /// or where there is none the slim pill or the shape the owner drew.
+    var facts: NotchDisplayFacts? = nil
+    /// Snapshots and previews pin the closed shape and the guide, so they never read a store; nil asks the model.
+    var footprintOverride: NotchFootprint? = nil
+    var guideOverride: Bool? = nil
+    /// Tests pass their own model; nil is the app's.
+    var drawnNotch: DrawnNotchModel? = nil
     /// Snapshots and previews pin the drop; nil reads Settings > Appearance > Top bar position.
     var topOffsetOverride: Double? = nil
+
+    /// The closed shape on this display.
+    var footprint: NotchFootprint {
+        if let footprintOverride { return footprintOverride }
+        guard let facts else { return .pill }
+        return (drawnNotch ?? .shared).footprint(for: facts)
+    }
+
+    /// A guide outline on the drawn notch while it is closed and being calibrated: a black shape on a dark menu
+    /// bar cannot be seen otherwise.
+    var showsGuide: Bool {
+        guard model.presentation == .closed, case .drawn = footprint else { return false }
+        return guideOverride ?? DrawnNotchCalibration.showsGuide((drawnNotch ?? .shared).state)
+    }
 
     /// How far the closed bar and the peek card sit below the top of the screen. The open panel stays
     /// flush with the top; the notch light, ticker and wings are part of the closed bar and move with it.
@@ -275,6 +294,12 @@ struct NotchView: View {
                 // corners, and the page (inserted at its final layout) showed outside the body
                 // while it grew.
                 .clipShape(shape)
+
+            if showsGuide {
+                shape.stroke(Color.white.opacity(0.6), lineWidth: 1)
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: size.width, height: size.height)
         // Glance (parity/N7, frames 139 to 143): the glass rim sits on the final open outline from
@@ -308,7 +333,9 @@ struct NotchView: View {
         switch model.presentation {
         case .closed:
             if let topBar {
+                // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
                 ClosedWings(topBar: topBar).frame(height: barHeight)
+                    .allowsHitTesting(false)
             }
         case .peek:
             VStack(spacing: 10) {
