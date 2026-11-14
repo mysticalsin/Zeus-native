@@ -178,18 +178,22 @@ public struct TileApplyOutcome: Equatable, Sendable {
 /// Runs a plan through a driver: each move once, in order, with no retry.
 @MainActor
 public enum TileApplier {
-    /// Seconds one pass may take before it stops starting new writes.
+    /// Seconds one plan may take before it stops starting new writes, when the caller gives no deadline.
     public static let defaultBudget = 0.75
 
+    /// `deadline` is a time on `clock`: no write starts at or after it, and each move left over is deferred. A pass
+    /// with several plans (one per display) gives every plan the same deadline, so the pass as a whole is bounded.
+    /// Without one the plan gets `budget` seconds from its own start.
     public static func apply(_ plan: TileMovePlan, with driver: some TilingWindowDriver, budget: Double = TileApplier.defaultBudget,
+                             until deadline: Double? = nil,
                              clock: () -> Double = { ProcessInfo.processInfo.systemUptime }) -> TileApplyOutcome {
         guard driver.isTrusted else { return TileApplyOutcome(state: .accessibilityOff) }
         var outcome = TileApplyOutcome(state: .applied)
         outcome.skipped = plan.inPlace
-        let start = clock()
+        let limit = deadline ?? clock() + budget
         var outOfTime = false
         for move in plan.moves {
-            if !outOfTime, clock() - start >= budget { outOfTime = true }
+            if !outOfTime, clock() >= limit { outOfTime = true }
             if outOfTime {
                 outcome.deferred.append(move.id)
                 continue

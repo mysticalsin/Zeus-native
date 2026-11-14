@@ -95,6 +95,9 @@ final class TilingController {
         }
     }
 
+    /// Seconds one pass may run before it stops starting writes: the listing's budget and the writes' budget.
+    static let passBudget = AXTilingWindowDriver.passBudget + TileApplier.defaultBudget
+
     static let shared = TilingController(services: .live())
     /// The key of the controller's own no-prompt wait. The key layer waits under its own key.
     static let gateKey = "tiling.controller"
@@ -520,6 +523,9 @@ final class TilingController {
         fullScreenFront = false
         syncFocus(front)
 
+        // One deadline bounds the whole pass on the main thread: the listing (its own budget), every display and every
+        // round of the loop below. A write in flight cannot be cut short, so the deadline is only checked before each move.
+        let deadline = services.now() + Self.passBudget
         let displays = driver.displays()
         lastDisplays = displays
         var listing = driver.windows(config: engineConfig)
@@ -548,7 +554,7 @@ final class TilingController {
                 guard let tree = layout.trees[display.id], !tree.isEmpty else { continue }
                 let plan = TilePlanner.plan(tree: tree, display: display, config: engine, windows: listing)
                 for move in plan.moves where preTiling[move.id] == nil { preTiling[move.id] = move.current }
-                let outcome = TileApplier.apply(plan, with: driver, clock: services.now)
+                let outcome = TileApplier.apply(plan, with: driver, until: deadline, clock: services.now)
                 if outcome.state == .accessibilityOff {
                     accessibilityLost()
                     return
