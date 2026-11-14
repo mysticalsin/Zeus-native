@@ -24,6 +24,14 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 - Indicator: the closed notch shows the Scribe recording wings for any Scribe recording (`ClosedWings.kind`), however it started.
 - Tests: `ScribeAutoStartTests.swift` (every transition, debounce, single trigger, consent, permission fallback, call-ended path, breakout, window, keep, cooldown re-arm, next meeting).
 
+### 24. Voice hold key (talk, dictation, Polyglot). EXPLICIT (2026-11-14)
+- Where: `ZeusCore/VoiceKeyMachine.swift` (`VoiceKeyMachine`) and `ZeusCore/KeyFacts.swift`, driven by `Zeus/Voice/HotkeyMonitor.swift` (a stateless adapter), fed by the monitors and the tiling tap's consumed key feed. Plan: `docs/VOICE-KEY-MACHINE-PLAN.md`.
+- Replaces 13 variables in three types (`HotkeyMonitor`: `gesture`, `sharedDown`, `holdTimer`, `commandLatched`, `isDown`, `cancelledByLargerChord`, `latch`, `pendingStop`, `directPressActive`, `state`; `TalkKeyLatch`; `SharedKeyGesture`) with four values in one: `config`, `keys` (`ShortcutState`), `barred` and `phase`. The adapter keeps only the machine.
+- Phases: idle, armed, holding (with shifted), tapped (open or not), latched, spent. Events: a key (from a monitor or the feed, with no way to tell which), a tick with the live modifiers, abandon (the owner refused or ended the turn), interrupt (sleep, wake). Effects: start, send, cancel, refused, wake.
+- Rules: a press that something foreign joined never sends and never latches; nothing starts after a cancel or on a larger chord until every key is up; every turn ends once; a consumed key is a key; a toggle fires once per press; never stuck.
+- Pointing stays its own reducer (`PointingKeyGesture`, item 22) and reads the same key facts.
+- Tests: `VoiceKeyMachineTests` (every transition), `VoiceKeyWalkTests` (every press order against the rules), `KeyFactsTests`, `HotkeyMonitorMachineTests` (the adapter), `TilingConsumedKeyTests`, `TileBaseConflictsTests` (the tiling clash rule).
+
 ## Fixed
 
 ### 1. Dictation job phase (live, file, history re-run). FIXED, severity high

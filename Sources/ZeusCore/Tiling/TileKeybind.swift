@@ -6,9 +6,10 @@ public enum TileModifierBase: String, Codable, Sendable, CaseIterable {
     case optionCommand
     case controlOptionCommand
 
-    /// The shipped pair. It is the one pair that no shipped key holds: Talk to Zeus and pointing are Control-Option,
+    /// The shipped pair. It is the one pair that no shipped key equals: Talk to Zeus and pointing are Control-Option,
     /// dictation is Right Command, VoiceOver uses Control-Option, and Talk to Zeus moves to Option-Command while
-    /// VoiceOver runs. `TileBaseConflictsTests` keeps it that way.
+    /// VoiceOver runs. The shipped hold keys sit strictly inside it, which the clash rule allows with a short confirm.
+    /// `TileBaseConflictsTests` keeps it that way.
     public static let standard = TileModifierBase.controlOptionCommand
 
     /// Reads a stored string, or the wording a settings row shows ("Control-Option"). Case, spaces and

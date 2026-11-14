@@ -49,8 +49,9 @@ public enum TileKeyDecision: Equatable, Sendable {
 extension TileKeyDecision {
     /// The keyboard event the other Zeus monitors would have seen had the tap not consumed `event`: the key-down of
     /// a press that was taken, or the key-up that went with it. Nil when the event passed through, or is a repeat
-    /// (the monitors skip repeats). Without it a modifier-only hold they track is never spoiled by a consumed
-    /// chord, and a smaller pair forms the moment the owner lets go of the extra modifier first.
+    /// (the monitors skip repeats). A consumed key is a key to the voice key machine: without it the machine would not
+    /// see a chord's key land, and a smaller hold that forms the moment the owner lets go of the extra modifier first
+    /// would look like a clean press. The machine already bars that hold, so the feed is a second witness.
     public func monitorEvent(for event: TileKeyEvent) -> ShortcutEvent? {
         guard case .consume = self, !event.isOwnInput else { return nil }
         switch event.phase {

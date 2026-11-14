@@ -293,13 +293,19 @@ It must not touch the top-bar or settings files.
   (`.cgSessionEventTap`, `.headInsertEventTap`, `.defaultTap`, because the tap must consume the chord). The tap is
   serviced by a thread of its own with its own run loop (`TilingRunLoopThread`), never the main one: a consuming tap
   makes the window server hold every keystroke in every app until the callback answers, and every Accessibility pass runs
-  on the main thread, where one slow app can take a second. `start()` creates the port and starts the thread, which adds the
-  source to its own loop in `.commonModes` and turns the tap on. `stop()` asks the thread to tear down and waits for it to end
+  on the main thread, where one slow app can take a second. `start()` creates the port and switches it off at once (a new tap
+  starts switched on, and no loop services it yet), then starts the thread, which adds the source to its own loop in
+  `.commonModes` and switches the tap on. A second `start()` while live asks the tap thread to switch it on again
+  (`TilingRunLoopThread.perform`), only while the life is still running, so no window server call is made under the lock
+  the callback takes, and a give-up or a teardown, which run on that thread too, cannot be followed by a late enable.
+  `stop()` closes the callback's gate under the same lock that moves the life to `stopping`, so a chord decided before
+  the teardown runs passes through; `start()` expects an `update` first, because a stop leaves the gate closed.
+  `stop()` asks the thread to tear down and waits for it to end
   (2 s at most, normally microseconds): on the thread's own loop, after any callback in flight, it turns the tap off,
   removes the source, calls `CFMachPortInvalidate` and ends the loop, so a callback never meets a freed port, and no key
   is consumed once `stop()` has returned. A stop that reaches the thread before its first step still runs the teardown
-  there (the port is made before the thread starts and is enabled from the start), so no port is ever left enabled with no
-  loop. A second caller waits for the same thread. If the thread has not ended after the 2 s wait, `stop()` returns false
+  there (the port is made before the thread starts and is switched off from the start), so no port is ever left registered with
+  no loop. A second caller waits for the same thread. If the thread has not ended after the 2 s wait, `stop()` returns false
   with the life still `stopping` and the run kept, `start()` is refused, and a later `stop()` waits again, so a second tap is
   never created beside an old one. `TilingKeyLayer` honours that across tiling off and on: it keeps a removed tap whose stop
   returned false, stops it again before installing, and when it still has not ended it builds no second tap, reports the
@@ -354,7 +360,8 @@ conflicts reported). The lint sample proves a `CGEvent.tapCreate` in a non-`noni
 `TileActionMailboxTests`); the thread (run on its own thread, stop during a callback, a stop that wins the race,
 300 start and stop cycles that release everything) and the real tap object (start and stop cycles, a burst of focus
 repeats while main is busy, and on a stand-in system: serviced on its own thread while main is blocked, a port
-invalidated on every stop path, a stop that times out) are proved in `TilingRunLoopThreadTests`,
+invalidated on every stop path, a stop that times out, the port made switched off and switched on by the tap thread, a
+chord decided after the stop took the lock passing through, an enable that takes no lock call and does not outlive a stop) are proved in `TilingRunLoopThreadTests`,
 `TilingKeyTapLifecycleTests` and `TilingKeyTapStandInTests`.
 
 ---
@@ -455,38 +462,34 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   never restored.
 - The key sheet hides on a six second timer, on the next tiling key, and when tiling stops. It does not take Escape:
   the tap sees only chords the owner bound, and the rule that Zeus never consumes an unbound key is kept.
-- Key clash, closed in the review pass: `TileBaseConflicts.notes` compares the tiling keys with the keys the other
-  monitors really use. The talk key is the effective one (`VoiceKey.effectiveTalkKey`), which moves off Control-Option
-  while VoiceOver runs; a modifier-only talk, pointing, dictation or Polyglot key with the same modifiers as the chosen pair is a
-  clash; a larger pair is free for a hold-style key, because the hold begins only on exactly its own modifiers
-  (`HotkeyMonitor.handleShared` arms on the exact match after its hold delay, and only a running hold tolerates extra
-  ones, such as Shift meaning Return), and a dedicated hold that Control, Option or Command joins is cancelled, not sent: the
-  talk and dictation hold in `HotkeyMonitor` (cancel through `onCancel`, and it cannot restart until every modifier is
-  up) and the pointing hold in `PointingKeyGesture` (which already did). Only a press that began or continued a turn is
-  cancelled: the press that ended a hands-free turn already finished it, so a modifier joining that press cancels nothing
-  (`TalkKeyLatch.isEnding`) and only keeps the smaller hold blocked until every modifier is up. On the shared talk and
-  dictation key a hold that is already running is not cancelled by a modifier joining it; the forwarded consumed key cancels
-  it (`otherKeyPressed`). That is the natural press order, Control and
-  Option first, then Command, so on the shipped defaults a tiling chord opens at most a talk turn that is cancelled and
-  never sent; Shift and Fn joining still end a hold the normal way. The tap also forwards every key it consumes,
-  key-down and key-up, to the talk, dictation, Polyglot and pointing monitors through `TilingConsumedKey`, so a smaller
-  hold that forms when the owner lets go of the extra modifier first stays spoiled until every modifier is up. A key
-  that acts on the first press has nothing to cancel, so a pair that strictly contains a press-to-toggle dictation key or a
-  modifier-only Polyglot key is a clash too (`dictationToggles` in the rule); every bound tiling chord (base plus key) is
-  compared with every keyed talk, pointing, dictation and Polyglot shortcut, with the fn flag handled as the tap handles it; a
-  chat chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch, the prompter pause or the approval
-  answer keys (Control-Option Y, N and O while "Answer permissions from the keyboard" is on); and while
-  VoiceOver runs every bound chord that holds Control and Option is refused, which VoiceOver uses alone and with
-  Command and a letter (the shipped pair included). The controller checks it on every settings write, before
-  any tap exists, and refuses a clash: no tap, no observer, the phase is Key clash, and the page and Settings show the
-  note. VoiceOver writes no setting, so the controller watches it (key value observing on the workspace) from the
-  first start with the switch on until the switch goes off, including while a clash holds tiling back, and checks the
-  clash again when VoiceOver starts or stops. The tap consumes a chord before the other keys' monitors can see it
-  spoil a hold, so refusing is the only fail-closed option for a key that is the same pair or a toggle inside it. The default pair is Control-Option-Command: no shipped key
-  holds it (Talk to Zeus and pointing are Control-Option, dictation is Right Command, Talk to Zeus moves to
-  Option-Command while VoiceOver runs), and `TileBaseConflictsTests` keeps it that way (while VoiceOver runs the pair is refused, with a note).
-  An unknown stored pair reads
-  as the default.
+- Key clash: `TileBaseConflicts.notes` compares the tiling keys with the keys the other monitors really use, and it reads
+  every modifier set the keymap binds (with the shipped table, the pair and the pair plus Shift), without Fn; a key that
+  differs from a bound set only by Fn counts as equal, and Fn alone is free. The talk key is the effective one
+  (`VoiceKey.effectiveTalkKey`), which moves off Control-Option while VoiceOver runs. The hold keys (talk, dictation,
+  pointing, Polyglot) follow `VoiceKeyMachine`, which cancels a turn that a foreign key or modifier joins and starts
+  nothing again until every key is up (`docs/VOICE-KEY.md`, `docs/VOICE-KEY-MACHINE-PLAN.md`), so the rule needs no
+  knowledge of how a monitor cancels. A modifier-only hold key is refused when its modifiers equal a bound set (a
+  dictation hold key: with or without Shift), and a key that switches on at the press (press to toggle dictation, a
+  modifier-only Polyglot key) is refused when its modifiers are inside a bound set, because a toggle cannot be taken
+  back. A hold key strictly inside a bound set is free and waits `TileBaseConflicts.holdConfirm` (0.15 s) while the tap
+  is installed, so a chord pressed as a chord opens nothing; `confirm(for:keymap:)` is that wait as a pure function, and
+  the owners' `confirmProvider` reading it is a later step. The tap forwards every key it consumes, key-down and
+  key-up, to the voice monitors through `TilingConsumedKey`, which the machine takes as a second witness: a consumed
+  key and the same key from a monitor give the same effects. Every bound tiling chord (base plus key) is compared with
+  every keyed talk, pointing, dictation and Polyglot shortcut, with the fn flag handled as the tap handles it; a chat
+  chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch, the prompter pause or the approval
+  answer keys (Control-Option Y, N and O while "Answer permissions from the keyboard" is on); and while VoiceOver runs
+  every bound chord that holds Control and Option is refused, which VoiceOver uses alone and with Command and a letter
+  (the shipped pair included). A note names the bound chord's modifiers, not the base. The controller checks it on every
+  settings write, before any tap exists, and refuses a clash: no tap, no observer, the phase is Key clash, and the page
+  and Settings show the note. VoiceOver writes no setting, so the controller watches it (key value observing on the
+  workspace) from the first start with the switch on until the switch goes off, including while a clash holds tiling
+  back, and checks the clash again when VoiceOver starts or stops. The tap consumes a chord before the other keys'
+  monitors can see it spoil a hold, so refusing is the only fail-closed option for a key that is the same set or a
+  toggle inside it. The default pair is Control-Option-Command: no shipped key holds it (Talk to Zeus and pointing are
+  Control-Option, dictation is Right Command, Talk to Zeus moves to Option-Command while VoiceOver runs), and
+  `TileBaseConflictsTests` keeps it that way (while VoiceOver runs the pair is refused, with a note). An unknown stored
+  pair reads as the default.
 - Other review fixes: the pause and key sheet chords work over a full-screen app; swap, flip, nudge and float do nothing
   while an app tiling does not read has the keyboard; the ring follows its setting while running; a revoked
   Accessibility is noticed on a settings change; `frontmost()` skips Zeus itself and has no protocol default; the undo

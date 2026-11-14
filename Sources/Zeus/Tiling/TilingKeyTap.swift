@@ -59,9 +59,9 @@ private nonisolated func createSessionTap(run: UnsafeMutableRawPointer) -> (port
 /// `TileKeyMatcher`, and forgets them. It never reads a character, never logs, and never stores or forwards
 /// what is typed. The only thing kept is the key codes of presses it consumed, to pair each with its key-up.
 /// A consumed press and its release are handed to the other Zeus key monitors as a key code and modifiers only
-/// (`TilingConsumedKey`), because an event the tap consumes never reaches them and a modifier-only hold they track
-/// would otherwise not be spoiled by the chord. Only chords the owner bound are ever consumed, so this reports
-/// nothing about typing.
+/// (`TilingConsumedKey`), because an event the tap consumes never reaches them. The voice key machine bars a smaller
+/// hold once the whole set has been down with a larger one, so the feed is a second witness that ends a forming hold at
+/// the key. Only chords the owner bound are ever consumed, so this reports nothing about typing.
 ///
 /// Permission: this type never prompts. `start()` returns false when the tap cannot be created, and the owner
 /// shows a notice. There is no fallback global monitor, because a monitor cannot consume an event.
@@ -289,9 +289,10 @@ final class TilingKeyTap: @unchecked Sendable {
     ///
     /// Order: a monitor learns of a consumed key through the main queue, but it learns of modifier changes from event
     /// monitors that the window server feeds, which the queue does not order. While main is busy, the owner letting go of
-    /// Command can be heard before the forwarded key. That gap is bounded, not closed: a smaller hold that forms in it is
-    /// cancelled the moment the key arrives and sends nothing (`TilingConsumedKeyTests` covers the order). Internal so a
-    /// test can send actions without a system event.
+    /// Command can be heard before the forwarded key. The machine does not depend on that order: it bars a smaller hold
+    /// that forms after a larger set was down (`barred`), so the forwarded key only confirms it, and a hold that
+    /// forms in the gap sends nothing (`TilingConsumedKeyTests` covers the order). Internal so a test can send actions
+    /// without a system event.
     nonisolated func deliver(_ action: TileAction?, joined: ShortcutEvent?) {
         if let joined {
             DispatchQueue.main.async { MainActor.assumeIsolated { TilingConsumedKey.post(joined) } }
