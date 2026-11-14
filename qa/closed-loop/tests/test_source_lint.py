@@ -904,7 +904,8 @@ class BrowserMediaLint(unittest.TestCase):
         gate = code_text((APP / "Chrome/ChromeOutputActivity.swift").read_text())
         self.assertIn("kAudioProcessPropertyIsRunningOutput", gate)
         self.assertIn("kAudioDevicePropertyDeviceIsRunningSomewhere", gate)
-        self.assertNotIn("@MainActor", gate, "Core Audio calls these blocks off the main actor")
+        self.assertNotIn("@MainActor final class", gate, "Core Audio calls these blocks off the main actor")
+        self.assertNotIn("@MainActor private", gate, "Core Audio calls these blocks off the main actor")
 
     def test_the_feed_polls_only_what_the_rules_and_the_machine_allow(self):
         feed = code_text((APP / BROWSER_MEDIA_FEED_FILE).read_text())

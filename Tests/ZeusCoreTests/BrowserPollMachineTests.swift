@@ -184,6 +184,15 @@ import Testing
         #expect(again.1 == [.schedule(1)])
     }
 
+    @Test func aPinWhileARequestIsOutDoesNotBlockTheLoopAfterwards() {
+        let out = step(ready(), .tick(playing))
+        #expect(out.1 == [.pollNow])
+        let pinned = step(out.0, .followChanged(followsAny: false))
+        let again = step(pinned.0, .followChanged(followsAny: true))
+        #expect(again.1 == [.schedule(1)])
+        #expect(step(again.0, .tick(playing)).1 == [.pollNow], "the dropped request does not hold the loop")
+    }
+
     @Test func screenSleepPausesPollingAndWakeResumesIt() {
         let asleep = step(ready(), .screensSlept)
         #expect(asleep.1 == [.cancelTimer])
