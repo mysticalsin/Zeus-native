@@ -107,8 +107,8 @@ final class ScribeCallPopup {
         }
         // A tap in flight, or its failure, stays on screen until it resolves.
         guard !driver.isBusy else { return }
-        // The "Meeting started" banner uses the same corner: never cover the card the person may be reaching for.
-        guard !ScribeMeetingBanner.shared.isVisible else { return }
+        // The meeting card uses the same corner: never cover the card the person may be reaching for.
+        guard !ScribeAutoStartController.shared.isCardVisible else { return }
         current = decision
         shown = decision
         model.headline = headline

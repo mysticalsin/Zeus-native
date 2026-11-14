@@ -2,23 +2,91 @@ import AVFoundation
 import Foundation
 import ZeusCore
 
-/// Performs what the core `ScribeAutoStartMachine` decides. It reads the signals the call watcher already
-/// gathers (calendar, running call apps, which process holds the microphone), asks the machine, and then
-/// shows the banner, starts Scribe or opens the end window. A detector signal only suggests an end; it never
-/// stops a recording. It never asks for any permission: automatic start needs the owner's click in Settings,
-/// Microphone already allowed and one earlier recording, otherwise the machine asks instead.
+/// What the meeting-start controller needs from Scribe. `ScribeController` is the production conformance; a test
+/// supplies its own, so the controller runs with no capture.
 @MainActor
-final class ScribeAutoStartController {
-    static let shared = ScribeAutoStartController()
+protocol ScribeStartPort: AnyObject {
+    var phase: ScribePhase { get }
+    /// Called after every change of `phase`, in the same turn.
+    var onPhaseChange: ((ScribePhase) -> Void)? { get set }
+    func start(context: ScribeMeetingContext?)
+    /// Throws away the recording of this session and saves nothing. Another session is left alone.
+    func cancel(session: ScribeSessionID)
+    /// Ends the recording at once, without opening the end window.
+    func endNow()
+    func suggestEnd()
+    func withdrawEndSuggestion()
+}
 
-    private(set) var machine = ScribeAutoStartMachine()
+/// One pending wake. Setting a new one replaces the old; nil cancels it.
+@MainActor
+protocol ScribeOneShotScheduling: AnyObject {
+    func schedule(after delay: TimeInterval?, fire: @escaping @MainActor () -> Void)
+}
+
+/// The shipped scheduler: one timer on the main run loop in the common modes, so a menu being tracked or a drag
+/// does not hold it back. Nothing repeats.
+@MainActor
+final class ScribeRunLoopScheduler: ScribeOneShotScheduling {
     private var timer: Timer?
 
-    private init() {
-        let banner = ScribeMeetingBanner.shared.model
-        banner.onPrimary = { [weak self] in self?.accept() }
-        banner.onSecondary = { [weak self] in self?.decline() }
-        banner.onPointer = { [weak self] inside in self?.pointer(inside: inside) }
+    func schedule(after delay: TimeInterval?, fire: @escaping @MainActor () -> Void) {
+        timer?.invalidate()
+        timer = nil
+        guard let delay else { return }
+        let timer = Timer(timeInterval: max(0, delay), repeats: false) { _ in
+            MainActor.assumeIsolated { fire() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+}
+
+/// Performs what the core `ScribeAutoStartMachine` decides. It reads the signals the call watcher already
+/// gathers (calendar, running call apps, which process holds the microphone) and the facts a start needs at the
+/// moment of each event (Scribe's phase, Microphone access, the readiness of an automatic start), asks the
+/// machine, then performs its effects, draws `machine.card(now:)` and sets one wake at `machine.nextWake(now:)`.
+/// A detector signal only suggests an end; it never stops a recording. It never asks for any permission:
+/// automatic start needs the owner's click in Settings, Microphone already allowed and one earlier recording,
+/// otherwise the machine asks instead.
+@MainActor
+final class ScribeAutoStartController {
+    /// The shipped composition: the real Scribe, the run loop, the card panel and the system's microphone answer.
+    static let shared: ScribeAutoStartController = {
+        let panel = ScribeMeetingCardPanel(actions: ScribeMeetingCardPanel.Actions(
+            primary: { card in ScribeAutoStartController.shared.primary(card) },
+            cancel: { card in ScribeAutoStartController.shared.cancel(card) },
+            dismiss: { card in ScribeAutoStartController.shared.dismiss(card) },
+            pointer: { inside in ScribeAutoStartController.shared.pointer(inside: inside) }
+        ))
+        return ScribeAutoStartController(
+            scribe: ScribeController.shared,
+            clock: { ProcessInfo.processInfo.systemUptime },
+            scheduler: ScribeRunLoopScheduler(),
+            panel: panel,
+            microphone: { ScribeMicrophoneAccess(authorizationRaw: AVCaptureDevice.authorizationStatus(for: .audio).rawValue) }
+        )
+    }()
+
+    private(set) var machine = ScribeAutoStartMachine()
+    /// The card last handed to the panel.
+    private(set) var drawn: ScribeMeetingCard = .hidden
+
+    private let scribe: ScribeStartPort
+    private let clock: () -> TimeInterval
+    private let scheduler: ScribeOneShotScheduling
+    private let panel: ScribeMeetingCardRendering
+    private let microphone: () -> ScribeMicrophoneAccess
+    private var lastLogged = ScribeAutoStartMachine().state.logName
+
+    init(scribe: ScribeStartPort, clock: @escaping () -> TimeInterval, scheduler: ScribeOneShotScheduling,
+         panel: ScribeMeetingCardRendering, microphone: @escaping () -> ScribeMicrophoneAccess) {
+        self.scribe = scribe
+        self.clock = clock
+        self.scheduler = scheduler
+        self.panel = panel
+        self.microphone = microphone
+        scribe.onPhaseChange = { [weak self] phase in self?.scribeChanged(phase) }
     }
 
     /// Once per launch, before anything reads the opt-in stamp or touches `ScribeController.shared`: carries an
@@ -30,134 +98,151 @@ final class ScribeAutoStartController {
         ScribeAutoStartOptIn.migrate(mode: ScribeAutoStartMode.current(), hasSavedMeetings: saved)
     }
 
-    /// The monotonic clock the machine's deadlines use.
-    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+    /// Whether a card is on screen. The heads-up card keeps out of its way.
+    var isCardVisible: Bool { drawn != .hidden }
+
+    // MARK: Input
 
     /// One reading from the call watcher, every poll and every microphone wake-up.
     func ingest(scan: ScribeCallScan, slots: [ScribeCalendarSlot], date: Date) {
         let mode = ScribeAutoStartMode.current()
         // A stamp that outlived its choice (a raw defaults write, say) is removed before it can be read.
         ScribeAutoStartOptIn.reconcile(mode: mode)
-        let automatic = ScribeAutoStartReadiness.resolve(
-            mode: mode,
-            optIn: ScribeAutoStartOptIn.date() != nil,
-            microphone: ScribeMicrophoneAccess(authorizationRaw: AVCaptureDevice.authorizationStatus(for: .audio).rawValue),
-            hasRecorded: ScribeAutoStartOptIn.hasRecorded()
-        )
         let evidence = ScribeMeetingEvidence(
             date: date,
             slots: slots,
             micApps: scan.calls.map(\.app),
             presentApps: scan.runningCallApps.map(\.app),
             mode: mode,
-            activity: ScribeActivity(ScribeController.shared.phase),
-            automatic: automatic,
+            context: startContext(mode: mode),
             callWindows: scan.callWindows
         )
-        perform(machine.handle(.evidence(evidence, now: now)))
-        syncTimer()
+        send(.evidence(evidence, now: clock()))
     }
 
-    /// Start (or Switch) was tapped. A Start tap always starts: if the question stopped pending at the same moment
-    /// (it timed out, or a poll replaced it), the meeting on the card starts anyway.
-    func accept() {
-        var effects = machine.handle(.accept(now: now))
-        if !effects.contains(where: { if case .startRecording = $0 { return true } else { return false } }),
-           !effects.contains(where: { if case .requestEnd = $0 { return true } else { return false } }),
-           let meeting = ScribeMeetingBanner.shared.meeting {
-            ScribePopupDriver.log("late tap", "meeting banner: question no longer pending, starting \(meeting.key)")
-            effects += machine.handle(.startNow(meeting, now: now))
-        }
-        perform(effects)
-        syncTimer()
+    /// The primary button of the card the person saw: Record, Allow, Try again or Switch.
+    func primary(_ card: ScribeMeetingCard) {
+        send(.primary(on: card, now: clock(), context: startContext()))
     }
 
-    /// The pointer is over the banner: "Ask me" does not time out under it.
+    func cancel(_ card: ScribeMeetingCard) {
+        send(.cancel(on: card, now: clock()))
+    }
+
+    func dismiss(_ card: ScribeMeetingCard) {
+        send(.dismiss(on: card, now: clock()))
+    }
+
+    /// The pointer is over the card: it does not leave under the hand about to tap it.
     func pointer(inside: Bool) {
-        perform(machine.handle(.pointer(inside: inside, now: now)))
-        syncTimer()
+        send(.pointer(inside: inside, now: clock()))
     }
 
-    /// Not now (or Cancel) was tapped. Like Start, it is an answer even when the question stopped pending at the
-    /// same moment: the meeting on the card is then noted as declined.
-    func decline() {
-        var effects = machine.handle(.decline(now: now))
-        if effects.isEmpty, let meeting = ScribeMeetingBanner.shared.meeting {
-            effects += machine.handle(.declineNow(meeting))
-        }
-        perform(effects)
-        syncTimer()
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-        ScribeMeetingBanner.shared.hide()
-    }
-
-    private func tick() {
-        perform(machine.handle(.tick(now: now)))
-        if case .countingDown(let meeting, let deadline) = machine.state {
-            ScribeMeetingBanner.shared.updateCountdown(meeting, seconds: Self.secondsLeft(deadline: deadline, now: now))
-        }
+    /// The scheduled wake: deadlines, the countdown's digit, the minute on the card.
+    func wake() {
+        send(.tick(now: clock(), context: startContext()))
         // A quiet spell only counts on evidence, so while the call looks over, read the signals again each second.
         if machine.needsFreshEvidence { ScribeCallWatcher.shared.pollNow() }
-        syncTimer()
+    }
+
+    /// Forgets the machine and takes the card down.
+    func stop() {
+        machine = ScribeAutoStartMachine()
+        lastLogged = machine.state.logName
+        scheduler.schedule(after: nil) {}
+        render()
+    }
+
+    // MARK: Machine
+
+    private func startContext(mode: ScribeAutoStartMode = ScribeAutoStartMode.current()) -> ScribeStartContext {
+        let access = microphone()
+        let readiness = ScribeAutoStartReadiness.resolve(
+            mode: mode,
+            optIn: ScribeAutoStartOptIn.date() != nil,
+            microphone: access,
+            hasRecorded: ScribeAutoStartOptIn.hasRecorded()
+        )
+        return ScribeStartContext(scribe: scribe.phase, microphone: access, automatic: readiness)
+    }
+
+    private func send(_ event: ScribeAutoStartMachine.Event) {
+        let before = machine.state
+        let effects = machine.handle(event)
+        if case .primary(let card, _, _) = event, effects.isEmpty, machine.state == before {
+            Self.log("tap ignored", "\(card.meeting?.key ?? "none") while \(before.logName)")
+        }
+        perform(effects)
+        refresh()
+    }
+
+    /// Scribe's phase changed. The machine reads it at once; a meeting held for Scribe is looked at in the next
+    /// turn, because starting from here would re-enter the transition that is still being applied.
+    private func scribeChanged(_ phase: ScribePhase) {
+        perform(machine.handle(.scribe(phase, now: clock())))
+        refresh()
+        if case .held = machine.state {
+            Task { @MainActor [weak self] in self?.wake() }
+        }
     }
 
     private func perform(_ effects: [ScribeAutoStartMachine.Effect]) {
         for effect in effects {
             switch effect {
-            case .showAsk(let meeting):
-                // The earlier "Starts in N min" card has done its job.
-                ScribeCallPopup.shared.hide()
-                ScribeMeetingBanner.shared.showAsk(meeting)
-            case .showCountdown(let meeting):
-                ScribeCallPopup.shared.hide()
-                let seconds = machine.bannerDeadline.map { Self.secondsLeft(deadline: $0, now: now) } ?? 0
-                ScribeMeetingBanner.shared.showCountdown(meeting, seconds: seconds)
-            case .showNextMeeting(let meeting):
-                ScribeMeetingBanner.shared.showNextMeeting(meeting)
-            case .hideBanner:
-                ScribeMeetingBanner.shared.hide()
-            case .startRecording(let meeting):
+            case .start(let meeting):
                 startScribe(for: meeting)
-            case .requestEnd:
-                ScribeController.shared.requestEnd()
+                // `ScribeController.start` reaches `.starting` at once, or refuses: read the phase in the same turn.
+                perform(machine.handle(.scribe(scribe.phase, now: clock())))
+            case .abandonStart(let session):
+                Self.log("abandon", "session \(session)")
+                scribe.cancel(session: session)
+            case .openMicrophoneSettings:
+                Self.log("open settings", "Privacy_Microphone")
+                ScribeSettingsLink.open(pane: "Privacy_Microphone")
             case .suggestEnd:
-                ScribeController.shared.suggestEnd()
+                scribe.suggestEnd()
             case .withdrawEnd:
-                ScribeController.shared.withdrawEndSuggestion()
+                scribe.withdrawEndSuggestion()
+            case .endNow:
+                Self.log("switch", "ending the recording now")
+                scribe.endNow()
             }
         }
     }
 
     private func startScribe(for meeting: ScribeMeeting) {
-        let controller = ScribeController.shared
-        guard !controller.phase.isActive else {
-            ScribePopupDriver.log("start skipped", "meeting \(meeting.key): Scribe is already \(ScribePopupDriver.describe(controller.phase))")
-            return
+        Self.log("start", "meeting \(meeting.key)")
+        // Only a live call has a process to follow; a calendar start has no call binding.
+        let identity = meeting.isLive
+            ? meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: .callDetected($0)) }
+            : nil
+        scribe.start(context: meeting.context(callIdentity: identity))
+    }
+
+    /// After every event: log a change of state once, draw the card the state gives, set the one wake.
+    private func refresh() {
+        let line = machine.state.logName
+        if line != lastLogged {
+            lastLogged = line
+            NSLog("[ZEUS] scribe meeting: %@", line)
+            FlightRecorder.shared.record("scribe", "meeting state", line)
         }
-        ScribePopupDriver.log("start", "meeting \(meeting.key)")
-        let identity = meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: .callDetected($0)) }
-        controller.start(context: meeting.context(callIdentity: identity))
-    }
-
-    /// Whole seconds left, counting the one in progress (5, 4, 3, 2, 1).
-    private static func secondsLeft(deadline: TimeInterval, now: TimeInterval) -> Int {
-        max(0, Int((deadline - now).rounded(.up)))
-    }
-
-    /// One second timer, only while a banner has a deadline or the call looks over.
-    private func syncTimer() {
-        if machine.needsTick {
-            guard timer == nil else { return }
-            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.tick() }
-            }
+        render()
+        let now = clock()
+        if let wake = machine.nextWake(now: now) {
+            scheduler.schedule(after: max(0, wake - now)) { [weak self] in self?.wake() }
         } else {
-            timer?.invalidate()
-            timer = nil
+            scheduler.schedule(after: nil) {}
         }
+    }
+
+    private func render() {
+        drawn = machine.card(now: clock())
+        panel.render(drawn)
+    }
+
+    private static func log(_ stage: String, _ detail: String) {
+        NSLog("[ZEUS] scribe meeting: %@ %@", stage, detail)
+        FlightRecorder.shared.record("scribe", "meeting \(stage)", detail)
     }
 }

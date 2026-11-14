@@ -240,7 +240,13 @@ final class ScribeController {
     static let shared = ScribeController.makeProduction()
 
     /// The machine is the single source of truth. Everything the page shows derives from `machine.phase`.
-    private(set) var machine = ScribeSessionMachine()
+    private(set) var machine = ScribeSessionMachine() {
+        // Both writers (`run` and the reset to idle) pass through here, so the meeting-start controller hears every
+        // phase change in the same turn.
+        didSet { if machine.phase != oldValue.phase { onPhaseChange?(machine.phase) } }
+    }
+    /// Called after every change of `phase`. Set by `ScribeAutoStartController`.
+    @ObservationIgnored var onPhaseChange: ((ScribePhase) -> Void)?
     /// Transient feedback only after final persistence succeeds. A late expiry cannot clear a newer session.
     private(set) var completedNoticeID: ScribeSessionID?
     @ObservationIgnored private var completedNoticeTask: Task<Void, Never>?
@@ -562,8 +568,8 @@ final class ScribeController {
     /// Starts a recording. `context` is the meeting it is for, if any; a refused start keeps nothing of it.
     func start(context: ScribeMeetingContext? = nil) {
         guard !machine.phase.isActive else {
-            NSLog("[ZEUS] scribe: start refused, already %@", ScribePopupDriver.describe(machine.phase))
-            FlightRecorder.shared.record("scribe", "start refused", ScribePopupDriver.describe(machine.phase))
+            NSLog("[ZEUS] scribe: start refused, already %@", machine.phase.logName)
+            FlightRecorder.shared.record("scribe", "start refused", machine.phase.logName)
             return
         }
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -658,8 +664,6 @@ final class ScribeController {
         }
         NSLog("[ZEUS] scribe: start session")
         FlightRecorder.shared.record("scribe", "start session")
-        // The prompt has done its job; the watcher won't offer another while a session is active.
-        ScribeCallWatcher.shared.recordingDidStart()
         let frames: @Sendable (ScribeAudioFrame) -> Void = { [weak self] frame in
             _ = router.route(frame)
             if frame.source == .system, readout.noteSystemFrame() {
@@ -681,13 +685,27 @@ final class ScribeController {
 
     /// Explicit Stop starts a nine-second end window. Only the provider's acknowledgment ends capture.
     func requestEnd() {
-        guard case .recording(let id, _) = machine.phase else { return }
+        guard case .recording(let id, _) = machine.phase, armEnd(id) else { return }
+        endWindow?.present(scribe: self)
+    }
+
+    /// Switch: ends the recording at once. It arms and confirms an explicit end without opening the end window,
+    /// and closes the one a suggestion opened.
+    func endNow() {
+        if case .recording(let id, _) = machine.phase, !armEnd(id) { return }
+        hideEndWindow()
+        guard case .ending(let id, _) = machine.phase, endWorkflow.endNow(session: id) else { return }
+        provider.stop(session: id)
+    }
+
+    /// The explicit end: the nine-second window starts. False when the workflow refuses it.
+    private func armEnd(_ id: ScribeSessionID) -> Bool {
         discardRequested = false
         let now = nowSeconds()
-        guard endWorkflow.requestEnd(session: id, now: now) else { return }
+        guard endWorkflow.requestEnd(session: id, now: now) else { return false }
         run { $0.requestEnd(id, now: now, grace: ScribeEndWorkflow.grace) }
         updateEndingCountdown(now: now)
-        endWindow?.present(scribe: self)
+        return true
     }
 
     /// A detector signal (the call app let go of the microphone, its call window closed): opens the end window with
@@ -763,6 +781,13 @@ final class ScribeController {
         default:
             return
         }
+    }
+
+    /// Throws away the recording of `session` and saves nothing, when it is the one running. The meeting-start card
+    /// uses this to abandon an automatic start.
+    func cancel(session: ScribeSessionID) {
+        guard machine.phase.sessionID == session else { return }
+        cancel()
     }
 
     func cancel() {
@@ -1943,3 +1968,5 @@ final class ScribeController {
         }
     }
 }
+
+extension ScribeController: ScribeStartPort {}
