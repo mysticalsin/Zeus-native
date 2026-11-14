@@ -43,15 +43,23 @@ public enum LyricsTitle {
         return removed && !current.isEmpty ? current : title
     }
 
-    private static let artistSeparators = [",", ";", " & ", " / ", " feat. ", " feat ", " ft. ", " ft ", " featuring "]
+    private static let featuredSeparators = [" feat. ", " feat ", " ft. ", " ft ", " featuring "]
+    private static let artistSeparators = [",", ";", " & ", " / "] + featuredSeparators
 
     /// The first credited artist: "Queen & David Bowie" is "Queen". Unchanged when only one is credited.
-    public static func primaryArtist(_ artist: String) -> String {
+    /// It cuts acts like "Simon & Garfunkel" too, so it only feeds the search, which a length check backs up.
+    public static func primaryArtist(_ artist: String) -> String { head(of: artist, at: artistSeparators) }
+
+    /// The artist without a featured credit: "Artist A feat. Artist B" is "Artist A". "&" and "," stay, so
+    /// "Earth, Wind & Fire" is unchanged. For the exact-match request, where a half of a group name finds nothing.
+    public static func withoutFeaturedArtists(_ artist: String) -> String { head(of: artist, at: featuredSeparators) }
+
+    private static func head(of artist: String, at separators: [String]) -> String {
         let trimmed = artist.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cuts = artistSeparators.compactMap { trimmed.range(of: $0, options: .caseInsensitive)?.lowerBound }
+        let cuts = separators.compactMap { trimmed.range(of: $0, options: .caseInsensitive)?.lowerBound }
         guard let cut = cuts.min() else { return artist }
-        let head = trimmed[..<cut].trimmingCharacters(in: .whitespacesAndNewlines)
-        return head.isEmpty ? artist : head
+        let first = trimmed[..<cut].trimmingCharacters(in: .whitespacesAndNewlines)
+        return first.isEmpty ? artist : first
     }
 }
 
@@ -110,11 +118,14 @@ public enum LyricsMatch {
     /// How far a candidate's length may be from the track's: 2 seconds, or 3 percent of the track if that is larger.
     public static func window(for duration: Double) -> Double { max(2, duration * 3 / 100) }
 
+    private static func plain(_ title: String) -> String { title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+
     /// Synced before plain before instrumental, inside the duration window, then the nearest duration (the earlier one
-    /// on a tie). With an unknown duration (0) only a candidate whose title equals `title`, ignoring case and version
-    /// suffixes, is taken. Candidates with nothing to show are skipped.
+    /// on a tie). With an unknown duration (0) only a candidate whose title equals `title`, the title as the player
+    /// reports it, ignoring case, is taken: a version suffix on either side is a different recording. Candidates with
+    /// nothing to show are skipped.
     public static func best(_ candidates: [LyricsCandidate], duration: Double, title: String) -> LyricsCandidate? {
-        let wanted = LyricsTitle.stripped(title).lowercased()
+        let wanted = Self.plain(title)
         var pick: (rank: Int, distance: Double, index: Int)?
         for (index, candidate) in candidates.enumerated() {
             let rank: Int
@@ -128,7 +139,7 @@ public enum LyricsMatch {
             if duration > 0 {
                 distance = abs(candidate.duration - duration)
                 guard candidate.duration > 0, distance <= window(for: duration) else { continue }
-            } else if LyricsTitle.stripped(candidate.title).lowercased() != wanted {
+            } else if Self.plain(candidate.title) != wanted {
                 continue
             }
             let entry = (rank: rank, distance: distance, index: index)
@@ -144,7 +155,7 @@ public struct LyricsRequest: Equatable, Sendable {
     public enum Step: Equatable, Sendable {
         /// `/api/get` with the track exactly as the player reports it.
         case exact
-        /// `/api/get` with the cleaned title and first artist, no album.
+        /// `/api/get` with the cleaned title and the artist without a featured credit, no album.
         case cleaned
         /// `/api/search` with the cleaned title and first artist.
         case search
@@ -160,30 +171,39 @@ public struct LyricsRequest: Equatable, Sendable {
             return LRCLIBResponse.parse(data)
         case .search:
             let list = LRCLIBResponse.parseSearch(data)
-            return LyricsMatch.best(list, duration: query.duration, title: LyricsTitle.stripped(query.title))?.result ?? .none
+            return LyricsMatch.best(list, duration: query.duration, title: query.title)?.result ?? .none
         }
     }
 }
 
 public extension LRCLIBQuery {
-    /// The title with version suffixes removed, and the first credited artist.
+    /// The title with version suffixes removed. Step 3 also uses the first credited artist.
     private var cleanedTitle: String { LyricsTitle.stripped(title) }
     private var cleanedArtist: String { LyricsTitle.primaryArtist(artist) }
+    /// For the exact-match step only a featured credit is cut: "Earth, Wind & Fire" is one act.
+    private var cleanedGetArtist: String { LyricsTitle.withoutFeaturedArtists(artist) }
+
+    /// The whole seconds LRCLIB's `/api/get` takes for the length: 1 to 3600. Nil for anything else
+    /// (unknown, under half a second, over an hour, not a number), which it answers with a 400.
+    var requestSeconds: Int? {
+        guard duration.isFinite, duration >= 0.5, duration < 3600.5 else { return nil }
+        return Int(duration.rounded())
+    }
 
     /// Step 1: today's strict request. Nil for a track that is not askable.
     var exactRequest: LyricsRequest? {
         guard isAskable else { return nil }
         var items = [("artist_name", artist), ("track_name", title), ("album_name", album)]
-        if duration > 0 { items.append(("duration", String(Int(duration.rounded())))) }
+        if let seconds = requestSeconds { items.append(("duration", String(seconds))) }
         return Self.request(.exact, path: "/api/get", items)
     }
 
-    /// Step 2, only when clean-up changed the title or the artist, and only with a known length: the old
+    /// Step 2, only when clean-up changed the title or cut a featured artist, and only with a length LRCLIB takes: the old
     /// request without a length could return another recording's timing.
     var cleanedRequest: LyricsRequest? {
-        guard isAskable, duration > 0, cleanedTitle != title || cleanedArtist != artist else { return nil }
+        guard isAskable, let seconds = requestSeconds, cleanedTitle != title || cleanedGetArtist != artist else { return nil }
         return Self.request(.cleaned, path: "/api/get", [
-            ("artist_name", cleanedArtist), ("track_name", cleanedTitle), ("duration", String(Int(duration.rounded()))),
+            ("artist_name", cleanedGetArtist), ("track_name", cleanedTitle), ("duration", String(seconds)),
         ])
     }
 
@@ -215,18 +235,22 @@ public extension LRCLIBQuery {
 public enum LyricsFetchOutcome: Equatable, Sendable {
     /// HTTP 200: there is a body to read.
     case found
-    /// HTTP 404: the service answered and has nothing for this request.
+    /// HTTP 404, or another 4xx that refuses this one request (400 and the like): the service answered and has
+    /// nothing for it, so the next step may run. It says nothing about the service being down.
     case notFound
-    /// No answer, 429, 5xx or anything unexpected. Never cached; `retryAfter` is the server's wait in seconds, if it sent one.
+    /// No answer, 408, 429, 5xx or anything unexpected. Never cached; `retryAfter` is the server's wait in seconds, if it sent one.
     case failed(retryAfter: TimeInterval?)
 }
 
 public enum LyricsStatus {
-    /// Maps an HTTP status code. Only 200 and 404 are answers; every other code is a failure so it is never cached as "no lyrics".
+    /// Maps an HTTP status code. 200 is a body, and a 4xx other than 408 and 429 is the service refusing this request
+    /// (404 has nothing, 400 is a value it cannot take): both are answers. Everything else is a failure, so it is
+    /// never cached as "no lyrics" and it starts the shared wait.
     public static func outcome(status: Int, retryAfter: TimeInterval?) -> LyricsFetchOutcome {
         switch status {
         case 200: .found
-        case 404: .notFound
+        case 408, 429: .failed(retryAfter: retryAfter)
+        case 400...499: .notFound
         default: .failed(retryAfter: retryAfter)
         }
     }
@@ -241,6 +265,26 @@ public enum LyricsStatus {
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
         guard let date = formatter.date(from: text) else { return nil }
         return max(0, date.timeIntervalSince(now))
+    }
+}
+
+/// What the one retry after a failure does at a wake-up.
+public enum LyricsRetryPlan: Equatable, Sendable {
+    /// The wait is not over: sleep this many seconds, then decide again.
+    case wait(TimeInterval)
+    /// Send the single request now.
+    case askNow
+    /// Send nothing. A later load of the same track from a lyric view starts over.
+    case stop
+}
+
+public enum LyricsRetry {
+    /// Decides the retry after a failure. It goes out only for the track that is still current and unanswered,
+    /// while it plays, with a lyric view on screen and lyrics switched on; otherwise it stops, so a closed notch,
+    /// paused music or a stopped player never causes a request. While the wait runs it sleeps for what is left.
+    public static func plan(remaining: TimeInterval, sameTrack: Bool, isPlaying: Bool, visible: Bool, enabled: Bool) -> LyricsRetryPlan {
+        guard enabled, sameTrack, isPlaying, visible else { return .stop }
+        return remaining > 0 ? .wait(remaining) : .askNow
     }
 }
 

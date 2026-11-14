@@ -290,9 +290,9 @@ import Testing
         let table = ["Simon & Garfunkel", "Earth, Wind & Fire", "Tyler, The Creator", "Florence + the Machine"]
         for artist in table {
             let remaster = LRCLIBQuery(artist: artist, title: "September - Remastered", album: "", duration: 215)
-            #expect(items(try #require(remaster.cleanedRequest).url)["artist_name"] == artist, artist)
+            #expect(items(try #require(remaster.cleanedRequest).url)["artist_name"] == artist, "\(artist)")
             let plain = LRCLIBQuery(artist: artist, title: "September", album: "", duration: 215)
-            #expect(plain.cleanedRequest == nil, artist)
+            #expect(plain.cleanedRequest == nil, "\(artist)")
         }
         let both = LRCLIBQuery(artist: "Earth, Wind & Fire ft. Someone", title: "September (Remastered)", duration: 215)
         #expect(items(try #require(both.cleanedRequest).url)["artist_name"] == "Earth, Wind & Fire")
