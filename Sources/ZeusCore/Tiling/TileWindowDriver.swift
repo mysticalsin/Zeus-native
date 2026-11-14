@@ -169,7 +169,8 @@ public struct TileApplyOutcome: Equatable, Sendable {
     public var refused: [TileWindowID] = []
     /// Not started because the time budget ran out. Not floating: a later pass takes them.
     public var deferred: [TileWindowID] = []
-    /// The frame asked for in every write, landed or not, for `TileSelfWrites`.
+    /// The frame asked for in every write, landed or not. The controller records it as the window's frame for the
+    /// rest of the pass when the write landed.
     public var intended: [TileWindowID: TileRect] = [:]
 
     public init(state: TileApplyState) { self.state = state }

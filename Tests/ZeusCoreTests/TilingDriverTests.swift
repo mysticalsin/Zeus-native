@@ -327,26 +327,6 @@ extension TilingDriverTests {
             #expect(TileReadBack.matches(rect(0, 0, 10, 10), rect(5, 0, 10, 10), tolerance: 5))
             #expect(!TileReadBack.matches(rect(0, 0, 10, 10), rect(6, 0, 10, 10), tolerance: 5))
         }
-
-        @Test func aMoveNotificationThatMatchesTheIntendedFrameIsOurOwnEcho() {
-            var writes = TileSelfWrites()
-            writes.record([id(1): rect(16, 16, 940, 1048)], at: 10)
-            #expect(writes.isOwnEcho(id(1), observed: rect(16, 16, 940, 1048), at: 10.2))
-            #expect(writes.isOwnEcho(id(1), observed: rect(17, 16, 940, 1048), at: 10.4), "a second notification for the same write still matches")
-            #expect(!writes.isOwnEcho(id(1), observed: rect(300, 16, 940, 1048), at: 10.4), "the person moved it somewhere else")
-            #expect(!writes.isOwnEcho(id(2), observed: rect(16, 16, 940, 1048), at: 10.4), "no write for that window")
-            #expect(!writes.isOwnEcho(id(1), observed: rect(16, 16, 940, 1048), at: 10 + TileSelfWrites.lifetime + 0.1), "an old write expires")
-        }
-
-        @Test func aNewWriteReplacesTheOldOneAndPruningDropsExpiredOnes() {
-            var writes = TileSelfWrites()
-            writes.record([id(1): rect(0, 0, 500, 500)], at: 1)
-            writes.record([id(1): rect(600, 0, 500, 500)], at: 2)
-            #expect(!writes.isOwnEcho(id(1), observed: rect(0, 0, 500, 500), at: 2.1))
-            #expect(writes.isOwnEcho(id(1), observed: rect(600, 0, 500, 500), at: 2.1))
-            writes.prune(now: 2 + TileSelfWrites.lifetime + 1)
-            #expect(writes.isEmpty)
-        }
     }
 }
 
@@ -575,15 +555,11 @@ extension TilingDriverTests {
             #expect(fake.writes.count == 3)
         }
 
-        @Test func theIntendedFramesOfEveryWriteAreReportedSoTheirEchoesCanBeIgnored() {
+        @Test func theIntendedFramesOfEveryWriteAreReportedLandedOrNot() {
             let fake = driver(2)
             fake.refuse = [id(2)]
             let outcome = TileApplier.apply(moves(2), with: fake)
             #expect(outcome.intended == [id(1): rect(100, 0, 90, 90), id(2): rect(200, 0, 90, 90)])
-            var writes = TileSelfWrites()
-            writes.record(outcome.intended, at: 5)
-            #expect(writes.isOwnEcho(id(1), observed: rect(100, 0, 90, 90), at: 5.1))
-            #expect(writes.isOwnEcho(id(2), observed: rect(200, 0, 90, 90), at: 5.1))
         }
 
         @Test func theTimeBudgetDefersTheRestInsteadOfFloatingThem() {
