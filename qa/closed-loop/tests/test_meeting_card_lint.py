@@ -95,6 +95,25 @@ class MeetingCardLint(unittest.TestCase):
         self.assertNotIn("makeKeyAndOrderFront", text)
         self.assertNotIn("NSApp.activate", text)
 
+    def test_motion_comes_from_alert_motion_alone(self):
+        for path in (VIEW, PANEL):
+            text = self.read(path)
+            self.assertEqual(re.findall(r"static let \w*[Dd]uration\w*\s*(?::\s*\w+)?\s*=\s*[0-9.]+", text), [],
+                             f"{path.name} keeps a duration of its own")
+        self.assertIn("AlertMotion.", self.read(PANEL))
+
+    def test_the_entrance_never_animates_the_ring(self):
+        text = self.read(VIEW)
+        # An implicit animation on the whole card would replace the ring's own linear sweep in the pass where it
+        # starts, so the entrance is scoped to the two modifiers it moves.
+        self.assertNotRegex(text, r"\.animation\(entrance\.animation,\s*value:")
+        self.assertRegex(text, r"\.animation\(entrance\.animation\)\s*\{[^}]*\.opacity\([^}]*\.offset\(")
+
+    def test_the_panel_picks_its_screen_when_it_appears_not_on_every_render(self):
+        text = self.read(PANEL)
+        _, body = function_body(text, "private func layout(_ panel: NSPanel, _ host: NSView) {")
+        self.assertNotIn("visibleFrame()", body)
+
     def test_the_panel_places_the_card_with_the_core_rule(self):
         self.assertIn("ScribeMeetingCardPlacement.origin(", self.read(PANEL))
 

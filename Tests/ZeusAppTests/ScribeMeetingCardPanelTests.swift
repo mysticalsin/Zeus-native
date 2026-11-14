@@ -19,6 +19,10 @@ struct ScribeMeetingCardPanelTests {
         }
     }
 
+    private final class Screen {
+        var frame = CGRect(x: -30_000, y: -30_000, width: 1440, height: 900)
+    }
+
     private final class Taps {
         var primary: [ScribeMeetingCard] = []
         var cancel: [ScribeMeetingCard] = []
@@ -31,14 +35,14 @@ struct ScribeMeetingCardPanelTests {
         return ScribeMeeting(key: title, title: title, callApp: .other("Synthetic"), slot: slot)
     }
 
-    private func make(_ fades: Fades, _ taps: Taps = Taps()) -> ScribeMeetingCardPanel {
+    private func make(_ fades: Fades, _ taps: Taps = Taps(), _ screen: Screen = Screen()) -> ScribeMeetingCardPanel {
         ScribeMeetingCardPanel(
             actions: .init(primary: { taps.primary.append($0) }, cancel: { taps.cancel.append($0) },
                            dismiss: { taps.dismiss.append($0) }),
             now: { Date(timeIntervalSince1970: 1_800_000_000) },
             uptime: { 100 },
             // Far off every screen, so a test never flashes a window.
-            visibleFrame: { CGRect(x: -30_000, y: -30_000, width: 1440, height: 900) },
+            visibleFrame: { screen.frame },
             fade: { _, alpha, done in
                 fades.targets.append(alpha)
                 if let done { fades.pending.append(done) }
@@ -106,17 +110,57 @@ struct ScribeMeetingCardPanelTests {
         #expect(panel.window?.ignoresMouseEvents == false)
     }
 
-    @Test func everyTapCarriesTheCardTheViewDrew() throws {
-        let fades = Fades()
+    /// Sends the key the way the window would receive it. Return is the primary button, Escape the cancel
+    /// action (Cancel while counting down, the dismiss glyph otherwise): the real buttons answer, not a test closure.
+    private func key(_ code: UInt16, _ character: String, in panel: ScribeMeetingCardPanel) throws {
+        let window = try #require(panel.window)
+        window.makeKey()
+        let event = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil, characters: character,
+            charactersIgnoringModifiers: character, isARepeat: false, keyCode: code))
+        #expect(window.performKeyEquivalent(with: event), "key \(code) was not taken by a button")
+    }
+
+    @Test func everyButtonHandsOverTheCardTheViewDrew() async throws {
         let taps = Taps()
-        let panel = make(fades, taps)
-        let card = ScribeMeetingCard.offer(meeting("First"), blocked: nil)
-        panel.render(card)
-        let view = try #require(panel.hostedView)
-        #expect(view.card == card)
-        view.onPrimary(view.card)
-        view.onCancel(view.card)
-        view.onDismiss(view.card)
-        #expect(taps.primary == [card] && taps.cancel == [card] && taps.dismiss == [card])
+        let panel = make(Fades(), taps)
+        defer { panel.window?.close() }
+        let offer = ScribeMeetingCard.offer(meeting("First"), blocked: nil)
+        panel.render(offer)
+        try await Task.sleep(for: .seconds(0.3))
+        try key(36, "\r", in: panel)
+        try key(53, "\u{1b}", in: panel)
+        let countdown = ScribeMeetingCard.countdown(meeting("Second"), seconds: 5, deadline: 105, total: 5)
+        panel.render(countdown)
+        try await Task.sleep(for: .seconds(0.3))
+        try key(53, "\u{1b}", in: panel)
+        #expect(taps.primary == [offer] && taps.dismiss == [offer] && taps.cancel == [countdown])
+    }
+
+    @Test func theCardStaysOnTheScreenItAppearedOnWhileItIsShown() {
+        let screen = Screen()
+        let fades = Fades()
+        let panel = make(fades, Taps(), screen)
+        panel.render(.offer(meeting("First"), blocked: nil))
+        let first = panel.window?.frame.origin
+        screen.frame = CGRect(x: -20_000, y: -20_000, width: 1440, height: 900)
+        panel.render(.countdown(meeting("First"), seconds: 5, deadline: 105, total: 5))
+        panel.render(.countdown(meeting("First"), seconds: 4, deadline: 105, total: 5))
+        #expect(panel.window?.frame.origin == first, "a render must not move the card to another display")
+        // A new appearance picks the screen again.
+        panel.render(.hidden)
+        fades.finishAll()
+        panel.render(.offer(meeting("Second"), blocked: nil))
+        #expect((panel.window?.frame.origin.x ?? 0) > -25_000, "the next appearance follows the screen of the day")
+    }
+
+    @Test func aScreenParameterChangeMovesTheCardWhereItIsShown() {
+        let screen = Screen()
+        let panel = make(Fades(), Taps(), screen)
+        panel.render(.offer(meeting("First"), blocked: nil))
+        screen.frame = CGRect(x: -20_000, y: -20_000, width: 1440, height: 900)
+        NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        #expect((panel.window?.frame.origin.x ?? 0) > -25_000)
     }
 }
