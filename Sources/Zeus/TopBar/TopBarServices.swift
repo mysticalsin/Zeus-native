@@ -260,6 +260,9 @@ final class TopBarServices {
             playing.positionAt = Date()
             playing.isPlaying.toggle()
             model.nowPlaying = playing
+            // The write is a guess: the display hold follows it. Read the player once it has settled; a
+            // notification that lands first wins (see `syncMusic`).
+            syncMusicSoon(player, delays: [1.5, 4])
         }
     }
 
