@@ -25,6 +25,9 @@ private final class FakeTilingDriver: TilingWindowDriver {
     var candidates: [Candidate] = []
     /// Apps whose windows the pass cannot read in time: left out of the listing, named in `unreadPIDs`.
     var unreadApps: Set<Int32> = []
+    /// Windows whose own read timed out: the driver lists the rest of their app but names the app unread, so the missing
+    /// window is unknown and not gone.
+    var unreadWindows: Set<TileWindowID> = []
     var front = TileFrontmost.none
     var refuse: Set<TileWindowID> = []
     /// Windows the driver cannot give the keyboard to (minimized or sent to another Space since the last pass): the
@@ -70,10 +73,10 @@ private final class FakeTilingDriver: TilingWindowDriver {
 
     func windows(config: TileConfig) -> [TileWindowRef] {
         windowReads += 1
-        unreadPIDs = unreadApps
+        unreadPIDs = unreadApps.union(unreadWindows.map(\.pid))
         guard trusted else { return [] }
         let policy = TileAdmissionPolicy(config: config, zeusPID: Self.zeusPID, zeusBundleID: Self.zeusBundle)
-        let readable = candidates.filter { !unreadApps.contains($0.facts.pid) }
+        let readable = candidates.filter { !unreadApps.contains($0.facts.pid) && !unreadWindows.contains($0.id) }
         let onScreen = readable.compactMap { candidate -> TileOnScreenWindow? in
             guard candidate.onScreen, let frame = candidate.facts.frame else { return nil }
             return TileOnScreenWindow(pid: candidate.facts.pid, frame: frame, layer: 0, ownerName: nil)
@@ -424,6 +427,28 @@ struct TilingControllerTests {
         #expect(rig.controller.layoutWindows(on: 1) == [id(1), id(2, pid: 901)], "an app that did not answer is unknown, not gone")
         #expect(rig.driver.writes.count == writes, "nothing is written to the slot of the missing window or around it")
         #expect(rig.driver.frame(of: id(1)) == leftTile)
+    }
+
+    @Test func aWindowWhoseOwnReadTimedOutKeepsItsSlotWhileItsSiblingsAreListed() {
+        let rig = Rig()
+        rig.driver.add(id(1, pid: 901))
+        rig.driver.add(id(2, pid: 901))
+        rig.driver.add(id(3, pid: 902))
+        rig.controller.start()
+        rig.settle()
+        #expect(Set(rig.controller.layoutWindows(on: 1)) == [id(1, pid: 901), id(2, pid: 901), id(3, pid: 902)])
+        let writes = rig.driver.writes.count
+        rig.driver.unreadWindows = [id(2, pid: 901)]
+        rig.controller.handle(.retile)
+        rig.settle()
+        #expect(Set(rig.controller.layoutWindows(on: 1)) == [id(1, pid: 901), id(2, pid: 901), id(3, pid: 902)],
+                "the slow window is unknown, not closed: its sibling does not grow over it")
+        #expect(rig.driver.writes.count == writes, "nothing is written around the slow window")
+        rig.driver.remove(id(2, pid: 901))
+        rig.driver.unreadWindows = []
+        rig.controller.handle(.retile)
+        rig.settle()
+        #expect(Set(rig.controller.layoutWindows(on: 1)) == [id(1, pid: 901), id(3, pid: 902)], "once the app answers, the closed window's slot goes")
     }
 
     @Test func oneSlowAppDoesNotPinTheSlotsOfWindowsThatClosedInOtherApps() {

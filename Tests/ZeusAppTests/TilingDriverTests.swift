@@ -34,5 +34,8 @@ import ZeusCore
         #expect(TileWindowsAnswer.classify(axError: AXError.success.rawValue) == .answered)
         #expect(TileWindowsAnswer.classify(axError: AXError.noValue.rawValue) == .noWindows)
         #expect(TileWindowsAnswer.classify(axError: AXError.cannotComplete.rawValue) == .unread)
+        #expect(TileWindowsAnswer.windowRead(axError: AXError.success.rawValue))
+        #expect(!TileWindowsAnswer.windowRead(axError: AXError.cannotComplete.rawValue))
+        #expect(!TileWindowsAnswer.windowRead(axError: AXError.invalidUIElement.rawValue))
     }
 }

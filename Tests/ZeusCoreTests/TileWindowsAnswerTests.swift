@@ -20,4 +20,15 @@ import Testing
             #expect(TileWindowsAnswer.classify(axError: code) == .unread, "code \(code)")
         }
     }
+
+    // MARK: One window's attribute read
+
+    @Test func onlyASuccessfulReadOfAWindowCountsAsRead() {
+        #expect(TileWindowsAnswer.windowRead(axError: 0))
+        #expect(!TileWindowsAnswer.windowRead(axError: TileWindowsAnswer.cannotCompleteCode),
+                "a busy app times out on one window: that window is slow, not closed")
+        for code: Int32 in [-25200, -25201, -25202, -25203, -25205, -25206, -25207, -25208, -25209, -25210, -25211, -25212, 1, -1] {
+            #expect(!TileWindowsAnswer.windowRead(axError: code), "code \(code)")
+        }
+    }
 }
