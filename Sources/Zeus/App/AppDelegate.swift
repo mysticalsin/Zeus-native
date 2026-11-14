@@ -207,7 +207,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Real agent events from Claude Code hooks. The socket starts only after `commandHandler`
         // is wired below so `zeus debug dictate-file` never runs while launch is still wiring handlers.
-        if on(.agentServer) { agentServer = AgentEventServer(notch: notch) }
+        if on(.agentServer) {
+            // Read this app's own signature now, off the main thread, before the socket opens: once Zeus.app is
+            // replaced on disk while this process runs, the running copy can no longer be validated, and every
+            // command that needs the peer check would be refused until the next launch.
+            Task.detached(priority: .utility) { _ = PeerSigning.captureOwnIdentity() }
+            agentServer = AgentEventServer(notch: notch)
+        }
         if on(.helperRefresh) {
             if ClaudeHookInstaller.isInstalled() { try? ClaudeHookInstaller.refreshHelper() }
             if ChromeInstaller.isInstalled() {
@@ -264,9 +270,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.updates) { syncMenuBarUpdateBadge() }
         if on(.voiceTurn) { wireDebugCommands() }
         if on(.agentServer) {
-            agentServer.commandHandler = { [weak self] line in
+            CLIAccess.migrateLegacyDefault()
+            agentServer.commandHandler = { [weak self] line, peer in
                 guard let self, let commands = self.commands else { return nil }
-                return await commands.handle(line)
+                return await commands.handle(line, peer: peer)
             }
             agentServer.start()
         }
@@ -378,10 +385,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.showOnboarding(restart: !isPreview)
         }
-        commands.onDebugScreenshot = { [weak self] argument in
+        commands.onDebugScreenshot = { [weak self] base, filter in
             guard let self else { return [] }
-            let (path, filter) = DebugScreenshot.parseArgument(argument)
-            let base = path ?? (NSTemporaryDirectory() + "zeus-screenshot-\(UUID().uuidString)")
             var named: [(name: String, window: NSWindow)] = []
             if let w = self.notch.debugWindow { named.append(("notch", w)) }
             if let w = self.glanceSettings.debugWindow { named.append(("settings", w)) }
@@ -629,7 +634,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
         }
         let providers = PointingProviders(
-            anyLLM: { (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount)) },
+            anyLLM: { (AIConnections.shared.anyLLM, AIConnections.shared.anyLLMCredential()) },
             localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) },
             anyLLMComplete: { AIConnections.shared.anyLLM.isComplete })
         // In memory only: a desktop session is never written to disk.
@@ -675,7 +680,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
         }
         let provider = ExplanationHTTPProvider(configuration: {
-            (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount))
+            (AIConnections.shared.anyLLM, AIConnections.shared.anyLLMCredential())
         }, localOnly: { FeatureSettings.bool("explanation.localOnly", default: false) })
         let storeFactory: () throws -> ExplanationHistoryStore = {
             guard let root = ExplanationHistoryStore.productionRootURL() else { throw CocoaError(.fileNoSuchFile) }

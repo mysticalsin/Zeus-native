@@ -243,7 +243,6 @@ final class SettingsStore {
         var rules = otherRules
         for key in boolKeys { rules[key] = .bool }
         // Privacy and control switches the Settings pages own (they are not `opt.` values).
-        rules[CLIAccess.defaultsKey] = .bool
         rules[WakeWordController.defaultsKey] = .bool
         rules[DriveAutonomy.settingsKey] = .text(64)
         return rules
@@ -258,7 +257,7 @@ final class SettingsStore {
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
     ]
     private static var neverEnabledAppKeys: Set<String> {
-        [CLIAccess.defaultsKey, WakeWordController.defaultsKey, "dictation.engineForVoice"]
+        [WakeWordController.defaultsKey, "dictation.engineForVoice"]
     }
     /// A cloud transcription engine or a non-local voice provider is only ever chosen on this Mac, by hand.
     static func importWouldSelectCloud(key: String, value: Any) -> Bool {
