@@ -356,17 +356,36 @@ private final class Fired: @unchecked Sendable { var count = 0 }
 
     // MARK: Cue, modes, artwork, page
 
+    @Test func theCueNamesTheSourceOnlyWhenTheShownSourceChanges() {
+        let rig = Rig()
+        rig.report(rig.music, "One")
+        #expect(rig.cues.last == .trackChanged(title: "One", artist: "Band", source: rig.music, sourceChanged: true),
+                "the first source shown is a change from nothing")
+        rig.report(rig.music, "Two")
+        #expect(rig.cues.last == .trackChanged(title: "Two", artist: "Band", source: rig.music, sourceChanged: false))
+        rig.report(rig.spotify, "Three")
+        #expect(rig.cues.last == .trackChanged(title: "Three", artist: "Band", source: rig.spotify, sourceChanged: true))
+        rig.report(rig.spotify, "Four")
+        #expect(rig.cues.last == .trackChanged(title: "Four", artist: "Band", source: rig.spotify, sourceChanged: false))
+        rig.report(Rig.tab(1), "Five")
+        #expect(rig.cues.last == .trackChanged(title: "Five", artist: "Band", source: Rig.tab(1), sourceChanged: true))
+        rig.report(Rig.tab(1), "Six")
+        #expect(rig.cues.last == .trackChanged(title: "Six", artist: "Band", source: Rig.tab(1), sourceChanged: false),
+                "a new track in the same tab keeps the plain cue")
+        #expect(rig.cues.count == 6)
+    }
+
     @Test func theTrackCueFiresOnTheShownItemAsToday() {
         let rig = Rig()
         rig.report(rig.music, "One")
-        #expect(rig.cues == [.trackChanged(title: "One", artist: "Band")])
+        #expect(rig.cues == [.trackChanged(title: "One", artist: "Band", source: rig.music, sourceChanged: true)])
         rig.report(rig.music, "One")
         rig.report(rig.music, "One", playing: false)
         #expect(rig.cues.count == 1, "the same track, and a pause, raise nothing")
         rig.report(rig.music, "Two", playing: false)
         #expect(rig.cues.count == 1, "a paused change of track raises nothing")
         rig.report(rig.music, "Three")
-        #expect(rig.cues.last == .trackChanged(title: "Three", artist: "Band"))
+        #expect(rig.cues.last == .trackChanged(title: "Three", artist: "Band", source: rig.music, sourceChanged: false))
         rig.report(rig.music, "Four", announce: false)
         #expect(rig.cues.count == 2, "a launch sync announces nothing")
         // An entry that is not shown raises nothing.

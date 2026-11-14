@@ -4474,6 +4474,18 @@
         "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
         "function": "whenNothingPlaysTheOneThatStoppedLastStaysWhateverStartedFirst"
       }
+    },
+    {
+      "id": "REG-459",
+      "failure": "A browser item drew Previous, Next, Shuffle and Repeat, buttons the source cannot honour, so they took presses and did nothing.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingDisplayTests.swift",
+        "function": "aBrowserItemDrawsNoPreviousNextShuffleOrRepeat"
+      }
     }
   ]
 }
