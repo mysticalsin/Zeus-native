@@ -60,8 +60,14 @@ final class ScribeAutoStartController {
         syncTimer()
     }
 
+    /// Not now (or Cancel) was tapped. Like Start, it is an answer even when the question stopped pending at the
+    /// same moment: the meeting on the card is then noted as declined.
     func decline() {
-        perform(machine.handle(.decline(now: now)))
+        var effects = machine.handle(.decline(now: now))
+        if effects.isEmpty, let meeting = ScribeMeetingBanner.shared.meeting {
+            effects += machine.handle(.declineNow(meeting))
+        }
+        perform(effects)
         syncTimer()
     }
 

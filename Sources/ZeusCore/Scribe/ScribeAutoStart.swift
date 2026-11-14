@@ -137,6 +137,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case accept(now: TimeInterval)
         /// Not now, or Cancel.
         case decline(now: TimeInterval)
+        /// The person tapped Not now on the card showing `meeting`, but the card's question is no longer pending
+        /// (it timed out at the same moment). The tap is still an answer.
+        case declineNow(ScribeMeeting)
         /// The pointer entered or left the banner. "Ask me" does not time out under the pointer.
         case pointer(inside: Bool, now: TimeInterval)
         /// The person tapped Start on the card showing `meeting`, but the card's question is no longer pending
@@ -217,7 +220,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             default:
                 return []
             }
-        case .decline(let now):
+        case .decline:
             switch state {
             case .prompting(let meeting, _), .countingDown(let meeting, _):
                 note(meeting, .declined)
@@ -239,6 +242,15 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 state = .prompting(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
             }
             return []
+        case .declineNow(let meeting):
+            switch state {
+            case .idle, .armed:
+                note(meeting, .declined)
+                state = .idle
+                return [.hideBanner]
+            default:
+                return []
+            }
         case .startNow(let meeting, let now):
             switch state {
             case .prompting, .countingDown:
@@ -365,14 +377,13 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         meeting.isLive && evidence.mode == .automatic && evidence.micPermissionGranted && evidence.autoConsentGiven
     }
 
-    /// An answered meeting is never shown again; the answer follows it to its calendar slot. A meeting whose
-    /// question timed out is shown again only when it would count down.
+    /// An answered meeting is never shown again. Whatever the ledger knows about it, even a question that timed
+    /// out, is written onto the meeting itself, so a call's mark moves to its calendar slot and outlives the call's
+    /// entry. A meeting whose question timed out is shown again only when it would count down.
     private mutating func offerable(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
         guard let mark = ledger.mark(of: meeting) else { return true }
-        if mark.isAnswered {
-            note(meeting, mark)
-            return false
-        }
+        note(meeting, mark)
+        if mark.isAnswered { return false }
         return mark != .asked || countsDown(meeting, evidence)
     }
 
