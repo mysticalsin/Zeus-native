@@ -43,7 +43,9 @@ struct LicenseCredentialCleanupTests {
         let proof = try SignedBlob.encode(ActivationPayload(license: "synthetic-license", device: "synthetic-device",
                                                             issued: 1, seat: 1, seats: 1),
                                          prefix: ActivationPayload.prefix, signingKey: signer)
-        let backend = MemoryKeychain(["com.zeus.app|license.key": key])
+        // The server address is only trusted with a Keychain binding the owner saved in Settings.
+        let backend = MemoryKeychain(["com.zeus.app|license.key": key,
+                                      "com.zeus.app|\(LicenseManager.serverOriginAccount)": "https://synthetic-license.invalid:443"])
         let server = serverResponse(proof)
         let manager = LicenseManager(defaults: defaults, credentials: KeychainStore(backend: backend, defaults: defaults),
                                      deviceID: "synthetic-device", trustedKeys: [signer.publicKey], synchronizeAtLaunch: false,
