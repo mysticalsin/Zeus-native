@@ -91,7 +91,7 @@ final class ScreenCornerOverlay {
             panel.contentView = nil
         }
         panels = wanted.map { placement in
-            let panel = makePanel()
+            let panel = Self.makePanel(visibleInShare: lastVisibleInShare)
             panel.setFrame(placement.frame, display: false)
             panel.contentView = NSHostingView(rootView: ScreenCornerView(side: placement.side, radius: Double(placement.frame.width)))
             panel.orderFrontRegardless()
@@ -100,18 +100,40 @@ final class ScreenCornerOverlay {
         placements = wanted
     }
 
-    private func makePanel() -> NSPanel {
-        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.ignoresMouseEvents = true
-        panel.level = .statusBar
+    static func makePanel(visibleInShare: Bool) -> NSPanel {
+        let flags = ScreenCornerPanelFlags.standard
+        let panel = NSPanel(contentRect: .zero, styleMask: flags.styleMask, backing: .buffered, defer: false)
+        flags.apply(to: panel)
         panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
-        ZeusWindowSharing.apply(to: panel, visibleInShare: lastVisibleInShare, surface: .zeusStandard)
+        ZeusWindowSharing.apply(to: panel, visibleInShare: visibleInShare, surface: .zeusStandard)
         return panel
+    }
+}
+
+/// The corner panel's window flags as a value, so a test can pin them: clicks pass through, it never takes
+/// focus, it joins every Space and shows over full-screen apps, and it is left out of the window cycle.
+struct ScreenCornerPanelFlags: Equatable {
+    var styleMask: NSWindow.StyleMask
+    var collectionBehavior: NSWindow.CollectionBehavior
+    var level: NSWindow.Level
+    var ignoresMouseEvents: Bool
+    var isOpaque: Bool
+    var hasShadow: Bool
+    var hidesOnDeactivate: Bool
+
+    static let standard = ScreenCornerPanelFlags(
+        styleMask: [.borderless, .nonactivatingPanel],
+        collectionBehavior: [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle],
+        level: .statusBar, ignoresMouseEvents: true, isOpaque: false, hasShadow: false, hidesOnDeactivate: false)
+
+    func apply(to panel: NSPanel) {
+        panel.isOpaque = isOpaque
+        panel.backgroundColor = .clear
+        panel.hasShadow = hasShadow
+        panel.ignoresMouseEvents = ignoresMouseEvents
+        panel.level = level
+        panel.hidesOnDeactivate = hidesOnDeactivate
+        panel.collectionBehavior = collectionBehavior
     }
 }
 
