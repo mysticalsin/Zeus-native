@@ -278,11 +278,11 @@ struct ScribeAutoStartTests {
         var machine = asPrompting()
         machine.handle(.tick(now: 23))
         #expect(machine.state == .idle)
-        let slot = asSlot("s1", start: 40, end: 1_800, app: .teams)
-        let opened = machine.handle(asEvidence(30, mic: [.teams], present: [.teams], slots: [slot]))
+        let slot = asSlot("s1", start: 150, end: 1_800, app: .teams)
+        let opened = machine.handle(asEvidence(40, mic: [.teams], present: [.teams], slots: [slot]))
         #expect(opened.isEmpty)
         // Muted for longer than the call entry lives: the slot still remembers the question.
-        machine.handle(asEvidence(40, present: [.teams], slots: [slot]))
+        machine.handle(asEvidence(45, present: [.teams], slots: [slot]))
         machine.handle(asEvidence(75, present: [.teams], slots: [slot]))
         var shown = 0
         for now in stride(from: 80.0, through: 120.0, by: 3.0) {
