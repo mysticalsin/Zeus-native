@@ -377,6 +377,21 @@ enum SnapshotRenderer {
         let drawnGuide = NotchModel()
         saveSurface(NotchStage(model: drawnGuide, topBar: TopBarModel(), footprint: drawn, guide: true), size: CGSize(width: 960, height: 120), name: "notch-drawn-guide")
 
+        // The Settings card for the drawn notch, one fixture per row set it can show. Each pins its own controller.
+        let drawnCardContext = GSContext(services: OnboardingServices(permissions: PermissionsModel()))
+        func drawnCard(_ name: String, height: CGFloat, _ pinned: SnapshotDrawnNotch) {
+            drawnCardContext.drawnNotch = pinned
+            guard let model = DrawnNotchCardModel(context: drawnCardContext, navigation: GSNavigation()) else { return }
+            saveSurface(DrawnNotchCard(model: model).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).background(GS.panel),
+                        size: CGSize(width: 760, height: height), name: "settings-drawn-card-\(name)")
+        }
+        let drawnDraft = DrawnNotchShape(width: 215, height: 36, offset: 0)
+        drawnCard("pill", height: 150, SnapshotDrawnNotch(style: .pill))
+        drawnCard("ready", height: 230, SnapshotDrawnNotch())
+        drawnCard("calibrating", height: 340, SnapshotDrawnNotch(state: .adjusting(draft: drawnDraft, saved: SnapshotDrawnNotch.savedShape)))
+        drawnCard("not-shown", height: 230, SnapshotDrawnNotch(availability: .notShown))
+        drawnCard("no-display", height: 230, SnapshotDrawnNotch(availability: .noDisplay))
+
         // Item 8's own row ("orb: the real voice orb or recorder pill view, not a MascotTile") and
         // P0 item F.3 (QA7): the real `RecorderPillView`, with its real `ThinkingOrbView`, in every
         // state Tony asked to see -- never the `ObsidianOrbSnapshotView` placeholder this used to be.
@@ -1014,6 +1029,26 @@ enum SnapshotRenderer {
             }),
         ]
     }
+}
+
+/// A controller of fixed answers for the card's fixtures. It reads no store, writes none and ignores every event,
+/// so a fixture never touches the drawn notch model.
+@MainActor
+private final class SnapshotDrawnNotch: DrawnNotchControlling {
+    static let savedShape = DrawnNotchShape(width: 200, height: 34, offset: 0)
+    let style: NotchlessStyle
+    let saved = SnapshotDrawnNotch.savedShape
+    let state: DrawnNotchCalibration.State
+    let availability: DrawnNotchAvailability
+
+    init(style: NotchlessStyle = .drawn, state: DrawnNotchCalibration.State = .idle, availability: DrawnNotchAvailability = .ready) {
+        self.style = style
+        self.state = state
+        self.availability = availability
+    }
+
+    func setStyle(_ style: NotchlessStyle) {}
+    func send(_ event: DrawnNotchCalibration.Event) {}
 }
 
 /// A notch on a slice of dark menu bar and desktop.
