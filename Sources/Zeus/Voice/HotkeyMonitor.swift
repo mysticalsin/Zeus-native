@@ -93,6 +93,7 @@ final class HotkeyMonitor {
     var cancelsWhenSpoiled = false
 
     private var keyMonitors: [Any] = []
+    private var consumedKeys: NSObjectProtocol?
     private var gesture = SharedKeyGesture()
     private var sharedDown = false
     private var holdTimer: DispatchWorkItem?
@@ -105,9 +106,16 @@ final class HotkeyMonitor {
 
     private var state = ShortcutState()
 
-    /// Keys the tiling tap consumes never reach the event monitors. Feeding them here keeps a hold spoiled as it would
-    /// be by the same chord unconsumed.
+    /// Keys the tiling tap consumes never reach the event monitors. Feeding them here keeps a hold spoiled until every
+    /// modifier is up, as the same chord unconsumed would: without it, letting go of the extra modifier first would
+    /// leave exactly this key's modifiers down and start a turn. Idempotent.
     func observeConsumedKeys() {
+        guard consumedKeys == nil else { return }
+        consumedKeys = NotificationCenter.default.addObserver(
+            forName: TilingConsumedKey.notification, object: nil, queue: .main) { [weak self] note in
+            guard let event = TilingConsumedKey.event(in: note) else { return }
+            MainActor.assumeIsolated { self?.feed(event) }
+        }
     }
 
     func start() {

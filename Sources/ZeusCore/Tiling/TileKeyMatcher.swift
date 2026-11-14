@@ -47,9 +47,16 @@ public enum TileKeyDecision: Equatable, Sendable {
 }
 
 extension TileKeyDecision {
-    /// The keyboard event the other Zeus monitors would have seen had the tap not consumed this one.
+    /// The keyboard event the other Zeus monitors would have seen had the tap not consumed `event`: the key-down of
+    /// a press that was taken, or the key-up that went with it. Nil when the event passed through, or is a repeat
+    /// (the monitors skip repeats). Without it a modifier-only hold they track is never spoiled by a consumed
+    /// chord, and a smaller pair forms the moment the owner lets go of the extra modifier first.
     public func monitorEvent(for event: TileKeyEvent) -> ShortcutEvent? {
-        nil
+        guard case .consume = self, !event.isOwnInput else { return nil }
+        switch event.phase {
+        case .down: return event.isRepeat ? nil : .keyDown(keyCode: event.keyCode, modifiers: event.modifiers)
+        case .up: return .keyUp(keyCode: event.keyCode)
+        }
     }
 }
 

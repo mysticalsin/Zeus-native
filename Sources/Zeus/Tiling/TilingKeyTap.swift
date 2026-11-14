@@ -15,6 +15,10 @@ import ZeusCore
 /// Privacy: the callback copies a key code, the modifier flags and two booleans, asks the pure
 /// `TileKeyMatcher`, and forgets them. It never reads a character, never logs, and never stores or forwards
 /// what is typed. The only thing kept is the key codes of presses it consumed, to pair each with its key-up.
+/// A consumed press and its release are handed to the other Zeus key monitors as a key code and modifiers only
+/// (`TilingConsumedKey`), because an event the tap consumes never reaches them and a modifier-only hold they track
+/// would otherwise not be spoiled by the chord. Only chords the owner bound are ever consumed, so this reports
+/// nothing about typing.
 ///
 /// Permission: this type never prompts. `start()` returns false when the tap cannot be created, and the owner
 /// shows a notice. There is no fallback global monitor, because a monitor cannot consume an event.
@@ -120,7 +124,7 @@ final class TilingKeyTap: @unchecked Sendable {
         case .passThrough:
             return Unmanaged.passUnretained(event)
         case .consume(let action):
-            if let action { deliver(action) }
+            deliver(action, joined: decision.monitorEvent(for: key))
             return nil
         }
     }
@@ -143,10 +147,17 @@ final class TilingKeyTap: @unchecked Sendable {
     }
 
     /// Always hops to the main queue, even from the main thread, so the callback returns before any
-    /// Accessibility work starts. The queue is first in, first out, so actions keep their order.
-    private nonisolated func deliver(_ action: TileAction) {
+    /// Accessibility work starts. The queue is first in, first out, so actions and consumed keys keep their order,
+    /// and a monitor hears about a consumed key before any later modifier change.
+    private nonisolated func deliver(_ action: TileAction?, joined: ShortcutEvent?) {
+        guard action != nil || joined != nil else { return }
         let sink = self.sink
-        DispatchQueue.main.async { MainActor.assumeIsolated { sink(action) } }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if let joined { TilingConsumedKey.post(joined) }
+                if let action { sink(action) }
+            }
+        }
     }
 }
 

@@ -51,10 +51,23 @@ final class PointingHotkeyMonitor {
     /// A `.began` was reported, so its end must be reported too, even if ownership changed mid-hold.
     private var turnOpen = false
     private var watchdog: Timer?
+    private var consumedKeys: NSObjectProtocol?
     private(set) var isRunning = false
 
-    /// Keys the tiling tap consumes never reach the tap or monitor below; this feeds them in.
+    /// Keys the tiling tap consumes never reach the tap below. Feeding them in keeps a hold spoiled until every
+    /// modifier is up, as the same chord unconsumed would. Idempotent.
     func observeConsumedKeys() {
+        guard consumedKeys == nil else { return }
+        consumedKeys = NotificationCenter.default.addObserver(
+            forName: TilingConsumedKey.notification, object: nil, queue: .main) { [weak self] note in
+            guard let event = TilingConsumedKey.event(in: note) else { return }
+            MainActor.assumeIsolated { guard let self else { return }; self.feed(event, at: self.now()) }
+        }
+    }
+
+    private func stopObservingConsumedKeys() {
+        if let consumedKeys { NotificationCenter.default.removeObserver(consumedKeys) }
+        consumedKeys = nil
     }
 
     /// Idempotent. Waits for the owner's own permission grant; never prompts.
@@ -67,6 +80,7 @@ final class PointingHotkeyMonitor {
 
     func stop() {
         isRunning = false
+        stopObservingConsumedKeys()
         tap?.stop(); tap = nil
         stopWatchdog()
         gesture.reset()
