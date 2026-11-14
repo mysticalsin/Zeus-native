@@ -193,8 +193,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         }
     }
 
-    /// The call looks over or is about to: the app should read fresh signals each second, because the end timer
-    /// only advances on evidence and a suggestion is withdrawn only when the call is seen coming back.
+    /// The call looks over or is about to: the app should read fresh signals each second, because a quiet spell
+    /// only counts on evidence and a suggestion is withdrawn only when the call is seen coming back.
     public var needsFreshEvidence: Bool {
         guard case .recording(let recording) = state else { return false }
         return recording.micReleasedAt != nil || recording.windowGoneAt != nil

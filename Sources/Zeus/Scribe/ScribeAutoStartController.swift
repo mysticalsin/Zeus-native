@@ -83,7 +83,7 @@ final class ScribeAutoStartController {
         if case .countingDown(let meeting, let deadline) = machine.state {
             ScribeMeetingBanner.shared.updateCountdown(meeting, seconds: Self.secondsLeft(deadline: deadline, now: now))
         }
-        // The end timer only advances on evidence, so while the call looks over, read the signals again each second.
+        // A quiet spell only counts on evidence, so while the call looks over, read the signals again each second.
         if machine.needsFreshEvidence { ScribeCallWatcher.shared.pollNow() }
         syncTimer()
     }
