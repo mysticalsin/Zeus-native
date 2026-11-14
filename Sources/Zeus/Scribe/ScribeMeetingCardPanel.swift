@@ -62,13 +62,16 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     typealias Fade = @MainActor (NSPanel, CGFloat, (@MainActor @Sendable () -> Void)?) -> Void
 
     private static let margin: CGFloat = 16
-    fileprivate static let fadeDuration: TimeInterval = 0.2
 
     private let actions: Actions
     private let now: () -> Date
     private let uptime: () -> TimeInterval
     private let visibleFrame: () -> CGRect
     private let fade: Fade
+    /// The visible frame of the screen the card appeared on. It is read when the card goes from hidden to
+    /// visible and when the screens change, so a card on screen never jumps to another display.
+    private var placement = CGRect.zero
+    private nonisolated(unsafe) var screenObserver: (any NSObjectProtocol)?
     private(set) var window: NSPanel?
     private var host: ScribeCardHostingView<ScribeMeetingCardView>?
     /// Counts renders, so a fade-out that ends after a later render knows it has been overtaken.
@@ -90,6 +93,19 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
         self.uptime = uptime
         self.visibleFrame = visibleFrame
         self.fade = fade ?? Self.animatedFade
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.screensChanged() } }
+    }
+
+    deinit {
+        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+    }
+
+    private func screensChanged() {
+        guard let window, let host, window.isVisible else { return }
+        placement = visibleFrame()
+        layout(window, host)
     }
 
     func render(_ card: ScribeMeetingCard) {
@@ -110,6 +126,7 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
         }
         let (panel, host) = ensurePanel()
         let wasVisible = panel.isVisible
+        if !wasVisible { placement = visibleFrame() }
         panel.ignoresMouseEvents = false
         host.rootView = view(card)
         layout(panel, host)
@@ -131,7 +148,7 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     private static let animatedFade: Fade = { panel, alpha, completion in
         let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = reduced ? AlertMotion.reducedFade : ScribeMeetingCardPanel.fadeDuration
+            context.duration = reduced ? AlertMotion.reducedFade : AlertMotion.collapseContentFade
             panel.animator().alphaValue = alpha
         }, completionHandler: {
             MainActor.assumeIsolated { completion?() }
@@ -141,7 +158,7 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     private func layout(_ panel: NSPanel, _ host: NSView) {
         let size = host.fittingSize
         panel.setContentSize(size)
-        panel.setFrameOrigin(ScribeMeetingCardPlacement.origin(size: size, visibleFrame: visibleFrame(),
+        panel.setFrameOrigin(ScribeMeetingCardPlacement.origin(size: size, visibleFrame: placement,
                                                                margin: Self.margin))
     }
 

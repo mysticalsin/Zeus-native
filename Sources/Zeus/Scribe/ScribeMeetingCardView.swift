@@ -95,9 +95,9 @@ private struct ScribeMeetingCardBody: View {
             .frame(width: ScribeMeetingCardView.width)
             .alertGlass(radius: 16)
             .preferredColorScheme(.dark)
-            .opacity(landed ? 1 : 0)
-            .offset(y: landed ? 0 : -entrance.drop)
-            .animation(entrance.animation, value: landed)
+            // The entrance moves these two only: an animation on the whole card would replace the ring's own
+            // linear sweep in the pass where both start.
+            .animation(entrance.animation) { $0.opacity(landed ? 1 : 0).offset(y: landed ? 0 : -entrance.drop) }
             .animation(ScribeMeetingCardMotion.crossfade, value: card.stateID)
             .onAppear { landed = true }
             .onChange(of: card.stateID, initial: true) {
