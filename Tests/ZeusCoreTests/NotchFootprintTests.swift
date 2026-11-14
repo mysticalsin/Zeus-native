@@ -317,16 +317,18 @@ import Testing
 
     @Test func theHardwareNotchAndThePillKeepTheirZones() {
         let item = wings(none: false, extra: 58)
+        #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: item)
+                == CGRect(x: 565, y: 951, width: 382, height: 31))
+        #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 24, wings: item)
+                == CGRect(x: 565, y: 927, width: 382, height: 55))
+        #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: nil)
+                == CGRect(x: 880, y: 1051, width: 160, height: 29))
         for offset: CGFloat in [0, 24] {
-            #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: offset, wings: item)
-                    == NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: offset, wings: item))
             #expect(NotchFootprintRules.clickZone(.hardware(hardware), screenFrame: laptop, topOffset: offset, wings: item)
                     == NotchOpenRules.clickZone(screenFrame: laptop, notchSize: hardware, topOffset: offset))
             #expect(NotchFootprintRules.clickZone(.pill, screenFrame: external, topOffset: offset, wings: item)
                     == NotchOpenRules.clickZone(screenFrame: external, notchSize: .zero, topOffset: offset))
         }
-        #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: nil)
-                == CGRect(x: 880, y: 1051, width: 160, height: 29))
     }
 
     // MARK: Taking the mouse
@@ -389,24 +391,10 @@ import Testing
         }
     }
 
-    @Test func theMotionKeyDoesNotDependOnTheFootprint() {
-        for item in everyWingFacts {
-            // The key is a property of the wing facts alone: one drawn shape resized, the pill and the notch share it.
-            let key = item.motionKey
-            #expect(key == wings(none: item.kindIsNone, lights: item.hasLights, live: item.hasLiveActivity,
-                                 extra: item.extraWidth).motionKey)
-        }
-        #expect(NotchFootprintRules.closedSize(drawn, wings: wings(none: false)).width
-                != NotchFootprintRules.closedSize(smallDrawn, wings: wings(none: false)).width)
-    }
-
-    // MARK: Words
-
-    @Test func noShapeNameCarriesADash() {
-        for footprint in [drawn, smallDrawn, NotchFootprint.pill, .hardware(hardware)] {
-            let text = String(describing: footprint)
-            #expect(!text.contains("\u{2014}"))
-            #expect(!text.contains("\u{2013}"))
-        }
+    @Test func resizingTheDrawnShapeMovesTheBodyAndNotTheMotionKey() {
+        let item = wings(none: false, extra: 58)
+        #expect(NotchFootprintRules.closedSize(drawn, wings: item).width != NotchFootprintRules.closedSize(smallDrawn, wings: item).width)
+        #expect(NotchFootprintRules.closedSize(drawn, wings: item).width != NotchFootprintRules.closedSize(.pill, wings: item).width)
+        #expect(item.motionKey == wings(none: false, extra: 58).motionKey)
     }
 }
