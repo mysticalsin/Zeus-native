@@ -397,6 +397,14 @@ private final class Fired: @unchecked Sendable { var count = 0 }
         #expect(first == [true, false] && second == [true, false])
     }
 
+    @Test func theFollowSettingOffersExactlyTheArbitersChoicesAndDefaultsToAnyPlayer() throws {
+        let option = try #require(SettingsCatalog.option(NowPlayingHub.followSettingID))
+        #expect(option.choices == NowPlayingArbiter.Follow.choices.map(\.label))
+        #expect(option.defaultValue == "Any player")
+        #expect(NowPlayingArbiter.Follow(label: option.defaultValue) == .any)
+        #expect(option.kind == .choice)
+    }
+
     @Test func attachingWiresTheModelsClosures() {
         let rig = Rig()
         rig.report(rig.music)

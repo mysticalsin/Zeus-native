@@ -5326,6 +5326,10 @@
             },
             {
               "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theFollowSettingOffersExactlyTheArbitersChoicesAndDefaultsToAnyPlayer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
               "function": "attachingWiresTheModelsClosures"
             }
           ]
