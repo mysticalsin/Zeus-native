@@ -26,7 +26,8 @@ public enum TileModifierBase: String, Codable, Sendable, CaseIterable {
 }
 
 public enum TileKeymapError: Error, Equatable, Sendable {
-    /// A bare letter, a modifier-only chord, or anything `Shortcut` reports invalid.
+    /// A modifier-only chord, anything `Shortcut` reports invalid, or a key chord that holds none of Control,
+    /// Option or Command (a bare letter, a bare function key, Shift or Fn with a key).
     case invalidChord
     /// The chord is already bound.
     case duplicateChord
@@ -51,18 +52,30 @@ public struct TileKeymap: Equatable, Sendable {
 
     public init() {}
 
-    /// Binds `shortcut` to `action`. A chord that is invalid, or only modifiers, or already bound is
-    /// rejected and nothing changes. An action may have more than one chord.
+    /// The modifiers a bound chord must hold at least one of. The key tap swallows every chord in the map, so
+    /// a chord without one of these (Shift-A, Fn-A, a bare F key) would take typing or a system key from every
+    /// app. `Shortcut.isValid` alone allows those, so it is not enough here.
+    private static let consumingModifiers: ShortcutModifiers = [.control, .option, .command]
+
+    /// Binds `shortcut` to `action`. A chord that is invalid, only modifiers, without Control, Option or
+    /// Command, or already bound is rejected and nothing changes. An action may have more than one chord.
     public mutating func bind(_ shortcut: Shortcut, to action: TileAction) throws {
         let chord = Self.normalized(shortcut)
-        guard chord.isValid, !chord.isModifierOnly else { throw TileKeymapError.invalidChord }
+        guard chord.isValid, !chord.isModifierOnly,
+              !chord.modifiers.intersection(Self.consumingModifiers).isEmpty else { throw TileKeymapError.invalidChord }
         guard lookup[chord] == nil else { throw TileKeymapError.duplicateChord }
         lookup[chord] = action
         bindings.append(Binding(shortcut: chord, action: action))
     }
 
+    /// The action bound to `shortcut`, or nil. macOS adds the fn flag to arrow and function key presses on
+    /// its own, so when the exact chord has no bind and the event carries fn, the chord without fn is tried
+    /// (the same rule as `ShortcutState.isHeld`). A chord bound with fn wins over the stripped lookup.
     public func action(for shortcut: Shortcut) -> TileAction? {
-        lookup[Self.normalized(shortcut)]
+        let chord = Self.normalized(shortcut)
+        if let hit = lookup[chord] { return hit }
+        guard chord.keyCode != nil, chord.modifiers.contains(.function) else { return nil }
+        return lookup[Shortcut(keyCode: chord.keyCode, modifiers: chord.modifiers.subtracting(.function))]
     }
 
     /// The first chord bound to `action`, for a key list.
