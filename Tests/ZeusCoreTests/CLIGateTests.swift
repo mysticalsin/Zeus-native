@@ -29,14 +29,23 @@ struct CLIGateTests {
 
     @Test func everyDebugHookIsEitherGatedOrOnTheReviewedOpenList() {
         // A new hook in the catalog fails here until someone decides which side it belongs on.
-        let reviewedOpen: Set<String> = ["brain-route", "second-brain-lookup", "present", "present-timeline", "update",
-                                         "wake-false-triggers", "learn", "clean-room", "permissions"]
+        let reviewedOpen: Set<String> = ["brain-route", "present", "present-timeline", "update",
+                                         "wake-false-triggers", "clean-room", "permissions"]
         for name in DebugSubcommandCatalog.names where !reviewedOpen.contains(name) {
             #expect(CLIGate.isSensitive(op: .debug, debugSubcommand: name, argument: ""), "\(name) is neither gated nor reviewed as open")
         }
         for name in reviewedOpen {
             #expect(DebugSubcommandCatalog.names.contains(name), "\(name) is on the open list but is not a debug hook")
             #expect(!CLIGate.isSensitive(op: .debug, debugSubcommand: name, argument: ""))
+        }
+    }
+
+    @Test func hooksThatReadFoldersOrChangeLearnedShortcutsNeedTheGate() {
+        // second-brain-lookup searches any folder named with --vault and returns snippets, so a program that lacks access to a
+        // folder could read it through Zeus. learn lists and undoes the owner's learned shortcuts.
+        for name in ["second-brain-lookup", "learn"] {
+            #expect(CLIGate.isSensitive(op: .debug, debugSubcommand: name, argument: ""), "\(name)")
+            #expect(CLIGate.isSensitive(op: .debug, debugSubcommand: name, argument: "list"), "\(name) list")
         }
     }
 

@@ -2,11 +2,13 @@ import Foundation
 
 /// Which `zeus` commands need "Allow command-line control", and who may use them once it is on.
 public enum CLIGate {
-    /// Debug hooks that capture, inject input, change privacy settings, write files, import keys, or
-    /// open and render Zeus's own panels (Calendar, Reminders and clipboard content included).
+    /// Debug hooks that capture, inject input, change privacy settings, write files, import keys, read folders
+    /// on the caller's behalf (`second-brain-lookup` searches any folder named with `--vault`, and Zeus may hold
+    /// access to folders the caller lacks), change the owner's learned shortcuts (`learn`), or open and render
+    /// Zeus's own panels (Calendar, Reminders and clipboard content included).
     static let sensitiveDebug: Set<String> = [
         "dictate-file", "wake-file", "record", "hands", "hands-live", "selection", "on-device-speech",
-        "import-assistant-key", "engine-logos",
+        "import-assistant-key", "engine-logos", "second-brain-lookup", "learn",
         "screenshot", "tab", "open-settings", "onboarding", "animate", "presence", "hud-state",
     ]
     /// The subset that starts capturing audio or screen content.
@@ -37,6 +39,10 @@ public enum CLIGate {
     /// The switch and the peer rule must both pass. The peer closure runs only when the switch is on,
     /// so a Mac that never turned the switch on never reads a signature. A peer that was not identified
     /// at all (nil) is refused.
+    ///
+    /// The peer rule only blocks clients that talk to the socket directly with their own program. It checks which
+    /// binary connected, not who started it, so it does not stop a program of the same user from running the
+    /// signed `zeus` command with its own arguments once the switch is on.
     public static func verdict(gateEnabled: Bool, peer: () -> PeerVerdict?) -> Verdict {
         guard gateEnabled else { return .gateOff }
         switch peer() {
