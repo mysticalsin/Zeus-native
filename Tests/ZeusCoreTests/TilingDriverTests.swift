@@ -201,6 +201,49 @@ extension TilingDriverTests {
             #expect(results == [.minimized, nil])
         }
 
+        // The window list says only that some window of the process sits at a frame. Every window of the process that could
+        // be that entry counts, whether or not it passed the other checks.
+        @Test func aWindowWhoseFactsDidNotReadMakesItsSameAppSiblingAmbiguous() {
+            // One window on this Space whose attributes timed out (no frame), and a clean one at the same frame on another
+            // Space. There is one on-screen entry, and it may belong to either.
+            let unread = facts { $0.role = nil; $0.subrole = nil; $0.isMinimized = nil; $0.isFullScreen = nil; $0.isSizeSettable = nil; $0.frame = nil }
+            let results = TileAdmission.rejections([unread, facts()], onScreen: onScreenEditor, policy: policy())
+            #expect(results == [.unreadable, .unreadable], "the clean window may be the one on the other Space: \(results)")
+        }
+
+        @Test func aWindowWhoseFrameDidNotReadDoesNotMatterToAnotherApp() {
+            let unread = facts { $0.pid = 501; $0.bundleID = "com.example.viewer"; $0.frame = nil }
+            let results = TileAdmission.rejections([unread, facts()], onScreen: onScreenEditor, policy: policy())
+            #expect(results == [.unreadable, nil])
+        }
+
+        @Test func aNonStandardLayerZeroWindowAtTheSameFrameMakesAStandardOneAmbiguous() {
+            let panel = facts { $0.subrole = "AXFloatingWindow" }
+            let results = TileAdmission.rejections([panel, facts()], onScreen: onScreenEditor, policy: policy())
+            #expect(results == [.notStandardWindow, .unreadable], "the one entry may be the panel's: \(results)")
+        }
+
+        @Test func aWindowThatCannotBeResizedOrIsFullScreenAtTheSameFrameCountsToo() {
+            let fixed = facts { $0.isSizeSettable = false }
+            #expect(TileAdmission.rejections([fixed, facts()], onScreen: onScreenEditor, policy: policy()) == [.notResizable, .unreadable])
+            let full = facts { $0.isFullScreen = true }
+            #expect(TileAdmission.rejections([full, facts()], onScreen: onScreenEditor, policy: policy()) == [.fullScreen, .unreadable])
+        }
+
+        @Test func aRejectedWindowAtAnotherFrameOfTheSameAppDoesNotMakeAVisibleOneAmbiguous() {
+            let elsewhere = facts { $0.subrole = "AXFloatingWindow"; $0.frame = rect(1000, 100, 400, 500) }
+            #expect(TileAdmission.rejections([elsewhere, facts()], onScreen: onScreenEditor, policy: policy()) == [.notStandardWindow, nil])
+            let partial = facts { $0.role = nil; $0.frame = rect(1000, 100, 400, 500) }
+            #expect(TileAdmission.rejections([partial, facts()], onScreen: onScreenEditor, policy: policy()) == [.unreadable, nil],
+                    "its frame read, so it is known to sit elsewhere")
+        }
+
+        @Test func enoughOnScreenEntriesForEveryPossibleWindowAdmitsTheCleanOne() {
+            let panel = facts { $0.subrole = "AXFloatingWindow" }
+            let twice = onScreenEditor + onScreenEditor
+            #expect(TileAdmission.rejections([panel, facts()], onScreen: twice, policy: policy()) == [.notStandardWindow, nil])
+        }
+
         @Test func theBatchAnswerForOneWindowIsTheSingleWindowAnswer() {
             #expect(TileAdmission.rejections([facts()], onScreen: onScreenEditor, policy: policy()) == [nil])
             #expect(TileAdmission.rejections([facts()], onScreen: [], policy: policy()) == [.otherSpace])
