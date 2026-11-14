@@ -127,7 +127,7 @@ private final class Fired: @unchecked Sendable { var count = 0 }
         rig.hub.musicCommand(.open)
         #expect(rig.sent.map(\.player) == [.spotify])
         #expect(rig.opened == [rig.spotify])
-        #expect(rig.model.commandTarget() == rig.spotify)
+        #expect(rig.model.commandTarget == rig.spotify)
         rig.report(rig.spotify, "Pinned")
         #expect(rig.model.nowPlaying?.source == rig.spotify)
         // The setting changes: the other player shows at once.
@@ -141,7 +141,7 @@ private final class Fired: @unchecked Sendable { var count = 0 }
 
     @Test func withNothingShownTheTargetIsMusicAndOpenNamesIt() {
         let rig = Rig()
-        #expect(rig.model.commandTarget() == rig.music)
+        #expect(rig.model.commandTarget == rig.music)
         rig.hub.musicCommand(.open)
         rig.hub.musicCommand(.playPause)
         #expect(rig.opened == [rig.music])
@@ -307,6 +307,22 @@ private final class Fired: @unchecked Sendable { var count = 0 }
         #expect(rig.model.nowPlaying?.isPlaying == true)
     }
 
+    @Test func aDictationPauseOfTheShownSourceKeepsItShown() {
+        let rig = Rig()
+        rig.report(rig.music)
+        rig.report(rig.spotify, "Later")
+        rig.report(rig.spotify, "Later", playing: false)
+        #expect(rig.model.nowPlaying?.source == rig.music)
+        // Music is the only one playing; pausing it for dictation must not hand the notch to the older Spotify entry.
+        #expect(rig.hub.pauseForDictation() == rig.music)
+        #expect(rig.model.nowPlaying?.source == rig.music)
+        #expect(rig.model.nowPlaying?.isPlaying == false)
+        rig.hub.resumeAfterDictation(rig.music)
+        #expect(rig.sent.map(\.kind) == [.pause, .play])
+        #expect(rig.model.nowPlaying?.source == rig.music)
+        #expect(rig.model.nowPlaying?.isPlaying == true)
+    }
+
     @Test func dictationLeavesAPausedOrEmptyNotchAlone() {
         let rig = Rig()
         #expect(rig.hub.pauseForDictation() == nil)
@@ -373,6 +389,48 @@ private final class Fired: @unchecked Sendable { var count = 0 }
         // Nothing left to show: reset.
         rig.hub.remove { _ in true }
         #expect(rig.modeResets == 4)
+    }
+
+    @Test func aChangeOfShownSourceFromTheSettingOrARemovalReadsTheNewOnesModes() {
+        let rig = Rig()
+        rig.report(rig.music)
+        rig.report(rig.spotify, playing: false)
+        #expect(rig.modeReads == [.music] && rig.modeResets == 1)
+        // Pinning Spotify shows its paused entry, which sends nothing now: its modes are read all the same.
+        rig.label = "Spotify"
+        rig.hub.followChanged()
+        #expect(rig.model.nowPlaying?.source == rig.spotify)
+        #expect(rig.modeResets == 2 && rig.modeReads == [.music, .spotify])
+        // Following any player shows Music again.
+        rig.label = nil
+        rig.hub.followChanged()
+        #expect(rig.model.nowPlaying?.source == rig.music)
+        #expect(rig.modeResets == 3 && rig.modeReads == [.music, .spotify, .music])
+        // Music quits: the paused Spotify entry shows and is read.
+        rig.hub.remove { $0 == rig.music }
+        #expect(rig.model.nowPlaying?.source == rig.spotify)
+        #expect(rig.modeResets == 4 && rig.modeReads == [.music, .spotify, .music, .spotify])
+        // A change that shows the same source reads nothing.
+        rig.hub.followChanged()
+        #expect(rig.modeResets == 4 && rig.modeReads.count == 4)
+    }
+
+    @Test func theCommandTargetIsObservedAndFollowsTheSetting() {
+        let rig = Rig()
+        #expect(rig.model.commandTarget == rig.music)
+        let fired = Fired()
+        withObservationTracking { _ = rig.model.commandTarget } onChange: { fired.count += 1 }
+        // Nothing is shown and the pin moves: the label of the Open button must follow.
+        rig.label = "Spotify"
+        rig.hub.followChanged()
+        #expect(rig.model.nowPlaying == nil)
+        #expect(rig.model.commandTarget == rig.spotify)
+        #expect(fired.count == 1)
+        // The target of a shown source is that source.
+        rig.label = nil
+        rig.hub.followChanged()
+        rig.report(Rig.tab(4))
+        #expect(rig.model.commandTarget == Rig.tab(4))
     }
 
     @Test func artworkIsRequestedForTheShownItem() {

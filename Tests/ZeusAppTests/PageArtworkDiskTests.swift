@@ -7,19 +7,27 @@ import ZeusCore
 /// Answers every request from a closure, so no test reaches the network. State is static, so the suite runs one case at a time.
 private final class StubProtocol: URLProtocol, @unchecked Sendable {
     enum Reply {
-        case image(Data, contentLength: Int? = nil)
+        case image(Data, contentLength: Int? = nil, setCookie: String? = nil)
         case redirect(to: String)
         case status(Int)
     }
 
     nonisolated(unsafe) static var replies: [String: Reply] = [:]
     nonisolated(unsafe) static var requested: [URL] = []
+    /// The Cookie header of each request, in order; nil when none was sent.
+    nonisolated(unsafe) static var cookieHeaders: [String?] = []
     private static let lock = NSLock()
 
     static func reset(_ replies: [String: Reply] = [:]) {
         lock.lock(); defer { lock.unlock() }
         self.replies = replies
         requested = []
+        cookieHeaders = []
+    }
+
+    static var cookies: [String?] {
+        lock.lock(); defer { lock.unlock() }
+        return cookieHeaders
     }
 
     static var requests: [URL] {
@@ -34,12 +42,14 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         guard let url = request.url else { return }
         Self.lock.lock()
         Self.requested.append(url)
+        Self.cookieHeaders.append(request.value(forHTTPHeaderField: "Cookie"))
         let reply = Self.replies[url.absoluteString]
         Self.lock.unlock()
         switch reply {
-        case .image(let data, let length):
+        case .image(let data, let length, let setCookie):
             var headers = ["Content-Type": "image/png"]
             if let length { headers["Content-Length"] = String(length) }
+            if let setCookie { headers["Set-Cookie"] = setCookie }
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
@@ -74,9 +84,9 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
 
     private func makeStore() throws -> (store: ArtworkStore, directory: URL) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("PageArtworkDiskTests-\(UUID().uuidString)", isDirectory: true)
-        let config = URLSessionConfiguration.ephemeral
+        // The configuration the app uses, with only the network swapped for the stub.
+        let config = ArtworkStore.sessionConfiguration()
         config.protocolClasses = [StubProtocol.self]
-        config.timeoutIntervalForRequest = 8
         return (ArtworkStore(directory: directory, session: URLSession(configuration: config)), directory)
     }
 
@@ -218,5 +228,30 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         moved.store.request(for: playing)
         #expect(await waitForCover(moved.store, playing) != nil)
         #expect(files(in: moved.directory).isEmpty)
+    }
+
+    @Test func aPageCoverSessionKeepsNoCookies() {
+        let config = ArtworkStore.sessionConfiguration()
+        #expect(config.httpCookieAcceptPolicy == .never)
+        #expect(!config.httpShouldSetCookies)
+        #expect(config.httpCookieStorage == nil)
+        #expect(config.urlCache == nil)
+        #expect(config.timeoutIntervalForRequest == 8 && config.timeoutIntervalForResource == 20)
+    }
+
+    @Test func aCookieSetByACoverHostIsNeverSentBack() async throws {
+        let other = "https://img.example.com/other.jpg"
+        StubProtocol.reset([coverURL: .image(Self.png(side: 8), setCookie: "id=owner-1; Path=/; Max-Age=3600"),
+                            other: .image(Self.png(side: 6))])
+        let (store, directory) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = tab(coverURL)
+        store.request(for: first)
+        #expect(await waitForCover(store, first) != nil)
+        let second = tab(other)
+        store.request(for: second)
+        #expect(await waitForCover(store, second) != nil)
+        #expect(StubProtocol.requests.map(\.absoluteString) == [coverURL, other])
+        #expect(StubProtocol.cookies.allSatisfy { $0 == nil }, "no request carries a Cookie header")
     }
 }

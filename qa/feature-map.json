@@ -675,6 +675,14 @@
       "scope": "Actual ArtworkStore with a temporary directory and a stub URLProtocol: no network, no real cache folder, no permission, no device acceptance."
     },
     {
+      "id": "native-LyricsStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "LyricsStoreTests",
+      "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+      "scope": "Actual LyricsStore with a temporary cache folder, a stub URLProtocol and the privacy switch given as on: no network, no real cache folder, no setting written, no device acceptance."
+    },
+    {
       "id": "native-LiveDiagnosticsCardTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5331,13 +5339,25 @@
             {
               "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
               "function": "attachingWiresTheModelsClosures"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aDictationPauseOfTheShownSourceKeepsItShown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aChangeOfShownSourceFromTheSettingOrARemovalReadsTheNewOnesModes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theCommandTargetIsObservedAndFollowsTheSetting"
             }
           ]
         },
         {
           "id": "F13.page-artwork-disk",
           "check": "native-PageArtworkDiskTests",
-          "acceptance": "A cover taken from a browser page is shown from the page's own https link, never read from or written to the artwork folder, ignores a file seeded at its key, and is refused when the link is not allowed, the answer is not an image, it is over 2 MB, or a redirect leaves allowed https. A real page and a real cache folder remain device proof.",
+          "acceptance": "A cover taken from a browser page is shown from the page's own https link, never read from or written to the artwork folder, ignores a file seeded at its key, and is refused when the link is not allowed, the answer is not an image, it is over 2 MB, or a redirect leaves allowed https, and the fetch session takes and sends no cookie. A real page and a real cache folder remain device proof.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
@@ -5362,6 +5382,37 @@
             {
               "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
               "function": "aRedirectToAnythingButAnAllowedHTTPSAddressIsRefused"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aPageCoverSessionKeepsNoCookies"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aCookieSetByACoverHostIsNeverSentBack"
+            }
+          ]
+        },
+        {
+          "id": "F13.lyrics-store-disk",
+          "check": "native-LyricsStoreTests",
+          "acceptance": "The actual lyric store never reads the lyric cache for a browser item, even with a file seeded at its key, writes nothing after an answer, and asks nothing for a browser item without a length; a player still reads and writes the cache as before. A real page and a real cache folder remain device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aBrowserItemNeverReadsOrWritesTheLyricCache"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aBrowserItemLeavesNoFileInAnEmptyCacheFolder"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aBrowserItemWithNoDurationAsksNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aPlayerStillReadsAndWritesTheLyricCache"
             }
           ]
         },

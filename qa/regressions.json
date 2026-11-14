@@ -4438,6 +4438,42 @@
         "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
         "function": "theModesBelongToTheShownSource"
       }
+    },
+    {
+      "id": "REG-456",
+      "failure": "Lyrics for a browser item were read from or written to the lyric cache folder, leaving a trace of a page on disk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LyricsStoreTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+        "function": "aBrowserItemNeverReadsOrWritesTheLyricCache"
+      }
+    },
+    {
+      "id": "REG-457",
+      "failure": "A page cover host could set a cookie that the app sent back on every later cover fetch, which let a host follow the owner across pages.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageArtworkDiskTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+        "function": "aCookieSetByACoverHostIsNeverSentBack"
+      }
+    },
+    {
+      "id": "REG-458",
+      "failure": "With nothing playing the notch jumped to the source that had started later but stopped earlier, so pausing Music handed the notch to a paused tab.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
+        "function": "whenNothingPlaysTheOneThatStoppedLastStaysWhateverStartedFirst"
+      }
     }
   ]
 }
