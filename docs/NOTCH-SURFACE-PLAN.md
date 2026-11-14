@@ -30,10 +30,14 @@ No code is copied and no dependency is added.
   choices `Hover` and `Click`, default `Hover`. Note: "Hover opens it after the delay. Click opens it only when you
   click the notch."
 - `Hover` is today's behaviour, unchanged in every detail.
-- With `Click`, hovering the notch does not open the panel. A left click inside the click zone opens it. Closing is
-  unchanged: the pointer leaving (when auto-hide is on), a click elsewhere, or the shortcut.
-- Click zone: on a notched display, the hardware notch rectangle, which no other app can use. On a display without a
-  notch, the pill's own rectangle grown by 12 pt on each side and to 14 pt tall, so it stays clear of menu bar items.
+- With `Click`, hovering the notch does not open the panel. A left click inside the click zone opens it, from the
+  closed notch or from a peek (a peek is a notification, and a click promotes it, as hovering does). Only the open
+  panel blocks a click. Closing is unchanged: the pointer leaving (when auto-hide is on), a click elsewhere, or the
+  shortcut.
+- Click zone: on a notched display, the hardware notch rectangle, which no other app can use, reaching down by the
+  applied top offset so a lowered bar is covered too (still only notch-wide, so menu bar items stay clear). On a
+  display without a notch, the pill zone: the pill's own rectangle grown by 12 pt on each side and to 14 pt tall,
+  hanging from the top offset, so it stays clear of menu bar items.
 - The click is observed, not taken: Zeus does not start absorbing mouse events while closed. The closed window stays
   click-through exactly as today.
 - Anything that opens the notch without the pointer (agent cards, cues, the shortcut, voice) is unchanged.
@@ -45,9 +49,11 @@ New file `Sources/ZeusCore/TopBar/NotchOpenTrigger.swift`:
 
 - `NotchOpenTrigger`: `hover`, `click`; `init(label:)` maps the stored display strings, anything unknown is `hover`.
 - `NotchOpenRules.opensOnHover(_:)`.
-- `NotchOpenRules.clickZone(screenFrame:notchSize:topOffset:)`: the rectangle in screen coordinates. A zero notch
-  size means no notch and gives the grown pill rectangle. Works for screens with negative origins.
-- `NotchOpenRules.opensOnClick(trigger:isClosed:point:zone:)`.
+- `NotchOpenRules.clickZone(screenFrame:notchSize:topOffset:)`: the rectangle in screen coordinates. On a notched
+  screen it is notch-wide and reaches down by the top offset; a zero notch size means no notch and gives the grown
+  pill rectangle. Works for screens with negative origins.
+- `NotchOpenRules.opensOnClick(trigger:panelIsOpen:point:zone:)`: true for `click`, a point in the zone and no open
+  panel. A peek does not block it, so a click promotes a peek.
 
 App side: one static reader beside the existing open-delay reader in `NotchController`, a gate in the hover branch,
 and click handling in the existing global left-mouse monitor plus a local one for when a Zeus window is frontmost.
@@ -56,9 +62,9 @@ and click handling in the existing global left-mouse monitor plus a local one fo
 
 ### Tests first (`Tests/ZeusCoreTests/NotchOpenTriggerTests.swift`)
 
-Label parsing with an unknown value; hover opens only for `hover`; the click zone for a notched screen, a screen
-without a notch, a screen with a negative origin and a non-zero top offset; a click inside and outside the zone;
-no open when the notch is already open; no open for `hover`.
+Label parsing with an unknown value; hover opens only for `hover`; the click zone for a notched screen (flush and
+lowered by a top offset), a screen without a notch, a screen with a negative origin and a non-zero top offset; a click
+inside and outside the zone; no open when the panel is already open; a click opens from a peek; no open for `hover`.
 
 ## S2. Rounded bottom corners
 

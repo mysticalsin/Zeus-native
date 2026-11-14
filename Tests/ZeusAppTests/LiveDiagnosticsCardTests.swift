@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import Testing
 import ZeusCore
@@ -136,5 +137,51 @@ struct LiveDiagnosticsCardTests {
         window.contentView = NSView()   // the reader leaves the window and stops listening
         NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
         #expect(reports.count == 3)
+    }
+
+    // MARK: Occlusion
+
+    @Test func samplingStopsWhenTheWindowIsOrderedInButCoveredOrOnAnotherSpace() {
+        #expect(SamplingVisibility.isSeen(ordered: true, occlusionVisible: true))
+        #expect(!SamplingVisibility.isSeen(ordered: true, occlusionVisible: false))
+        #expect(!SamplingVisibility.isSeen(ordered: false, occlusionVisible: true))
+        #expect(!SamplingVisibility.isSeen(ordered: false, occlusionVisible: false))
+    }
+
+    @Test func aWindowThatIsNotShownIsNeverSeenAndCloseAlwaysReadsHidden() {
+        let window = window()
+        window.isReleasedWhenClosed = false
+        #expect(!SamplingVisibility.isSeen(window))
+        #expect(!SamplingVisibility.isSeen(nil))
+        #expect(!SamplingVisibility.reading(after: NSWindow.willCloseNotification, in: window))
+        #expect(!SamplingVisibility.reading(after: NSWindow.didChangeOcclusionStateNotification, in: window))
+    }
+
+    // MARK: Thermal delivery
+
+    @Test func theThermalNotificationReachesTheCardOnTheMainThread() async {
+        let center = NotificationCenter()
+        var cancellable: AnyCancellable?
+        let onMain: Bool = await withCheckedContinuation { continuation in
+            cancellable = LiveDiagnosticsCard.thermalChanges(center: center).sink { continuation.resume(returning: Thread.isMainThread) }
+            // Foundation posts this notification from a global queue.
+            DispatchQueue.global().async { center.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil) }
+        }
+        cancellable?.cancel()
+        #expect(onMain)
+    }
+
+    // MARK: Copy
+
+    @Test func copyPutsTheSummaryOnThePasteboardAndAnnouncesIt() {
+        let board = NSPasteboard(name: NSPasteboard.Name("zeus.diagnostics.\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        let live = LiveDiagnostics(cpuPercent: 0.4, memoryBytes: 96 * 1_048_576, thermal: .nominal, audio: .off,
+                                   playerName: "Music", isPlaying: true, appVersion: "1.0", build: "1", osVersion: "26.0.0")
+        var spoken: [String] = []
+        LiveDiagnosticsCard.copy(live, to: board) { spoken.append($0) }
+        #expect(board.string(forType: .string) == live.summaryText)
+        #expect(spoken == [LiveDiagnosticsCard.copiedAnnouncement])
+        #expect(!LiveDiagnosticsCard.copiedAnnouncement.isEmpty)
     }
 }

@@ -32,6 +32,51 @@ struct SettingsCatalogTests {
         #expect(option?.title == "Light lyrics word by word")
     }
 
+    @Test func theOpenTriggerChoicesParseToTheirTriggersAndDefaultToHover() throws {
+        let option = try #require(SettingsCatalog.option("notch.openTrigger"))
+        #expect(option.section == .appearance)
+        #expect(option.group == "Notch behavior")
+        #expect(option.kind == .choice)
+        #expect(option.state == .live)
+        #expect(option.title == "Open the notch on")
+        #expect(option.choices == ["Hover", "Click"])
+        #expect(option.choices.map { NotchOpenTrigger(label: $0) } == [.hover, .click])
+        #expect(NotchOpenTrigger(label: option.defaultValue) == .hover)
+        #expect(option.choices.contains(option.defaultValue))
+    }
+
+    @Test func theCornerSizeChoicesAreTheCoreSizesAndDefaultToMedium() throws {
+        let option = try #require(SettingsCatalog.option("screen.cornerRadius"))
+        #expect(option.section == .appearance)
+        #expect(option.group == "Screen")
+        #expect(option.kind == .choice)
+        #expect(option.state == .live)
+        #expect(option.title == "Corner size")
+        #expect(option.choices == ScreenCornerSize.allCases.map(\.label))
+        #expect(option.choices.map { ScreenCornerSize(label: $0) } == ScreenCornerSize.allCases)
+        #expect(Set(option.choices.map { ScreenCornerSize(label: $0).radius }).count == option.choices.count)
+        #expect(ScreenCornerSize(label: option.defaultValue) == .medium)
+    }
+
+    @MainActor @Test func theCornerAndMusicAwakeTogglesAreLiveAndDefaultOff() throws {
+        let corners = try #require(SettingsCatalog.option("screen.roundBottomCorners"))
+        #expect(corners.section == .appearance)
+        #expect(corners.group == "Screen")
+        #expect(corners.kind == .toggle)
+        #expect(corners.state == .live)
+        #expect(corners.defaultValue == "false")
+        #expect(corners.title == "Round the bottom screen corners")
+
+        let music = try #require(SettingsCatalog.option("keepAwake.whileMusic"))
+        #expect(music.section == .general)
+        #expect(music.group == "Day to day")
+        #expect(music.kind == .toggle)
+        #expect(music.state == .live)
+        #expect(music.defaultValue == "false")
+        #expect(music.title == "Keep the display awake while music plays")
+        #expect(music.id == MusicAwakeHold.settingID)
+    }
+
     @Test func dictationLanguageIsCatalogued() {
         #expect(SettingsCatalog.option("dictation.language")?.title == "Dictation language")
         #expect(SettingsCatalog.option("dictation.behavior")?.isShown == true)

@@ -554,6 +554,127 @@ class Pass3NotchWiring(unittest.TestCase):
         self.assertIn("whileOpen: true", pass3_function_body(self.TEXT, "func snoozeAlert("))
 
 
+OPEN_ON_CLICK_RETURN = "if self?.openOnClick() == true { return }"
+HOVER_GATE = "guard NotchOpenRules.opensOnHover(Self.openTrigger) else"
+
+
+def click_open_returns_before_outside(text):
+    """True when the global mouse-down closure returns after a click that opened the notch, before
+    clickedOutside() can dismiss the panel that click just opened."""
+    returned = text.find(OPEN_ON_CLICK_RETURN)
+    outside = text.find("self?.clickedOutside()")
+    return returned != -1 and outside != -1 and returned < outside
+
+
+def local_mouse_down_opens_on_click(text):
+    return re.search(r"addLocalMonitorForEvents\(matching: \[\.leftMouseDown\]\)[^}]*?openOnClick\(\)", text) is not None
+
+
+def hover_gate_precedes_the_dwell(body):
+    """True when click mode returns before the hover dwell that opens the panel."""
+    gate = body.find(HOVER_GATE)
+    dwell = body.find("hoverTask = Task")
+    shortcut = body.find("guard topBar != nil else { show(.panel); return }")
+    return gate != -1 and gate < dwell and gate < shortcut
+
+
+def check_precedes(body, first, second):
+    return first in body and second in body and body.index(first) < body.index(second)
+
+
+class Pass4IslandWiring(unittest.TestCase):
+    """Island click open, corner overlay, music display hold and lyrics privacy: wiring no pure rule can see."""
+    NOTCH = pass3_source("Sources/Zeus/Notch/NotchController.swift")
+
+    def test_a_click_that_opens_the_notch_returns_before_clicked_outside(self):
+        start = pass3_function_body(self.NOTCH, "func start()")
+        self.assertTrue(click_open_returns_before_outside(start))
+
+    def test_click_mode_also_listens_while_a_zeus_window_is_frontmost(self):
+        self.assertTrue(local_mouse_down_opens_on_click(pass3_function_body(self.NOTCH, "func start()")))
+
+    def test_hovering_never_opens_the_notch_in_click_mode(self):
+        self.assertTrue(hover_gate_precedes_the_dwell(pass3_function_body(self.NOTCH, "private func mouseMoved()")))
+
+    def test_a_click_opens_only_through_the_pure_rule_and_a_known_surface(self):
+        body = pass3_function_body(self.NOTCH, "private func openOnClick() -> Bool")
+        self.assertIn("topBar != nil || !model.sessions.isEmpty || model.approval != nil", body)
+        self.assertTrue(check_precedes(body, "NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel", "show(.panel)"))
+
+    def test_the_corner_overlay_follows_screen_sharing_and_the_two_settings(self):
+        sharing = pass3_source("Sources/Zeus/App/ZeusWindowSharing.swift")
+        self.assertIn("ScreenCornerOverlay.shared.applyScreenSharePolicy(visibleInShare: visible)", pass3_function_body(sharing, "static func refresh("))
+        delegate = pass3_source("Sources/Zeus/App/AppDelegate.swift")
+        self.assertIn("ScreenCornerOverlay.shared.start()", delegate)
+        self.assertIn('case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()', delegate)
+
+    def test_the_corner_overlay_draws_only_on_notched_screens_and_keeps_unchanged_panels(self):
+        overlay = pass3_source("Sources/Zeus/Notch/ScreenCornerOverlay.swift")
+        self.assertIn("ScreenCorners.draws(hasNotch: Self.hasNotch(screen), enabled: enabled)", overlay)
+        self.assertIn("guard wanted != placements else { return }", pass3_function_body(overlay, "private func rebuild()"))
+        make = pass3_function_body(overlay, "static func makePanel(")
+        self.assertIn("ScreenCornerPanelFlags.standard", make)
+        self.assertIn("ZeusWindowSharing.apply(to: panel", make)
+        self.assertIn("ignoresMouseEvents: true", overlay)
+
+    def test_the_music_hold_takes_its_own_display_assertion_that_releases_itself(self):
+        hold = pass3_source("Sources/Zeus/TopBar/MusicAwakeHold.swift")
+        body = pass3_function_body(hold, "static func createAssertion(")
+        self.assertIn("IOPMAssertionCreateWithDescription(", body)
+        self.assertIn('"PreventUserIdleDisplaySleep"', body)
+        self.assertIn('"TimeoutActionRelease"', body)
+        self.assertIn("timeout,", body)
+        self.assertNotIn("KeepAwakeSession.shared.begin", hold)
+
+    def test_lyrics_are_never_requested_while_the_privacy_setting_is_off(self):
+        text = pass3_source("Sources/Zeus/TopBar/LyricsViews.swift")
+        load = pass3_function_body(text, "func load(for playing: NowPlaying?)")
+        self.assertTrue(check_precedes(load, "guard Self.enabled else", "ask(query)"))
+        self.assertIn("enabled: Self.enabled", pass3_function_body(text, "private func retryPlan(for key: String)"))
+        self.assertEqual(text.count("self?.run("), 1, "only ask(_:) may start a request")
+
+    def test_the_sampling_reader_uses_the_occlusion_aware_rule(self):
+        text = pass3_source("Sources/Zeus/Perf/SamplingHold.swift")
+        body = pass3_function_body(text, "override func viewDidMoveToWindow()")
+        self.assertIn("SamplingVisibility.reading(after: name", body)
+        self.assertIn("onChange(SamplingVisibility.isSeen(window))", body)
+        self.assertNotIn("WindowVisibility.reading", body)
+        self.assertNotIn("WindowVisibility.isVisible", body)
+
+    def test_the_diagnostics_card_hears_thermal_changes_on_the_main_queue_from_one_publisher(self):
+        text = pass3_source("Sources/Zeus/Settings/GSLiveDiagnosticsCard.swift")
+        self.assertIn(".onReceive(Self.thermalPublisher)", text)
+        self.assertIn("static let thermalPublisher = thermalChanges()", text)
+        factory = pass3_function_body(text, "static func thermalChanges(")
+        self.assertIn(".receive(on: DispatchQueue.main)", factory)
+        self.assertEqual(text.count("publisher(for: ProcessInfo.thermalStateDidChangeNotification)"), 1,
+                         "only thermalChanges(center:) may subscribe, and it hops to the main queue")
+
+    def test_the_island_lints_detect_their_failure_shapes(self):
+        good = f"""func start() {{
+            addGlobalMonitorForEvents(matching: [.leftMouseDown]) {{ _ in
+                {OPEN_ON_CLICK_RETURN}
+                self?.clickedOutside()
+            }}
+            addLocalMonitorForEvents(matching: [.leftMouseDown]) {{ event in
+                MainActor.assumeIsolated {{ _ = self?.openOnClick() }}
+                return event
+            }}
+        }}"""
+        self.assertTrue(click_open_returns_before_outside(good))
+        self.assertTrue(local_mouse_down_opens_on_click(good))
+        self.assertFalse(click_open_returns_before_outside(good.replace(OPEN_ON_CLICK_RETURN, "_ = self?.openOnClick()")))
+        self.assertFalse(click_open_returns_before_outside(good.replace("self?.openOnClick() == true { return }", "self?.openOnClick() == true { }")))
+        self.assertFalse(local_mouse_down_opens_on_click(good.replace("self?.openOnClick()", "self?.noop()")))
+        hover = f"{HOVER_GATE} {{ return }}\nguard topBar != nil else {{ show(.panel); return }}\nhoverTask = Task {{ }}"
+        self.assertTrue(hover_gate_precedes_the_dwell(hover))
+        self.assertFalse(hover_gate_precedes_the_dwell(hover.replace(HOVER_GATE, "guard true else")))
+        self.assertFalse(hover_gate_precedes_the_dwell("guard topBar != nil else { show(.panel); return }\n" + HOVER_GATE + " { return }\nhoverTask = Task { }"))
+        self.assertTrue(check_precedes("guard Self.enabled else {}\nask(query)", "guard Self.enabled else", "ask(query)"))
+        self.assertFalse(check_precedes("ask(query)\nguard Self.enabled else {}", "guard Self.enabled else", "ask(query)"))
+        self.assertFalse(check_precedes("ask(query)", "guard Self.enabled else", "ask(query)"))
+
+
 class Pass3StaleReadWiring(unittest.TestCase):
     def test_launch_at_login_read_is_invalidated_by_a_toggle(self):
         text = pass3_source("Sources/Zeus/App/SettingsStore.swift")

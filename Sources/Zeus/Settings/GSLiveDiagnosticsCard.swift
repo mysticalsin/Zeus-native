@@ -1,10 +1,11 @@
 import AppKit
+import Combine
 import SwiftUI
 import ZeusCore
 
 /// Settings > Diagnostics > "Zeus right now": Zeus's own CPU, memory, heat and audio state, and a Copy button
 /// for a bug report. Samples through the shared `EnergyMonitor` only while the card is on screen in a window
-/// that can be seen, so nothing runs when the page is left or the Settings window is closed or minimised.
+/// that can be seen, so nothing runs when the page is left or the Settings window is closed, minimised, covered or on another Space.
 /// Snapshots show fixed values and start nothing.
 struct LiveDiagnosticsCard: View {
     let context: GSContext
@@ -35,7 +36,7 @@ struct LiveDiagnosticsCard: View {
                     Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
                 .buttonStyle(GSButtonStyle())
-                .accessibilityLabel(copied ? "Copied the diagnostics summary" : "Copy the diagnostics summary")
+                .accessibilityLabel(copied ? Self.copiedAnnouncement : "Copy the diagnostics summary")
             }
         }
         // The probe is an NSView; ImageRenderer (snapshots) would draw it as a yellow placeholder.
@@ -54,9 +55,22 @@ struct LiveDiagnosticsCard: View {
             copied = false
             hold.disappear()
         }
-        .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in
+        .onReceive(Self.thermalPublisher) { _ in
             thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
         }
+    }
+
+    /// One publisher for every render: `AnyPublisher` is not Equatable, so building it inside `body` would
+    /// resubscribe on each update and could drop a notification that lands during the hop.
+    private static let thermalPublisher = thermalChanges()
+
+    /// The system says the Mac's heat changed. Foundation posts this on a global queue, so it is handed to
+    /// the main queue before the view's state is written.
+    static func thermalChanges(center: NotificationCenter = .default) -> AnyPublisher<Void, Never> {
+        center.publisher(for: ProcessInfo.thermalStateDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .map { _ in () }
+            .eraseToAnyPublisher()
     }
 
     // MARK: Values
@@ -80,15 +94,24 @@ struct LiveDiagnosticsCard: View {
             appVersion: version, build: build, osVersion: osText)
     }
 
+    /// What VoiceOver says after a successful copy; the button's label change alone is not spoken.
+    static let copiedAnnouncement = "Copied the diagnostics summary"
+
     private func copy(_ live: LiveDiagnostics) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(live.summaryText, forType: .string)
+        Self.copy(live, to: .general)
         copied = true
         resetCopied?.cancel()
         resetCopied = Task {
             try? await Task.sleep(for: .seconds(2))
             if !Task.isCancelled { copied = false }
         }
+    }
+
+    static func copy(_ live: LiveDiagnostics, to pasteboard: NSPasteboard,
+                     announce: (String) -> Void = { AccessibilityNotification.Announcement($0).post() }) {
+        pasteboard.clearContents()
+        pasteboard.setString(live.summaryText, forType: .string)
+        announce(copiedAnnouncement)
     }
 
     // MARK: Drawing
