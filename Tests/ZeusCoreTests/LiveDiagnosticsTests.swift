@@ -195,6 +195,19 @@ struct LiveDiagnosticsTests {
         }
     }
 
+    @Test func aBrowserItemShowsItsKindAndNeverAHostOrATitle() {
+        let key = BrowserMediaKey(tabID: 4, documentID: "doc-secret", host: "private.example.org", fingerprint: "fp-secret")
+        let track = NowPlaying(source: .browser(key), title: "Secret Clip Title", artist: "Hidden Channel", album: "",
+                               isPlaying: true, duration: 90, position: 10)
+        let live = LiveDiagnostics(cpuPercent: 0.3, memoryBytes: 90 * Self.mb, thermal: .nominal, audio: .running,
+                                   nowPlaying: track, appVersion: "1.4.2", build: "317", osVersion: "15.1.0")
+        #expect(live.rows[4].value == "Chrome, Playing")
+        for secret in ["Secret Clip Title", "Hidden Channel", "private.example.org", "doc-secret", "fp-secret"] {
+            #expect(!live.summaryText.contains(secret))
+            #expect(!live.rows.contains { $0.value.contains(secret) })
+        }
+    }
+
     @Test func noPlayerReadsNone() {
         let live = LiveDiagnostics(cpuPercent: 0.3, memoryBytes: 90 * Self.mb, thermal: .nominal, audio: .off,
                                    nowPlaying: nil, appVersion: "1", build: "1", osVersion: "1")

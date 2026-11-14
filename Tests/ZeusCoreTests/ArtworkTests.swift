@@ -83,6 +83,61 @@ import Testing
         #expect(ArtworkSource.cacheKey(for: playing(.music, album: "")) != a)
     }
 
+    /// Literal keys recorded on the code before the source model existed: a cover already on disk keeps its name.
+    @Test func playerCacheKeysAreUnchanged() {
+        func playing(_ player: NowPlaying.Player, artist: String, album: String, title: String = "Track", id: String? = nil) -> NowPlaying {
+            NowPlaying(player: player, title: title, artist: artist, album: album, isPlaying: true, duration: 1, position: 0, trackID: id)
+        }
+        #expect(ArtworkSource.cacheKey(for: playing(.music, artist: "M83", album: "Hurry Up")) == "music-ec25b708c562c308")
+        #expect(ArtworkSource.cacheKey(for: playing(.music, artist: "m83 ", album: "HURRY UP")) == "music-ec25b708c562c308")
+        #expect(ArtworkSource.cacheKey(for: playing(.music, artist: "M83", album: "", title: "Midnight City")) == "music-2ea3e3cee70960ae")
+        #expect(ArtworkSource.cacheKey(for: playing(.music, artist: "Beyonc\u{E9}", album: "LEMONADE")) == "music-550c358deeaaa7df")
+        #expect(ArtworkSource.cacheKey(for: playing(.spotify, artist: "M83", album: "Hurry Up")) == "spotify-ec25b708c562c308")
+        #expect(ArtworkSource.cacheKey(for: playing(.spotify, artist: "The XX", album: "Coexist", id: "spotify:track:6rqhFgbbKwnb9MLmUQDhG6"))
+                == "spotify-6rqhFgbbKwnb9MLmUQDhG6")
+        #expect(ArtworkSource.cacheKey(for: playing(.spotify, artist: "The XX", album: "Coexist", id: "spotify:episode:abc")) == "spotify-c038c5433c5c7795")
+    }
+
+    @Test func pageImageKeysHashTheURL() {
+        let key = BrowserMediaKey(tabID: 1, documentID: "d", host: "video.example.com", fingerprint: "f")
+        func tab(_ cover: String?, title: String = "Clip", artist: String = "Channel") -> NowPlaying {
+            NowPlaying(source: .browser(key), title: title, artist: artist, album: "", isPlaying: true, duration: 60, position: 0,
+                       artworkURL: cover.flatMap(URL.init(string:)))
+        }
+        let cover = "https://img.example.com/cover.jpg"
+        let a = ArtworkSource.cacheKey(for: tab(cover))
+        #expect(a == "page-3ff3c553349618cf")
+        // The key follows the image, not the title or the artist.
+        #expect(a == ArtworkSource.cacheKey(for: tab(cover, title: "Another clip", artist: "Someone else")))
+        #expect(a != ArtworkSource.cacheKey(for: tab("https://img.example.com/other.jpg")))
+        // Nothing of the page or the image address shows in a file name.
+        #expect(!a.contains("example") && !a.contains("video") && !a.contains("jpg"))
+        #expect(a.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" })
+        // No cover link: still a page key, one shared by every item without one.
+        #expect(ArtworkSource.cacheKey(for: tab(nil)) == "page-cbf29ce484222325")
+        // A page key never collides with a player's.
+        #expect(!a.hasPrefix("music-") && !a.hasPrefix("spotify-"))
+    }
+
+    @Test func pageImageAllowedRules() throws {
+        func allowed(_ text: String) throws -> Bool { ArtworkSource.pageImageAllowed(try #require(URL(string: text))) }
+        #expect(try allowed("https://img.example.com/a.jpg"))
+        #expect(try allowed("https://example.com:8443/a.jpg?size=300"))
+        #expect(try allowed("https://i.ytimg.com/vi/x/hq.jpg"))
+        for refused in [
+            "http://img.example.com/a.jpg", "ftp://img.example.com/a.jpg", "data:image/png;base64,AAAA", "file:///tmp/a.png",
+            "blob:https://example.com/1234",
+            "https://127.0.0.1/a.jpg", "https://192.168.1.4/a.jpg", "https://10.0.0.1:8080/a.jpg", "https://[::1]/a.jpg",
+            "https://[fe80::1]/a.jpg", "https://2130706433/a.jpg", "https://0x7f.0.0.1/a.jpg", "https://0177.0.0.1/a.jpg",
+            "https://localhost/a.jpg", "https://localhost./a.jpg", "https://LOCALHOST/a.jpg", "https://app.localhost/a.jpg",
+            "https://printer.local/a.jpg", "https://printer.local./a.jpg", "https://intranet/a.jpg",
+        ] {
+            #expect(try !allowed(refused), "\(refused) must be refused")
+        }
+        let hostless = try #require(URL(string: "https:///a.jpg"))
+        #expect(!ArtworkSource.pageImageAllowed(hostless))
+    }
+
     @Test func cacheEvictsLeastRecentlyUsedFirst() {
         let now = Date()
         let entries = [

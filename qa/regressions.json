@@ -4366,6 +4366,78 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-450",
+      "failure": "Moving music onto one source model would rename the cover files of Music and Spotify, so every cover already on disk was fetched again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ArtworkTests.swift",
+        "function": "playerCacheKeysAreUnchanged"
+      }
+    },
+    {
+      "id": "REG-451",
+      "failure": "A cover or lyrics for a browser item could be written to the cache folders, leaving a trace of a page on disk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageArtworkDiskTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+        "function": "aPageCoverShowsAndLeavesTheDirectoryEmpty"
+      }
+    },
+    {
+      "id": "REG-452",
+      "failure": "A playing browser tab counted as a player session, so the voice command to play stopped resuming Spotify.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
+        "function": "aBrowserTabIsNotAPlayerSession"
+      }
+    },
+    {
+      "id": "REG-453",
+      "failure": "Dictation resumed whatever the notch fell back to after its source went away, so it could start Music.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NowPlayingHubTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+        "function": "aResumeAfterTheSourceWasRemovedDoesNothingAndNeverReachesMusic"
+      }
+    },
+    {
+      "id": "REG-454",
+      "failure": "A source heard paused for the first time took the notch from the one that was playing.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
+        "function": "aSourceFirstSeenPausedNeverDisplacesTheShownOne"
+      }
+    },
+    {
+      "id": "REG-455",
+      "failure": "A player that was not shown reset or read the shuffle and repeat of the one that was.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NowPlayingHubTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+        "function": "theModesBelongToTheShownSource"
+      }
     }
   ]
 }
