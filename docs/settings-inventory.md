@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 174 of 174 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 174 in scope). 163 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 175 of 175 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 175 in scope). 164 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 123.
+**Before this round:** has 19, partial 27, missing 124.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
