@@ -43,6 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pointingProviders: PointingProviders?
     private var pointingSettingsObserver: NSObjectProtocol?
     private var explanationQuitToken: UUID?
+    /// The per-app equaliser. Built with its live ports, started by nothing: only the owner's switch starts it.
+    private var equaliser: EqualiserController?
     private var explanationDeletionTasks: [UUID: Task<Void, Never>] = [:]
     /// History UUID -> conversation UUID. Retained until exact deletion succeeds.
     private var failedExplanationDeletions: [UUID: UUID] = [:]
@@ -90,6 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SystemAudioDucker.end()
         explanation?.stop()
         pointing?.stop()
+        // Every shaping tap is destroyed and the claim released, so no app is left muted.
+        equaliser?.shutdown()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
         // A Memory edit typed inside its 600 ms pause is written before Zeus goes.
@@ -261,6 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if on(.shortcuts) { ExtraPreferences.shared.onShortcutsChange = { [weak self] in self?.registerShortcuts() } }
         if on(.settingsCatalog) { wireSettingsCatalog() }
+        if on(.settingsCatalog) { makeEqualiser() }
         if on(.updates) {
             UpdateCoordinator.shared.onBadgeDidChange = { [weak self] in self?.syncMenuBarUpdateBadge() }
             UpdateCoordinator.shared.startPolling()
@@ -877,6 +882,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let agentsAwake = KeepAwake(kind: .system)
     private let notificationPeeker = NotificationPeeker()
     private var menuBarBadgeHost: NSHostingView<MenuBarUpdateBadge>?
+
+    /// Builds the equaliser with its live ports and runs the launch housekeeping. Nothing is switched on here: no
+    /// listener, no tap, no prompt. The owner's switch is the only start.
+    private func makeEqualiser() {
+        let controller = EqualiserController(
+            defaults: .standard,
+            factory: LiveShapingTapFactory(),
+            monitor: AudioProcessMonitor(),
+            claim: EqualiserFileClaim(),
+            scheduler: MainEqualiserScheduler(),
+            ownBundleID: Bundle.main.bundleIdentifier ?? "",
+            ownPID: ProcessInfo.processInfo.processIdentifier,
+            zeusCaptures: {
+                let polyglot = PolyglotController.shared
+                let recordly = RecordlyController.shared
+                return EqualiserPolicy.zeusCaptures(
+                    scribe: ScribeController.shared.phase,
+                    polyglotActive: polyglot.isListening || polyglot.isStarting,
+                    recordlySystemAudio: recordly.isRecording && recordly.audio.systemAudio)
+            },
+            observesSystem: true)
+        controller.launch()
+        equaliser = controller
+    }
 
     /// Actions and live facts behind catalog rows (Settings, generated from the Glance inventory).
     private func wireSettingsCatalog() {
