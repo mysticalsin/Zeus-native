@@ -140,7 +140,6 @@ private func chord(_ code: UInt16, _ modifiers: ShortcutModifiers) -> Shortcut {
             #expect(map.action(for: chord(left, mods.union(.function))) == .focus(.left))
             #expect(map.action(for: chord(down, mods.union(.function))) == .focus(.down))
             #expect(map.action(for: chord(right, mods.union([.shift, .function]))) == .swap(.right))
-            #expect(map.action(for: chord(keyJ, mods.union(.function))) == .flipSplit)
         }
         let map = TileKeymap.defaults(base: .controlOption)
         // Fn does not hide an extra modifier, and Fn alone is not a base.
@@ -148,6 +147,33 @@ private func chord(_ code: UInt16, _ modifiers: ShortcutModifiers) -> Shortcut {
         #expect(map.action(for: chord(left, [.control, .function])) == nil)
         #expect(map.action(for: chord(left, .function)) == nil)
         #expect(map.action(for: Shortcut(modifiers: [.control, .option, .function])) == nil)
+    }
+
+    /// Only the keys macOS marks with fn by itself lose it. Fn plus the base plus a letter is a deliberate Globe chord,
+    /// which is a different chord from the one the keymap binds, so the tap passes it through.
+    @Test func theFnFlagIsOnlyIgnoredOnTheKeysMacOSMarksWithItItself() {
+        for base in allBases {
+            let map = TileKeymap.defaults(base: base)
+            let mods = base.modifiers
+            for code in [keyJ, 17 /* T */, 35 /* P */, 15 /* R */, 40 /* K */] {
+                #expect(map.action(for: chord(code, mods)) != nil, "key \(code) is bound on \(base)")
+                #expect(map.action(for: chord(code, mods.union(.function))) == nil, "fn plus \(base) plus key \(code) is another chord")
+            }
+            #expect(map.action(for: chord(33, mods.union([.shift, .function]))) == nil, "shifted bracket with fn")
+        }
+    }
+
+    @Test func theFnFlagIsIgnoredOnArrowFunctionAndNavigationKeys() throws {
+        let marked: [UInt16] = [123, 124, 125, 126, // arrows
+                                122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, 105, 107, 113, 106, 64, 79, 80, 90, // F1 to F20
+                                115, 119, 116, 121, 117] // Home, End, Page Up, Page Down, Forward Delete
+        #expect(TileKeymap.fnMarkedKeyCodes == Set(marked))
+        var map = TileKeymap()
+        for code in marked { try map.bind(chord(code, [.control, .option]), to: .retile) }
+        for code in marked {
+            #expect(map.action(for: chord(code, [.control, .option, .function])) == .retile, "key \(code)")
+            #expect(map.action(for: chord(code, [.control, .option, .command, .function])) == nil, "key \(code) with an extra modifier")
+        }
     }
 
     @Test func aChordBoundWithFnStillMatchesExactlyAndBeatsTheStrippedOne() throws {

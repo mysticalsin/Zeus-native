@@ -144,6 +144,12 @@ import Testing
                 "macOS adds fn to an arrow key, and the tap strips it before it looks the chord up")
     }
 
+    @Test func aGlobeChordOnALetterIsNotAClashWithTheChordWithoutFn() {
+        #expect(notes(.controlOption, talk: chord(keyJ, [.control, .option, .function]), dictation: nil).isEmpty,
+                "the tap passes Globe plus the pair plus J through, so it never takes the key from another feature")
+        #expect(notes(.controlOption, talk: chord(keyJ, [.control, .option]), dictation: nil).count == 1)
+    }
+
     @Test func aKeyedShortcutTheKeymapDoesNotBindIsClear() {
         #expect(notes(.controlOption, talk: chord(space, [.control, .option]), dictation: nil).isEmpty, "the default table never binds Space")
         #expect(notes(.controlOption, talk: chord(leftArrow, [.control, .option, .command]), dictation: nil).isEmpty, "a different modifier set")

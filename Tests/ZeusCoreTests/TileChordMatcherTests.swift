@@ -66,6 +66,12 @@ private func release(_ code: UInt16, _ modifiers: ShortcutModifiers = [], own: B
         #expect(matcher.decide(press(keyZ, base.union(.function)), keymap: map, gate: live) == .passThrough)
     }
 
+    @Test func aGlobeChordOnALetterIsNotTheBoundChord() {
+        var matcher = TileKeyMatcher()
+        #expect(matcher.decide(press(keyJ, base.union(.function)), keymap: map, gate: live) == .passThrough)
+        #expect(matcher.decide(press(keyJ, base), keymap: map, gate: live) == .consume(.flipSplit))
+    }
+
     @Test func everyKeyCodeAndModifierSetAgreesWithTheKeymapLookup() {
         // The tap may consume only what the keymap binds: exhaustive over key codes and modifier subsets.
         var consumed = 0
