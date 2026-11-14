@@ -1165,7 +1165,7 @@ private struct PrivacyPage: View {
             GSToggleRow(symbol: "terminal", title: "Allow command-line control of sensitive actions",
                         text: cliAccess.failed
                             ? "Zeus could not change this in your Keychain. Check Keychain access and try again."
-                            : "Lets the zeus command that ships inside Zeus.app listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, import keys, and open or capture Zeus's own panels. Off by default and kept in your Keychain; read-only commands such as status always work.",
+                            : "Lets the zeus command, and any program on this Mac running as you that runs it, listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, import keys, read folders you name, and open or capture Zeus's own panels. Off by default and kept in your Keychain; read-only commands such as status always work.",
                         isOn: Binding(get: { cliAccess.enabled }, set: { cliAccess.set($0) }))
         }
     }
