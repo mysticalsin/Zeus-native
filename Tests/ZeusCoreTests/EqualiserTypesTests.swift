@@ -131,6 +131,6 @@ struct EqualiserTypesTests {
         let sample = EqualiserStatus.snapshotSample
         #expect(hasNoDash(sample.line))
         #expect(sample.rows.allSatisfy { hasNoDash($0.displayName) && hasNoDash($0.exclusionLabel ?? "") })
-        #expect(sample.line.contains(where: \.isLetter))
+        #expect(sample.line.contains { $0.isLetter })
     }
 }
