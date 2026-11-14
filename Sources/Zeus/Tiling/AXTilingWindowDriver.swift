@@ -154,7 +154,8 @@ final class AXTilingWindowDriver: TilingWindowDriver {
 
     /// Everything admission needs, from one round trip plus the settable check. A property that does not read is nil.
     /// A window with no full-screen attribute cannot be in full screen, so that one reads as false. The result is nil
-    /// when the round trip itself did not complete (`TileWindowsAnswer.windowRead`): then nothing is known about the window.
+    /// when the round trip itself did not complete (`TileWindowsAnswer.windowRead`), or the settable check did not
+    /// (`TileWindowsAnswer.sizeSettable`): then nothing is known about the window.
     private static func facts(of window: AXUIElement, app: NSRunningApplication) -> TileWindowFacts? {
         var facts = TileWindowFacts(pid: app.processIdentifier, bundleID: app.bundleIdentifier,
                                     isRegularApp: app.activationPolicy == .regular, role: nil, subrole: nil,
@@ -182,9 +183,17 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         facts.isMinimized = flag(2)
         facts.isFullScreen = flag(3) ?? (unsupported(3) ? false : nil)
         facts.frame = frame(position: values[4], size: values[5])
-        // The settable check is one more call, so it runs only for a window that could still be admitted.
+        // The settable check is one more call, so it runs only for a window that could still be admitted. Its error is
+        // kept: a timeout here is a slow window, not one that cannot be resized, so the app counts as unread.
         let standard = facts.role == "AXWindow" && facts.subrole == "AXStandardWindow"
-        facts.isSizeSettable = standard ? AXFinder.isSettable(window, kAXSizeAttribute) : false
+        guard standard else {
+            facts.isSizeSettable = false
+            return facts
+        }
+        var settable = DarwinBoolean(false)
+        let settableError = AXUIElementIsAttributeSettable(window, kAXSizeAttribute as CFString, &settable)
+        guard let answer = TileWindowsAnswer.sizeSettable(axError: settableError.rawValue, value: settable.boolValue) else { return nil }
+        facts.isSizeSettable = answer
         return facts
     }
 

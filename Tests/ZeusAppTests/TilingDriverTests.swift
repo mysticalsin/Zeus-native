@@ -37,5 +37,8 @@ import ZeusCore
         #expect(TileWindowsAnswer.windowRead(axError: AXError.success.rawValue))
         #expect(!TileWindowsAnswer.windowRead(axError: AXError.cannotComplete.rawValue))
         #expect(!TileWindowsAnswer.windowRead(axError: AXError.invalidUIElement.rawValue))
+        #expect(TileWindowsAnswer.sizeSettable(axError: AXError.success.rawValue, value: true) == true)
+        #expect(TileWindowsAnswer.sizeSettable(axError: AXError.attributeUnsupported.rawValue, value: true) == false)
+        #expect(TileWindowsAnswer.sizeSettable(axError: AXError.cannotComplete.rawValue, value: false) == nil)
     }
 }

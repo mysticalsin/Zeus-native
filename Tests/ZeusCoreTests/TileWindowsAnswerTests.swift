@@ -31,4 +31,24 @@ import Testing
             #expect(!TileWindowsAnswer.windowRead(axError: code), "code \(code)")
         }
     }
+
+    // MARK: The size-settable question
+
+    @Test func aSuccessfulSettableCheckGivesItsOwnAnswer() {
+        #expect(TileWindowsAnswer.sizeSettable(axError: 0, value: true) == true)
+        #expect(TileWindowsAnswer.sizeSettable(axError: 0, value: false) == false)
+    }
+
+    @Test func aWindowWithNoSizeAttributeIsDefinitelyNotResizable() {
+        #expect(TileWindowsAnswer.sizeSettable(axError: TileWindowsAnswer.attributeUnsupportedCode, value: true) == false,
+                "the value out parameter is not read after a failure")
+    }
+
+    @Test func aTimeoutAndEveryOtherFailureGiveNoAnswerSoTheAppCountsAsUnread() {
+        #expect(TileWindowsAnswer.sizeSettable(axError: TileWindowsAnswer.cannotCompleteCode, value: false) == nil,
+                "a busy app that answered the list and the attributes, then timed out on this one question")
+        for code: Int32 in [-25200, -25201, -25202, -25203, -25206, -25207, -25208, -25209, -25210, -25211, -25212, 1, -1] {
+            #expect(TileWindowsAnswer.sizeSettable(axError: code, value: false) == nil, "code \(code)")
+        }
+    }
 }

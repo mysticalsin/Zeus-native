@@ -29,4 +29,16 @@ public enum TileWindowsAnswer: Equatable, Sendable {
     public static func windowRead(axError code: Int32) -> Bool {
         code == 0
     }
+
+    /// What the "is the size settable" question gave for one window: its answer, or nil when it did not complete.
+    /// `success` carries the answer itself. "Unsupported" is definitive: a window with no size attribute cannot be
+    /// resized. A timeout, or any other failure, is no answer, and the caller counts the whole app as unread for the
+    /// pass, as for a window whose attributes did not read: a slow window is not a window that cannot be resized.
+    public static func sizeSettable(axError code: Int32, value: Bool) -> Bool? {
+        switch code {
+        case 0: value
+        case attributeUnsupportedCode: false
+        default: nil
+        }
+    }
 }
