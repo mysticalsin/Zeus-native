@@ -201,16 +201,22 @@ in parallel with T3 and T5 after T1 lands.
 
 ### Rules and shape
 
-- `TilingWindowDriver` protocol: `windows() -> [TileWindowRef]`, `setFrame(_:for:) -> Bool`, `focus(_:)`,
-  `displays() -> [TileDisplay]`. `TileWindowRef` carries the `TileWindowID`, the owning pid, the AppKit frame and the
-  element identity. `TileDisplay` carries the display id and its visible frame.
+- `TilingWindowDriver` protocol (shipped in `Sources/ZeusCore/Tiling/TileWindowDriver.swift`): `isTrusted`,
+  `windows(config:) -> [TileWindowRef]`, `lastPassComplete`, `setFrame(_:for:) -> Bool`, `focus(_:)`,
+  `displays() -> [TileDisplay]`. `TileWindowRef` carries the `TileWindowID` (the pid and a per-app number that is the
+  element identity as far as ZeusCore goes), the bundle id and the frame in engine coordinates. `TileDisplay` carries
+  the display id, its AppKit frames and its engine frame. `windows(config:)` reads every window fresh in the call: a
+  window it could not read in time is left out, never reported from an earlier call, and `lastPassComplete` is false.
+  `setFrame` and `focus` act only on a window the last `windows(config:)` returned.
 - `AXTilingWindowDriver` is the real one, main actor like `AXSnapshotter` and `AXFinder`, with a per-pass time budget.
   It builds `AXUIElementCreateApplication(pid)` per regular app, calls `AXUIElementSetMessagingTimeout(app, 0.25)` as
   `AXSnapshotter` does, reads `kAXWindowsAttribute`, and reads role, subrole, minimized, full-screen, position and
-  size in one round trip with `AXUIElementCopyMultipleAttributeValues`. It writes with `AXUIElementSetAttributeValue`
+  size in one round trip with `AXUIElementCopyMultipleAttributeValues`. The pass budget is checked before every app
+  and every window, and a hidden app is skipped. It writes with `AXUIElementSetAttributeValue`
   on `kAXPositionAttribute` then `kAXSizeAttribute` using `AXValueCreate`, and focuses by setting `kAXMainAttribute`
   and `kAXFocusedAttribute` and performing `kAXRaiseAction`. It reuses `AXFinder.frame(of:)`,
-  `AXSnapshotter.quartzRect`, and `AXFinder.string`, `number` and `isSettable`.
+  `AXSnapshotter.quartzRect`, and `AXFinder.string`, `number` and `isSettable`. As shipped it reads and writes frames
+  in engine coordinates directly with type-checked values and uses only `AXFinder.isSettable`.
 - Coordinate conversion lives here. The engine's `TileRect` (top-left, y down) converts to the AppKit frame per
   display using that display's own height, not the main screen's, so a display above or left of the main one with a
   negative origin converts correctly.
@@ -232,12 +238,20 @@ insert.
 - Accessibility denied: the driver reports not trusted and does nothing. No frame is written.
 - A window that refuses to move: after the write the frame is read back; a difference beyond the tolerance marks the
   window floating for the session and asks the controller to rebuild without it. Never retried in a loop.
-- A hung app: the 0.25 s messaging timeout and the per-pass budget bound the cost.
+- A hung app: the 0.25 s messaging timeout and the per-pass budget bound the cost. An app that does not answer in
+  time is left out of the listing and the pass reports `lastPassComplete == false`; the controller keeps the slots of
+  windows missing from an incomplete listing and writes to none of them.
+- Two windows of one app at the same frame, one on another Space: the window list cannot tell them apart, so when more
+  candidates share a frame than the list has entries for it, none of them is admitted.
 - A stale element after an app quits: dropped on the next read.
 - The driver's own writes fire move notifications: writes carry the intended frame, and the controller ignores a
   change that matches it, so the layout does not react to itself.
 
-### Tests first (`Tests/ZeusAppTests/TilingDriverTests.swift`, `.serialized`)
+### Tests first (`Tests/ZeusCoreTests/TilingDriverTests.swift`, with `Tests/ZeusAppTests/TilingDriverTests.swift`)
+
+As shipped, the pure rules are in ZeusCoreTests under the parent suite `TilingDriverTests`, so
+`swift test --filter TilingDriverTests` runs them. The app target keeps only the trust and no-element tests of the real
+driver (`.serialized`), also named `TilingDriverTests`. The list below is the intent.
 
 Coordinate conversion round-trips for an ordinary display, a display at a negative origin, and a second display to
 the right and above; the admission filter drops Zeus's own window, a system window, a sheet, a minimized window, a
@@ -392,7 +406,10 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
 The overlay suite follows `PointingOverlayTests`: never key or main, ignores the mouse, non-activating,
 `sharingType == .none`, removed on hide, vacuous with no display. The controller suite uses the fake
 `TilingWindowDriver` and checks every fail-closed path: Accessibility denied, a move refused, a display change, a
-full-screen app frontmost, a minimized window, Zeus's own window and a system window all left alone.
+full-screen app frontmost, a minimized window, Zeus's own window and a system window all left alone. The refused-to-floating
+step belongs to this suite: ids in `TileApplyOutcome.refused` are added to `TileConfig.floating` for the session and
+the tree is rebuilt without them, while `deferred` ids are not floated. It also checks that a window missing from a
+listing with `lastPassComplete == false` keeps its slot and is not written.
 
 ---
 
