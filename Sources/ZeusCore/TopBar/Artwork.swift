@@ -95,8 +95,11 @@ public enum ArtworkSource {
         return prefix + fnv(normalize(playing.artist) + "|" + normalize(album))
     }
 
+    /// Names that stay on a home or office network.
+    private static let privateSuffixes = [".local", ".localhost", ".lan", ".internal", ".home.arpa"]
+
     /// Whether a page's cover link may be fetched: https only, a named host (no IP address in any spelling), and
-    /// nothing local. A page must not be able to point Zeus at an address inside the owner's network.
+    /// no name that ends in a private suffix. A public name that resolves to a private address is not caught here.
     public static func pageImageAllowed(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "https", var host = url.host?.lowercased(), !host.isEmpty else { return false }
         if host.hasSuffix(".") { host.removeLast() }
@@ -107,7 +110,7 @@ public enum ArtworkSource {
             !label.isEmpty && (label.allSatisfy(\.isNumber) || (label.hasPrefix("0x") && label.dropFirst(2).allSatisfy(\.isHexDigit)))
         }
         guard !isAddress, !labels.contains(where: \.isEmpty) else { return false }
-        return host != "localhost" && !host.hasSuffix(".local") && !host.hasSuffix(".localhost")
+        return host != "localhost" && !privateSuffixes.contains { host.hasSuffix($0) }
     }
 
     static func normalize(_ text: String) -> String {

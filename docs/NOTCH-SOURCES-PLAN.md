@@ -168,7 +168,8 @@ Every hidden two-player assumption, and its replacement:
 - `ArtworkStore.load` (`:116-131`): `pageImage` returns before the disk read (`:117`) and never calls `save` (`:127`).
   It streams with `session.bytes(from:)`, rejects a `Content-Length` over 2 MB and stops at 2 MB, keeps the 8 s
   timeout, and a task delegate refuses any non-`https` redirect. `ArtworkSource.pageImageAllowed(_:)`: `https` only,
-  no IP literal, no `.local` or `localhost`.
+  no IP literal, no `localhost`, no name ending in `.local`, `.localhost`, `.lan`, `.internal` or `.home.arpa`. A public
+  name that resolves to a private address is a known gap for A3 to weigh.
 - Lyrics: `LRCLIBQuery` (`Lyrics.swift:96`) is unchanged. `LyricsStore.load` (`LyricsViews.swift:56`) asks only with
   the `lyrics` capability, else `.none` as today; without `persistsDerivedData` it skips `cache.load` and `cache.save`.
   The store is now a thin adapter over the pure `LyricsFlow` reducer, so both rules are applied in the adapter and
