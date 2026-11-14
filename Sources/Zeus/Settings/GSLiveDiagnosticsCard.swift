@@ -5,7 +5,7 @@ import ZeusCore
 
 /// Settings > Diagnostics > "Zeus right now": Zeus's own CPU, memory, heat and audio state, and a Copy button
 /// for a bug report. Samples through the shared `EnergyMonitor` only while the card is on screen in a window
-/// that can be seen, so nothing runs when the page is left or the Settings window is closed or minimised.
+/// that can be seen, so nothing runs when the page is left or the Settings window is closed, minimised, covered or on another Space.
 /// Snapshots show fixed values and start nothing.
 struct LiveDiagnosticsCard: View {
     let context: GSContext

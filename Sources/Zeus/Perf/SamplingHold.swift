@@ -34,8 +34,27 @@ final class SamplingHold {
     }
 }
 
+/// Whether sampling should run for a window. Stricter than `WindowVisibility.isVisible`, which the notch
+/// clocks use and which ignores occlusion because the transparent notch panel reports itself occluded while it
+/// draws. An ordinary window such as Settings is not seen while another app covers it or it sits on another Space.
+enum SamplingVisibility {
+    static func isSeen(ordered: Bool, occlusionVisible: Bool) -> Bool {
+        ordered && occlusionVisible
+    }
+
+    static func isSeen(_ window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        return isSeen(ordered: WindowVisibility.isVisible(window), occlusionVisible: window.occlusionState.contains(.visible))
+    }
+
+    /// Visibility after `notification`; a window that is about to close reads hidden without waiting.
+    static func reading(after notification: NSNotification.Name, in window: NSWindow?) -> Bool {
+        notification == NSWindow.willCloseNotification ? false : isSeen(window)
+    }
+}
+
 /// Reports whether the hosting window can be seen: when the view joins or leaves a window, and after the
-/// window closes, is minimised or restored, or changes occlusion. Draws nothing and takes no clicks.
+/// window closes, is minimised or restored, or is covered or moved to another Space. Draws nothing and takes no clicks.
 struct WindowVisibilityReader: NSViewRepresentable {
     let onChange: (Bool) -> Void
 
@@ -64,11 +83,11 @@ struct WindowVisibilityReader: NSViewRepresentable {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated {
                         guard let self else { return }
-                        self.onChange(WindowVisibility.reading(after: name, in: self.window))
+                        self.onChange(SamplingVisibility.reading(after: name, in: self.window))
                     }
                 })
             }
-            onChange(WindowVisibility.isVisible(window))
+            onChange(SamplingVisibility.isSeen(window))
         }
     }
 }
