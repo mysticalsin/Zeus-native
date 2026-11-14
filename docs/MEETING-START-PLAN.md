@@ -59,7 +59,7 @@ ticket leaves the gate red.
 | MS2 | Refactor | Title, guests and call binding travel as three loose optionals that leak after a refused start | One `ScribeMeetingContext` value passed to `start` |
 | MS3 | Fix | A call app that releases the microphone for 8 s arms a stop that saves 9 s later, against the privacy doc | Detector signals only suggest. Nothing stops without a tap or the bound app closing |
 | MS4 | Feature | Automatic start still asks on the first meeting, keeps its consent after being switched away, and can be selected by a settings import | Choosing it in Settings is the opt-in, at that click; any other choice withdraws it; an import can never select it |
-| MS5 | Feature | Three lines of text, two equal buttons, no motion, no countdown you can see | Title, time, one action; a countdown ring with Cancel; motion from the alert tokens; keyboard and VoiceOver |
+| MS5 | Feature | Three lines of text, two equal buttons, no motion, no countdown you can see | A liquid-glass slab: orb with a countdown ring, call app tiles, status pill, title, time, one action; Join in the call app when the link is known; motion from the alert tokens; keyboard and VoiceOver |
 | MS6 | Refactor | Two machines disagree on "did it start"; an automatic start fails silently; a Cancel can arrive too late | One machine from sighting to result; Starting, Recording or the true reason for taps and automatic starts alike; Cancel always wins |
 | MS7 | Refactor | The heads-up is a second pipeline, gone 75 s before the meeting, never shown in automatic mode, sometimes never shown | An `upcoming` state in the same machine; the heads-up pipeline is deleted |
 | MS8 | Feature | The detector polls every 5 s forever, in every mode | Stopped when Off, event driven when idle, polling only while a meeting is near |
@@ -169,12 +169,12 @@ None of these blocks the start of work; each has a safe default written into a t
   open. In this plan every calendar meeting with guests or a link gets one card two minutes before and one at
   its start, with or without a call app. Automatic recording still needs a live call. Say no and MS1 keeps
   the app condition.
-- D6, the Reduce Transparency still. The plan listed it among the MS5 fixtures. The build dropped it: the
-  setting is read-only in SwiftUI and `AlertGlass` has no override, so a render cannot show it. Default: check it
-  by hand with the setting on. A still needs an override seam in `AlertGlass`, which is outside MS5.
-- D7, two-line status. The plan allowed two lines for a failure. The build also allows two for a blocked
-  reason, because those words wrap at 340 pt. Default: two lines for both. The alternative is shorter reason
-  words in `ScribeMeetingCardText`, which keeps the row one line.
+- D6, the Reduce Transparency still. The first build dropped it: the setting is read-only in SwiftUI and
+  `AlertGlass` has no override. The redrawn card has its own glass with one pure surface rule and an override on
+  the view, so the still exists again. `AlertGlass` itself is untouched.
+- D7, status lines. The first build allowed two lines for a failure and a blocked reason because the words
+  wrapped at 340 pt. The redrawn right column is about 275 pt wide and the reasons fit on one line; a long free
+  text reason from the capture is cut with an ellipsis and read in full by VoiceOver.
 
 ## Privacy and consent (rules that do not move)
 
@@ -505,57 +505,101 @@ the choice), REG-417 (mode change ignored in the countdown).
 ## MS5. The card
 
 Builds the view and the panel from the MS0 contract. Not wired until MS6, so it can be built in a parallel
-worktree while MS1 to MS4 land.
+worktree while MS1 to MS4 land. Behaviour, states and actions are as first planned; the look, the layout and the
+motion were redrawn after the owner's reference, a premium liquid-glass meeting reminder. Zeus draws all of it
+in its own code; no third-party logo or image is bundled.
 
 ### Behaviour and design
 
-- One row on `alertGlass`, 340 pt wide: the symbol, the title (12.5 semibold, one line, tail truncation), under
-  it one status line (10, `monospacedDigit`, two lines at most for a failure, and for a blocked reason as the
-  build has it: D7), then one control, then a small dismiss glyph where the card can be dismissed.
-- Offer: status "in 2 min" or "now", or the reason automatic start is blocked; button Record.
-- Countdown: status "Recording starts in 5"; the only control is Cancel, with a thin ring around it that drains
-  over the 5 s. No dismiss glyph and no Record, so there is exactly one action. Escape cancels when the card is key.
-- Waiting: status "Starts once your last meeting is saved"; the only control is Cancel.
-- Starting: a small spinner; status "Starting". An automatic start keeps Cancel in the same place, so a tap
-  already on its way still lands on Cancel. No red, no dot.
-- Recording: status "Recording" for 1.5 s, then the card leaves. The top bar wings stay the real indicator.
-- Failed: status is the reason; button Allow or Try again; the dismiss glyph stays.
-- Next meeting while recording: status "in 1 min" or "now"; button Switch; dismiss keeps recording, and so does
-  the timeout.
-- Motion uses `AlertStyle` and `AlertMotion` only: in with `spring(response: 0.42, dampingFraction: 0.78)` and a
-  6 pt drop, out with a fade. The ring is one linear animation keyed on the deadline (`.id(deadline)`), started
-  with the time left; the per-second redraw of the digit never restarts it. State changes inside the card
-  crossfade in place. Reduce Motion: a 0.12 s crossfade, no spring, no ring sweep; the digit still counts.
-  Reduce Transparency comes from `AlertGlass`. Its fixture is owed (D6): the setting is
-  read-only in SwiftUI and `AlertGlass` has no override, so a still cannot show it; check it by hand with the
-  setting on.
+- One wide liquid-glass slab, 440 pt wide and 156 pt tall, continuous corner radius 32 pt, in a window that adds
+  24 pt of room on every side for its shadow. The slab sits 24 pt from the top and right edges of the visible
+  frame (below the menu bar), so the window is flush with the corner and the margin is even.
+- Material: the system behind-window blur, strongly blurred, with a cool blue-violet tint on top; a luminous
+  rim of 1.25 pt, brightest along the top and top-left, with a faint glow; a soft inner highlight near the top
+  edge; a wide soft shadow. Reduce Transparency swaps the blur for an opaque deep blue surface and keeps the
+  same rim, highlight and shadow. The surface is chosen by one pure rule so a test and a still can both reach it.
+- Left column, 30 percent of the width, closed by a thin vertical hairline. A glowing glass orb of 64 pt with a
+  white calendar symbol; the countdown ring is a circle around it. Under it a row of rounded 22 pt tiles, one per
+  call app the meeting can open in: real icons read at run time from the installed apps, only apps that match
+  the meeting link, at most four, none when Zeus has no link. Matching means the app of the link's provider,
+  when it is installed, then the installed browsers that open it, the default one first. The first tile is the
+  app the primary action uses.
+- Right column, top to bottom:
+  - A status pill (translucent, a small coloured dot and a short phrase): "Starting soon" for the offer and the
+    next meeting, "Recording in N" while counting down, "Waiting to record", "Starting", "Recording",
+    "Not recorded" for a failure. Violet dot before the start, green while recording, orange for a failure.
+  - The title, 24 pt bold, one line, tail truncation.
+  - A clock symbol, the time range, a thin divider, then the relative time in the accent violet ("In 5 min",
+    "Now"). A call with no calendar meeting has no range and shows only the relative time.
+  - A people symbol and "N participants", only when the calendar gives names; it counts the named guests and
+    the owner. In the states that carry a reason this line holds the reason instead: the blocked reason, the
+    failure reason, or "Starts once your last meeting is saved". One line, tail truncation (D7); the spoken
+    label carries the full words.
+  - At the bottom one wide translucent capsule for the primary action of the state, with a symbol; where the
+    card can be dismissed, a round translucent close button at the top right.
+- Primary action by state:
+  - Offer with a link Zeus already holds (the calendar slot carries it): "Join in <app>" opens the link in the
+    first matching app. A chevron opens a small menu of the other matching apps and, last, "Record", so the
+    offer keeps its old action. Recording still follows the owner's chosen mode exactly as the plan defines;
+    Join only opens the call.
+  - Offer without a link, a failure and the next meeting: the state's own action (Record, Allow, Try again,
+    Switch). Countdown, waiting and a cancellable start: Cancel. Starting without Cancel and recording: no
+    button; the slot stays empty so the card does not change size.
+  - The close button is the existing dismiss. It appears when the pointer is over the card (the panel reports
+    the pointer) and stays reachable for VoiceOver and the keyboard at rest. Return is the primary action,
+    Escape is Cancel or dismiss.
+- Countdown: the pill reads "Recording in N"; the capsule is Cancel; a thin ring around the orb drains over the
+  5 s. No close button and no Record, so there is exactly one action. The orb glow breathes very slowly, one
+  finite pass over the countdown, and only while counting down.
+- Starting: a small spinner replaces the pill dot. An automatic start keeps Cancel in the same place, so a tap
+  already on its way still lands on Cancel. No red.
+- Recording: the pill reads "Recording" for 1.5 s, then the card leaves. The top bar wings stay the real
+  indicator.
+- Motion uses `AlertStyle` and `AlertMotion` only: in with the alert spring, a scale from 0.96, a fade and a 6 pt
+  downward drift; a state change swaps the right column with a short crossfade and the slab never jumps; out
+  with a fade while drifting up. The ring is one linear animation keyed on the deadline (`.id(deadline)`),
+  started with the time left; the per-second redraw never restarts it. Reduce Motion: fades only, no scale, no
+  drift, no ring sweep and no breathing; the digit still counts.
+- Never a text field, chat area or reply box. The pill, the time line and the participants line are the only
+  labels beyond the old status words.
 - Keyboard: `.defaultAction` on the primary and `.cancelAction` on Cancel or dismiss, active when the card is
   key. The panel stays non-activating and never takes the keyboard from the call.
-- VoiceOver: one element labelled "<title>, <status>"; buttons named by their titles and "Dismiss"; no hints.
-  One announcement per state. The countdown is never announced each second; Cancel exposes the seconds as its
-  value.
+- VoiceOver: one element for the words, labelled "<title>, <status>"; buttons named by their titles and
+  "Dismiss"; no hints. One announcement per state. The countdown is never announced each second; Cancel exposes
+  the seconds as its value.
 - Placement: top right of the active screen, from `ScribeMeetingCardPlacement`. Moving it under the notch needs
   the alert stack to host a card with a button, which is a separate plan.
 
 App files: `Sources/Zeus/Scribe/ScribeMeetingCardView.swift` (a function of one `ScribeMeetingCard`, the two
-clock readings, and three closures: primary, cancel and dismiss, each handed the card it drew; the pointer is
-reported by `ScribeCardHostingView`; it stores no meeting, string or phase) and
-`ScribeMeetingCardPanel.swift` (`protocol ScribeMeetingCardRendering { func render(_ card: ScribeMeetingCard) }`,
+clock readings, the join apps, the pointer flag and four closures: primary, cancel, dismiss and join, each handed
+the card it drew; the pointer is reported by `ScribeCardHostingView`; it stores no meeting, string or phase),
+`ScribeMeetingCardGlass.swift` (the surface), `ScribeJoinApps.swift` (finds the installed apps and opens the link)
+and `ScribeMeetingCardPanel.swift` (`protocol ScribeMeetingCardRendering { func render(_ card: ScribeMeetingCard) }`,
 one non-activating panel using `ScribeCardHostingView`; `render` shows, updates or orders out and is the only
-way the panel leaves). Controls carry `ownedJourneyControl` ids `scribe.meetingCard.primary`,
-`scribe.meetingCard.cancel` and `scribe.meetingCard.dismiss`.
+way the panel leaves). Core adds the metrics, the pill words, the time and participants lines and the join app
+choice to `ScribeMeetingCard.swift` and `ScribeJoinApps.swift`. Controls carry `ownedJourneyControl` ids
+`scribe.meetingCard.primary`, `scribe.meetingCard.cancel`, `scribe.meetingCard.dismiss` and
+`scribe.meetingCard.apps`.
 
 ### Tests first
 
 - `qa/closed-loop/tests/test_meeting_card_lint.py` (new): the two files contain no `Timer`, `TimelineView` or
   `repeatForever`; the view declares no `@State` holding a meeting; the ring is keyed with `.id(` on the
-  deadline; the panel orders out only inside `render`; the panel hosts with `ScribeCardHostingView(rootView:`.
+  deadline; the panel orders out only inside `render`; the panel hosts with `ScribeCardHostingView(rootView:`;
+  the view draws on the card glass and has no text field.
+- Core tests: the metrics (size, radius, left column share, orb, tile, at most four apps), the placement rule
+  with the shadow room, the pill words and tone per state, the time and participants lines, which controls
+  show on hover per state, the join app choice.
 - Snapshot fixtures through `SnapshotRenderer`, 1x and 2x: offer with a short and a long title, "in 2 min",
   "now" and a blocked reason, countdown at 5, 3 and 1, waiting, starting with and without Cancel, recording,
-  each failure, next meeting. (Reduce Transparency has no still: D6.)
+  each failure, next meeting, the hover variant, a card with no link, the Reduce Transparency still, and cards
+  over a busy colourful backdrop so the glass shows.
 - A temporal test in `Tests/ZeusAppTests/ScribeMeetingCardMotionTests.swift` (new): the countdown rendered at
   0, 1.5, 3 and 4.9 s with an injected animation clock; the ring share falls steadily across the per-second
-  redraws; with Reduce Motion there is no sweep and the digit still counts.
+  redraws; with Reduce Motion there is no sweep and the digit still counts. The pixel reads sample the band
+  of the ring around the orb.
+- App tests: the hosted card has the planned size, no state draws a text field, the Reduce Transparency surface
+  is opaque and the default one is not, the pointer reaches the view, Join and the menu hand over their app.
 
 ## MS6. One machine from sighting to result
 
