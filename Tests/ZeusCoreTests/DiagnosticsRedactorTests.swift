@@ -16,6 +16,17 @@ struct DiagnosticsRedactorTests {
         #expect(redact("db_password=hunter2 and APP_TOKEN=zzz") == "db_password=\(mask) and APP_TOKEN=\(mask)")
     }
 
+    @Test func privateKeysCredentialsAndBasicAuthAreMasked() {
+        let mask = DiagnosticsRedactor.mask
+        #expect(redact("PRIVATE_KEY=MIIEvQIBADANBgkqhkiG9w0BAQEF") == "PRIVATE_KEY=\(mask)")
+        #expect(redact("TLS_PRIVATE_KEY: abc123def456") == "TLS_PRIVATE_KEY: \(mask)")
+        #expect(redact("privatekey=abc") == "privatekey=\(mask)")
+        #expect(redact("AWS_CREDENTIALS=abc123") == "AWS_CREDENTIALS=\(mask)")
+        #expect(redact("credentials: hunter2") == "credentials: \(mask)")
+        #expect(redact("Authorization: Basic dXNlcjpwYXNzd29yZA==") == "Authorization: \(mask)")
+        #expect(redact("authorization=basic dXNlcjpwYXNzd29yZA==") == "authorization=\(mask)")
+    }
+
     @Test func unprefixedPairsStillWork() {
         let mask = DiagnosticsRedactor.mask
         #expect(redact("api_key=abc") == "api_key=\(mask)")
@@ -26,7 +37,8 @@ struct DiagnosticsRedactorTests {
 
     @Test func normalWordsAreLeftAlone() {
         for text in ["The tokenizer ran: ok", "max_tokens=512 and secretary: Ana", "keyboard=us password reset needed",
-                     "monkey=banana", "passwordless: yes", "keep_alive=true", "token count is 12", "secrets are hard"] {
+                     "monkey=banana", "passwordless: yes", "keep_alive=true", "token count is 12", "secrets are hard",
+                     "private keys are rotated", "credentialsFile=ok", "privatekeys=3", "the private key is stored safely"] {
             #expect(redact(text) == text, "\(text)")
         }
     }

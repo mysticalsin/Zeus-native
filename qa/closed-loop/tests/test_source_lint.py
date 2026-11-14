@@ -633,6 +633,23 @@ class Pass4IslandWiring(unittest.TestCase):
         self.assertIn("enabled: Self.enabled", pass3_function_body(text, "private func retryPlan(for key: String)"))
         self.assertEqual(text.count("self?.run("), 1, "only ask(_:) may start a request")
 
+    def test_the_sampling_reader_uses_the_occlusion_aware_rule(self):
+        text = pass3_source("Sources/Zeus/Perf/SamplingHold.swift")
+        body = pass3_function_body(text, "override func viewDidMoveToWindow()")
+        self.assertIn("SamplingVisibility.reading(after: name", body)
+        self.assertIn("onChange(SamplingVisibility.isSeen(window))", body)
+        self.assertNotIn("WindowVisibility.reading", body)
+        self.assertNotIn("WindowVisibility.isVisible", body)
+
+    def test_the_diagnostics_card_hears_thermal_changes_on_the_main_queue_from_one_publisher(self):
+        text = pass3_source("Sources/Zeus/Settings/GSLiveDiagnosticsCard.swift")
+        self.assertIn(".onReceive(Self.thermalPublisher)", text)
+        self.assertIn("static let thermalPublisher = thermalChanges()", text)
+        factory = pass3_function_body(text, "static func thermalChanges(")
+        self.assertIn(".receive(on: DispatchQueue.main)", factory)
+        self.assertEqual(text.count("publisher(for: ProcessInfo.thermalStateDidChangeNotification)"), 1,
+                         "only thermalChanges(center:) may subscribe, and it hops to the main queue")
+
     def test_the_island_lints_detect_their_failure_shapes(self):
         good = f"""func start() {{
             addGlobalMonitorForEvents(matching: [.leftMouseDown]) {{ _ in

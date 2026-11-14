@@ -39,6 +39,7 @@ struct SettingsCatalogTests {
         #expect(option.kind == .choice)
         #expect(option.state == .live)
         #expect(option.title == "Open the notch on")
+        #expect(option.choices == ["Hover", "Click"])
         #expect(option.choices.map { NotchOpenTrigger(label: $0) } == [.hover, .click])
         #expect(NotchOpenTrigger(label: option.defaultValue) == .hover)
         #expect(option.choices.contains(option.defaultValue))

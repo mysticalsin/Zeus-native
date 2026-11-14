@@ -5238,6 +5238,10 @@
             },
             {
               "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "aWindowThatIsNotShownIsNeverSeenAndCloseAlwaysReadsHidden"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
               "function": "theThermalNotificationReachesTheCardOnTheMainThread"
             },
             {
