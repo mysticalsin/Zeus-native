@@ -243,6 +243,9 @@ New file `Sources/ZeusCore/Scribe/ScribeMeetingCard.swift`:
   - `seconds(deadline:now:)` (whole seconds left, counting the one in progress) and
     `ring(deadline:now:total:)` (the share left, clamped 0 to 1).
   - `label(_:now:)` ("<title>, <status>"), `announcement(_:now:)` and `accessibilityValue(_:)`.
+  - `now` in `time`, `status`, `label` and `announcement` is a wall-clock `Date`. The countdown digit is the
+    card's own `seconds`, which the machine refreshes at each wake; `seconds(deadline:now:)` and `ring` take the
+    machine's uptime, and only the machine and the ring view call them.
 - `ScribeMeetingCardPlacement.origin(size:visibleFrame:margin:)`: top right of the given screen frame.
 
 ### Tests first (`Tests/ZeusCoreTests/ScribeMeetingCardTests.swift`, new)

@@ -44,17 +44,6 @@ public enum ScribeMeetingCard: Equatable, Sendable {
     }
 }
 
-/// The two clock readings a card is read against: wall time for "in 2 min", uptime for the countdown.
-public struct ScribeCardClock: Equatable, Sendable {
-    public var date: Date
-    public var uptime: TimeInterval
-
-    public init(date: Date, uptime: TimeInterval) {
-        self.date = date
-        self.uptime = uptime
-    }
-}
-
 public enum ScribeMeetingCardText {
     /// One generic symbol for every card.
     public static let symbol = "video.fill"
@@ -76,7 +65,7 @@ public enum ScribeMeetingCardText {
         return "in \(max(1, Int((until / 60).rounded(.up)))) min"
     }
 
-    public static func status(_ card: ScribeMeetingCard, now: ScribeCardClock) -> String {
+    public static func status(_ card: ScribeMeetingCard, now: Date) -> String {
         switch card {
         case .hidden:
             return ""
@@ -167,14 +156,14 @@ public enum ScribeMeetingCardText {
     // MARK: Accessibility
 
     /// "<title>, <status>", empty for a hidden card.
-    public static func label(_ card: ScribeMeetingCard, now: ScribeCardClock) -> String {
+    public static func label(_ card: ScribeMeetingCard, now: Date) -> String {
         guard let meeting = card.meeting else { return "" }
         return "\(title(meeting)), \(status(card, now: now))"
     }
 
     /// Spoken once when the card changes state. The countdown is stated at its full length, so the text does
     /// not change while it counts down.
-    public static func announcement(_ card: ScribeMeetingCard, now: ScribeCardClock) -> String {
+    public static func announcement(_ card: ScribeMeetingCard, now: Date) -> String {
         guard case .countdown(let meeting, _, _, let total) = card else { return label(card, now: now) }
         return "\(title(meeting)), Recording starts in \(Int(total.rounded()))"
     }
@@ -185,9 +174,9 @@ public enum ScribeMeetingCardText {
         return String(seconds)
     }
 
-    private static func time(of meeting: ScribeMeeting, now: ScribeCardClock) -> String {
+    private static func time(of meeting: ScribeMeeting, now: Date) -> String {
         guard let slot = meeting.slot else { return "now" }
-        return time(startsAt: slot.start, now: now.date)
+        return time(startsAt: slot.start, now: now)
     }
 }
 

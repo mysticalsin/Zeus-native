@@ -244,7 +244,7 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy", "pointing") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe") and platform_name == "linux"
     extra_target = ''
     products = ''
     core_dependencies = '[]'
