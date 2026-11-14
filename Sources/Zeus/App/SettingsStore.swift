@@ -256,6 +256,8 @@ final class SettingsStore {
     static let neverEnabledByImport: Set<String> = [
         "voice.answers", "privacy.lyrics", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
+        // It reads other apps' window frames and moves their windows.
+        "tiling.enabled",
     ]
     private static var neverEnabledAppKeys: Set<String> {
         [CLIAccess.defaultsKey, WakeWordController.defaultsKey, "dictation.engineForVoice"]
