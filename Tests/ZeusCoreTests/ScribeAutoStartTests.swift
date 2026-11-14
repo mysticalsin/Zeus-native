@@ -5,9 +5,9 @@ import Testing
 private let asBase = Date(timeIntervalSince1970: 1_000_000)
 
 private func asSlot(_ id: String = "s1", title: String = "Design review", start: TimeInterval = 0,
-                  end: TimeInterval? = nil, link: Bool = true) -> ScribeCalendarSlot {
+                  end: TimeInterval? = nil, link: Bool = true, app: ScribeCallApp? = nil) -> ScribeCalendarSlot {
     ScribeCalendarSlot(id: id, title: title, start: asBase.addingTimeInterval(start),
-                       end: end.map { asBase.addingTimeInterval($0) }, hasCallLink: link)
+                       end: end.map { asBase.addingTimeInterval($0) }, hasCallLink: link, callApp: app)
 }
 
 private func asEvidence(
@@ -20,7 +20,7 @@ private func asEvidence(
                                     autoConsentGiven: consent, callWindows: windows), now: now)
 }
 
-private let asTeams = ScribeMeeting(key: "call:Teams", title: "Teams call", callApp: .teams)
+private let asTeams = ScribeMeeting(key: "call:Teams", title: "Call", callApp: .teams, isLive: true)
 
 /// A machine whose Teams call has been seen at 0 and again at 3, so the "Ask me" banner is up.
 private func asPrompting(mode: ScribeAutoStartMode = .ask, granted: Bool = false, consent: Bool = true) -> ScribeAutoStartMachine {
@@ -72,24 +72,101 @@ struct ScribeAutoStartTests {
         #expect(ScribeMeetingEvidence(date: asBase, presentApps: [.teams]).candidate == nil)
     }
 
-    @Test func aCalendarEventWithALinkAndItsAppOpenIsAMeetingWithItsTitle() {
-        let event = asSlot(start: -30)
-        let meeting = ScribeMeetingEvidence(date: asBase, slots: [event], presentApps: [.zoom]).candidate
-        #expect(meeting?.key == "s1")
-        #expect(meeting?.title == "Design review")
-        #expect(meeting?.callApp == .zoom)
+    @Test func aStartedCalendarMeetingIsAScheduledMeetingWithItsTitle() {
+        let event = asSlot(start: -30, app: .zoom)
+        let meeting = ScribeMeetingEvidence(date: asBase, slots: [event]).candidate
+        #expect(meeting == ScribeMeeting(key: "s1", title: "Design review", callApp: .zoom, slot: event, isLive: false))
         #expect(meeting?.promptDecision == .upcoming(event))
+        let noApp = ScribeMeetingEvidence(date: asBase, slots: [asSlot(start: -30)], presentApps: [.teams]).candidate
+        #expect(noApp?.callApp == nil)
+        #expect(noApp?.isLive == false)
     }
 
-    @Test func aCalendarEventAloneOrWithoutALinkOrOutsideTheWindowIsNotEnough() {
-        #expect(ScribeMeetingEvidence(date: asBase, slots: [asSlot(start: 0)]).candidate == nil)
-        #expect(ScribeMeetingEvidence(date: asBase, slots: [asSlot(start: 0, link: false)], presentApps: [.teams]).candidate == nil)
+    @Test func aCalendarEventOutsideItsWindowIsNotEnough() {
         let early = asSlot(start: ScribeMeetingStartPolicy.leadWindow + 1)
         #expect(ScribeMeetingEvidence(date: asBase, slots: [early], presentApps: [.teams]).candidate == nil)
         let late = asSlot(start: -(ScribeMeetingStartPolicy.lateWindow + 1))
         #expect(ScribeMeetingEvidence(date: asBase, slots: [late], presentApps: [.teams]).candidate == nil)
         let over = asSlot(start: -60, end: -1)
         #expect(ScribeMeetingEvidence(date: asBase, slots: [over], presentApps: [.teams]).candidate == nil)
+    }
+
+    @Test func aLinkMeetingIsNotStartedBeforeItsStartTime() {
+        let event = asSlot(start: 119, app: .teams)
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [event], presentApps: [.teams]).candidate == nil)
+        let atStart = ScribeMeetingEvidence(date: asBase.addingTimeInterval(119), slots: [event], presentApps: [.teams]).candidate
+        #expect(atStart?.key == "s1")
+        #expect(atStart?.isLive == false)
+        let justBefore = ScribeMeetingEvidence(date: asBase.addingTimeInterval(118.5), slots: [event], presentApps: [.teams]).candidate
+        #expect(justBefore == nil)
+    }
+
+    @Test func aLiveCallBeforeTheStartCarriesTheMeetingTitle() {
+        let event = asSlot(start: 100, app: .teams)
+        let meeting = ScribeMeetingEvidence(date: asBase, slots: [event], micApps: [.teams]).candidate
+        #expect(meeting == ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event, isLive: true))
+        let tooEarly = asSlot(start: ScribeMeetingStartPolicy.leadWindow + 1, app: .teams)
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [tooEarly], micApps: [.teams]).candidate?.key == "call:Teams")
+    }
+
+    @Test func aLiveCallNeedsALinkToBelongToAMeeting() {
+        let event = asSlot(start: -30, link: false)
+        let meeting = ScribeMeetingEvidence(date: asBase, slots: [event], micApps: [.teams]).candidate
+        #expect(meeting == asTeams)
+    }
+
+    @Test func aCalendarMeetingKeepsRunningPastTheLateWindowWhileTheCallLives() {
+        let event = asSlot(start: -1_000, end: 600, app: .zoom)
+        let live = ScribeMeetingEvidence(date: asBase, slots: [event], micApps: [.zoom]).candidate
+        #expect(live?.key == "s1")
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [event], presentApps: [.zoom]).candidate == nil)
+    }
+
+    @Test func twoLinkMeetingsInWindowThePairedAppTitlesTheCall() {
+        let zoom = asSlot("z", title: "Zoom review", start: -20, app: .zoom)
+        let teams = asSlot("t", title: "Teams review", start: -10, app: .teams)
+        let slots = [zoom, teams]
+        let onZoom = ScribeMeetingEvidence(date: asBase, slots: slots, micApps: [.zoom]).candidate
+        #expect(onZoom?.key == "z")
+        #expect(onZoom?.callApp == .zoom)
+        let onTeams = ScribeMeetingEvidence(date: asBase, slots: slots, micApps: [.teams]).candidate
+        #expect(onTeams?.key == "t")
+        let onMeet = ScribeMeetingEvidence(date: asBase, slots: slots, micApps: [.meet]).candidate
+        #expect(onMeet == ScribeMeeting(key: "call:Google Meet", title: "Call", callApp: .meet, isLive: true))
+    }
+
+    @Test func aSlotWithAnUnknownLinkPairsWithTheFirstAppHoldingTheMicrophone() {
+        let event = asSlot("w", start: -10, app: .other("whereby.com"))
+        let meeting = ScribeMeetingEvidence(date: asBase, slots: [event], micApps: [.zoom, .teams]).candidate
+        #expect(meeting?.key == "w")
+        #expect(meeting?.callApp == .zoom)
+        let none = asSlot("n", start: -10)
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [none], micApps: [.teams]).candidate?.key == "n")
+    }
+
+    @Test func aCallNearTheNextMeetingKeepsItsOwnName() {
+        let next = asSlot("next", title: "Planning", start: 90, app: .zoom)
+        let meeting = ScribeMeetingEvidence(date: asBase, slots: [next], micApps: [.teams]).candidate
+        #expect(meeting == asTeams)
+    }
+
+    @Test func aStartedMeetingWinsOverOneStillToCome() {
+        let started = asSlot("started", start: -30, app: .teams)
+        let coming = asSlot("coming", start: 20, app: .teams)
+        let slots = [coming, started]
+        let live = ScribeMeetingStartPolicy.liveSlot(in: slots, micApps: [.teams], at: asBase)
+        #expect(live?.id == "started")
+        let alone = ScribeMeetingStartPolicy.liveSlot(in: [coming], micApps: [.teams], at: asBase)
+        #expect(alone?.id == "coming")
+        #expect(ScribeMeetingStartPolicy.liveSlot(in: slots, micApps: [], at: asBase) == nil)
+    }
+
+    @Test func theLatestStartedMeetingWins() {
+        let older = asSlot("older", start: -200)
+        let newer = asSlot("newer", start: -10)
+        #expect(ScribeMeetingStartPolicy.startedSlot(in: [older, newer], at: asBase)?.id == "newer")
+        #expect(ScribeMeetingStartPolicy.startedSlot(in: [asSlot("later", start: 1)], at: asBase) == nil)
+        #expect(ScribeMeetingStartPolicy.startedSlot(in: [asSlot("edge", start: -ScribeMeetingStartPolicy.lateWindow)], at: asBase)?.id == "edge")
     }
 
     @Test func theMicrophoneAppNamesTheMeetingEvenWithoutACalendarEvent() {
@@ -137,7 +214,7 @@ struct ScribeAutoStartTests {
         machine.handle(asEvidence(0, mic: [.teams]))
         let switched = machine.handle(asEvidence(2, mic: [.zoom]))
         #expect(switched.isEmpty)
-        #expect(machine.state == .armed(meeting: ScribeMeeting(key: "call:Zoom", title: "Zoom call", callApp: .zoom), since: 2))
+        #expect(machine.state == .armed(meeting: ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true), since: 2))
     }
 
     @Test func aTickNeverPromotesAnArmedMeeting() {
@@ -171,16 +248,14 @@ struct ScribeAutoStartTests {
     @Test func aFlickerOfTheMicrophoneDoesNotMakeANewMeeting() {
         var machine = asPrompting()
         machine.handle(.decline(now: 5))
-        machine.handle(asEvidence(10))
-        machine.handle(asEvidence(20, mic: [.teams]))
-        machine.handle(asEvidence(35))
-        machine.handle(asEvidence(60, mic: [.teams]))
-        let later = machine.handle(asEvidence(90, mic: [.teams]))
+        machine.handle(asEvidence(10, present: [.teams]))
+        machine.handle(asEvidence(20, mic: [.teams], present: [.teams]))
+        machine.handle(asEvidence(35, present: [.teams]))
+        machine.handle(asEvidence(60, mic: [.teams], present: [.teams]))
+        let later = machine.handle(asEvidence(90, mic: [.teams], present: [.teams]))
         #expect(later.isEmpty)
-        guard case .cooldown = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .declined)
     }
 
     // MARK: Ask me
@@ -196,12 +271,8 @@ struct ScribeAutoStartTests {
         var machine = asPrompting()
         let effects = machine.handle(.decline(now: 8))
         #expect(effects == [.hideBanner])
-        guard case .cooldown(let cooldown) = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
-        #expect(cooldown.key == "call:Teams")
-        #expect(cooldown.until == 68)
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .declined)
     }
 
     @Test func theAskBannerLeavesAfterTwentySecondsAndCountsAsNotNow() {
@@ -211,10 +282,8 @@ struct ScribeAutoStartTests {
         #expect(machine.needsTick)
         let timeout = machine.handle(.tick(now: 23))
         #expect(timeout == [.hideBanner])
-        guard case .cooldown = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .asked)
         #expect(!machine.needsTick)
         let again = machine.handle(asEvidence(30, mic: [.teams]))
         #expect(again.isEmpty)
@@ -237,10 +306,7 @@ struct ScribeAutoStartTests {
         var machine = asPrompting()
         let hidden = machine.handle(asEvidence(8, mic: [.teams], mode: .off))
         #expect(hidden == [.hideBanner])
-        guard case .cooldown = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
+        #expect(machine.state == .idle)
     }
 
     @Test func offWhileArmedDropsTheMeeting() {
@@ -305,10 +371,8 @@ struct ScribeAutoStartTests {
         var machine = asPrompting()
         let effects = machine.handle(asEvidence(6, mic: [.teams], activity: .starting))
         #expect(effects == [.hideBanner])
-        guard case .cooldown = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .started)
     }
 
     @Test func aRecordingStartedByHandIsNeverPromptedOver() {
@@ -374,7 +438,7 @@ struct ScribeAutoStartTests {
         }
     }
 
-    @Test func afterTheEndWindowSavesTheMeetingTheMachineCoolsDown() {
+    @Test func afterTheEndWindowSavesTheMeetingTheLedgerKeepsItStarted() {
         var machine = asRecordingTeams()
         machine.handle(asEvidence(12, activity: .recording))
         machine.handle(asEvidence(20, activity: .recording))
@@ -382,11 +446,8 @@ struct ScribeAutoStartTests {
         #expect(ending.isEmpty)
         let saved = machine.handle(asEvidence(40, activity: .idle))
         #expect(saved == [.hideBanner])
-        guard case .cooldown(let cooldown) = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
-        #expect(cooldown.key == "call:Teams")
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .started)
     }
 
     @Test func keepRecordingReturnsToRecordingAndWaitsForTheCallToReturn() {
@@ -407,7 +468,7 @@ struct ScribeAutoStartTests {
         #expect(again == [.requestEnd(asTeams)])
     }
 
-    @Test func stoppingByHandAfterTheGraceMovesToCooldown() {
+    @Test func stoppingByHandAfterTheGraceReturnsToIdle() {
         var machine = asPrompting()
         machine.handle(.accept(now: 10))
         let within = machine.handle(asEvidence(15, activity: .idle))
@@ -418,37 +479,132 @@ struct ScribeAutoStartTests {
         }
         let after = machine.handle(asEvidence(20, activity: .idle))
         #expect(after == [.hideBanner])
-        guard case .cooldown = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .started)
     }
 
-    // MARK: Cooldown
+    // MARK: Ledger
 
-    @Test func theSameMeetingStaysQuietUntilItHasBeenGoneAWhile() {
+    @Test func theSameCallStaysQuietUntilItHasBeenGoneAWhile() {
         var machine = asPrompting()
         machine.handle(.decline(now: 5))
-        machine.handle(asEvidence(10))
-        machine.handle(asEvidence(41))
-        let back = machine.handle(asEvidence(70, mic: [.teams]))
+        machine.handle(asEvidence(10, present: [.teams]))
+        machine.handle(asEvidence(41, present: [.teams]))
+        let back = machine.handle(asEvidence(70, mic: [.teams], present: [.teams]))
         #expect(back.isEmpty)
         #expect(machine.state == .armed(meeting: asTeams, since: 70))
-        let shown = machine.handle(asEvidence(73, mic: [.teams]))
+        let shown = machine.handle(asEvidence(73, mic: [.teams], present: [.teams]))
         #expect(shown == [.showAsk(asTeams)])
     }
 
-    @Test func aDifferentMeetingWaitsOutTheCooldownThenTriggers() {
+    @Test func aDifferentMeetingArmsWithoutWaiting() {
         var machine = asPrompting()
         machine.handle(.decline(now: 5))
-        let zoom = ScribeMeeting(key: "call:Zoom", title: "Zoom call", callApp: .zoom)
-        let early = machine.handle(asEvidence(30, mic: [.zoom]))
+        let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
+        let early = machine.handle(asEvidence(6, mic: [.zoom]))
         #expect(early.isEmpty)
-        let afterCooldown = machine.handle(asEvidence(66, mic: [.zoom]))
-        #expect(afterCooldown.isEmpty)
-        #expect(machine.state == .armed(meeting: zoom, since: 66))
-        let shown = machine.handle(asEvidence(69, mic: [.zoom]))
+        #expect(machine.state == .armed(meeting: zoom, since: 6))
+        let shown = machine.handle(asEvidence(9, mic: [.zoom]))
         #expect(shown == [.showAsk(zoom)])
+    }
+
+    @Test func anAnsweredMeetingIsNeverArmedAgain() {
+        var machine = asPrompting()
+        machine.handle(.decline(now: 5))
+        let effects = machine.handle(asEvidence(6, mic: [.teams]))
+        #expect(effects.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func automaticNeverCountsDownWithoutALiveCall() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0, app: .teams)
+        for now in stride(from: 0.0, through: 3.0, by: 1.0) {
+            machine.handle(asEvidence(now, slots: [event], mode: .automatic, granted: true, consent: true))
+        }
+        #expect(machine.state == .prompting(meeting: ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event),
+                                            deadline: 23))
+        let tick = machine.handle(.tick(now: 8))
+        #expect(tick.isEmpty)
+        let late = machine.handle(.tick(now: 23))
+        #expect(late == [.hideBanner])
+        #expect(!late.contains { if case .startRecording = $0 { return true } else { return false } })
+    }
+
+    @Test func aCalendarMeetingIsOfferedAtItsStartWithNoCallAppOpen() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0)
+        machine.handle(asEvidence(0, slots: [event]))
+        let shown = machine.handle(asEvidence(3, slots: [event]))
+        #expect(shown == [.showAsk(ScribeMeeting(key: "s1", title: "Design review", callApp: nil, slot: event))])
+        var early = ScribeAutoStartMachine()
+        let notYet = asSlot(start: 30)
+        early.handle(asEvidence(0, present: [.teams], slots: [notYet]))
+        #expect(early.handle(asEvidence(3, present: [.teams], slots: [notYet])).isEmpty)
+        #expect(early.state == .idle)
+    }
+
+    @Test func anUnansweredCardDoesNotBlockTheAutomaticCountdown() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0, app: .teams)
+        machine.handle(asEvidence(0, slots: [event], mode: .automatic, granted: true, consent: true))
+        machine.handle(asEvidence(3, slots: [event], mode: .automatic, granted: true, consent: true))
+        machine.handle(.tick(now: 23))
+        #expect(machine.state == .idle)
+        let live = ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event, isLive: true)
+        machine.handle(asEvidence(30, mic: [.teams], slots: [event], mode: .automatic, granted: true, consent: true))
+        #expect(machine.state == .armed(meeting: live, since: 30))
+        let counting = machine.handle(asEvidence(33, mic: [.teams], slots: [event], mode: .automatic, granted: true, consent: true))
+        #expect(counting == [.showCountdown(live)])
+        #expect(machine.state == .countingDown(meeting: live, deadline: 38))
+    }
+
+    @Test func anUnansweredCardInAskMeIsNotAskedAgainWhenTheCallBegins() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0, app: .teams)
+        machine.handle(asEvidence(0, slots: [event]))
+        machine.handle(asEvidence(3, slots: [event]))
+        machine.handle(.tick(now: 23))
+        let live = machine.handle(asEvidence(30, mic: [.teams], slots: [event]))
+        #expect(live.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func aDeclinedMeetingStaysQuietWhenItsSlotEndsAndTheCallContinues() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0, app: .teams)
+        machine.handle(asEvidence(0, mic: [.teams], slots: [event]))
+        machine.handle(asEvidence(3, mic: [.teams], slots: [event]))
+        machine.handle(.decline(now: 4))
+        var effects: [ScribeAutoStartMachine.Effect] = []
+        for now in stride(from: 5.0, through: 600.0, by: 5.0) {
+            effects += machine.handle(asEvidence(now, mic: [.teams], slots: [event]))
+        }
+        #expect(effects.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func aRecordingStartedWithoutALiveAppAdoptsTheAppWhenTheMeetingGoesLive() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0, app: .teams)
+        machine.handle(asEvidence(0, slots: [event]))
+        machine.handle(asEvidence(3, slots: [event]))
+        machine.handle(.accept(now: 4))
+        guard case .recording(let before) = machine.state else {
+            Issue.record("expected recording, got \(machine.state)")
+            return
+        }
+        #expect(before.meeting.isLive == false)
+        machine.handle(asEvidence(10, mic: [.teams], slots: [event], activity: .recording))
+        guard case .recording(let after) = machine.state else {
+            Issue.record("expected recording, got \(machine.state)")
+            return
+        }
+        #expect(after.meeting == ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event, isLive: true))
+        #expect(after.sawMic)
+        machine.handle(asEvidence(11, slots: [event], activity: .recording))
+        let ended = machine.handle(asEvidence(19, slots: [event], activity: .recording))
+        #expect(ended == [.requestEnd(after.meeting)])
     }
 
     // MARK: First-use consent
@@ -646,15 +802,14 @@ struct ScribeAutoStartTests {
         #expect(machine.state == .endingSuggested(meeting: asTeams, since: 22))
         let saved = machine.handle(asEvidence(40, mic: [.teams], slots: [next], activity: .idle))
         #expect(saved == [.hideBanner])
-        guard case .cooldown(let cooldown) = machine.state else {
-            Issue.record("expected cooldown, got \(machine.state)")
-            return
-        }
-        #expect(cooldown.until == 40)
+        #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: asTeams) == .started)
+        let nextMeeting = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams, slot: next, isLive: true)
+        #expect(machine.ledger.mark(of: nextMeeting) == .headsUp)
         let seen = machine.handle(asEvidence(41, mic: [.teams], slots: [next], activity: .idle))
         #expect(seen.isEmpty)
         let shown = machine.handle(asEvidence(44, mic: [.teams], slots: [next], activity: .idle))
-        #expect(shown == [.showAsk(ScribeMeeting(key: "n1", title: "Standup", callApp: .teams, slot: next))])
+        #expect(shown == [.showAsk(nextMeeting)])
     }
 
     @Test func theCallEndingTakesTheNextMeetingCardDown() {
@@ -675,6 +830,19 @@ struct ScribeAutoStartTests {
         var recording = asRecordingTeams()
         let noCard = recording.handle(.accept(now: 30))
         #expect(noCard.isEmpty)
+    }
+
+    @Test func aDeclinedNextMeetingStaysQuietWhenTheRecordingEnds() {
+        var machine = asRecordingTeams()
+        let next = asSlot("n1", title: "Standup", start: 80)
+        machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
+        machine.handle(.decline(now: 26))
+        machine.handle(asEvidence(40, mic: [.teams], slots: [next], activity: .idle))
+        var effects: [ScribeAutoStartMachine.Effect] = []
+        for now in stride(from: 45.0, through: 200.0, by: 5.0) {
+            effects += machine.handle(asEvidence(now, mic: [.teams], slots: [next], activity: .idle))
+        }
+        #expect(effects.isEmpty)
     }
 
     @Test func newBannerWordingIsPlain() {
@@ -698,8 +866,8 @@ struct ScribeAutoStartTests {
     }
 
     @Test func bannerWordingIsPlain() {
-        #expect(ScribeAutoStartText.askHeadline(asTeams) == "Meeting started: Teams call. Take notes?")
-        #expect(ScribeAutoStartText.countdownHeadline(asTeams, seconds: 3) == "Meeting started: Teams call. Taking notes in 3.")
+        #expect(ScribeAutoStartText.askHeadline(asTeams) == "Meeting started: Call. Take notes?")
+        #expect(ScribeAutoStartText.countdownHeadline(asTeams, seconds: 3) == "Meeting started: Call. Taking notes in 3.")
         #expect(ScribeAutoStartText.countdownHeadline(asTeams, seconds: -1).hasSuffix("in 0."))
         for text in [ScribeAutoStartText.askDetail, ScribeAutoStartText.countdownDetail,
                      ScribeAutoStartText.askHeadline(asTeams)] {
