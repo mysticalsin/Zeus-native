@@ -12,9 +12,9 @@ import Foundation
 /// the port there, so no callback is ever running while the port goes away (a callback and the teardown are two
 /// items of one loop). `teardown` runs exactly once for every thread, and never before `install` when both run. A
 /// stop that wins the race against the thread's first step skips `install`, and the thread runs `teardown` on its own
-/// before it ends: the owner made the port before the thread started, and a new tap starts enabled, so without the
-/// teardown the window server would route keystrokes to a tap that no loop services. When the loop has ended both
-/// closures are released.
+/// before it ends: the owner made the port before the thread started, so without the teardown the port would stay
+/// registered with the window server, and switched on by a later enable, with no loop to service it. When the loop has
+/// ended both closures are released.
 ///
 /// Nonisolated on purpose, like the tap itself: no `@MainActor` type may sit between a system callback and its owner.
 final class TilingRunLoopThread: @unchecked Sendable {

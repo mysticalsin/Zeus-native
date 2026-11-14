@@ -127,7 +127,8 @@ final class TilingKeyTap: @unchecked Sendable {
         }
     }
 
-    /// Creates the tap and starts its thread. The caller holds the lock and has moved the life to `starting`.
+    /// Creates the tap switched off and starts its thread, which adds the source and then switches the tap on. The caller
+    /// holds the lock and has moved the life to `starting`.
     private nonisolated func create() -> Bool {
         let run = Run(owner: self)
         guard let made = system.create(Unmanaged.passUnretained(run).toOpaque()) else {
@@ -135,6 +136,10 @@ final class TilingKeyTap: @unchecked Sendable {
             return false
         }
         let port = made.port, source = made.source
+        // A new tap is switched on from the moment it is made, and no loop services it yet. Off here, the window server
+        // does not hold every keystroke in every app until the thread has added the source: the thread switches the port
+        // on after it did. No callback can run before then, so this call waits for nothing under the lock.
+        system.setEnabled(port, false)
         run.port = port
         run.source = source
         matcher.reset()
@@ -151,7 +156,7 @@ final class TilingKeyTap: @unchecked Sendable {
                 run.owner?.installed(run)
             },
             teardown: { [run] in
-                // Also runs when a stop came before `install`: the port exists and is enabled from the moment it is made.
+                // Also runs when a stop came before `install`: the port was made switched off, and the call is harmless.
                 guard let port = run.port, let source = run.source else { return }
                 system.setEnabled(port, false)
                 CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
