@@ -27,8 +27,8 @@ POINTING = APP / "Pointing"
 TILING = APP / "Tiling"
 # Pointing must advance on real events, never a sleep, and must never use the word-count clock.
 POINTING_FORBIDDEN = re.compile(r"\bTask\.sleep\b|SpeechDrawingTimeline\.estimate|\.installTap\(|\brequestAccess\(|\brequestAuthorization\b|CGRequestScreenCaptureAccess|CGRequestListenEventAccess")
-# System callbacks that must be installed from a nonisolated function.
-POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents")
+# System callbacks that must be installed from a nonisolated function (Pointing and Tiling both follow this).
+POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents|AXObserverCreate")
 
 
 def pointing_callback_offenders(text, label="sample"):
