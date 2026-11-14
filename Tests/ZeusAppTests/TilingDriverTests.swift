@@ -5,7 +5,7 @@ import ZeusCore
 
 /// The real Accessibility driver with Accessibility off. The Accessibility and window-list paths themselves are
 /// proven on a Mac, not here: this suite checks only that nothing is read or written without the permission.
-@Suite(.serialized) @MainActor struct TilingDriverAXTests {
+@Suite(.serialized) @MainActor struct TilingDriverTests {
     @Test func withAccessibilityOffEveryEntryPointIsANoOpThatReportsTheState() {
         let driver = AXTilingWindowDriver(isTrusted: { false })
         #expect(!driver.isTrusted)
