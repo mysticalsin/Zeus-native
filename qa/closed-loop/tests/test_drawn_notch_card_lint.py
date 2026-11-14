@@ -17,7 +17,8 @@ CARD_TESTS = ROOT / "Tests/ZeusAppTests/DrawnNotchCardTests.swift"
 FEATURE_MAP = ROOT / "qa/feature-map.json"
 DASHES = (chr(0x2013), chr(0x2014))
 
-CONTROL = r"\.send\(\s*\.(begin|setWidth|setHeight|setOffset|step|reset|done|cancel)\b"
+# Calls on the drawn notch's controller only: other state machines (the recording countdown) have a `cancel` too.
+CONTROL = r"\b(?:drawnNotch|DrawnNotchModel\.shared|controller)\??\.send\(\s*\.(begin|setWidth|setHeight|setOffset|step|reset|done|cancel)\b"
 LOSS_ALLOWED = {CARD.name, WINDOW.name, MODEL.name}
 
 
@@ -134,6 +135,9 @@ class DrawnNotchCardLintFailsOnItsFailureShapes(unittest.TestCase):
         self.assertEqual(sends_control("drawnNotch.send(.step(.width, .up))"), ["step"])
         self.assertEqual(sends_control("// drawnNotch.send(.done)"), [])
         self.assertEqual(sends_control("drawnNotch.send(.surfaceGone(.noDisplay))"), [])
+        self.assertEqual(sends_control("DrawnNotchModel.shared.send(.reset)"), ["reset"])
+        self.assertEqual(sends_control("context.drawnNotch?.send(.cancel)"), ["cancel"])
+        self.assertEqual(sends_control("perform(countdown.send(.cancel))"), [])
 
     def test_a_loss_sent_from_an_unlisted_file_is_caught(self):
         import tempfile
