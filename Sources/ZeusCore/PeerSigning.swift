@@ -18,9 +18,18 @@ public enum PeerSigning {
         guard let token = auditToken, token.count == 32 else { return .deny("peer audit token unavailable") }
         guard let peer = describePeer(auditToken: token) else { return .deny("peer code signature unreadable") }
         let own = OwnApp.current
+        // An installed helper has no bundle of its own: the app that shipped it is the peer, and its bundle's
+        // helper hashes are what tie the two together. Read only for that case, never at idle.
+        var peerBundleHashes = Set<String>()
+        if own.bundlePath == nil, own.signature?.teamIdentifier?.isEmpty ?? true, own.signature?.cdHash?.isEmpty == false,
+           let path = peer.path, let bundle = AppBundleLocator.bundlePath(forExecutable: path) {
+            peerBundleHashes = helperCDHashes(bundle: bundle, folders: ["Contents/Helpers"], requireValid: true)
+        }
+        let installed = resolve(ZeusPaths.binDirectory.path) ?? ZeusPaths.binDirectory.path
         return PeerBinaryRule.decide(own: own.signature, peer: peer.signature, peerExecutablePath: peer.path,
                                      ownBundlePath: own.bundlePath, ownExecutableDirectory: own.executableDirectory,
-                                     ownBundleCDHashes: own.bundleCDHashes)
+                                     ownBundleCDHashes: own.bundleCDHashes, peerBundleCDHashes: peerBundleHashes,
+                                     installedHelpersDirectory: installed)
     }
 
     // MARK: This program
@@ -46,30 +55,34 @@ public enum PeerSigning {
             // Cdhashes of the bundled programs only matter when the app has no team to compare.
             var hashes = Set<String>()
             if signature?.teamIdentifier?.isEmpty ?? true, let bundle {
-                hashes = bundledCDHashes(bundle: bundle)
+                hashes = PeerSigning.helperCDHashes(bundle: bundle, folders: ["Contents/MacOS", "Contents/Helpers"], requireValid: false)
             }
             return OwnApp(signature: signature, bundlePath: bundle, executableDirectory: directory, bundleCDHashes: hashes)
-        }
-
-        private static func bundledCDHashes(bundle: String) -> Set<String> {
-            var hashes = Set<String>()
-            for folder in ["Contents/MacOS", "Contents/Helpers"] {
-                let directory = bundle + "/" + folder
-                for name in (try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? [] {
-                    var staticCode: SecStaticCode?
-                    let url = URL(fileURLWithPath: directory + "/" + name)
-                    // Only the hash the signature declares is read. It is not a trust decision on its own: a peer
-                    // must still pass its own signature check, which hashes its real content.
-                    guard SecStaticCodeCreateWithPath(url as CFURL, SecCSFlags(), &staticCode) == errSecSuccess, let staticCode,
-                          let hash = PeerSigning.describe(staticCode: staticCode, valid: true)?.signature.cdHash else { continue }
-                    hashes.insert(hash)
-                }
-            }
-            return hashes
         }
     }
 
     // MARK: Reading a signature
+
+    /// The cdhashes the signatures of the programs in `folders` declare. For this app's own bundle the declared
+    /// hash is enough (the peer must still pass its own check, which hashes its real content). For a peer's
+    /// bundle each program must also pass a static validity check, so a hash is only listed for intact code.
+    fileprivate static func helperCDHashes(bundle: String, folders: [String], requireValid: Bool) -> Set<String> {
+        var hashes = Set<String>()
+        for folder in folders {
+            let directory = bundle + "/" + folder
+            for name in (try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? [] {
+                var staticCode: SecStaticCode?
+                let url = URL(fileURLWithPath: directory + "/" + name)
+                guard SecStaticCodeCreateWithPath(url as CFURL, SecCSFlags(), &staticCode) == errSecSuccess, let staticCode else { continue }
+                if requireValid {
+                    let flags = SecCSFlags(rawValue: UInt32(kSecCSDoNotValidateResources))
+                    guard SecStaticCodeCheckValidity(staticCode, flags, nil) == errSecSuccess else { continue }
+                }
+                if let hash = describe(staticCode: staticCode, valid: true)?.signature.cdHash { hashes.insert(hash) }
+            }
+        }
+        return hashes
+    }
 
     private struct Described {
         var signature: CodeSignature
@@ -86,10 +99,9 @@ public enum PeerSigning {
         let attributes = [kSecGuestAttributeAudit as String: auditToken] as CFDictionary
         guard SecCodeCopyGuestWithAttributes(nil, attributes, SecCSFlags(), &guest) == errSecSuccess, let guest,
               let described = describe(code: guest) else { return nil }
-        // The running image's path comes from the kernel (pid word of the audit token), not from the file system lookup.
-        let pid = auditToken.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 5 * MemoryLayout<UInt32>.size, as: UInt32.self) }
-        let kernelPath = pid > 0 ? PeerCheck.executablePath(pid: pid_t(pid)) : nil
-        let path = (kernelPath ?? described.mainExecutable).flatMap(resolve)
+        // The running image's path is looked up by the whole audit token, which carries the pid version, so a pid
+        // reused by another process after the peer exits finds nothing. A bare pid lookup is never used.
+        let path = (PeerCheck.executablePath(auditToken: auditToken) ?? described.mainExecutable).flatMap(resolve)
         return PeerDescription(signature: described.signature, path: path)
     }
 

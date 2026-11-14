@@ -72,27 +72,49 @@ public enum PeerBinaryRule {
     ///   - ownBundlePath: the `.app` folder this program runs from, if any.
     ///   - ownExecutableDirectory: the folder holding this program (the build products folder for a loose binary).
     ///   - ownBundleCDHashes: cdhashes of the programs shipped inside this app, so an installed copy of a bundled helper still matches.
+    ///   - peerBundleCDHashes: cdhashes of the helpers shipped inside the peer's own `.app`, each one checked
+    ///     valid. Only read when this program has no bundle (the installed bridge) and the peer runs inside one.
+    ///   - installedHelpersDirectory: the folder the app copies its helpers into. Any program of this user can
+    ///     write there, so it is never trusted as a build products folder.
     ///
     /// When this app is signed with a team identifier the peer must carry the same one. When it is ad hoc
     /// or locally signed (development builds, the test host) the peer must live inside this app's bundle or
-    /// next to this program, be an exact copy of a bundled helper, or share this build's signing certificate.
+    /// next to this loose program, be an exact copy of a bundled helper, share this build's signing
+    /// certificate, or (for an installed helper that has no bundle) run from an app whose bundle holds an
+    /// exact copy of this helper. An ad hoc build has no identity beyond that: a same-user program could
+    /// still assemble such a bundle, which is why a team-signed build compares teams instead.
     /// Every other case, and every missing input, refuses.
     public static func decide(own: CodeSignature?, peer: CodeSignature?, peerExecutablePath: String?,
                               ownBundlePath: String?, ownExecutableDirectory: String?,
-                              ownBundleCDHashes: Set<String> = []) -> PeerVerdict {
+                              ownBundleCDHashes: Set<String> = [], peerBundleCDHashes: Set<String> = [],
+                              installedHelpersDirectory: String? = nil) -> PeerVerdict {
         guard let own, own.isValid else { return .deny("own code signature unavailable") }
         guard let peer, peer.isValid else { return .deny("peer code signature missing or invalid") }
         if let team = own.team {
             guard !peer.isAdHoc, peer.team == team else { return .deny("peer is not signed by this app's team") }
             return .allow
         }
-        if let path = peerExecutablePath, !path.isEmpty {
-            for root in [ownBundlePath, ownExecutableDirectory] {
+        let path = peerExecutablePath.flatMap { $0.isEmpty ? nil : $0 }
+        if let path {
+            let directory = isTrustedDirectory(ownExecutableDirectory, installedHelpers: installedHelpersDirectory) ? ownExecutableDirectory : nil
+            for root in [ownBundlePath, directory] {
                 if let root, PathContainment.isInside(path, root: root) { return .allow }
             }
         }
         if let hash = peer.cdHash, !hash.isEmpty, ownBundleCDHashes.contains(hash) { return .allow }
         if !own.isAdHoc, let certificate = own.certificateHash, !certificate.isEmpty, peer.certificateHash == certificate { return .allow }
+        // The installed bridge: no bundle of its own, so the peer must be the app that shipped this exact copy.
+        if ownBundlePath == nil, let path, AppBundleLocator.bundlePath(forExecutable: path) != nil,
+           let hash = own.cdHash, !hash.isEmpty, peerBundleCDHashes.contains(hash) { return .allow }
         return .deny("peer is not this app's program")
+    }
+
+    /// A folder holding this program is a build products folder only when it is not the installed helpers
+    /// folder or inside it.
+    private static func isTrustedDirectory(_ directory: String?, installedHelpers: String?) -> Bool {
+        guard let directory, let installedHelpers else { return directory != nil }
+        guard let own = PathContainment.components(directory), let installed = PathContainment.components(installedHelpers),
+              !installed.isEmpty else { return false }
+        return !(own.count >= installed.count && Array(own.prefix(installed.count)) == installed)
     }
 }

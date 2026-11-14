@@ -123,6 +123,18 @@ public enum PeerCheck {
         return token.withUnsafeBytes { Data($0) }
     }
 
+    /// The path of the program behind an audit token (32 bytes). Unlike a pid lookup it refuses once the process
+    /// that owned the token has exited, even when another process has taken its pid.
+    static func executablePath(auditToken data: Data) -> String? {
+        guard data.count == MemoryLayout<audit_token_t>.size else { return nil }
+        var token = audit_token_t()
+        withUnsafeMutableBytes(of: &token) { _ = data.copyBytes(to: $0) }
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let length = proc_pidpath_audittoken(&token, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+
     static func executablePath(pid: pid_t) -> String? {
         var buffer = [CChar](repeating: 0, count: 4096)
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
