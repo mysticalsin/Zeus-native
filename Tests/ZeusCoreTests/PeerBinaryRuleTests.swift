@@ -13,20 +13,23 @@ struct PeerBinaryRuleTests {
     private let helpers = "/Applications/Zeus.app/Contents/Helpers"
     private let appBinary = "/Applications/Zeus.app/Contents/MacOS/Zeus"
 
+    /// `anchored` is what the adapter reports after checking the running code against the requirement built from the
+    /// server's identity. A real team or certificate peer meets it; a program that only claims the team does not.
     private func signature(valid: Bool = true, identifier: String? = "Zeus", team: String? = nil, adHoc: Bool = false,
-                           certificate: String? = nil, cdHash: String? = nil) -> CodeSignature {
-        CodeSignature(isValid: valid, identifier: identifier, teamIdentifier: team, isAdHoc: adHoc,
-                      certificateHash: certificate, cdHash: cdHash)
+                           certificate: String? = nil, cdHash: String? = nil, anchored: Bool? = nil) -> CodeSignature {
+        let real = !adHoc && ((team?.isEmpty == false) || (certificate?.isEmpty == false))
+        return CodeSignature(isValid: valid, identifier: identifier, teamIdentifier: team, isAdHoc: adHoc,
+                             certificateHash: certificate, cdHash: cdHash, satisfiesIdentityRequirement: anchored ?? real)
     }
 
     private func decide(own: CodeSignature?, peer: CodeSignature?, path: String?, bundle: String? = "/Applications/Zeus.app",
                         directory: String? = "/Applications/Zeus.app/Contents/Helpers", hashes: Set<String> = [],
                         peerBundleHelpers: Set<String> = [], installedHelpers: String? = nil,
-                        expectedPeerIdentifier: String? = nil) -> PeerVerdict {
+                        expectedPeerIdentifier: String? = nil, trustShippingBundle: Bool = false) -> PeerVerdict {
         PeerBinaryRule.decide(own: own, peer: peer, peerExecutablePath: path, ownBundlePath: bundle,
                               ownExecutableDirectory: directory, ownBundleCDHashes: hashes,
                               peerBundleHelperIdentifiers: peerBundleHelpers, installedHelpersDirectory: installedHelpers,
-                              expectedPeerIdentifier: expectedPeerIdentifier)
+                              expectedPeerIdentifier: expectedPeerIdentifier, trustShippingBundle: trustShippingBundle)
     }
 
     // MARK: Team signed (release builds)
@@ -133,7 +136,8 @@ struct PeerBinaryRuleTests {
     private func decideForBridge(own: CodeSignature, peer: CodeSignature, path: String?, peerBundleHelpers: Set<String> = [],
                                  expectedPeerIdentifier: String? = nil) -> PeerVerdict {
         decide(own: own, peer: peer, path: path, bundle: nil, directory: installedBin,
-               peerBundleHelpers: peerBundleHelpers, installedHelpers: installedBin, expectedPeerIdentifier: expectedPeerIdentifier)
+               peerBundleHelpers: peerBundleHelpers, installedHelpers: installedBin, expectedPeerIdentifier: expectedPeerIdentifier,
+               trustShippingBundle: true)
     }
 
     private let appIdentifier = "app.zeus.mac"
@@ -253,6 +257,85 @@ struct PeerBinaryRuleTests {
         #expect(PeerBinaryRule.decide(own: own, peer: peer, peerExecutablePath: "/work/.build/debug/Zeus", ownBundlePath: nil,
                                       ownExecutableDirectory: "/work/.build/debug", installedHelpersDirectory: installedBin) == .allow,
                 "a build products folder elsewhere is still trusted")
+    }
+
+    // MARK: The identity is anchored, not claimed
+
+    @Test func aTeamPeerThatOnlyClaimsTheTeamIsRefused() {
+        // A self-signed certificate can carry the team identifier as its organizational unit. Signing information shows
+        // the claim; only a check against Apple's chain proves it. The adapter reports that check as `anchored`.
+        let own = signature(team: "ABCDE12345")
+        let forged = signature(team: "ABCDE12345", anchored: false)
+        #expect(!decide(own: own, peer: forged, path: appBinary).isAllowed, "inside the bundle path")
+        #expect(!decide(own: own, peer: forged, path: "/tmp/Zeus").isAllowed, "outside it")
+        #expect(!decide(own: own, peer: forged, path: appBinary, expectedPeerIdentifier: appIdentifier).isAllowed, "with the app identifier")
+        #expect(decide(own: own, peer: signature(team: "ABCDE12345", anchored: true), path: "/tmp/Zeus") == .allow, "the real team")
+    }
+
+    @Test func aTeamSignedBridgeRefusesAForgedTeamPeer() {
+        let running = bridge(team: "ABCDE12345", adHoc: false)
+        let forged = signature(identifier: appIdentifier, team: "ABCDE12345", cdHash: "forged", anchored: false)
+        #expect(!decideForBridge(own: running, peer: forged, path: "/Applications/Zeus.app/Contents/MacOS/Zeus",
+                                 peerBundleHelpers: ["zeus-bridge"], expectedPeerIdentifier: appIdentifier).isAllowed)
+    }
+
+    @Test func aCertificatePeerThatIsNotAnchoredToTheCertificateIsRefused() {
+        let own = signature(certificate: "cert-1")
+        let path = "/Users/me/Library/Application Support/Zeus/bin/zeus-bridge"
+        #expect(decide(own: own, peer: signature(certificate: "cert-1", anchored: true), path: path) == .allow)
+        #expect(!decide(own: own, peer: signature(certificate: "cert-1", anchored: false), path: path).isAllowed,
+                "the hash read from signing information alone is not enough")
+    }
+
+    @Test func theRequirementNamesTheAppleChainTheTeamAndTheIdentifier() {
+        let team = PeerRequirement.text(ownTeam: "ABCDE12345", ownLeafSHA1: nil, ownIsAdHoc: false, peerIdentifier: nil)
+        #expect(team == "anchor apple generic and certificate leaf[subject.OU] = \"ABCDE12345\"")
+        let named = PeerRequirement.text(ownTeam: "ABCDE12345", ownLeafSHA1: nil, ownIsAdHoc: false, peerIdentifier: "app.zeus.mac")
+        #expect(named == "anchor apple generic and certificate leaf[subject.OU] = \"ABCDE12345\" and identifier \"app.zeus.mac\"")
+    }
+
+    @Test func aTeamRequirementIgnoresTheCertificateOfAnAppThatHasATeam() {
+        let sha1 = String(repeating: "ab", count: 20)
+        let text = PeerRequirement.text(ownTeam: "ABCDE12345", ownLeafSHA1: sha1, ownIsAdHoc: false, peerIdentifier: nil)
+        #expect(text?.contains("anchor apple generic") == true)
+        #expect(text?.contains("H\"") == false)
+    }
+
+    @Test func aLocalIdentityRequirementNamesTheExactCertificate() {
+        let sha1 = String(repeating: "ab", count: 20)
+        #expect(PeerRequirement.text(ownTeam: nil, ownLeafSHA1: sha1, ownIsAdHoc: false, peerIdentifier: nil) == "certificate leaf = H\"\(sha1)\"")
+        #expect(PeerRequirement.text(ownTeam: "", ownLeafSHA1: sha1.uppercased(), ownIsAdHoc: false, peerIdentifier: "app.zeus.mac")
+                == "certificate leaf = H\"\(sha1)\" and identifier \"app.zeus.mac\"", "case is normalised and an empty team is no team")
+    }
+
+    @Test func noRequirementExistsWhenTheOwnerHasNoIdentityToName() {
+        let sha1 = String(repeating: "ab", count: 20)
+        #expect(PeerRequirement.text(ownTeam: nil, ownLeafSHA1: nil, ownIsAdHoc: false, peerIdentifier: nil) == nil, "no certificate")
+        #expect(PeerRequirement.text(ownTeam: nil, ownLeafSHA1: sha1, ownIsAdHoc: true, peerIdentifier: nil) == nil, "ad hoc")
+        #expect(PeerRequirement.text(ownTeam: nil, ownLeafSHA1: "abc", ownIsAdHoc: false, peerIdentifier: nil) == nil, "a short hash")
+        #expect(PeerRequirement.text(ownTeam: nil, ownLeafSHA1: String(repeating: "zz", count: 20), ownIsAdHoc: false, peerIdentifier: nil) == nil, "not hex")
+    }
+
+    @Test func aMalformedTeamOrIdentifierNeverReachesTheRequirementText() {
+        for team in ["ABC\" or true", "AB CD", "ABCDE12345\" and identifier \"x", "", "a/b"] {
+            #expect(PeerRequirement.text(ownTeam: team, ownLeafSHA1: nil, ownIsAdHoc: false, peerIdentifier: nil) == nil, "\(team)")
+        }
+        for identifier in ["app\" or anchor apple", "a b", "x\\y", ""] {
+            #expect(PeerRequirement.text(ownTeam: "ABCDE12345", ownLeafSHA1: nil, ownIsAdHoc: false, peerIdentifier: identifier) == nil, "\(identifier)")
+        }
+    }
+
+    // MARK: The shipping-bundle allowance is the bridge's alone
+
+    @Test func aServerThatDoesNotOptInRefusesAnAssembledBundle() {
+        // A loose ad hoc Zeus (a SwiftPM build) serving the command socket must not accept /tmp/X.app holding a re-signed helper.
+        let assembled = signature(identifier: appIdentifier, adHoc: true, cdHash: "x")
+        let loose = signature(identifier: "Zeus", adHoc: true)
+        #expect(!decide(own: loose, peer: assembled, path: "/tmp/X.app/Contents/MacOS/Zeus", bundle: nil, directory: installedBin,
+                        peerBundleHelpers: ["Zeus"], installedHelpers: installedBin).isAllowed)
+        #expect(decide(own: loose, peer: assembled, path: "/tmp/X.app/Contents/MacOS/Zeus", bundle: nil, directory: installedBin,
+                       peerBundleHelpers: ["Zeus"], installedHelpers: installedBin, trustShippingBundle: true) == .allow,
+                "the bridge opts in and keeps the allowance")
     }
 
     // MARK: Helpers

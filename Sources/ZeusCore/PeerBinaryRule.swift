@@ -13,20 +13,33 @@ public struct CodeSignature: Equatable, Sendable {
     public var certificateHash: String?
     /// The code directory hash (cdhash), hex: the identity of one exact build of one program.
     public var cdHash: String?
+    /// The running code met `PeerRequirement` in the same call that checked it, so its identity is anchored in
+    /// Apple's chain (a team) or in the exact certificate (a local identity), not just claimed in its signing
+    /// information. False when no requirement applied or it was not met.
+    public var satisfiesIdentityRequirement: Bool
 
     public init(isValid: Bool, identifier: String? = nil, teamIdentifier: String? = nil, isAdHoc: Bool = false,
-                certificateHash: String? = nil, cdHash: String? = nil) {
+                certificateHash: String? = nil, cdHash: String? = nil, satisfiesIdentityRequirement: Bool = false) {
         self.isValid = isValid
         self.identifier = identifier
         self.teamIdentifier = teamIdentifier
         self.isAdHoc = isAdHoc
         self.certificateHash = certificateHash
         self.cdHash = cdHash
+        self.satisfiesIdentityRequirement = satisfiesIdentityRequirement
     }
 
     fileprivate var team: String? {
         guard let teamIdentifier, !teamIdentifier.isEmpty else { return nil }
         return teamIdentifier
+    }
+}
+
+/// The code requirement a peer must meet, built from this program's own identity.
+public enum PeerRequirement {
+    /// Nil when this program has no identity a requirement can name (ad hoc builds) or its inputs are malformed.
+    public static func text(ownTeam: String?, ownLeafSHA1: String?, ownIsAdHoc: Bool, peerIdentifier: String?) -> String? {
+        nil
     }
 }
 
@@ -92,7 +105,8 @@ public enum PeerBinaryRule {
     public static func decide(own: CodeSignature?, peer: CodeSignature?, peerExecutablePath: String?,
                               ownBundlePath: String?, ownExecutableDirectory: String?,
                               ownBundleCDHashes: Set<String> = [], peerBundleHelperIdentifiers: Set<String> = [],
-                              installedHelpersDirectory: String? = nil, expectedPeerIdentifier: String? = nil) -> PeerVerdict {
+                              installedHelpersDirectory: String? = nil, expectedPeerIdentifier: String? = nil,
+                              trustShippingBundle: Bool = false) -> PeerVerdict {
         guard let own, own.isValid else { return .deny("own code signature unavailable") }
         guard let peer, peer.isValid else { return .deny("peer code signature missing or invalid") }
         if let expected = expectedPeerIdentifier {
