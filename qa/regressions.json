@@ -4378,6 +4378,30 @@
         "file": "Tests/ZeusCoreTests/EqualiserTypesTests.swift",
         "function": "aMainActorFakeConformsToTheControlProtocol"
       }
+    },
+    {
+      "id": "REG-431",
+      "failure": "A non-finite sample in a tapped buffer could pass through the equaliser and reach the speakers instead of one silent buffer.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserDSPTests.swift",
+        "function": "aNaNInTheMiddleOfABufferGivesOneSilentBuffer"
+      }
+    },
+    {
+      "id": "REG-432",
+      "failure": "Boosting every band of a full-scale signal could push the equaliser output past full scale.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserDSPTests.swift",
+        "function": "aFullScaleSineWithEveryBandAtPlusTwelveNeverPassesFullScale"
+      }
     }
   ]
 }
