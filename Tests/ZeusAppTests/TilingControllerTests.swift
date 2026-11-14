@@ -133,6 +133,10 @@ private final class Rig {
     var focusBorder = true
     /// The note the key clash check gives for a base; nil means the base is free.
     var clashNote: (TileModifierBase) -> String? = { _ in nil }
+    /// Whether VoiceOver is running. A test that makes the key clash depend on it also calls `changeVoiceOver`.
+    var voiceOverOn = false
+    private(set) var voiceOverWatchers: [TilingWork] = []
+    private(set) var voiceOverCancels = 0
     var scheduled: [Pending] = []
     let appCenter = NotificationCenter()
     let workspaceCenter = NotificationCenter()
@@ -152,6 +156,10 @@ private final class Rig {
             readConfig: { [unowned self] in config },
             focusBorderOn: { [unowned self] in focusBorder },
             keyClash: { [unowned self] base, _ in clashNote(base) },
+            watchVoiceOver: { [unowned self] changed in
+                voiceOverWatchers.append(changed)
+                return { [unowned self] in voiceOverCancels += 1 }
+            },
             whenTrusted: { [unowned self] work in trustWaiters.append(work) },
             cancelTrustWait: { [unowned self] in trustCancels += 1 },
             schedule: { [unowned self] delay, work in
@@ -167,6 +175,12 @@ private final class Rig {
     }
 
     var pending: [Pending] { scheduled.filter { !$0.cancelled } }
+
+    /// VoiceOver started or stopped: tells every watcher the controller installed.
+    func changeVoiceOver(to on: Bool) {
+        voiceOverOn = on
+        for watcher in voiceOverWatchers { watcher() }
+    }
 
     /// Runs what is scheduled now, once. Work scheduled while it runs stays pending.
     func runOnce() {
@@ -505,6 +519,52 @@ struct TilingControllerTests {
         rig.config = TileConfig(enabled: false)
         rig.controller.start()
         #expect(rig.controller.phase == .off && rig.controller.keyClashNote == nil)
+    }
+
+    private static let voiceOverNote = "Control-Option is the VoiceOver key pair and VoiceOver is running."
+
+    @Test func voiceOverStartingWhileTilingRunsRemovesTheTapAndStoppingItBringsTilingBack() {
+        let rig = Rig()
+        rig.clashNote = { [unowned rig] base in rig.voiceOverOn && base == .controlOption ? Self.voiceOverNote : nil }
+        twoWindows(rig)
+        #expect(rig.controller.isRunning && rig.keys.last?.enabled == true)
+        rig.changeVoiceOver(to: true)
+        #expect(!rig.controller.isRunning && rig.controller.phase == .keyClash)
+        #expect(rig.controller.keyClashNote == Self.voiceOverNote)
+        #expect(rig.keys.last?.enabled == false, "the tap is gone the moment VoiceOver takes the pair")
+        #expect(rig.controller.observerCount == 0 && rig.pending.isEmpty)
+        rig.changeVoiceOver(to: false)
+        #expect(rig.controller.isRunning && rig.controller.phase == .running && rig.controller.keyClashNote == nil)
+        #expect(rig.keys.last?.enabled == true)
+    }
+
+    @Test func theVoiceOverWatchIsInstalledOnceWhileTheSwitchIsOnAndKeptWhileAClashHoldsTiling() {
+        let rig = Rig()
+        rig.clashNote = { [unowned rig] _ in rig.voiceOverOn ? Self.voiceOverNote : nil }
+        rig.controller.start()
+        rig.controller.start()
+        #expect(rig.voiceOverWatchers.count == 1, "start() runs on every settings write and must not stack watches")
+        rig.changeVoiceOver(to: true)
+        #expect(rig.controller.phase == .keyClash)
+        #expect(rig.voiceOverCancels == 0, "the watch stays so that VoiceOver going away can clear the clash")
+        rig.controller.start()
+        #expect(rig.voiceOverWatchers.count == 1)
+    }
+
+    @Test func turningTheSwitchOffRemovesTheVoiceOverWatchAndANewOnInstallsOneAgain() {
+        let rig = Rig()
+        rig.config = TileConfig(enabled: false)
+        rig.controller.start()
+        #expect(rig.voiceOverWatchers.isEmpty, "nothing is watched while tiling is off")
+        rig.config = TileConfig(enabled: true)
+        rig.controller.start()
+        #expect(rig.voiceOverWatchers.count == 1 && rig.voiceOverCancels == 0)
+        rig.config = TileConfig(enabled: false)
+        rig.controller.start()
+        #expect(rig.voiceOverCancels == 1)
+        rig.config = TileConfig(enabled: true)
+        rig.controller.start()
+        #expect(rig.voiceOverWatchers.count == 2)
     }
 
     // MARK: Actions that move nothing
