@@ -649,6 +649,46 @@
       "tier": "device-proof",
       "scope": "Desktop pointing end to end on a consented Mac: hold keys, speech, capture, AX ring within 2 pt, interruption, packaged launch with no new prompts.",
       "reason": "Native compilation and execution, the key tap, Screen Recording, Accessibility and real provider calls are unverified. The owner-run self-test (scripts/pointing-selftest.sh) produces the evidence receipt; no physical Mac executor is connected to CI."
+    },
+    {
+      "id": "native-MusicAwakeHoldTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "MusicAwakeHoldTests",
+      "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+      "scope": "Actual MusicAwakeHold with injected clock, power, rules, assertion and timer ports; a real PowerMonitor is started and stopped in a few cases. No real display assertion, no real timers, no capture or permission, no device acceptance."
+    },
+    {
+      "id": "native-LiveDiagnosticsCardTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "LiveDiagnosticsCardTests",
+      "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+      "scope": "Actual EnergyMonitor timer, SamplingHold and sampling-visibility rule, an unshown owned NSWindow, a private NotificationCenter and a private pasteboard. No capture, permission, provider or device acceptance."
+    },
+    {
+      "id": "native-KeepAwakeRulesChangeTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "KeepAwakeRulesChangeTests",
+      "file": "Tests/ZeusAppTests/KeepAwakeRulesChangeTests.swift",
+      "scope": "Actual KeepAwakeSession instance with its change callback; no real display or system assertion and no device acceptance."
+    },
+    {
+      "id": "native-PowerMonitorClientsTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "PowerMonitorClientsTests",
+      "file": "Tests/ZeusAppTests/PowerMonitorClientsTests.swift",
+      "scope": "Actual PowerMonitor start and stop by client; no battery drain, no system power change and no device acceptance."
+    },
+    {
+      "id": "native-ScreenCornerPanelTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ScreenCornerPanelTests",
+      "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
+      "scope": "Actual panel flag value and an unshown owned NSPanel; no display ordering, capture or device acceptance."
     }
   ],
   "features": [
@@ -5121,6 +5161,137 @@
             {
               "file": "Tests/ZeusAppTests/OnboardingFilmLifecycleTests.swift",
               "function": "onlyOwnedNaturalCompletionsCanRequeueBundledFilms"
+            }
+          ]
+        },
+        {
+          "id": "F13.music-awake-hold",
+          "check": "native-MusicAwakeHoldTests",
+          "acceptance": "Actual MusicAwakeHold with injected clock, power, rules, assertion and timer ports and no real timers: one two-minute-lease hold only while a track plays and the setting is on; grace on pause; renewal takes the new assertion before releasing the old; low battery and heat release and recovery re-holds; invalidate releases everything. Real display sleep and the OS assertion remain device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "playingWithTheSettingOnHoldsOneAssertionWithATwoMinuteLease"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "theSettingOffNeverHolds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "aPauseHoldsInsideTheGraceAndReleasesAfterIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "theMinuteTickRenewsTheLeaseWithoutAGap"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "lowBatteryOnBatteryReleasesAndRecoveryHoldsAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "theHotLevelReleases"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "theMinuteTimerTakesANewAssertionBeforeReleasingTheOldOne"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "invalidateCancelsTheTimersAndReleasesTheAssertion"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
+              "function": "theMusicHoldLeavesTheKeepAwakeSessionsReadingsOn"
+            }
+          ]
+        },
+        {
+          "id": "F13.diagnostics-card-sampling",
+          "check": "native-LiveDiagnosticsCardTests",
+          "acceptance": "The Diagnostics card samples only while shown in a window that can be seen: the sampling hold stays balanced in any event order and releases on teardown, the rule stops sampling for a covered or off-Space window, thermal changes reach the card on the main thread, and Copy puts the summary on a private pasteboard and announces it. Real window occlusion and VoiceOver speech remain device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "theCpuSampleFlagIsFalseFromEveryFreshStartUntilTheFirstSample"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "theHoldStartsOnlyWhenShownAndInAVisibleWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "theHoldStaysBalancedWhateverOrderTheEventsComeIn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "aHoldGoneWithoutDisappearReleasesTheMonitor"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "closingTheWindowStopsTheRealMonitorsTimer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "samplingStopsWhenTheWindowIsOrderedInButCoveredOrOnAnotherSpace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "theThermalNotificationReachesTheCardOnTheMainThread"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LiveDiagnosticsCardTests.swift",
+              "function": "copyPutsTheSummaryOnThePasteboardAndAnnouncesIt"
+            }
+          ]
+        },
+        {
+          "id": "F13.keep-awake-rules-change",
+          "check": "native-KeepAwakeRulesChangeTests",
+          "acceptance": "The music hold hears a battery-floor or heat-setting change through onRulesChange, even when no keep-awake session is running.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/KeepAwakeRulesChangeTests.swift",
+              "function": "changingTheBatteryFloorOrTheHeatSettingTellsTheListener"
+            }
+          ]
+        },
+        {
+          "id": "F13.power-monitor-clients",
+          "check": "native-PowerMonitorClientsTests",
+          "acceptance": "The keep-awake session and the music hold share one PowerMonitor; it stops only when the last client leaves, and one client stopping never switches the readings off for the other.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PowerMonitorClientsTests.swift",
+              "function": "stopsOnlyWhenTheLastClientLeaves"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PowerMonitorClientsTests.swift",
+              "function": "theMusicClientAloneKeepsItRunning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PowerMonitorClientsTests.swift",
+              "function": "startingTwiceAndStoppingOnceStopsThatClient"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PowerMonitorClientsTests.swift",
+              "function": "theDefaultClientIsTheKeepAwakeSession"
+            }
+          ]
+        },
+        {
+          "id": "F13.screen-corner-panel",
+          "check": "native-ScreenCornerPanelTests",
+          "acceptance": "The rounded-corner panels are click-through, non-activating, on every Space and over full-screen apps, outside the window cycle, and follow the screen-sharing policy in both states. Seeing the corners on a notched display remains device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
+              "function": "theFlagSetIsClickThroughNonActivatingAndOnEverySpace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
+              "function": "aBuiltPanelCarriesTheFlagsAndTheCapturePolicy"
             }
           ]
         }
