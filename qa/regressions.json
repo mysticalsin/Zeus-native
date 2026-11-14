@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy": "A caught product failure must gain a reproducible production-path test/type/lint guard before resolution. These historical defects have executable test guards. New failed runs emit regression-candidates.json and stay red; candidates are not automatically declared fixed or counted as tests. Native guards remain not-run until executed on macOS.",
+  "policy": "A caught product failure must gain a reproducible production-path test/type/lint guard before resolution. These historical defects have executable test guards. New failed runs emit regression-candidates.json and stay red; candidates are not automatically declared fixed or counted as tests. Native guards remain not-run until executed on macOS. REG-410 to REG-429 are reserved for docs/MEETING-START-PLAN.md.",
   "regressions": [
     {
       "id": "REG-001",
