@@ -223,17 +223,23 @@ final class TilingKeyTap: @unchecked Sendable {
         // Only a chord that holds a consuming modifier can ever match, so the secure input check is skipped for
         // plain typing, which is nearly every event.
         let secure = isDown && !modifiers.isDisjoint(with: [.control, .option, .command]) && IsSecureEventInputEnabled()
-        let decision: TileKeyDecision = lock.withLock {
-            var gate = snapshot.gate
-            gate.secureInput = secure
-            return matcher.decide(key, keymap: snapshot.keymap, gate: gate)
-        }
+        let decision = decide(key, secure: secure)
         switch decision {
         case .passThrough:
             return Unmanaged.passUnretained(event)
         case .consume(let action):
             deliver(action, joined: decision.monitorEvent(for: key))
             return nil
+        }
+    }
+
+    /// What the tap does with one key, from the snapshot under the lock. Internal so a test can decide an event without
+    /// a system one.
+    nonisolated func decide(_ key: TileKeyEvent, secure: Bool) -> TileKeyDecision {
+        lock.withLock {
+            var gate = snapshot.gate
+            gate.secureInput = secure
+            return matcher.decide(key, keymap: snapshot.keymap, gate: gate)
         }
     }
 

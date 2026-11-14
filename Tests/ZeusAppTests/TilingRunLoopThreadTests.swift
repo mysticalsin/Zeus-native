@@ -261,8 +261,11 @@ struct TilingKeyTapStandInTests {
         private var source: CFRunLoopSource?
         private var loop: CFRunLoop?
         var onFire: @Sendable () -> Void = {}
-        /// Called inside `setEnabled(false)`, on the thread that tears the tap down.
+        /// Called inside the `setEnabled(false)` of the teardown, on the thread that tears the tap down. The first switch
+        /// of a port, the one right after it is made, does not call it.
         var duringDisable: @Sendable () -> Void = {}
+        /// Called inside every `setEnabled(true)`.
+        var duringEnable: @Sendable () -> Void = {}
 
         func system() -> TilingTapSystem {
             TilingTapSystem(
@@ -283,8 +286,8 @@ struct TilingKeyTapStandInTests {
                     return (port, made)
                 },
                 setEnabled: { [self] _, on in
-                    lock.lock(); enables.append((on, Thread.isMainThread)); lock.unlock()
-                    if !on { duringDisable() }
+                    lock.lock(); enables.append((on, Thread.isMainThread)); let first = enables.count == 1; lock.unlock()
+                    if on { duringEnable() } else if !first { duringDisable() }
                 })
         }
 
@@ -317,11 +320,84 @@ struct TilingKeyTapStandInTests {
         standin.onFire = { onMain.set(Thread.isMainThread); ran.signal() }
         #expect(tap.start())
         #expect(waitLive(standin))
-        #expect(standin.enableLog.first?.main == false, "the tap is turned on by its own thread, not the main one")
+        #expect(standin.enableLog.first(where: { $0.on })?.main == false, "the tap is turned on by its own thread, not the main one")
         DispatchQueue.global().async { standin.fire() }
         #expect(Thread.isMainThread)
         #expect(ran.wait(timeout: .now() + 2) == .success, "the source waited for the blocked main thread")
         #expect(onMain.value == false)
+    }
+
+    @Test func theTapIsMadeOffAndOnlyItsOwnThreadSwitchesItOn() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        defer { tap.stop() }
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        let log = standin.enableLog
+        #expect(log.count >= 2, "\(log)")
+        #expect(log.first?.on == false && log.first?.main == true, "the owner switches the port off as soon as it is made: \(log)")
+        #expect(log.dropFirst().first?.on == true && log.dropFirst().first?.main == false,
+                "the tap thread switches it on once its source is on the loop: \(log)")
+    }
+
+    @Test func aBoundChordDecidedAfterStopTookTheLockPassesThrough() {
+        let standin = Standin()
+        let reached = DispatchSemaphore(value: 0)
+        let hold = DispatchSemaphore(value: 0)
+        standin.duringDisable = { reached.signal(); _ = hold.wait(timeout: .now() + 5) } // the teardown, held open
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        tap.update(keymap: TileKeymap.defaults(base: .controlOptionCommand), enabled: true, paused: false)
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        let chord = TileKeyEvent(phase: .down, keyCode: 123, modifiers: [.control, .option, .command])
+        #expect(tap.decide(chord, secure: false) == .consume(.focus(.left)), "while tiling runs the chord is taken")
+        let stopped = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { tap.stop(); stopped.signal() }
+        #expect(reached.wait(timeout: .now() + 2) == .success)
+        #expect(tap.decide(chord, secure: false) == .passThrough, "stop closed the gate under its lock, before the teardown ran")
+        hold.signal()
+        #expect(stopped.wait(timeout: .now() + 5) == .success)
+    }
+
+    @Test func aSetEnabledThatTakesTheTapsLockReturnsWhenStartAsksForAnEnable() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        standin.duringEnable = { _ = tap.isRunning } // takes the lock the callback takes
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        let enabled = standin.enableLog.filter(\.on).count
+        let returned = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { _ = tap.start(); returned.signal() }
+        let done = returned.wait(timeout: .now() + 2) == .success
+        #expect(done, "start() made a window server call while holding the lock the callback needs")
+        guard done else { return } // a stuck lock cannot be stopped
+        let deadline = Date().addingTimeInterval(2)
+        while standin.enableLog.filter(\.on).count == enabled, Date() < deadline { Thread.sleep(forTimeInterval: 0.002) }
+        let log = standin.enableLog.filter(\.on)
+        #expect(log.count == enabled + 1 && log.last?.main == false, "the enable ran once, on the tap thread: \(standin.enableLog)")
+        tap.stop()
+    }
+
+    @Test func anEnableAskedForBeforeAStopIsNotAppliedAfterIt() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        // The tap thread is busy in a callback, so an enable asked for now can only wait behind it.
+        let busy = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        standin.onFire = { busy.signal(); _ = release.wait(timeout: .now() + 5) }
+        DispatchQueue.global().async { standin.fire() }
+        #expect(busy.wait(timeout: .now() + 2) == .success)
+        #expect(tap.start())
+        let stopped = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { tap.stop(); stopped.signal() }
+        let deadline = Date().addingTimeInterval(2)
+        while tap.isRunning, Date() < deadline { Thread.sleep(forTimeInterval: 0.002) }
+        release.signal()
+        #expect(stopped.wait(timeout: .now() + 5) == .success)
+        #expect(standin.enableLog.map(\.on) == [false, true, false],
+                "off when made, on once installed, off by the teardown, and no enable after the stop: \(standin.enableLog)")
     }
 
     @Test func stopTurnsTheTapOffAndInvalidatesItsPortBeforeItReturns() {
