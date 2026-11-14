@@ -839,5 +839,71 @@ class ScribeMeetingCardTests(unittest.TestCase):
         self.assertIn("FlightRecorder.shared.record(", driver)
 
 
+# --- Face presence (docs/FACE-PRESENCE-PLAN.md): presence only, never input, passwords, network or stored images ----
+FACE_CARD = APP / "Settings/GSFacePresenceCard.swift"
+FACE_FORBIDDEN = re.compile(
+    r"CGEvent|post\(tap|IOHIDPost|AXUIElementPostKeyboardEvent|keystroke|password|kSecClassInternetPassword|LAContext"
+    r"|SACLockScreenImmediate|ScreenLock\.lock\(\)|URLSession|CGImageDestination|NSBitmapImageRep|pngData|ArcFace",
+    re.IGNORECASE)
+# Face presence may use only the event-free members of ScreenLock.
+FACE_LOCK_CALL = re.compile(r"\bScreenLock\.(?!lockWithoutEvents\b|canLockWithoutEvents\b)\w+")
+
+
+def face_presence_files():
+    files = sorted(SOURCES.glob("*/FacePresence/**/*.swift"))
+    return files + ([FACE_CARD] if FACE_CARD.exists() else [])
+
+
+def face_code(text):
+    """(line number, code part) for every line of a Swift text, with comments removed."""
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.strip().startswith("//"):
+            yield number, strip_trailing_comment(line)
+
+
+def face_presence_offenders(text, label="sample", pattern=FACE_FORBIDDEN):
+    return [f"{label}:{n}" for n, code in face_code(text) if pattern.search(code)]
+
+
+class FacePresenceLint(unittest.TestCase):
+    def test_face_presence_never_posts_events_or_touches_passwords(self):
+        offenders = [o for p in face_presence_files() for o in face_presence_offenders(p.read_text(), str(p.relative_to(ROOT)))]
+        self.assertEqual(offenders, [], "face presence must never post events, read passwords, use the network or write images")
+
+    def test_face_presence_locks_only_through_the_event_free_call(self):
+        actions = (APP / "Intent/FastActions.swift").read_text()
+        enum = actions[actions.index("enum ScreenLock {"):]
+        self.assertIn("static var canLockWithoutEvents: Bool { lockFunction != nil }", enum)
+        free = "\n".join(code for _, code in face_code(enum[enum.index("static func lockWithoutEvents()"):enum.index("static func lock() -> Bool")]))
+        self.assertIn("SACLockScreenImmediate", enum)
+        self.assertNotRegex(free, r"CGEvent|AXIsProcessTrusted|\.post\(")
+        self.assertIn("guard let function else { return false }", free)
+        # lock() keeps its shortcut fallback for the voice intent; the event-free call must stay a separate path.
+        self.assertIn("event?.post(tap: .cghidEventTap)", enum[enum.index("static func lock() -> Bool"):])
+        offenders = [o for p in face_presence_files() for o in face_presence_offenders(p.read_text(), str(p.relative_to(ROOT)), FACE_LOCK_CALL)]
+        self.assertEqual(offenders, [], "face presence may call only lockWithoutEvents and canLockWithoutEvents")
+        elsewhere = [f"{p.relative_to(ROOT)}:{n}" for p in sorted(SOURCES.rglob("*.swift")) if p != APP / "Intent/FastActions.swift"
+                     for n, code in face_code(p.read_text()) if "SACLockScreenImmediate" in code]
+        self.assertEqual(elsewhere, [], "SACLockScreenImmediate is reached only through ScreenLock")
+
+    def test_face_presence_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: each banned shape must be flagged, and comments must stay free.
+        for shape in ("let e = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: true)", "event.post(tap: .cghidEventTap)",
+                      "IOHIDPostEvent(port, 0, data, 0, 0, 0)", "AXUIElementPostKeyboardEvent(app, 0, 12, true)",
+                      "typeKeystroke(\"a\")", "let secret = loginPassword", "kSecClassInternetPassword", "let context = LAContext()",
+                      "SACLockScreenImmediate()", "_ = ScreenLock.lock()", "URLSession.shared.dataTask(with: url)",
+                      "CGImageDestinationCreateWithURL(url, type, 1, nil)", "NSBitmapImageRep(cgImage: image)", "image.pngData()",
+                      "let model = ArcFaceEmbedder()"):
+            self.assertEqual(face_presence_offenders(shape), ["sample:1"], shape)
+        clean = "// Adapted from Glance (MIT, Copyright (c) 2026 Jonathan Zhou): FaceDetector.swift.\nlet x = 1 // never a password\n_ = ScreenLock.lockWithoutEvents()"
+        self.assertEqual(face_presence_offenders(clean), [])
+        self.assertEqual(face_presence_offenders("let s = \"// password\""), ["sample:1"])
+        self.assertEqual(face_presence_offenders("a\nb\nimage.pngData()"), ["sample:3"])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.lock()", pattern=FACE_LOCK_CALL), ["sample:1"])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.canLockWithoutEvents", pattern=FACE_LOCK_CALL), [])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.lockWithoutEvents()", pattern=FACE_LOCK_CALL), [])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.lockWithoutEventsAnyway()", pattern=FACE_LOCK_CALL), ["sample:1"])
+
+
 if __name__ == "__main__":
     unittest.main()

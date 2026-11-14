@@ -4366,6 +4366,42 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-600",
+      "failure": "Face presence code could post a keystroke or synthetic event, read or type a password, call the network, write an image or load the ArcFace model.",
+      "features": [
+        "F14"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_face_presence_never_posts_events_or_touches_passwords"
+      }
+    },
+    {
+      "id": "REG-601",
+      "failure": "The face presence lint passed silently on the shapes it exists to catch, or flagged comments and the allowed event-free lock members.",
+      "features": [
+        "F14"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_face_presence_lint_detects_its_failure_shapes"
+      }
+    },
+    {
+      "id": "REG-602",
+      "failure": "Face presence locked the Mac through the shortcut fallback of lock(), or SACLockScreenImmediate was reached outside ScreenLock.",
+      "features": [
+        "F14"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_face_presence_locks_only_through_the_event_free_call"
+      }
     }
   ]
 }
