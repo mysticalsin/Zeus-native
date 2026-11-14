@@ -241,7 +241,9 @@ insert.
 - A hung app: the 0.25 s messaging timeout and the per-pass budget bound the cost. An app that does not answer in
   time is left out of the listing and its process id is in `unreadPIDs`; the controller keeps the slots of windows
   that belong to an unread app (`TilePlanner.slotsToKeep`) and writes to none of them. A window missing from an app that
-  was read is gone, so one slow app never pins the slots of windows that closed in other apps.
+  was read is gone, so one slow app never pins the slots of windows that closed in other apps. An app that answers
+  "no value" or "attribute unsupported" to the window list has no windows: it counts as read (`TileWindowsAnswer`), so
+  only a timeout, another failure or the pass budget leaves an app unread.
 - Two windows of one app at the same frame, one on another Space: the window list cannot tell them apart, so when more
   candidates share a frame than the list has entries for it, none of them is admitted.
 - A stale element after an app quits: dropped on the next read.
@@ -417,23 +419,30 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
 - Key clash, closed in the review pass: `TileBaseConflicts.notes` compares the tiling keys with the keys the other
   monitors really use. The talk key is the effective one (`VoiceKey.effectiveTalkKey`), which moves off Control-Option
   while VoiceOver runs; a modifier-only talk, pointing or dictation key with the same modifiers as the chosen pair is a
-  clash (a larger pair is clear); every bound tiling chord (base plus key) is compared with every keyed talk, pointing
-  and dictation shortcut, with the fn flag handled as the tap handles it; a chat chord the keymap binds is a clash; and
-  the Control-Option pair is refused while VoiceOver runs. The controller checks it on every settings write, before
+  clash (a larger pair is free, because the tap forwards every key it consumes, key-down and key-up, to the talk,
+  dictation and pointing monitors through `TilingConsumedKey`, so a smaller hold that forms when the owner lets go of
+  the extra modifier first stays spoiled until every modifier is up); every bound tiling chord (base plus key) is
+  compared with every keyed talk, pointing and dictation shortcut, with the fn flag handled as the tap handles it; a
+  chat chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch or the prompter pause; and while
+  VoiceOver runs every bound chord that holds Control and Option is refused, which VoiceOver uses alone and with
+  Command and a letter (the shipped pair included). The controller checks it on every settings write, before
   any tap exists, and refuses a clash: no tap, no observer, the phase is Key clash, and the page and Settings show the
   note. VoiceOver writes no setting, so the controller watches it (key value observing on the workspace) from the
   first start with the switch on until the switch goes off, including while a clash holds tiling back, and checks the
   clash again when VoiceOver starts or stops. The tap consumes a chord before the other keys' monitors can see it
   spoil a hold, so refusing is the only fail-closed option. The default pair is Control-Option-Command: no shipped key
   holds it (Talk to Zeus and pointing are Control-Option, dictation is Right Command, Talk to Zeus moves to
-  Option-Command while VoiceOver runs), and `TileBaseConflictsTests` keeps it that way. An unknown stored pair reads
+  Option-Command while VoiceOver runs), and `TileBaseConflictsTests` keeps it that way (while VoiceOver runs the pair is refused, with a note).
+  An unknown stored pair reads
   as the default.
 - Other review fixes: the pause and key sheet chords work over a full-screen app; swap, flip, nudge and float do nothing
   while an app tiling does not read has the keyboard; the ring follows its setting while running; a revoked
   Accessibility is noticed on a settings change; `frontmost()` skips Zeus itself and has no protocol default; the undo
   memory drops windows that are gone; an equal settings write does not notify the page; the key pair picker shows a
   check on the chosen pair; the permission row reads again when Zeus is activated; quitting stops tiling only when the
-  startup service is allowed.
+  startup service is allowed; an unchanged settings write, paused or not, still notices a revoked Accessibility; and a
+  focus key draws the ring from the keyboard as the system reports it after the call, so a neighbour that was
+  minimized or unread since the last pass gets no ring.
 - Not done here, still open: the acceptance-map decision in `qa/feature-map.json`.
 
 ### Fail-closed paths
