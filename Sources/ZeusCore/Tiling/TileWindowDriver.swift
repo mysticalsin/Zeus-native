@@ -25,11 +25,18 @@ public protocol TilingWindowDriver: AnyObject {
     var isTrusted: Bool { get }
     /// The connected displays with their visible areas.
     func displays() -> [TileDisplay]
-    /// The windows on the current Space that pass admission under `config`. Empty without Accessibility.
+    /// The windows on the current Space that pass admission under `config`, every one read fresh in this call.
+    /// A window the call could not read in time is left out, never reported from an earlier call. Empty without
+    /// Accessibility.
     func windows(config: TileConfig) -> [TileWindowRef]
+    /// False when the last `windows(config:)` could not read every app. A window missing from an incomplete
+    /// listing is unknown, not gone: the caller keeps its slot and does not write to it.
+    var lastPassComplete: Bool { get }
     /// Moves and resizes `window`, then reads the frame back. True only when it landed within the tolerance.
+    /// Only a window the last `windows(config:)` returned can be written; any other id is refused.
     func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool
-    /// Brings `window` to the front and gives it keyboard focus.
+    /// Brings `window` to the front and gives it keyboard focus. Does nothing for a window the last
+    /// `windows(config:)` did not return.
     func focus(_ window: TileWindowID)
 }
 

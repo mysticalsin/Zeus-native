@@ -3,7 +3,7 @@ import ApplicationServices
 import ZeusCore
 
 /// The Accessibility window driver for tiling. It lists the standard windows of regular apps on the current
-/// Space, writes frames, and focuses a window. It never asks for a permission: with Accessibility off every
+/// Space, writes frames to the windows it listed, and focuses one of them. It never asks for a permission: with Accessibility off every
 /// entry point does nothing and `isTrusted` says so. No window title or content is read.
 ///
 /// Frames are in the engine's space (top left of the main display, y down), which is what Accessibility and the
@@ -11,8 +11,8 @@ import ZeusCore
 /// Every decision that can be pure (admission, read-back tolerance, matching windows to slots) is in ZeusCore.
 @MainActor
 final class AXTilingWindowDriver: TilingWindowDriver {
-    /// Seconds one listing pass may spend. Apps it has not reached keep their last answer, so a slow pass never
-    /// makes the layout think their windows are gone.
+    /// Seconds one listing pass may spend, checked before every app and every window. An app the pass could not
+    /// finish is left out of the listing and the pass reports itself incomplete.
     static let passBudget = 0.5
     /// A hung app answers each call only after this timeout.
     static let messagingTimeout: Float = 0.25
@@ -21,9 +21,10 @@ final class AXTilingWindowDriver: TilingWindowDriver {
     private var allocator = TileIDAllocator()
     /// The live element behind each id handed out, by app. Identity is `CFEqual` on the element.
     private var known: [pid_t: [(element: AXUIElement, id: TileWindowID)]] = [:]
-    /// The last admitted windows of each app, used when a pass runs out of time or an app does not answer.
-    private var lastListing: [pid_t: [TileWindowRef]] = [:]
-    /// False when the last listing reused an app's earlier answer.
+    /// The windows the last listing returned. Only these are ever written or focused: `known` also holds
+    /// minimized, full-screen and other-Space windows, which admission rejects.
+    private var admitted: Set<TileWindowID> = []
+    /// False when the last listing could not read an app in time.
     private(set) var lastPassComplete = true
 
     init(isTrusted: @escaping @MainActor () -> Bool = { AccessibilityGate.trusted }) {
@@ -49,7 +50,13 @@ final class AXTilingWindowDriver: TilingWindowDriver {
     // MARK: Windows
 
     func windows(config: TileConfig) -> [TileWindowRef] {
-        guard isTrusted else { return [] }
+        guard isTrusted else {
+            // Nothing from before the permission was revoked may survive its return.
+            known = [:]
+            admitted = []
+            lastPassComplete = false
+            return []
+        }
         let policy = TileAdmissionPolicy(config: config, zeusPID: ProcessInfo.processInfo.processIdentifier,
                                          zeusBundleID: Bundle.main.bundleIdentifier)
         let onScreen = Self.onScreenWindows()
@@ -57,7 +64,6 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         let running = NSWorkspace.shared.runningApplications.filter { !$0.isTerminated }
         let alive = Set(running.map(\.processIdentifier))
         known = known.filter { alive.contains($0.key) }
-        lastListing = lastListing.filter { alive.contains($0.key) }
 
         var out: [TileWindowRef] = []
         var complete = true
@@ -65,29 +71,28 @@ final class AXTilingWindowDriver: TilingWindowDriver {
             let pid = app.processIdentifier
             if TileAdmission.appRejection(pid: pid, bundleID: app.bundleIdentifier,
                                           isRegularApp: app.activationPolicy == .regular, policy: policy) != nil {
-                lastListing[pid] = nil
                 known[pid] = nil
                 continue
             }
-            if ProcessInfo.processInfo.systemUptime > deadline {
+            // A hidden app has no window on screen, so every window would be rejected as on another Space. Its
+            // elements stay known so its ids are the same when it is shown again.
+            if app.isHidden { continue }
+            guard let refs = scan(app, onScreen: onScreen, policy: policy, deadline: deadline) else {
                 complete = false
-                out += lastListing[pid] ?? []
                 continue
             }
-            if let refs = scan(app, onScreen: onScreen, policy: policy) {
-                lastListing[pid] = refs
-                out += refs
-            } else {
-                complete = false
-                out += lastListing[pid] ?? []
-            }
+            out += refs
         }
+        admitted = Set(out.map(\.id))
         lastPassComplete = complete
         return out
     }
 
-    /// The admitted windows of one app, or nil when the app did not answer.
-    private func scan(_ app: NSRunningApplication, onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy) -> [TileWindowRef]? {
+    /// The admitted windows of one app, or nil when the app did not answer in time. Nothing is guessed: the
+    /// caller leaves an unanswered app out of the listing.
+    private func scan(_ app: NSRunningApplication, onScreen: [TileOnScreenWindow], policy: TileAdmissionPolicy,
+                      deadline: TimeInterval) -> [TileWindowRef]? {
+        guard ProcessInfo.processInfo.systemUptime <= deadline else { return nil }
         let pid = app.processIdentifier
         let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(appElement, Self.messagingTimeout)
@@ -95,12 +100,17 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &raw) == .success,
               let list = raw as? [AXUIElement] else { return nil }
 
-        var refs: [TileWindowRef] = []
+        var facts: [TileWindowFacts] = []
         for window in list {
+            guard ProcessInfo.processInfo.systemUptime <= deadline else { return nil }
             AXUIElementSetMessagingTimeout(window, Self.messagingTimeout)
-            let facts = Self.facts(of: window, app: app)
-            guard TileAdmission.rejection(facts, onScreen: onScreen, policy: policy) == nil,
-                  let frame = facts.frame, let bundleID = facts.bundleID else { continue }
+            facts.append(Self.facts(of: window, app: app))
+        }
+        // The windows of one app are judged together, so two windows at one frame cannot both borrow one on-screen entry.
+        let verdicts = TileAdmission.rejections(facts, onScreen: onScreen, policy: policy)
+        var refs: [TileWindowRef] = []
+        for (index, window) in list.enumerated() where verdicts[index] == nil {
+            guard let frame = facts[index].frame, let bundleID = facts[index].bundleID else { continue }
             refs.append(TileWindowRef(id: identity(of: window, pid: pid), bundleID: bundleID, frame: frame))
         }
         // A window that left the app's list is gone: its element and number are dropped.
@@ -115,8 +125,10 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         return id
     }
 
+    /// The element of a window the last listing returned. Any other id has no element here.
     private func element(for window: TileWindowID) -> AXUIElement? {
-        known[window.pid]?.first { $0.id == window }?.element
+        guard admitted.contains(window) else { return nil }
+        return known[window.pid]?.first { $0.id == window }?.element
     }
 
     // MARK: Reading
@@ -151,16 +163,21 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         facts.subrole = values[1] as? String
         facts.isMinimized = flag(2)
         facts.isFullScreen = flag(3) ?? (unsupported(3) ? false : nil)
-        var point = CGPoint.zero
-        var size = CGSize.zero
-        if CFGetTypeID(values[4]) == AXValueGetTypeID(), CFGetTypeID(values[5]) == AXValueGetTypeID(),
-           AXValueGetValue(values[4] as! AXValue, .cgPoint, &point), AXValueGetValue(values[5] as! AXValue, .cgSize, &size) { // swiftlint:disable:this force_cast
-            facts.frame = tileRect(CGRect(origin: point, size: size))
-        }
+        facts.frame = frame(position: values[4], size: values[5])
         // The settable check is one more call, so it runs only for a window that could still be admitted.
         let standard = facts.role == "AXWindow" && facts.subrole == "AXStandardWindow"
         facts.isSizeSettable = standard ? AXFinder.isSettable(window, kAXSizeAttribute) : false
         return facts
+    }
+
+    /// A frame from the position and size values of one read, or nil when either is not the expected value type.
+    private static func frame(position: AnyObject, size: AnyObject) -> TileRect? {
+        guard CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() else { return nil }
+        var point = CGPoint.zero
+        var extent = CGSize.zero
+        guard AXValueGetValue(position as! AXValue, .cgPoint, &point), // swiftlint:disable:this force_cast
+              AXValueGetValue(size as! AXValue, .cgSize, &extent) else { return nil } // swiftlint:disable:this force_cast
+        return tileRect(CGRect(origin: point, size: extent))
     }
 
     /// The system's on-screen windows: owner, bounds and level only. No title is read and no capture permission is needed.
@@ -196,9 +213,13 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         AXUIElementSetAttributeValue(element, attribute as CFString, axValue)
     }
 
-    /// The window's frame in engine coordinates, through the shared Accessibility helpers.
+    /// The window's frame in engine coordinates. Accessibility already reports it with the origin at the top left of
+    /// the main display, so it is read as is, with no AppKit conversion to undo.
     private static func readFrame(of element: AXUIElement) -> TileRect? {
-        AXFinder.frame(of: element).map { tileRect(AXSnapshotter.quartzRect($0)) }
+        var raw: CFArray?
+        guard AXUIElementCopyMultipleAttributeValues(element, [kAXPositionAttribute, kAXSizeAttribute] as CFArray, [], &raw) == .success,
+              let values = raw as? [AnyObject], values.count == 2 else { return nil }
+        return frame(position: values[0], size: values[1])
     }
 
     func focus(_ window: TileWindowID) {
