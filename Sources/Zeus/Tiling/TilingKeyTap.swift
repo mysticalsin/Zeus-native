@@ -113,7 +113,8 @@ final class TilingKeyTap: @unchecked Sendable {
         snapshot = Snapshot(keymap: keymap, gate: TileKeyGate(enabled: enabled, paused: paused))
     }
 
-    /// Idempotent. Returns true when the tap is running (or being installed by its thread).
+    /// Idempotent. Returns true when the tap is running (or being installed by its thread). Call `update` first: a `stop`
+    /// leaves the gate closed, so a tap that starts again without an `update` consumes nothing.
     nonisolated func start() -> Bool {
         lock.lock(); defer { lock.unlock() }
         switch life.handle(.startRequested) {
@@ -179,6 +180,9 @@ final class TilingKeyTap: @unchecked Sendable {
     nonisolated func stop() -> Bool {
         lock.lock()
         _ = life.handle(.stopRequested)
+        // The gate closes with the life: until the teardown has run, the port can still be serviced, and a chord decided in
+        // that gap would be taken for a tap that is going away.
+        snapshot.gate.enabled = false
         matcher.reset()
         mailbox.reset()
         let stopping = run
