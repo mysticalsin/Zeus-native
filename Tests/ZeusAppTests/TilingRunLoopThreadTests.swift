@@ -123,7 +123,20 @@ struct TilingRunLoopThreadTests {
         #expect(log.all == ["callback done", "teardown"], "the port is never invalidated under a callback: \(log.all)")
     }
 
-    @Test func aStopRequestedBeforeTheThreadGotToInstallEndsItWithoutLeavingAnythingBehind() {
+    @Test func aStopRequestedBeforeTheThreadGotToInstallStillRunsTheTeardownOnTheTapThread() {
+        // The thread is held before its first step, so the stop surely wins the race.
+        let log = Log()
+        let release = DispatchSemaphore(value: 0)
+        let thread = TilingRunLoopThread(
+            name: "app.zeus.tiling.test", install: { log.add("install") },
+            teardown: { log.add("teardown on \(Thread.isMainThread ? "main" : "tap")") },
+            beforeRun: { _ = release.wait(timeout: .now() + 2) })
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { release.signal() }
+        #expect(thread.stop())
+        #expect(log.all == ["teardown on tap"], "the port made before the thread started is still turned off and invalidated: \(log.all)")
+    }
+
+    @Test func everyThreadTearsDownExactlyOnceWhateverTheStopTiming() {
         for _ in 0..<200 {
             let beacon = Beacon()
             let log = Log()
@@ -131,7 +144,7 @@ struct TilingRunLoopThreadTests {
             #expect(thread.stop())
             let installs = log.all.filter { $0.hasPrefix("install") }.count
             let teardowns = log.all.filter { $0.hasPrefix("teardown") }.count
-            #expect(installs == teardowns, "every install is matched by a teardown: \(log.all)")
+            #expect(teardowns == 1 && installs <= 1, "a teardown for every thread, installed or not: \(log.all)")
         }
     }
 
@@ -181,7 +194,7 @@ struct TilingKeyTapLifecycleTests {
     private func blockMain(until signal: DispatchSemaphore) -> Bool { signal.wait(timeout: .now() + 5) == .success }
 
     @Test func startingAndStoppingManyTimesLeavesNothingRunning() {
-        let tap = TilingKeyTap(sink: { _ in }, onFailure: {})
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {})
         for cycle in 0..<40 {
             let started = tap.start()
             #expect(tap.isRunning == started, "cycle \(cycle)")
@@ -194,7 +207,7 @@ struct TilingKeyTapLifecycleTests {
     }
 
     @Test func aTapThatIsDroppedWhileRunningEndsItsThreadAndIsFreed() {
-        var tap: TilingKeyTap? = TilingKeyTap(sink: { _ in }, onFailure: {})
+        var tap: TilingKeyTap? = TilingKeyTap(sink: { _, _ in }, onFailure: {})
         weak var observed = tap
         _ = tap?.start()
         tap = nil
@@ -203,7 +216,7 @@ struct TilingKeyTapLifecycleTests {
 
     @Test func aBurstOfFocusRepeatsWhileMainIsBusyRunsOneAction() async throws {
         let seen = Seen()
-        let tap = TilingKeyTap(sink: { seen.add($0) }, onFailure: {})
+        let tap = TilingKeyTap(sink: { action, _ in seen.add(action) }, onFailure: {})
         let sent = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             for _ in 0..<500 { tap.deliver(.focus(.left), joined: nil) }
@@ -217,7 +230,7 @@ struct TilingKeyTapLifecycleTests {
 
     @Test func repeatsThatArriveDuringARunningScanMergeBehindItAndOnlyTheNewestRuns() async throws {
         let seen = Seen()
-        let tap = TilingKeyTap(sink: { action in
+        let tap = TilingKeyTap(sink: { action, _ in
             seen.add(action)
             if action == .retile { Thread.sleep(forTimeInterval: 0.4) } // a slow window scan on the main actor
         }, onFailure: {})
@@ -233,7 +246,7 @@ struct TilingKeyTapLifecycleTests {
 
     @Test func everyOtherActionIsRunInOrder() async throws {
         let seen = Seen()
-        let tap = TilingKeyTap(sink: { seen.add($0) }, onFailure: {})
+        let tap = TilingKeyTap(sink: { action, _ in seen.add(action) }, onFailure: {})
         let order: [TileAction] = [.focus(.left), .swap(.left), .flipSplit, .focus(.up), .toggleFloat, .retile]
         let sent = DispatchSemaphore(value: 0)
         DispatchQueue.global().async { for action in order { tap.deliver(action, joined: nil) }; sent.signal() }
@@ -241,4 +254,164 @@ struct TilingKeyTapLifecycleTests {
         try await Task.sleep(for: .seconds(0.3))
         #expect(seen.all == order)
     }
+}
+
+/// The real tap object on a stand-in system: a run loop source in place of the event tap, so the object's own wiring is
+/// tested without Accessibility. This is what pins the tap to a thread of its own, and what proves a stop leaves no
+/// port behind in each of the paths (normal, stop winning the race, a thread that is slow to end).
+@Suite("Tiling key tap on a stand-in system", .serialized) @MainActor
+struct TilingKeyTapStandInTests {
+    /// Locked record of what the tap did to its port and where.
+    private final class Standin: @unchecked Sendable {
+        private let lock = NSLock()
+        private(set) var created = 0
+        private(set) var ports: [CFMachPort] = []
+        private(set) var enables: [(on: Bool, main: Bool)] = []
+        private var source: CFRunLoopSource?
+        private var loop: CFRunLoop?
+        var onFire: @Sendable () -> Void = {}
+        /// Called inside `setEnabled(false)`, on the thread that tears the tap down.
+        var duringDisable: @Sendable () -> Void = {}
+
+        func system() -> TilingTapSystem {
+            TilingTapSystem(
+                create: { [self] _ in
+                    var context = CFRunLoopSourceContext(
+                        version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil,
+                        copyDescription: nil, equal: nil, hash: nil,
+                        schedule: { info, loop, _ in
+                            let me = Unmanaged<Standin>.fromOpaque(info!).takeUnretainedValue()
+                            me.lock.lock(); me.loop = loop; me.lock.unlock()
+                        },
+                        cancel: nil,
+                        perform: { info in Unmanaged<Standin>.fromOpaque(info!).takeUnretainedValue().onFire() })
+                    guard let made = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context) else { return nil }
+                    var free = DarwinBoolean(false)
+                    guard let port = CFMachPortCreate(kCFAllocatorDefault, { _, _, _, _ in }, nil, &free) else { return nil }
+                    lock.lock(); created += 1; ports.append(port); source = made; lock.unlock()
+                    return (port, made)
+                },
+                setEnabled: { [self] _, on in
+                    lock.lock(); enables.append((on, Thread.isMainThread)); lock.unlock()
+                    if !on { duringDisable() }
+                })
+        }
+
+        func fire() {
+            lock.lock(); let made = source; let current = loop; lock.unlock()
+            guard let made, let current else { return }
+            CFRunLoopSourceSignal(made)
+            CFRunLoopWakeUp(current)
+        }
+
+        var valid: [Bool] { lock.lock(); defer { lock.unlock() }; return ports.map { CFMachPortIsValid($0) } }
+        var enableLog: [(on: Bool, main: Bool)] { lock.lock(); defer { lock.unlock() }; return enables }
+    }
+
+    private func waitLive(_ standin: Standin) -> Bool {
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline {
+            if standin.enableLog.contains(where: { $0.on }) { return true }
+            Thread.sleep(forTimeInterval: 0.002)
+        }
+        return false
+    }
+
+    @Test func theTapIsEnabledAndServicedOnAThreadOfItsOwnWhileMainIsBlocked() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        defer { tap.stop() }
+        let ran = DispatchSemaphore(value: 0)
+        let onMain = TapFlag()
+        standin.onFire = { onMain.set(Thread.isMainThread); ran.signal() }
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        #expect(standin.enableLog.first?.main == false, "the tap is turned on by its own thread, not the main one")
+        DispatchQueue.global().async { standin.fire() }
+        #expect(Thread.isMainThread)
+        #expect(ran.wait(timeout: .now() + 2) == .success, "the source waited for the blocked main thread")
+        #expect(onMain.value == false)
+    }
+
+    @Test func stopTurnsTheTapOffAndInvalidatesItsPortBeforeItReturns() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        tap.stop()
+        #expect(!tap.isRunning)
+        #expect(standin.valid == [false])
+        #expect(standin.enableLog.last?.on == false && standin.enableLog.last?.main == false)
+    }
+
+    @Test func aStopThatWinsTheRaceStillInvalidatesThePort() {
+        for round in 0..<300 {
+            let standin = Standin()
+            let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+            #expect(tap.start())
+            tap.stop() // in the same main-thread turn: the thread may not have run yet
+            #expect(standin.valid == [false], "round \(round): a port made by start is always invalidated by stop")
+            #expect(standin.enableLog.last?.on == false, "round \(round): and it is turned off, not left enabled with no loop")
+        }
+    }
+
+    @Test func startingAndStoppingManyTimesCreatesOnePortEachAndLeavesNoneValid() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        for _ in 0..<60 {
+            #expect(tap.start())
+            tap.stop()
+        }
+        #expect(standin.created == 60)
+        #expect(!standin.valid.contains(true))
+    }
+
+    @Test func aStopThatTimesOutKeepsTheRunSoNoSecondTapIsCreatedBesideIt() {
+        let standin = Standin()
+        let hold = DispatchSemaphore(value: 0)
+        standin.duringDisable = { _ = hold.wait(timeout: .now() + 5) } // a thread that is slow to end
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system(), stopTimeout: 0.1)
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        tap.stop() // gives up waiting after 0.1 s
+        #expect(standin.created == 1)
+        #expect(!tap.start(), "the old thread and tap may still exist, so no second tap is made")
+        #expect(standin.created == 1, "still one tap")
+        hold.signal() // the old thread finishes
+        tap.stop() // a later stop waits for it again
+        #expect(standin.valid == [false])
+        #expect(tap.start(), "once the old one is gone a new tap can start")
+        #expect(standin.created == 2)
+        tap.stop()
+    }
+
+    @Test func twoStopsAtOnceBothReturnOnlyWhenTheTapIsGone() async {
+        let standin = Standin()
+        standin.duringDisable = { Thread.sleep(forTimeInterval: 0.15) }
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        #expect(tap.start())
+        #expect(waitLive(standin))
+        let gone = TapFlags()
+        let group = DispatchGroup()
+        for index in 0..<2 {
+            group.enter()
+            DispatchQueue.global().async { tap.stop(); gone.set(index, standin.valid == [false]); group.leave() }
+        }
+        group.wait()
+        #expect(gone.all == [true, true], "a second caller does not return while the thread may still be consuming keys")
+    }
+}
+
+private final class TapFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Bool?
+    func set(_ value: Bool) { lock.lock(); stored = value; lock.unlock() }
+    var value: Bool? { lock.lock(); defer { lock.unlock() }; return stored }
+}
+
+private final class TapFlags: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [Int: Bool] = [:]
+    func set(_ index: Int, _ value: Bool) { lock.lock(); stored[index] = value; lock.unlock() }
+    var all: [Bool] { lock.lock(); defer { lock.unlock() }; return stored.keys.sorted().map { stored[$0]! } }
 }

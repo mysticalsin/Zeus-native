@@ -46,7 +46,7 @@ import Testing
     }
 
     @Test func noOtherActionIsEverMerged() {
-        let others: [TileAction] = [.swap(.right), .flipSplit, .toggleFloat, .togglePause, .retile, .nudge(.left), .showKeys, .maximizeToggle]
+        let others: [TileAction] = [.swap(.right), .flipSplit, .toggleFloat, .togglePause, .retile, .showKeys, .maximizeToggle]
         for action in others {
             var box = TileActionMailbox()
             _ = box.push(action)
@@ -93,5 +93,55 @@ import Testing
         box.reset()
         #expect(box.pop() == nil)
         let ask8 = asksForDrain(&box, .focus(.left)); #expect(ask8)
+    }
+
+    // MARK: Nudges
+
+    @Test func aBurstOfEqualNudgesIsOneEntryWithAStepCount() {
+        var box = TileActionMailbox()
+        for _ in 0..<5 { _ = box.push(.nudge(.left)) }
+        #expect(box.pending == [.nudge(.left)], "one pass for the whole burst")
+        let popped = box.pop()
+        #expect(popped?.action == .nudge(.left) && popped?.count == 5 && popped?.more == false, "\(String(describing: popped))")
+    }
+
+    @Test func theStepCountStopsAtWhatTheRatioRangeCanHold() {
+        var box = TileActionMailbox()
+        for _ in 0..<10_000 { _ = box.push(.nudge(.right)) }
+        #expect(box.pop()?.count == TileActionMailbox.maxNudgeSteps)
+        #expect(Double(TileActionMailbox.maxNudgeSteps) * TileResolver.nudgeStep >= TileRatio.maximum - TileRatio.minimum,
+                "a held key can still travel the whole range")
+    }
+
+    @Test func nudgesInAnotherDirectionOrBehindAnotherActionDoNotMerge() {
+        var box = TileActionMailbox()
+        _ = box.push(.nudge(.left))
+        _ = box.push(.nudge(.left))
+        _ = box.push(.nudge(.right))
+        _ = box.push(.swap(.left))
+        _ = box.push(.nudge(.right))
+        var seen: [(TileAction, Int)] = []
+        while let next = box.pop() { seen.append((next.action, next.count)) }
+        #expect(seen.map(\.0) == [.nudge(.left), .nudge(.right), .swap(.left), .nudge(.right)])
+        #expect(seen.map(\.1) == [2, 1, 1, 1])
+    }
+
+    @Test func everyOtherActionHasACountOfOne() {
+        var box = TileActionMailbox()
+        _ = box.push(.focus(.left)); _ = box.push(.focus(.left)); _ = box.push(.retile); _ = box.push(.retile)
+        var counts: [Int] = []
+        while let next = box.pop() { counts.append(next.count) }
+        #expect(counts == [1, 1, 1])
+    }
+
+    @Test func aNudgeBurstWhileMainIsBlockedLeavesOneQueuedPassBehindTheRunningOne() {
+        var box = TileActionMailbox()
+        let ask = asksForDrain(&box, .nudge(.left)); #expect(ask)
+        let running = box.pop() // the pass for this nudge is running on the main actor now
+        #expect(running?.count == 1)
+        for _ in 0..<300 { _ = box.push(.nudge(.left)) }
+        #expect(box.pending == [.nudge(.left)], "nothing queues behind the running pass but one entry")
+        let queued = box.pop()
+        #expect(queued?.count == TileActionMailbox.maxNudgeSteps, "300 repeats, capped")
     }
 }

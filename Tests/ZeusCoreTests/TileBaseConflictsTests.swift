@@ -9,10 +9,10 @@ import Testing
     private func notes(_ base: TileModifierBase = .controlOption, talk: Shortcut = .controlOption,
                        dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, polyglot: Shortcut? = nil,
                        chat: ChatHotkey = .off, voiceOverOn: Bool = false, keymap: TileKeymap? = nil,
-                       others: [TileBaseConflicts.NamedShortcut] = []) -> [String] {
+                       dictationToggles: Bool = false, others: [TileBaseConflicts.NamedShortcut] = []) -> [String] {
         TileBaseConflicts.notes(base: base, keymap: keymap ?? TileKeymap.defaults(base: base), talk: talk,
                                 dictation: dictation, pointing: pointing, polyglot: polyglot, chat: chat,
-                                voiceOverOn: voiceOverOn, others: others)
+                                voiceOverOn: voiceOverOn, dictationToggles: dictationToggles, others: others)
     }
 
     /// A keyed chord on `modifiers`: left arrow, J and Space.
@@ -29,10 +29,52 @@ import Testing
         #expect(notes(.optionCommand).isEmpty)
     }
 
-    /// The rule leaves a larger pair free only because the tap tells the monitors about every key it consumes, so the
-    /// hold stays spoiled until every modifier is up (`TilingConsumedKeyTests` proves that half).
+    /// The rule leaves a larger pair free only because every hold-style monitor cancels a hold that a larger chord
+    /// ends, and the tap tells the monitors about every key it consumes (`TilingConsumedKeyTests` proves both halves).
     @Test func aLargerPairThanTheTalkKeyIsFreeBecauseTheMonitorsAreToldAboutEveryConsumedKey() {
         #expect(notes(.controlOptionCommand).isEmpty)
+    }
+
+    // MARK: Keys that act on the first press
+
+    /// A press-to-toggle dictation key acts the moment its own modifiers are down. A larger tiling pair that is
+    /// pressed in the natural order (the smaller pair first) would toggle dictation on every chord, and a toggle
+    /// cannot be taken back the way a hold can be cancelled, so the pair is refused.
+    @Test func aToggleDictationKeyInsideALargerPairIsAClash() {
+        let found = notes(.controlOptionCommand, talk: .rightOption, dictation: .controlOption, dictationToggles: true)
+        #expect(found.count == 1 && found[0].contains("Dictation") && found[0].contains("Control-Option-Command"), "\(found)")
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: .controlOption, dictationToggles: false).isEmpty,
+                "a hold is cancelled when a larger chord ends it, so a hold-style key inside the pair is free")
+    }
+
+    @Test func aToggleDictationKeyOnTheSameModifiersIsStillTheEqualPairNote() {
+        let found = notes(.controlOption, talk: .rightOption, dictation: .controlOption, dictationToggles: true)
+        #expect(found.count == 1 && found[0].contains("also your Dictation key"), "one note, not two: \(found)")
+    }
+
+    @Test func aModifierOnlyPolyglotKeyInsideALargerPairIsAClashBecauseItToggles() {
+        let found = notes(.controlOptionCommand, talk: .rightOption, dictation: nil, polyglot: .controlOption)
+        #expect(found.count == 1 && found[0].contains("Polyglot"), "\(found)")
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: nil, polyglot: Shortcut(keyCode: keyT, modifiers: [.shift])).isEmpty)
+    }
+
+    @Test func aToggleKeyOutsideThePairOrOffIsFree() {
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: .function, dictationToggles: true).isEmpty, "Fn is not in the pair")
+        #expect(notes(.optionCommand, talk: .rightOption, dictation: .controlOption, dictationToggles: true).isEmpty,
+                "Control is not in Option-Command, so Control-Option is not inside it")
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: nil, dictationToggles: true).isEmpty, "dictation is off")
+    }
+
+    @Test func aSingleModifierToggleKeyInsideThePairIsAClashToo() {
+        let found = notes(.optionCommand, talk: .rightOption, dictation: .rightCommand, dictationToggles: true)
+        #expect(found.count == 1 && found[0].contains("Dictation"), "Right Command is held inside Option-Command: \(found)")
+    }
+
+    @Test func theShippedDefaultsClashWithNothing() {
+        // Shipped: talk and pointing Control-Option, dictation Right Command in hold mode, Polyglot Control-Option-T, tiling Control-Option-Command.
+        let polyglot = Shortcut(keyCode: keyT, modifiers: [.control, .option])
+        #expect(notes(.standard, talk: .controlOption, dictation: .rightCommand, pointing: .controlOption, polyglot: polyglot).isEmpty)
+        #expect(TileModifierBase.standard == .controlOptionCommand)
     }
 
     @Test func pointingAndDictationAreNamedWhenTheyHoldThePair() {

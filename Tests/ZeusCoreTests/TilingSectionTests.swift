@@ -307,6 +307,44 @@ extension TilingSectionTests {
             #expect(abs(ratio - 0.55) < 1e-9)
         }
 
+        @Test func severalNudgesAreOneResolveWithOneLayoutRequest() {
+            let once = resolve(.nudge(.right), threeWindowState())
+            let twice = resolve(.nudge(.right), once.state)
+            let batched = TileResolver.resolve(.nudge(.right), times: 2, in: threeWindowState(), displays: [mainDisplay()], config: TileConfig())
+            #expect(batched.state == twice.state, "two steps give what two single nudges give")
+            #expect(batched.effect == .relayout)
+            guard case .split(_, let ratio, _, _, _)? = batched.state.trees[1]?.root else {
+                Issue.record("the root should still be a split")
+                return
+            }
+            #expect(abs(ratio - 0.60) < 1e-9)
+        }
+
+        @Test func aLongRunOfNudgesStopsAtTheRatioLimit() {
+            let batched = TileResolver.resolve(.nudge(.right), times: TileActionMailbox.maxNudgeSteps, in: threeWindowState(),
+                                               displays: [mainDisplay()], config: TileConfig())
+            guard case .split(_, let ratio, _, _, _)? = batched.state.trees[1]?.root else {
+                Issue.record("the root should still be a split")
+                return
+            }
+            #expect(abs(ratio - TileRatio.maximum) < 1e-9)
+            #expect(batched.effect == .relayout)
+        }
+
+        @Test func aRepeatCountMeansNothingToAnyOtherAction() {
+            for action in [TileAction.focus(.right), .swap(.right), .flipSplit, .retile, .toggleFloat] {
+                let single = resolve(action, threeWindowState(focused: id(2)))
+                let counted = TileResolver.resolve(action, times: 9, in: threeWindowState(focused: id(2)), displays: [mainDisplay()], config: TileConfig())
+                #expect(counted.state == single.state && counted.effect == single.effect, "\(action)")
+            }
+        }
+
+        @Test func nudgesWithNothingToMoveStayNothing() {
+            let state = threeWindowState()
+            let batched = TileResolver.resolve(.nudge(.left), times: 5, in: state, displays: [mainDisplay()], config: TileConfig())
+            #expect(batched.effect == .none && batched.state == state)
+        }
+
         @Test func nudgeWithNoMatchingSplitDoesNothing() {
             // Window 1 is the left column: only a split on its right edge can move, so nudging it left finds none.
             let state = threeWindowState()

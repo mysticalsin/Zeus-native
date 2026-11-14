@@ -205,9 +205,12 @@ struct TilingKeyLayerTests {
     @Test func aChordTheTapMatchedReachesTheOwnerOnTheMainActor() {
         let rig = Rig(trusted: true)
         var got: [TileAction] = []
-        rig.layer.onAction = { got.append($0) }
+        var counts: [Int] = []
+        rig.layer.onAction = { action, count in got.append(action); counts.append(count) }
         rig.apply()
-        rig.taps[0].sink(.retile)
-        #expect(got == [.retile])
+        rig.taps[0].sink(.retile, 1)
+        rig.taps[0].sink(.nudge(.left), 4)
+        #expect(got == [.retile, .nudge(.left)])
+        #expect(counts == [1, 4], "a merged run of nudges keeps its step count on the way to the owner")
     }
 }

@@ -69,6 +69,20 @@ struct TilingKeyClashTests {
         #expect(live.pointing == (PointingSettings.enabled ? PointingSettings.shortcut : nil))
     }
 
+    @Test func aToggleDictationKeyInsideTheTilingPairIsRefusedByTheReader() {
+        let keys = TilingKeyClash.Keys(talk: .rightOption, dictation: .controlOption, pointing: nil, polyglot: nil, chat: .off,
+                                       voiceOverOn: false, dictationToggles: true, others: [])
+        #expect(TilingKeyClash.note(base: .controlOptionCommand, keymap: nil, keys: keys)?.contains("Dictation") == true)
+        var held = keys
+        held.dictationToggles = false
+        #expect(TilingKeyClash.note(base: .controlOptionCommand, keymap: nil, keys: held) == nil)
+    }
+
+    @Test func theLiveKeysReadTheToggleBehaviourTheDictationMonitorReads() {
+        let dictation = DictationSettings.shared
+        #expect(TilingKeyClash.Keys.live().dictationToggles == (dictation.enabled && dictation.selectedBehavior == .pressToToggle))
+    }
+
     // MARK: Polyglot, and every monitor key in one place
 
     @Test func theShippedPolyglotKeyIsRefusedOnTheControlOptionPair() {

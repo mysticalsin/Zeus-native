@@ -121,7 +121,7 @@ private final class FakeTilingDriver: TilingWindowDriver {
 
 @MainActor
 private final class FakeTilingKeys: TilingKeyControlling {
-    var onAction: (TileAction) -> Void = { _ in }
+    var onAction: (TileAction, Int) -> Void = { _, _ in }
     var onUnavailable: () -> Void = {}
     private(set) var applies: [(enabled: Bool, paused: Bool, keymap: TileKeymap)] = []
     private(set) var stops = 0
@@ -873,8 +873,22 @@ struct TilingControllerTests {
     @Test func theKeyLayerHandsActionsToTheController() {
         let rig = Rig()
         twoWindows(rig)
-        rig.keys.onAction(.focus(.right))
+        rig.keys.onAction(.focus(.right), 1)
         #expect(rig.driver.focusCalls == [id(2)])
+    }
+
+    @Test func aRunOfNudgesIsOneResizePassWithTheSameResultAsOneAtATime() {
+        let merged = Rig()
+        twoWindows(merged)
+        let before = merged.driver.writes.count
+        merged.keys.onAction(.nudge(.right), 3)
+        let single = Rig()
+        twoWindows(single)
+        for _ in 0..<3 { single.controller.handle(.nudge(.right)) }
+        #expect(merged.driver.writes(to: id(1)).last == single.driver.writes(to: id(1)).last, "the same split")
+        #expect(merged.driver.writes(to: id(2)).last == single.driver.writes(to: id(2)).last)
+        #expect(merged.driver.writes.count - before == 2, "one pass over two windows, not three")
+        #expect(single.driver.writes.count - before == 6)
     }
 
     @Test func aFocusKeyFocusesTheNeighbourThroughTheDriverAndMovesTheRing() {
