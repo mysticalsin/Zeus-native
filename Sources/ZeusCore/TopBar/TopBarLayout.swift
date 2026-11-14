@@ -7,6 +7,8 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
     case continuity
     /// Appended last, off by default: the live audio spectrum. Switch it on in Settings › Top Bar.
     case waves
+    /// Appended last, but second in the default row: arrange windows from the keyboard.
+    case tiling
 
     public var id: String { rawValue }
 
@@ -31,6 +33,7 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .insomnia: "Insomnia"
         case .continuity: "Continuity"
         case .waves: "Waves"
+        case .tiling: "Tiling"
         case .polyglot: "Polyglot"
         case .recordly: "Record"
         case .scribe: "Scribe"
@@ -44,6 +47,7 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .continuity: "Continuity: your keyboard and mouse across Macs and PCs (Beamer)"
         case .polyglot: "Polyglot: live translated captions"
         case .scribe: "Scribe: listens to a meeting and writes your notes"
+        case .tiling: "Tiling: arrange your windows from the keyboard"
         default: title
         }
     }
@@ -70,6 +74,7 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .insomnia: "moon.zzz.fill"
         case .continuity: "rectangle.connected.to.line.below"
         case .waves: "waveform"
+        case .tiling: "rectangle.split.2x2.fill"
         case .polyglot: "globe"
         case .recordly: "record.circle"
         case .scribe: "waveform.and.mic"
@@ -85,9 +90,9 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
     /// Glance's seven, as the live app labels them when selected (glance-clone-proof/parity/tabs):
     /// Home, Chat, Alerts, Clipboard, Shelf, then Zeus To-do and Murmure.
     public static let glanceSeven: [TopBarTab] = [.home, .chat, .notifications, .clipboard, .shelf, .todo, .dictation]
-    /// The row Tony asked for: Home, Agents, then Chat, Alerts, Clipboard, Shelf, To-do, Murmure, Teleprompter,
+    /// The row Tony asked for: Home, Tiling, Agents, then Chat, Alerts, Clipboard, Shelf, To-do, Murmure, Teleprompter,
     /// Insomnia, Polyglot, Recordly and Scribe. The rest stay one click away in Settings › Top Bar.
-    public static let defaultRow: [TopBarTab] = [.home, .agents] + glanceSeven.dropFirst() + [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
+    public static let defaultRow: [TopBarTab] = [.home, .tiling, .agents] + glanceSeven.dropFirst() + [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
     public static let standard = TopBarLayout(tabs: defaultRow + [.reminders, .today, .music, .calendar, .focus, .usage])
 
     /// A saved layout with Glance's seven moved to the front (in Glance's order), every other
@@ -124,6 +129,11 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
         TopBarLayout(tabs: tabs + [.agents].filter { !tabs.contains($0) }).defaultRowOrdered()
     }
 
+    /// One-time upgrade: Tiling joins the default row right after Home.
+    public func upgradedToTilingRow() -> TopBarLayout {
+        TopBarLayout(tabs: tabs + [.tiling].filter { !tabs.contains($0) }).defaultRowOrdered()
+    }
+
     private func ordered(first order: [TopBarTab]) -> TopBarLayout {
         let first = order.filter { tabs.contains($0) }
         return TopBarLayout(tabs: first + tabs.filter { !first.contains($0) })
@@ -142,11 +152,15 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
             tabs.remove(at: index)
         } else {
             // Keep the canonical order when a tab comes back.
-            let order = TopBarTab.allCases
+            let order = Self.canonicalOrder
             let position = tabs.firstIndex { order.firstIndex(of: $0)! > order.firstIndex(of: tab)! } ?? tabs.endIndex
             tabs.insert(tab, at: position)
         }
     }
+
+    /// Where a tab goes when it is switched back on: the case order, except Tiling, which sits right after Home
+    /// where the default row puts it. Without this, a tab switched back on would land in front of Tiling.
+    private static let canonicalOrder: [TopBarTab] = [.home, .tiling] + TopBarTab.allCases.filter { $0 != .home && $0 != .tiling }
 
     public mutating func move(_ tab: TopBarTab, by offset: Int) {
         guard tab != .home, let index = tabs.firstIndex(of: tab) else { return }
