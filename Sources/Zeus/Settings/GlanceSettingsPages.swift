@@ -1157,7 +1157,7 @@ private struct PrivacyPage: View {
         GSCard("Command line") {
             if cliAccess.noticePending {
                 GSRow(symbol: "info.circle", title: "Command-line control was reset",
-                      text: "This setting now lives in your Keychain, so no other program can switch it on. Zeus turned it off once; turn it on again below if you use the zeus command.") {
+                      text: "This setting now lives in your Keychain, not in a preferences file, so editing preferences cannot switch it on. Zeus turned it off once; turn it on again below if you use the zeus command.") {
                     Button("Got it") { cliAccess.dismissNotice() }.buttonStyle(GSButtonStyle())
                 }
                 GSDivider()

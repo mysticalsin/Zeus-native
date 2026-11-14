@@ -47,8 +47,12 @@ public enum CLIGate {
     }
 }
 
-/// Where the switch is kept. A same-user program can write any UserDefaults value but cannot write a
-/// Keychain item that Zeus created, so the switch lives in the Keychain and only the Settings toggle sets it.
+/// Where the switch is kept. Any program of this user can write a UserDefaults value, so the switch lives in
+/// the Keychain, where only the Settings toggle writes it and a plain preferences write cannot turn it on.
+/// How well the Keychain protects it depends on the build: a signed release keeps it behind the Keychain's
+/// access rules for this app, while a development build keeps its items in a local keychain whose password
+/// is a file the user can read, so there the switch is a guard against mistakes and preference edits, not
+/// against a program that sets out to unlock that keychain. The item is "on" when it exists with value 1.
 public enum CLIGateStore {
     /// The Keychain account (under the app service) that holds the switch. Present means on.
     public static let account = "cli.control.enabled"
