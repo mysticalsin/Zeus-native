@@ -49,6 +49,8 @@ final class TilingController {
         var keys: any TilingKeyControlling
         var readConfig: () -> TileConfig
         var focusBorderOn: () -> Bool
+        /// Why the key pair for this base cannot be used (another Zeus key holds it), or nil when it is free.
+        var keyClash: (TileModifierBase, TileKeymap) -> String? = { _, _ in nil }
         /// Runs the closure once Accessibility is on, without ever prompting.
         var whenTrusted: (@escaping () -> Void) -> Void
         var cancelTrustWait: () -> Void
@@ -68,6 +70,7 @@ final class TilingController {
                 keys: TilingKeyLayer(),
                 readConfig: { TileConfig.fromSettings() },
                 focusBorderOn: { FeatureSettings.tilingFocusBorder() },
+                keyClash: { base, keymap in TilingKeyClash.note(base: base, keymap: keymap) },
                 whenTrusted: { work in AccessibilityGate.whenTrusted(key: TilingController.gateKey, work) },
                 cancelTrustWait: { AccessibilityGate.cancelWaiting(key: TilingController.gateKey) },
                 schedule: { delay, work in
@@ -102,6 +105,8 @@ final class TilingController {
     private(set) var accessibilityOn = false
     private(set) var isPaused = false
     private(set) var keysUnavailable = false
+    /// Why tiling is refused: another Zeus key already holds the chosen key pair. Nil when the pair is free.
+    private(set) var keyClashNote: String?
 
     // MARK: Inner state
 
@@ -125,6 +130,8 @@ final class TilingController {
     @ObservationIgnored private var followUps = 0
     @ObservationIgnored private var sheetVisible = false
     @ObservationIgnored private var ringTarget: TilingRingTarget?
+    /// What the focus ring setting said the last time the ring was worked out.
+    @ObservationIgnored private var ringAllowed = true
     @ObservationIgnored private var lastDisplays: [TileDisplay] = []
     @ObservationIgnored private var preTiling: [TileWindowID: TileRect] = [:]
 
@@ -155,24 +162,41 @@ final class TilingController {
     func start() {
         guard !isFixture else { return }
         let wanted = services.readConfig()
-        config = wanted
+        if config != wanted { config = wanted }
         guard wanted.enabled else {
             stop()
             return
         }
+        let wantedKeymap = TileKeymap.defaults(base: wanted.base)
+        if keymap != wantedKeymap {
+            keymap = wantedKeymap
+            keyRows = TileKeyList.rows(keymap: keymap)
+        }
+        // Another Zeus key holds this pair: the tap would consume the chord before that key's monitor could cancel
+        // its hold. Nothing is installed until the owner picks another pair.
+        if let note = services.keyClash(wanted.base, wantedKeymap) {
+            stop()
+            if keyClashNote != note { keyClashNote = note }
+            refreshPhase()
+            return
+        }
+        if keyClashNote != nil { keyClashNote = nil }
         if running, appliedConfig == wanted {
+            // The focus ring is not part of the config, so it is checked here.
+            if services.focusBorderOn() != ringAllowed { updateRing(displays: lastDisplays) }
             refreshPhase()
             return
         }
         appliedConfig = wanted
         running = true
-        keymap = TileKeymap.defaults(base: wanted.base)
-        keyRows = TileKeyList.rows(keymap: keymap)
-        accessibilityOn = services.driver.isTrusted
+        setAccessibility(services.driver.isTrusted)
         services.keys.apply(enabled: true, paused: isPaused, keymap: keymap)
         if accessibilityOn {
             activate()
             if !isPaused { queueRelayout(delay: 0) }
+        } else if active {
+            // Accessibility was revoked while tiling ran: stop reading and writing, and wait for it again.
+            accessibilityLost()
         } else {
             waitForAccessibility()
         }
@@ -183,6 +207,7 @@ final class TilingController {
     /// Accessibility. Windows are left where they are.
     func stop() {
         guard !isFixture else { return }
+        if keyClashNote != nil { keyClashNote = nil }
         guard running || active else {
             refreshPhase()
             return
@@ -211,8 +236,9 @@ final class TilingController {
     /// Reads the settings and the Accessibility state for the page. Reads a permission, never asks for one.
     func refresh() {
         guard !isFixture else { return }
-        config = services.readConfig()
-        accessibilityOn = services.driver.isTrusted
+        let current = services.readConfig()
+        if config != current { config = current }
+        setAccessibility(services.driver.isTrusted)
         refreshPhase()
     }
 
@@ -259,6 +285,17 @@ final class TilingController {
         guard !isFixture, running, active, !sleeping else { return }
         if isPaused, action != .togglePause { return }
         if action != .showKeys { hideSheet() }
+        // These two read no window and move none, so they need neither Accessibility nor a window in front.
+        switch action {
+        case .togglePause:
+            togglePause()
+            return
+        case .showKeys:
+            presentSheet()
+            return
+        default:
+            break
+        }
         let driver = services.driver
         guard driver.isTrusted else {
             accessibilityLost()
@@ -268,6 +305,14 @@ final class TilingController {
         // A full-screen app has the screen: tiling keys do nothing over it.
         guard !front.isFullScreen else { return }
         syncFocus(front)
+        // The keyboard is in an app tiling does not read, so the layout's focused window is not the one the owner is
+        // looking at. These act on that window, so they wait until a tiled window has the keyboard.
+        if !focusIsFront {
+            switch action {
+            case .swap, .flipSplit, .nudge, .toggleFloat: return
+            default: break
+            }
+        }
         let displays = driver.displays()
         lastDisplays = displays
         let outcome = TileResolver.resolve(action, in: layout, displays: displays, config: engineConfig)
@@ -489,6 +534,9 @@ final class TilingController {
         let known = Set(layout.tiledWindows).union(layout.floating).union(listing.map(\.id))
         if let focused = layout.focused, !known.contains(focused) { layout.focused = nil }
         layout.recency = layout.recency.filter { known.contains($0) }
+        // Ids are never reused, so the undo memory of a window that is gone is dead weight. An incomplete read
+        // leaves it alone: a window that did not answer in time is unknown, not gone.
+        if complete { preTiling = preTiling.filter { known.contains($0.key) } }
         publish(displays: displays)
         if deferred, followUps < 5 { queueRelayout(delay: 0.2, followUp: true) }
     }
@@ -501,7 +549,16 @@ final class TilingController {
         let marked = focusIsFront ? layout.focused : nil
         picture = TilingPicture.make(displays: displays, trees: layout.trees, config: engine, focused: marked)
         refreshPhase()
-        guard running, !isPaused, !fullScreenFront, accessibilityOn, services.focusBorderOn(),
+        updateRing(displays: displays)
+    }
+
+    /// Puts the ring around the focused tiled window, or orders it out when it should not show.
+    private func updateRing(displays: [TileDisplay]) {
+        let engine = engineConfig
+        let marked = focusIsFront ? layout.focused : nil
+        let allowed = services.focusBorderOn()
+        ringAllowed = allowed
+        guard running, !isPaused, !fullScreenFront, accessibilityOn, allowed,
               let marked, let place = layout.location(of: marked),
               let display = displays.first(where: { $0.id == place.displayID }),
               let frame = TileFrames.frames(of: place.tree, display: display.visibleFrame, config: engine)[marked],
@@ -533,8 +590,16 @@ final class TilingController {
         services.showSheet(nil)
     }
 
+    /// Each of these only assigns a changed value: `@Observable` notifies on every set, and the settings observer
+    /// calls `start()` on every preference write in the process, so an equal assignment would redraw the page.
     private func refreshPhase() {
-        phase = TilingPhase(enabled: running, accessibilityOn: accessibilityOn, keysUnavailable: keysUnavailable, paused: isPaused)
+        let next = TilingPhase(enabled: running || keyClashNote != nil, accessibilityOn: accessibilityOn,
+                               keysUnavailable: keysUnavailable, paused: isPaused, keyClash: keyClashNote != nil)
+        if phase != next { phase = next }
+    }
+
+    private func setAccessibility(_ on: Bool) {
+        if accessibilityOn != on { accessibilityOn = on }
     }
 }
 
