@@ -295,6 +295,9 @@ public struct TalkKeyLatch: Sendable {
 
     public var isLatched: Bool { state == .latched }
 
+    /// The press that ended a hands-free turn is down: the turn is already finished, and the key-up has nothing to add.
+    public var isEnding: Bool { state == .ending }
+
     public mutating func keyDown(at time: TimeInterval) -> Action? {
         switch state {
         case .idle:

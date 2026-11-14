@@ -7,7 +7,10 @@ protocol TilingKeyTapping: AnyObject {
     func update(keymap: TileKeymap, enabled: Bool, paused: Bool)
     /// True when the tap is running.
     func start() -> Bool
-    func stop()
+    /// True when the tap is gone: its thread has ended, or there was nothing to stop. False when the stop gave up
+    /// waiting, so the tap and its port may still exist.
+    @discardableResult
+    func stop() -> Bool
 }
 
 extension TilingKeyTap: TilingKeyTapping {}
@@ -49,6 +52,9 @@ final class TilingKeyLayer {
 
     private let environment: Environment
     private var tap: (any TilingKeyTapping)?
+    /// A removed tap whose stop gave up waiting. The layer keeps it, and builds no second tap, until a later stop sees
+    /// its thread end; letting go of it would stop it once more in its deinit and make a second tap beside it.
+    private var stopping: (any TilingKeyTapping)?
     private var wanted = false
     private var failed = false
     private var keymap = TileKeymap()
@@ -94,6 +100,13 @@ final class TilingKeyLayer {
 
     private func install() {
         guard wanted, !failed, tap == nil, environment.isTrusted() else { return }
+        finishPendingStop()
+        guard stopping == nil else {
+            // The old tap's thread is still alive. Stay off until tiling is turned off and on again, and say so once.
+            failed = true
+            onUnavailable()
+            return
+        }
         let created = environment.makeTap(
             { [weak self] action, count in self?.onAction(action, count) },
             { [weak self] in self?.tapKeepsFailing() })
@@ -114,7 +127,16 @@ final class TilingKeyLayer {
     }
 
     private func removeTap() {
-        tap?.stop()
-        tap = nil
+        if let removed = tap {
+            tap = nil
+            stopping = removed
+        }
+        finishPendingStop()
+    }
+
+    /// Asks the removed tap to finish its stop. It is forgotten only once its thread has ended.
+    private func finishPendingStop() {
+        guard let pending = stopping else { return }
+        if pending.stop() { stopping = nil }
     }
 }

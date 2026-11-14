@@ -105,7 +105,7 @@ final class TilingKeyTap: @unchecked Sendable {
         self.stopTimeout = stopTimeout
     }
 
-    deinit { stop() }
+    deinit { _ = stop() }
 
     /// Replaces the keymap and the gate the callback reads. The callback only ever sees a whole snapshot.
     nonisolated func update(keymap: TileKeymap, enabled: Bool, paused: Bool) {
@@ -168,23 +168,26 @@ final class TilingKeyTap: @unchecked Sendable {
 
     /// Removes the tap and ends its thread, and returns once both are gone. Safe to call again and from any thread: a
     /// second caller, while a stop is under way, waits for the same thread. If the thread has not ended after
-    /// `stopTimeout`, this returns with the tap still `stopping` and its run kept, so `start()` cannot make a second tap;
-    /// a later `stop()` waits again.
-    nonisolated func stop() {
+    /// `stopTimeout`, this returns false with the tap still `stopping` and its run kept, so `start()` cannot make a
+    /// second tap; a later `stop()` waits again. True when the thread has ended or there was nothing to stop.
+    @discardableResult
+    nonisolated func stop() -> Bool {
         lock.lock()
         _ = life.handle(.stopRequested)
         matcher.reset()
         mailbox.reset()
         let stopping = run
         lock.unlock()
+        guard let stopping else { return true }
         // The wait is outside the lock: the callback takes it, and the teardown waits for the callback.
-        guard let stopping, let thread = stopping.thread, thread.stop(timeout: stopTimeout) else { return }
+        guard let thread = stopping.thread, thread.stop(timeout: stopTimeout) else { return false }
         lock.lock(); defer { lock.unlock() }
         // The first caller to see the thread end clears the run. A later one finds it already gone, and a tap started
         // since then is not touched.
-        guard run === stopping else { return }
+        guard run === stopping else { return true }
         run = nil
         _ = life.handle(.threadEnded)
+        return true
     }
 
     var isRunning: Bool { lock.withLock { life.isRunning } }

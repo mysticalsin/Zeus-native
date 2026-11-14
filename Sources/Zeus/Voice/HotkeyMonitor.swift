@@ -259,7 +259,11 @@ final class HotkeyMonitor {
         } else if !pressed, isDown {
             isDown = false
             if endedByLargerChord(key) {
-                cancelHold(key)
+                if latch.isEnding {
+                    finishEndedTurn()
+                } else {
+                    cancelHold(key)
+                }
             } else {
                 fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
             }
@@ -268,10 +272,19 @@ final class HotkeyMonitor {
 
     /// The hold ended because Control, Option or Command joined it, not because a key of it was let go: the owner was
     /// pressing a larger chord (the tiling pair is Control-Option-Command, and Control-Option comes first). Shift and Fn
-    /// are not counted: Shift joining a hold is how the owner asks for Return after dictation.
+    /// are not counted: Shift joining a hold is how the owner asks for Return after dictation. A press that began or
+    /// continued a turn is cancelled (`cancelHold`); the press that ended a hands-free turn is not (`finishEndedTurn`).
     private func endedByLargerChord(_ key: Shortcut) -> Bool {
         guard key.isModifierOnly, state.modifiers.isSuperset(of: key.modifiers) else { return false }
         return !state.modifiers.subtracting(key.modifiers).isDisjoint(with: [.control, .option, .command])
+    }
+
+    /// The press that ended a hands-free turn became a larger chord. The key-down already finished that turn (its text
+    /// is on the way), so nothing is cancelled: the latch takes the key-up as it does for any ended press. The smaller
+    /// hold that is left when the extra modifier is let go first stays blocked until every modifier is up.
+    private func finishEndedTurn() {
+        cancelledByLargerChord = true
+        fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
     }
 
     /// The hold became a larger chord: end the turn without sending it, as a key joining the hold does (`spoilHold`),
