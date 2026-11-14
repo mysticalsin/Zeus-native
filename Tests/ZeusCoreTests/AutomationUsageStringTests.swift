@@ -47,6 +47,12 @@ struct AutomationUsageStringTests {
         return found
     }
 
+    @Test func theSystemEventsClauseNamesBeamerNotAPresentationTool() throws {
+        let text = try #require(try plist()["NSAppleEventsUsageDescription"] as? String)
+        #expect(text.contains("Beamer"), "the only System Events script drives the Beamer menu")
+        #expect(!text.contains("presentation tool"), "Beamer shares a keyboard and mouse, it is not a presentation tool")
+    }
+
     @Test func theStringKeepsToTheHouseWritingRules() throws {
         let text = try #require(try plist()["NSAppleEventsUsageDescription"] as? String)
         #expect(!text.contains("\u{2014}") && !text.contains("\u{2013}"), "no em or en dashes")

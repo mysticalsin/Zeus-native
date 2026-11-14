@@ -166,6 +166,34 @@ struct DebugOutputPathTests {
         }
     }
 
+    @Test func aChosenFolderIsListedByItsResolvedPath() throws {
+        let (root, cleanup) = try folder()
+        defer { cleanup() }
+        try FileManager.default.createDirectory(atPath: root + "/home/Documents/real", withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root + "/shots", withDestinationPath: root + "/home/Documents/real")
+        let folders = DebugOutputPath.allowedFolders(cachesDirectory: root + "/caches",
+                                                     environment: ["ZEUS_DEBUG_SCREENSHOT_DIR": root + "/shots"], homeDirectory: root + "/home")
+        let real = try #require(DebugOutputPath.realPath(root + "/home/Documents/real"))
+        #expect(folders.count == 2)
+        #expect(folders.last == real, "the path that was checked is the path that is kept: \(folders)")
+    }
+
+    @Test func aFolderSwappedForALinkToLoginItemsAfterTheListWasMadeIsRefused() throws {
+        let (root, cleanup) = try folder()
+        defer { cleanup() }
+        let home = root + "/home"
+        try FileManager.default.createDirectory(atPath: home + "/Library/LaunchAgents", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: root + "/shots", withIntermediateDirectories: true)
+        let listed = DebugOutputPath.allowedFolders(cachesDirectory: root + "/caches",
+                                                    environment: ["ZEUS_DEBUG_SCREENSHOT_DIR": root + "/shots"], homeDirectory: home)
+        #expect(listed.count == 2, "a plain folder is allowed when the list is made")
+        #expect(accepted(DebugOutputPath.validate(root + "/shots/a.png", allowedFolders: listed, homeDirectory: home)) != nil)
+        // The owner's folder is replaced by a link after the list was made; every request resolves it again.
+        try FileManager.default.removeItem(atPath: root + "/shots")
+        try FileManager.default.createSymbolicLink(atPath: root + "/shots", withDestinationPath: home + "/Library/LaunchAgents")
+        #expect(rejection(DebugOutputPath.validate(root + "/shots/evil.plist", allowedFolders: listed, homeDirectory: home)) == .outsideAllowedFolders)
+    }
+
     @Test func theDefaultBaseLivesInTheCachesFolder() {
         let base = DebugOutputPath.defaultBase(cachesDirectory: "/Users/me/Library/Caches", token: "abc")
         #expect(base == "/Users/me/Library/Caches/app.zeus.mac/DebugScreenshots/zeus-screenshot-abc")
