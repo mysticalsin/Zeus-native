@@ -4,8 +4,9 @@ import ZeusCore
 
 /// Which CLI commands may use the microphone, screen or input, launch agents or open Zeus's private
 /// panels, and whether the user allowed that (Settings ▸ Privacy, off by default). The switch lives in the
-/// Keychain, where another program running as the user cannot write it, and even with it on the request must
-/// come from the `zeus` command that ships with this app. Read-only commands never need the setting.
+/// Keychain, out of reach of a preferences write (see `CLIGateStore` for what that does and does not
+/// protect on a development build), and even with it on the request must come from the `zeus` command
+/// that ships with this app. Read-only commands never need the setting.
 enum CLIAccess {
     static let refusal = "Refused: this command can use the microphone, screen or input, open Zeus's panels, or launch agents. Turn on 'Allow command-line control' in Zeus Settings ▸ Privacy to allow it."
     static let peerRefusal = "Refused: Zeus could not confirm this request came from the zeus command that ships inside Zeus.app. Reinstall that command and try again ('Allow command-line control' in Settings ▸ Privacy must also be on)."
@@ -107,7 +108,8 @@ final class CommandCenter {
 
     var onDebugOpenSettings: ((String?) -> Bool)?
     var onDebugOnboarding: ((Bool) -> Void)?
-    var onDebugScreenshot: ((String?) async -> [String])?
+    /// The path already passed `DebugOutputPath`; the second value is the window filter.
+    var onDebugScreenshot: ((String, String?) async -> [String])?
     var onDebugTab: ((String) -> Bool)?
     var onDebugAnimate: ((String) -> Bool)?
     var onDebugHUDState: (() -> String)?
@@ -281,18 +283,16 @@ final class CommandCenter {
             case "screenshot":
                 // Where the PNG goes is checked here, before anything is created: only the app's caches
                 // folder or a folder the owner chose at launch, with no traversal and no symlink escape.
-                let (requested, window) = DebugScreenshot.parseArgument(rest.isEmpty ? nil : rest)
-                let base = requested ?? DebugOutputPath.defaultBase(cachesDirectory: CLIAccess.cachesDirectory, token: UUID().uuidString)
-                let checked: String
-                switch DebugOutputPath.validate(base, allowedFolders: CLIAccess.screenshotFolders) {
-                case .success(let path): checked = path
+                let base = DebugOutputPath.defaultBase(cachesDirectory: CLIAccess.cachesDirectory, token: UUID().uuidString)
+                let plan: DebugScreenshot.Plan
+                switch DebugScreenshot.plan(argument: rest.isEmpty ? nil : rest, allowedFolders: CLIAccess.screenshotFolders, defaultBase: base) {
+                case .success(let accepted): plan = accepted
                 case .failure:
                     return ZeusCommandReply(id: command.id, ok: false,
                                             text: "Screenshots can only be saved inside Zeus's caches folder or a folder chosen at launch with \(DebugOutputPath.ownerFolderVariable).")
                 }
-                let argument = checked + (window.map { " --window \($0)" } ?? "")
                 if let onDebugScreenshot {
-                    let paths = await onDebugScreenshot(argument)
+                    let paths = await onDebugScreenshot(plan.path, plan.filter)
                     return ZeusCommandReply(id: command.id, ok: !paths.isEmpty,
                                             text: paths.isEmpty ? "Screenshot failed." : "Screenshot saved to \(paths.joined(separator: ", "))",
                                             actions: paths.map { "screenshot:\($0)" })

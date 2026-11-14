@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import AppKit
 @testable import Zeus
+import ZeusCore
 
 /// Pure logic behind "zeus debug drives the running app; single instance" (PLAN-QA7 item 1).
 /// None of these launch, quit or control a real app: they test the decision functions only.

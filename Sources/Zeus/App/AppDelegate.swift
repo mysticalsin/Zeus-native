@@ -379,10 +379,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.showOnboarding(restart: !isPreview)
         }
-        commands.onDebugScreenshot = { [weak self] argument in
+        commands.onDebugScreenshot = { [weak self] base, filter in
             guard let self else { return [] }
-            let (path, filter) = DebugScreenshot.parseArgument(argument)
-            let base = path ?? (NSTemporaryDirectory() + "zeus-screenshot-\(UUID().uuidString)")
             var named: [(name: String, window: NSWindow)] = []
             if let w = self.notch.debugWindow { named.append(("notch", w)) }
             if let w = self.glanceSettings.debugWindow { named.append(("settings", w)) }
