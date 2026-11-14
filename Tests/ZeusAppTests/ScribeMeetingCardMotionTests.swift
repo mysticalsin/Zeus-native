@@ -147,6 +147,33 @@ struct ScribeMeetingCardHostedMotionTests {
         return sum
     }
 
+    /// How opaque the slab is at a point that holds no text or control, the top edge of the left column: 0 before
+    /// the entrance has started and 1 once it has landed.
+    private func slabAlpha(_ view: NSView) throws -> Double {
+        view.layoutSubtreeIfNeeded()
+        let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let scale = Double(rep.pixelsWide) / Double(view.bounds.width)
+        let x = Int((Double(ScribeMeetingCardMetrics.shadowRoom) + 70) * scale)
+        let y = Int((Double(ScribeMeetingCardMetrics.shadowRoom) + 8) * scale)
+        return Double(try #require(rep.colorAt(x: x, y: y)).alphaComponent)
+    }
+
+    /// Waits until the entrance has landed, however late the machine starts it. The entrance begins on the first
+    /// display pass after the card is shown, and a busy main thread can delay that pass by far more than the
+    /// spring takes, so no fixed pause says when the card is up.
+    private func waitUntilLanded(_ window: NSWindow, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        let view = try #require(window.contentView, sourceLocation: sourceLocation)
+        let giveUp = uptime() + 10
+        while try slabAlpha(view) < 0.99 {
+            guard uptime() < giveUp else {
+                Issue.record("the entrance never landed", sourceLocation: sourceLocation)
+                return
+            }
+            try await Task.sleep(for: .seconds(0.05))
+        }
+    }
+
     /// The ring's centre in a hosted card: the orb's centre inside the slab, inside the room the window adds.
     private var cardRingCenter: CGPoint {
         CGPoint(x: ScribeMeetingCardMetrics.shadowRoom + ScribeMeetingCardMetrics.orbCenter.x,
@@ -206,7 +233,7 @@ struct ScribeMeetingCardHostedMotionTests {
         let reference = try ends { .countdown(meeting(), seconds: 5, deadline: $0, total: total) }
         card.render(.offer(meeting(), blocked: nil))
         // Let the entrance land, as it has when the person sees the offer first.
-        try await Task.sleep(for: .seconds(0.8))
+        try await waitUntilLanded(try #require(card.window))
         let began = uptime()
         let deadline = began + total
         card.render(countdown(deadline: deadline))
