@@ -202,11 +202,11 @@ in parallel with T3 and T5 after T1 lands.
 ### Rules and shape
 
 - `TilingWindowDriver` protocol (shipped in `Sources/ZeusCore/Tiling/TileWindowDriver.swift`): `isTrusted`,
-  `windows(config:) -> [TileWindowRef]`, `lastPassComplete`, `setFrame(_:for:) -> Bool`, `focus(_:)`,
+  `windows(config:) -> [TileWindowRef]`, `unreadPIDs`, `setFrame(_:for:) -> Bool`, `focus(_:)`,
   `displays() -> [TileDisplay]`. `TileWindowRef` carries the `TileWindowID` (the pid and a per-app number that is the
   element identity as far as ZeusCore goes), the bundle id and the frame in engine coordinates. `TileDisplay` carries
   the display id, its AppKit frames and its engine frame. `windows(config:)` reads every window fresh in the call: a
-  window it could not read in time is left out, never reported from an earlier call, and `lastPassComplete` is false.
+  window it could not read in time is left out, never reported from an earlier call, and its app's process id is in `unreadPIDs`.
   `setFrame` and `focus` act only on a window the last `windows(config:)` returned.
 - `AXTilingWindowDriver` is the real one, main actor like `AXSnapshotter` and `AXFinder`, with a per-pass time budget.
   It builds `AXUIElementCreateApplication(pid)` per regular app, calls `AXUIElementSetMessagingTimeout(app, 0.25)` as
@@ -239,8 +239,9 @@ insert.
 - A window that refuses to move: after the write the frame is read back; a difference beyond the tolerance marks the
   window floating for the session and asks the controller to rebuild without it. Never retried in a loop.
 - A hung app: the 0.25 s messaging timeout and the per-pass budget bound the cost. An app that does not answer in
-  time is left out of the listing and the pass reports `lastPassComplete == false`; the controller keeps the slots of
-  windows missing from an incomplete listing and writes to none of them.
+  time is left out of the listing and its process id is in `unreadPIDs`; the controller keeps the slots of windows
+  that belong to an unread app (`TilePlanner.slotsToKeep`) and writes to none of them. A window missing from an app that
+  was read is gone, so one slow app never pins the slots of windows that closed in other apps.
 - Two windows of one app at the same frame, one on another Space: the window list cannot tell them apart, so when more
   candidates share a frame than the list has entries for it, none of them is admitted.
 - A stale element after an app quits: dropped on the next read.
@@ -445,7 +446,7 @@ The overlay suite follows `PointingOverlayTests`: never key or main, ignores the
 full-screen app frontmost, a minimized window, Zeus's own window and a system window all left alone. The refused-to-floating
 step belongs to this suite: ids in `TileApplyOutcome.refused` are added to `TileConfig.floating` for the session and
 the tree is rebuilt without them, while `deferred` ids are not floated. It also checks that a window missing from a
-listing with `lastPassComplete == false` keeps its slot and is not written.
+listing keeps its slot and is not written when its app is in `unreadPIDs`, and loses it when its app was read.
 
 ---
 

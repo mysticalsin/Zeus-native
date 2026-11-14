@@ -12,7 +12,7 @@ import ZeusCore
 @MainActor
 final class AXTilingWindowDriver: TilingWindowDriver {
     /// Seconds one listing pass may spend, checked before every app and every window. An app the pass could not
-    /// finish is left out of the listing and the pass reports itself incomplete.
+    /// finish is left out of the listing and named in `unreadPIDs`.
     static let passBudget = 0.5
     /// A hung app answers each call only after this timeout.
     static let messagingTimeout: Float = 0.25
@@ -24,8 +24,9 @@ final class AXTilingWindowDriver: TilingWindowDriver {
     /// The windows the last listing returned. Only these are ever written or focused: `known` also holds
     /// minimized, full-screen and other-Space windows, which admission rejects.
     private var admitted: Set<TileWindowID> = []
-    /// False when the last listing could not read an app in time.
-    private(set) var lastPassComplete = true
+    /// The apps the last listing could not read in time: an app that did not answer, or was not reached before the
+    /// pass budget ran out. Every running app while Accessibility is off.
+    private(set) var unreadPIDs: Set<Int32> = []
 
     init(isTrusted: @escaping @MainActor () -> Bool = { AccessibilityGate.trusted }) {
         trustCheck = isTrusted
@@ -54,7 +55,7 @@ final class AXTilingWindowDriver: TilingWindowDriver {
             // Nothing from before the permission was revoked may survive its return.
             known = [:]
             admitted = []
-            lastPassComplete = false
+            unreadPIDs = Set(NSWorkspace.shared.runningApplications.map(\.processIdentifier))
             return []
         }
         let policy = TileAdmissionPolicy(config: config, zeusPID: ProcessInfo.processInfo.processIdentifier,
@@ -66,7 +67,7 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         known = known.filter { alive.contains($0.key) }
 
         var out: [TileWindowRef] = []
-        var complete = true
+        var unread = Set<pid_t>()
         for app in running {
             let pid = app.processIdentifier
             if TileAdmission.appRejection(pid: pid, bundleID: app.bundleIdentifier,
@@ -78,13 +79,13 @@ final class AXTilingWindowDriver: TilingWindowDriver {
             // elements stay known so its ids are the same when it is shown again.
             if app.isHidden { continue }
             guard let refs = scan(app, onScreen: onScreen, policy: policy, deadline: deadline) else {
-                complete = false
+                unread.insert(pid)
                 continue
             }
             out += refs
         }
         admitted = Set(out.map(\.id))
-        lastPassComplete = complete
+        unreadPIDs = unread
         return out
     }
 

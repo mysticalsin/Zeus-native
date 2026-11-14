@@ -45,9 +45,10 @@ public protocol TilingWindowDriver: AnyObject {
     /// A window the call could not read in time is left out, never reported from an earlier call. Empty without
     /// Accessibility.
     func windows(config: TileConfig) -> [TileWindowRef]
-    /// False when the last `windows(config:)` could not read every app. A window missing from an incomplete
-    /// listing is unknown, not gone: the caller keeps its slot and does not write to it.
-    var lastPassComplete: Bool { get }
+    /// The apps (by process id) the last `windows(config:)` could not read. A window of such an app that is missing
+    /// from the listing is unknown, not gone: the caller keeps its slot and does not write to it. A window
+    /// missing from an app that was read is gone. Without Accessibility every running app is unread.
+    var unreadPIDs: Set<Int32> { get }
     /// Moves and resizes `window`, then reads the frame back. True only when it landed within the tolerance.
     /// Only a window the last `windows(config:)` returned can be written; any other id is refused.
     func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool
@@ -116,6 +117,14 @@ public enum TilePlanner {
             kept.append(window)
         }
         return kept
+    }
+
+    /// The slots of `old` to keep although the listing does not hold them: a window that is not listed, not
+    /// floating, and belongs to an app the pass could not read. A window of an app that was read and is missing is
+    /// gone, so one slow app never pins the slots of windows that closed elsewhere.
+    public static func slotsToKeep(old: [TileWindowID], listed: Set<TileWindowID>, floating: Set<TileWindowID>,
+                                   unreadPIDs: Set<Int32>) -> Set<TileWindowID> {
+        Set(old.filter { !listed.contains($0) && !floating.contains($0) && unreadPIDs.contains($0.pid) })
     }
 
     /// The moves that put each window of `tree` into its engine frame on `display`, in tree order. A window not in

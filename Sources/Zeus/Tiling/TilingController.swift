@@ -492,7 +492,7 @@ final class TilingController {
         let displays = driver.displays()
         lastDisplays = displays
         var listing = driver.windows(config: engineConfig)
-        let complete = driver.lastPassComplete
+        let unread = driver.unreadPIDs
         var deferred = false
 
         for _ in 0..<3 {
@@ -504,8 +504,9 @@ final class TilingController {
                 let mine = eligible.filter { TileDisplays.display(for: $0.frame, in: displays)?.id == display.id }
                 var wanted = Set(mine.map(\.id))
                 let old = layout.trees[display.id] ?? TileTree(displayID: display.id)
-                // An app that did not answer in time is unknown, not gone: its windows keep their slots.
-                if !complete { wanted.formUnion(old.windows.filter { !listed.contains($0) && !engine.floating.contains($0) }) }
+                // An app that did not answer in time is unknown, not gone: its windows keep their slots. A window
+                // missing from an app that did answer is gone.
+                wanted.formUnion(TilePlanner.slotsToKeep(old: old.windows, listed: listed, floating: engine.floating, unreadPIDs: unread))
                 trees[display.id] = TileOps.reconcile(tree: old, eligible: wanted, order: mine.map(\.id),
                                                       display: display.visibleFrame, config: engine).tree
             }
@@ -534,9 +535,9 @@ final class TilingController {
         let known = Set(layout.tiledWindows).union(layout.floating).union(listing.map(\.id))
         if let focused = layout.focused, !known.contains(focused) { layout.focused = nil }
         layout.recency = layout.recency.filter { known.contains($0) }
-        // Ids are never reused, so the undo memory of a window that is gone is dead weight. An incomplete read
-        // leaves it alone: a window that did not answer in time is unknown, not gone.
-        if complete { preTiling = preTiling.filter { known.contains($0.key) } }
+        // Ids are never reused, so the undo memory of a window that is gone is dead weight. The windows of an app
+        // that did not answer in time are unknown, not gone, so their memory stays.
+        preTiling = preTiling.filter { known.contains($0.key) || unread.contains($0.key.pid) }
         publish(displays: displays)
         if deferred, followUps < 5 { queueRelayout(delay: 0.2, followUp: true) }
     }
