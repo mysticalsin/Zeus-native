@@ -1,7 +1,7 @@
 import Foundation
 
 /// Which source the notch shows. One entry per source; the one that most recently started playing is shown. With
-/// none playing the last one that started stays, paused. A source first seen paused never displaces the shown one,
+/// none playing the one that stopped last stays, paused. A source first seen paused never displaces the shown one,
 /// and a track change is not a start. Pure: feeds report, the app layer shows what `shown(follow:)` says.
 public struct NowPlayingArbiter: Equatable, Sendable {
     /// Which sources may be shown: any, or only one player.
@@ -29,6 +29,9 @@ public struct NowPlayingArbiter: Equatable, Sendable {
         public var playing: NowPlaying
         /// When the source last went from not playing to playing; `.distantPast` if it never has.
         public var startedAt: Date
+        /// The last sample that found the source playing, or the one that found it just stopped; `.distantPast` if it
+        /// never played. It orders the sources when none plays.
+        public var lastPlayingAt: Date
         public var seenAt: Date
 
         public var isPlaying: Bool { playing.isPlaying }
@@ -49,7 +52,9 @@ public struct NowPlayingArbiter: Equatable, Sendable {
         guard playing.source == source else { return false }
         let before = entries[source]
         let started = playing.isPlaying && before?.isPlaying != true
-        entries[source] = Entry(playing: playing, startedAt: started ? now : before?.startedAt ?? .distantPast, seenAt: now)
+        let stopped = !playing.isPlaying && before?.isPlaying == true
+        entries[source] = Entry(playing: playing, startedAt: started ? now : before?.startedAt ?? .distantPast,
+                                lastPlayingAt: playing.isPlaying || stopped ? now : before?.lastPlayingAt ?? .distantPast, seenAt: now)
         return true
     }
 
@@ -70,7 +75,8 @@ public struct NowPlayingArbiter: Equatable, Sendable {
         }
     }
 
-    /// The entry to show: among those that play the latest start, else among all the latest start, then the latest sample.
+    /// The entry to show: among those that play the latest start; with none playing, the one that played last. A source
+    /// that never played comes after one that did, then the latest sample orders them.
     /// Ties go to Music, then Spotify, then a browser tab by its id.
     public func shown(follow: Follow) -> Entry? {
         let allowed = entries.filter { Self.follows(follow, $0.key) }
@@ -99,6 +105,8 @@ public struct NowPlayingArbiter: Equatable, Sendable {
     }
 
     private static func ranks(_ a: (key: NowPlayingSource, value: Entry), before b: (key: NowPlayingSource, value: Entry)) -> Bool {
+        // The pool is all playing or all not, so one entry says which order applies.
+        if !a.value.isPlaying, a.value.lastPlayingAt != b.value.lastPlayingAt { return a.value.lastPlayingAt > b.value.lastPlayingAt }
         if a.value.startedAt != b.value.startedAt { return a.value.startedAt > b.value.startedAt }
         if a.value.seenAt != b.value.seenAt { return a.value.seenAt > b.value.seenAt }
         return tieOrder(a.key) < tieOrder(b.key)
