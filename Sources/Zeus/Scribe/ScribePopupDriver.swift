@@ -3,36 +3,6 @@ import Foundation
 import SwiftUI
 import ZeusCore
 
-/// Hosting view for the Scribe meeting cards. The cards sit in non-activating panels that are almost never key
-/// (the person is in their call app when a meeting starts). Without `acceptsFirstMouse` AppKit spends the first
-/// click on making the panel key and the button never sees it: that was the "I clicked and nothing happened".
-/// It also reports the pointer entering and leaving, so a card never times out under the hand about to tap it.
-final class ScribeCardHostingView<Content: View>: NSHostingView<Content> {
-    var onPointer: (@MainActor (Bool) -> Void)?
-    private var hoverArea: NSTrackingArea?
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                                  owner: self, userInfo: nil)
-        addTrackingArea(area)
-        hoverArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        onPointer?(true)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        onPointer?(false)
-    }
-}
-
 /// Runs one card's `ScribePopupLifecycle`: feeds it taps, the pointer, Scribe's phase and the time, performs its
 /// effects, and logs every step so a lost tap can be found afterwards ("[ZEUS] scribe popup: ...").
 @MainActor

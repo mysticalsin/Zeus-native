@@ -25,12 +25,6 @@ enum ScribeMeetingCardMotion {
         return Sweep(from: ScribeMeetingCardText.ring(deadline: deadline, now: uptime, total: total), duration: left)
     }
 
-    /// The share `sweep` has reached `elapsed` seconds after it began.
-    static func share(_ sweep: Sweep, elapsed: TimeInterval) -> Double {
-        guard sweep.duration > 0 else { return 0 }
-        return sweep.from * (1 - min(max(elapsed, 0), sweep.duration) / sweep.duration)
-    }
-
     /// The share a redraw shows before any sweep runs: where the sweep starts, or, with Reduce Motion, the
     /// share left at this redraw (the ring steps down once a second instead of sweeping).
     static func drawn(deadline: TimeInterval, uptime: TimeInterval, total: TimeInterval, reduceMotion: Bool) -> Double {
@@ -54,9 +48,10 @@ struct ScribeMeetingCardView: View {
     let uptime: TimeInterval
     /// A rendered still has no appearance to wait for.
     var settled = false
-    var onPrimary: () -> Void = {}
-    var onCancel: () -> Void = {}
-    var onDismiss: () -> Void = {}
+    /// Each tap passes `card`, the one drawn here, so no one downstream keeps a copy of what is on screen.
+    var onPrimary: (ScribeMeetingCard) -> Void = { _ in }
+    var onCancel: (ScribeMeetingCard) -> Void = { _ in }
+    var onDismiss: (ScribeMeetingCard) -> Void = { _ in }
 
     var body: some View {
         if card != .hidden {
@@ -70,15 +65,16 @@ private struct ScribeMeetingCardBody: View {
     let card: ScribeMeetingCard
     let now: Date
     let uptime: TimeInterval
-    let onPrimary: () -> Void
-    let onCancel: () -> Void
-    let onDismiss: () -> Void
+    let onPrimary: (ScribeMeetingCard) -> Void
+    let onCancel: (ScribeMeetingCard) -> Void
+    let onDismiss: (ScribeMeetingCard) -> Void
     private let still: Bool
     @State private var landed: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(card: ScribeMeetingCard, now: Date, uptime: TimeInterval, settled: Bool,
-         onPrimary: @escaping () -> Void, onCancel: @escaping () -> Void, onDismiss: @escaping () -> Void) {
+         onPrimary: @escaping (ScribeMeetingCard) -> Void, onCancel: @escaping (ScribeMeetingCard) -> Void,
+         onDismiss: @escaping (ScribeMeetingCard) -> Void) {
         self.card = card
         self.now = now
         self.uptime = uptime
@@ -107,8 +103,6 @@ private struct ScribeMeetingCardBody: View {
             .onChange(of: card.stateID, initial: true) {
                 AccessibilityNotification.Announcement(ScribeMeetingCardText.announcement(card, now: now)).post()
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(ScribeMeetingCardText.label(card, now: now))
     }
 
     private var row: some View {
@@ -130,6 +124,9 @@ private struct ScribeMeetingCardBody: View {
                 status
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // One element for the words, "<title>, <status>"; the buttons stay elements of their own.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(ScribeMeetingCardText.label(card, now: now))
             controls
         }
         // The height of the row that carries Cancel and its ring, so the card does not shift between states.
@@ -153,22 +150,21 @@ private struct ScribeMeetingCardBody: View {
     @ViewBuilder private var controls: some View {
         if card.isStarting { progress }
         if let title = ScribeMeetingCardText.primary(card) {
-            Button(action: onPrimary) { ScribeMeetingCardButtonLabel(title: title, prominent: true) }
+            Button { onPrimary(card) } label: { ScribeMeetingCardButtonLabel(title: title, prominent: true) }
                 .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
                 .keyboardShortcut(.defaultAction)
                 .ownedJourneyControl("scribe.meetingCard.primary")
         }
         if let title = ScribeMeetingCardText.cancel(card) {
-            Button(action: onCancel) { ScribeMeetingCardButtonLabel(title: title, prominent: false) }
+            Button { onCancel(card) } label: { ScribeMeetingCardButtonLabel(title: title, prominent: false) }
                 .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
                 .keyboardShortcut(.cancelAction)
                 .accessibilityValue(ScribeMeetingCardText.accessibilityValue(card) ?? "")
                 .ownedJourneyControl("scribe.meetingCard.cancel")
-                .padding(4)
                 .overlay { ring }
         }
         if ScribeMeetingCardText.canDismiss(card) {
-            Button(action: onDismiss) {
+            Button { onDismiss(card) } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(Theme.cloudSecondary)
@@ -197,12 +193,14 @@ private struct ScribeMeetingCardBody: View {
         if case .countdown(_, _, let deadline, let total) = card {
             ScribeMeetingCardRing(deadline: deadline, uptime: uptime, total: total, reduceMotion: reduceMotion, still: still)
                 .id(deadline)
+                // Around the button, outside its frame, so Cancel sits where Record sits.
+                .padding(-4)
         }
     }
 }
 
 /// The thin ring that drains over the countdown. One linear animation, started with the time left.
-private struct ScribeMeetingCardRing: View {
+struct ScribeMeetingCardRing: View {
     let deadline: TimeInterval
     let uptime: TimeInterval
     let total: TimeInterval
