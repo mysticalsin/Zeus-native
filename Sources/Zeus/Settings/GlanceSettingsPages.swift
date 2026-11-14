@@ -1176,6 +1176,7 @@ private struct DiagnosticsPage: View {
                 GSStatus(ok: up, text: up ? "Connected" : "Offline")
             }
         }
+        LiveDiagnosticsCard(context: context)
         DiagnosticsLogsCard()
         GSCard("Restart the local connection") {
             GSRow(symbol: "arrow.clockwise", title: "Restart the connection", text: "Agents and running tasks keep going in their own apps.") {

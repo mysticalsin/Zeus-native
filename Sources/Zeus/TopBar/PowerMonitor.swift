@@ -57,7 +57,7 @@ final class PowerMonitor {
 
     func refresh() {
         var next = Self.battery()
-        next.thermal = Self.thermal(ProcessInfo.processInfo.thermalState)
+        next.thermal = KeepAwakeRules.Thermal(ProcessInfo.processInfo.thermalState)
         guard next != power else { return }
         power = next
         onChange()
@@ -78,15 +78,5 @@ final class PowerMonitor {
                          onBattery: (info[kIOPSPowerSourceStateKey] as? String) == kIOPSBatteryPowerValue)
         }
         return .init()
-    }
-
-    private static func thermal(_ state: ProcessInfo.ThermalState) -> KeepAwakeRules.Thermal {
-        switch state {
-        case .nominal: .nominal
-        case .fair: .fair
-        case .serious: .serious
-        case .critical: .critical
-        @unknown default: .nominal
-        }
     }
 }
