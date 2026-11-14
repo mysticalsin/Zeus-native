@@ -160,8 +160,16 @@ extension TilingSectionTests {
             #expect(TilingPhase(enabled: true, accessibilityOn: true, keysUnavailable: false, paused: false) == .running)
         }
 
+        @Test func aKeyClashComesAfterTheSwitchAndBeforeEverythingElse() {
+            #expect(TilingPhase(enabled: false, accessibilityOn: true, keysUnavailable: false, paused: false, keyClash: true) == .off)
+            #expect(TilingPhase(enabled: true, accessibilityOn: false, keysUnavailable: true, paused: true, keyClash: true) == .keyClash)
+            #expect(TilingPhase(enabled: true, accessibilityOn: true, keysUnavailable: false, paused: false, keyClash: true) == .keyClash)
+            #expect(TilingPhase(enabled: true, accessibilityOn: true, keysUnavailable: false, paused: false) == .running,
+                    "no clash by default")
+        }
+
         @Test func everyStateHasItsOwnWordAndItsOwnSymbolSoColourIsNeverTheOnlyCue() {
-            let phases: [TilingPhase] = [.off, .needsAccessibility, .keysUnavailable, .paused, .running]
+            let phases: [TilingPhase] = [.off, .needsAccessibility, .keyClash, .keysUnavailable, .paused, .running]
             #expect(Set(phases.map(\.word)).count == phases.count)
             #expect(Set(phases.map(\.symbol)).count == phases.count)
             #expect(phases.allSatisfy { !$0.detail.isEmpty })
@@ -170,7 +178,7 @@ extension TilingSectionTests {
         }
 
         @Test func theCopyIsPlainAndHasNoDashes() {
-            let phases: [TilingPhase] = [.off, .needsAccessibility, .keysUnavailable, .paused, .running]
+            let phases: [TilingPhase] = [.off, .needsAccessibility, .keyClash, .keysUnavailable, .paused, .running]
             for phase in phases {
                 for text in [phase.word, phase.detail] {
                     #expect(!text.contains("\u{2014}") && !text.contains("\u{2013}"), "\(text)")
@@ -525,19 +533,6 @@ extension TilingSectionTests {
         @Test func theEmptyAnswerNamesNoWindowAndIsNotFullScreen() {
             #expect(TileFrontmost.none.focused == nil)
             #expect(!TileFrontmost.none.isFullScreen)
-        }
-
-        @MainActor private final class Bare: TilingWindowDriver {
-            var isTrusted: Bool { false }
-            func displays() -> [TileDisplay] { [] }
-            func windows(config: TileConfig) -> [TileWindowRef] { [] }
-            var lastPassComplete: Bool { true }
-            func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool { false }
-            func focus(_ window: TileWindowID) {}
-        }
-
-        @MainActor @Test func aDriverThatDoesNotSayWhatIsInFrontReportsNothing() {
-            #expect(Bare().frontmost() == TileFrontmost.none)
         }
     }
 }

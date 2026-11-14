@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Observation
 import Testing
 import ZeusCore
 @testable import Zeus
@@ -127,6 +128,8 @@ private final class Rig {
     let keys = FakeTilingKeys()
     var config = TileConfig(enabled: true)
     var focusBorder = true
+    /// The note the key clash check gives for a base; nil means the base is free.
+    var clashNote: (TileModifierBase) -> String? = { _ in nil }
     var scheduled: [Pending] = []
     let appCenter = NotificationCenter()
     let workspaceCenter = NotificationCenter()
@@ -145,6 +148,7 @@ private final class Rig {
             driver: driver, keys: keys,
             readConfig: { [unowned self] in config },
             focusBorderOn: { [unowned self] in focusBorder },
+            keyClash: { [unowned self] base, _ in clashNote(base) },
             whenTrusted: { [unowned self] work in trustWaiters.append(work) },
             cancelTrustWait: { [unowned self] in trustCancels += 1 },
             schedule: { [unowned self] delay, work in
@@ -418,6 +422,163 @@ struct TilingControllerTests {
         rig.post(workspace: NSWorkspace.activeSpaceDidChangeNotification)
         rig.settle()
         #expect(rig.controller.layoutWindows(on: 1).contains(id(3, pid: 901)))
+    }
+
+    // MARK: Key clash
+
+    private static let talkNote = "Control-Option is also your Talk to Zeus key."
+
+    @Test func aPairAnotherZeusKeyHoldsIsRefusedAndNothingExists() {
+        let rig = Rig()
+        rig.clashNote = { $0 == .controlOption ? Self.talkNote : nil }
+        rig.driver.add(id(1))
+        rig.controller.start()
+        #expect(!rig.controller.isRunning)
+        #expect(rig.controller.phase == .keyClash)
+        #expect(rig.controller.keyClashNote == Self.talkNote)
+        #expect(rig.controller.observerCount == 0 && rig.pending.isEmpty && rig.trustWaiters.isEmpty)
+        #expect(rig.keys.last?.enabled != true, "the tap is never installed over another Zeus key")
+        #expect(rig.driver.windowReads == 0 && rig.driver.writes.isEmpty)
+        rig.controller.handle(.retile)
+        #expect(rig.driver.windowReads == 0, "a chord does nothing while refused")
+    }
+
+    @Test func choosingAnotherPairStartsTilingAndClearsTheNote() {
+        let rig = Rig()
+        rig.clashNote = { $0 == .controlOption ? Self.talkNote : nil }
+        rig.driver.add(id(1))
+        rig.controller.start()
+        rig.config.base = .optionCommand
+        rig.controller.start()
+        #expect(rig.controller.isRunning && rig.controller.phase == .running)
+        #expect(rig.controller.keyClashNote == nil)
+        #expect(rig.keys.last?.enabled == true)
+        #expect(rig.keys.last?.keymap == TileKeymap.defaults(base: .optionCommand))
+    }
+
+    @Test func aClashThatAppearsWhileRunningRemovesTheTapAndTheObservers() {
+        let rig = Rig()
+        twoWindows(rig)
+        #expect(rig.controller.isRunning && rig.keys.last?.enabled == true)
+        rig.clashNote = { _ in Self.talkNote }
+        rig.controller.start()
+        #expect(!rig.controller.isRunning && rig.controller.phase == .keyClash)
+        #expect(rig.controller.observerCount == 0 && rig.pending.isEmpty)
+        #expect(rig.keys.last?.enabled == false)
+        #expect(rig.driver.frame(of: id(1)) == leftTile, "windows stay where they are")
+        rig.clashNote = { _ in nil }
+        rig.controller.start()
+        #expect(rig.controller.isRunning && rig.controller.phase == .running && rig.controller.keyClashNote == nil)
+    }
+
+    @Test func turningTheSwitchOffClearsTheNote() {
+        let rig = Rig()
+        rig.clashNote = { _ in Self.talkNote }
+        rig.controller.start()
+        #expect(rig.controller.phase == .keyClash)
+        rig.config = TileConfig(enabled: false)
+        rig.controller.start()
+        #expect(rig.controller.phase == .off && rig.controller.keyClashNote == nil)
+    }
+
+    // MARK: Actions that move nothing
+
+    @Test func resumingFromPauseWorksOverAFullScreenApp() {
+        let rig = Rig()
+        twoWindows(rig)
+        rig.controller.handle(.togglePause)
+        #expect(rig.controller.phase == .paused)
+        rig.driver.front = TileFrontmost(focused: nil, isFullScreen: true)
+        rig.controller.handle(.togglePause)
+        #expect(rig.controller.phase == .running, "the resume chord is not swallowed by the full-screen guard")
+        #expect(rig.keys.last?.paused == false)
+    }
+
+    @Test func theKeySheetShowsOverAFullScreenApp() {
+        let rig = Rig()
+        twoWindows(rig)
+        rig.driver.front = TileFrontmost(focused: nil, isFullScreen: true)
+        rig.controller.handle(.showKeys)
+        #expect(rig.sheets.last! != nil)
+        let writes = rig.driver.writes.count
+        rig.controller.handle(.retile)
+        #expect(rig.driver.writes.count == writes, "a window action still waits for the full-screen app to end")
+    }
+
+    // MARK: A front app that is not tiled
+
+    @Test func actionsOnTheFocusedWindowDoNothingWhenTheFrontAppIsNotTiled() {
+        let rig = Rig()
+        twoWindows(rig)
+        let before = rig.controller.layoutWindows(on: 1)
+        let writes = rig.driver.writes.count
+        rig.driver.front = .none
+        for action in [TileAction.swap(.right), .flipSplit, .toggleFloat, .nudge(.right)] { rig.controller.handle(action) }
+        rig.settle()
+        #expect(rig.controller.layoutWindows(on: 1) == before)
+        #expect(rig.controller.floatingWindows.isEmpty)
+        #expect(rig.driver.writes.count == writes, "the hidden window was not touched")
+        rig.controller.handle(.focus(.right))
+        #expect(rig.driver.focusCalls == [id(2)], "a focus key still brings a tiled window forward")
+    }
+
+    // MARK: Settings that change while running
+
+    @Test func turningTheRingOffWhileRunningOrdersItOutAndTurningItOnBringsItBack() {
+        let rig = Rig()
+        twoWindows(rig)
+        #expect(rig.lastRing?.frame == leftTile)
+        rig.focusBorder = false
+        rig.controller.start()
+        #expect(rig.lastRing == nil)
+        rig.focusBorder = true
+        rig.controller.start()
+        #expect(rig.lastRing?.frame == leftTile)
+    }
+
+    @Test func accessibilityRevokedThenASettingChangeWaitsAndComesBackWhenItIsGranted() {
+        let rig = Rig()
+        twoWindows(rig)
+        rig.driver.trusted = false
+        rig.config = TileConfig(enabled: true, innerGap: 12)
+        rig.controller.start()
+        #expect(rig.controller.phase == .needsAccessibility)
+        #expect(rig.controller.observerCount == 0, "nothing observes while Accessibility is off")
+        #expect(!rig.trustWaiters.isEmpty)
+        rig.driver.trusted = true
+        rig.trustWaiters.last?()
+        rig.settle()
+        #expect(rig.controller.phase == .running)
+        #expect(rig.controller.observerCount == 7)
+    }
+
+    @Test func aWindowThatIsGoneLeavesTheUndoMemory() {
+        let rig = Rig()
+        twoWindows(rig)
+        #expect(rig.controller.preTilingFrame(of: id(2)) != nil)
+        rig.driver.remove(id(2))
+        rig.controller.handle(.retile)
+        rig.settle()
+        #expect(rig.controller.preTilingFrame(of: id(2)) == nil)
+        #expect(rig.controller.preTilingFrame(of: id(1)) != nil)
+    }
+
+    private final class Flag: @unchecked Sendable { var raised = false }
+
+    @Test func aSettingsWriteThatChangesNothingDoesNotNotifyThePage() {
+        let rig = Rig()
+        twoWindows(rig)
+        let flag = Flag()
+        withObservationTracking {
+            _ = rig.controller.config
+            _ = rig.controller.phase
+            _ = rig.controller.accessibilityOn
+            _ = rig.controller.keyRows
+            _ = rig.controller.keyClashNote
+        } onChange: { flag.raised = true }
+        rig.controller.start()
+        rig.controller.refresh()
+        #expect(!flag.raised)
     }
 
     // MARK: Generation counter

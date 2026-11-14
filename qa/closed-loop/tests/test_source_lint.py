@@ -692,6 +692,23 @@ class TilingWiringLint(unittest.TestCase):
         terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
         self.assertIn("TilingController.shared.stop()", terminate)
 
+    def test_quitting_stops_tiling_only_when_the_startup_service_is_allowed(self):
+        terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertRegex(terminate, r"if on\(\.tiling\) \{\s*TilingController\.shared\.stop\(\)\s*\}")
+
+    def test_the_driver_never_reads_zeus_itself_and_every_driver_must_say_what_is_in_front(self):
+        ax = (TILING / "AXTilingWindowDriver.swift").read_text()
+        front = self.body(ax, "func frontmost()", "\n    }\n")
+        self.assertIn("ProcessInfo.processInfo.processIdentifier", front)
+        protocol = (ROOT / "Sources/ZeusCore/Tiling/TileWindowDriver.swift").read_text()
+        self.assertNotIn("extension TilingWindowDriver", protocol)
+
+    def test_the_page_marks_the_key_pair_by_shape_and_rechecks_accessibility_when_zeus_is_activated(self):
+        page = (APP / "TopBar/TilingPage.swift").read_text()
+        keys = self.body(page, "private var keysRow", "\n    }\n")
+        self.assertIn("checkmark", keys)
+        self.assertIn("NSApplication.didBecomeActiveNotification", page)
+
     def test_both_overlays_are_in_the_sharing_refresh_and_the_debug_capture_boost(self):
         sharing = (APP / "App/ZeusWindowSharing.swift").read_text()
         for name in ("TilingFocusBorder", "TilingKeySheet"):
