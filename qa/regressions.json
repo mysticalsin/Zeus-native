@@ -4426,6 +4426,42 @@
         "file": "Tests/ZeusCoreTests/EqualiserModelTests.swift",
         "function": "aFullBookWithNoNeutralEntryRefusesAndStaysUnchanged"
       }
+    },
+    {
+      "id": "REG-435",
+      "failure": "A shared web engine helper was joined to Safari, so shaping Safari would have muted the sound of every web view.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserPolicyTests.swift",
+        "function": "aWebKitHelperIsNeverMappedToSafari"
+      }
+    },
+    {
+      "id": "REG-436",
+      "failure": "An app stayed silent when its muted tap received only zeros, because the tap was not destroyed before the listen-only probe.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserLifecycleTests.swift",
+        "function": "zerosUnderAMutedTapDestroyTheTapBeforeAnythingElseThenProbe"
+      }
+    },
+    {
+      "id": "REG-437",
+      "failure": "A call, a capture by Zeus, a lost claim or an unsupported output left a muted tap alive instead of destroying every tap first.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserLifecycleTests.swift",
+        "function": "everyPauseFromARunningStateDestroysEverythingFirst"
+      }
     }
   ]
 }
