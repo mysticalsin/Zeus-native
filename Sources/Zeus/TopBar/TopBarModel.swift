@@ -128,6 +128,9 @@ final class TopBarModel {
     var nowPlaying: NowPlaying? {
         didSet { if oldValue?.isPlaying != nowPlaying?.isPlaying { AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true) } }
     }
+    /// What the player says about shuffle and repeat. Kept apart from `nowPlaying` so a playback
+    /// notification never wipes it; unknown when the player has not answered.
+    var musicModes = MusicModes()
     var events: [CalendarItem] = []
     var reminders: [ReminderItem] = []
     var calendarAccess: Access = .unknown
@@ -230,7 +233,7 @@ final class TopBarModel {
     /// The notch's dictation button: click to start, click again to stop and type it where you were.
     var toggleDictation: () -> Void = {}
 
-    enum MusicCommand { case playPause, next, previous, open }
+    enum MusicCommand { case playPause, next, previous, open, toggleShuffle, cycleRepeat }
 
     /// Jumps the current track to this many seconds (the progress line's drag).
     var seek: (Double) -> Void = { _ in }
