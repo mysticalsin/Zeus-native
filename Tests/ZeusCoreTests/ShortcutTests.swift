@@ -209,6 +209,20 @@ import Testing
         #expect(!rig.latch.isLatched)
     }
 
+    /// The press that ends a hands-free turn is `ending` until its key-up. The monitor reads it to tell a press that
+    /// ended a turn (nothing left to cancel) from one that began or continued a turn.
+    @Test func theTapThatEndsALatchedTurnIsEndingUntilItsKeyUp() {
+        var latch = TalkKeyLatch()
+        #expect(!latch.isEnding)
+        _ = latch.keyDown(at: 0); _ = latch.keyUp(at: 0.1)
+        _ = latch.keyDown(at: 0.25); _ = latch.keyUp(at: 0.35)
+        #expect(latch.isLatched && !latch.isEnding)
+        #expect(latch.keyDown(at: 4) == .stop)
+        #expect(latch.isEnding && !latch.isLatched)
+        #expect(latch.keyUp(at: 4.1) == nil, "the key-up of the ending press sends nothing more")
+        #expect(!latch.isEnding)
+    }
+
     @Test func aSingleTapStopsAfterTheGap() {
         var rig = Rig(shortcut: .optionCommand)
         rig.chord(down: 0); rig.release(at: 0.1)

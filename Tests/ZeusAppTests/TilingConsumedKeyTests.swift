@@ -221,6 +221,62 @@ struct TilingConsumedKeyTests {
         #expect(turns.starts == 1 && turns.releases == 1 && turns.cancels == 0)
     }
 
+    // MARK: A hands-free turn that the press itself already ended
+
+    /// Right Command pressed twice quickly: a hands-free turn is running (latched).
+    private func latchHandsFree(_ monitor: HotkeyMonitor) {
+        for _ in 0..<2 {
+            monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+            monitor.feed(.flags(keyCode: 54, modifiers: []))
+        }
+    }
+
+    /// The default dictation key is Right Command. The owner latches dictation hands-free, then presses the key to end
+    /// it and goes on to Control (the Command-first press of the default Control-Option-Command pair). The key-down
+    /// already finished the turn, so a modifier joining afterwards has no turn left to cancel: cancelling would drop
+    /// text that is on its way to being inserted.
+    @Test func aModifierJoiningThePressThatEndedAHandsFreeTurnDoesNotCancelIt() {
+        for role in [HotkeyMonitor.Role.dictation, .talk] {
+            let (monitor, turns) = turnMonitor(key: .rightCommand, role: role)
+            latchHandsFree(monitor)
+            #expect(turns.starts == 1 && turns.releases == 0, "latched: \(turns.starts) \(turns.releases)")
+            monitor.feed(.flags(keyCode: 54, modifiers: [.command])) // the tap that ends it: the turn is finished here
+            #expect(turns.releases == 1, "\(role): the key-down finishes the turn")
+            monitor.feed(.flags(keyCode: 59, modifiers: [.command, .control])) // Control joins
+            monitor.feed(.flags(keyCode: 58, modifiers: all))
+            #expect(turns.cancels == 0, "\(role): a finished turn is not cancelled")
+            #expect(turns.releases == 1, "\(role): and it is finished once")
+            monitor.feed(.flags(keyCode: 54, modifiers: [.control, .option]))
+            monitor.feed(.flags(keyCode: 58, modifiers: [.control]))
+            monitor.feed(.flags(keyCode: 59, modifiers: []))
+            #expect(turns.starts == 1 && turns.releases == 1 && turns.cancels == 0, "\(role): \(turns.starts) \(turns.releases) \(turns.cancels)")
+        }
+    }
+
+    /// The press that ended the turn belonged to a larger chord, so the smaller hold left over when the extra modifier is
+    /// let go first must not open a new turn.
+    @Test func theKeyThatEndedAHandsFreeTurnDoesNotStartANewOneWhenTheExtraModifierIsLetGo() {
+        let (monitor, turns) = turnMonitor(key: .rightCommand, role: .dictation)
+        latchHandsFree(monitor)
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 59, modifiers: [.command, .control]))
+        monitor.feed(.flags(keyCode: 59, modifiers: [.command]))
+        #expect(turns.starts == 1 && turns.cancels == 0, "no second turn: \(turns.starts) \(turns.cancels)")
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(turns.starts == 2, "a fresh press works once every modifier was up")
+    }
+
+    /// The second press of a double-tap continues a turn that is still open, so a modifier joining it still cancels.
+    @Test func aModifierJoiningTheSecondTapOfADoubleTapStillCancelsTheOpenTurn() {
+        let (monitor, turns) = turnMonitor(key: .rightCommand, role: .dictation)
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 59, modifiers: [.command, .control]))
+        #expect(turns.starts == 1 && turns.cancels == 1 && turns.releases == 0, "\(turns.starts) \(turns.releases) \(turns.cancels)")
+    }
+
     @Test func aSharedHoldInTheSameOrderStartsNothingWhenTheRestOfThePairArrivesInTime() async throws {
         let (monitor, seen) = sharedDictationMonitor()
         monitor.feed(.flags(keyCode: 59, modifiers: [.control]))

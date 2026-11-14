@@ -11,6 +11,8 @@ private final class FakeTap: TilingKeyTapping {
     let sink: TilingKeyTap.Sink
     let onFailure: TilingKeyTap.Failure
     var startSucceeds: Bool
+    /// False for a tap whose thread has not ended when the stop gives up waiting.
+    var stopEnds = true
     private(set) var started = 0
     private(set) var stopped = 0
     private(set) var updates: [(enabled: Bool, paused: Bool, keymap: TileKeymap)] = []
@@ -26,7 +28,10 @@ private final class FakeTap: TilingKeyTapping {
         started += 1
         return startSucceeds
     }
-    func stop() { stopped += 1 }
+    func stop() -> Bool {
+        stopped += 1
+        return stopEnds
+    }
 }
 
 /// The permission and the tap factory, with the wait that `AccessibilityGate` keeps by key.
@@ -200,6 +205,49 @@ struct TilingKeyLayerTests {
         #expect(waiting.waits.isEmpty)
         waiting.grant()
         #expect(waiting.taps.isEmpty && !waiting.layer.isInstalled)
+    }
+
+    /// A stop whose thread has not ended leaves the old tap and its port alive. The layer keeps hold of that tap and builds
+    /// no second one beside it until a later stop has seen it end.
+    @Test func aTapWhoseStopDidNotFinishBlocksANewOneUntilALaterStopSeesItEnd() {
+        let rig = Rig(trusted: true)
+        rig.apply()
+        let old = rig.taps[0]
+        old.stopEnds = false
+        rig.apply(enabled: false)
+        #expect(!rig.layer.isInstalled && old.stopped == 1)
+        rig.apply()
+        #expect(rig.taps.count == 1, "no second tap beside one that may still exist")
+        #expect(old.stopped == 2, "installing asks the old tap to finish its stop first")
+        #expect(!rig.layer.isInstalled && rig.unavailable == 1, "the owner is told once")
+        rig.apply(paused: true)
+        #expect(rig.taps.count == 1 && rig.unavailable == 1, "no retry loop and no second report")
+        old.stopEnds = true
+        rig.apply(enabled: false)
+        #expect(old.stopped == 3, "turning tiling off asks once more")
+        rig.apply()
+        #expect(rig.layer.isInstalled && rig.taps.count == 2, "once the old tap is gone a new one is made")
+        #expect(old.stopped == 3, "a tap that has ended is not stopped again")
+    }
+
+    @Test func aTapThatEndedOnItsFirstStopIsNeverStoppedAgain() {
+        let rig = Rig(trusted: true)
+        rig.apply()
+        rig.apply(enabled: false)
+        rig.apply(enabled: false)
+        rig.layer.stop()
+        #expect(rig.taps[0].stopped == 1)
+    }
+
+    @Test func aStopThatDidNotFinishWhenAccessibilityIsRevokedStillBlocksTheNextTap() {
+        let rig = Rig(trusted: true)
+        rig.apply()
+        rig.taps[0].stopEnds = false
+        rig.trusted = false
+        rig.apply()
+        rig.grant()
+        #expect(rig.taps.count == 1 && !rig.layer.isInstalled, "the old tap may still exist")
+        #expect(rig.unavailable == 1)
     }
 
     @Test func aChordTheTapMatchedReachesTheOwnerOnTheMainActor() {

@@ -193,25 +193,14 @@ struct TilingKeyTapLifecycleTests {
     /// Blocks the calling thread, which is the main one here. A synchronous helper, because the wait is not available in an async test.
     private func blockMain(until signal: DispatchSemaphore) -> Bool { signal.wait(timeout: .now() + 5) == .success }
 
-    @Test func startingAndStoppingManyTimesLeavesNothingRunning() {
+    /// The one test that uses the real system tap. It must pass whether or not this process may create one: without
+    /// Accessibility `start()` says false and nothing runs, with it the tap has a closed gate and passes every event.
+    @Test func aLiveSmokeTapStartsAndStopsWhetherOrNotTheRunnerIsTrusted() {
         let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {})
-        for cycle in 0..<40 {
-            let started = tap.start()
-            #expect(tap.isRunning == started, "cycle \(cycle)")
-            #expect(tap.start() == started, "a second start changes nothing")
-            tap.stop()
-            #expect(!tap.isRunning, "cycle \(cycle)")
-        }
-        tap.stop()
+        let started = tap.start()
+        #expect(tap.isRunning == started)
+        #expect(tap.stop())
         #expect(!tap.isRunning)
-    }
-
-    @Test func aTapThatIsDroppedWhileRunningEndsItsThreadAndIsFreed() {
-        var tap: TilingKeyTap? = TilingKeyTap(sink: { _, _ in }, onFailure: {})
-        weak var observed = tap
-        _ = tap?.start()
-        tap = nil
-        #expect(observed == nil, "nothing keeps a dropped tap alive")
     }
 
     @Test func aBurstOfFocusRepeatsWhileMainIsBusyRunsOneAction() async throws {
@@ -346,6 +335,32 @@ struct TilingKeyTapStandInTests {
         #expect(standin.enableLog.last?.on == false && standin.enableLog.last?.main == false)
     }
 
+    @Test func startingAndStoppingManyTimesLeavesNothingRunning() {
+        let standin = Standin()
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        for cycle in 0..<40 {
+            let started = tap.start()
+            #expect(started)
+            #expect(tap.isRunning == started, "cycle \(cycle)")
+            #expect(tap.start() == started, "a second start changes nothing")
+            #expect(tap.stop())
+            #expect(!tap.isRunning, "cycle \(cycle)")
+        }
+        #expect(tap.stop())
+        #expect(!tap.isRunning)
+        #expect(standin.created == 40 && !standin.valid.contains(true))
+    }
+
+    @Test func aTapThatIsDroppedWhileRunningEndsItsThreadAndIsFreed() {
+        let standin = Standin()
+        var tap: TilingKeyTap? = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system())
+        weak var observed = tap
+        #expect(tap?.start() == true)
+        tap = nil
+        #expect(observed == nil, "nothing keeps a dropped tap alive")
+        #expect(standin.valid == [false], "and its port went with it")
+    }
+
     @Test func aStopThatWinsTheRaceStillInvalidatesThePort() {
         for round in 0..<300 {
             let standin = Standin()
@@ -375,12 +390,12 @@ struct TilingKeyTapStandInTests {
         let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {}, system: standin.system(), stopTimeout: 0.1)
         #expect(tap.start())
         #expect(waitLive(standin))
-        tap.stop() // gives up waiting after 0.1 s
+        #expect(!tap.stop(), "gives up waiting after 0.1 s and says the thread has not ended")
         #expect(standin.created == 1)
         #expect(!tap.start(), "the old thread and tap may still exist, so no second tap is made")
         #expect(standin.created == 1, "still one tap")
         hold.signal() // the old thread finishes
-        tap.stop() // a later stop waits for it again
+        #expect(tap.stop(), "a later stop waits for it again and sees it end")
         #expect(standin.valid == [false])
         #expect(tap.start(), "once the old one is gone a new tap can start")
         #expect(standin.created == 2)
