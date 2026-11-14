@@ -39,7 +39,7 @@ struct LicenseSettings: View {
                 if license.status.payload != nil || license.deactivationError != nil {
                     GlassDivider()
                     // A partial cleanup still exposes its reason and retry after the key is gone.
-                    GlassRow(title: "Deactivate or move to another Mac", note: license.deactivationError ?? "Frees this Mac's seat and removes the key from its Keychain. Activate the same key on the new Mac.") {
+                    GlassRow(title: "Deactivate or move to another Mac", note: license.deactivationError ?? (license.serverNeedsReentry ? LicenseManager.reentryMessage : "Frees this Mac's seat and removes the key from its Keychain. Activate the same key on the new Mac.")) {
                         Button(drafts.confirmDeactivate ? "Press again" : license.deactivationError == nil ? "Deactivate" : "Try again") {
                             if drafts.confirmDeactivate {
                                 drafts.confirmDeactivate = false

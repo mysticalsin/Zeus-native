@@ -94,6 +94,10 @@ final class LicenseManager {
         return serverURL == nil
     }
 
+    /// Shown when a saved server address is unbound. The seat on the server cannot be freed or claimed until the
+    /// owner saves the address again, so the key stays on this Mac instead of leaving the seat held.
+    static let reentryMessage = "Save the license server address again in the License server section first. Zeus keeps its license key on this Mac until you do, so no seat is left held on the server."
+
     func setServer(_ text: String) {
         credentialRevision &+= 1
         let trimmed = text.trimmingCharacters(in: .whitespaces)
@@ -131,6 +135,7 @@ final class LicenseManager {
         guard !defaults.bool(forKey: "license.cleanupPending") else {
             return deactivationError ?? "Finish removing the previous local license credentials first."
         }
+        guard !serverNeedsReentry else { lastError = Self.reentryMessage; return lastError }
         let key = raw.filter { !$0.isWhitespace }
         credentialRevision &+= 1
         let revision = credentialRevision
@@ -190,6 +195,8 @@ final class LicenseManager {
     @discardableResult
     func deactivate() async -> String? {
         guard !busy else { return "A license change is already in progress." }
+        // A retry after the server released the seat only finishes local cleanup, so it needs no server address.
+        if !defaults.bool(forKey: "license.cleanupPending"), serverNeedsReentry { lastError = Self.reentryMessage; return lastError }
         credentialRevision &+= 1
         let revision = credentialRevision
         busy = true

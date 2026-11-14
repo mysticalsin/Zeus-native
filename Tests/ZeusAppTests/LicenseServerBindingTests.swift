@@ -104,10 +104,28 @@ struct LicenseServerBindingTests {
     @Test func theLicenseKeyIsNotSentToAnUnboundServer() async throws {
         let f = try fixture(defaultsServer: "https://collect.example.net", boundOrigin: nil)
         defer { f.cleanup() }
-        _ = await f.manager.activate(f.key)
+        let activation = await f.manager.activate(f.key)
+        #expect(activation != nil, "the owner is told to save the address again")
         #expect(await f.recorder.activations == 0)
-        _ = await f.manager.deactivate()
+    }
+
+    @Test func deactivatingWithAnUnboundServerKeepsTheKeyAndSaysWhy() async throws {
+        let f = try fixture(defaultsServer: "https://collect.example.net", boundOrigin: nil)
+        defer { f.cleanup() }
+        let message = await f.manager.deactivate()
+        #expect(message?.contains("Save the license server address again") == true)
         #expect(await f.recorder.deactivations == 0)
+        #expect(f.backend.items["com.zeus.app|license.key"] == f.key, "the seat is still held, so the key stays")
+        #expect(f.manager.serverNeedsReentry)
+    }
+
+    @Test func deactivatingWorksAfterTheServerIsSavedAgain() async throws {
+        let f = try fixture(defaultsServer: "https://licenses.example.com", boundOrigin: nil)
+        defer { f.cleanup() }
+        f.manager.setServer("https://licenses.example.com")
+        #expect(await f.manager.deactivate() == nil)
+        #expect(await f.recorder.deactivations == 1)
+        #expect(f.backend.items["com.zeus.app|license.key"] == nil)
     }
 
     @Test func theLicenseKeyIsSentToTheBoundServer() async throws {
