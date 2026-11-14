@@ -131,18 +131,21 @@ public enum PeerSigning {
     }
 
     /// `requirement`, when given, is checked against the running code itself. Failing to build it counts as not met.
+    ///
+    /// One validity call decides the common case: code that passes with the requirement is valid by that same call. Only
+    /// code that fails it is asked again without one, to tell a broken signature from an identity that is simply not ours.
+    /// Default flags: passing `kSecCSDoNotValidateResources` made a validly signed running process read as invalid.
     private static func describe(code: SecCode, requirement: String?) -> Described? {
         var staticCode: SecStaticCode?
         guard SecCodeCopyStaticCode(code, SecCSFlags(), &staticCode) == errSecSuccess, let staticCode else { return nil }
         var satisfied = false
-        if let requirement {
-            var compiled: SecRequirement?
-            if SecRequirementCreateWithString(requirement as CFString, SecCSFlags(), &compiled) == errSecSuccess, let compiled {
-                satisfied = SecCodeCheckValidity(code, SecCSFlags(), compiled) == errSecSuccess
-            }
+        var compiled: SecRequirement?
+        if let requirement, SecRequirementCreateWithString(requirement as CFString, SecCSFlags(), &compiled) == errSecSuccess,
+           let compiled {
+            satisfied = SecCodeCheckValidity(code, SecCSFlags(), compiled) == errSecSuccess
         }
-        let valid = SecCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess
-        return describe(staticCode: staticCode, valid: valid, satisfiesRequirement: satisfied && valid)
+        let valid = satisfied || SecCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess
+        return describe(staticCode: staticCode, valid: valid, satisfiesRequirement: satisfied)
     }
 
     private static func describe(staticCode: SecStaticCode, valid: Bool, satisfiesRequirement: Bool = false) -> Described? {
