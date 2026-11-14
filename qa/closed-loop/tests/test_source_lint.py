@@ -909,7 +909,7 @@ class EqualiserLint(unittest.TestCase):
 
     def test_shaping_render_has_no_allocation_or_main_hops(self):
         render = between(EQ_SHAPING_TAP.read_text(), EQ_RENDER_START, EQ_RENDER_END)
-        self.assertIn("nonisolated static func makeRenderBlock(kernel:scratch:map:tapIndex:meter:)", render)
+        self.assertRegex(render, r"nonisolated static func makeRenderBlock\(\s*kernel:")
         self.assertIn("kernel.process(", render)
         kernel = between(between(EQ_KERNEL.read_text(), KERNEL_CLASS_HEADER), KERNEL_PROCESS_HEADER)
         self.assertIn("private func processChunk(", kernel)
@@ -918,10 +918,11 @@ class EqualiserLint(unittest.TestCase):
 
     def test_the_io_proc_block_is_built_by_the_nonisolated_render_function(self):
         text = EQ_SHAPING_TAP.read_text()
-        calls = [m.start() for m in re.finditer(r"AudioDeviceCreateIOProcIDWithBlock\(", text)]
-        self.assertTrue(calls, "the shaping tap creates its IOProc")
-        for start in calls:
-            self.assertIn("Self.makeRenderBlock(", text[start:start + 300])
+        self.assertEqual(len(re.findall(r"AudioDeviceCreateIOProcIDWithBlock\(", text)), 1)
+        self.assertIn("AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue, block)", text)
+        self.assertIn("block = Self.makeRenderBlock(", text)
+        self.assertIn("block = Self.makeProbeBlock(", text)
+        self.assertRegex(text, r"nonisolated static func makeProbeBlock\(")
 
     def test_core_audio_listeners_are_installed_from_nonisolated_functions(self):
         text = EQ_MONITOR.read_text()
