@@ -527,7 +527,7 @@ in its own code; no third-party logo or image is bundled.
 - Right column, top to bottom:
   - A status pill (translucent, a small coloured dot and a short phrase): "Starting soon" for the offer and the
     next meeting, "Recording in N" while counting down, "Waiting to record", "Starting", "Recording",
-    "Not recorded" for a failure. Violet dot before the start, green while recording, orange for a failure.
+    "Not recorded" for a failure. Violet dot before the start, red while recording, orange for a failure.
   - The title, 24 pt bold, one line, tail truncation.
   - A clock symbol, the time range, a thin divider, then the relative time in the accent violet ("In 5 min",
     "Now"). A call with no calendar meeting has no range and shows only the relative time.
@@ -580,6 +580,11 @@ way the panel leaves). Core adds the metrics, the pill words, the time and parti
 choice to `ScribeMeetingCard.swift` and `ScribeJoinApps.swift`. Controls carry `ownedJourneyControl` ids
 `scribe.meetingCard.primary`, `scribe.meetingCard.cancel`, `scribe.meetingCard.dismiss` and
 `scribe.meetingCard.apps`.
+
+The link: `ScribeCalendarSlot` gains `callLink: URL?` (default nil) and the watcher fills it from the event, where it
+already searched for the link. Only the Join action reads it; it is never logged or stored. A meeting without
+`callLink` keeps the old Record action, so the card works before any watcher change lands. `AppBrandCatalog`
+brands for call apps list the hosts of their links, so the provider of a link is found from the catalog.
 
 ### Tests first
 
