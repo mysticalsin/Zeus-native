@@ -19,7 +19,7 @@ CLICK_GUARD = "topBar != nil || !model.sessions.isEmpty || model.approval != nil
 CLICK_RULE = "NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel"
 CALIBRATION_GUARD = "drawnNotch.isCalibrating"
 HELPER = "ignoresMouseWhileClosed()"
-DASHES = ("–", "—")
+DASHES = (chr(0x2013), chr(0x2014))
 
 
 def function_body(text, signature):
