@@ -21,6 +21,8 @@ final class GSContext {
     @ObservationIgnored var topBar: TopBarModel?
     /// "Allow all" on the Permissions page; nil in parity captures, which then show the rows only.
     @ObservationIgnored var sweep: PermissionSweepRunner?
+    /// The drawn notch's model. Nil until the app sets it, and then the Appearance card is not placed.
+    @ObservationIgnored var drawnNotch: (any DrawnNotchControlling)?
 
     init(services: OnboardingServices) {
         self.services = services
@@ -44,7 +46,7 @@ struct GSPageView: View {
             SettingsUpdateBadgeRow()
             switch section {
             case .general: GeneralPage(navigation: navigation, openGuide: context.openGuide)
-            case .appearance: AppearancePage(context: context)
+            case .appearance: AppearancePage(context: context, navigation: navigation)
             case .sounds: SoundsPage()
             case .notifications: GSNotificationsPage()
             case .shortcuts: ShortcutsPage()
@@ -185,6 +187,7 @@ struct GSSetupCard: View {
 
 private struct AppearancePage: View {
     let context: GSContext
+    let navigation: GSNavigation
 
     /// The notch reads the model's own `topBar.musicWings` key, not the `opt.` copy a plain store write would make.
     private var musicWingsBinding: Binding<Bool> {
@@ -258,6 +261,7 @@ private struct AppearancePage: View {
                         text: "On: people you share your screen with, and screenshots, can see Zeus. Off keeps it out of them. Your choice applies during meetings too.",
                         isOn: bool(ZeusScreenSharePolicy.showInSharingKey))
         }
+        if let drawnNotchCard = DrawnNotchCardModel(context: context, navigation: navigation) { DrawnNotchCard(model: drawnNotchCard) }
         GSCard("Running card") {
             HStack(spacing: 12) {
                 runningTheme("Wave", "")

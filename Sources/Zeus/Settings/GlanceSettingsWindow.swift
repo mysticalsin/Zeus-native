@@ -139,6 +139,15 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
     }
 
+    /// Command-W and the red button end calibration without saving, whether or not the page's `onDisappear` fires.
+    func windowWillClose(_ notification: Notification) {
+        context.drawnNotch?.send(.surfaceGone(.settingsClosed))
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        context.drawnNotch?.send(.surfaceGone(.settingsMinimised))
+    }
+
     func step(_ delta: Int) {
         let list = GSSection.shown
         let index = list.firstIndex(of: navigation.section) ?? 0

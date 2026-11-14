@@ -827,6 +827,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         context.openGuide = { [weak self] in self?.showOnboarding() }
         context.showLicenses = { [weak self] in self?.showThirdPartyLicenses() }
         context.topBar = topBar
+        context.drawnNotch = DrawnNotchModel.shared
         context.sweep = permissionSweep
         context.continuityTabShown = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
         context.setContinuityTabShown = { [weak self] on in
