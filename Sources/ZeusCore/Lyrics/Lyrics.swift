@@ -22,6 +22,7 @@ public enum LRC {
         var offset = 0.0
         var lines: [LyricLine] = []
         for raw in text.split(whereSeparator: \.isNewline) {
+            if lines.count >= LyricsLimits.maxLines { break }
             var rest = Substring(raw).trimmingCharacters(in: .whitespaces)[...]
             var stamps: [Double] = []
             while rest.hasPrefix("["), let close = rest.firstIndex(of: "]") {
@@ -33,8 +34,8 @@ public enum LRC {
                     offset = ms / 1000
                 } // other metadata tags (ar, ti, al, by...) are ignored
             }
-            let words = strippingWordTags(rest).trimmingCharacters(in: .whitespaces)
-            for time in stamps { lines.append(LyricLine(time: time, text: words)) }
+            let words = LyricsLimits.clipped(strippingWordTags(rest).trimmingCharacters(in: .whitespaces))
+            for time in stamps where lines.count < LyricsLimits.maxLines { lines.append(LyricLine(time: time, text: words)) }
         }
         // A positive offset makes the lyrics appear sooner.
         let shifted = lines.map { LyricLine(time: max(0, $0.time - offset), text: $0.text) }
@@ -43,13 +44,16 @@ public enum LRC {
 
     /// Drops inline word tags (`<mm:ss.xx>`, as in enhanced `.lrc` files) so they never show as text.
     /// Angle brackets that do not hold a timestamp stay. A tag with spaces on both sides leaves one space.
+    /// A tag closes within `LyricsLimits.maxWordTagCharacters`, so every `<` looks at a fixed window and the
+    /// scan is linear however many brackets the text holds.
     static func strippingWordTags(_ text: Substring) -> String {
         var kept = ""
         var rest = text
         while let open = rest.firstIndex(of: "<") {
             kept += rest[..<open]
             let inside = rest.index(after: open)
-            if let close = rest[inside...].firstIndex(of: ">"), stamp(String(rest[inside..<close])) != nil {
+            let window = rest[inside...].prefix(LyricsLimits.maxWordTagCharacters + 1)
+            if let close = window.firstIndex(of: ">"), stamp(String(window[..<close])) != nil {
                 rest = rest[rest.index(after: close)...]
                 if kept.last?.isWhitespace == true { rest = rest.drop(while: \.isWhitespace) }
             } else {
@@ -129,7 +133,8 @@ public enum LRCLIBResponse {
 }
 
 /// Lyrics kept on disk (~/Library/Caches/Zeus/lyrics), one small JSON file per track. Misses are kept too,
-/// for `missLifetime`, so a track LRCLIB does not know is not asked about again on every play.
+/// for `missLifetime`, so a track LRCLIB does not know is not asked about again on every play. An answer over
+/// `LyricsLimits.maxCachedEntryBytes` is not kept.
 public struct LyricsCache: Sendable {
     public let directory: URL
     public var missLifetime: TimeInterval = 3 * 24 * 3600
@@ -139,26 +144,34 @@ public struct LyricsCache: Sendable {
             .appendingPathComponent("Zeus/lyrics", isDirectory: true)
     }
 
+    /// The version of the lookup rules that wrote a miss. Raise it when the lookup learns to find more, so misses
+    /// the older rules cached are ignored once instead of hiding the new matching until they expire.
+    static let missRulesVersion = 2
+
     struct Entry: Codable {
         var kind: String
         var lines: [LyricLine]?
         var plain: String?
         var fetchedAt: Date
+        /// `missRulesVersion` at the time of writing. Absent in entries from before it existed.
+        var rules: Int?
     }
 
     public func load(_ query: LRCLIBQuery, now: Date = Date()) -> LyricsResult? {
         let url = directory.appendingPathComponent(query.cacheKey + ".json")
         guard let data = try? Data(contentsOf: url), let entry = try? JSONDecoder().decode(Entry.self, from: data) else { return nil }
         switch entry.kind {
-        case "synced": return entry.lines.map { .synced($0) }
+        case "synced": return entry.lines.map { .synced(LyricsLimits.clamped($0)) }
         case "plain": return entry.plain.map { .plain($0) }
         case "instrumental": return .instrumental
-        default: return now.timeIntervalSince(entry.fetchedAt) < missLifetime ? LyricsResult.none : nil
+        default:
+            guard (entry.rules ?? 0) >= Self.missRulesVersion else { return nil }
+            return now.timeIntervalSince(entry.fetchedAt) < missLifetime ? LyricsResult.none : nil
         }
     }
 
     public func save(_ result: LyricsResult, for query: LRCLIBQuery, now: Date = Date()) {
-        var entry = Entry(kind: "none", lines: nil, plain: nil, fetchedAt: now)
+        var entry = Entry(kind: "none", lines: nil, plain: nil, fetchedAt: now, rules: Self.missRulesVersion)
         switch result {
         case .synced(let lines): entry.kind = "synced"; entry.lines = lines
         case .plain(let text): entry.kind = "plain"; entry.plain = text
@@ -166,7 +179,7 @@ public struct LyricsCache: Sendable {
         case .none: break
         }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(entry) {
+        if let data = try? JSONEncoder().encode(entry), data.count <= LyricsLimits.maxCachedEntryBytes {
             try? data.write(to: directory.appendingPathComponent(query.cacheKey + ".json"), options: .atomic)
         }
     }
