@@ -268,6 +268,11 @@ final class SettingsStore {
         default: return false
         }
     }
+    /// Choosing the drawn notch makes the closed window take clicks over its own shape, so only a person at this
+    /// Mac chooses it. A file may carry Pill and the size rows like any other row.
+    static func importWouldSelectDrawnNotch(id: String, value: String) -> Bool {
+        id == DrawnNotchModel.Row.style && NotchlessStyle(label: value) == .drawn
+    }
     /// Decided on each Mac, never carried over: how far Zeus may drive.
     private static var neverImportedAppKeys: Set<String> { [DriveAutonomy.settingsKey] }
 
@@ -312,6 +317,7 @@ final class SettingsStore {
             guard let option = SettingsCatalog.option(id), option.state != .stub, let value = raw as? String,
                   Self.accepts(value, for: option) else { continue }
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
+            if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if values[id] != value { optionChanges.append((id, value)) }
         }
         var appChanges: [(key: String, value: Any)] = []
