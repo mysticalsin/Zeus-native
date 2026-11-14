@@ -135,8 +135,8 @@ public enum ScribeMeetingStartPolicy {
     /// ...until this long after.
     public static let lateWindow: TimeInterval = ScribeCallPrompt.lateWindow
 
-    /// The app of a call app holding the microphone that belongs to this slot. A slot whose link is Teams, Zoom
-    /// or Meet pairs only with that app; any other slot pairs with the first app that holds the microphone.
+    /// The app of a call app holding the microphone that belongs to this slot. A slot whose link is one of the known
+    /// call apps pairs only with that app; any other slot pairs with the first app that holds the microphone.
     public static func pairedApp(for slot: ScribeCalendarSlot, micApps: [ScribeCallApp]) -> ScribeCallApp? {
         if let app = slot.callApp, [.teams, .zoom, .meet].contains(app) {
             return micApps.contains(app) ? app : nil
