@@ -68,7 +68,7 @@ enum SnapshotRenderer {
         let notch = CGSize(width: 185, height: 32)
         TopBarStyle.isSnapshot = true
         for (name, model) in notchStates() {
-            save(NotchStage(model: model, notch: notch), size: CGSize(width: 960, height: 400 + (model.approval?.extraHeight ?? 0)),
+            save(NotchStage(model: model, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400 + (model.approval?.extraHeight ?? 0)),
                  to: directory.appendingPathComponent("notch-\(name).png"))
         }
         // The top bar: closed wings and cues, then every page opened.
@@ -80,7 +80,7 @@ enum SnapshotRenderer {
             if name.contains("waves") { // the Waves tab in each of its three styles
                 SettingsStore.shared.set(AudioSpectrumService.styleKey, name.hasSuffix("-wave") ? "Wave" : name.hasSuffix("-mirror") ? "Mirror" : "Bars")
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)),
                  size: wide ? CGSize(width: 1000, height: 120) : CGSize(width: 960, height: tall ? 520 : 400),
                  to: directory.appendingPathComponent("topbar-\(name).png"))
         }
@@ -110,7 +110,7 @@ enum SnapshotRenderer {
                 hub.newDirectory = "/Users/fixture/Projects/Zeus"
                 hub.newInstruction = "fix the failing tests"
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("agents-\(name).png"))
         }
         hub.creating = false
@@ -120,7 +120,7 @@ enum SnapshotRenderer {
         for (index, state) in AvatarState.allCases.enumerated() {
             AvatarStatus.shared.pinned = state
             let tag = String(format: "%02d-%@", index + 1, state.rawValue)
-            save(NotchStage(model: NotchModel(), topBar: TopBarModel(), notch: notch), size: CGSize(width: 640, height: 120),
+            save(NotchStage(model: NotchModel(), topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 640, height: 120),
                  to: directory.appendingPathComponent("avatar-notch-\(tag).png"))
             let buddy = BuddyModel()
             buddy.hasAppeared = true
@@ -145,7 +145,7 @@ enum SnapshotRenderer {
         AvatarStatus.shared.pinned = .thinking
         let open = NotchModel()
         open.presentation = .panel
-        save(NotchStage(model: open, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 400),
+        save(NotchStage(model: open, topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
              to: directory.appendingPathComponent("avatar-open-thinking.png"))
         AvatarStatus.shared.pinned = nil
         AvatarStatus.shared.alwaysInNotch = true // the shipped default
@@ -341,31 +341,31 @@ enum SnapshotRenderer {
 
         let notchClosed = NotchModel()
         notchClosed.presentation = .closed
-        saveSurface(NotchStage(model: notchClosed, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-closed")
+        saveSurface(NotchStage(model: notchClosed, topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "notch-closed")
 
         // Top bar position: the closed bar lowered 12 pt, light and wings with it.
         let notchLowered = NotchModel()
         notchLowered.presentation = .closed
-        saveSurface(NotchStage(model: notchLowered, topBar: TopBarModel(), notch: notch, topOffset: 12), size: CGSize(width: 960, height: 120), name: "notch-closed-lowered")
+        saveSurface(NotchStage(model: notchLowered, topBar: TopBarModel(), footprint: .hardware(notch), topOffset: 12), size: CGSize(width: 960, height: 120), name: "notch-closed-lowered")
 
         let notchPeek = NotchModel()
         notchPeek.presentation = .peek
-        saveSurface(NotchStage(model: notchPeek, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-peek")
+        saveSurface(NotchStage(model: notchPeek, topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "notch-peek")
 
         let notchPanel = NotchModel()
         let panelTop = TopBarModel()
         notchPanel.presentation = .panel
-        saveSurface(NotchStage(model: notchPanel, topBar: panelTop, notch: notch), size: CGSize(width: 960, height: 400), name: "notch-panel")
+        saveSurface(NotchStage(model: notchPanel, topBar: panelTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400), name: "notch-panel")
 
         let volNotch = NotchModel()
         let volTop = TopBarModel()
         volTop.show(.volume(0.75, muted: false))
-        saveSurface(NotchStage(model: volNotch, topBar: volTop, notch: notch), size: CGSize(width: 960, height: 120), name: "hud-volume")
+        saveSurface(NotchStage(model: volNotch, topBar: volTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "hud-volume")
 
         let brightNotch = NotchModel()
         let brightTop = TopBarModel()
         brightTop.show(.brightness(0.75))
-        saveSurface(NotchStage(model: brightNotch, topBar: brightTop, notch: notch), size: CGSize(width: 960, height: 120), name: "hud-brightness")
+        saveSurface(NotchStage(model: brightNotch, topBar: brightTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "hud-brightness")
 
         // Item 8's own row ("orb: the real voice orb or recorder pill view, not a MascotTile") and
         // P0 item F.3 (QA7): the real `RecorderPillView`, with its real `ThinkingOrbView`, in every
@@ -642,13 +642,13 @@ enum SnapshotRenderer {
         for (index, finish) in CardFinish.allCases.enumerated() {
             store.set("appearance.cardStyle", finish.rawValue)
             let (model, topBar) = sampleModel()
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent(String(format: "parity-card-%d-%@.png", index + 1, finish.rawValue.replacingOccurrences(of: " ", with: "-"))))
         }
         for (index, style) in ["Borderless", "Borderless colour"].enumerated() {
             store.set("appearance.homeStyle", style)
             let (model, topBar) = sampleModel()
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-home-\(index + 1)-\(style.replacingOccurrences(of: " ", with: "-")).png"))
         }
         store.set("appearance.homeStyle", "Device")
@@ -663,14 +663,14 @@ enum SnapshotRenderer {
             let (model, topBar) = sampleModel { $0.selectedTab = .music }
             if let playing = topBar.nowPlaying { LyricsStore.shared.seed(.synced(lines), for: playing) }
             LyricsToggle.snapshotShow = true
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-lyrics-music.png"))
             LyricsToggle.snapshotShow = false
             store.set("home.variant.music", "Lyrics")
             for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name) }
             let (homeModel, homeBar) = sampleModel()
             if let playing = homeBar.nowPlaying { LyricsStore.shared.seed(.synced(lines), for: playing) }
-            save(NotchStage(model: homeModel, topBar: homeBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: homeModel, topBar: homeBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-lyrics-home.png"))
             store.set("home.variant.music", "Art")
         }
@@ -692,7 +692,7 @@ enum SnapshotRenderer {
                 history.add("https://zeus.dev/docs", sourceApp: "Safari", at: now.addingTimeInterval(-90))
                 t.clipboard = history
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-clipboard.png"))
         }
 
@@ -707,7 +707,7 @@ enum SnapshotRenderer {
             RemindersController.shared.filter = filter
             RemindersController.shared.pendingDue = filter == .today ? .tomorrowMorning : nil
             let (model, topBar) = sampleModel { $0.selectedTab = .reminders }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-reminders-\(name).png"))
         }
         RemindersController.shared.filter = .all
@@ -716,7 +716,7 @@ enum SnapshotRenderer {
         // Focus dial.
         do {
             let (model, topBar) = sampleModel { t in t.selectedTab = .focus; t.focus.setTime(minutes: 35); t.focus.start(at: now.addingTimeInterval(-300)); t.focus.extend(by: 300, at: now) }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-focus.png"))
         }
         // The Quit peek on the closed notch.
@@ -727,7 +727,7 @@ enum SnapshotRenderer {
                 t.setLightsForSnapshot([(.shortcut(.quit), 0.3)])
             }
             model.presentation = .closed
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-quit-peek.png"))
         }
     }
@@ -744,7 +744,7 @@ enum SnapshotRenderer {
         }
         func render(_ name: String, _ configure: (TopBarModel) -> Void = { _ in }) {
             let (model, topBar) = sampleModel(configure)
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("home-\(name).png"))
         }
         let defaults = ["Music", "Focus", "Weather", "Calendar"]
@@ -786,7 +786,7 @@ enum SnapshotRenderer {
         do {
             let (model, topBar) = sampleModel { $0.tabEditing = true; $0.tabEditorNote = nil }
             topBar.layout = TopBarLayout.standard.trimmedToRow()
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("tabs-editor.png"))
         }
         do {
@@ -813,7 +813,7 @@ enum SnapshotRenderer {
                 t.calendarDetailID = "m0"
                 t.quickAddNote = "Added Lunch with Ana, tomorrow 1:00 PM."
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("calendar-month.png"))
         }
     }
@@ -1010,15 +1010,15 @@ enum SnapshotRenderer {
 private struct NotchStage: View {
     let model: NotchModel
     var topBar: TopBarModel? = nil
-    let notch: CGSize
+    let footprint: NotchFootprint
     /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
     var topOffset: Double = 0
 
     var body: some View {
         ZStack(alignment: .top) {
             LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
-            Rectangle().fill(Color.black.opacity(0.35)).frame(height: notch.height)
-            NotchView(model: model, topBar: topBar, footprint: .hardware(notch), topOffsetOverride: topOffset)
+            Rectangle().fill(Color.black.opacity(0.35)).frame(height: footprint.layoutSize.height)
+            NotchView(model: model, topBar: topBar, footprint: footprint, topOffsetOverride: topOffset)
         }
     }
 }
