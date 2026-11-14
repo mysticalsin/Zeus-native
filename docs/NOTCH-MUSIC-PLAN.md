@@ -102,13 +102,16 @@ never wipe it. It resets to unknown when the player changes or playback stops.
   does not say the track has no lyrics, and nothing is cached. Zeus then waits before asking again: 30 seconds,
   doubling to a ceiling of 15 minutes, or the server's Retry-After when it sends one. A success clears the wait.
 - While waiting, a new track does not cause a request. When the wait ends and the same track is still current,
-  Zeus asks once.
+  Zeus asks once, but only while it plays and a lyric view is on screen (`LyricsRetry.plan`). A stopped player,
+  paused music or a closed notch sends nothing; the next load from a lyric view starts the retry again.
+- A request the service refuses as invalid (400 and the other 4xx except 408 and 429) is an answer for that step,
+  like a 404. It never starts the wait. `duration` is sent only inside 1 to 3600 seconds, as `/api/get` requires.
 
 ### Lookup order
 
 1. `GET /api/get` with the raw title, artist, album and rounded duration (today's strict request).
-2. On 404, and only when clean-up changed something: `GET /api/get` with the cleaned title, the first credited
-   artist and the duration, without the album.
+2. On 404, and only when clean-up changed something: `GET /api/get` with the cleaned title, the artist without a
+   feat. or ft. credit ("Earth, Wind & Fire" stays whole) and the duration, without the album.
 3. On 404: `GET /api/search` with the cleaned title and first artist; pick with `LyricsMatch.best`.
 
 The old "loose" request without a duration is removed: it could return another recording's timing.
@@ -119,7 +122,8 @@ The old "loose" request without a duration is removed: it could return another r
 - `LyricsCandidate` (id, title, artist, duration, instrumental, synced text, plain text) and
   `LRCLIBResponse.parseSearch(_:)`.
 - `LyricsMatch.best(_ candidates:duration:)`: synced before plain, inside the duration window, then nearest duration.
-  With an unknown duration (0) only an exact title match, ignoring case, is taken.
+  With an unknown duration (0) only an exact title match, ignoring case, is taken: the title as the player
+  reports it, with no version suffix stripped on either side.
 - `LyricsRequest` values for the three steps, built by `LRCLIBQuery`, so URL building stays testable.
 - `LyricsBackoff` (failures, blocked-until, `recordFailure(now:retryAfter:)`, `recordSuccess()`, `canAsk(now:)`).
 - `LyricsFetchOutcome`: `found`, `notFound`, `failed(retryAfter:)`, and `LyricsStatus.outcome(status:retryAfter:)`

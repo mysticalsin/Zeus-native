@@ -33,12 +33,31 @@ public enum LRC {
                     offset = ms / 1000
                 } // other metadata tags (ar, ti, al, by...) are ignored
             }
-            let words = rest.trimmingCharacters(in: .whitespaces)
+            let words = strippingWordTags(rest).trimmingCharacters(in: .whitespaces)
             for time in stamps { lines.append(LyricLine(time: time, text: words)) }
         }
         // A positive offset makes the lyrics appear sooner.
         let shifted = lines.map { LyricLine(time: max(0, $0.time - offset), text: $0.text) }
         return shifted.enumerated().sorted { ($0.element.time, $0.offset) < ($1.element.time, $1.offset) }.map(\.element)
+    }
+
+    /// Drops inline word tags (`<mm:ss.xx>`, as in enhanced `.lrc` files) so they never show as text.
+    /// Angle brackets that do not hold a timestamp stay. A tag with spaces on both sides leaves one space.
+    static func strippingWordTags(_ text: Substring) -> String {
+        var kept = ""
+        var rest = text
+        while let open = rest.firstIndex(of: "<") {
+            kept += rest[..<open]
+            let inside = rest.index(after: open)
+            if let close = rest[inside...].firstIndex(of: ">"), stamp(String(rest[inside..<close])) != nil {
+                rest = rest[rest.index(after: close)...]
+                if kept.last?.isWhitespace == true { rest = rest.drop(while: \.isWhitespace) }
+            } else {
+                kept.append("<")
+                rest = rest[inside...]
+            }
+        }
+        return kept + rest
     }
 
     /// "01:02.34", "1:02", "00:12.5" in seconds; nil for anything else (a metadata tag).
@@ -64,13 +83,12 @@ public extension Array where Element == LyricLine {
     /// How far through the current line (0...1), for a soft fill. Lines last until the next one starts.
     func lineProgress(at time: Double, trackEnd: Double = 0) -> Double {
         guard let index = currentIndex(at: time) else { return 0 }
-        let end = index + 1 < count ? self[index + 1].time : Swift.max(trackEnd, self[index].time + 4)
-        let span = Swift.max(end - self[index].time, 0.001)
+        let span = Swift.max(lineEnd(at: index, trackEnd: trackEnd) - self[index].time, 0.001)
         return Swift.min(Swift.max((time - self[index].time) / span, 0), 1)
     }
 }
 
-/// The LRCLIB request (https://lrclib.net/api/get): free, no key.
+/// The LRCLIB lookup (https://lrclib.net/api): free, no key. The requests built from it are in LyricsMatching.swift.
 public struct LRCLIBQuery: Equatable, Sendable {
     public var artist: String
     public var title: String
@@ -87,21 +105,6 @@ public struct LRCLIBQuery: Equatable, Sendable {
 
     /// Needs at least a title; LRCLIB matches on artist too, so a track with neither is not asked about.
     public var isAskable: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty && !artist.trimmingCharacters(in: .whitespaces).isEmpty }
-
-    public var url: URL? { build(withAlbumAndDuration: true) }
-    /// For a 404: the same track without album and duration, which LRCLIB then matches loosely.
-    public var looseURL: URL? { build(withAlbumAndDuration: false) }
-
-    private func build(withAlbumAndDuration: Bool) -> URL? {
-        var parts = URLComponents(string: "https://lrclib.net/api/get")
-        var items = [URLQueryItem(name: "artist_name", value: artist), URLQueryItem(name: "track_name", value: title)]
-        if withAlbumAndDuration {
-            items.append(URLQueryItem(name: "album_name", value: album))
-            if duration > 0 { items.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded())))) }
-        }
-        parts?.queryItems = items
-        return parts?.url
-    }
 
     /// A stable file name for the cache.
     public var cacheKey: String {

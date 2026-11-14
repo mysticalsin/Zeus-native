@@ -346,6 +346,7 @@ private struct AppearancePage: View {
             GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
+            light("lyrics.wordByWord", "music.note.list", "Light lyrics word by word", "Each word lights as it is sung. Word timing is estimated from the line timing.")
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
             GSDivider()
             GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum. Add the tab under Top bar tabs, further down this page.") {
