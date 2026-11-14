@@ -24,6 +24,15 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 - Indicator: the closed notch shows the Scribe recording wings for any Scribe recording (`ClosedWings.kind`), however it started.
 - Tests: `ScribeAutoStartTests.swift` (every transition, debounce, single trigger, consent, permission fallback, call-ended path, breakout, window, keep, cooldown re-arm, next meeting).
 
+### 24. Drawn notch calibration. EXPLICIT from the start (2026-11-14)
+- Where: `ZeusCore/TopBar/DrawnNotch.swift` (`DrawnNotchCalibration.reduce`), the shape rules in `DrawnNotchLimits`, the footprint in `NotchFootprint.swift`. The notch model and the Settings card come in later tickets and meet at `DrawnNotchControlling`.
+- States: `idle`, `adjusting(draft, saved)`. The draft is shown while adjusting and the saved shape otherwise; the guide outline shows and opening by pointer stops only while adjusting.
+- Events: `begin(saved:)`, `setWidth`, `setHeight`, `setOffset`, `step(field, direction)`, `reset`, `done`, `cancel`, `surfaceGone(loss)`.
+- Effects: `persist(shape)` and `announce(text)`. Only `done` with a draft that differs from the saved shape persists; `cancel` and every `surfaceGone` return to `idle` and persist nothing.
+- Losses, logged by name and all with the same result: the page was left, Settings closed, Settings minimised, the app hid, Pill was chosen, the last display without a notch went away, the Mac locked or slept, the session switched user. Settings sitting behind another app is not a loss.
+- Rules: a second `begin` changes nothing; a set, step or reset while `idle` is ignored; every field is snapped to its step and clamped, and a field that is not a number takes its default.
+- Tests: `DrawnNotchCalibrationTests.swift` (every event from both states, each of the nine losses, no persist from cancel or a loss), `DrawnNotchTests.swift` (limits, fit, availability).
+
 ## Fixed
 
 ### 1. Dictation job phase (live, file, history re-run). FIXED, severity high
