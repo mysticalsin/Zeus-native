@@ -46,12 +46,13 @@ GROUPS = {
               "ExplanationChartMathTests", "ExplanationCardPlacementTests"),
     ),
     "socket-safety": (
-        core("UnixSocket.swift", "PeerCredentials.swift"),
-        tests("UnixSocketSafetyTests", "PeerCredentialsTests"),
+        core("UnixSocket.swift", "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "ZeusPaths.swift"),
+        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests"),
     ),
     "bridge-transport": (
         core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
-             "PeerCredentials.swift", "JSONValue.swift", "ZeusPaths.swift", "Version.swift") + ["Sources/zeus-bridge/main.swift"],
+             "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "JSONValue.swift", "ZeusPaths.swift",
+             "Version.swift") + ["Sources/zeus-bridge/main.swift"],
         tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
     ),
     "keychain": (

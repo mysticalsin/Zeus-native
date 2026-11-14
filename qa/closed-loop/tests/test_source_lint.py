@@ -629,9 +629,12 @@ class Pass4IslandWiring(unittest.TestCase):
     def test_lyrics_are_never_requested_while_the_privacy_setting_is_off(self):
         text = pass3_source("Sources/Zeus/TopBar/LyricsViews.swift")
         load = pass3_function_body(text, "func load(for playing: NowPlaying?)")
-        self.assertTrue(check_precedes(load, "guard Self.enabled else", "ask(query)"))
-        self.assertIn("enabled: Self.enabled", pass3_function_body(text, "private func retryPlan(for key: String)"))
-        self.assertEqual(text.count("self?.run("), 1, "only ask(_:) may start a request")
+        self.assertIn("send(.load(enabled: Self.enabled", load, "the flow decides with the privacy switch")
+        run = pass3_function_body(text, "private func run(_ query: LRCLIBQuery) async")
+        self.assertTrue(check_precedes(run, "guard mayRequest(key) else { return }", "Self.fetch("),
+                        "the switch is checked before every request")
+        self.assertIn("retryPlan(for: key, now: Date(), enabled: Self.enabled)", text)
+        self.assertEqual(text.count("self?.run("), 1, "only the flow's lookup effect may start a request")
 
     def test_the_sampling_reader_uses_the_occlusion_aware_rule(self):
         text = pass3_source("Sources/Zeus/Perf/SamplingHold.swift")
