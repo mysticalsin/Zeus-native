@@ -176,8 +176,8 @@ def write_excerpts(root, group, manifest):
             text, evidence = section(path, start, end)
             pieces.append(text)
             manifest["excerpts"].append(evidence)
-        text, evidence = section(CORE + "Scribe/ScribeAutoStart.swift",
-                                 "/// One meeting, identified so the same meeting never triggers twice.",
+        text, evidence = section(CORE + "Scribe/ScribeMeetingSignals.swift",
+                                 "public struct ScribeCalendarSlot: Equatable, Sendable {",
                                  "/// Everything the detector knows at one moment.")
         pieces.append(text)
         manifest["excerpts"].append(evidence)
