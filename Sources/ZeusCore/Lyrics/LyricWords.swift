@@ -141,7 +141,7 @@ public enum LyricWordTiming {
 
 public extension Array where Element == LyricLine {
     /// When line `index` stops being the current line: the next line's time, or `trackEnd` (at least four seconds
-    /// after its start) for the last one. The same end `lineProgress` uses.
+    /// after its start) for the last one. `lineProgress` takes its end from here.
     func lineEnd(at index: Int, trackEnd: Double = 0) -> Double {
         index + 1 < count ? self[index + 1].time : Swift.max(trackEnd, self[index].time + 4)
     }

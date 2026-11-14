@@ -42,7 +42,7 @@ public enum LRC {
     }
 
     /// Drops inline word tags (`<mm:ss.xx>`, as in enhanced `.lrc` files) so they never show as text.
-    /// Angle brackets that do not hold a timestamp stay.
+    /// Angle brackets that do not hold a timestamp stay. A tag with spaces on both sides leaves one space.
     static func strippingWordTags(_ text: Substring) -> String {
         var kept = ""
         var rest = text
@@ -51,6 +51,7 @@ public enum LRC {
             let inside = rest.index(after: open)
             if let close = rest[inside...].firstIndex(of: ">"), stamp(String(rest[inside..<close])) != nil {
                 rest = rest[rest.index(after: close)...]
+                if kept.last?.isWhitespace == true { rest = rest.drop(while: \.isWhitespace) }
             } else {
                 kept.append("<")
                 rest = rest[inside...]
@@ -82,8 +83,7 @@ public extension Array where Element == LyricLine {
     /// How far through the current line (0...1), for a soft fill. Lines last until the next one starts.
     func lineProgress(at time: Double, trackEnd: Double = 0) -> Double {
         guard let index = currentIndex(at: time) else { return 0 }
-        let end = index + 1 < count ? self[index + 1].time : Swift.max(trackEnd, self[index].time + 4)
-        let span = Swift.max(end - self[index].time, 0.001)
+        let span = Swift.max(lineEnd(at: index, trackEnd: trackEnd) - self[index].time, 0.001)
         return Swift.min(Swift.max((time - self[index].time) / span, 0), 1)
     }
 }
