@@ -83,26 +83,23 @@ public struct ScribeMeetingEvidence: Equatable, Sendable {
     /// Known call apps running, or a browser showing a call tab, whether or not they use the microphone.
     public var presentApps: [ScribeCallApp]
     public var mode: ScribeAutoStartMode
-    /// Microphone permission is already granted. The detector never asks for it.
-    public var micPermissionGranted: Bool
     public var activity: ScribeActivity
-    /// The person already agreed, once, that Zeus may start notes by itself (`ScribeAutoStartConsent`).
-    public var autoConsentGiven: Bool
+    /// Whether an automatic start may count down, or what is missing. The detector never asks for a permission.
+    public var automatic: ScribeAutoStartReadiness
     /// Whether each call app's call window is still on screen. Missing means unknown, which never ends a call.
     public var callWindows: [ScribeCallApp: ScribeCallWindowState]
 
     public init(date: Date, slots: [ScribeCalendarSlot] = [], micApps: [ScribeCallApp] = [],
                 presentApps: [ScribeCallApp] = [], mode: ScribeAutoStartMode = .ask,
-                micPermissionGranted: Bool = false, activity: ScribeActivity = .idle,
-                autoConsentGiven: Bool = false, callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]) {
+                activity: ScribeActivity = .idle, automatic: ScribeAutoStartReadiness = .blocked(.notChosen),
+                callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]) {
         self.date = date
         self.slots = slots
         self.micApps = micApps
         self.presentApps = presentApps
         self.mode = mode
-        self.micPermissionGranted = micPermissionGranted
         self.activity = activity
-        self.autoConsentGiven = autoConsentGiven
+        self.automatic = automatic
         self.callWindows = callWindows
     }
 

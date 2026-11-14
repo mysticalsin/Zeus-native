@@ -5,8 +5,8 @@ import ZeusCore
 /// Performs what the core `ScribeAutoStartMachine` decides. It reads the signals the call watcher already
 /// gathers (calendar, running call apps, which process holds the microphone), asks the machine, and then
 /// shows the banner, starts Scribe or opens the end window. A detector signal only suggests an end; it never
-/// stops a recording. It never asks for any permission: automatic start needs Microphone to be allowed already,
-/// otherwise the machine asks instead.
+/// stops a recording. It never asks for any permission: automatic start needs the owner's click in Settings,
+/// Microphone already allowed and one earlier recording, otherwise the machine asks instead.
 @MainActor
 final class ScribeAutoStartController {
     static let shared = ScribeAutoStartController()
@@ -26,15 +26,23 @@ final class ScribeAutoStartController {
 
     /// One reading from the call watcher, every poll and every microphone wake-up.
     func ingest(scan: ScribeCallScan, slots: [ScribeCalendarSlot], date: Date) {
+        let mode = ScribeAutoStartMode.current()
+        // A stamp that outlived its choice (a raw defaults write, say) is removed before it can be read.
+        ScribeAutoStartOptIn.reconcile(mode: mode)
+        let automatic = ScribeAutoStartReadiness.resolve(
+            mode: mode,
+            optIn: ScribeAutoStartOptIn.date() != nil,
+            microphone: ScribeMicrophoneAccess(authorizationRaw: AVCaptureDevice.authorizationStatus(for: .audio).rawValue),
+            hasRecorded: ScribeAutoStartOptIn.hasRecorded()
+        )
         let evidence = ScribeMeetingEvidence(
             date: date,
             slots: slots,
             micApps: scan.calls.map(\.app),
             presentApps: scan.runningCallApps.map(\.app),
-            mode: ScribeAutoStartMode.current(),
-            micPermissionGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+            mode: mode,
             activity: ScribeActivity(ScribeController.shared.phase),
-            autoConsentGiven: ScribeAutoStartConsent.isGiven(),
+            automatic: automatic,
             callWindows: scan.callWindows
         )
         perform(machine.handle(.evidence(evidence, now: now)))
@@ -99,11 +107,6 @@ final class ScribeAutoStartController {
                 ScribeCallPopup.shared.hide()
                 let seconds = machine.bannerDeadline.map { Self.secondsLeft(deadline: $0, now: now) } ?? 0
                 ScribeMeetingBanner.shared.showCountdown(meeting, seconds: seconds)
-            case .showConsentAsk(let meeting):
-                ScribeCallPopup.shared.hide()
-                ScribeMeetingBanner.shared.showConsent(meeting)
-            case .recordConsent:
-                ScribeAutoStartConsent.record()
             case .showNextMeeting(let meeting):
                 ScribeMeetingBanner.shared.showNextMeeting(meeting)
             case .hideBanner:

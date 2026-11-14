@@ -80,10 +80,10 @@ final class ScribeMeetingBanner {
     private static let margin: CGFloat = 16
 
     private enum Kind {
-        case ask, consent, nextMeeting, countdown
+        case ask, nextMeeting, countdown
 
         /// The Start questions, whose primary tap starts Scribe and is tracked to its outcome.
-        var startsScribe: Bool { self == .ask || self == .consent }
+        var startsScribe: Bool { self == .ask }
     }
 
     let model = ScribeMeetingBannerModel()
@@ -112,16 +112,6 @@ final class ScribeMeetingBanner {
         model.primaryTitle = "Start"
         model.secondaryTitle = "Not now"
         present(announce: "\(model.headline) Start, or Not now.")
-    }
-
-    /// The first time "Start automatically" would fire: one question, and the answer is remembered.
-    func showConsent(_ meeting: ScribeMeeting) {
-        guard begin(.consent, meeting) else { return }
-        model.headline = ScribeAutoStartText.askHeadline(meeting)
-        model.detail = ScribeAutoStartText.consentDetail
-        model.primaryTitle = "Start and allow"
-        model.secondaryTitle = "Not now"
-        present(announce: "\(model.headline) Start and allow, or Not now.")
     }
 
     /// Another meeting is about to start while this one records.

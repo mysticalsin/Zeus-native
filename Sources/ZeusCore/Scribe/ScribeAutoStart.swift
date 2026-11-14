@@ -34,23 +34,6 @@ public enum ScribeAutoStartMode: String, CaseIterable, Sendable {
     }
 }
 
-/// The one-time agreement that lets "Start automatically" start without asking. Stored as a timestamp.
-public enum ScribeAutoStartConsent {
-    public static let key = "scribe.autoStart.consentAt"
-
-    public static func isGiven(defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: key) is Double
-    }
-
-    public static func consentDate(defaults: UserDefaults = .standard) -> Date? {
-        (defaults.object(forKey: key) as? Double).map(Date.init(timeIntervalSince1970:))
-    }
-
-    public static func record(at date: Date = Date(), defaults: UserDefaults = .standard) {
-        defaults.set(date.timeIntervalSince1970, forKey: key)
-    }
-}
-
 public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// The same meeting must be seen again this long after it first appeared before anything is shown.
     public var debounce: TimeInterval
@@ -155,10 +138,6 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     public enum Effect: Equatable, Sendable {
         case showAsk(ScribeMeeting)
         case showCountdown(ScribeMeeting)
-        /// The first time "Start automatically" would fire: ask once, and remember the answer.
-        case showConsentAsk(ScribeMeeting)
-        /// Store the consent timestamp (`ScribeAutoStartConsent.record`).
-        case recordConsent
         /// Another meeting is starting while this one records.
         case showNextMeeting(ScribeMeeting)
         case hideBanner
@@ -215,11 +194,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case .accept(let now):
             switch state {
             case .prompting(let meeting, _), .countingDown(let meeting, _):
-                var effects: [Effect] = [.hideBanner]
-                if let last = lastEvidence, last.mode == .automatic, last.micPermissionGranted, !last.autoConsentGiven {
-                    effects.append(.recordConsent)
-                }
-                return effects + begin(meeting, now: now)
+                return [.hideBanner] + begin(meeting, now: now)
             case .recording(let recording):
                 guard recording.nextMeeting != nil else { return [] }
                 // Switch: end this recording (the end window can still be cancelled); the next meeting is a
@@ -310,6 +285,10 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 state = .idle
                 return [.hideBanner]
             }
+            if case .countingDown = state, !holdsCountdown(evidence) {
+                // The choice, the readiness or the live call changed: nothing starts by itself, so ask instead.
+                return ask(meeting, now: now)
+            }
             return expire(now: now)
 
         case .recording(var recording):
@@ -396,12 +375,18 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             state = .countingDown(meeting: meeting, deadline: now + timing.countdown)
             return [.showCountdown(meeting)]
         }
-        return ask(meeting, evidence, now: now)
+        return ask(meeting, now: now)
     }
 
-    /// Automatic start counts down only for a live call, with Microphone allowed and the consent given.
+    /// Automatic start counts down only for a live call, with "Start automatically" chosen and every part of
+    /// its readiness in place.
     private func countsDown(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
-        meeting.isLive && evidence.mode == .automatic && evidence.micPermissionGranted && evidence.autoConsentGiven
+        meeting.isLive && holdsCountdown(evidence)
+    }
+
+    /// What must still be true on every evidence while the countdown runs, and at its end.
+    private func holdsCountdown(_ evidence: ScribeMeetingEvidence) -> Bool {
+        evidence.mode == .automatic && evidence.automatic.isReady && evidence.candidate?.isLive == true
     }
 
     /// An answered meeting is never shown again. Whatever the ledger knows about it, even a question that timed
@@ -418,16 +403,12 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         ledger.note(meeting, mark, date: lastEvidence?.date ?? .distantPast)
     }
 
-    /// "Ask me", or "Start automatically" without Microphone permission already granted or without the one-time
-    /// consent: Zeus never starts capture from the detector without both, so it asks. The first automatic start asks
-    /// in words that also record the consent.
-    private mutating func ask(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence?, now: TimeInterval) -> [Effect] {
+    /// "Ask me", or "Start automatically" while anything it needs is missing: Zeus never starts capture from the
+    /// detector on its own unless every part of the readiness holds, so it asks.
+    private mutating func ask(_ meeting: ScribeMeeting, now: TimeInterval) -> [Effect] {
         // A fresh card: an old "pointer inside" from a card that was taken down must not hold this one.
         pointerInside = false
         state = .prompting(meeting: meeting, deadline: now + timing.askTimeout)
-        if let evidence, evidence.mode == .automatic, evidence.micPermissionGranted, !evidence.autoConsentGiven {
-            return [.showConsentAsk(meeting)]
-        }
         return [.showAsk(meeting)]
     }
 
@@ -438,9 +419,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             state = .idle
             return [.hideBanner]
         case .countingDown(let meeting, let deadline) where now >= deadline:
-            guard lastEvidence?.micPermissionGranted == true, lastEvidence?.autoConsentGiven == true else {
-                // Permission (or consent) was withdrawn during the countdown: ask instead.
-                return ask(meeting, lastEvidence, now: now)
+            guard let last = lastEvidence, holdsCountdown(last) else {
+                // Something the countdown needs went missing: ask instead.
+                return ask(meeting, now: now)
             }
             return [.hideBanner] + begin(meeting, now: now)
         case .recording(var recording):
@@ -493,28 +474,11 @@ public enum ScribeAutoStartText {
         "Meeting started: \(meeting.title). Taking notes in \(max(0, seconds))."
     }
 
-    /// Under the Settings choice.
-    public static func settingNote(_ mode: ScribeAutoStartMode) -> String {
-        switch mode {
-        case .off:
-            return "Zeus never offers to take notes when a meeting starts."
-        case .ask:
-            return "Zeus asks when a call or a calendar meeting starts. Nothing is recorded until you tap Start."
-        case .automatic:
-            return "Zeus starts taking notes 5 seconds after a meeting starts, and you can cancel. It asks once the first time, and asks every time while Microphone is not allowed."
-        }
-    }
-
-    public static let settingEndNote =
-        "When the call ends, Zeus offers to stop and save the notes. You can keep recording. If another meeting starts while you record, Zeus asks before switching."
-
     public static func nextMeetingHeadline(_ meeting: ScribeMeeting) -> String {
         "Next meeting: \(meeting.title) is starting. Switch notes to it?"
     }
 
     public static let nextMeetingDetail = "Switching stops this recording and saves it first. Keep recording leaves it running."
-    public static let consentDetail =
-        "You chose Start automatically. Tap Start and allow, and Zeus will start by itself from now on, after a 5 second countdown you can cancel."
 
     public static let askDetail = "Nothing is recorded until you tap Start."
     public static let countdownDetail = "Tap Cancel to keep Zeus from recording this meeting."

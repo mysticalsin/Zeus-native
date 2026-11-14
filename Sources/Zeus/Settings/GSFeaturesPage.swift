@@ -98,12 +98,10 @@ struct FeaturesSettingsPage: View {
     }
 
     private var scribeCard: some View {
-        let mode = ScribeAutoStartMode.parse(store.string(ScribeAutoStartMode.settingID))
-        return GSCard("Scribe") {
-            GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts", text: ScribeAutoStartText.settingNote(mode)) {
+        GSCard("Scribe") {
+            GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts") {
                 GSPopup(selection: store.stringBinding(ScribeAutoStartMode.settingID), options: ScribeAutoStartMode.choices)
             }
-            GSInfo(text: ScribeAutoStartText.settingEndNote)
         }
     }
 
