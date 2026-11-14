@@ -202,20 +202,22 @@ struct TilingConsumedKeyTests {
         #expect(turns.starts == 2, "a fresh hold works again")
     }
 
-    @Test func shiftJoiningAHoldStillEndsItTheNormalWay() {
+    @Test func shiftJoiningAHoldStillEndsItTheNormalWay() async throws {
         let (monitor, turns) = turnMonitor(role: .dictation)
         monitor.feed(.flags(keyCode: 59, modifiers: [.control]))
         monitor.feed(.flags(keyCode: 58, modifiers: [.control, .option]))
         monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option, .shift]))
+        try await hold(0.55) // a quick tap waits for a possible second tap before it ends
         #expect(turns.starts == 1 && turns.releases == 1 && turns.cancels == 0, "\(turns.starts) \(turns.releases) \(turns.cancels)")
     }
 
-    @Test func aPlainHoldAndReleaseStillSendsTheTurn() {
+    @Test func aPlainHoldAndReleaseStillSendsTheTurn() async throws {
         let (monitor, turns) = turnMonitor()
         monitor.feed(.flags(keyCode: 59, modifiers: [.control]))
         monitor.feed(.flags(keyCode: 58, modifiers: [.control, .option]))
         monitor.feed(.flags(keyCode: 58, modifiers: [.control]))
         monitor.feed(.flags(keyCode: 59, modifiers: []))
+        try await hold(0.55)
         #expect(turns.starts == 1 && turns.releases == 1 && turns.cancels == 0)
     }
 

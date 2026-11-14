@@ -100,6 +100,8 @@ final class HotkeyMonitor {
     private var commandLatched = false
 
     private var isDown = false
+    /// A hold was cancelled because a larger chord ended it. It cannot begin again until every modifier is up.
+    private var cancelledByLargerChord = false
     private var latch = TalkKeyLatch()
     private var pendingStop: DispatchWorkItem?
     private var directPressActive = false
@@ -231,7 +233,8 @@ final class HotkeyMonitor {
             handleShared(key)
             return
         }
-        let pressed = state.isHeld(key, exact: true)
+        if state.modifiers.isEmpty { cancelledByLargerChord = false }
+        let pressed = state.isHeld(key, exact: true) && !cancelledByLargerChord
         if directPress {
             if pressed, !isDown {
                 if key == .controlOption, NSWorkspace.shared.isVoiceOverEnabled {
@@ -255,8 +258,31 @@ final class HotkeyMonitor {
             fire(latch.keyDown(at: ProcessInfo.processInfo.systemUptime))
         } else if !pressed, isDown {
             isDown = false
-            fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
+            if endedByLargerChord(key) {
+                cancelHold(key)
+            } else {
+                fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
+            }
         }
+    }
+
+    /// The hold ended because Control, Option or Command joined it, not because a key of it was let go: the owner was
+    /// pressing a larger chord (the tiling pair is Control-Option-Command, and Control-Option comes first). Shift and Fn
+    /// are not counted: Shift joining a hold is how the owner asks for Return after dictation.
+    private func endedByLargerChord(_ key: Shortcut) -> Bool {
+        guard key.isModifierOnly, state.modifiers.isSuperset(of: key.modifiers) else { return false }
+        return !state.modifiers.subtracting(key.modifiers).isDisjoint(with: [.control, .option, .command])
+    }
+
+    /// The hold became a larger chord: end the turn without sending it, as a key joining the hold does (`spoilHold`),
+    /// and keep it ended until every modifier is up.
+    private func cancelHold(_ key: Shortcut) {
+        cancelledByLargerChord = true
+        pendingStop?.cancel()
+        pendingStop = nil
+        latch = TalkKeyLatch()
+        VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut became a larger chord (\(key.title) + modifiers): cancelled, nothing sent")
+        (onCancel ?? onRelease)?()
     }
 
     /// Hold to talk; double-tap to keep listening hands-free until the next tap.

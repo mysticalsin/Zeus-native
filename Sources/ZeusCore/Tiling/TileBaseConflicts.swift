@@ -6,10 +6,18 @@ import Foundation
 ///
 /// A modifier-only key (talk, pointing, dictation, Polyglot) starts a turn on its modifiers alone and is cancelled only when
 /// a monitor sees another key go down. A tiling pair that is the same pair would start a turn on every tiling
-/// chord and never cancel it, so that pair is refused. A larger pair is free: every one of those holds needs exactly
-/// its own modifiers to begin (the shared talk and dictation key too: `HotkeyMonitor.handleShared`), and a smaller
-/// hold that forms when the owner lets go of the extra modifier first stays spoiled because the tap forwards every
-/// key it consumes to the monitors (`TileKeyDecision.monitorEvent`).
+/// chord and never cancel it, so that pair is refused.
+///
+/// A larger pair is free for a hold-style key. It begins only on exactly its own modifiers, and when the owner presses
+/// the smaller pair first (Control and Option, then Command) the hold can begin before the rest arrives. Every hold-style
+/// monitor therefore cancels a hold that another Control, Option or Command key ends by joining (`HotkeyMonitor`,
+/// `PointingKeyGesture`), so nothing is sent, and the tap forwards every key it consumes so a smaller hold that forms when
+/// the owner lets go of the extra modifier first stays spoiled (`TileKeyDecision.monitorEvent`). The shared talk and
+/// dictation hold begins only after its hold delay and the larger chord cancels it first (`HotkeyMonitor.handleShared`).
+///
+/// A key that acts on the first press has nothing to cancel. A press-to-toggle dictation key and a modifier-only Polyglot
+/// key switch on the moment their own modifiers are down, and a toggle cannot be taken back, so a pair that strictly
+/// contains one of them is refused too.
 ///
 /// A keyed key (a talk, pointing, dictation or Polyglot shortcut with a letter, an arrow or Space) is a chord the tap would
 /// swallow if the tiling keymap binds the same chord, so every bound tiling chord is compared with every keyed
@@ -37,11 +45,12 @@ public enum TileBaseConflicts {
 
     /// Plain sentences naming each key that holds `base`, or a chord in `keymap`. Empty when the keys are free.
     /// `talk` is the key the owner chose; `dictation`, `pointing` and `polyglot` are nil when off. The rule works out the key
-    /// the talk monitor listens on from `voiceOverOn`. `others` are the remaining keyed global shortcuts. The
+    /// the talk monitor listens on from `voiceOverOn`. `dictationToggles` is true when the dictation key toggles on a press
+    /// (the Press to toggle behaviour) instead of being held. `others` are the remaining keyed global shortcuts. The
     /// VoiceOver sentence comes first.
     public static func notes(base: TileModifierBase, keymap: TileKeymap, talk: Shortcut, dictation: Shortcut?,
                              pointing: Shortcut?, polyglot: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool,
-                             others: [NamedShortcut] = []) -> [String] {
+                             dictationToggles: Bool = false, others: [NamedShortcut] = []) -> [String] {
         var out: [String] = []
         if voiceOverOn, keymap.bindings.contains(where: { $0.shortcut.modifiers.isSuperset(of: voiceOverPair) }) {
             out.append("\(base.label) uses Control and Option, the keys VoiceOver holds while it runs, so tiling cannot use it.")
@@ -63,6 +72,17 @@ public enum TileBaseConflicts {
         }
         if movedTalkHoldsBase {
             out.append("\(base.label) is also where Talk to Zeus moves while VoiceOver is on.")
+        }
+
+        var togglers: [String] = []
+        let toggles: [(String, Shortcut?)] = [("Dictation", dictationToggles ? dictation : nil), ("Polyglot", polyglot)]
+        for (name, key) in toggles {
+            guard let key, key.isModifierOnly, key.modifiers != base.modifiers,
+                  key.modifiers.isSubset(of: base.modifiers) else { continue }
+            togglers.append(name)
+        }
+        if !togglers.isEmpty {
+            out.append("\(base.label) also holds your \(togglers.joined(separator: " and ")) key, which switches on the moment it is pressed, so tiling cannot use it.")
         }
 
         for (name, key) in holds {

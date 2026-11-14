@@ -34,6 +34,9 @@ enum TilingKeyClash {
         var polyglot: Shortcut?
         var chat: ChatHotkey
         var voiceOverOn: Bool
+        /// The dictation key toggles on a press (Press to toggle) instead of being held, as the dictation monitor reads
+        /// it (`directPressProvider`). Such a key acts the moment its modifiers are down, so a larger pair is refused.
+        var dictationToggles = false
         /// The other global hot keys with a key: Quick to-do, the notch, the prompter pause and the approval answer keys.
         var others: [TileBaseConflicts.NamedShortcut] = []
 
@@ -63,6 +66,7 @@ enum TilingKeyClash {
                         polyglot: polyglot.enabled ? polyglot.hotkey : nil,
                         chat: ChatHotkey.stored(UserDefaults.standard.string(forKey: "chat.hotkey")),
                         voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled,
+                        dictationToggles: dictation.enabled && dictation.selectedBehavior == .pressToToggle,
                         others: presets.compactMap { name, preset in
                             preset.tilingShortcut.map { TileBaseConflicts.NamedShortcut(name: name, shortcut: $0) }
                         } + [prompterPause] + (answerKeysOn ? approvalAnswers : []))
@@ -76,7 +80,7 @@ enum TilingKeyClash {
         return TileBaseConflicts.notes(
             base: base, keymap: keymap ?? TileKeymap.defaults(base: base),
             talk: keys.talk, dictation: keys.dictation, pointing: keys.pointing, polyglot: keys.polyglot, chat: keys.chat,
-            voiceOverOn: keys.voiceOverOn, others: keys.others).first
+            voiceOverOn: keys.voiceOverOn, dictationToggles: keys.dictationToggles, others: keys.others).first
     }
 
     /// Calls `changed` on the main actor each time VoiceOver starts or stops, and returns the way to stop watching.
