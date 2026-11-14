@@ -98,16 +98,13 @@ struct ScribeMeetingLedgerTests {
         #expect(ledger.mark(of: call) == nil)
     }
 
-    @Test func aCallEntryLeavesOnlyAfterTheAbsenceWhenItsAppIsGone() throws {
+    @Test func aCallEntryOfANativeAppLeavesAtOnceWhenTheAppQuits() throws {
         var ledger = ScribeMeetingLedger()
         let call = try mlMeeting(mlEvidence(0, mic: [.zoom]))
         ledger.note(call, .started, date: mlBase)
         ledger.observe(mlEvidence(5, present: [.zoom]), now: 5)
         #expect(ledger.mark(of: call) == .started)
         ledger.observe(mlEvidence(6), now: 6)
-        ledger.observe(mlEvidence(34), now: 34)
-        #expect(ledger.mark(of: call) == .started)
-        ledger.observe(mlEvidence(35), now: 35)
         #expect(ledger.mark(of: call) == nil)
     }
 

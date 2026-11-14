@@ -555,7 +555,7 @@ struct ScribeAutoStartTests {
         var machine = ScribeAutoStartMachine()
         let event = asSlot(start: 0, app: .teams)
         for now in stride(from: 0.0, through: 3.0, by: 1.0) {
-            machine.handle(asEvidence(now, slots: [event], mode: .automatic, granted: true, consent: true))
+            machine.handle(asEvidence(now, present: [.teams], slots: [event], mode: .automatic, granted: true, consent: true))
         }
         #expect(machine.state == .prompting(meeting: ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event),
                                             deadline: 23))
@@ -990,6 +990,19 @@ struct ScribeAutoStartTests {
         let later = machine.handle(asEvidence(30, mic: [.teams], mode: .automatic, granted: true, consent: true))
         #expect(later.isEmpty)
         #expect(machine.state == .idle)
+    }
+
+    @Test func aLateNotNowTapForAnotherMeetingLeavesTheArmedOneArmed() {
+        var machine = asPrompting()
+        machine.handle(.tick(now: 23))
+        let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
+        machine.handle(asEvidence(24, mic: [.zoom]))
+        #expect(machine.state == .armed(meeting: zoom, since: 24))
+        let effects = machine.handle(.declineNow(asTeams))
+        #expect(effects.isEmpty)
+        #expect(machine.state == .armed(meeting: zoom, since: 24))
+        #expect(machine.ledger.mark(of: asTeams) == .declined)
+        #expect(machine.ledger.mark(of: zoom) == nil)
     }
 
     @Test func declineNowNeverAnswersAMeetingWhileScribeRecordsIt() {
