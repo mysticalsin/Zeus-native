@@ -314,6 +314,7 @@ private final class Fired: @unchecked Sendable { var count = 0 }
         rig.report(rig.spotify, "Later", playing: false)
         #expect(rig.model.nowPlaying?.source == rig.music)
         // Music is the only one playing; pausing it for dictation must not hand the notch to the older Spotify entry.
+        rig.advance()
         #expect(rig.hub.pauseForDictation() == rig.music)
         #expect(rig.model.nowPlaying?.source == rig.music)
         #expect(rig.model.nowPlaying?.isPlaying == false)
