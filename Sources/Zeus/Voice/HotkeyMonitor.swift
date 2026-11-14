@@ -175,9 +175,14 @@ final class HotkeyMonitor {
     }
 
     /// Shared-key path: raw down/up of the key plus "another modifier joined in".
+    ///
+    /// A hold begins only when the key's own modifiers are the ones down, with nothing else held and the chord not
+    /// spoiled: the exact rule every other monitor uses, so a larger chord that contains this key (a tiling chord
+    /// built on the same modifiers, or Command pressed first) never starts a hold. Once the hold is running, extra
+    /// modifiers are allowed: Shift joining a running dictation means Return, and it must not end the hold.
     private func handleShared(_ key: Shortcut) {
         let now = ProcessInfo.processInfo.systemUptime
-        let down = state.isHeld(key, exact: false)
+        let down = state.isHeld(key, exact: !sharedDown)
         let extra = state.modifiers.subtracting(key.modifiers).subtracting(.function)
         if down, !gesture.isHolding, !extra.isEmpty { otherKeyPressed() }
         if down, !sharedDown {

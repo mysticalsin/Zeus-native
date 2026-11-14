@@ -66,6 +66,57 @@ struct TilingConsumedKeyTests {
         #expect(presses.count == 0)
     }
 
+    // MARK: Talk and dictation on one key
+
+    private final class Dictation { var starts = 0; var ends = 0; var cancels = 0 }
+
+    /// The talk key and the dictation key are one key (the shared gesture): dictation starts on a hold.
+    private func sharedDictationMonitor(key: Shortcut = .controlOption) -> (HotkeyMonitor, Dictation) {
+        let monitor = HotkeyMonitor()
+        let seen = Dictation()
+        monitor.role = .dictation
+        monitor.keyProvider = { key }
+        monitor.sharedProvider = { true }
+        monitor.onPress = { seen.starts += 1 }
+        monitor.onRelease = { seen.ends += 1 }
+        monitor.onCancel = { seen.cancels += 1 }
+        monitor.observeConsumedKeys()
+        return (monitor, seen)
+    }
+
+    private func hold(_ seconds: Double) async throws { try await Task.sleep(for: .seconds(seconds)) }
+
+    /// The default tiling pair holds Command as well. The owner presses Command first, then Control and Option, and keeps
+    /// them down past the hold delay before the first arrow. The hold is for exactly Control-Option, so it must not begin.
+    @Test func aSharedHoldOfAPairInsideTheTilingPairDoesNotStartDictationWhenCommandComesFirst() async throws {
+        let (monitor, seen) = sharedDictationMonitor()
+        monitor.feed(.flags(keyCode: 55, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 59, modifiers: [.command, .control]))
+        monitor.feed(.flags(keyCode: 58, modifiers: all))
+        try await hold(0.45)
+        #expect(seen.starts == 0, "the microphone must stay closed while the larger pair is held")
+        tell(.keyDown(keyCode: leftArrow, modifiers: all))
+        tell(.keyUp(keyCode: leftArrow))
+        try await hold(0.45)
+        #expect(seen.starts == 0 && seen.cancels == 0, "nothing started, so nothing is cancelled")
+        monitor.feed(.flags(keyCode: 55, modifiers: [.control, .option]))
+        try await hold(0.45)
+        #expect(seen.starts == 0, "letting go of Command first must not form the smaller hold after a consumed chord")
+    }
+
+    @Test func aSharedHoldOfExactlyItsOwnKeyStillStartsDictationAndExtraModifiersDoNotEndIt() async throws {
+        let (monitor, seen) = sharedDictationMonitor()
+        monitor.feed(.flags(keyCode: 59, modifiers: [.control]))
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control, .option]))
+        try await hold(0.45)
+        #expect(seen.starts == 1, "a plain hold begins dictation")
+        monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option, .shift]))
+        #expect(seen.ends == 0, "Shift joining a running dictation means Return, it does not end the hold")
+        monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option]))
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control]))
+        #expect(seen.ends == 1, "letting go of the key ends it")
+    }
+
     // MARK: Pointing
 
     @Test func aPointingHoldDoesNotBeginWhenCommandIsReleasedFirstAfterAConsumedChord() {

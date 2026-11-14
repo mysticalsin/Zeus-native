@@ -6,9 +6,10 @@ import Foundation
 ///
 /// A modifier-only key (talk, pointing, dictation, Polyglot) starts a turn on its modifiers alone and is cancelled only when
 /// a monitor sees another key go down. A tiling pair that is the same pair would start a turn on every tiling
-/// chord and never cancel it, so that pair is refused. A larger pair is free: those holds need exactly their own
-/// modifiers, and a smaller hold that forms when the owner lets go of the extra modifier first stays spoiled because
-/// the tap forwards every key it consumes to the monitors (`TileKeyDecision.monitorEvent`).
+/// chord and never cancel it, so that pair is refused. A larger pair is free: every one of those holds needs exactly
+/// its own modifiers to begin (the shared talk and dictation key too: `HotkeyMonitor.handleShared`), and a smaller
+/// hold that forms when the owner lets go of the extra modifier first stays spoiled because the tap forwards every
+/// key it consumes to the monitors (`TileKeyDecision.monitorEvent`).
 ///
 /// A keyed key (a talk, pointing, dictation or Polyglot shortcut with a letter, an arrow or Space) is a chord the tap would
 /// swallow if the tiling keymap binds the same chord, so every bound tiling chord is compared with every keyed
@@ -18,7 +19,7 @@ import Foundation
 /// moves to a fallback (`VoiceKey.effectiveTalkKey`). VoiceOver also owns Control-Option itself, alone and with
 /// Command and a letter, so while it runs every bound chord that holds Control and Option is refused.
 ///
-/// The other global Zeus keys with a key (Quick to-do, the notch, the prompter pause) are compared the same way.
+/// The other global Zeus keys with a key (Quick to-do, the notch, the prompter pause, the approval answers) are compared the same way.
 public enum TileBaseConflicts {
     /// The pair VoiceOver holds while it runs.
     public static let voiceOverPair: ShortcutModifiers = [.control, .option]
