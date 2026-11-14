@@ -7,16 +7,13 @@ private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 /// A calendar meeting that starts `startsIn` seconds after `t0`.
 private func calendarMeeting(title: String = "Weekly sync", startsIn: TimeInterval = 120) -> ScribeMeeting {
     let slot = ScribeCalendarSlot(id: "slot-1", title: title, start: t0.addingTimeInterval(startsIn), hasCallLink: true)
-    return ScribeMeeting(key: slot.id, title: title, callApp: .teams, slot: slot)
+    return ScribeMeeting(key: slot.id, title: title, callApp: .other("Synthetic"), slot: slot)
 }
 
 /// A call with no calendar meeting behind it.
 private func bareCall() -> ScribeMeeting {
     ScribeMeeting(key: "call:Synthetic", title: "Synthetic call", callApp: .other("Synthetic"))
 }
-
-/// The clock the card is read against: 100 s of uptime, and `t0` on the wall.
-private let clock = ScribeCardClock(date: t0, uptime: 100)
 
 private struct Row {
     var name: String
@@ -76,8 +73,17 @@ struct ScribeMeetingCardTests {
     @Test func eachCardHasItsTitleAndStatus() {
         for row in rows {
             #expect(row.card.meeting.map(ScribeMeetingCardText.title) == row.title, "\(row.name)")
-            #expect(ScribeMeetingCardText.status(row.card, now: clock) == row.status, "\(row.name)")
+            #expect(ScribeMeetingCardText.status(row.card, now: t0) == row.status, "\(row.name)")
         }
+    }
+
+    @Test func aMeetingWithASlotIsTitledByTheSlotNotByTheCallApp() {
+        let slot = ScribeCalendarSlot(id: "slot-2", title: "Planning", start: t0.addingTimeInterval(120), hasCallLink: true)
+        let meeting = ScribeMeeting(key: slot.id, title: "Planning", callApp: .other("Synthetic Call App"), slot: slot)
+        #expect(ScribeMeetingCardText.title(meeting) == "Planning")
+        #expect(ScribeMeetingCardText.label(.offer(meeting, blocked: nil), now: t0) == "Planning, in 2 min")
+        let call = ScribeMeeting(key: "call:Synthetic Call App", title: "Synthetic Call App", callApp: .other("Synthetic Call App"))
+        #expect(ScribeMeetingCardText.title(call) == "Call")
     }
 
     @Test func eachCardHasItsControls() {
@@ -109,7 +115,7 @@ struct ScribeMeetingCardTests {
 
     @Test func recordingIsTheStatusOfTheRecordingCardOnly() {
         for row in rows {
-            let status = ScribeMeetingCardText.status(row.card, now: clock)
+            let status = ScribeMeetingCardText.status(row.card, now: t0)
             if case .recording = row.card {
                 #expect(status == "Recording")
             } else {
@@ -121,9 +127,9 @@ struct ScribeMeetingCardTests {
     @Test func aHiddenCardHasNothingToSay() {
         let card = ScribeMeetingCard.hidden
         #expect(card.meeting == nil)
-        #expect(ScribeMeetingCardText.status(card, now: clock).isEmpty)
-        #expect(ScribeMeetingCardText.label(card, now: clock).isEmpty)
-        #expect(ScribeMeetingCardText.announcement(card, now: clock).isEmpty)
+        #expect(ScribeMeetingCardText.status(card, now: t0).isEmpty)
+        #expect(ScribeMeetingCardText.label(card, now: t0).isEmpty)
+        #expect(ScribeMeetingCardText.announcement(card, now: t0).isEmpty)
         #expect(ScribeMeetingCardText.primary(card) == nil)
         #expect(ScribeMeetingCardText.cancel(card) == nil)
         #expect(!ScribeMeetingCardText.canDismiss(card))
@@ -146,10 +152,8 @@ struct ScribeMeetingCardTests {
 
     @Test func aCardReadsTheTimeFromTheWallClockItIsGiven() {
         let card = ScribeMeetingCard.offer(m, blocked: nil)
-        let later = ScribeCardClock(date: t0.addingTimeInterval(60), uptime: 160)
-        #expect(ScribeMeetingCardText.status(card, now: later) == "in 1 min")
-        let started = ScribeCardClock(date: t0.addingTimeInterval(120), uptime: 220)
-        #expect(ScribeMeetingCardText.status(card, now: started) == "now")
+        #expect(ScribeMeetingCardText.status(card, now: t0.addingTimeInterval(60)) == "in 1 min")
+        #expect(ScribeMeetingCardText.status(card, now: t0.addingTimeInterval(120)) == "now")
     }
 
     // MARK: Countdown arithmetic
@@ -173,22 +177,22 @@ struct ScribeMeetingCardTests {
     // MARK: Accessibility
 
     @Test func theLabelIsTheTitleAndTheStatus() {
-        #expect(ScribeMeetingCardText.label(.offer(m, blocked: nil), now: clock) == "Weekly sync, in 2 min")
-        #expect(ScribeMeetingCardText.label(.recording(m), now: clock) == "Weekly sync, Recording")
-        #expect(ScribeMeetingCardText.label(.offer(bareCall(), blocked: nil), now: clock) == "Call, now")
+        #expect(ScribeMeetingCardText.label(.offer(m, blocked: nil), now: t0) == "Weekly sync, in 2 min")
+        #expect(ScribeMeetingCardText.label(.recording(m), now: t0) == "Weekly sync, Recording")
+        #expect(ScribeMeetingCardText.label(.offer(bareCall(), blocked: nil), now: t0) == "Call, now")
     }
 
     @Test func theCountdownIsAnnouncedOnceNotEachSecond() {
         let five = ScribeMeetingCard.countdown(m, seconds: 5, deadline: 105, total: 5)
         let two = ScribeMeetingCard.countdown(m, seconds: 2, deadline: 105, total: 5)
-        #expect(ScribeMeetingCardText.announcement(five, now: clock) == "Weekly sync, Recording starts in 5")
-        #expect(ScribeMeetingCardText.announcement(two, now: clock) == ScribeMeetingCardText.announcement(five, now: clock))
+        #expect(ScribeMeetingCardText.announcement(five, now: t0) == "Weekly sync, Recording starts in 5")
+        #expect(ScribeMeetingCardText.announcement(two, now: t0) == ScribeMeetingCardText.announcement(five, now: t0))
     }
 
     @Test func otherCardsAreAnnouncedAsTheyAreLabelled() {
         for row in rows {
             if case .countdown = row.card { continue }
-            #expect(ScribeMeetingCardText.announcement(row.card, now: clock) == ScribeMeetingCardText.label(row.card, now: clock),
+            #expect(ScribeMeetingCardText.announcement(row.card, now: t0) == ScribeMeetingCardText.label(row.card, now: t0),
                     "\(row.name)")
         }
     }
@@ -211,9 +215,9 @@ struct ScribeMeetingCardTests {
     @Test func noWordOnACardHasADashOrAProductName() {
         var words: [String] = [ScribeMeetingCardText.symbol, ScribeMeetingCardText.dismiss]
         for row in rows {
-            words.append(ScribeMeetingCardText.status(row.card, now: clock))
-            words.append(ScribeMeetingCardText.label(row.card, now: clock))
-            words.append(ScribeMeetingCardText.announcement(row.card, now: clock))
+            words.append(ScribeMeetingCardText.status(row.card, now: t0))
+            words.append(ScribeMeetingCardText.label(row.card, now: t0))
+            words.append(ScribeMeetingCardText.announcement(row.card, now: t0))
             words.append(contentsOf: [ScribeMeetingCardText.primary(row.card), ScribeMeetingCardText.cancel(row.card),
                                       ScribeMeetingCardText.accessibilityValue(row.card)].compactMap { $0 })
         }
