@@ -24,6 +24,7 @@ HANDLER_APIS = re.compile(r"\b(?:SFSpeechRecognizer\.requestAuthorization|INFocu
 
 
 POINTING = APP / "Pointing"
+TILING = APP / "Tiling"
 # Pointing must advance on real events, never a sleep, and must never use the word-count clock.
 POINTING_FORBIDDEN = re.compile(r"\bTask\.sleep\b|SpeechDrawingTimeline\.estimate|\.installTap\(|\brequestAccess\(|\brequestAuthorization\b|CGRequestScreenCaptureAccess|CGRequestListenEventAccess")
 # System callbacks that must be installed from a nonisolated function.
@@ -40,6 +41,14 @@ def pointing_callback_offenders(text, label="sample"):
         header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
         if "nonisolated" not in header:
             offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
+def callback_offenders_under(directory):
+    """Every system-callback install under `directory` that is not in a nonisolated function."""
+    offenders = []
+    for p in sorted(directory.rglob("*.swift")):
+        offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(directory.parent)))
     return offenders
 
 
@@ -154,6 +163,9 @@ class SourceLint(unittest.TestCase):
             offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(ROOT)))
         self.assertEqual(offenders, [])
 
+    def test_tiling_system_callbacks_are_installed_from_nonisolated_functions(self):
+        self.assertEqual(callback_offenders_under(TILING), [])
+
     def test_pointing_lint_detects_its_failure_shapes(self):
         # Fail-first samples: the exact shapes the lint exists to catch.
         self.assertTrue(POINTING_FORBIDDEN.search("try await Task.sleep(for: .seconds(1))"))
@@ -163,6 +175,25 @@ class SourceLint(unittest.TestCase):
         self.assertEqual(pointing_callback_offenders(bad), ["sample:3"])
         good = "enum B {\n    nonisolated static func start() {\n        CGEvent.tapCreate(tap: x)\n    }\n}"
         self.assertEqual(pointing_callback_offenders(good), [])
+
+    def test_tiling_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: a tap installed from a main-actor function under a Tiling folder is reported.
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "Tiling"
+            folder.mkdir()
+            (folder / "Bad.swift").write_text(
+                "@MainActor final class K {\n    func start() {\n"
+                "        CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap)\n    }\n}\n")
+            self.assertEqual(callback_offenders_under(folder), ["Tiling/Bad.swift:3"])
+            (folder / "Bad.swift").write_text(
+                "enum K {\n    nonisolated func start() {\n        CGEvent.tapCreate(tap: .cgSessionEventTap)\n    }\n}\n")
+            self.assertEqual(callback_offenders_under(folder), [])
+        # The observer API the later Accessibility upgrade will use is watched too.
+        observer = "@MainActor final class K {\n    func watch() {\n        AXObserverCreate(pid, callback, &observer)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(observer), ["sample:3"])
+        fine = "enum K {\n    nonisolated func watch() {\n        AXObserverCreate(pid, callback, &observer)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(fine), [])
 
     def test_lint_detects_the_original_crash_shapes(self):
         # Fail-first evidence kept as a test: the exact pre-fix lines must be flagged.
