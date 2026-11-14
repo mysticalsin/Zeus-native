@@ -5,6 +5,8 @@ import ZeusCore
 /// Time-synced lyrics from LRCLIB for what is playing. Off until Settings > Privacy > Synced lyrics is on,
 /// because asking sends the title and artist to lrclib.net. Answers (and misses) are cached on disk; a service
 /// failure is never cached, shows `.unavailable`, and holds back every request until the shared wait is over.
+/// The one retry after a failure goes out only for the track a lyric view is showing, while it plays; otherwise
+/// nothing runs, and the next load from a lyric view starts it again.
 @MainActor
 @Observable
 final class LyricsStore {
@@ -23,6 +25,12 @@ final class LyricsStore {
 
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
+    /// True while `retryTask` is still waiting to decide; false once it asked or stopped.
+    @ObservationIgnored private var retryArmed = false
+    /// What a lyric view last showed: whether it is playing now is read from here when the wait ends.
+    @ObservationIgnored private var watching: NowPlaying?
+    /// How many lyric views are on screen.
+    @ObservationIgnored private var viewers = 0
     /// The wait after a failure. One for the whole service, so a new track does not skip it.
     @ObservationIgnored private var backoff = LyricsBackoff()
     @ObservationIgnored private let cache: LyricsCache
@@ -45,22 +53,45 @@ final class LyricsStore {
         return state
     }
 
+    /// A lyric view appeared or went away. With no view left the retry has nobody to show its answer to, so it stops.
+    func viewerAppeared() { viewers += 1 }
+    func viewerLeft() {
+        viewers = max(0, viewers - 1)
+        if viewers == 0 { cancelRetry() }
+    }
+
     func load(for playing: NowPlaying?) {
+        watching = playing
         guard Self.enabled else {
-            task?.cancel(); retryTask?.cancel()
+            task?.cancel(); cancelRetry()
             currentKey = nil
             state = .off
             return
         }
-        guard let playing else { return }
+        // Nothing is playing: drop the track and its retry, so no request is left for a track that stopped.
+        guard let playing else {
+            task?.cancel(); cancelRetry()
+            currentKey = nil
+            return
+        }
         let query = LRCLIBQuery(playing)
-        guard currentKey != query.cacheKey else { return }
+        guard currentKey != query.cacheKey else {
+            // Same track, still unanswered, the retry has stopped and it plays again: start it over.
+            if state == .unavailable, !retryArmed, playing.isPlaying { ask(query) }
+            return
+        }
         currentKey = query.cacheKey
-        task?.cancel(); retryTask?.cancel()
+        task?.cancel(); cancelRetry()
         guard query.isAskable else { state = .none; return }
         if let cached = cache.load(query) { state = Self.state(from: cached); return }
         if TopBarStyle.isSnapshot { state = .none; return }
         ask(query)
+    }
+
+    private func cancelRetry() {
+        retryTask?.cancel()
+        retryTask = nil
+        retryArmed = false
     }
 
     /// Sends the lookup, or shows `.unavailable` and waits first while the back-off is running.
@@ -100,20 +131,33 @@ final class LyricsStore {
         state = Self.state(from: result)
     }
 
-    /// When the wait ends and this track is still the current one, ask once.
+    /// Waits out the back-off, then asks once, but only while ZeusCore's rule says the retry still matters:
+    /// this track is current and unanswered, it is playing, a lyric view is on screen, lyrics are on.
     private func scheduleRetry(_ query: LRCLIBQuery) {
         retryTask?.cancel()
+        retryArmed = true
         let key = query.cacheKey
         retryTask = Task { [weak self] in
-            while let wait = self?.backoff.remaining(now: Date()), wait > 0 {
-                try? await Task.sleep(for: .seconds(wait))
-                if Task.isCancelled { return }
+            while !Task.isCancelled {
+                guard let plan = self?.retryPlan(for: key) else { return }
+                switch plan {
+                case .wait(let seconds): try? await Task.sleep(for: .seconds(seconds))
+                case .askNow: self?.retryDue(query); return
+                case .stop: self?.retryArmed = false; return
+                }
             }
-            guard let self, !Task.isCancelled, currentKey == key, state == .unavailable else { return }
-            // Lyrics were switched off during the wait: send nothing, and let the next load start over.
-            guard Self.enabled else { currentKey = nil; return }
-            ask(query)
         }
+    }
+
+    private func retryPlan(for key: String) -> LyricsRetryPlan {
+        LyricsRetry.plan(remaining: backoff.remaining(now: Date()),
+                         sameTrack: currentKey == key && state == .unavailable,
+                         isPlaying: watching?.isPlaying == true, visible: viewers > 0, enabled: Self.enabled)
+    }
+
+    private func retryDue(_ query: LRCLIBQuery) {
+        retryArmed = false
+        ask(query)
     }
 
     /// Snapshots and tests: set the answer for a track without the network.
@@ -161,8 +205,10 @@ struct LyricsView: View {
     var body: some View {
         let store = LyricsStore.shared
         content(store.state(for: playing))
-            .onAppear { store.load(for: playing) }
+            .onAppear { store.viewerAppeared(); store.load(for: playing) }
+            .onDisappear { store.viewerLeft() }
             .onChange(of: playing.map { LRCLIBQuery($0).cacheKey }) { store.load(for: playing) }
+            .onChange(of: playing?.isPlaying) { store.load(for: playing) }
     }
 
     @ViewBuilder
@@ -261,7 +307,8 @@ private struct LyricWindow: View {
 /// the same as the whole-line Text. Sung words and the word being sung are white, words to come the next-line tone.
 /// It wakes at word changes with a sleeping task, not a fast timer: the task covers the stretch until the next
 /// once-a-second tick (which restarts it and re-reads the playback position), and it does nothing while
-/// paused, in snapshots, or after the view goes away. The row's accessibility label already reads the whole line.
+/// paused, in snapshots, or after the view goes away. A pause or a seek restarts it at once. The row's accessibility
+/// label already reads the whole line.
 private struct WordLitText: View {
     let line: LyricLine
     let lineEnd: Double
@@ -269,6 +316,13 @@ private struct WordLitText: View {
     let tick: Date
     /// Bumped at each word change to redraw this view.
     @State private var revision = 0
+
+    /// What the wake-up task was planned from: a new tick, a pause or a seek replaces it.
+    private struct WakeKey: Equatable {
+        var tick: Date
+        var isPlaying: Bool
+        var positionAt: Date
+    }
 
     /// How long one wake-up task runs at most; the next tick replaces it.
     private static let window: TimeInterval = 1.5
@@ -281,7 +335,7 @@ private struct WordLitText: View {
         Text(runs(words, lit: lit))
             .contentTransition(Motion.reduced ? .identity : .opacity)
             .animation(Motion.reduced ? nil : .easeOut(duration: 0.18), value: lit)
-            .task(id: tick) { await wake(words) }
+            .task(id: WakeKey(tick: tick, isPlaying: playing.isPlaying, positionAt: playing.positionAt)) { await wake(words) }
     }
 
     private func runs(_ words: [LyricWord], lit: Int?) -> AttributedString {
