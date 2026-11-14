@@ -688,7 +688,7 @@ class TilingWiringLint(unittest.TestCase):
         sync = self.body(self.DELEGATE, "private func syncTiling()", "\n    }\n")
         self.assertIn("guard on(.tiling)", sync)
         self.assertIn("TilingController.shared.start()", sync)
-        self.assertIn("UserDefaults.didChangeNotification", self.body(self.DELEGATE, "if on(.tiling) {", "\n        }\n"))
+        self.assertIn("UserDefaults.didChangeNotification", self.body(self.DELEGATE, "if on(.tiling) {\n", "\n        }\n"))
         terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
         self.assertIn("TilingController.shared.stop()", terminate)
 

@@ -91,8 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SystemAudioDucker.end()
         explanation?.stop()
         pointing?.stop()
-        // Tiling removes its key tap, observers and overlays. It never moves a window on the way out.
-        TilingController.shared.stop()
+        // Tiling removes its key tap, observers and overlays. It never moves a window on the way out. The controller
+        // is not even made when the service is denied.
+        if on(.tiling) { TilingController.shared.stop() }
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
         // A Memory edit typed inside its 600 ms pause is written before Zeus goes.

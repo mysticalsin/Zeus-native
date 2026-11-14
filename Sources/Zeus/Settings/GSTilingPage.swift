@@ -20,6 +20,9 @@ struct TilingSettingsPage: View {
                 GSPopup(selection: store.stringBinding("tiling.keyBase"),
                         options: SettingsCatalog.option("tiling.keyBase")?.choices ?? [], label: "Tiling keys")
             }
+            if let note = TilingKeyClash.note(base: TileModifierBase(label: store.string("tiling.keyBase"))) {
+                GSInfo(text: "\(note) Tiling stays off until you pick another pair.")
+            }
             GSInfo(text: "Moving windows uses Accessibility. Zeus never asks for it from here: allow it in Permissions.")
         }
         GSCard("Layout") {

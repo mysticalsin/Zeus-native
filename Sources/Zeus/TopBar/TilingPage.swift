@@ -20,6 +20,10 @@ struct TilingPage: View {
             Tile(padding: 12) { TilingKeyListView(rows: tiling.keyRows) }
         }
         .onAppear { if !TopBarStyle.isSnapshot { tiling.refresh() } }
+        // Accessibility is granted in System Settings, so the row is read again when Zeus comes back to the front.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if !TopBarStyle.isSnapshot { tiling.refresh() }
+        }
     }
 }
 
@@ -65,16 +69,20 @@ private struct TilingControls: View {
             }
             Text(phase.detail).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            if let note = tiling.keyClashNote {
+                Text(note).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
+                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Tiling is \(phase.word)")
-        .accessibilityValue(phase.detail)
+        .accessibilityValue([phase.detail, tiling.keyClashNote].compactMap { $0 }.joined(separator: " "))
     }
 
     private var tint: Color {
         switch phase {
         case .running: Theme.accent
-        case .needsAccessibility, .keysUnavailable: Theme.bolt
+        case .needsAccessibility, .keysUnavailable, .keyClash: Theme.bolt
         case .off, .paused: Theme.cloudQuiet
         }
     }
@@ -117,9 +125,13 @@ private struct TilingControls: View {
             ForEach(TileModifierBase.allCases, id: \.self) { base in
                 let selected = tiling.config.base == base
                 Button { tiling.chooseBase(base) } label: {
-                    Text(base.glyphs).font(TopBarStyle.label(11, .semibold))
-                        .foregroundStyle(selected ? Theme.storm : Theme.cloudSecondary)
-                        .padding(.horizontal, 9).padding(.vertical, 3)
+                    HStack(spacing: 3) {
+                        // The chosen pair also carries a check, so it reads without colour.
+                        if selected { Image(systemName: "checkmark").font(.system(size: 8, weight: .bold)) }
+                        Text(base.glyphs).font(TopBarStyle.label(11, .semibold))
+                    }
+                    .foregroundStyle(selected ? Theme.storm : Theme.cloudSecondary)
+                    .padding(.horizontal, 9).padding(.vertical, 3)
                         .background(Capsule().fill(selected ? Theme.accent : Color.white.opacity(0.08)))
                 }
                 .buttonStyle(PressableStyle())
