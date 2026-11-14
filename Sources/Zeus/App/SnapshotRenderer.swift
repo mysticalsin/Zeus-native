@@ -367,6 +367,16 @@ enum SnapshotRenderer {
         brightTop.show(.brightness(0.75))
         saveSurface(NotchStage(model: brightNotch, topBar: brightTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "hud-brightness")
 
+        // The drawn notch on a display without one: idle, with music wings, and with the calibration guide.
+        let drawn = NotchFootprint.drawn(DrawnNotchShape(width: 200, height: 34, offset: 0))
+        let drawnIdle = NotchModel()
+        saveSurface(NotchStage(model: drawnIdle, topBar: TopBarModel(), footprint: drawn), size: CGSize(width: 960, height: 120), name: "notch-drawn-idle")
+        let (drawnMusic, drawnMusicBar) = sampleModel()
+        drawnMusic.presentation = .closed
+        saveSurface(NotchStage(model: drawnMusic, topBar: drawnMusicBar, footprint: drawn), size: CGSize(width: 960, height: 120), name: "notch-drawn-music")
+        let drawnGuide = NotchModel()
+        saveSurface(NotchStage(model: drawnGuide, topBar: TopBarModel(), footprint: drawn, guide: true), size: CGSize(width: 960, height: 120), name: "notch-drawn-guide")
+
         // Item 8's own row ("orb: the real voice orb or recorder pill view, not a MascotTile") and
         // P0 item F.3 (QA7): the real `RecorderPillView`, with its real `ThinkingOrbView`, in every
         // state Tony asked to see -- never the `ObsidianOrbSnapshotView` placeholder this used to be.
