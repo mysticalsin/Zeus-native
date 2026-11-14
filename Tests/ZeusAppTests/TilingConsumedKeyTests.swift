@@ -28,7 +28,8 @@ struct TilingConsumedKeyTests {
         let monitor = HotkeyMonitor()
         let presses = Presses()
         monitor.keyProvider = { key }
-        monitor.onPress = { presses.count += 1 }
+        monitor.onPress = { presses.count += 1; return true }
+        monitor.liveModifiers = { nil }
         monitor.observeConsumedKeys()
         return (monitor, presses)
     }
@@ -77,7 +78,8 @@ struct TilingConsumedKeyTests {
         monitor.role = .dictation
         monitor.keyProvider = { key }
         monitor.sharedProvider = { true }
-        monitor.onPress = { seen.starts += 1 }
+        monitor.onPress = { seen.starts += 1; return true }
+        monitor.liveModifiers = { nil }
         monitor.onRelease = { seen.ends += 1 }
         monitor.onCancel = { seen.cancels += 1 }
         monitor.observeConsumedKeys()
@@ -128,10 +130,10 @@ struct TilingConsumedKeyTests {
         monitor.role = role
         monitor.keyProvider = { key }
         monitor.sharedProvider = { false }
-        monitor.onPress = { turns.starts += 1 }
+        monitor.onPress = { turns.starts += 1; return true }
+        monitor.liveModifiers = { nil }
         monitor.onRelease = { turns.releases += 1 }
         monitor.onCancel = { turns.cancels += 1 }
-        monitor.cancelsWhenSpoiled = role == .talk
         monitor.observeConsumedKeys()
         return (monitor, turns)
     }
@@ -185,7 +187,6 @@ struct TilingConsumedKeyTests {
         #expect(turns.starts == 1 && turns.cancels == 1 && turns.releases == 0, "\(turns.starts) \(turns.releases) \(turns.cancels)")
     }
 
-    /// Shift joining a hold is how the owner asks for Return after dictation, so it ends the hold as before.
     /// Pressed as a plain modifier chord with no key, then Command let go first: the smaller pair is held again, but the
     /// turn was cancelled, so it stays cancelled until every modifier is up, as the pointing hold does.
     @Test func aCancelledHoldDoesNotRestartWhenTheExtraModifierIsLetGo() {
@@ -202,13 +203,37 @@ struct TilingConsumedKeyTests {
         #expect(turns.starts == 2, "a fresh hold works again")
     }
 
-    @Test func shiftJoiningAHoldStillEndsItTheNormalWay() async throws {
+    /// Shift joining a dictation hold is how the owner asks for Return, so the turn runs on: nothing is sent while Shift is
+    /// down, and the release of a key of the hold sends it once. The swap and nudge chords are the pair plus Shift, so a
+    /// release at the Shift would let a tiling chord send dictation.
+    @Test func shiftJoiningADictationHoldKeepsItUntilTheKeyIsLetGo() async throws {
         let (monitor, turns) = turnMonitor(role: .dictation)
         monitor.feed(.flags(keyCode: 59, modifiers: [.control]))
         monitor.feed(.flags(keyCode: 58, modifiers: [.control, .option]))
         monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option, .shift]))
-        try await hold(0.55) // a quick tap waits for a possible second tap before it ends
+        try await hold(0.55) // the old rule sent after a quick tap's gap
+        #expect(turns.starts == 1 && turns.releases == 0 && turns.cancels == 0, "\(turns.starts) \(turns.releases) \(turns.cancels)")
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control, .shift]))
+        #expect(turns.releases == 1 && turns.cancels == 0, "the key let go with Shift down sends once: \(turns.releases) \(turns.cancels)")
+        monitor.feed(.flags(keyCode: 56, modifiers: []))
+        monitor.feed(.flags(keyCode: 59, modifiers: []))
+        try await hold(0.55)
         #expect(turns.starts == 1 && turns.releases == 1 && turns.cancels == 0, "\(turns.starts) \(turns.releases) \(turns.cancels)")
+    }
+
+    /// Shift let go first and then the key is one release, and a quick second tap that Shift joined never latches.
+    @Test func aDictationPressThatShiftJoinedIsSentOnceAndNeverLatchesHandsFree() async throws {
+        let (monitor, turns) = turnMonitor(key: .rightCommand, role: .dictation)
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 56, modifiers: [.command, .shift]))
+        monitor.feed(.flags(keyCode: 56, modifiers: [.command]))
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        #expect(turns.releases == 1 && turns.cancels == 0, "\(turns.starts) \(turns.releases) \(turns.cancels)")
+        try await hold(0.55)
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(turns.starts == 2 && turns.releases == 1, "not hands-free: the next press starts a turn, \(turns.starts) \(turns.releases)")
     }
 
     @Test func aPlainHoldAndReleaseStillSendsTheTurn() async throws {
