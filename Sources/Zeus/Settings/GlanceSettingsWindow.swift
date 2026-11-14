@@ -8,7 +8,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     case general, appearance, sounds, notifications, shortcuts, insomnia
     case integrations, murmure, polyglot, dictation, voice, engine, iPhone
     case license, permissions, privacy, diagnostics, about
-    case features, beamer
+    case features, beamer, tiling
 
     var id: String { rawValue }
 
@@ -17,7 +17,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     var group: Group {
         switch self {
         case .general, .appearance, .sounds, .notifications, .shortcuts, .insomnia: .settings
-        case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer: .tools
+        case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer, .tiling: .tools
         case .license, .permissions, .privacy, .diagnostics, .about: .app
         }
     }
@@ -47,6 +47,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .iPhone: "iPhone"
         case .features: "Features"
         case .beamer: "Beamer"
+        case .tiling: "Tiling"
         case .license: "License"
         case .permissions: "Permissions"
         case .privacy: "Privacy"
@@ -83,6 +84,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .iPhone: "iphone"
         case .features: "switch.2"
         case .beamer: "rectangle.connected.to.line.below"
+        case .tiling: "rectangle.split.2x2"
         case .license: "key"
         case .permissions: "checkmark.shield"
         case .privacy: "lock.shield"
@@ -163,7 +165,7 @@ struct GlanceSettingsRoot: View {
     }
 }
 
-/// Logo tile, wordmark, three groups of items (28 pt apart), version at the foot.
+/// Logo tile, wordmark, three groups of items (27 pt apart), version at the foot.
 struct GSSidebar: View {
     let navigation: GSNavigation
 
@@ -209,7 +211,8 @@ struct GSSidebar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, 2)
+        // 1 pt between items, so twenty rows still end above the version line at y 751.
+        .padding(.bottom, 1)
         .accessibilityLabel(section.title)
         .accessibilityIdentifier("settings.sidebar.\(section.rawValue)")
         .accessibilityAddTraits(selected ? [.isSelected] : [])

@@ -129,7 +129,7 @@ struct TilingSettingsCatalogTests {
 
     // MARK: Import
 
-    @Test func theCatalogListsTilingAmongTheSwitchesAnImportCannotTurnOn() {
+    @MainActor @Test func theCatalogListsTilingAmongTheSwitchesAnImportCannotTurnOn() {
         #expect(SettingsStore.neverEnabledByImport.contains("tiling.enabled"))
         // The focus border is passive: an import may carry it either way.
         #expect(!SettingsStore.neverEnabledByImport.contains("tiling.focusBorder"))
@@ -223,7 +223,7 @@ struct TilingSettingsCatalogTests {
         #expect(!GSSection.tiling.symbol.isEmpty)
     }
 
-    @Test func theLegacySectionNamesTheSameWords() {
+    @MainActor @Test func theLegacySectionNamesTheSameWords() {
         #expect(SettingsNavigation.Section.tiling.title == "Tiling")
         #expect(SettingsNavigation.Section.shown.contains(.tiling))
     }
