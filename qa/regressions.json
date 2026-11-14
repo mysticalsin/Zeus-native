@@ -4486,6 +4486,102 @@
         "file": "Tests/ZeusCoreTests/NowPlayingDisplayTests.swift",
         "function": "aBrowserItemDrawsNoPreviousNextShuffleOrRepeat"
       }
+    },
+    {
+      "id": "REG-460",
+      "failure": "A call that ran in a browser tab could be read as media and paused by dictation, because its tab looked like any other playing tab.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserMediaTests.swift",
+        "function": "whileACallRunsInABrowserNoItemIsShownAndNoCommandIsSent"
+      }
+    },
+    {
+      "id": "REG-461",
+      "failure": "A page opened from a file, or one in a private window, could be reported as playing media, so a page written to disk or a private tab could reach the notch.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserMediaTests.swift",
+        "function": "onlyAWebPageIsAnItemNeverAFileOrAPrivateWindow"
+      }
+    },
+    {
+      "id": "REG-462",
+      "failure": "A bridge that refused the app and a bridge that was slow looked the same, so the poll could never back off against a refusal.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-socket-safety",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+        "function": "exchangeTellsAMissingPathASilentListenerAndAClosingOneApart"
+      }
+    },
+    {
+      "id": "REG-463",
+      "failure": "Failed polls retried every few seconds forever, which made the bridge check Zeus's signature again and again while Chrome was not connected.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserPollMachineTests.swift",
+        "function": "theBackOffIsFiveTenTwentyFortySixtyAndStaysAtSixty"
+      }
+    },
+    {
+      "id": "REG-464",
+      "failure": "With Show music from set to one player, Chrome was still asked what its tabs play.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserPollMachineTests.swift",
+        "function": "aPinStopsPollingAndDropsTheEntriesAndAnyPlayerStartsItAgain"
+      }
+    },
+    {
+      "id": "REG-465",
+      "failure": "A media command could be sent to a tab from code other than the feed, such as a voice or tag path, which would let a model pause a page.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_media_command_goes_out_only_through_the_bridge_and_the_feed"
+      }
+    },
+    {
+      "id": "REG-466",
+      "failure": "The Chrome output gate could tap or read audio instead of listening to property changes.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_output_gate_listens_to_properties_and_never_taps_audio"
+      }
+    },
+    {
+      "id": "REG-467",
+      "failure": "A settings file could turn on reading Chrome tab media for a person who had not chosen it.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_media_toggle_is_never_turned_on_by_an_import"
+      }
     }
   ]
 }
