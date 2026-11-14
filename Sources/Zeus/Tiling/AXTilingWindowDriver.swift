@@ -18,6 +18,8 @@ final class AXTilingWindowDriver: TilingWindowDriver {
     static let messagingTimeout: Float = 0.25
 
     private let trustCheck: @MainActor () -> Bool
+    /// The admission policy of the last listing, so a window can be judged again before it is given the keyboard.
+    private var lastPolicy: TileAdmissionPolicy?
     private var allocator = TileIDAllocator()
     /// The live element behind each id handed out, by app. Identity is `CFEqual` on the element.
     private var known: [pid_t: [(element: AXUIElement, id: TileWindowID)]] = [:]
@@ -55,11 +57,13 @@ final class AXTilingWindowDriver: TilingWindowDriver {
             // Nothing from before the permission was revoked may survive its return.
             known = [:]
             admitted = []
+            lastPolicy = nil
             unreadPIDs = Set(NSWorkspace.shared.runningApplications.map(\.processIdentifier))
             return []
         }
         let policy = TileAdmissionPolicy(config: config, zeusPID: ProcessInfo.processInfo.processIdentifier,
                                          zeusBundleID: Bundle.main.bundleIdentifier)
+        lastPolicy = policy
         let onScreen = Self.onScreenWindows()
         let deadline = ProcessInfo.processInfo.systemUptime + Self.passBudget
         let running = NSWorkspace.shared.runningApplications.filter { !$0.isTerminated }
@@ -236,8 +240,12 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         return frame(position: values[0], size: values[1])
     }
 
+    /// Gives `window` the keyboard only when it is still a window tiling would list: the listing it came from can be
+    /// minutes old, and raising a window that has since been minimized or sent to another Space would bring it back or
+    /// switch Spaces. The app is read again, in one pass with the listing's budget, and a window that does not pass
+    /// admission now, or an app that does not answer, is left alone.
     func focus(_ window: TileWindowID) {
-        guard isTrusted, let element = element(for: window) else { return }
+        guard isTrusted, let element = element(for: window), stillAdmitted(window) else { return }
         let app = AXUIElementCreateApplication(window.pid)
         AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
         AXUIElementSetMessagingTimeout(element, Self.messagingTimeout)
@@ -245,6 +253,14 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         AXUIElementSetAttributeValue(element, kAXMainAttribute as CFString, kCFBooleanTrue)
         AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
         AXUIElementPerformAction(element, kAXRaiseAction as CFString)
+    }
+
+    private func stillAdmitted(_ window: TileWindowID) -> Bool {
+        guard let policy = lastPolicy, let app = NSRunningApplication(processIdentifier: window.pid),
+              !app.isTerminated, !app.isHidden else { return false }
+        let deadline = ProcessInfo.processInfo.systemUptime + Self.passBudget
+        guard let refs = scan(app, onScreen: Self.onScreenWindows(), policy: policy, deadline: deadline) else { return false }
+        return refs.contains { $0.id == window }
     }
 
     /// The front app's focused window, when the last listing admitted it, and whether that window is in full screen.

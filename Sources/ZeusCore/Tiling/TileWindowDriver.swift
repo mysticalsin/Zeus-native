@@ -54,7 +54,8 @@ public protocol TilingWindowDriver: AnyObject {
     /// Only a window the last `windows(config:)` returned can be written; any other id is refused.
     func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool
     /// Brings `window` to the front and gives it keyboard focus. Does nothing for a window the last
-    /// `windows(config:)` did not return.
+    /// `windows(config:)` did not return, or one that no longer passes admission when this call reads it again
+    /// (minimized or moved to another Space since).
     func focus(_ window: TileWindowID)
     /// Which window has the keyboard, and whether the front app is in full screen. Empty without Accessibility.
     func frontmost() -> TileFrontmost
