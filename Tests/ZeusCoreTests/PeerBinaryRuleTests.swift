@@ -515,4 +515,33 @@ struct PeerVerificationWiringTests {
         let reply = await Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 2) }.value
         #expect(reply == Data("app".utf8))
     }
+
+    private final class FirstCallGate: @unchecked Sendable {
+        private let lock = NSLock()
+        private let release = DispatchSemaphore(value: 0)
+        private var calls = 0
+        /// Blocks the first caller until `open()`; every later caller passes at once.
+        func pass() { if lock.withLock({ calls += 1; return calls == 1 }) { _ = release.wait(timeout: .now() + 10) } }
+        var entered: Int { lock.withLock { calls } }
+        func open() { release.signal() }
+    }
+
+    @Test func aSlowSignatureCheckDoesNotHoldUpAnotherConnection() async throws {
+        let (root, path) = try socketPath("f.sock")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gate = FirstCallGate()
+        let server = UnixSocketServer(path: path, peerPolicy: .sameUserExecutable([ownName]), peerVerifier: { _ in
+            gate.pass()
+            return .allow
+        }) { _, reply in reply(Data("{\"ok\":true}".utf8)) }
+        try server.start()
+        defer { server.stop() }
+        let slow = Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 8) }
+        for _ in 0..<200 where gate.entered == 0 { try await Task.sleep(nanoseconds: 10_000_000) }
+        #expect(gate.entered == 1, "the first peer is being checked")
+        let second = await Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 2) }.value
+        #expect(second == Data("{\"ok\":true}".utf8), "the second peer is not queued behind the first check")
+        gate.open()
+        #expect(await slow.value == Data("{\"ok\":true}".utf8), "the slow peer is admitted once its check passes")
+    }
 }

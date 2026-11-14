@@ -237,9 +237,7 @@ public final class UnixSocketServer: @unchecked Sendable {
             guard UnixSocket.prepare(client) else { close(client); continue }
             // Refuse before any byte is read: only the owner (and, where set, the named program) may talk.
             let peer = PeerCheck.identify(fd: client)
-            var verdict = PeerCheck.decide(peerPolicy, ownUID: UInt32(geteuid()), peer: peer)
-            // A file name proves nothing: a program that must be this app's own is judged by its signature too.
-            if verdict.isAllowed, peerPolicy.requiresSignedApp { verdict = peerVerifier(peer?.auditToken) }
+            let verdict = PeerCheck.decide(peerPolicy, ownUID: UInt32(geteuid()), peer: peer)
             if case .deny(let reason) = verdict {
                 NSLog("[ZEUS] socket %@: connection refused (%@, pid %d)", (path as NSString).lastPathComponent, reason, peer?.pid ?? -1)
                 close(client)
@@ -257,7 +255,21 @@ public final class UnixSocketServer: @unchecked Sendable {
                 connections[id] = connection
                 return true
             }
-            if admitted { connection.receive(handler) } else { connection.cancel() }
+            guard admitted else { connection.cancel(); continue }
+            guard peerPolicy.requiresSignedApp else { connection.receive(handler); continue }
+            // A program that must be this app's own is judged by its signature too, since a file name proves nothing.
+            // The check reads the peer's code and can be slow, so it runs per connection off the accept queue: one slow
+            // check never holds up another accept. The connection is already counted against the limit and reads
+            // nothing until the check allows it.
+            let name = (path as NSString).lastPathComponent, pid = peer?.pid ?? -1, handler = self.handler
+            DispatchQueue.global(qos: .userInitiated).async {
+                if case .deny(let reason) = verifier(token) {
+                    NSLog("[ZEUS] socket %@: connection refused (%@, pid %d)", name, reason, pid)
+                    connection.cancel()
+                    return
+                }
+                connection.receive(handler)
+            }
         }
     }
 
