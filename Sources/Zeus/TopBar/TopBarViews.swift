@@ -480,6 +480,7 @@ struct TopBarPage: View {
             case .polyglot: PolyglotPage(polyglot: .shared, topBar: topBar)
             case .recordly: RecordlyPage(topBar: topBar, recordly: topBar.recordlyForSnapshot ?? .shared)
             case .scribe: ScribePage(topBar: topBar, scribe: .shared)
+            case .tiling: TilingPage(topBar: topBar, tiling: topBar.tilingForSnapshot ?? .shared)
             case .chat: ChatPage(chat: .shared)
             case .usage: UsagePage(usage: .shared)
             case .today: TodayPage(topBar: topBar, today: .shared)

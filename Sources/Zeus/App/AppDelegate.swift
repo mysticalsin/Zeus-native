@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pointing: PointingController?
     private var pointingProviders: PointingProviders?
     private var pointingSettingsObserver: NSObjectProtocol?
+    private var tilingSettingsObserver: NSObjectProtocol?
     private var explanationQuitToken: UUID?
     private var explanationDeletionTasks: [UUID: Task<Void, Never>] = [:]
     /// History UUID -> conversation UUID. Retained until exact deletion succeeds.
@@ -90,6 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SystemAudioDucker.end()
         explanation?.stop()
         pointing?.stop()
+        // Tiling removes its key tap, observers and overlays. It never moves a window on the way out.
+        TilingController.shared.stop()
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
         // A Memory edit typed inside its 600 ms pause is written before Zeus goes.
@@ -293,6 +296,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pointingSettingsObserver = NotificationCenter.default.addObserver(
                 forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.syncPointing() }
+            }
+        }
+        if on(.tiling) {
+            syncTiling()
+            // The switch can change while Zeus runs; tiling starts or stops with it.
+            tilingSettingsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncTiling() }
             }
         }
         if on(.polyglotHotkey) {
@@ -515,6 +526,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenEdgeGlowController.shared.boostCaptureVisibility(for: captureBoost)
             EdgeWaveController.shared.boostCaptureVisibility(for: captureBoost)
             ScreenCornerOverlay.shared.boostCaptureVisibility(for: captureBoost)
+            TilingFocusBorder.shared.boostCaptureVisibility(for: captureBoost)
+            TilingKeySheet.shared.boostCaptureVisibility(for: captureBoost)
             return NotchDebugAnimator.run(lower, topBar: self.topBar)
         }
     }
@@ -597,6 +610,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         syncDictationPreset()
         if PointingSettings.enabled { pointingController().start() }
         else if let pointing { pointing.stop(); self.pointing = nil; pointingProviders = nil }
+    }
+
+    /// Tiling: off until the owner turns it on (`tiling.enabled`). Starting it installs the key layer and waits for
+    /// Accessibility without a prompt; turning it off removes everything. Cheap when nothing changed, because the
+    /// settings notify on every preference write.
+    private func syncTiling() {
+        guard on(.tiling) else { return }
+        if FeatureSettings.tilingEnabled() { TilingController.shared.start() } else { TilingController.shared.stop() }
     }
 
     /// The optional Fn+Control dictation key. Off by default; turning it off restores the previous key.

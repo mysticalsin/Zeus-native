@@ -233,6 +233,30 @@ final class AXTilingWindowDriver: TilingWindowDriver {
         AXUIElementPerformAction(element, kAXRaiseAction as CFString)
     }
 
+    /// The front app's focused window, when the last listing admitted it, and whether that window is in full screen.
+    /// One app, two reads, with the same messaging timeout as everything else; anything unreadable is "not full
+    /// screen" and "no focused window", which leaves the layout as it is.
+    func frontmost() -> TileFrontmost {
+        guard isTrusted, let app = NSWorkspace.shared.frontmostApplication, !app.isTerminated else { return .none }
+        let pid = app.processIdentifier
+        let appElement = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(appElement, Self.messagingTimeout)
+        var raw: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &raw) == .success,
+              let raw, CFGetTypeID(raw) == AXUIElementGetTypeID() else { return .none }
+        let window = raw as! AXUIElement // swiftlint:disable:this force_cast
+        AXUIElementSetMessagingTimeout(window, Self.messagingTimeout)
+        var full: CFTypeRef?
+        var isFullScreen = false
+        if AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &full) == .success, let full,
+           CFGetTypeID(full) == CFBooleanGetTypeID() {
+            isFullScreen = CFBooleanGetValue(full as! CFBoolean) // swiftlint:disable:this force_cast
+        }
+        let entry = known[pid]?.first { CFEqual($0.element, window) }
+        let focused = entry.flatMap { admitted.contains($0.id) ? $0.id : nil }
+        return TileFrontmost(focused: focused, isFullScreen: isFullScreen)
+    }
+
     private static func tileRect(_ rect: CGRect) -> TileRect {
         TileRect(x: rect.origin.x, y: rect.origin.y, width: rect.size.width, height: rect.size.height)
     }

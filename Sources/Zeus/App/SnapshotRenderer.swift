@@ -940,6 +940,14 @@ enum SnapshotRenderer {
                 if tab == .usage { UsageModel.shared.loadNow() }
                 if tab == .polyglot { PolyglotController.shared.seedForSnapshot() }
                 if tab == .shelf { t.shelf = [.init(url: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff"))] }
+                if tab == .tiling { t.tilingForSnapshot = TilingController.snapshotFixture(.running) }
+            }))
+        }
+        // The Tiling page in the other states a person meets: two screens, off, Accessibility missing, paused.
+        for state in TilingSnapshotState.allCases where state != .running {
+            let index = TopBarTab.allCases.firstIndex(of: .tiling) ?? 0
+            states.append((String(format: "%02d-page-tiling-%@", 10 + index, state.rawValue), make(.tiling) { _, t in
+                t.tilingForSnapshot = TilingController.snapshotFixture(state)
             }))
         }
         // The Record page in the states a person meets: one or two displays, permission missing, countdown, recording, saved.
