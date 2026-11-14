@@ -7,11 +7,12 @@ import Testing
 @Suite struct TileBaseConflictsTests {
     /// `talk` is the key the owner chose; the rule works out the key the talk monitor really listens on.
     private func notes(_ base: TileModifierBase = .controlOption, talk: Shortcut = .controlOption,
-                       dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, chat: ChatHotkey = .off,
-                       voiceOverOn: Bool = false, keymap: TileKeymap? = nil,
+                       dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, polyglot: Shortcut? = nil,
+                       chat: ChatHotkey = .off, voiceOverOn: Bool = false, keymap: TileKeymap? = nil,
                        others: [TileBaseConflicts.NamedShortcut] = []) -> [String] {
         TileBaseConflicts.notes(base: base, keymap: keymap ?? TileKeymap.defaults(base: base), talk: talk,
-                                dictation: dictation, pointing: pointing, chat: chat, voiceOverOn: voiceOverOn, others: others)
+                                dictation: dictation, pointing: pointing, polyglot: polyglot, chat: chat,
+                                voiceOverOn: voiceOverOn, others: others)
     }
 
     /// A keyed chord on `modifiers`: left arrow, J and Space.
@@ -166,6 +167,39 @@ import Testing
         #expect(found.count == 1 && found[0].contains("Dictation") && found[0].contains("also your"), "\(found)")
     }
 
+    // MARK: Polyglot
+
+    /// Polyglot ships on, with Control-Option-T. Its monitor reads every key the tiling tap forwards as a consumed key
+    /// and toggles audio capture on an exact match, so a chord both features bind would float a window and start
+    /// capturing audio from one key press.
+    private let polyglotDefault = Shortcut(keyCode: 17, modifiers: [.control, .option])
+
+    @Test func theShippedPolyglotKeyAgainstTheControlOptionPairIsAClash() {
+        let found = notes(.controlOption, talk: .rightOption, dictation: nil, polyglot: polyglotDefault)
+        #expect(found.count == 1 && found[0].contains("Polyglot") && found[0].contains("tiling key"), "\(found)")
+        #expect(found[0].contains(polyglotDefault.symbol), "\(found)")
+    }
+
+    @Test func aPolyglotKeyOnAnotherTilingChordIsAClash() {
+        let found = notes(.controlOptionCommand, talk: .rightOption, dictation: nil,
+                          polyglot: chord(keyT, [.control, .option, .command]))
+        #expect(found.count == 1 && found[0].contains("Polyglot"), "\(found)")
+        let shifted = notes(.controlOption, talk: .rightOption, dictation: nil, polyglot: chord(leftArrow, [.control, .option, .shift]))
+        #expect(shifted.count == 1 && shifted[0].contains("Polyglot"), "swap left: \(shifted)")
+    }
+
+    @Test func aPolyglotKeyTheKeymapDoesNotBindIsClearAndAnOffKeyIsIgnored() {
+        #expect(notes(.controlOptionCommand, talk: .rightOption, dictation: nil, polyglot: polyglotDefault).isEmpty,
+                "the shipped pair binds Control-Option-Command chords, not Control-Option-T")
+        #expect(notes(.controlOption, talk: .rightOption, dictation: nil, polyglot: chord(space, [.control, .option])).isEmpty)
+        #expect(notes(.controlOption, talk: .rightOption, dictation: nil, polyglot: nil).isEmpty)
+    }
+
+    @Test func aModifierOnlyPolyglotKeyEqualToThePairHoldsIt() {
+        let found = notes(.optionCommand, talk: .rightOption, dictation: nil, polyglot: .optionCommand)
+        #expect(found.count == 1 && found[0].contains("Polyglot") && found[0].contains("also your"), "\(found)")
+    }
+
     // MARK: The other global Zeus shortcuts
 
     private func named(_ name: String, _ code: UInt16, _ modifiers: ShortcutModifiers) -> TileBaseConflicts.NamedShortcut {
@@ -198,7 +232,7 @@ import Testing
         func shipped(voiceOver: Bool) -> [String] {
             TileBaseConflicts.notes(base: base, keymap: TileKeymap.defaults(base: base),
                                     talk: ShortcutStore.talkDefault, dictation: .rightCommand, pointing: .controlOption,
-                                    chat: .standard, voiceOverOn: voiceOver, others: shippedOthers)
+                                    polyglot: polyglotDefault, chat: .standard, voiceOverOn: voiceOver, others: shippedOthers)
         }
         #expect(shipped(voiceOver: false).isEmpty, "\(shipped(voiceOver: false))")
         // With VoiceOver running the pair holds Control and Option, which VoiceOver owns: that note alone, nothing else.

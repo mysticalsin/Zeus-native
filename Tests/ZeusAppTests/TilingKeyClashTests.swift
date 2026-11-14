@@ -9,10 +9,10 @@ import ZeusCore
 @Suite("Tiling key clash reader", .serialized) @MainActor
 struct TilingKeyClashTests {
     private func note(_ base: TileModifierBase, talk: Shortcut = .controlOption, voiceOverOn: Bool, dictation: Shortcut? = nil,
-                      pointing: Shortcut? = nil) -> String? {
+                      pointing: Shortcut? = nil, polyglot: Shortcut? = nil) -> String? {
         TilingKeyClash.note(base: base, keymap: nil,
-                            keys: TilingKeyClash.Keys(talk: talk, dictation: dictation, pointing: pointing, chat: .off,
-                                                      voiceOverOn: voiceOverOn, others: []))
+                            keys: TilingKeyClash.Keys(talk: talk, dictation: dictation, pointing: pointing, polyglot: polyglot,
+                                                      chat: .off, voiceOverOn: voiceOverOn, others: []))
     }
 
     @Test func theNoteFollowsTheKeyTheTalkMonitorListensOnWhileVoiceOverRuns() {
@@ -32,7 +32,8 @@ struct TilingKeyClashTests {
 
     @Test func anotherZeusShortcutTheTilingKeysBindIsRefused() {
         let todo = TileBaseConflicts.NamedShortcut(name: "Quick to-do", shortcut: Shortcut(keyCode: 17, modifiers: [.control, .option]))
-        let keys = TilingKeyClash.Keys(talk: .rightOption, dictation: nil, pointing: nil, chat: .off, voiceOverOn: false, others: [todo])
+        let keys = TilingKeyClash.Keys(talk: .rightOption, dictation: nil, pointing: nil, polyglot: nil, chat: .off,
+                                       voiceOverOn: false, others: [todo])
         #expect(TilingKeyClash.note(base: .controlOption, keymap: nil, keys: keys)?.contains("Quick to-do") == true)
         #expect(TilingKeyClash.note(base: .controlOptionCommand, keymap: nil, keys: keys) == nil)
     }
@@ -66,5 +67,40 @@ struct TilingKeyClashTests {
         #expect(live.voiceOverOn == NSWorkspace.shared.isVoiceOverEnabled)
         #expect(live.dictation == (DictationSettings.shared.enabled ? DictationSettings.shared.key : nil))
         #expect(live.pointing == (PointingSettings.enabled ? PointingSettings.shortcut : nil))
+    }
+
+    // MARK: Polyglot, and every monitor key in one place
+
+    @Test func theShippedPolyglotKeyIsRefusedOnTheControlOptionPair() {
+        let found = note(.controlOption, talk: .rightOption, voiceOverOn: false, polyglot: PolyglotSettings.defaultHotkey)
+        #expect(found?.contains("Polyglot") == true, "\(String(describing: found))")
+        #expect(note(.controlOptionCommand, talk: .rightOption, voiceOverOn: false, polyglot: PolyglotSettings.defaultHotkey) == nil)
+        #expect(note(.controlOption, talk: .rightOption, voiceOverOn: false, polyglot: nil) == nil)
+    }
+
+    @Test func theLiveKeysCarryThePolyglotKeyAsItsMonitorReadsIt() {
+        let settings = PolyglotSettings.shared
+        #expect(TilingKeyClash.Keys.live().polyglot == (settings.enabled ? settings.hotkey : nil))
+    }
+
+    /// Every `HotkeyMonitor` in the app listens for a key the tiling tap could consume, so each one has to be read by
+    /// `Keys.live()`. A new monitor or a new key provider fails here until its key is added there and its file is
+    /// named below.
+    @Test func everyKeyMonitorInTheAppIsAccountedForByTheLiveKeys() throws {
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Zeus")
+        let files = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        var monitors: Set<String> = []
+        var providers: Set<String> = []
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            if text.contains("HotkeyMonitor()") { monitors.insert(url.lastPathComponent) }
+            if text.contains(".keyProvider =") { providers.insert(url.lastPathComponent) }
+        }
+        // Talk (the app delegate), Dictation, Polyglot, Pointing and Chat.
+        #expect(monitors == ["AppDelegate.swift", "DictationController.swift", "PolyglotController.swift",
+                             "PointingController.swift", "ChatHotkeyMonitor.swift"], "\(monitors.sorted())")
+        // The talk monitor's own provider is the default one in HotkeyMonitor.swift.
+        #expect(providers == ["DictationController.swift", "PolyglotController.swift"], "\(providers.sorted())")
     }
 }
