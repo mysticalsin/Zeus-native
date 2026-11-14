@@ -1,11 +1,12 @@
 # Voice key machine: plan and design
 
-Written 14 November 2026 on `codex/island-tiling-20261114` at `ae2ea60`. The spec, design note and task list for one
-refactor: the hold keys of Zeus (talk, dictation, the Polyglot key, with the pointing key beside them) get one explicit
-state machine, in the pattern of `docs/STATE-MACHINES.md` (a pure `State`, `Event`, `Effect` reducer in ZeusCore, a
-controller that only runs effects). Nothing was built or run for this plan. Every claim about today's code was read in
-the source and carries a file and line; what could not be checked that way says "not verified". Nothing here is accepted
-until the named tests run on macOS and the behaviour is seen on a real Mac.
+Written 14 November 2026 on `codex/island-tiling-20261114` at `ae2ea60`; revised the same day at `133bb9b` after an
+adversarial review ("Review notes" at the end). The spec, design note and task list for one refactor: the hold keys of
+Zeus (talk, dictation, the Polyglot key, with the pointing key beside them) get one explicit state machine, in the
+pattern of `docs/STATE-MACHINES.md` (a pure `State`, `Event`, `Effect` reducer in ZeusCore, a controller that only runs
+effects). Nothing was built or run for this plan. Every claim about today's code was read in the source and carries a
+file and line; what could not be checked that way says "not verified". Nothing here is accepted until the named tests
+run on macOS and the behaviour is seen on a real Mac.
 
 ## Why
 
@@ -17,11 +18,11 @@ rule has to be proved again by hand against every combination. The patching stop
 
 | # | Open finding | Closed by |
 | --- | --- | --- |
-| F1 | Shift joining a talk hold is read as a release: Control, Option, Shift, Command, Left sends the turn 0.4 s later, and two quick swaps can latch hands-free (`HotkeyMonitor.swift:277-280`, `:170`) | I1, I2, table rows 11 and 16 |
+| F1 | Shift joining a talk hold is read as a release: Control, Option, Shift, Command, Left sends the turn 0.4 s later, and two quick swaps can latch hands-free (`HotkeyMonitor.swift:277-280`, `:170`) | I1, I2, table rows 8 and 11 |
 | F2 | The clash rule compares modifier-only keys with the pair only, not the pair plus Shift (`TileBaseConflicts.swift:67`, `:80-81`) | Part 6 |
-| F3 | The tap is created enabled before its thread services it (`TilingKeyTap.swift:25-26`, `:147-150`) | Step 11 |
-| F4 | `stop()` leaves the gate open until the teardown runs (`TilingKeyTap.swift:174-180`) | Step 12 |
-| F5 | `start()` calls the window server while holding the callback's lock (`TilingKeyTap.swift:118-123`) | Step 13 |
+| F3 | The tap is created enabled before its thread services it (`TilingKeyTap.swift:25-26`, `:147-150`) | Step 14 |
+| F4 | `stop()` leaves the gate open until the teardown runs (`TilingKeyTap.swift:174-180`) | Step 15 |
+| F5 | `start()` calls the window server while holding the callback's lock (`TilingKeyTap.swift:118-123`) | Step 16 |
 
 ## 1. Today
 
@@ -32,19 +33,14 @@ rule has to be proved again by hand against every combination. The patching stop
 
 | # | Variable | Where | Meaning |
 | --- | --- | --- | --- |
-| 1 | `state.modifiers` | `Shortcut.swift:289` | Modifiers down as the last event said. A key-down overwrites it (`:335`), so it can be stale until the next flags event |
-| 2 | `state.deviceKeys` | `Shortcut.swift:290` | Physical modifier keys down, from flags events only (`:318-329`) |
-| 3 | `state.keysDown` | `Shortcut.swift:291` | Ordinary keys down |
-| 4 | `state.spoiled` | `Shortcut.swift:293` | An ordinary key joined while a modifier key was down (`:348`); cleared when a flags event shows none (`:330`) |
-| 5 | `isDown` | `HotkeyMonitor.swift:102` | Dedicated key: a press is counted as down |
-| 6 | `cancelledByLargerChord` | `:104` | Dedicated key: no press until the modifiers are empty (`:236`) |
+| 1, 2 | `state.modifiers`, `state.deviceKeys` | `Shortcut.swift:289-290` | Modifiers down as the last event said: a key-down overwrites them (`:335`), so they can be stale until the next flags event. Physical modifier keys down, from flags events only (`:318-329`) |
+| 3, 4 | `state.keysDown`, `state.spoiled` | `Shortcut.swift:291-293` | Ordinary keys down. An ordinary key joined while a modifier key was down (`:348`); cleared when a flags event shows none (`:330`) |
+| 5, 6 | `isDown`, `cancelledByLargerChord` | `HotkeyMonitor.swift:102-104` | Dedicated key: a press is counted as down; no press until the modifiers are empty (`:236`) |
 | 7 | `latch` | `:105` | `TalkKeyLatch`: idle, holding(down, second), tapped(up), latched, ending (`ZeusCommand.swift:282-288`) |
 | 8 | `pendingStop` | `:106` | The timer that sends a quick tap after 0.4 s |
 | 9 | `directPressActive` | `:107` | The toggle mode last seen; a flip resets 5, 7 and 8 with no callback (`:225-231`) |
-| 10 | `sharedDown` | `:98` | Shared key: counted as down |
-| 11 | `gesture` | `:97` | `SharedKeyGesture`: idle, down(at, second, holding, spoiled), tapped(up) (`SharedKeyGesture.swift:10-14`) |
-| 12 | `holdTimer` | `:99` | The 0.25 s hold delay timer |
-| 13 | `commandLatched` | `:100` | Shared key, talk side: a hands-free command turn is open |
+| 10, 11 | `sharedDown`, `gesture` | `:97-98` | Shared key: counted as down; `SharedKeyGesture`: idle, down(at, second, holding, spoiled), tapped(up) (`SharedKeyGesture.swift:10-14`) |
+| 12, 13 | `holdTimer`, `commandLatched` | `:99-100` | The 0.25 s hold delay timer. Shared key, talk side: a hands-free command turn is open |
 | 14 to 17 | a second `ShortcutState` | `PointingKeyGesture.swift:32` | As 1 to 4 |
 | 18 to 21 | `isActive`, `blockedByVoiceOver`, `waitForRelease`, `activeSince` | `PointingKeyGesture.swift:29-34` | A hold is running; VoiceOver owns the chord; nothing begins until everything is up; when the hold began |
 | 22 to 24 | `controlDownAt`, `controlTapClean`, `lastControlTap` | `:35-37` | The double Control tap |
@@ -53,346 +49,328 @@ rule has to be proved again by hand against every combination. The patching stop
 Wiring, not counted: the monitor and observer handles (`HotkeyMonitor.swift:95-96`, `PointingHotkeyMonitor.swift:49`,
 `:54-55`). State outside the monitors that the key logic leans on: `WakeWordController.talkKeyHeld`
 (`AppDelegate.swift:282`, `:289`), `topBar.isDictating` (`DictationController.swift:393`), `run.isActive`
-(`PolyglotController.swift:120`).
+(`PolyglotController.swift:120`), and the turn itself, never read by the monitor (`VoiceTurnController.swift:27`, `DictationFlow.swift:25-32`).
 
 ### 1.2 Sources of events
 
-- Local monitor (Zeus's own windows, `HotkeyMonitor.swift:126-130`) and global monitor (other apps, once Accessibility
-  or Input Monitoring is on, `:125`, `:134-139`): flags, key-down, key-up. Both pass through `convert` (`:141-149`): a
-  flags event carries the whole modifier set, a repeat is dropped (`:145`).
-- Consumed key feed: the tiling tap turns a key it consumed into the event a monitor would have seen
-  (`TileKeyMatcher.swift:54-60`) and posts it on the main queue (`TilingKeyTap.swift:270-273`); each monitor feeds it to
-  itself (`HotkeyMonitor.swift:114-121`). Nothing orders it against the monitors' own events (`TilingKeyTap.swift:265-268`).
-- Timers: the hold delay (`HotkeyMonitor.swift:199-206`) and the send after a tap (`:306-316`), stored work items.
-  Settings (key, shared test, toggle test, VoiceOver) are read in `evaluate` (`:219-241`): a change shows only at the
-  next key event.
-- Pointing: its own event tap (`PointingHotkeyMonitor.swift:112-117`), the same feed (`:59-66`), the watchdog
-  (`:98-110`), sleep, wake and display changes (`PointingController.swift:278`), and `stop()` (`:81-88`).
+| Source | What arrives |
+| --- | --- |
+| Local monitor (Zeus's own windows, `HotkeyMonitor.swift:126-130`) and global monitor (other apps, once Accessibility or Input Monitoring is on, `:125`, `:134-139`) | Flags, key-down, key-up, through `convert` (`:141-149`): a flags event carries the whole modifier set, a repeat is dropped (`:145`) |
+| Consumed key feed | The tiling tap turns a key it consumed into the event a monitor would have seen (`TileKeyMatcher.swift:54-60`) and posts it on the main queue (`TilingKeyTap.swift:270-273`); each monitor feeds it to itself (`HotkeyMonitor.swift:114-121`). Nothing orders it against the monitors' own events (`TilingKeyTap.swift:265-268`) |
+| Timers and settings | The hold delay (`HotkeyMonitor.swift:199-206`) and the send after a tap (`:306-316`), stored work items. Settings (key, shared test, toggle test, VoiceOver) are read in `evaluate` (`:219-241`): a change shows only at the next key event. Nothing tells the monitor about sleep, wake or a release it could not see |
+| Pointing | Its own event tap (`PointingHotkeyMonitor.swift:112-117`), the same feed (`:59-66`), the watchdog with the live modifiers (`:41-43`, `:98-110`), sleep, wake and display changes (`PointingController.swift:278`), `stop()` (`:81-88`) |
 
 ### 1.3 Transitions as the code behaves
 
 `evaluate` picks a path at every event (`HotkeyMonitor.swift:223-235`): shared when the talk key the owner chose equals
 the dictation key (`:88`); toggle for a dictation role with the toggle setting on its own key (`:224`); else the latch.
+A bare `:n` below is a line of `HotkeyMonitor.swift`.
 
-**Dedicated key, hold** (talk; dictation with "Hold to speak").
-- Pressed means held exactly and not `cancelledByLargerChord` (`:237`). Exactly: the modifiers are equal, no ordinary
-  key is down, the chord is not spoiled, and the side matches (`Shortcut.swift:355-367`).
-- Press edge (`:251-258`): the latch starts a turn from idle, continues a tapped one (a second tap when within 0.4 s),
-  or ends a latched one at once and becomes `ending` (`ZeusCommand.swift:301-315`).
-- Release edge (`:259-270`): when Control, Option or Command joined (`:277-280`) the turn is cancelled, or only blocked
-  when the latch is `ending` (`:285-299`). Otherwise the latch takes a key-up (`ZeusCommand.swift:317-337`): a first
-  press of up to 0.3 s waits 0.4 s and sends; a second quick one latches hands-free; a longer one sends.
-- Shift or Fn joining is also a release edge: the exact hold fails and `:279` does not count them. For dictation that
-  is the documented Shift means Return (`docs/VOICE-KEY.md:47`; the Return is read from the live flags at delivery,
-  `DictationController.swift:977`, `:1005`). For talk it is F1: the send timer runs with `isDown` false, `spoilHold`
-  guards on `isDown` (`:170`), so nothing cancels it. Shift let go again is a second press: a quick swap can latch.
-- Another key down (`:154-157`): the talk monitor cancels (`:169-177`, `cancelsWhenSpoiled` from
-  `AppDelegate.swift:287`). The dictation monitor does not (`:170`): the release edge sends the turn or counts a tap.
-- A larger set shrinking to the key's set (Command, Control, Option, then Command up) starts a turn (`:237`).
-- VoiceOver on and the key Control-Option: `onBlocked` and nothing else, on every event while held (`:252-255`). The
-  talk key itself moves to a fallback meanwhile (`VoiceKey.swift:23-27`, `HotkeyMonitor.swift:74-80`), same paths.
-
-**Shared key** (`handleShared`, `:185-216`).
-- A press is armed only on an exact hold (`:187`). Before the hold begins, an extra modifier other than Fn spoils the
-  press (`:188-189`), and so does another key (`:161-165`).
-- Dictation role: after 0.25 s unspoiled the turn starts (`:199-206`, `SharedKeyGesture.swift:41-45`); the key-up sends
-  it (`:211`). A running hold tolerates every extra modifier (`:187` stops asking for exact), which is how Shift means
-  Return here; only another key cancels it (`SharedKeyGesture.swift:48-55`).
-- Talk role: two taps of up to 0.25 s, at most 0.35 s apart (`SharedKeyGesture.swift:16-18`, `:57-65`), start a
-  hands-free command turn (`:212`). The next key-down sends it and is itself a first tap (`:192-197`).
-- No VoiceOver check: the check sits after the `return` at `:234`.
-
-**Toggle** (dictation "Press to start and stop" on its own key; Polyglot always, `PolyglotController.swift:110-115`).
-The press edge calls `onPress`, the release edge nothing (`:238-250`). The owner decides start or finish from its own
-state (`DictationBehavior.swift:24-29`, `PolyglotController.swift:120`). A foreign modifier tapped during one physical
-hold makes a second press edge and toggles again. Polyglot's default key, Control-Option-T (`PolyglotSettings.swift:13`),
-is keyed: held when the modifiers are equal and T is down; other keys and `spoiled` are ignored (`Shortcut.swift:359-363`).
-
-**Settings change.** The key becomes nil while `isDown`: the turn is sent (`:219-222`). The toggle setting flips: the
-latch and `isDown` reset with no callback, and an open turn runs on with no owner in the monitor (`:225-231`).
-
-**Esc.** `TalkKeyLatch.cancelFromEsc` (`ZeusCommand.swift:347-351`) has no caller in `Sources/Zeus`. Dictation's own Esc
-monitor cancels the turn (`DictationController.swift:613-616`) without telling the key monitor, so a latched monitor
-stays latched and the next press is spent ending a turn that is gone.
-
-**Pointing** (`PointingKeyGesture.feed`, `:41-68`). A hold begins on an exact hold when not waiting (`:58-64`), unless
-VoiceOver owns Control-Option (`:59-60`). When no longer exact it ends if what is left is inside the key's set,
-unspoiled, with no key down (`:49-50`); otherwise it is cancelled and waits for everything to be up (`:51-55`). Also
-the watchdog and the 95 s bound (`:75-84`), the interrupt (`:88-94`), Esc and the double Control tap (`:66`, `:96-118`).
-The monitor adds one-turn bookkeeping (`PointingHotkeyMonitor.swift:120-144`) and starts no turn when the pointing key
-is the talk key (`VoiceKey.swift:31-33`). Like the dedicated path it starts on a shrink.
+| Path | What the code does |
+| --- | --- |
+| Dedicated hold (talk; dictation "Hold to speak"): press | Pressed means held exactly and not `cancelledByLargerChord` (`:237`): the modifiers are equal, no ordinary key is down, the chord is not spoiled, the side matches (`Shortcut.swift:355-367`; Left and Right Command together still read as Right Command, `:367`). The press edge (`:251-258`) starts a turn from idle, continues a tapped one (a second tap when within 0.4 s), or ends a latched one at once and becomes `ending` (`ZeusCommand.swift:301-315`) |
+| Dedicated hold: release | The release edge (`:259-270`): when Control, Option or Command joined (`:277-280`) the turn is cancelled, or only blocked when the latch is `ending` (`:285-299`). Otherwise the latch takes a key-up (`ZeusCommand.swift:317-337`): a first press of up to 0.3 s waits 0.4 s and sends; a second quick one latches hands-free; a longer one sends |
+| Dedicated hold: Shift or Fn joins | Also a release edge: the exact hold fails and `:279` does not count them. For dictation the docs call it Shift means Return (`docs/VOICE-KEY.md:47`), but the Return is read from the live flags at delivery (`DictationController.swift:977`, `:1005`), so Shift joining ends the turn whatever comes next. For talk it is F1: the send timer runs with `isDown` false, `spoilHold` guards on `isDown` (`:170`), nothing cancels it, and a quick swap can latch |
+| Dedicated hold: another key, or a larger set that shrinks | Another key down (`:154-157`): the talk monitor cancels (`:169-177`, `cancelsWhenSpoiled` from `AppDelegate.swift:287`); the dictation monitor does not (`:170`), and the release edge sends the turn or counts a tap. Command, Control, Option, then Command up starts a turn (`:237`) |
+| An arrow and an Fn key | An arrow, F or navigation key-down carries the Fn flag and overwrites `modifiers` (`Shortcut.swift:335`); no flags event follows, so after its key-up an Fn hold key (the third VoiceOver fallback, `VoiceKey.swift:19`) reads as held and a turn starts. The same in `PointingKeyGesture` (`:44`). Not verified on hardware |
+| VoiceOver fallback | VoiceOver on and the key Control-Option: `onBlocked` and nothing else, on every event while held (`:252-255`). The talk key itself moves to a fallback meanwhile (`VoiceKey.swift:23-27`, `:74-80`), same paths |
+| Shared key (`handleShared`, `:185-216`) | Armed only on an exact hold (`:187`); before the hold begins an extra modifier other than Fn spoils the press (`:188-189`), and so does another key (`:161-165`). No VoiceOver check: it sits after the `return` at `:234`. Dictation role: after 0.25 s unspoiled the turn starts (`:199-206`, `SharedKeyGesture.swift:41-45`) and the key-up sends it (`:211`); a running hold tolerates every extra modifier (`:187` stops asking for exact), which is how Shift means Return here; only another key cancels it (`SharedKeyGesture.swift:48-55`). Talk role: two taps of up to 0.25 s, at most 0.35 s apart (`SharedKeyGesture.swift:16-18`, `:57-65`), start a hands-free command turn (`:212`); the next key-down sends it and is itself a first tap (`:192-197`) |
+| Toggle (dictation "Press to start and stop"; Polyglot always, `PolyglotController.swift:110-115`) | The press edge calls `onPress`, the release edge nothing (`:238-250`); the owner decides start or finish (`DictationBehavior.swift:24-29`, `PolyglotController.swift:120`). A foreign modifier tapped during one hold makes a second press edge and toggles again. Polyglot's default key, Control-Option-T (`PolyglotSettings.swift:12`), is keyed: held when the modifiers are equal and T is down; other keys and `spoiled` are ignored (`Shortcut.swift:359-363`) |
+| What a start costs | A talk press yields explanation audio, makes the wake word listener let go of the microphone and calls the companion (`AppDelegate.swift:585-592`), cancels the answer in flight (the fast race, the session's busy run, the turn task, the brain's turn) and stops speech (`VoiceTurnController.swift:128-145`), then opens the microphone, plays the listen sound, dips other audio, captures the screens and reads the front browser tab (`:153-178`). A dictation press reads the front app and the selected text, plays the start cue, opens the microphone and pauses media (`DictationController.swift:570-611`). A pointing start stops speech and the answer in flight too (`AppDelegate.swift:645`, `VoiceTurnController.swift:113-125`) |
+| A press the owner refuses | `begin()` returns without a word while a job is transcribing or rewriting (`DictationController.swift:539`, `DictationFlow.swift:34-41`) or when the start fails (`:559`, `:598`); the talk press can return false (`VoiceTurnController.swift:163`, `AppDelegate.swift:586`, `:595-602`). The monitor counts the press as down all the same, and the key's cancel is `cancel()` (`DictationController.swift:367`), which drops any active job, a transcribing one included (`:723-727`) |
+| Settings change; Esc | The key becomes nil while `isDown`: the turn is sent (`:219-222`). The toggle setting flips: the latch and `isDown` reset with no callback and an open turn runs on with no owner in the monitor (`:225-231`). `TalkKeyLatch.cancelFromEsc` (`ZeusCommand.swift:347-351`) has no caller in `Sources/Zeus`; dictation's own Esc cancels the turn (`DictationController.swift:613-616`) without telling the monitor, so a latched monitor stays latched and the next press is spent on a turn that is gone |
+| Pointing (`PointingKeyGesture.feed`, `:41-68`) | A hold begins on an exact hold when not waiting (`:58-64`), unless VoiceOver owns Control-Option (`:59-60`). When no longer exact it ends if what is left is inside the key's set, unspoiled, with no key down (`:49-50`); otherwise it is cancelled and waits for everything to be up (`:51-55`). The watchdog and the interrupt empty the picture (`:80`, `:91`), so the wait clears on the next key event even with keys held (`:55`). Also the 95 s bound (`:75-84`), Esc and the double Control tap (`:66`, `:96-118`). The monitor adds one-turn bookkeeping (`PointingHotkeyMonitor.swift:120-144`) and starts no turn when the pointing key is the talk key (`VoiceKey.swift:31-33`). It starts on a shrink too |
 
 ## 2. What must not change
 
 | Behaviour | Pinned by |
 | --- | --- |
 | A hold starts at once and the release sends | `TalkKeyLatchTests.holdToTalk`, `ShortcutTests.holdToTalkStartsAndStops`, `TilingConsumedKeyTests.aPlainHoldAndReleaseStillSendsTheTurn` |
-| A quick tap sends after the gap; tap then hold is a hold | `singleTapStopsAfterTheGap`, `aSingleTapStopsAfterTheGap`, `tapThenHoldIsANormalHold` |
-| A double tap latches until the next tap | `doubleTapLatchesUntilTheNextTap` (both suites) |
+| A quick tap sends after the gap; tap then hold is a hold; a double tap latches until the next tap | `singleTapStopsAfterTheGap`, `aSingleTapStopsAfterTheGap`, `tapThenHoldIsANormalHold`, `doubleTapLatchesUntilTheNextTap` (both suites) |
 | The press that ends a hands-free turn sends once, cancels nothing, starts nothing | `theTapThatEndsALatchedTurnIsEndingUntilItsKeyUp`, `aModifierJoiningThePressThatEndedAHandsFreeTurnDoesNotCancelIt`, `theKeyThatEndedAHandsFreeTurnDoesNotStartANewOneWhenTheExtraModifierIsLetGo` |
 | The owner ends a turn itself | `escapeCancelsHoldOrLatch` |
-| Shared key: hold dictates, double tap talks, a shortcut is ignored or cancels | `SharedKeyGestureTests` (5), `aSharedHoldOfExactlyItsOwnKeyStillStartsDictationAndExtraModifiersDoNotEndIt`, `aSharedHoldOfAPairInsideTheTilingPairDoesNotStartDictationWhenCommandComesFirst`, `aSharedHoldInTheSameOrderStartsNothingWhenTheRestOfThePairArrivesInTime` |
+| Shared key: hold dictates, double tap talks, a shortcut is ignored or cancels, Shift does not end a running hold | `SharedKeyGestureTests` (5), `aSharedHoldOfExactlyItsOwnKeyStillStartsDictationAndExtraModifiersDoNotEndIt`, `aSharedHoldOfAPairInsideTheTilingPairDoesNotStartDictationWhenCommandComesFirst`, `aSharedHoldInTheSameOrderStartsNothingWhenTheRestOfThePairArrivesInTime` |
 | A larger chord cancels, never sends | `aTalkTurnThatTheRestOfTheTilingPairEndsIsCancelledNotSent`, `aSlowPressOfTheSameOrderIsCancelledToo`, `aDedicatedDictationHoldThatTheRestOfThePairEndsIsCancelledNotInserted`, `aSingleModifierHoldThatAnotherModifierEndsIsCancelledToo`, `aModifierJoiningTheSecondTapOfADoubleTapStillCancelsTheOpenTurn` |
 | Nothing restarts until every modifier is up | `aCancelledHoldDoesNotRestartWhenTheExtraModifierIsLetGo`, `aTalkHoldDoesNotStartWhenCommandIsReleasedFirstAfterAConsumedChord`, `aDictationKeyOnRightCommandDoesNotStartWhenTheOthersAreReleasedFirst`, `aModifierChangeHeardBeforeTheForwardedKeyOnlyCostsACancelledTurn` |
-| Shift on a dedicated dictation hold sends | `shiftJoiningAHoldStillEndsItTheNormalWay` |
-| The keyboard picture | `ShortcutTests`: `optionCommandChord`, `aKeyPressedDuringTheChordSpoilsIt`, `rightCommandIsNotLeftCommand`, `repeatedFlagsChangedWhileHeldDoesNotReadAsARelease`, `anUnrelatedCommandShortcutElsewhereDoesNotSpoilALaterBareModifierHold`, `fnAloneAndKeyedShortcuts` |
+| The keyboard picture (`isHeld` stays as it is) | `ShortcutTests`: `optionCommandChord`, `aKeyPressedDuringTheChordSpoilsIt`, `rightCommandIsNotLeftCommand`, `repeatedFlagsChangedWhileHeldDoesNotReadAsARelease`, `anUnrelatedCommandShortcutElsewhereDoesNotSpoilALaterBareModifierHold`, `fnAloneAndKeyedShortcuts` |
 | The feed carries one event and nothing else | `theNotificationCarriesTheEventAndNothingElse`, `withTheForwardedKeyTheTalkHoldStaysSpoiledUntilEveryModifierIsUpThenWorksAgain` |
-| Pointing | `PointingKeyGestureTests` (9), the stuck key, sleep and wake suite beside it (10), `PointingHotkeyMonitorTests` (6), `thePointingHoldStaysSpoiledToo`, `aPointingHoldDoesNotBeginWhenCommandIsReleasedFirstAfterAConsumedChord`, `aPointingHoldThatTheRestOfTheTilingPairEndsIsCancelledNotEnded` |
-| One owner per hold; the VoiceOver fallback | `VoiceKeyTests.everyHoldHasAtMostOneOwner`, `voiceOverKeepsControlOptionAndTalkMovesToAFallback` |
-| Every key monitor is read by the clash check | `TilingKeyClashTests.everyKeyMonitorInTheAppIsAccountedForByTheLiveKeys` |
+| Pointing | `PointingKeyGestureTests` (9), the stuck key, sleep and wake suite beside it, `PointingHotkeyMonitorTests` (6), `thePointingHoldStaysSpoiledToo`, `aPointingHoldDoesNotBeginWhenCommandIsReleasedFirstAfterAConsumedChord`, `aPointingHoldThatTheRestOfTheTilingPairEndsIsCancelledNotEnded` |
+| One owner per hold; the VoiceOver fallback; every key monitor is read by the clash check | `VoiceKeyTests.everyHoldHasAtMostOneOwner`, `voiceOverKeepsControlOptionAndTalkMovesToAFallback`, `TilingKeyClashTests.everyKeyMonitorInTheAppIsAccountedForByTheLiveKeys` |
+
+**One pinned behaviour changes.** `shiftJoiningAHoldStillEndsItTheNormalWay` pins that Shift joining a dedicated
+dictation hold sends it. The swap and nudge chords are the pair plus Shift, so that rule lets a tiling chord send
+dictation (C4). The test is renamed `shiftJoiningADictationHoldKeepsItUntilTheKeyIsLetGo` and expects no release while
+Shift is held and one release when a key of the hold is let go with Shift still down.
 
 **No test pins these today.** The toggle path through the monitor (Polyglot, press to toggle). The VoiceOver refusal in
 the monitor. The talk side of the shared key through the monitor (`commandLatched`). A settings change mid turn. A key
-joining a dedicated dictation hold. Fn joining a hold. A keyed hold key (Option-Space) meeting a foreign modifier. The
-shrink start. Esc while latched. The real timers, except through sleeps in `TilingConsumedKeyTests`.
+joining a dedicated dictation hold. Fn joining a hold; an arrow and an Fn key. A keyed hold key (Option-Space) meeting
+a foreign modifier or key. Left Command joining a Right Command hold. The shrink start. Esc while latched. A refused
+press. The real timers, except through sleeps in `TilingConsumedKeyTests`.
 
-**Changed on purpose.** Each row is a behaviour no test pins, changed because a rule in part 3 demands it.
+**Changed on purpose.** Each row is unpinned today (C4 apart) and changes because a rule in part 3 demands it.
 
 | # | Today | After |
 | --- | --- | --- |
 | C1 | Shift or Fn joining a talk hold is a release: sent, or a tap that can latch (F1) | Cancelled |
 | C2 | A key joining a dedicated dictation hold is a release | Cancelled |
 | C3 | Command, Control, Option or Fn joining a running shared dictation hold is tolerated until a key lands | Cancelled |
-| C4 | Shift joining a dedicated dictation hold is the latch's key-up: a quick one waits 0.4 s and can latch | Sent at once; the key does nothing more until every modifier is up |
+| C4 | Shift joining a dedicated dictation hold ends it: sent after 0.4 s, or a tap that can latch | The turn runs on, as on the shared key. Letting go with Shift down, alone, sends it (Return). Anything else foreign cancels |
 | C5 | A tap waiting out its 0.4 s, then a foreign key or modifier: sent | Cancelled |
-| C6 | A larger set that shrinks to the key's set starts a turn, and re-fires a toggle (talk, dictation, Polyglot, pointing) | Nothing until every modifier is up |
+| C6 | A larger set that shrinks to the key's set starts a turn, and fires a toggle again (talk, dictation, Polyglot, pointing) | Nothing until every modifier is up |
 | C7 | Settings change mid turn: a nil key sends, a mode flip leaves the turn open | Cancelled |
 | C8 | VoiceOver refusal repeats on every event and is skipped on the shared key | Once per press, in every mode |
-| C9 | A keyed hold key that a foreign modifier or key joins is a release | Cancelled |
+| C9 | A keyed hold key that a foreign modifier joins is a release; a foreign key is ignored (`Shortcut.swift:359-363`) | Cancelled |
 | C10 | A cancel with no `onCancel` falls back to `onRelease`, which sends (`HotkeyMonitor.swift:176`, `:298`) | A cancel never calls `onRelease` |
+| C11 | A keyed key (Control-Option-T, Option-Space) pressed while another ordinary key is still down from rollover acts | Nothing, and nothing until every key is up |
+| C12 | A foreign modifier tapped during one toggle press toggles again | One toggle per press |
+| C13 | The other side of a sided key (Left Command beside Right Command) is not seen | Foreign: it bars a start and cancels a hold |
+| C14 | A hold key inside a tiling chord starts the moment its set is down | While tiling runs it starts after 0.15 s alone, or by a double tap; a lone tap under 0.15 s does nothing; the press that ends a hands-free turn sends after 0.15 s or on a clean release (part 6) |
+| C15 | An arrow, F or navigation key starts an Fn hold key on its key-up | Nothing: only flags events say which modifiers are down |
+| C16 | A press the owner refuses counts as down; a later cancel can drop a transcribing job | The press is abandoned; the key's cancel reaches only a listening turn |
+| C17 | A release the monitors never saw, or sleep, leaves the turn open until the next event | Ended within 0.25 s from the live modifiers; sleep and wake cancel an open turn |
+| C18 | The owner's own end (dictation Esc) leaves the monitor latched and the next press is spent | The machine is told; the next press starts |
 
 ## 3. Safety rules
 
-Words. The key's **own set** is its modifiers, with its side, and its key code when it has one. **Foreign** is a
-modifier outside the own set, or an ordinary key that is not the key's own. A **press** lasts while the whole own set is
-down. A **turn** runs from `start` to `send` or `cancel`. A step is one key going down or up, or time passing. The rules
-hold after every step of every order, and the walk in part 5 checks them against the keys physically down, not against
-the machine's own picture.
+Words. The key's **own set** is its modifiers and its key code when it has one; for a sided key it is that one
+physical key, and the other side is foreign. **Foreign** is a modifier outside the own set, or an ordinary key that is
+not the key's own. A **press** lasts while the whole own set is down. A **turn** runs from `start` to `send` or
+`cancel`, and is **hands-free** while the machine says `isLatched`. The rules hold after every step (a key down or up,
+a forwarded key arriving, time passing, an `abandon`) of every order; the search in part 5 checks them from the keys
+physically down, the effects and `isLatched`, and reads nothing else of the machine.
 
-- **I1. A foreign press never sends and never latches.** For every `send`, nothing foreign was down at any step between
-  the turn's `start` and the `send`, except while the turn was latched hands-free, and except Shift on a dictation key
-  (Shift means Return). A turn becomes latched only if nothing foreign was down since its `start`. The press that ends
-  a hands-free turn sends at the step where exactly the own set came down.
-- **I2. After a cancel, nothing starts until everything is up.** No `start` after a `cancel` until every key is up.
-- **I3. Nothing starts on a larger chord.** No `start` at a step where the keys down are a strict superset of the own set.
-- **I4. Every turn ends exactly once.** `start` is followed by exactly one `send` or `cancel` before the next `start`;
-  no `send` or `cancel` without an open turn. With every key up and every timer run out, only a latched turn is open.
-- **I5. A consumed key is a key.** The machine's event has no field that says where a key came from, so a consumed key
-  and the same key unconsumed give the same effects. Arriving late (after the next modifier event), every other rule still holds.
-- **I6. Nothing starts when a larger chord shrinks.** Once the whole own set has been down with something foreign, no
-  `start` until every key is up. This closes the gap `TilingKeyTap.swift:265-268` calls bounded, whatever the feed's order.
-- **I7. A toggle fires once per press.** At most one `start` per press of a toggle key, and none while I2 or I6 bar it.
-  A toggle cannot be taken back, so I1 and I4 do not apply to it; part 6 refuses the pairs that would need them.
-- **I8. Never stuck.** From every state, letting go of everything, waiting, then pressing exactly the own set acts.
+| Rule | Checkable statement |
+| --- | --- |
+| **I1.** A press that something foreign joined never sends and never latches | For every `send` of a turn that is not hands-free, nothing foreign was down at any step from its `start` to the `send`. One exception: on a dictation key Shift may be down, alone, and the `send` then comes only at a step where the key is let go (hold Shift while releasing means Return, `DictationController.swift:977`); Shift joining never sends. A turn becomes hands-free only if nothing foreign was down since its `start`. A hands-free turn is sent only by a press of exactly the own set: at the step the set came down when `confirm` is 0, otherwise once it stayed down alone for `confirm` or was let go with nothing foreign down since the press began. Typing and larger chords neither send nor cancel it |
+| **I2.** After a cancel, nothing starts until everything is up | No `start` after a `cancel` until every key is up |
+| **I3.** Nothing starts on a larger chord | No `start` at a step where the keys down are a strict superset of the own set |
+| **I4.** Every turn ends exactly once | `start` is followed by exactly one `send`, `cancel` or `abandon` before the next `start`; no `send` or `cancel` without an open turn. With every key up and every timer run out, only a hands-free turn is open |
+| **I5.** A consumed key is a key | The machine's event has no field that says where a key came from, so a consumed key and the same key unconsumed give the same effects. Arriving late by any number of events, every other rule still holds, for every key part 6 allows; it refuses the keys a late key could fool, those that hold a whole bound chord |
+| **I6.** Nothing starts when a larger chord shrinks | Once the whole own set has been down with something foreign, no `start` until every key is up. This closes the gap `TilingKeyTap.swift:265-268` calls bounded, whatever the feed's order |
+| **I7.** A toggle fires once per press | At most one `start` per press of a toggle key, and none while I2 or I6 bar it. A toggle cannot be taken back, so I1 and I4 do not apply to it; part 6 refuses the pairs that would need them |
+| **I8.** Never stuck | From every state, letting go of everything, waiting 0.5 s, then pressing exactly the own set acts. Acts: a hold key gives `start` once held for `confirm` (`send` when a hands-free turn was open); a toggle gives `start`; a shared dictation key gives `start` after 0.25 s; a shared talk key gives `start` on the second of two quick clean taps; a key VoiceOver holds gives `refused` |
 
 ## 4. The target
 
 ### 4.1 One reducer
 
-`Sources/ZeusCore/VoiceKeyMachine.swift`, about 170 lines, `Sendable` and `Equatable`, no clock, no timer, no callback.
+`Sources/ZeusCore/VoiceKeyMachine.swift`, about 200 lines, `Sendable` and `Equatable`, no clock, no timer, no callback.
 
 ```swift
 public struct VoiceKeyMachine: Sendable, Equatable {
     public enum Role: Sendable { case talk, dictation }
     public enum Mode: Sendable { case hold, shared, toggle }
-    /// Read by the adapter at every event. `key` nil is off; `voiceOverHoldsKey`: VoiceOver is on and the key is Control-Option.
-    public struct Config: Sendable, Equatable { var key: Shortcut?; var role: Role; var mode: Mode; var voiceOverHoldsKey: Bool }
+    public struct Config: Sendable, Equatable { var key: Shortcut?; var role: Role; var mode: Mode; var voiceOverHoldsKey: Bool; var confirm: TimeInterval }
     public enum Event: Sendable, Equatable {
-        case key(ShortcutEvent, at: TimeInterval)    // from a monitor or from the consumed key feed: no way to tell
-        case tick(at: TimeInterval)                  // a wake the machine asked for
-        case abandon                                 // the owner ended the turn itself
+        case key(ShortcutEvent, at: TimeInterval)              // from a monitor or from the feed: no way to tell
+        case tick(at: TimeInterval, live: ShortcutModifiers?)  // a wake the machine asked for, with the modifiers the system reports now
+        case abandon                                           // the owner refused the press or ended the turn itself
+        case interrupt(live: ShortcutModifiers?)               // sleep or wake
     }
     public enum Effect: Sendable, Equatable { case start, send, cancel, refused, wake(after: TimeInterval) }
+    public enum Press: Sendable { case first, second, ending } // ending: this press will end a hands-free turn
     public enum Phase: Sendable, Equatable {
-        case idle                                        // nothing open, no press counted
-        case armed(since: TimeInterval, second: Bool)    // shared key: the press is down, nothing started yet
-        case holding(since: TimeInterval, second: Bool)  // a turn is open and the key is down
-        case tapped(at: TimeInterval, open: Bool)        // the key is up after a quick tap; open: its turn waits for the gap
-        case latched                                     // hands-free: a turn is open and the key is up
-        case spent                                       // the key is down and this press has done all it will do
+        case idle                                              // nothing open, no press counted
+        case armed(since: TimeInterval, press: Press)          // the key is down alone and has not acted yet
+        case holding(since: TimeInterval, second: Bool, check: TimeInterval) // a turn is open and the key is down
+        case tapped(at: TimeInterval, open: Bool)              // the key is up after a quick tap; open: its turn waits for the gap
+        case latched                                           // hands-free: a turn is open and the key is up
+        case spent                                             // the key is down and this press has done all it will do
     }
+    public var isLatched: Bool { get }
     public mutating func handle(_ event: Event, config: Config) -> [Effect]
 }
 ```
 
-The whole state is four values: `config` (the last one seen), `keys` (a `ShortcutState`, unchanged, the picture of the
-keyboard), `barred` (nothing may begin until everything is up) and `phase`. `mode` is the choice made today at
-`HotkeyMonitor.swift:223-224`. Times are fixed per mode and keep today's values: hold 0.3 s tap and 0.4 s gap
-(`ZeusCommand.swift:290-291`); shared 0.25 s hold delay, 0.25 s tap, 0.35 s gap (`SharedKeyGesture.swift:16-18`); a due
-check allows 1 ms (`SharedKeyGesture.swift:42`). A `wake` asks for a `tick` later; the machine decides from the tick's
-time and its own phase, so a late or stale tick does nothing and nothing ever needs cancelling.
+The whole state is four values: `config` (the last one seen, nil before the first), `keys` (a `ShortcutState`, the
+picture of the keyboard), `barred` (nothing may begin until everything is up) and `phase`. The adapter reads the config
+at every event: `key` nil is off; `mode` is the choice made today at `HotkeyMonitor.swift:223-224`; `voiceOverHoldsKey`
+means VoiceOver is on and the key is Control-Option; `confirm` is how long a hold key must be down alone before it
+acts, 0 except in part 6. Times keep today's values: hold 0.3 s tap and 0.4 s gap (`ZeusCommand.swift:290-291`); shared
+0.25 s hold delay, 0.25 s tap, 0.35 s gap (`SharedKeyGesture.swift:16-18`); a due check allows 1 ms (`:42`). The
+**delay** of a press is `confirm` for a hold key and 0.25 s for a shared dictation key. A `wake` asks for a `tick`
+later; the machine decides from the tick's time and its own phase, so a late or stale tick does nothing and nothing
+ever needs cancelling.
 
 ### 4.2 Key facts
 
-`Sources/ZeusCore/KeyFacts.swift`, a pure function of a `ShortcutState` and a `Shortcut`, used by the machine and by
-`PointingKeyGesture`, so both mean the same thing by every word below.
+`ShortcutState` gains one value and one function; `isHeld` and `modifiers` stay, with their tests. `flagModifiers` is
+the modifier set of the last flags event: a key-down adds a key and never writes it, so the Fn flag an arrow carries
+and a pasted Command-V change nothing. `resync(to:)` sets both modifier values to the live set the adapter read, keeps
+device keys only for modifiers still down, and forgets ordinary keys; it replaces `reset()` where a monitor keeps
+running. `KeyFacts.swift` is a pure function of a `ShortcutState` and a `Shortcut`, read by the machine and by pointing.
 
 | Fact | Meaning |
 | --- | --- |
-| `ownDown` | Every modifier of the key is down, its side key if it has a side, its key code if it has one |
-| `foreignModifier` | A modifier outside the key's set is down (Fn is ignored for a keyed key that does not ask for it, as `Shortcut.swift:359`) |
+| `ownDown` | Every modifier of the key is in `flagModifiers`; for a sided key its own device key is down; for a keyed key its key code is down |
+| `foreignModifier` | `flagModifiers` holds a modifier outside the key's set (Fn does not count for a keyed key that does not ask for it, as `Shortcut.swift:358`: a laptop F key needs it), or the other side of a sided key is down |
 | `foreignKey` | Modifier-only key: an ordinary key is down, or `spoiled`. Keyed key: an ordinary key other than its own is down |
-| `allUp` | No modifier key is physically down (`deviceKeys` is empty) and no ordinary key is down. Not `modifiers.isEmpty`: a key-down can leave `modifiers` stale (`Shortcut.swift:335`) |
+| `allUp` | `flagModifiers` is empty and no ordinary key is down. True at launch; after a `resync` it is what the system reports |
 
-One **reading** per event, from the facts and the role:
-- **E**, exact: `ownDown` and nothing foreign. For a modifier-only key this equals `isHeld(key, exact: true)`.
-- **R**, let go: not `ownDown` and nothing foreign.
-- **S**, Shift only, dictation role only: Shift is the one foreign thing down. For a talk key Shift is plain foreign.
-- **F**, foreign: anything else.
+One **reading** per event, from the facts and the role. **E**, exact: `ownDown` and nothing foreign. **R**, let go: not
+`ownDown` and nothing foreign. **S**, Shift only, dictation role only: Shift is the one foreign thing down (for a talk
+key Shift is plain foreign). **F**, foreign: anything else.
 
 ### 4.3 The transition table
 
-Before the row, in this order: (1) apply a key event to `keys` and take the facts; (2) if `config` differs from the
-stored one, emit `cancel` when a turn is open (holding, tapped open, latched), go to idle, store it, and set `barred`
-unless `allUp` (a nil key stops here); (3) `barred` becomes false when `allUp`, else true when `ownDown` with anything
-foreign; (4) the row. **Begin** means reading E and not `barred`. Every `cancel` also sets `barred` unless `allUp`.
+Before the row, in this order: (1) a key event is applied to `keys`; an `interrupt` resyncs `keys`; (2) the first
+config is stored and is no change; when a later one differs, emit `cancel` if a turn is open (holding, tapped open,
+latched, armed ending), go to idle, store it, and set `barred` unless `allUp` (a nil key stops here); (3) `barred`
+becomes false when `allUp`, else true when `ownDown` with anything foreign; (4) the row. **Begin** means reading E and
+not `barred`. Every `cancel` also sets `barred` unless `allUp`. Quick means within the mode's tap time.
 
 | # | Phase | Input | Mode | Next phase | Effects |
 | --- | --- | --- | --- | --- | --- |
 | 1 | idle | begin, `voiceOverHoldsKey` | any | spent | `refused` |
-| 2 | idle | begin | hold | holding(t, first) | `start` |
-| 3 | idle | begin | shared | armed(t, first) | dictation: `wake(0.25)`; talk: none |
-| 4 | idle | begin | toggle | spent | `start` |
-| 5 | armed(since, second) | R | shared, talk | up to 0.25 s and second: latched. Up to 0.25 s and first: tapped(t, not open). Longer: idle | `start` when latched |
-| 6 | armed | R | shared, dictation | idle | none |
-| 7 | armed | F or S | shared | idle | none |
-| 8 | armed(since, second) | tick, 0.25 s since | shared, dictation | holding(since, second) | `start` |
-| 9 | holding(since, second) | R | hold | up to 0.3 s and second: latched. Up to 0.3 s and first: tapped(t, open). Longer: idle | tapped: `wake(0.4)`. Longer: `send` |
+| 2 | idle | begin | toggle | spent | `start` |
+| 3 | idle | begin | hold, `confirm` 0 | holding(t, first) | `start`, `wake(0.25)` |
+| 4 | idle | begin | hold with `confirm`; shared | armed(t, first) | `wake(delay)`; shared talk: none |
+| 5 | armed(since, press) | tick, the delay since | hold; shared dictation; any when ending | first, second: holding(since, second). Ending: spent, or armed(since, first) for shared talk | `start`, `wake(0.25)`. Ending: `send` |
+| 6 | armed(since, press) | R | hold; shared talk | ending: idle, or as a first press for shared talk. Quick and second: latched. Quick and first: tapped(t, not open). Else idle | ending: `send`. Latched: `start` |
+| 7 | armed | R | shared dictation | idle | none |
+| 8 | armed(press) | F or S | any | ending: latched. Else idle | none |
+| 9 | holding(since, second) | R | hold | quick and second: latched. Quick and first: tapped(t, open). Longer: idle | tapped: `wake(0.4)`. Longer: `send` |
 | 10 | holding | R | shared | idle | `send` |
 | 11 | holding | F | any | idle | `cancel` |
-| 12 | holding | S with the key still down | hold | idle | `send` |
-| 13 | holding | S with the key still down | shared | holding | none |
-| 14 | holding | S with the key let go | any | idle | `send` |
-| 15 | tapped(at, open) | begin | hold | holding(t, second when within 0.4 s of at) | none |
+| 12 | holding | S with the key still down | any | holding | none |
+| 13 | holding | S with the key let go | any | idle | `send` |
+| 14 | holding | tick at the check time | any | holding, next check 0.25 s on | `wake(0.25)` |
+| 15 | tapped(at, open) | begin | hold | holding(t, second when within 0.4 s of at) | `wake(0.25)` |
 | 16 | tapped(at, open) | F or S | any | idle | `cancel` |
 | 17 | tapped(at, open) | tick, 0.4 s since at | any | idle | `send` |
-| 18 | tapped(at, not open) | begin | shared, talk | armed(t, second when within 0.35 s of at) | none |
+| 18 | tapped(at, not open) | begin | hold; shared talk | armed(t, second when within the gap of at) | hold: `wake(confirm)` |
 | 19 | tapped(at, not open) | F or S | any | idle | none |
-| 20 | latched | begin | hold | spent | `send` |
-| 21 | latched | begin | shared, talk | armed(t, first) | `send` |
+| 20 | latched | begin, `confirm` 0 | hold; shared talk | spent; shared talk: armed(t, first) | `send` |
+| 21 | latched | begin, `confirm` above 0 | hold; shared talk | armed(t, ending) | `wake(confirm)` |
 | 22 | spent | R, F or S | any | idle | none |
-| 23 | any | `abandon` | any | idle, `barred` unless `allUp` | none |
-| 24 | any | anything else | any | unchanged | none |
+| 23 | holding, tapped open, latched, armed ending | `abandon` | any | idle, `barred` unless `allUp` | none |
+| 24 | any | `interrupt` | any | idle, `barred` unless `allUp` | `cancel` when a turn was open |
+| 25 | any | anything else | any | unchanged | none |
 
-How the rules follow. I3: only a begin starts, and a begin needs reading E. I2 and I6: `barred` is set by every cancel
-and by step 3, cleared only at `allUp`, and a begin needs it false. I1: rows 11 and 16 are the only exits from an open,
-unlatched turn when something foreign shows, and both cancel; rows 12 to 14 are the Shift exception. I4: a turn is open
-only in holding, tapped open and latched; `start` appears only on entering them (rows 2, 5, 8; row 4 is a toggle's
-press and opens no turn here), and every move from them to another phase carries exactly one `send` or `cancel` (rows
-9 to 12, 14, 16, 17, 20, 21, step 2), except `abandon`, where the owner has already ended the turn. I5: `Event.key` is
-the only way in. I7: rows 1 and 4 go to spent, which no begin leaves. I8: every phase reaches idle at `allUp` or keeps
-a turn that the next begin ends. F1 on the table: Control, Option is row 2 (`start`). Shift is reading F for a talk
-key: row 11, `cancel`, `barred`. Command, Left, and Shift let go again change nothing until everything is up.
+Rows 5 and 14 first compare the key with the tick's live modifiers: when they no longer hold the key's modifiers a
+release was missed, `keys` is resynced, and the row for the new reading runs instead (6 to 8, or 9 to 13).
+
+How the rules follow. I3: only a begin starts or arms, and a begin needs reading E. I2 and I6: `barred` is set by every
+cancel and by step 3, cleared only at `allUp`, and a begin needs it false. I1: from an open turn that is not hands-free
+the only exits when something foreign shows are rows 11 and 16, which cancel, and row 13, the Shift release; Shift
+joining is row 12 and sends nothing; row 8 drops a press that has not acted and leaves a hands-free turn as it was.
+I4: a turn is open only in holding, tapped open, latched and armed ending; `start` appears only on entering them (rows
+3, 5, 6; row 2 opens no turn here), and every move out carries exactly one `send` or `cancel` (rows 5, 6, 9 to 11, 13,
+16, 17, 20, 24, step 2) or is an `abandon`. I5: `Event.key` is the only way a key gets in. I7: rows 1 and 2 go to
+spent, which no begin leaves. I8: every phase reaches idle at `allUp` or keeps a turn the next begin ends. F1 with
+tiling running: Control, Option is row 4; Shift is row 8 for a talk key (idle, `barred`), or row 11 (`cancel`) when
+pressed slowly. The swap chord on a dictation key: Shift is row 8 or 12, Command row 11 or nothing. Nothing is sent.
 
 ### 4.4 The adapter
 
-`HotkeyMonitor` keeps its callbacks and providers (`HotkeyMonitor.swift:68-90`), so its three owners do not change, and
-keeps the monitors, `convert` and the feed observer (`:114-149`). Everything else goes. What is left is one stored
-`machine`, an injectable `now`, and two entries: `feed(_:)` runs `machine.handle(.key(event, at: now()), config:)` and
-`tick()` runs `.tick(at: now())`. `config()` reads the providers into a `Config`. The effects map `start` to `onPress`,
-`send` to `onRelease`, `cancel` to `onCancel`, `refused` to `onBlocked` with today's sentence (`:241`), and
-`wake(after:)` to one `asyncAfter` that calls `tick()`. It stores no timer and no flag: the only stored value that
-changes after `start()` is `machine`. Both monitors and the feed call the same `feed`, which is I5 at the adapter.
+`HotkeyMonitor` keeps its providers (`HotkeyMonitor.swift:74-90`), the monitors, `convert` and the feed observer
+(`:114-149`). Everything else goes. What is left is one stored `machine`, injectable `now` and `liveModifiers` (as
+`PointingHotkeyMonitor.swift:41-44`), a `confirmProvider` that defaults to 0, and four entries: `feed(_:)` sends
+`.key(event, at: now())`, `tick()` sends `.tick(at: now(), live: liveModifiers())`, `turnEnded()` sends `.abandon`, and
+the sleep and wake notices (as `PointingController.swift:297-300`) send `.interrupt`. The effects map `start` to
+`onPress`, `send` to `onRelease`, `cancel` to `onCancel`, `refused` to `onBlocked` with today's sentence (`:241`), and
+`wake(after:)` to one `asyncAfter` that calls `tick()`. It stores no timer and no flag: only `machine` changes after
+`start()`. Both monitors and the feed call the same `feed`, which is I5 at the adapter.
+
+The owners change in three small ways, so the machine is never wrong about the turn.
+
+| Change | Where |
+| --- | --- |
+| `onPress` returns whether the owner took the press; false sends `.abandon` | Talk returns what `press()` returns (`VoiceTurnController.swift:128`; false at the guards of `AppDelegate.swift:586`, `:595`), dictation returns `flow.isListening` after `begin()` (`DictationController.swift:392-397`), Polyglot returns true |
+| Each owner calls `turnEnded()` when its turn stops listening for any reason | Dictation where the flow leaves listening (`apply`, `DictationController.swift:503-520`, which Esc at `:613-616` reaches); talk in a `didSet` on `listening` (`VoiceTurnController.swift:27`). After the machine's own `send` or `cancel` no turn is open, so row 23 ignores that echo |
+| The dictation key's cancel drops only a listening turn | `flow.isListening`, then `cancel()` (`DictationController.swift:367`), as the talk key's already does (`VoiceTurnController.swift:205-206`) |
 
 ### 4.5 Pointing keeps its own reducer
 
-`PointingKeyGesture` does not join. It is already a pure reducer with three suites (`docs/STATE-MACHINES.md:170`). It
-carries four things the voice keys have no use for (Esc, the double Control tap, the watchdog with live modifiers, the
-interrupt) and none of theirs (tap, latch, hold delay, toggle, Shift): one reducer for both would be two tables behind
-a mode switch. What must be the same is the rule. So pointing reads the same `KeyFacts`, runs under the same walk and
-invariants, and takes two small changes: `waitForRelease` is also set when the whole own set is down with something
-foreign while no hold is active (I6), and it is cleared on `KeyFacts.allUp` in place of `PointingKeyGesture.swift:55`.
+`PointingKeyGesture` does not join. It is already a pure reducer with three suites (`docs/STATE-MACHINES.md:170`), it
+has no tap, latch or toggle, and its outputs are pinned one by one (a timed out hold is not an ended one,
+`PointingHotkeyMonitor.swift:109`, `:139`): one reducer for both would be two tables behind a mode switch, plus a
+wrapper to keep the old outputs. What must be the same is the rule, so pointing reads the same `KeyFacts`, runs under
+the same search and invariants, and takes four small changes. (1) Began, ended and cancelled are read from `KeyFacts`
+(E, R, anything else), not from `isHeld` and `modifiers` (`:44`, `:49`). (2) `waitForRelease` is also set when the own
+set is down with something foreign and no hold is active (I6), and cleared on `allUp`, not by `:55`. (3) `tick` and
+`interrupt` take the live modifiers and `resync` where they `reset()` (`:80`, `:91`), so the wait cannot clear while a
+key is held. (4) It takes the same `confirm`: an exact hold gives a new output `armed`, the monitor asks for one
+`confirm(at:)` after the delay, and `began` comes then if the hold is still exact; a shorter tap begins nothing.
 
 ## 5. Tests first
 
-**The table.** `Tests/ZeusCoreTests/VoiceKeyMachineTests.swift`: one test per row of 4.3, the prelude steps, F1's order,
-and each row of the "changed on purpose" list. `Tests/ZeusCoreTests/KeyFactsTests.swift`: every fact for a modifier-only
-key, a sided key and a keyed key, the stale modifier case, and `E == isHeld(exact: true)` over every modifier set.
+**The search.** `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift`, pure, no sleep. It explores the whole graph of reachable
+states, so it covers every order of presses and releases at every length, with no cut-off: each state is expanded once
+with every move, and a visited set ends the search. Time is a whole number of 0.05 s steps, of which every threshold is
+a multiple (0.15, 0.25, 0.3, 0.35, 0.4), and the state key holds ages capped at 0.5 s, past every window, so the graph
+is finite. The moves: toggle one physical key (a press if it is up, a release if it is down, so every order is valid);
+wait 0.05 s; deliver the oldest forwarded key held back; `abandon`; `interrupt`. The harness is the stand-in adapter:
+it keeps the wakes and delivers each due `tick` with the true modifiers. A key-down is offered to the real
+`TileKeyMatcher` with `TileKeymap.defaults(base: .standard)`; a consumed key becomes `TileKeyDecision.monitorEvent` and
+the search branches: it reaches the machine at once, or waits in a queue behind any number of later events. After
+every move a checker asserts I1 to I7 from the effects, the keys physically down and `isLatched`; at every state it
+also lets go of everything, waits 0.5 s, presses the own set and asserts I8 and the last clause of I4.
 
-**The walk.** `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift`, pure, no sleep. Five physical keys: Control, Option, Right
-Command, Shift and one ordinary key (Left arrow; T for Polyglot). Seven moves at every step: toggle one of the five keys
-(a press if it is up, a release if it is down, so every order is valid), wait 0.2 s (inside every window), or wait 0.5 s
-(past every window). The harness is the stand-in adapter: it keeps the wakes and delivers each due `tick` in order as
-time passes. A key-down is offered to the real `TileKeyMatcher` with `TileKeymap.defaults(base: .standard)`; a consumed
-key reaches the machine as `TileKeyDecision.monitorEvent`, which the harness asserts equals what a monitor would have seen.
-
-Eight runs, one per role, mode and key: **A** talk, hold, Control-Option (shipped talk). **B** dictation, hold, Right
-Command (shipped dictation). **C** dictation, hold, Control-Option. **D** dictation, shared, Control-Option. **E** talk,
-shared, Control-Option. **F** dictation, toggle, Right Command. **G** toggle, Control-Option-T (shipped Polyglot).
-**H** `PointingKeyGesture`, Control-Option (shipped pointing): began is `start`, ended and timed out are `send`.
-
-Each run is walked twice: consumed keys delivered in order, and late (after the next key event, or before a wait). From
-rest, every order up to 6 steps: 7 + 49 + 343 + 2,401 + 16,807 + 117,649 = 137,256 sequences per walk, 16 walks,
-2,196,096 sequences. From a latched hands-free turn (runs A, B, C, E), every order up to 5 steps: 19,607 sequences per
-walk, 8 walks, 156,856 sequences. Total 2,352,952. After every step a small checker, which sees only the effects and the
-keys physically down, asserts I1 to I7; at the end of every sequence it lets go of everything, waits, and asserts I4's
-last clause and I8. The walk is a depth-first search that copies the machine value at each step, so a step costs one
-reducer call; each run is one case of a parameterised test, and the cases run in parallel. Budget: under 1 s a run and
-under 5 s for the suite in a debug build. Not measured: nothing was built for this plan. Step 2 records the time here;
-if it is over, the search skips a state already expanded with as many steps left (times compared as ages), and a depth
-4 run without the skip must reach the same states.
-
-**The existing suites stay.** `TalkKeyLatchTests`, `SharedKeyGestureTests` and the rig in `ShortcutTests.swift:171-230`
-keep their names, their timelines and their expectations, and drive the machine in place of the two deleted types
-(`stopLater(0.4)` reads `wake(after: 0.4)`, `cancelPendingStop` reads no effect, `isLatched` reads `phase == .latched`,
-`isEnding` reads `phase == .spent`, `cancelFromEsc` reads `abandon`). `TilingConsumedKeyTests` loses one line, the
-`cancelsWhenSpoiled` setter at `:134`.
-
-**The monitor.** `Tests/ZeusAppTests/HotkeyMonitorMachineTests.swift`: F1's order through the real monitor sends nothing
-and latches nothing; a key joining a dictation hold cancels; a cancel never calls `onRelease`; a toggle fires once per
-press; the VoiceOver refusal comes once; a consumed key and the same key fed directly give the same callbacks.
+| Tests | What they hold |
+| --- | --- |
+| The ten runs of the search | The keys are Control, Option, Command, Shift and one ordinary key (Left arrow; T in run G), plus what is named. **A** talk, hold, Control-Option, `confirm` 0.15 (shipped talk beside tiling). **A0** the same, `confirm` 0. **B** dictation, hold, Right Command, `confirm` 0.15, with Left Command as a sixth key and a move that flips the config between hold, toggle and off (shipped dictation). **C** dictation, hold, Control-Option, `confirm` 0.15. **D** dictation, shared, Control-Option. **E** talk, shared, Control-Option. **F** dictation, toggle, Right Command. **G** toggle, Control-Option-T (shipped Polyglot). **H** `PointingKeyGesture`, Control-Option, `confirm` 0.15 (shipped pointing): began is `start`, ended and timed out are `send`. **I** talk, hold, Fn, the Globe key in place of Command |
+| How many, and how long | Sequences are without number, because no length is cut off; what is counted is states and moves. The count is not known until step 2 runs the search: the test prints both for each run and step 2 writes them here. An upper estimate, not measured: under 200,000 states a run, 9 moves each. As a check on the state key, run A is also walked plainly from rest, every order up to 5 steps over eight moves (the five keys, wait 0.05 s, wait 0.5 s, `abandon`): 8 + 64 + 512 + 4,096 + 32,768 = 37,448 sequences, which must meet no state the search did not and break no rule. Budget: one parameterised case a run, run in parallel, the suite under 5 s in a debug build. Not measured. If step 2 finds it over, `abandon` and `interrupt` stay as moves in runs A and B only |
+| `Tests/ZeusCoreTests/VoiceKeyMachineTests.swift` | One test per row of 4.3, the prelude steps (the first press after launch acts; a config change), F1's order, the swap chord on a dictation key in both orders (Control, Option, Shift, Command, Left; Right Command, Shift, Control, Option, Left), a missed release found by a tick, a forwarded key that comes before the flags event of the last modifier, and each row C1 to C18 |
+| `Tests/ZeusCoreTests/KeyFactsTests.swift` | Every fact for a modifier-only, a sided and a keyed key; an arrow key-down carrying Fn and its key-up leave an Fn key not held; a key-down carrying Command leaves `allUp` true; Left Command is foreign to Right Command; after a resync, one modifier let go and pressed again is never `allUp` in between |
+| The existing suites, which stay | `TalkKeyLatchTests` (`Tests/ZeusCoreTests/ZeusCLITests.swift:99-140`), `SharedKeyGestureTests` and the rig in `ShortcutTests.swift:171-230` keep their names, timelines and expectations, and drive the machine with `confirm` 0 in place of the two deleted types (`stopLater(0.4)` reads `wake(after: 0.4)`, `cancelPendingStop` reads no effect, `isLatched` stays, `isEnding` reads `phase == .spent`, `cancelFromEsc` reads `abandon`). `TilingConsumedKeyTests` loses the `cancelsWhenSpoiled` setter at `:134` and takes the one change of part 2. The pointing suites pass the live modifiers to `interrupt`; a new case: interrupt, one modifier let go and pressed again begins nothing |
+| `Tests/ZeusAppTests/HotkeyMonitorMachineTests.swift` and a dictation test | F1's order through the real monitor sends and latches nothing; a key joining a dictation hold cancels; a cancel never calls `onRelease`; a toggle fires once per press; the VoiceOver refusal comes once; a consumed key and the same key fed directly give the same callbacks; a refused press followed by a foreign key calls neither `onRelease` nor `onCancel`; `turnEnded()` while latched lets the next press start. Dictation: a refused press while a turn is transcribing, then a foreign key, leaves that turn alone |
 
 ## 6. The tiling clash rule
 
-Once the machine holds I1 to I7, the rule needs no knowledge of how a monitor cancels. Let **B** be the modifier sets of
+Once the machine holds I1 to I8, the rule needs no knowledge of how a monitor cancels. Let **B** be the modifier sets of
 the chords the keymap really binds (`TileKeymap.bindings`, `TileKeybind.swift:56`): for the default table, the pair and
-the pair plus Shift (`TileKeybind.swift:117-129`). For each modifier-only Zeus key with modifiers **K** (talk as the
-monitor hears it, pointing, dictation, Polyglot; `TileBaseConflicts.swift:59-62`):
+the pair plus Shift (`TileKeybind.swift:117-129`). For each modifier-only Zeus key (talk as the monitor hears it,
+pointing, dictation, Polyglot; `TileBaseConflicts.swift:59-62`) let **K** be its modifiers without Fn: the tap matches
+an arrow, F or navigation key with or without the Fn flag (`TileKeybind.swift:89-94`). A key that is Fn alone is free.
 
 | K against B | Hold key | Key that switches on at the press (press to toggle dictation, modifier-only Polyglot) |
 | --- | --- | --- |
 | K equals a set in B | Refused | Refused |
-| K is strictly inside a set in B | Free | Refused |
+| K is strictly inside a set in B | Free, with `confirm` 0.15 s while the tap is installed | Refused |
 | K is inside no set in B | Free | Free |
 
-In one sentence: a modifier-only key is refused when its modifiers equal those of a bound chord, and a key that switches
-on at the press is refused when its modifiers are inside those of a bound chord. It is total: every key lands in one
-cell. `TileBaseConflicts.notes` keeps its signature and takes B from the keymap it is already given.
+In one sentence: a modifier-only key is refused when its modifiers equal those of a bound chord, a key that switches on
+at the press is refused when its modifiers are inside those of a bound chord, and a hold key inside one waits 0.15 s.
+It is total: every key lands in one cell. `TileBaseConflicts.notes` keeps its signature and takes B from the keymap it
+is given; a note names the bound chord's modifiers ("Control-Option-Command-Shift is also your Dictation key"), not
+`base.label` (`:71`). `TileBaseConflicts.confirm(for:keymap:)` is the middle cell as a pure function; each owner's
+`confirmProvider` calls it with the installed tap's keymap (`TilingController.swift:131`, `TilingKeyLayer.swift:68`; the accessor is new).
 
-Each case still refused, and why:
-1. **Equal** (today only against the pair, `:67`; F2). Every chord of that set has exactly the key's modifiers down
-   before its key lands, so the turn starts on every such chord in every press order. The machine would cancel it (I5),
-   but the microphone would open each time. A dictation key recorded as the pair plus Shift (the recorder takes any
-   modifier peak, `Shortcut.swift:395-403`) is now refused with a note that names the key.
-2. **A toggle inside** (today only against the pair, `:80-81`; F2). The smaller set down first fires the toggle, and I7
-   says it cannot be taken back. Now also caught against the pair plus Shift, for example a key that holds Shift.
-3. **A keyed Zeus shortcut the keymap binds** (`:88-100`, unchanged): the tap would swallow it.
-4. **VoiceOver on and a bound chord holds Control and Option** (`:55-57`, unchanged).
+| Still refused | Why |
+| --- | --- |
+| Equal (today only against the pair, `:67`; F2) | Every chord of that set has exactly the key's modifiers down before its key lands, in every press order, so the turn would start on every such chord, and a forwarded key that comes late could not be told from a clean hold (I5). A dictation key recorded as the pair plus Shift (the recorder takes any modifier peak, `Shortcut.swift:395-403`) is now refused, and so is the pair plus Fn |
+| A toggle inside (today only against the pair, `:80-81`; F2) | The smaller set down first fires the toggle, and I7 says it cannot be taken back. Now also caught against the pair plus Shift, for example a key that holds Shift |
+| A keyed Zeus shortcut the keymap binds (`:88-100`); VoiceOver on and a bound chord holds Control and Option (`:55-57`) | Unchanged: the tap would swallow the first, and VoiceOver owns the second |
 
-A hold key strictly inside a bound set stays free: by I1, I2 and I6 such a chord can never send or latch a turn, in any
-order, with the feed early or late. That is the shipped case, so **the shipped pair stays Control-Option-Command**
-(`TileKeybind.swift:12`): shipped talk and pointing are Control-Option and shipped dictation is Right Command in hold
-mode, hold keys strictly inside; shipped Polyglot is keyed and its chord is not bound.
-`theShippedDefaultsClashWithNothing` and `theShippedDefaultPairClashesWithNoShippedDefaultKey` stay as they are.
+**The shipped pair stays Control-Option-Command** (`TileKeybind.swift:12`). Shipped talk and pointing are Control-Option
+and shipped dictation is Right Command in hold mode: hold keys strictly inside, free, with the confirm. Shipped Polyglot
+is keyed and its chord is not bound. No other pair is better: Control-Option equals the talk key, and Option-Command
+holds Right Command and is where talk moves while VoiceOver runs (`TileKeybind.swift:4-7`, `VoiceKey.swift:19`). The
+tests `theShippedDefaultsClashWithNothing` and `theShippedDefaultPairClashesWithNoShippedDefaultKey` stay as they are.
 
-**Can the microphone open, even briefly, on a tiling chord with shipped defaults? Yes.** A hold key starts the moment
-exactly its own set is down (row 2). When the owner's fingers land Control and Option before Command, the talk turn
-starts at the second of them and is cancelled when Command lands (row 11). The same holds for Right Command landing
-before Control or Option, for dictation. What the owner sees and hears in that moment: any answer Zeus was speaking
-stops, the listen sound plays, other audio dips, the companion shows listening and the microphone light comes on
-(`VoiceTurnController.swift:128-175`); then the turn is dropped with no sound (`:205-223`). Dictation shows "Dictation
-cancelled" (`DictationController.swift:723-727`). Nothing is sent, nothing is inserted, nothing is latched, and nothing
-starts again until every key is up. With Command down first, nothing opens at all (I3, I6), and talk and pointing keys
-inside no bound set, such as Fn (`Shortcut.swift:47`), never open on a tiling chord. `docs/VOICE-KEY.md` will say so.
+**Can the microphone open, even briefly, on a tiling chord with shipped defaults?** Without a rule, yes, whenever
+Control and Option land before Command (two of the six orders; with Right Command first, dictation), and that start is
+not cheap: it stops speech and throws away the answer Zeus was still working on, makes the wake word listener let go of
+the microphone, plays the listen sound, dips other audio, shows listening, and begins a screen capture and a browser
+tab read; dictation plays its cue, pauses media and reads the selected text (1.3). The cancel that follows sends
+nothing and brings none of that back. So a rule is planned, the simplest that fits: the confirm. A hold key inside a
+bound chord acts only after its own set has been down alone for 0.15 s (rows 4, 5, 21).
 
-No simple rule takes that moment away, and none is planned:
-- Refusing every pair that contains a hold key is simple and total, but it refuses all three pairs
-  (`TileKeybind.swift:4-7`) against the shipped keys: Control-Option equals talk, the other two contain Right Command.
-- Another shipped pair moves the moment and does not remove it: Option-Command still contains Right Command, and it is
-  where talk moves while VoiceOver runs (`VoiceKey.swift:19`). Not verified from the code: how many app shortcuts
-  Option-Command plus an arrow or a letter would take.
-- A start delay on the hold key shortens the window and never closes it (a slow chord still opens), delays every talk
-  turn, and changes what a quick tap means. The machine could take it later as one more use of `armed`.
+With the confirm the plain answer is: only on a chord pressed one key at a time. If Control and Option stay down alone
+for 0.15 s or more before Command lands, the talk turn starts and the owner sees and hears all of the above, then the
+turn is dropped in silence (`VoiceTurnController.swift:205-223`; dictation shows "Dictation cancelled",
+`DictationController.swift:723-727`). Nothing is sent, inserted or latched, and nothing starts again until every key is
+up. Pressed as a chord, or with Command first, nothing opens, nothing is interrupted, and a hands-free turn that was
+running stays open (row 8). The price: while tiling runs, talk and dictation on these keys start 0.15 s after the
+press, and a lone tap shorter than that does nothing (a double tap still latches). 0.15 s is a first value, not
+measured; Mac check 2 sets it. With tiling off the keys behave as today.
+
+Accepted, and named: with `confirm` 0 the press that ends a hands-free turn sends at the key-down, as the three tests
+of part 2 pin, so another larger chord pressed own set first (Control-Option-Space for Chat) ends a hands-free talk
+turn there. Not planned: a talk start split into a quiet microphone and a later barge-in. Speech must stop for the
+microphone to hear, so the answer is lost either way, and the split needs the same timer.
 
 ## 7. Steps
 
@@ -400,20 +378,23 @@ Small commits that each build. A step named "failing tests" builds and its new t
 
 | # | Commit | What |
 | --- | --- | --- |
-| 1 | Add the key facts both key reducers read | `KeyFacts.swift`, `KeyFactsTests.swift`. Green |
-| 2 | Add failing tests for the voice key machine and the walk over every press order | `VoiceKeyMachine.swift` with the types of 4.1 and a `handle` that only applies keys; `VoiceKeyMachineTests`, `VoiceKeyWalkTests`. Red. Record the walk's time |
-| 3 | Fill the voice key machine from its transition table | Rows 1 to 24. Walk green for runs A to G |
-| 4 | Hold the pointing gesture to the same start rule | The two changes of 4.5. Walk green for run H; the three pointing suites unchanged |
-| 5 | Drive the latch and shared gesture suites through the machine | The ports of part 5. Green; the two old types have no test left |
-| 6 | Add failing monitor tests for the press orders the reviews found | `HotkeyMonitorMachineTests`. Red |
-| 7 | Make HotkeyMonitor an adapter over the voice key machine | 4.4. Deletes the flags and functions below. Green |
-| 8 | Delete TalkKeyLatch and SharedKeyGesture | No caller is left |
-| 9 | Add failing tests for a key on the modifiers of any bound tiling chord | `TileBaseConflictsTests`: equal to the pair plus Shift (hold and toggle), a toggle inside the pair plus Shift only, a hold inside it free, the copy has no dashes |
-| 10 | Compare modifier-only keys with every modifier set the tiling keymap binds | Part 6 in `TileBaseConflicts.notes`; rewrite its header comment (`:3-30`) |
-| 11 | Create the tiling tap disabled until its thread installs it | `create()` disables the port right after `system.create` (`TilingKeyTap.swift:133-139`); install enables it after adding the source (`:149-150`); fix the comment at `:154`. Stand-in test: the first switch is off on the owner's thread, the next is on, on the tap thread |
-| 12 | Close the tiling gate under the lock when the tap stops | `stop()` sets `snapshot.gate.enabled = false` in its locked region (`:175-180`). The layer builds a new tap and calls `update` before every start (`TilingKeyLayer.swift:110-114`), so nothing reopens a stopped one. Stand-in test with the teardown held open, through an internal entry that decides one `TileKeyEvent` (the part of `handleKey` at `:226-230`): a bound chord decided after `stop()` took the lock passes through |
-| 13 | Switch the tiling tap on outside its lock | `start()` records the port under the lock and calls `setEnabled` after unlocking (`:117-128`), as `handleDisabled` already does (`:244-258`). Stand-in test: a `setEnabled` that takes the tap's lock returns |
-| 14 | Record the voice key machine in the docs | `docs/VOICE-KEY.md` (the "Chords" section at `:37-56` becomes the rules of part 3 and the plain answer of part 6), `docs/STATE-MACHINES.md` (a new entry: voice hold key, explicit, with the 13 variables it replaces), `docs/TILING-PLAN.md` (the key clash paragraph at `:458-489` becomes part 6), `qa/regressions.json` rows after REG-409 for F1 to F5 |
+| 1 | Add the flags-only modifier picture and the key facts both key reducers read | `ShortcutState.flagModifiers` and `resync(to:)`, `KeyFacts.swift`, `KeyFactsTests.swift`. Green |
+| 2 | Add failing tests for the voice key machine and the search over every press order | `VoiceKeyMachine.swift` with the types of 4.1 and a `handle` that only applies keys; `VoiceKeyMachineTests`, `VoiceKeyWalkTests`. Red. Record states, moves and time in part 5 |
+| 3 | Fill the voice key machine from its transition table | Rows 1 to 25. Search green for runs A to G and I |
+| 4 | Hold the pointing gesture to the same facts and the same start rule | The four changes of 4.5. Search green for run H; the pointing suites keep their expectations |
+| 5 | Drive the latch and shared gesture suites through the machine | The ports of part 5 (`ZeusCLITests.swift`, `SharedKeyGestureTests.swift`, `ShortcutTests.swift`). Green; the two old types have no test left |
+| 6 | Add failing monitor tests for the press orders the reviews found | `HotkeyMonitorMachineTests` and the dictation test. Red |
+| 7 | Make HotkeyMonitor an adapter over the voice key machine | 4.4 without the owners' calls. Deletes the flags and functions below; `onPress` returns a Bool in its three owners. Monitor tests green |
+| 8 | Tell the key machine when its owner refuses or ends a turn | `turnEnded()` from `DictationController.apply` and from `listening`; the dictation key's cancel checks listening; sleep and wake send `interrupt`. Dictation test green |
+| 9 | Delete TalkKeyLatch and SharedKeyGesture | No caller is left |
+| 10 | Add failing tests for a key on the modifiers of any bound tiling chord | `TileBaseConflictsTests`: equal to the pair plus Shift (hold and toggle), the pair plus Fn, a toggle inside the pair plus Shift only, a hold inside free with a confirm, Fn alone free, the note names the chord, the copy has no dashes |
+| 11 | Compare modifier-only keys with every modifier set the tiling keymap binds | Part 6 in `TileBaseConflicts.notes` and `confirm(for:keymap:)`; rewrite its header comment (`:3-30`) |
+| 12 | Wait out a short confirm before a hold key inside a tiling chord acts | The `confirmProvider` of talk, dictation and pointing reads the installed keymap. Monitor test: with a confirm, the chord pressed fast calls nothing |
+| 13 | Add failing tests for the three tap findings | The stand-in system tests named in steps 14 to 16. Red |
+| 14 | Create the tiling tap disabled until its thread installs it | `create()` disables the port right after `system.create` (`TilingKeyTap.swift:133-139`); install enables it after adding the source (`:149-150`); fix the comment at `:154`. Test: the first switch is off on the owner's thread, the next is on, on the tap thread |
+| 15 | Close the tiling gate under the lock when the tap stops | `stop()` sets `snapshot.gate.enabled = false` in its locked region (`:175-180`). `start()` says in its contract that `update` comes first: a stop leaves the gate closed, and the layer already calls `update` before every start (`TilingKeyLayer.swift:113-114`). Test with the teardown held open, through an internal entry that decides one `TileKeyEvent` (the part of `handleKey` at `:226-230`): a bound chord decided after `stop()` took the lock passes through |
+| 16 | Switch the tiling tap on from its own thread | `start()` in the enable case makes no system call under the lock (`:118-123`): it asks the tap thread (`TilingRunLoopThread` gains `perform`, a block on its loop plus a wake, as `stop` does at `:63-64`), and the block switches the port on only while the life is still running. The give-up and the teardown run on that thread too (`TilingKeyTap.swift:242-258`, `:153-159`), so an enable cannot land after either. Tests: a `setEnabled` that takes the tap's lock returns; an enable asked for before a give-up or a stop is not applied after it |
+| 17 | Record the voice key machine in the docs | `docs/VOICE-KEY.md`: "Chords" (`:37-56`) becomes the rules of part 3 and the plain answer of part 6, with what a start costs; "Tests" (`:78-86`) drops `finishEndedTurn` and `isEnding`. `docs/STATE-MACHINES.md`: a new entry, voice hold key, explicit, with the 13 variables it replaces. `docs/TILING-PLAN.md`: the key clash paragraph (`:458-489`) becomes part 6. Comments that would go stale: `TileKeyMatcher.swift:50-53`, `TilingKeyTap.swift:61-64` and `:265-268` (the feed is a second witness; `barred` stops the smaller hold), `TileKeybind.swift:9-11`, `HotkeyMonitor.swift:62-65`. `qa/regressions.json`: rows after REG-409 for F1 to F5 and the swap chord |
 
 **Deleted.** From `HotkeyMonitor.swift`: the stored `gesture`, `sharedDown`, `holdTimer`, `commandLatched`, `isDown`,
 `cancelledByLargerChord`, `latch`, `pendingStop`, `directPressActive`, `state` (`:97-109`); the functions
@@ -422,28 +403,48 @@ Small commits that each build. A step named "failing tests" builds and its new t
 cancel. From ZeusCore: `TalkKeyLatch` (`ZeusCommand.swift:271-352`) and `SharedKeyGesture.swift`. Thirteen variables in
 three types become four values in one. Kept: `ShortcutState`, the feed, `PointingKeyGesture`, the monitor's callbacks.
 
-**Risks.**
-- Ten behaviours change on purpose (C1 to C10). None is pinned by a test today, so only the Mac list below can say they
-  feel right. C2 and C5 change dictation on its shipped key: a shortcut made with Right Command now cancels the turn.
-- The three ported suites change their bodies. The review must check each timeline and expectation against the old one.
-- A release the monitors never see (secure input hides keys from them; not verified here) leaves a turn open until the
-  next event, as today. This plan adds no watchdog to `HotkeyMonitor`.
-- `allUp` trusts `deviceKeys`. A modifier already down when the monitor starts is not in it, so `barred` can clear early.
-- Fn is foreign for a key that does not hold it. Not verified on hardware: that no flags event carries the Fn flag
-  without the Globe key down. The walk's time is an estimate until step 2 measures it.
-- Not changed here: the shared test compares the talk key the owner chose, not the one heard while VoiceOver runs
-  (`HotkeyMonitor.swift:88`); and Esc while latched does not reach the machine (`abandon` exists and is tested; wiring
-  it from the two controllers is a change of its own).
-- F3 and F5 rest on the event tap contract (a new tap starts enabled; enabling a dead port does nothing): not verified.
+| Risk | What it means |
+| --- | --- |
+| Eighteen behaviours change on purpose (C1 to C18), one of them pinned today (C4) | Only the Mac list below can say they feel right. C2 and C5 change dictation on its shipped key: a shortcut made with Right Command cancels the turn |
+| C14 delays every talk and dictation start by 0.15 s while tiling runs | If that feels slow, or the owner's chords are slower than it, the number moves; at 0 the rule is off and the answer of part 6 is "on two orders in six" |
+| The three ported suites change their bodies | The review must check each timeline and expectation against the old one |
+| Only flags events say which modifiers are down | A chord some tool posts as a key-down with flags and no flags event no longer presses a keyed key (Control-Option-T). Not verified: whether any tool Zeus uses posts chords that way, and that no flags event carries the Fn flag without the Globe key down |
+| Row 14 trusts the live modifiers | Not verified: that secure input hides flags events from the monitors, and that `NSEvent.modifierFlags` still tells the truth then |
+| The search's size and time are estimates | Step 2 measures them; the fallback is in part 5 |
+| Not changed here | The shared test compares the talk key the owner chose, not the one heard while VoiceOver runs (`HotkeyMonitor.swift:88`). Noted, not planned: for every key part 6 allows, a consumed chord holds a modifier foreign to the key before its key lands, so `barred` is set without the feed; the feed stays as a second witness with I5 tested, and deleting it is the owner's call after the Mac checks |
+| F3 and F5 rest on the event tap contract | A new tap starts enabled; enabling a dead port does nothing. Not verified |
 
-**Only a person at the Mac can check.**
-1. Control, Option, Shift, Command, Left, fast and slow, twice in a row: nothing sent, hands-free never latched (F1).
-2. Part 6: Control and Option before Command gives one listen sound and a dropped turn; Command first, nothing.
-3. Hold to talk, quick tap, double tap hands-free and the tap that ends it, on Control-Option and on Right Command.
-4. Dictation: hold and release; hold, Shift, release gives Return, on a dedicated key and on the shared key.
-5. Right Command with C, with V, and with Tab: dictation is cancelled and the shortcut works (C2).
-6. Press to toggle dictation and the Polyglot key: one toggle per press, none on a tiling chord.
-7. VoiceOver on: the talk key moves, Control-Option refuses once per press, tiling shows its note.
-8. A dictation key recorded as the pair plus Shift: tiling shows the note and installs no tap (F2).
-9. Tiling switched on and off twenty times while typing in another app: no lost or late keystroke (F3 to F5).
-10. A real keyboard's rollover: no dead talk key after fast typing, and no turn opened by typing.
+| # | Only a person at the Mac can check |
+| --- | --- |
+| 1 | Control, Option, Shift, Command, Left, fast and slow, twice in a row: nothing sent, hands-free never latched (F1). The same with dictation on Control-Option, and Right Command, Shift, Control, Option, Left: nothing inserted |
+| 2 | Part 6, with Zeus speaking an answer: a tiling chord pressed as a chord interrupts nothing and plays no sound; pressed one key at a time it gives one listen sound and a dropped turn. Read the gaps between the owner's own chord keys from the log and set 0.15 s by them. Does talk feel late with tiling on? |
+| 3 | Hold to talk, quick tap, double tap hands-free and the tap that ends it, on Control-Option and on Right Command, with tiling on and off. A tiling chord during a hands-free turn leaves it running |
+| 4 | Dictation: hold and release; hold, Shift, release gives Return; hold, Shift, let Shift go, release gives no Return; on a dedicated key and on the shared key |
+| 5 | Right Command with C, with V, with Tab, and with Left Command: dictation is cancelled and the shortcut works (C2). While a dictation is being rewritten, press the key and then a shortcut: the first text still arrives (C16) |
+| 6 | Press to toggle dictation and the Polyglot key: one toggle per press, none on a tiling chord. Control-Option-T typed fast in the middle of a sentence still toggles (C11) |
+| 7 | VoiceOver on: the talk key moves, Control-Option refuses once per press, tiling shows its note. Talk on Fn: the arrow keys start nothing (C15) |
+| 8 | A dictation key recorded as the pair plus Shift: tiling shows the note, names that chord, installs no tap (F2) |
+| 9 | Tiling switched on and off twenty times while typing in another app: no lost or late keystroke (F3 to F5). A real keyboard's rollover: no dead talk key after fast typing, and no turn opened by typing |
+| 10 | Hold the talk key and click into a password field, let go: the turn ends within a moment. Close the lid while holding: nothing is sent on wake. Esc during hands-free dictation: the next press starts a new turn (C17, C18) |
+
+## Review notes
+
+Revision of 14 November 2026, after an adversarial review of `133bb9b`. Each finding was checked against the code.
+
+| # | Finding | Verdict | Change |
+| --- | --- | --- | --- |
+| 1 | Shift joining a dedicated dictation hold sent it, so the swap and nudge chords sent dictation | Confirmed (`DictationController.swift:1005`, `TileKeybind.swift:118-129`) | Old rows 12 and 13 merged into row 12; I1 excuses Shift only at a release; C4, the renamed test, Mac checks 1 and 4, two orders in the table tests |
+| 2 | A cancel after a refused press drops a transcribing job | Confirmed (`DictationController.swift:539`, `:723-727`, `DictationFlow.swift:41`) | Both fixes taken: `onPress` returns a Bool and the key's cancel checks listening (4.4, C16, step 8) |
+| 3 | A key-down rewrites the modifiers, so an arrow starts an Fn key | Confirmed in the source (`Shortcut.swift:335`, `:355-367`), not on hardware | `flagModifiers`, C15, run I; the test of E against `isHeld` is dropped. Kept against the finding's letter: Fn is not foreign for a keyed key, or a laptop F key could never be a talk key |
+| 4 | `allUp` from `deviceKeys` clears after a reset with keys held | Confirmed (`PointingKeyGesture.swift:80`, `:91`) | Taken further than asked: the finding's own definition still clears on the next key event after a reset, as today's `:55` does, so `resync(to:)` replaces `reset()` (4.2, 4.5) |
+| 5 | The answer understated what a start costs | Confirmed (`VoiceTurnController.swift:128-178`, `AppDelegate.swift:585-592`) | 1.3 and part 6 state it. Option one chosen: the confirm (C14, rows 4, 5, 21, step 12), for pointing too. Option two rejected in part 6 |
+| 6 | The walk was not exhaustive, missed events, and its checker could not see latching | Confirmed; its cost figure could not be checked either way | A search of the reachable graph with a visited set; Left Command, Fn, config flips, `abandon`, `interrupt` and any lateness added; the checker reads `isLatched`; "acts" defined in I8; the other side of a sided key is foreign (C13) |
+| 7 | A late forwarded key breaks I1 for the pair plus Fn | Confirmed (`TileKeybind.swift:89-94`) | Part 6 drops Fn from K, so that key is refused; I5 says for which keys it holds |
+| 8 | The first config could count as a change | Confirmed as unstated | Prelude step 2; a table test |
+| 9 | Two behaviour changes were not listed | Confirmed (`Shortcut.swift:359-363`) | C11, C12, Mac check 6 |
+| 10 | Esc and a hidden release were left outside the reducer | Confirmed (`DictationController.swift:613-616`) | `turnEnded()`, `interrupt`, row 14 (C17, C18, step 8) |
+| 11 | A tiling chord sends a latched turn in mid sentence | Confirmed (old rows 20 and 21) | Closed for tiling by the confirm (rows 21 and 8). The second option, ending on the clean release always, is rejected: it changes three pinned tests and adds the press time to every ending. The case that remains is named in part 6 |
+| 12 | An enable outside the lock can land after a give-up or a teardown; a stop leaves the gate closed for a later start | Confirmed (`TilingKeyTap.swift:117-128`, `:242-258`) | Steps 15 and 16 |
+| 13 | The docs list missed stale text | Confirmed (`docs/VOICE-KEY.md:50`, `:83`, and the comments named) | Steps 5, 11 and 17 |
+
+Nothing was rejected outright. Three fixes were taken in another form than proposed (3, 4, 11), for the reasons above.
