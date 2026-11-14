@@ -235,14 +235,17 @@ final class NowPlayingHub {
 
     // MARK: Open
 
-    /// Opens the source's app. A scripted player is launched if it is not running, as the Open button always did;
-    /// any other source is only brought forward when it already runs, never started.
+    /// Opens the source's app. A scripted player is launched if it is not running and brought forward if it is, by
+    /// `openApplication` as the Open button always did: a panel that does not activate may not use `activate()`.
+    /// Any other source is only brought forward when it already runs, never started.
     private static func open(_ source: NowPlayingSource) {
         let id = source.appBundleID
-        if let running = NSRunningApplication.runningApplications(withBundleIdentifier: id).first {
-            running.activate()
-        } else if source.scriptedPlayer != nil, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
-            NSWorkspace.shared.openApplication(at: url, configuration: .init())
+        if source.scriptedPlayer != nil {
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+                NSWorkspace.shared.openApplication(at: url, configuration: .init())
+            }
+        } else {
+            NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.activate()
         }
     }
 }
