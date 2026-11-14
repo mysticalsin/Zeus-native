@@ -15,15 +15,21 @@ public enum PeerSigning {
     #if canImport(Darwin)
     /// True when the process behind `auditToken` is this app's own program.
     /// `expectedPeerIdentifier` is the signing identifier the peer must carry, for a server whose only client is the app.
-    public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil) -> PeerVerdict {
+    /// `trustShippingBundle` lets an installed ad hoc bridge accept the app bundle that ships a bridge of its name;
+    /// only the bridge's verifier sets it.
+    public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil, trustShippingBundle: Bool = false) -> PeerVerdict {
         guard let token = auditToken, token.count == 32 else { return .deny("peer audit token unavailable") }
-        guard let peer = describePeer(auditToken: token) else { return .deny("peer code signature unreadable") }
         let own = OwnApp.current
+        // A team or a local certificate is checked against the running peer in the same call that validates it, so a
+        // certificate that only names the team, or a file swapped after a separate read, cannot pass as the app.
+        let requirement = PeerRequirement.text(ownTeam: own.signature?.teamIdentifier, ownLeafSHA1: own.leafSHA1,
+                                               ownIsAdHoc: own.signature?.isAdHoc ?? true, peerIdentifier: expectedPeerIdentifier)
+        guard let peer = describePeer(auditToken: token, requirement: requirement) else { return .deny("peer code signature unreadable") }
         // An installed ad hoc helper has no bundle of its own: the app that shipped it is the peer, and the names of
         // the valid ad hoc programs in that bundle's Helpers are what tie the two together. Read only for that case,
         // never at idle, and never for a signed build, which compares its team or certificate instead.
         var peerBundleHelpers = Set<String>()
-        if own.bundlePath == nil, own.signature?.isAdHoc == true, own.signature?.identifier?.isEmpty == false,
+        if trustShippingBundle, own.bundlePath == nil, own.signature?.isAdHoc == true, own.signature?.identifier?.isEmpty == false,
            let path = peer.path, let bundle = AppBundleLocator.bundlePath(forExecutable: path) {
             peerBundleHelpers = Set(signatures(bundle: bundle, folders: ["Contents/Helpers"], requireValid: true)
                 .filter(\.isAdHoc).compactMap(\.identifier))
@@ -32,7 +38,8 @@ public enum PeerSigning {
         return PeerBinaryRule.decide(own: own.signature, peer: peer.signature, peerExecutablePath: peer.path,
                                      ownBundlePath: own.bundlePath, ownExecutableDirectory: own.executableDirectory,
                                      ownBundleCDHashes: own.bundleCDHashes, peerBundleHelperIdentifiers: peerBundleHelpers,
-                                     installedHelpersDirectory: installed, expectedPeerIdentifier: expectedPeerIdentifier)
+                                     installedHelpersDirectory: installed, expectedPeerIdentifier: expectedPeerIdentifier,
+                                     trustShippingBundle: trustShippingBundle)
     }
 
     /// Reads this program's own identity now and keeps it. A long-running program (the bridge Chrome keeps alive
@@ -48,6 +55,8 @@ public enum PeerSigning {
         var bundlePath: String?
         var executableDirectory: String?
         var bundleCDHashes: Set<String>
+        /// SHA-1 of this program's leaf signing certificate, hex: what `certificate leaf = H"..."` names.
+        var leafSHA1: String?
 
         /// Read on the first use, then kept: a program that never serves a signed-peer command never reads it, and
         /// `captureOwnIdentity` reads it at start for one that does.
@@ -55,9 +64,12 @@ public enum PeerSigning {
 
         private static func read() -> OwnApp {
             var signature: CodeSignature?
+            var leafSHA1: String?
             var selfCode: SecCode?
             if SecCodeCopySelf(SecCSFlags(), &selfCode) == errSecSuccess, let selfCode {
-                signature = PeerSigning.describe(code: selfCode)?.signature
+                let described = PeerSigning.describe(code: selfCode, requirement: nil)
+                signature = described?.signature
+                leafSHA1 = described?.leafSHA1
             }
             let path = PeerCheck.executablePath(pid: getpid()).flatMap(PeerSigning.resolve)
             let bundle = path.flatMap(AppBundleLocator.bundlePath(forExecutable:))
@@ -68,7 +80,8 @@ public enum PeerSigning {
                 hashes = Set(PeerSigning.signatures(bundle: bundle, folders: ["Contents/MacOS", "Contents/Helpers"], requireValid: false)
                     .compactMap(\.cdHash))
             }
-            return OwnApp(signature: signature, bundlePath: bundle, executableDirectory: directory, bundleCDHashes: hashes)
+            return OwnApp(signature: signature, bundlePath: bundle, executableDirectory: directory, bundleCDHashes: hashes,
+                          leafSHA1: leafSHA1)
         }
     }
 
@@ -98,6 +111,7 @@ public enum PeerSigning {
     private struct Described {
         var signature: CodeSignature
         var mainExecutable: String?
+        var leafSHA1: String?
     }
 
     private struct PeerDescription {
@@ -105,24 +119,33 @@ public enum PeerSigning {
         var path: String?
     }
 
-    private static func describePeer(auditToken: Data) -> PeerDescription? {
+    private static func describePeer(auditToken: Data, requirement: String?) -> PeerDescription? {
         var guest: SecCode?
         let attributes = [kSecGuestAttributeAudit as String: auditToken] as CFDictionary
         guard SecCodeCopyGuestWithAttributes(nil, attributes, SecCSFlags(), &guest) == errSecSuccess, let guest,
-              let described = describe(code: guest) else { return nil }
+              let described = describe(code: guest, requirement: requirement) else { return nil }
         // The running image's path is looked up by the whole audit token, which carries the pid version, so a pid
         // reused by another process after the peer exits finds nothing. A bare pid lookup is never used.
         let path = (PeerCheck.executablePath(auditToken: auditToken) ?? described.mainExecutable).flatMap(resolve)
         return PeerDescription(signature: described.signature, path: path)
     }
 
-    private static func describe(code: SecCode) -> Described? {
+    /// `requirement`, when given, is checked against the running code itself. Failing to build it counts as not met.
+    private static func describe(code: SecCode, requirement: String?) -> Described? {
         var staticCode: SecStaticCode?
         guard SecCodeCopyStaticCode(code, SecCSFlags(), &staticCode) == errSecSuccess, let staticCode else { return nil }
-        return describe(staticCode: staticCode, valid: SecCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess)
+        var satisfied = false
+        if let requirement {
+            var compiled: SecRequirement?
+            if SecRequirementCreateWithString(requirement as CFString, SecCSFlags(), &compiled) == errSecSuccess, let compiled {
+                satisfied = SecCodeCheckValidity(code, SecCSFlags(), compiled) == errSecSuccess
+            }
+        }
+        let valid = SecCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess
+        return describe(staticCode: staticCode, valid: valid, satisfiesRequirement: satisfied && valid)
     }
 
-    private static func describe(staticCode: SecStaticCode, valid: Bool) -> Described? {
+    private static func describe(staticCode: SecStaticCode, valid: Bool, satisfiesRequirement: Bool = false) -> Described? {
         var information: CFDictionary?
         let flags = SecCSFlags(rawValue: UInt32(kSecCSSigningInformation))
         guard SecCodeCopySigningInformation(staticCode, flags, &information) == errSecSuccess,
@@ -132,15 +155,18 @@ public enum PeerSigning {
         let adHocFlag: UInt32 = 0x2 // kSecCodeSignatureAdhoc
         let codeFlags = (info[kSecCodeInfoFlags as String] as? NSNumber)?.uint32Value ?? 0
         let certificates = info[kSecCodeInfoCertificates as String] as? [SecCertificate]
-        let leaf = certificates?.first.map { hex(SHA256.hash(data: SecCertificateCopyData($0) as Data)) }
+        let leafData = certificates?.first.map { SecCertificateCopyData($0) as Data }
+        let leaf = leafData.map { hex(SHA256.hash(data: $0)) }
         let signature = CodeSignature(
             isValid: valid,
             identifier: info[kSecCodeInfoIdentifier as String] as? String,
             teamIdentifier: info[kSecCodeInfoTeamIdentifier as String] as? String,
             isAdHoc: codeFlags & adHocFlag != 0,
             certificateHash: leaf,
-            cdHash: (info[kSecCodeInfoUnique as String] as? Data).map { hex($0) })
-        return Described(signature: signature, mainExecutable: (info[kSecCodeInfoMainExecutable as String] as? URL)?.path)
+            cdHash: (info[kSecCodeInfoUnique as String] as? Data).map { hex($0) },
+            satisfiesIdentityRequirement: satisfiesRequirement)
+        return Described(signature: signature, mainExecutable: (info[kSecCodeInfoMainExecutable as String] as? URL)?.path,
+                         leafSHA1: leafData.map { hex(Insecure.SHA1.hash(data: $0)) })
     }
 
     private static func hex<S: Sequence>(_ bytes: S) -> String where S.Element == UInt8 {
@@ -154,6 +180,6 @@ public enum PeerSigning {
     }
     #else
     /// `expectedPeerIdentifier` is the signing identifier the peer must carry, for a server whose only client is the app.
-    public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil) -> PeerVerdict { .deny("peer signatures are not available on this platform") }
+    public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil, trustShippingBundle: Bool = false) -> PeerVerdict { .deny("peer signatures are not available on this platform") }
     #endif
 }

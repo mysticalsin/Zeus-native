@@ -35,11 +35,37 @@ public struct CodeSignature: Equatable, Sendable {
     }
 }
 
-/// The code requirement a peer must meet, built from this program's own identity.
+/// The code requirement a peer must meet, built from this program's own identity. The adapter hands it to
+/// `SecCodeCheckValidity` together with the running code, so validity and identity are one check, and a
+/// signing certificate that merely carries the team identifier as a name does not pass.
 public enum PeerRequirement {
-    /// Nil when this program has no identity a requirement can name (ad hoc builds) or its inputs are malformed.
+    /// - A team-signed program: the peer's certificate chains to Apple (`anchor apple generic`) and its leaf names
+    ///   the same team.
+    /// - A locally signed program: the peer's leaf certificate is the very certificate this program was signed with.
+    /// - `peerIdentifier`, when given, is the signing identifier the peer must carry too.
+    ///
+    /// Nil when this program has no identity a requirement can name (an ad hoc build) or an input is malformed;
+    /// the caller then treats every peer as not meeting it.
     public static func text(ownTeam: String?, ownLeafSHA1: String?, ownIsAdHoc: Bool, peerIdentifier: String?) -> String? {
-        nil
+        var suffix = ""
+        if let peerIdentifier {
+            guard isName(peerIdentifier, allowing: "._-") else { return nil }
+            suffix = " and identifier \"\(peerIdentifier)\""
+        }
+        if let team = ownTeam, !team.isEmpty {
+            guard isName(team, allowing: "") else { return nil }
+            return "anchor apple generic and certificate leaf[subject.OU] = \"\(team)\"" + suffix
+        }
+        guard !ownIsAdHoc, let sha1 = ownLeafSHA1?.lowercased(), sha1.count == 40,
+              sha1.allSatisfy({ $0.isHexDigit }) else { return nil }
+        return "certificate leaf = H\"\(sha1)\"" + suffix
+    }
+
+    /// Letters, digits and the given extras only, so nothing typed into a requirement can add a clause.
+    private static func isName(_ text: String, allowing extra: String) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy { scalar in
+            (scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar) || extra.unicodeScalars.contains(scalar)))
+        }
     }
 }
 
@@ -92,6 +118,8 @@ public enum PeerBinaryRule {
     ///     write there, so it is never trusted as a build products folder.
     ///   - expectedPeerIdentifier: the signing identifier the peer must carry (the app's bundle identifier),
     ///     for a server whose only client is the app. Nil leaves the rest of the rule alone.
+    ///   - trustShippingBundle: turns on the installed ad hoc bridge allowance below. Only the bridge's verifier
+    ///     sets it; a loose ad hoc app serving the command socket must not accept an assembled bundle.
     ///
     /// Identity is a stable requirement, never the code directory hash of one build, because a long-running
     /// program (the bridge Chrome keeps alive) outlives the app build that shipped it. When this app is
@@ -113,7 +141,9 @@ public enum PeerBinaryRule {
             guard let identifier = peer.identifier, identifier == expected else { return .deny("peer is not the app") }
         }
         if let team = own.team {
-            guard !peer.isAdHoc, peer.team == team else { return .deny("peer is not signed by this app's team") }
+            guard !peer.isAdHoc, peer.team == team, peer.satisfiesIdentityRequirement else {
+                return .deny("peer is not signed by this app's team")
+            }
             return .allow
         }
         let path = peerExecutablePath.flatMap { $0.isEmpty ? nil : $0 }
@@ -124,9 +154,10 @@ public enum PeerBinaryRule {
             }
         }
         if let hash = peer.cdHash, !hash.isEmpty, ownBundleCDHashes.contains(hash) { return .allow }
-        if !own.isAdHoc, let certificate = own.certificateHash, !certificate.isEmpty, peer.certificateHash == certificate { return .allow }
+        if !own.isAdHoc, let certificate = own.certificateHash, !certificate.isEmpty, peer.certificateHash == certificate,
+           peer.satisfiesIdentityRequirement { return .allow }
         // The installed ad hoc bridge: no bundle of its own, so the peer must be an app that ships a bridge of this name.
-        if own.isAdHoc, ownBundlePath == nil, let path, AppBundleLocator.bundlePath(forExecutable: path) != nil,
+        if trustShippingBundle, own.isAdHoc, ownBundlePath == nil, let path, AppBundleLocator.bundlePath(forExecutable: path) != nil,
            let name = own.identifier, !name.isEmpty, peerBundleHelperIdentifiers.contains(name) { return .allow }
         return .deny("peer is not this app's program")
     }
