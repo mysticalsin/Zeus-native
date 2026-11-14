@@ -8,6 +8,9 @@ import Glibc
 /// Where `zeus debug screenshot` may write. A request may name any path, so the path is judged here
 /// before anything is created: absolute, no traversal, and (after resolving every symlink that
 /// exists) strictly inside the app's own caches folder or a folder the owner chose at launch.
+/// A chosen folder may not be the home folder, the Library folder, the login item folder or any
+/// folder above them or inside them, nor a hidden folder under home, because a PNG written to the
+/// right name there would replace a shell startup file, a login item or a key.
 public enum DebugOutputPath {
     public enum Rejection: Error, Equatable, Sendable {
         case empty
@@ -16,18 +19,37 @@ public enum DebugOutputPath {
         case outsideAllowedFolders
     }
 
-    /// The environment variable that names one more allowed folder. A program cannot change another
-    /// process's environment, so only whoever launched Zeus can set it.
+    /// The environment variable that names one more allowed folder. The environment is read when Zeus
+    /// starts. It is set by whoever launched Zeus, or by the login session's environment, which any
+    /// program of this user can change for the next start, so the folder is also checked against the
+    /// broad folders above and a request still has to name a file strictly inside it.
     public static let ownerFolderVariable = "ZEUS_DEBUG_SCREENSHOT_DIR"
 
     /// Caches folder of the app plus, when the owner chose one at launch, that folder.
-    /// A chosen folder must be absolute, free of `..` and not the filesystem root.
-    public static func allowedFolders(cachesDirectory: String, environment: [String: String]) -> [String] {
+    /// A chosen folder must be absolute, free of `..`, not the filesystem root and not a broad folder
+    /// (see `isBroad`); symlinks are resolved before that check.
+    public static func allowedFolders(cachesDirectory: String, environment: [String: String],
+                                      homeDirectory: String = NSHomeDirectory(),
+                                      resolve: (String) -> String? = realPath) -> [String] {
         var folders = [appCachesFolder(cachesDirectory: cachesDirectory)]
         if let chosen = environment[ownerFolderVariable], let parts = PathContainment.components(chosen), !parts.isEmpty {
-            folders.append("/" + parts.joined(separator: "/"))
+            let path = "/" + parts.joined(separator: "/")
+            if !isBroad(resolved(path, resolve: resolve), home: resolved(homeDirectory, resolve: resolve)) { folders.append(path) }
         }
         return folders
+    }
+
+    /// True for the home folder, `~/Library`, `~/Library/LaunchAgents`, every folder above them, anything
+    /// inside the login item folder and any hidden folder directly under home (`.ssh`, `.config`).
+    /// Both paths are absolute and symlink-resolved.
+    static func isBroad(_ folder: String, home: String) -> Bool {
+        guard let parts = PathContainment.components(folder), let homeParts = PathContainment.components(home) else { return true }
+        let agents = homeParts + ["Library", "LaunchAgents"]
+        if parts.count <= agents.count, Array(agents.prefix(parts.count)) == parts { return true }
+        if parts.count >= agents.count, Array(parts.prefix(agents.count)) == agents { return true }
+        if parts.count > homeParts.count, Array(parts.prefix(homeParts.count)) == homeParts,
+           parts[homeParts.count].hasPrefix(".") { return true }
+        return false
     }
 
     public static func appCachesFolder(cachesDirectory: String) -> String {
