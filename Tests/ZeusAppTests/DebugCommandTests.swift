@@ -58,6 +58,38 @@ struct DebugScreenshotTests {
         #expect(emptyFilter == nil)
     }
 
+    @Test func aValidatedPathWithASpaceReachesTheCaptureUnchanged() throws {
+        // The allowed folder is a link to a folder whose real name has a space. The path that passed the check
+        // is the one handed to the capture, as typed values, never joined into text and split again.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-plan-\(UUID().uuidString.prefix(8))")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let real = root.appendingPathComponent("QA Shots")
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root.path + "/shots", withDestinationPath: real.path)
+        let plan = DebugScreenshot.plan(argument: "\(root.path)/shots/x --window notch", allowedFolders: [root.path + "/shots"],
+                                        defaultBase: "/unused")
+        let accepted = try #require(try? plan.get())
+        let resolvedReal = try #require(DebugOutputPath.realPath(real.path))
+        #expect(accepted.path == resolvedReal + "/x")
+        #expect(accepted.path.contains("QA Shots"))
+        #expect(accepted.filter == "notch")
+    }
+
+    @Test func aPlanRefusesAPathOutsideTheAllowedFolders() {
+        let plan = DebugScreenshot.plan(argument: "/tmp/elsewhere/x", allowedFolders: ["/tmp/allowed-\(UUID().uuidString.prefix(8))"], defaultBase: "/unused")
+        #expect((try? plan.get()) == nil)
+    }
+
+    @Test func aPlanWithNoPathUsesTheDefaultBase() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-plan-\(UUID().uuidString.prefix(8))")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let accepted = try #require(try? DebugScreenshot.plan(argument: "--window all", allowedFolders: [root.path],
+                                                              defaultBase: root.path + "/base").get())
+        #expect(accepted.path.hasSuffix("/base"))
+        #expect(accepted.filter == "all")
+    }
+
     @MainActor
     @Test func captureWritesOnlyMatchingNamedWindows() {
         let settingsWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 40, height: 40),

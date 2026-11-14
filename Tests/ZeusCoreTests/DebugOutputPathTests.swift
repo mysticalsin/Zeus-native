@@ -134,6 +134,38 @@ struct DebugOutputPathTests {
         }
     }
 
+    @Test func aChosenFolderThatReachesTheHomeFolderOrStartupFilesIsIgnored() {
+        let caches = ["/Users/me/Library/Caches/app.zeus.mac"]
+        let broad = ["/Users/me", "/Users/me/", "/Users", "/Users/me/Library", "/Users/me/Library/LaunchAgents",
+                     "/Users/me/Library/LaunchAgents/sub", "/Users/me/.ssh", "/Users/me/.config/zeus"]
+        for bad in broad {
+            let folders = DebugOutputPath.allowedFolders(cachesDirectory: "/Users/me/Library/Caches",
+                                                         environment: ["ZEUS_DEBUG_SCREENSHOT_DIR": bad], homeDirectory: "/Users/me")
+            #expect(folders == caches, "\(bad)")
+        }
+    }
+
+    @Test func aFolderBelowTheHomeFolderIsStillAllowed() {
+        for good in ["/Users/me/Documents/shots", "/Users/me/qa-shots", "/Users/me/Library/Caches/shots", "/Volumes/Work/shots"] {
+            let folders = DebugOutputPath.allowedFolders(cachesDirectory: "/Users/me/Library/Caches",
+                                                         environment: ["ZEUS_DEBUG_SCREENSHOT_DIR": good], homeDirectory: "/Users/me")
+            #expect(folders.contains(good), "\(good)")
+        }
+    }
+
+    @Test func aChosenFolderThatIsALinkToTheHomeFolderIsIgnored() throws {
+        let (root, cleanup) = try folder()
+        defer { cleanup() }
+        try FileManager.default.createDirectory(atPath: root + "/home/Library", withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root + "/shots", withDestinationPath: root + "/home")
+        try FileManager.default.createSymbolicLink(atPath: root + "/lib", withDestinationPath: root + "/home/Library")
+        for link in ["/shots", "/lib"] {
+            let folders = DebugOutputPath.allowedFolders(cachesDirectory: root + "/caches",
+                                                         environment: ["ZEUS_DEBUG_SCREENSHOT_DIR": root + link], homeDirectory: root + "/home")
+            #expect(folders.count == 1, "\(link)")
+        }
+    }
+
     @Test func theDefaultBaseLivesInTheCachesFolder() {
         let base = DebugOutputPath.defaultBase(cachesDirectory: "/Users/me/Library/Caches", token: "abc")
         #expect(base == "/Users/me/Library/Caches/app.zeus.mac/DebugScreenshots/zeus-screenshot-abc")

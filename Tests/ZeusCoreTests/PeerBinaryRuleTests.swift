@@ -20,9 +20,11 @@ struct PeerBinaryRuleTests {
     }
 
     private func decide(own: CodeSignature?, peer: CodeSignature?, path: String?, bundle: String? = "/Applications/Zeus.app",
-                        directory: String? = "/Applications/Zeus.app/Contents/Helpers", hashes: Set<String> = []) -> PeerVerdict {
+                        directory: String? = "/Applications/Zeus.app/Contents/Helpers", hashes: Set<String> = [],
+                        peerBundleHashes: Set<String> = [], installedHelpers: String? = nil) -> PeerVerdict {
         PeerBinaryRule.decide(own: own, peer: peer, peerExecutablePath: path, ownBundlePath: bundle,
-                              ownExecutableDirectory: directory, ownBundleCDHashes: hashes)
+                              ownExecutableDirectory: directory, ownBundleCDHashes: hashes,
+                              peerBundleCDHashes: peerBundleHashes, installedHelpersDirectory: installedHelpers)
     }
 
     // MARK: Team signed (release builds)
@@ -114,6 +116,68 @@ struct PeerBinaryRuleTests {
         #expect(!decide(own: own, peer: signature(adHoc: true, certificate: nil), path: "/Users/me/bin/zeus-bridge").isAllowed)
         #expect(!decide(own: signature(adHoc: true), peer: signature(certificate: "cert-1"), path: "/Users/me/bin/x").isAllowed,
                 "an ad hoc app has no certificate to compare")
+    }
+
+    // MARK: The installed bridge (a loose copy in Application Support) and the app that shipped it
+
+    private let installedBin = "/Users/me/Library/Application Support/Zeus/bin"
+    private let devApp = "/Users/me/zeus/dist/Zeus.app/Contents/MacOS/Zeus"
+
+    /// `zeus-bridge` as Chrome starts it: no bundle around it, running from the folder the app copied it into.
+    private func bridge(certificate: String? = nil, adHoc: Bool = true, cdHash: String? = "bridge-1") -> CodeSignature {
+        signature(identifier: "zeus-bridge", adHoc: adHoc, certificate: certificate, cdHash: cdHash)
+    }
+
+    private func decideForBridge(own: CodeSignature, peer: CodeSignature, path: String?, peerBundleHashes: Set<String> = []) -> PeerVerdict {
+        decide(own: own, peer: peer, path: path, bundle: nil, directory: installedBin,
+               peerBundleHashes: peerBundleHashes, installedHelpers: installedBin)
+    }
+
+    @Test func anAdHocInstalledBridgeTrustsTheAppThatShipsAnExactCopyOfIt() {
+        let app = signature(adHoc: true, cdHash: "app-1")
+        #expect(decideForBridge(own: bridge(), peer: app, path: devApp, peerBundleHashes: ["bridge-1", "hook-1"]) == .allow)
+        #expect(decideForBridge(own: bridge(), peer: app, path: "/Applications/Zeus.app/Contents/MacOS/Zeus", peerBundleHashes: ["bridge-1"]) == .allow,
+                "wherever the app is installed")
+    }
+
+    @Test func anAdHocInstalledBridgeRefusesAnAppWhoseBundleHoldsAnotherBuildOfIt() {
+        let app = signature(adHoc: true, cdHash: "app-1")
+        #expect(!decideForBridge(own: bridge(), peer: app, path: devApp, peerBundleHashes: ["bridge-2", "hook-1"]).isAllowed, "a different build")
+        #expect(!decideForBridge(own: bridge(), peer: app, path: devApp, peerBundleHashes: []).isAllowed, "no helper hashes")
+        #expect(!decideForBridge(own: bridge(cdHash: nil), peer: app, path: devApp, peerBundleHashes: ["bridge-1"]).isAllowed, "the bridge has no hash")
+        #expect(!decideForBridge(own: bridge(cdHash: ""), peer: app, path: devApp, peerBundleHashes: [""]).isAllowed, "an empty hash never matches")
+    }
+
+    @Test func theBundleHashesOnlyCountForAPeerThatRunsInsideThatBundle() {
+        let app = signature(adHoc: true, cdHash: "app-1")
+        #expect(!decideForBridge(own: bridge(), peer: app, path: "/tmp/Zeus", peerBundleHashes: ["bridge-1"]).isAllowed, "a loose binary has no bundle")
+        #expect(!decideForBridge(own: bridge(), peer: app, path: nil, peerBundleHashes: ["bridge-1"]).isAllowed)
+        #expect(!decideForBridge(own: bridge(), peer: signature(valid: false, adHoc: true), path: devApp, peerBundleHashes: ["bridge-1"]).isAllowed,
+                "a broken peer signature")
+    }
+
+    @Test func anInstalledProgramNeverTrustsItsOwnFolderAsABuildProductsFolder() {
+        // Application Support is writable by any program of this user, so a same-named binary dropped there proves nothing.
+        let inFolder = installedBin + "/Zeus"
+        #expect(!decideForBridge(own: bridge(certificate: "cert-1", adHoc: false), peer: signature(adHoc: true), path: inFolder).isAllowed,
+                "ad hoc copy beside the installed bridge")
+        #expect(!decideForBridge(own: bridge(certificate: "cert-1", adHoc: false), peer: signature(certificate: "cert-2"), path: inFolder).isAllowed,
+                "another certificate beside the installed bridge")
+        #expect(!decideForBridge(own: bridge(), peer: signature(adHoc: true), path: inFolder).isAllowed)
+        #expect(!decideForBridge(own: bridge(), peer: signature(adHoc: true), path: installedBin + "/sub/Zeus").isAllowed)
+        #expect(decideForBridge(own: bridge(certificate: "cert-1", adHoc: false), peer: signature(certificate: "cert-1"), path: devApp) == .allow,
+                "the same certificate still decides")
+    }
+
+    @Test func aFolderInsideTheInstalledFolderIsNotTrustedEither() {
+        let own = signature(adHoc: true)
+        let peer = signature(adHoc: true)
+        let deeper = installedBin + "/build"
+        #expect(!PeerBinaryRule.decide(own: own, peer: peer, peerExecutablePath: deeper + "/Zeus", ownBundlePath: nil,
+                                       ownExecutableDirectory: deeper, installedHelpersDirectory: installedBin).isAllowed)
+        #expect(PeerBinaryRule.decide(own: own, peer: peer, peerExecutablePath: "/work/.build/debug/Zeus", ownBundlePath: nil,
+                                      ownExecutableDirectory: "/work/.build/debug", installedHelpersDirectory: installedBin) == .allow,
+                "a build products folder elsewhere is still trusted")
     }
 
     // MARK: Helpers
