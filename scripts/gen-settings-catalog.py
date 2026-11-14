@@ -230,7 +230,16 @@ o(S,'Models','Models Zeus uses (read-only)','status','-','Which model each engin
 o(S,'Drive','When Zeus may drive your Mac','menu','-','How much Zeus may do on its own on your Mac.','missing','privacy.driveAutonomy','choice',['Always ask','Safe steps alone','Trusted'],'Safe steps alone','custom','Zeus addition. Privacy page; stored under drive.autonomy.')
 o(S,'Drive','Move the system pointer','toggle','-','Drive mode may glide and click with CGEvent when Accessibility cannot.','missing','present.physicalPointer','toggle',[],'false','live','L5. Off by default. Key present.physicalPointer.')
 
-SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents'}
+S='tiling'
+o(S,'Arrange','Arrange my windows from the keyboard','toggle','-','Snaps the windows on each screen into a tidy grid, and keys move focus, swap windows and flip a split. Off until you turn it on.','missing','tiling.enabled','toggle',[],'false','live','Zeus addition. Off by default, and a settings import never turns it on. It reads the frames of other apps\' windows and moves them with Accessibility; no window title or content is read or stored.')
+o(S,'Arrange','Tiling keys','menu','-','The keys you hold with a letter or an arrow to move, swap and resize windows. Control-Option is also Talk to Zeus and pointing, so pick another pair if they clash.','missing','tiling.keyBase','choice',['Control-Option','Option-Command','Control-Option-Command'],'Control-Option','live','Zeus addition. An unknown stored choice reads as Control-Option.')
+o(S,'Layout','Gap between windows','slider','-','Space between two tiled windows, in points.','missing','tiling.innerGap','slider',[0,64,4],'8','live','Zeus addition. Whole points; the engine keeps it between 0 and 64.')
+o(S,'Layout','Gap to the screen edge','slider','-','Space between the tiled windows and the edge of the screen, in points.','missing','tiling.outerGap','slider',[0,64,4],'8','live','Zeus addition. Whole points; the engine keeps it between 0 and 64.')
+o(S,'Layout','Default split','slider','-','How much of a slot the window already there keeps when a new window joins it.','missing','tiling.splitRatio','slider',[30,70,5],'50','live','Zeus addition. A percentage; the engine keeps it between 15 and 85.')
+o(S,'Focus','Ring the focused window','toggle','-','Draws a thin ring around the window the tiling keys act on.','missing','tiling.focusBorder','toggle',[],'true','live','Zeus addition. Applies while tiling is on.')
+o(S,'Left out','Apps Zeus never tiles','text','-','Bundle ids, separated by commas. Their windows are left where they are.','missing','tiling.excludedApps','text',[],'','live','Zeus addition. Bundle ids, comma separated; case is kept.')
+
+SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents','tiling':'Tiling'}
 
 def swift_str(s): return json.dumps(s, ensure_ascii=False)
 
@@ -243,7 +252,8 @@ def validate_table():
     opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
               'lights.liveSpectrum', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
-              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl')
+              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl',
+              'tiling.enabled')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':

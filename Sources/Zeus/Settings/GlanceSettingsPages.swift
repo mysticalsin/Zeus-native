@@ -58,6 +58,7 @@ struct GSPageView: View {
             case .iPhone: IPhonePage()
             case .features: FeaturesSettingsPage()
             case .beamer: BeamerSettingsPage(context: context)
+            case .tiling: TilingSettingsPage()
             case .license: LicensePage(navigation: navigation)
             case .permissions: PermissionsPage(context: context)
             case .privacy: PrivacyPage(context: context)

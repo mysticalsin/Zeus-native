@@ -8,7 +8,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     case general, appearance, sounds, notifications, shortcuts, insomnia
     case integrations, murmure, polyglot, dictation, voice, engine, iPhone
     case license, permissions, privacy, diagnostics, about
-    case features, beamer
+    case features, beamer, tiling
 
     var id: String { rawValue }
 
@@ -17,7 +17,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     var group: Group {
         switch self {
         case .general, .appearance, .sounds, .notifications, .shortcuts, .insomnia: .settings
-        case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer: .tools
+        case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer, .tiling: .tools
         case .license, .permissions, .privacy, .diagnostics, .about: .app
         }
     }
@@ -29,6 +29,33 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     var isShown: Bool { self == .iPhone ? Self.iPhonePairingAvailable : true }
 
     static var shown: [GSSection] { allCases.filter(\.isShown) }
+
+    /// The sidebar's vertical geometry, in points. The rows share the height between the headings and the version line,
+    /// so adding a section (or showing the iPhone page) tightens the spacing instead of running into the version.
+    enum SidebarLayout {
+        static let top = 114.0
+        static let versionY = 751.0
+        static let headingHeight = 20.0
+        static let headingBottom = 5.0
+        static let groupGap = 8.5
+        static let rowHeight = 26.0
+        static let rowGap = 2.0
+
+        /// Every group heading and the gaps between groups.
+        static var headingsHeight: Double {
+            let groups = Double(Group.allCases.count)
+            return groups * (headingHeight + headingBottom) + (groups - 1) * groupGap
+        }
+
+        /// The row height and the gap under it for `rowCount` rows: 26 and 2 while they fit, then a whole-point pitch that ends above the version line.
+        static func rowMetrics(rowCount: Int) -> (height: Double, gap: Double) {
+            let full = rowHeight + rowGap
+            let room = versionY - top - headingsHeight
+            let pitch = min(full, (room / Double(max(rowCount, 1))).rounded(.down))
+            let gap = pitch >= full ? rowGap : 1
+            return (max(1, min(rowHeight, pitch - gap)), gap)
+        }
+    }
 
     var title: String {
         switch self {
@@ -47,6 +74,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .iPhone: "iPhone"
         case .features: "Features"
         case .beamer: "Beamer"
+        case .tiling: "Tiling"
         case .license: "License"
         case .permissions: "Permissions"
         case .privacy: "Privacy"
@@ -83,6 +111,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .iPhone: "iphone"
         case .features: "switch.2"
         case .beamer: "rectangle.connected.to.line.below"
+        case .tiling: "rectangle.split.2x2"
         case .license: "key"
         case .permissions: "checkmark.shield"
         case .privacy: "lock.shield"
@@ -163,7 +192,7 @@ struct GlanceSettingsRoot: View {
     }
 }
 
-/// Logo tile, wordmark, three groups of items (28 pt apart), version at the foot.
+/// Logo tile, wordmark, three groups of items (28 pt apart, tighter when more rows show), version at the foot.
 struct GSSidebar: View {
     let navigation: GSNavigation
 
@@ -175,10 +204,10 @@ struct GSSidebar: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(GSSection.Group.allCases, id: \.self) { group in
                     Text(group.rawValue).font(GS.sidebarHead).foregroundStyle(GS.secondary)
-                        .frame(height: 20, alignment: .leading)
+                        .frame(height: GSSection.SidebarLayout.headingHeight, alignment: .leading)
                         .padding(.leading, 14)
-                        .padding(.top, group == .settings ? 0 : 8.5)
-                        .padding(.bottom, 5)
+                        .padding(.top, group == .settings ? 0 : GSSection.SidebarLayout.groupGap)
+                        .padding(.bottom, GSSection.SidebarLayout.headingBottom)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(GSSection.shown.filter { $0.group == group }) { section in
                         item(section)
@@ -186,8 +215,8 @@ struct GSSidebar: View {
                 }
             }
             .frame(width: 194)
-            .offset(x: 12, y: 114)
-            Text("Zeus \(Self.version)").font(OB.font(13)).foregroundStyle(GS.secondary).offset(x: 26, y: 751)
+            .offset(x: 12, y: GSSection.SidebarLayout.top)
+            Text("Zeus \(Self.version)").font(OB.font(13)).foregroundStyle(GS.secondary).offset(x: 26, y: GSSection.SidebarLayout.versionY)
         }
     }
 
@@ -195,6 +224,7 @@ struct GSSidebar: View {
 
     private func item(_ section: GSSection) -> some View {
         let selected = navigation.section == section
+        let metrics = GSSection.SidebarLayout.rowMetrics(rowCount: GSSection.shown.count)
         return Button { navigation.section = section } label: {
             HStack(spacing: 0) {
                 Image(systemName: section.symbol).font(.system(size: 15, weight: .regular))
@@ -204,12 +234,12 @@ struct GSSidebar: View {
             }
             .foregroundStyle(selected ? GS.selectedText : GS.text)
             .padding(.leading, 14)
-            .frame(height: 26)
+            .frame(height: metrics.height)
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(selected ? GS.selectedFill : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, 2)
+        .padding(.bottom, metrics.gap)
         .accessibilityLabel(section.title)
         .accessibilityIdentifier("settings.sidebar.\(section.rawValue)")
         .accessibilityAddTraits(selected ? [.isSelected] : [])

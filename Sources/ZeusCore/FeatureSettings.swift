@@ -37,6 +37,46 @@ public enum FeatureSettings {
 
     public static func pointingShortcutName(defaults: UserDefaults = .standard) -> String { string("pointing.shortcut", default: pointingShortcutDefault, defaults: defaults) }
 
+    // MARK: Tiling
+
+    /// Arranging windows from the keyboard. Off until the owner turns it on, and a settings import cannot turn it on.
+    public static func tilingEnabled(defaults: UserDefaults = .standard) -> Bool { bool("tiling.enabled", default: false, defaults: defaults) }
+
+    /// The gap between two tiles, in points. A value that is not a number reads as 8; `TileConfig` clamps the range.
+    public static func tilingInnerGap(defaults: UserDefaults = .standard) -> Double { number("tiling.innerGap", default: 8, defaults: defaults) }
+
+    /// The gap between the tiles and the screen edge, in points.
+    public static func tilingOuterGap(defaults: UserDefaults = .standard) -> Double { number("tiling.outerGap", default: 8, defaults: defaults) }
+
+    /// The default split as the percentage the page shows (50). It is not the engine's ratio: pass `tilingDefaultRatio` to `TileConfig`.
+    public static func tilingSplitRatio(defaults: UserDefaults = .standard) -> Double { number("tiling.splitRatio", default: 50, defaults: defaults) }
+
+    /// The default split as the engine's ratio (0.5), the percentage over 100. `TileConfig` clamps the range.
+    public static func tilingDefaultRatio(defaults: UserDefaults = .standard) -> Double { tilingSplitRatio(defaults: defaults) / 100 }
+
+    /// A ring around the focused window.
+    public static func tilingFocusBorder(defaults: UserDefaults = .standard) -> Bool { bool("tiling.focusBorder", default: true, defaults: defaults) }
+
+    /// The modifiers held for every tiling key. An unknown stored label is Control-Option.
+    public static func tilingKeyBase(defaults: UserDefaults = .standard) -> TileModifierBase {
+        TileModifierBase(label: string("tiling.keyBase", default: "Control-Option", defaults: defaults))
+    }
+
+    /// Bundle ids Zeus never tiles, separated by commas or new lines (any kind, CRLF included). Case is kept: a bundle id is compared as written.
+    public static func tilingExcludedApps(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(string("tiling.excludedApps", default: "", defaults: defaults)
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty })
+    }
+
+    /// A stored number, or `value` when nothing is stored or the text is not a finite number.
+    private static func number(_ id: String, default value: Double, defaults: UserDefaults) -> Double {
+        guard let text = defaults.string(forKey: key(id)),
+              let number = Double(text.trimmingCharacters(in: .whitespaces)), number.isFinite else { return value }
+        return number
+    }
+
     // MARK: Browser agent
 
     public static let browserStepChoices = [10, 15, 25, 40, 60]
