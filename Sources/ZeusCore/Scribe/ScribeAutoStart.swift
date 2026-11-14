@@ -244,8 +244,12 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             return []
         case .declineNow(let meeting):
             switch state {
-            case .idle, .armed:
+            case .idle:
                 note(meeting, .declined)
+                return [.hideBanner]
+            case .armed(let armed, _):
+                note(meeting, .declined)
+                guard armed.key == meeting.key else { return [] }
                 state = .idle
                 return [.hideBanner]
             default:
