@@ -139,8 +139,8 @@ Words. The key's **own set** is its modifiers and its key code when it has one; 
 physical key, and the other side is foreign. **Foreign** is a modifier outside the own set, or an ordinary key that is
 not the key's own. A **press** lasts while the whole own set is down. A **turn** runs from `start` to `send` or
 `cancel`, and is **hands-free** while the machine says `isLatched`. The rules hold after every step (a key down or up,
-a forwarded key arriving, time passing, an `abandon`) of every order; the search in part 5 checks them from the keys
-physically down, the effects and `isLatched`, and reads nothing else of the machine.
+a forwarded key arriving, time passing, an `abandon`) of every order; the search in part 5 checks them from the keys the
+machine has been told are down, the effects and `isLatched`, and reads nothing else of the machine.
 
 | Rule | Checkable statement |
 | --- | --- |
@@ -148,7 +148,7 @@ physically down, the effects and `isLatched`, and reads nothing else of the mach
 | **I2.** After a cancel, nothing starts until everything is up | No `start` after a `cancel` until every key is up |
 | **I3.** Nothing starts on a larger chord | No `start` at a step where the keys down are a strict superset of the own set |
 | **I4.** Every turn ends exactly once | `start` is followed by exactly one `send`, `cancel` or `abandon` before the next `start`; no `send` or `cancel` without an open turn. With every key up and every timer run out, only a hands-free turn is open |
-| **I5.** A consumed key is a key | The machine's event has no field that says where a key came from, so a consumed key and the same key unconsumed give the same effects. Arriving late by any number of events, every other rule still holds, for every key part 6 allows; it refuses the keys a late key could fool, those that hold a whole bound chord |
+| **I5.** A consumed key is a key | The machine's event has no field that says where a key came from, so a consumed key and the same key unconsumed give the same effects. A forwarded key that comes ahead of the flags event of the modifier pressed before it leaves every other rule holding. A forwarded key that waits behind three later events cannot be held to the rules by any reducer: with the three modifiers of a bound chord let go and the arrow still held, the machine is told that every key is up (third pass, finding 24) |
 | **I6.** Nothing starts when a larger chord shrinks | Once the whole own set has been down with something foreign, no `start` until every key is up. This closes the gap `TilingKeyTap.swift:265-268` calls bounded, whatever the feed's order |
 | **I7.** A toggle fires once per press | At most one `start` per press of a toggle key, and none while I2 or I6 bar it. A toggle cannot be taken back, so I1 and I4 do not apply to it; part 6 refuses the pairs that would need them |
 | **I8.** Never stuck | From every state, letting go of everything, waiting 0.5 s, then pressing exactly the own set acts. Acts: a hold key gives `start` once held for `confirm` (`send` when a hands-free turn was open); a toggle gives `start`; a shared dictation key gives `start` after 0.25 s; a shared talk key gives `start` on the second of two quick clean taps; a key VoiceOver holds gives `refused` |
@@ -307,22 +307,24 @@ key is held. (4) It takes the same `confirm`: an exact hold gives a new output `
 **The search.** `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift`, pure, no sleep. It explores the whole graph of reachable
 states, so it covers every order of presses and releases at every length, with no cut-off: each state is expanded once
 with every move, and a visited set ends the search. Time is a whole number of 0.05 s steps, of which every threshold is
-a multiple (0.15, 0.25, 0.3, 0.35, 0.4), and the state key is a normalised copy of the machine with ages in place of
-times, capped at 0.5 s, past every window, so the graph is finite. The pointing gesture gets the same key, which asks
+a multiple (0.15, 0.25, 0.3, 0.35, 0.4), and the state key is the machine's config, keyboard picture, `barred` and phase with
+ages in place of times, capped at 0.45 s, past every window, so the graph is finite. The pointing gesture gets the same key, which asks
 `PointingKeyGesture` to be `Equatable` (step 4); its 95 s bound (`PointingKeyGesture.swift:26`) is past the cap and stays
-with `PointingRobustnessTests`. The moves: toggle one physical key (a press if it is up, a release if it is down, so every order is valid);
-wait 0.05 s; deliver the oldest forwarded key held back; `abandon`; `interrupt`. The harness is the stand-in adapter:
+with `PointingRobustnessTests`. The moves: toggle one physical key (a press if it is up, a release if it is down, so every order is valid), its event reaching the machine at once or held back for the next forwarded key;
+wait 0.05 s (not while an event is held back); deliver the held event; `abandon`; `interrupt` (not while an ordinary key
+is down, because a resync forgets ordinary keys by design); in run B, flip the config. The harness is the stand-in adapter:
 it keeps the wakes and delivers each due `tick` with the true modifiers. A missed event is not a move: C17 is held by
 the unit tests of rows 5, 14 and 24 and by Mac check 10, not by the search. A key-down is offered to the real
 `TileKeyMatcher` with `TileKeymap.defaults(base: .standard)`; a consumed key becomes `TileKeyDecision.monitorEvent` and
-the search branches: it reaches the machine at once, or waits in a queue behind any number of later events. After
-every move a checker asserts I1 to I7 from the effects, the keys physically down and `isLatched`; at every state it
+the forwarded key reaches the machine at once, and one monitor event may be held back behind it, so the machine can hear a
+forwarded key before the flags event of the modifier pressed ahead of it. After
+every move a checker asserts I1 to I7 from the effects, the keys the machine has been told are down and `isLatched`; at every state it
 also lets go of everything, waits 0.5 s, presses the own set and asserts I8 and the last clause of I4.
 
 | Tests | What they hold |
 | --- | --- |
-| The ten runs of the search | The keys are Control, Option, Command, Shift and one ordinary key (Left arrow; T in run G), plus what is named. **A** talk, hold, Control-Option, `confirm` 0.15 (shipped talk beside tiling). **A0** the same, `confirm` 0. **B** dictation, hold, Right Command, `confirm` 0.15, with Left Command as a sixth key and a move that flips the config between hold, toggle and off (shipped dictation). **C** dictation, hold, Control-Option, `confirm` 0.15. **D** dictation, shared, Control-Option. **E** talk, shared, Control-Option. **F** dictation, toggle, Right Command. **G** toggle, Control-Option-T (shipped Polyglot). **H** `PointingKeyGesture`, Control-Option, `confirm` 0.15 (shipped pointing): began is `start`, ended and timed out are `send`. **I** talk, hold, Fn, the Globe key in place of Command |
-| How many, and how long | Sequences are without number, because no length is cut off; what is counted is states and moves. The count is not known until step 2 runs the search: the test prints both for each run and step 2 writes them here. An upper estimate, not measured: under 200,000 states a run, 9 moves each. As a check on the state key, run A is also walked plainly from rest, every order up to 5 steps over eight moves (the five keys, wait 0.05 s, wait 0.5 s, `abandon`): 8 + 64 + 512 + 4,096 + 32,768 = 37,448 sequences, which must meet no state the search did not and break no rule. Budget: one parameterised case a run, run in parallel, the suite under 5 s in a debug build. Not measured. If step 2 finds it over, `abandon` and `interrupt` stay as moves in runs A and B only |
+| The runs of the search (nine built, H waits for step 4) | The keys are Control, Option, Command, Shift and one ordinary key (Left arrow; T in run G), plus what is named. **A** talk, hold, Control-Option, `confirm` 0.15 (shipped talk beside tiling). **A0** the same, `confirm` 0. **B** dictation, hold, Right Command, `confirm` 0.15, with Left Command as a sixth key and a move that flips the config between hold, toggle and off (shipped dictation). **C** dictation, hold, Control-Option, `confirm` 0.15. **D** dictation, shared, Control-Option. **E** talk, shared, Control-Option. **F** dictation, toggle, Right Command. **G** toggle, Control-Option-T (shipped Polyglot). **H** `PointingKeyGesture`, Control-Option, `confirm` 0.15 (shipped pointing): began is `start`, ended and timed out are `send`. **I** talk, hold, Fn, the Globe key in place of Command |
+| How many, and how long | Sequences are without number, because no length is cut off; what is counted is states and moves, and the test prints both for each run. Measured at step 3 in a debug build on a loaded Mac (load average 60 to 100): A 10,659 states, 84,781 moves, 3 s; A0 6,648, 52,813, 2 s; B 176,105, 1,754,811, 23 s; C 21,677, 172,434, 5 s; D 8,779, 69,741, 3 s; E 7,014, 55,741, 3 s; F 1,356, 10,775, under 1 s; G 1,441, 11,434, under 1 s; I 3,150, 24,955, 1 s. As a check on the state key, run A is also walked plainly from rest, every order up to 5 steps over eight moves (the five keys, wait 0.05 s, wait 0.5 s, `abandon`): 8 + 64 + 512 + 4,096 + 32,768 = 37,448 sequences, which meet no state the search did not and break no rule (6 s). The suite takes 23 s in parallel, run B alone; the budget of 5 s is not met, and the fallback (`abandon` and `interrupt` in A and B only) would not bring B down, so it was not taken |
 | `Tests/ZeusCoreTests/VoiceKeyMachineTests.swift` | One test per row of 4.3, the prelude steps (the first press after launch acts; a config change), F1's order, the swap chord on a dictation key in both orders (Control, Option, Shift, Command, Left; Right Command, Shift, Control, Option, Left), a missed release found by a tick, a forwarded key that comes before the flags event of the last modifier, a dictation press that Shift joins and lets go, released as a quick second tap (sent once, never latched), and each row C1 to C18 |
 | `Tests/ZeusCoreTests/KeyFactsTests.swift` | Every fact for a modifier-only, a sided and a keyed key; an arrow key-down carrying Fn and its key-up leave an Fn key not held; a key-down carrying Command leaves `allUp` true; Left Command is foreign to Right Command; after a resync, one modifier let go and pressed again is never `allUp` in between |
 | The existing suites, which stay | `TalkKeyLatchTests` (`Tests/ZeusCoreTests/ZeusCLITests.swift:99-149`), `SharedKeyGestureTests` and the rig in `ShortcutTests.swift:169-230` keep their names, timelines and expectations, and drive the machine with `confirm` 0 in place of the two deleted types (`stopLater(0.4)` reads `wake(after: 0.4)`, `cancelPendingStop` reads no effect, `isLatched` stays, `isEnding` reads `phase == .spent`, `cancelFromEsc` reads `abandon`). `TilingConsumedKeyTests` loses the `cancelsWhenSpoiled` setter at `:134` and takes the one change of part 2. The pointing suites pass the live modifiers to `interrupt`; a new case: interrupt, one modifier let go and pressed again begins nothing |
@@ -495,3 +497,17 @@ included.
 
 Nothing from this pass was rejected. Two limits stay and are named, not hidden: the search has no missed-event move
 (22), and the 0.15 s and the search size are estimates until step 2 and Mac check 2 run.
+
+### Third pass
+
+Revision of 14 November 2026 made while steps 1 to 3 were built (the flags-only picture, the failing tests, the reducer). The
+search was run against the reducer and against deliberate mutations of it (Shift read as a Shift press for a talk key
+too, `barred` never set, a cancel that leaves `barred` alone, no wake after a first tap, no send when a shared talk press
+ends a command turn, no `shifted` mark): each was found, with the shortest order that shows it.
+
+| # | Finding | Verdict | Change |
+| --- | --- | --- | --- |
+| 24 | A forwarded key that waits behind several later events breaks I2, I3 and I6 whatever the reducer does: Control, Option, Command, Left (consumed), Command, Option, Control, then Control, Option with the arrow still held. The machine is never told about the arrow, sees every modifier up, clears `barred`, and starts on Control-Option with the arrow down. A late key-up has the same effect on a key pressed again. Found by the search at three events, and at one for the key-up | Confirmed by the walk; the claim of I5 (late by any number of events) cannot hold | The search forwards a consumed key at once and lets one monitor event wait behind it (the forwarded key ahead of the flags event of the modifier pressed first, the order the unit test names); time does not pass while an event waits; the rules read the keys the machine was told about. The late forwarded key stays a risk the Mac checks must watch (check 9, rollover) |
+| 25 | A stale wake kept by the harness can cover a phase that forgot to ask for its own, and it multiplied the state space (3.4 million states for run A0 before, 6,648 after) | Confirmed | A wake belongs to the phase that asked for it; a phase change drops the old ones |
+| 26 | A tick or a key event that arrives late was not stated: an armed press past its delay, or a tap past its gap, would be read as a quick tap | Confirmed by reading rows 5 and 17 | `settle`: an overdue delay or gap acts first, on the keyboard as it was before the event, so a late timer cannot change what a key did. Unit tests of row 15 and the late tick |
+| 27 | `isLatched` must be true for the press that will end a hands-free turn (armed ending), or the checker would read its send as the send of an ordinary turn | Confirmed | `isLatched` is true for `latched` and for `armed(_, .ending)` |

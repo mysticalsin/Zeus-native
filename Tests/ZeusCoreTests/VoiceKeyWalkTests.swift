@@ -7,9 +7,20 @@ import Testing
 // It walks the whole graph of reachable states of one hold key: each state is expanded once with every move and a
 // visited set ends the search, so every order of presses and releases at every length is covered with no cut-off on
 // length. Time moves in whole steps of 0.05 s, of which every threshold is a multiple, and the state key keeps ages
-// (capped at 0.5 s, past every window) in place of times, so the graph is finite. After every move a checker reads
-// rules I1 to I7 from the effects, the keys physically down and `isLatched`; at every state the walk also lets go of
-// everything, waits 0.5 s and presses the own set, and reads I8 and the last clause of I4.
+// (capped at 0.45 s, past every window) in place of times, so the graph is finite. After every move a checker reads
+// rules I1 to I7 from the effects, the keys the machine has been told are down and `isLatched`; at every state the
+// walk also lets go of everything, waits 0.5 s and presses the own set, and reads I8 and the last clause of I4.
+//
+// What reaches the machine, and when. A modifier key and a key the tiling matcher passes on send a monitor event; a key
+// the real `TileKeyMatcher` consumes is forwarded as the event a monitor would have seen. The forwarded key reaches the
+// machine at once, and a monitor event may be held back for one event, so the machine can hear a forwarded key before
+// the flags event of the modifier pressed ahead of it. Time does not pass while an event is held. A forwarded key that
+// waited behind several later events is not modelled: with three modifiers let go and the arrow still held, the machine
+// sees every key up and a start can follow, and no reducer can tell that from a clean press. The rules are therefore
+// read against the keys the machine was told about, not against the keys physically down.
+//
+// A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
+// forgets its own wake is caught instead of being covered by a stale one.
 
 /// One physical key of a run.
 struct WalkKey: Hashable, Sendable {
@@ -99,31 +110,44 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 
 // MARK: - The harness
 
-/// A forwarded key held back in the queue: only a key-down or a key-up ever waits there.
+/// A monitor event held back for one event: the machine hears the next forwarded key first.
 private struct Held: Hashable {
-    var isDown: Bool
+    enum Kind: UInt8 { case flags, down, up }
+    var kind: Kind
     var code: UInt16
     var mods: UInt8
+    var index: UInt8
+    var pressed: Bool
 
-    init(_ event: ShortcutEvent) {
+    init(_ event: ShortcutEvent, index: Int, pressed: Bool) {
+        self.index = UInt8(index)
+        self.pressed = pressed
         switch event {
-        case .keyDown(let code, let mods): isDown = true; self.code = code; self.mods = mods.rawValue
-        case .keyUp(let code): isDown = false; self.code = code; mods = 0
-        case .flags: preconditionFailure("the tap never forwards a flags event")
+        case .flags(let code, let mods): kind = .flags; self.code = code; self.mods = mods.rawValue
+        case .keyDown(let code, let mods): kind = .down; self.code = code; self.mods = mods.rawValue
+        case .keyUp(let code): kind = .up; self.code = code; mods = 0
         }
     }
 
     var event: ShortcutEvent {
-        isDown ? .keyDown(keyCode: code, modifiers: ShortcutModifiers(rawValue: mods)) : .keyUp(keyCode: code)
+        let modifiers = ShortcutModifiers(rawValue: mods)
+        switch kind {
+        case .flags: return .flags(keyCode: code, modifiers: modifiers)
+        case .down: return .keyDown(keyCode: code, modifiers: modifiers)
+        case .up: return .keyUp(keyCode: code)
+        }
     }
 }
 
 private enum Move: Hashable {
-    case toggle(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
+    /// A key goes down or up and its event reaches the machine at once; `toggleHeld`: the event of a modifier key or an
+    /// unconsumed key waits for the next forwarded key.
+    case toggle(Int), toggleHeld(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
 
     func text(_ run: WalkRun) -> String {
         switch self {
         case .toggle(let index): run.keys[index].name
+        case .toggleHeld(let index): run.keys[index].name + " (event held)"
         case .wait: "wait 0.05"
         case .waitHalfSecond: "wait 0.5"
         case .deliver: "deliver"
@@ -184,8 +208,9 @@ private struct Edge {
 /// times. `ShortcutState.modifiers` is left out because nothing in the machine reads it.
 private struct StateKey: Hashable {
     var down: UInt16
+    var seen: UInt16
     var consumed: UInt16
-    var queue: [Held]
+    var held: Held?
     var wakes: [Int]
     var cfg: Int
     var config: VoiceKeyMachine.Config?
@@ -199,10 +224,11 @@ private struct StateKey: Hashable {
 }
 
 private extension VoiceKeyMachine {
-    /// The phase with ages in place of times, capped at 0.5 s: the same phase whenever it was reached.
+    /// The phase with ages in place of times, capped at 0.45 s, past every window (the longest is 0.4 s): the same
+    /// phase whenever it was reached.
     func normalizedPhase(at now: TimeInterval) -> Phase {
-        func age(_ time: TimeInterval) -> TimeInterval { Double(min(10, max(0, Int(((now - time) / 0.05).rounded())))) * 0.05 }
-        func ahead(_ time: TimeInterval) -> TimeInterval { Double(min(10, max(0, Int(((time - now) / 0.05).rounded())))) * 0.05 }
+        func age(_ time: TimeInterval) -> TimeInterval { Double(min(9, max(0, Int(((now - time) / 0.05).rounded())))) * 0.05 }
+        func ahead(_ time: TimeInterval) -> TimeInterval { Double(min(9, max(0, Int(((time - now) / 0.05).rounded())))) * 0.05 }
         switch phase {
         case .idle, .latched, .spent: return phase
         case .armed(let since, let press): return .armed(since: age(since), press: press)
@@ -214,15 +240,17 @@ private extension VoiceKeyMachine {
 }
 
 private struct Sim {
-    /// Forwarded keys wait here, at most this many, so the graph stays finite.
-    static let queueLimit = 4
     static let keymap = TileKeymap.defaults(base: .standard)
     static let gate = TileKeyGate(enabled: true)
 
     var machine = VoiceKeyMachine()
     var down: UInt16 = 0
+    /// The keys the machine has been told are down: the physical keys, less the events that are still on the way.
+    /// The rules are read against this, because a key the machine was never told about cannot be told from no key.
+    var seen: UInt16 = 0
     var consumed: UInt16 = 0
-    var queue: [Held] = []
+    /// At most one monitor event waits behind the next forwarded key.
+    var held: Held?
     var wakes: Set<Int> = []
     var step = 0
     var cfg = 0
@@ -237,7 +265,7 @@ private struct Sim {
     var now: TimeInterval { Double(step) * 0.05 }
 
     func key(_ run: WalkRun) -> StateKey {
-        StateKey(down: down, consumed: consumed, queue: queue, wakes: wakes.map { $0 - step }.sorted(), cfg: cfg,
+        StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { $0 - step }.sorted(), cfg: cfg,
                  config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
                  keysDown: machine.keys.keysDown, spoiled: machine.keys.spoiled, barred: machine.barred,
                  phase: machine.normalizedPhase(at: now), checker: checker)
@@ -251,34 +279,34 @@ private struct Sim {
         return live
     }
 
-    func moves(_ run: WalkRun, plain: Bool = false) -> [Move] {
+    func moves(_ run: WalkRun) -> [Move] {
         var out: [Move] = []
-        for (index, key) in run.keys.enumerated() {
-            // A press of an ordinary key can add to the queue; a release too. Both wait for room.
-            if key.flag == nil, queue.count >= Self.queueLimit { continue }
+        for index in run.keys.indices {
             out.append(.toggle(index))
+            if held == nil { out.append(.toggleHeld(index)) }
         }
-        out.append(.wait)
-        if plain { out.append(.waitHalfSecond) }
-        if !plain, !queue.isEmpty { out.append(.deliver) }
+        // Time does not pass while an event is held back: it is a matter of one turn of the run loop.
+        if held == nil { out.append(.wait) } else { out.append(.deliver) }
         out.append(.abandon)
-        if !plain, run.configs.count > 1 { out.append(.flip) }
-        if !plain, down & run.ordinaryMask == 0 { out.append(.interrupt) }
+        if run.configs.count > 1 { out.append(.flip) }
+        if held == nil, down & run.ordinaryMask == 0 { out.append(.interrupt) }
         return out
+    }
+
+    /// The eight moves of the plain walk: the keys, a short and a long wait, and an abandon.
+    func plainMoves(_ run: WalkRun) -> [Move] {
+        run.keys.indices.map { Move.toggle($0) } + [.wait, .waitHalfSecond, .abandon]
     }
 
     // MARK: Applying a move
 
     mutating func apply(_ move: Move, _ run: WalkRun) {
-        edge = Edge()
         switch move {
-        case .toggle(let index): toggle(index, run)
+        case .toggle(let index): toggle(index, hold: false, run)
+        case .toggleHeld(let index): toggle(index, hold: true, run)
         case .wait: advance(run)
         case .waitHalfSecond: for _ in 0..<10 { advance(run) }
-        case .deliver:
-            guard !queue.isEmpty else { return }
-            let held = queue.removeFirst()
-            feed(.key(held.event, at: now), .deliver, run)
+        case .deliver: flushHeld(run)
         case .abandon: feed(.abandon, .abandon, run)
         case .interrupt: feed(.interrupt(live: liveModifiers(run)), .interrupt, run)
         case .flip:
@@ -288,28 +316,42 @@ private struct Sim {
         if !checker.ownWasDown { checker.pressForeign = false }
     }
 
-    private mutating func toggle(_ index: Int, _ run: WalkRun) {
+    private mutating func flushHeld(_ run: WalkRun) {
+        guard let event = held?.event else { return }
+        let (index, pressed) = (Int(held?.index ?? 0), held?.pressed ?? false)
+        held = nil
+        feed(.key(event, at: now), .deliver, run, key: (index, pressed))
+    }
+
+    /// One monitor event reaches the machine, behind the one held back before it, or is held back itself.
+    private mutating func monitor(_ event: ShortcutEvent, index: Int, pressed: Bool, hold: Bool, _ run: WalkRun) {
+        flushHeld(run)
+        if hold { held = Held(event, index: index, pressed: pressed) }
+        else { feed(.key(event, at: now), .key, run, key: (index, pressed)) }
+    }
+
+    private mutating func toggle(_ index: Int, hold: Bool, _ run: WalkRun) {
         let bit = UInt16(1) << UInt16(index)
         let key = run.keys[index]
         let pressing = down & bit == 0
         down ^= bit
-        physicalChanged(run)
         let live = liveModifiers(run)
         if key.flag != nil {
-            feed(.key(.flags(keyCode: key.code, modifiers: live), at: now), .key, run)
+            monitor(.flags(keyCode: key.code, modifiers: live), index: index, pressed: pressing, hold: hold, run)
             return
         }
         // An ordinary key goes through the real tiling matcher first. A key it consumes never reaches the monitors:
-        // it comes back later as the forwarded event, behind any number of other events.
+        // it comes back as the forwarded event, at once, and so ahead of a monitor event that was held back.
         let marked = TileKeymap.fnMarkedKeyCodes.contains(key.code)
         let mods = marked ? live.union(.function) : live
         let tile = TileKeyEvent(phase: pressing ? .down : .up, keyCode: key.code, modifiers: mods)
         let decision = matcher.decide(tile, keymap: Self.keymap, gate: Self.gate)
         if let forwarded = decision.monitorEvent(for: tile) {
             if pressing { consumed |= bit } else { consumed &= ~bit }
-            queue.append(Held(forwarded))
+            feed(.key(forwarded, at: now), .key, run, key: (index, pressing))
         } else {
-            feed(.key(pressing ? .keyDown(keyCode: key.code, modifiers: mods) : .keyUp(keyCode: key.code), at: now), .key, run)
+            monitor(pressing ? .keyDown(keyCode: key.code, modifiers: mods) : .keyUp(keyCode: key.code), index: index,
+                    pressed: pressing, hold: hold, run)
         }
     }
 
@@ -330,11 +372,21 @@ private struct Sim {
         }
     }
 
-    private mutating func feed(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun) {
+    private mutating func feed(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)? = nil) {
+        edge = Edge()
+        if let (index, pressed) = key {
+            let bit = UInt16(1) << UInt16(index)
+            if pressed { seen |= bit } else { seen &= ~bit }
+            seenChanged(run)
+        }
         let config = run.configs[cfg]
         let wasLatched = machine.isLatched
+        let before = machine.phase
         let effects = machine.handle(event, config: config)
         log += effects
+        // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
+        // phase that forgets to ask for its own wake is caught, not covered by a stale one.
+        if machine.phase != before { wakes.removeAll() }
         for effect in effects {
             if case .wake(let after) = effect { wakes.insert(step + Int((after / 0.05).rounded())) }
         }
@@ -344,8 +396,8 @@ private struct Sim {
 
     // MARK: The rules
 
-    private mutating func physicalChanged(_ run: WalkRun) {
-        let phys = Phys(down, run)
+    private mutating func seenChanged(_ run: WalkRun) {
+        let phys = Phys(seen, run)
         let wasOwn = checker.ownWasDown
         if phys.ownAll, !wasOwn {
             checker.pressAge = 0
@@ -372,7 +424,7 @@ private struct Sim {
 
     private mutating func check(_ effects: [VoiceKeyMachine.Effect], wasLatched: Bool, kind: Kind,
                                 config: VoiceKeyMachine.Config, _ run: WalkRun) {
-        let phys = Phys(down, run)
+        let phys = Phys(seen, run)
         let dictation = config.role == .dictation
         let confirmSteps = Int((config.confirm / 0.05).rounded())
         for effect in effects {
@@ -450,8 +502,9 @@ private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) ->
 private func restCheck(_ sim: Sim, _ run: WalkRun) -> [String] {
     var base = sim
     base.found = []
+    base.apply(.deliver, run)
     for index in run.keys.indices where base.down & (UInt16(1) << UInt16(index)) != 0 { base.apply(.toggle(index), run) }
-    while !base.queue.isEmpty { base.apply(.deliver, run) }
+    base.apply(.deliver, run)
     for _ in 0..<10 { base.apply(.wait, run) }
     var out = base.found
     base.found = []
@@ -600,7 +653,7 @@ private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
         var problems: [String] = []
         func walk(_ sim: Sim, depth: Int, trail: [Move]) {
             if depth == 5 { return }
-            for move in sim.moves(run, plain: true) {
+            for move in sim.plainMoves(run) {
                 var next = sim
                 next.found = []
                 next.apply(move, run)
