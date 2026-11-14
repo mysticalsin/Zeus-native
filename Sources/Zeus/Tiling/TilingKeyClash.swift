@@ -24,11 +24,14 @@ extension ShortcutPreset {
 enum TilingKeyClash {
     /// The keys the rule compares, read at one moment. `talk` is the key the owner chose; the rule derives the key
     /// the talk monitor listens on (it moves while VoiceOver runs). Dictation and pointing are nil when off,
-    /// exactly as `HotkeyMonitor` reads them.
+    /// exactly as `HotkeyMonitor` reads them. Polyglot is the same: its monitor is a `HotkeyMonitor` too, and it
+    /// hears every key the tap forwards. `TilingKeyClashTests` lists every monitor in the app, so a new global key
+    /// cannot be left out of this struct unnoticed.
     struct Keys: Equatable {
         var talk: Shortcut
         var dictation: Shortcut?
         var pointing: Shortcut?
+        var polyglot: Shortcut?
         var chat: ChatHotkey
         var voiceOverOn: Bool
         /// The other global hot keys with a key: Quick to-do, the notch, and the prompter pause.
@@ -42,10 +45,12 @@ enum TilingKeyClash {
         @MainActor static func live() -> Keys {
             let dictation = DictationSettings.shared
             let extras = ExtraPreferences.shared
+            let polyglot = PolyglotSettings.shared
             let presets: [(String, ShortcutPreset)] = [("Open the notch", extras.openNotch), ("Quick to-do", extras.quickTodo)]
             return Keys(talk: Preferences.shared.pushToTalk,
                         dictation: dictation.enabled ? dictation.key : nil,
                         pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
+                        polyglot: polyglot.enabled ? polyglot.hotkey : nil,
                         chat: ChatHotkey.stored(UserDefaults.standard.string(forKey: "chat.hotkey")),
                         voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled,
                         others: presets.compactMap { name, preset in
@@ -60,7 +65,7 @@ enum TilingKeyClash {
         let keys = keys ?? Keys.live()
         return TileBaseConflicts.notes(
             base: base, keymap: keymap ?? TileKeymap.defaults(base: base),
-            talk: keys.talk, dictation: keys.dictation, pointing: keys.pointing, chat: keys.chat,
+            talk: keys.talk, dictation: keys.dictation, pointing: keys.pointing, polyglot: keys.polyglot, chat: keys.chat,
             voiceOverOn: keys.voiceOverOn, others: keys.others).first
     }
 

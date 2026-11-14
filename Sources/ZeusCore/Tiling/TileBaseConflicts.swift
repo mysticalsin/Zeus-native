@@ -4,13 +4,13 @@ import Foundation
 ///
 /// The tiling tap consumes a bound chord before any other monitor sees it. Two kinds of clash follow.
 ///
-/// A modifier-only key (talk, pointing, dictation) starts a turn on its modifiers alone and is cancelled only when
+/// A modifier-only key (talk, pointing, dictation, Polyglot) starts a turn on its modifiers alone and is cancelled only when
 /// a monitor sees another key go down. A tiling pair that is the same pair would start a turn on every tiling
 /// chord and never cancel it, so that pair is refused. A larger pair is free: those holds need exactly their own
 /// modifiers, and a smaller hold that forms when the owner lets go of the extra modifier first stays spoiled because
 /// the tap forwards every key it consumes to the monitors (`TileKeyDecision.monitorEvent`).
 ///
-/// A keyed key (a talk, pointing or dictation shortcut with a letter, an arrow or Space) is a chord the tap would
+/// A keyed key (a talk, pointing, dictation or Polyglot shortcut with a letter, an arrow or Space) is a chord the tap would
 /// swallow if the tiling keymap binds the same chord, so every bound tiling chord is compared with every keyed
 /// Zeus shortcut, with the fn flag handled the way the tap handles it.
 ///
@@ -35,11 +35,11 @@ public enum TileBaseConflicts {
     }
 
     /// Plain sentences naming each key that holds `base`, or a chord in `keymap`. Empty when the keys are free.
-    /// `talk` is the key the owner chose; `dictation` and `pointing` are nil when off. The rule works out the key
+    /// `talk` is the key the owner chose; `dictation`, `pointing` and `polyglot` are nil when off. The rule works out the key
     /// the talk monitor listens on from `voiceOverOn`. `others` are the remaining keyed global shortcuts. The
     /// VoiceOver sentence comes first.
     public static func notes(base: TileModifierBase, keymap: TileKeymap, talk: Shortcut, dictation: Shortcut?,
-                             pointing: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool,
+                             pointing: Shortcut?, polyglot: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool,
                              others: [NamedShortcut] = []) -> [String] {
         var out: [String] = []
         if voiceOverOn, keymap.bindings.contains(where: { $0.shortcut.modifiers.isSuperset(of: voiceOverPair) }) {
@@ -48,7 +48,8 @@ public enum TileBaseConflicts {
 
         let heard = VoiceKey.effectiveTalkKey(chosen: talk, dictation: dictation, pointing: pointing, voiceOverOn: voiceOverOn)
         let talkMoved = heard != talk
-        let holds: [(String, Shortcut?)] = [("Talk to Zeus", heard), ("Pointing", pointing), ("Dictation", dictation)]
+        let holds: [(String, Shortcut?)] = [("Talk to Zeus", heard), ("Pointing", pointing), ("Dictation", dictation),
+                                        ("Polyglot", polyglot)]
 
         var holders: [String] = []
         var movedTalkHoldsBase = false
