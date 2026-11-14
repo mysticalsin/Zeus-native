@@ -21,6 +21,8 @@ private final class FakeTilingDriver: TilingWindowDriver {
     static let zeusBundle = "app.zeus.mac"
 
     var trusted = true
+    /// Accessibility is revoked as this write is made: the write fails and trust is gone from then on.
+    var revokeAtWrite: Int?
     var screens: [TileDisplay] = [FakeTilingDriver.mainDisplay()]
     var candidates: [Candidate] = []
     /// Apps whose windows the pass cannot read in time: left out of the listing, named in `unreadPIDs`.
@@ -95,6 +97,10 @@ private final class FakeTilingDriver: TilingWindowDriver {
     func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool {
         guard trusted, listed.contains(window) else {
             unlistedWrites.append(window)
+            return false
+        }
+        if revokeAtWrite == writes.count + 1 {
+            trusted = false
             return false
         }
         writes.append((window, frame))
@@ -334,6 +340,25 @@ struct TilingControllerTests {
         #expect(rig.controller.phase == .needsAccessibility)
         #expect(rig.lastRing == nil)
         #expect(!rig.trustWaiters.isEmpty, "it waits for the permission to come back")
+    }
+
+    @Test func accessibilityRevokedInTheMiddleOfAPassFloatsNoWindowAndTilingResumesWhenItReturns() {
+        let rig = Rig()
+        rig.driver.add(id(1))
+        rig.driver.add(id(2))
+        rig.driver.revokeAtWrite = 2
+        rig.controller.start()
+        rig.settle()
+        #expect(rig.controller.phase == .needsAccessibility)
+        #expect(rig.controller.floatingWindows.isEmpty, "a write that failed because access went away says nothing about the window")
+        // The permission comes back: the window the revoke cut off is tiled again, not left floating for the session.
+        rig.driver.trusted = true
+        rig.driver.revokeAtWrite = nil
+        rig.trustWaiters.last?()
+        rig.settle()
+        #expect(rig.controller.floatingWindows.isEmpty)
+        #expect(rig.driver.frame(of: id(1)) == leftTile)
+        #expect(rig.driver.frame(of: id(2)) == rightTile)
     }
 
     @Test func aMoveThatDoesNotLandFloatsTheWindowForTheSessionAndTheRestLayOutAgain() {

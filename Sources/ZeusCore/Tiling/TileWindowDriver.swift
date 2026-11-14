@@ -176,7 +176,8 @@ public struct TileApplyOutcome: Equatable, Sendable {
     public init(state: TileApplyState) { self.state = state }
 }
 
-/// Runs a plan through a driver: each move once, in order, with no retry.
+/// Runs a plan through a driver: each move once, in order, with no retry. Trust is checked before the first write and
+/// again after every write that fails, so a permission revoked part way ends the plan as `.accessibilityOff`.
 @MainActor
 public enum TileApplier {
     /// Seconds one plan may take before it stops starting new writes, when the caller gives no deadline.
@@ -202,6 +203,11 @@ public enum TileApplier {
             outcome.intended[move.id] = move.target
             if driver.setFrame(move.target, for: move.id) {
                 outcome.moved.append(move.id)
+            } else if !driver.isTrusted {
+                // Accessibility went away part way through: every later write fails for that reason alone, and none of
+                // the windows is to blame. Stopping here keeps them out of the refused list, so the caller never floats
+                // them for the session.
+                return TileApplyOutcome(state: .accessibilityOff)
             } else {
                 outcome.refused.append(move.id)
             }

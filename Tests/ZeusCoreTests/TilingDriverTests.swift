@@ -531,6 +531,29 @@ extension TilingDriverTests {
             #expect(outcome.moved.isEmpty && outcome.refused.isEmpty && outcome.deferred.isEmpty)
         }
 
+        @Test func accessibilityRevokedPartWayStopsThePlanAndBlamesNoWindow() {
+            let fake = driver(3)
+            var writes = 0
+            // The second write is the one the revoke hits: the driver then says false for it, as the real one does.
+            fake.refuse = [id(2)]
+            fake.onWrite = {
+                writes += 1
+                if writes == 2 { fake.isTrusted = false }
+            }
+            let outcome = TileApplier.apply(moves(3), with: fake)
+            #expect(outcome.state == .accessibilityOff)
+            #expect(outcome.refused.isEmpty, "a write that failed because access went away is not a refusal")
+            #expect(fake.writes.count == 2, "nothing is written after trust is gone")
+        }
+
+        @Test func aRefusedWriteWhileTrustHoldsIsStillARefusal() {
+            let fake = driver(3)
+            fake.refuse = [id(2)]
+            let outcome = TileApplier.apply(moves(3), with: fake)
+            #expect(outcome.state == .applied)
+            #expect(outcome.refused == [id(2)])
+        }
+
         @Test func everyMoveIsWrittenOnceAndAReapplyOfTheSameLayoutWritesNothing() {
             let fake = driver(3)
             let first = TileApplier.apply(moves(3), with: fake)
