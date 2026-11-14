@@ -135,7 +135,7 @@ chord type is added):
   table. `action(for:)` is a lookup over an immutable copy. It rejects duplicate chords and rejects a chord that
   `Shortcut` reports invalid (a bare letter with no modifier), and any key chord without Control, Option or Command
   (Shift or Fn plus a key, a bare F key), because the tap consumes what the keymap binds. `action(for:)` ignores the
-  fn flag that macOS adds to arrow and function keys, unless the chord was bound with it. `encode`/`decode` use a
+  fn flag that macOS adds to arrow, function (F1 to F20) and navigation keys (Home, End, Page Up, Page Down, Forward Delete), unless the chord was bound with it; fn with any other key is a different chord and passes through. `encode`/`decode` use a
   stable `Codable` form and skip unknown actions, so a newer file does not break an older build. `conflicts(with:)` returns the chords that collide
   with a supplied set of reserved shortcuts.
 
@@ -207,7 +207,8 @@ in parallel with T3 and T5 after T1 lands.
   element identity as far as ZeusCore goes), the bundle id and the frame in engine coordinates. `TileDisplay` carries
   the display id, its AppKit frames and its engine frame. `windows(config:)` reads every window fresh in the call: a
   window it could not read in time is left out, never reported from an earlier call, and its app's process id is in `unreadPIDs`.
-  `setFrame` and `focus` act only on a window the last `windows(config:)` returned.
+  `setFrame` and `focus` act only on a window the last `windows(config:)` returned. `focus` also reads the app again
+  first and does nothing for a window that no longer passes admission (minimized or moved to another Space since).
 - `AXTilingWindowDriver` is the real one, main actor like `AXSnapshotter` and `AXFinder`, with a per-pass time budget.
   It builds `AXUIElementCreateApplication(pid)` per regular app, calls `AXUIElementSetMessagingTimeout(app, 0.25)` as
   `AXSnapshotter` does, reads `kAXWindowsAttribute`, and reads role, subrole, minimized, full-screen, position and
@@ -243,9 +244,12 @@ insert.
   that belong to an unread app (`TilePlanner.slotsToKeep`) and writes to none of them. A window missing from an app that
   was read is gone, so one slow app never pins the slots of windows that closed in other apps. An app that answers
   "no value" or "attribute unsupported" to the window list has no windows: it counts as read (`TileWindowsAnswer`), so
-  only a timeout, another failure or the pass budget leaves an app unread.
+  only a timeout, another failure or the pass budget leaves an app unread. So does a window whose own attribute read
+  does not complete (`TileWindowsAnswer.windowRead`): that window is slow, not closed, so the whole app is unread.
 - Two windows of one app at the same frame, one on another Space: the window list cannot tell them apart, so when more
-  candidates share a frame than the list has entries for it, none of them is admitted.
+  windows of the app could be the on-screen entry than the list has entries for it, none of the candidates is admitted.
+  A window could be the entry when it sits at the frame whatever else is wrong with it (a panel, a fixed-size window,
+  full screen), or when its frame did not read; only a minimized window certainly is not.
 - A stale element after an app quits: dropped on the next read.
 - The driver's own writes fire move notifications: writes carry the intended frame, and the controller ignores a
   change that matches it, so the layout does not react to itself.
@@ -418,11 +422,11 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   the tap sees only chords the owner bound, and the rule that Zeus never consumes an unbound key is kept.
 - Key clash, closed in the review pass: `TileBaseConflicts.notes` compares the tiling keys with the keys the other
   monitors really use. The talk key is the effective one (`VoiceKey.effectiveTalkKey`), which moves off Control-Option
-  while VoiceOver runs; a modifier-only talk, pointing or dictation key with the same modifiers as the chosen pair is a
+  while VoiceOver runs; a modifier-only talk, pointing, dictation or Polyglot key with the same modifiers as the chosen pair is a
   clash (a larger pair is free, because the tap forwards every key it consumes, key-down and key-up, to the talk,
-  dictation and pointing monitors through `TilingConsumedKey`, so a smaller hold that forms when the owner lets go of
+  dictation, Polyglot and pointing monitors through `TilingConsumedKey`, so a smaller hold that forms when the owner lets go of
   the extra modifier first stays spoiled until every modifier is up); every bound tiling chord (base plus key) is
-  compared with every keyed talk, pointing and dictation shortcut, with the fn flag handled as the tap handles it; a
+  compared with every keyed talk, pointing, dictation and Polyglot shortcut, with the fn flag handled as the tap handles it; a
   chat chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch or the prompter pause; and while
   VoiceOver runs every bound chord that holds Control and Option is refused, which VoiceOver uses alone and with
   Command and a letter (the shipped pair included). The controller checks it on every settings write, before
@@ -443,6 +447,12 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   startup service is allowed; an unchanged settings write, paused or not, still notices a revoked Accessibility; and a
   focus key draws the ring from the keyboard as the system reports it after the call, so a neighbour that was
   minimized or unread since the last pass gets no ring.
+- Second review round: the Polyglot key (on by default, Control-Option-T) is read by `TilingKeyClash.Keys.live()` like
+  the other monitor keys, and `TilingKeyClashTests` lists every `HotkeyMonitor` and key provider in the app, so a new
+  global key fails a test until it is added; the whole pass shares one deadline (`TilingController.passBudget`, the
+  listing's budget plus the writes' budget) that every display's writes check before each move; `TilingKeyLayer` takes
+  its trust check and tap factory, so its rules (no tap while off or untrusted, removed on revoke, off after a failed
+  start) are tested.
 - Not done here, still open: the acceptance-map decision in `qa/feature-map.json`.
 
 ### Fail-closed paths
