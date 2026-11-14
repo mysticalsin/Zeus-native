@@ -1,8 +1,8 @@
 import Foundation
 
 // What the meeting-start machine has already done about each meeting, in one place. A calendar meeting is
-// remembered by its slot until the slot ends; a call is remembered by its app until the app is gone or has not
-// held the microphone for a while. Pure: the machine feeds it evidence and reads marks back.
+// remembered by its slot until the slot ends; a call is remembered by its app until the app has not held the
+// microphone for a while. Pure: the machine feeds it evidence and reads marks back.
 
 public struct ScribeMeetingLedger: Equatable, Sendable {
     /// How far the machine got with a meeting. Ordered: a mark never goes down.
@@ -68,19 +68,15 @@ public struct ScribeMeetingLedger: Equatable, Sendable {
     /// The mark of a calendar slot by id, nil when nothing is known.
     public func mark(ofSlot id: String) -> Mark? { slots[id]?.mark }
 
-    /// Reads one piece of evidence: slot entries leave at their end, and a call entry leaves when its app is gone
-    /// or has not held the microphone for `rearmAfterAbsence`.
+    /// Reads one piece of evidence: slot entries leave at their end, and a call entry leaves once its app has not
+    /// held the microphone for `rearmAfterAbsence`. A browser call is seen only while its window title says so, so an app missing from
+    /// the scan is not proof that the call ended: it is absent like one that is muted.
     public mutating func observe(_ evidence: ScribeMeetingEvidence, now: TimeInterval,
                                  rearmAfterAbsence: TimeInterval = ScribeAutoStartTiming.standard.rearmAfterAbsence) {
         slots = slots.filter { $0.value.expires > evidence.date }
         for (app, entry) in calls {
-            let held = evidence.micApps.contains(app)
-            guard held || evidence.presentApps.contains(app) else {
-                calls[app] = nil
-                continue
-            }
             var updated = entry
-            updated.absentSince = held ? nil : (entry.absentSince ?? now)
+            updated.absentSince = evidence.micApps.contains(app) ? nil : (entry.absentSince ?? now)
             if let since = updated.absentSince, now - since >= rearmAfterAbsence {
                 calls[app] = nil
             } else {
