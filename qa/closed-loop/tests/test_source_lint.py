@@ -670,6 +670,72 @@ class PointingMainActorLint(unittest.TestCase):
         self.assertIn("show(capturingMouse: false)", controller)
 
 
+class TilingWiringLint(unittest.TestCase):
+    """Tiling is off until the owner turns it on, never prompts, never ticks, and its panels are in every hand-kept list."""
+    DELEGATE = (APP / "App/AppDelegate.swift").read_text()
+
+    @staticmethod
+    def body(text, start, end):
+        first = text.index(start)
+        return text[first:text.index(end, first)]
+
+    def tiling_sources(self):
+        return sorted(TILING.rglob("*.swift")) + [APP / "TopBar/TilingPage.swift"]
+
+    def test_the_controller_starts_only_from_the_gated_sync_and_stops_at_quit(self):
+        self.assertIn("if on(.tiling)", self.DELEGATE)
+        self.assertEqual(self.DELEGATE.count("TilingController.shared.start()"), 1)
+        sync = self.body(self.DELEGATE, "private func syncTiling()", "\n    }\n")
+        self.assertIn("guard on(.tiling)", sync)
+        self.assertIn("TilingController.shared.start()", sync)
+        self.assertIn("UserDefaults.didChangeNotification", self.body(self.DELEGATE, "if on(.tiling) {", "\n        }\n"))
+        terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertIn("TilingController.shared.stop()", terminate)
+
+    def test_both_overlays_are_in_the_sharing_refresh_and_the_debug_capture_boost(self):
+        sharing = (APP / "App/ZeusWindowSharing.swift").read_text()
+        for name in ("TilingFocusBorder", "TilingKeySheet"):
+            self.assertIn(f"{name}.shared.applyScreenSharePolicy(visibleInShare: visible)", sharing)
+            self.assertIn(f"{name}.shared.boostCaptureVisibility(for: captureBoost)", self.DELEGATE)
+
+    def test_every_tiling_panel_is_registered_with_the_window_sharing_policy_when_it_is_made(self):
+        for name in ("TilingFocusBorder", "TilingKeySheet"):
+            text = (TILING / f"{name}.swift").read_text()
+            self.assertIn("ZeusWindowSharing.apply(to: panel", text, name)
+            self.assertIn("surface: .zeusStandard", text, name)
+            self.assertIn("TopBarStyle.isSnapshot", text, name)
+
+    def test_tiling_never_prompts_for_a_permission(self):
+        forbidden = re.compile(r"AXIsProcessTrustedWithOptions|kAXTrustedCheckOptionPrompt|requestAccess\(|requestAuthorization|CGRequestListenEventAccess|CGRequestPostEventAccess|CGRequestScreenCaptureAccess")
+        for path in self.tiling_sources():
+            self.assertIsNone(forbidden.search(path.read_text()), path.name)
+
+    def test_tiling_has_no_ticking_clock_and_no_sleeping_task(self):
+        forbidden = re.compile(r"\bTimelineView\b|Timer\.scheduledTimer|\bTask\.sleep\b|\bTickingView\b|\bEdgeLightClock\b")
+        for path in self.tiling_sources():
+            self.assertIsNone(forbidden.search(path.read_text()), path.name)
+
+    def test_the_page_makes_no_accessibility_or_overlay_call_of_its_own(self):
+        page = (APP / "TopBar/TilingPage.swift").read_text()
+        for name in ("AXIsProcessTrusted", "AXUIElement", "AccessibilityGate", "TilingFocusBorder", "TilingKeySheet", "NSScreen"):
+            self.assertNotIn(name, page)
+
+    def test_the_page_is_routed_from_the_page_switch(self):
+        views = (APP / "TopBar/TopBarViews.swift").read_text()
+        self.assertIn("case .tiling: TilingPage(topBar: topBar, tiling: topBar.tilingForSnapshot ?? .shared)", views)
+
+    def test_tiling_is_a_startup_service_a_qa_startup_denies(self):
+        core = (ROOT / "Sources/ZeusCore/StartupPolicy.swift").read_text()
+        self.assertRegex(core, r"\bcase\b[^\n]*\btiling\b")
+        self.assertNotRegex(core.split("qaAllowed", 1)[1].split("\n", 1)[0], r"tiling")
+
+    def test_the_lint_notices_a_ticking_clock_and_a_prompt(self):
+        ticking = "struct V: View { var body: some View { TimelineView(.animation) { _ in Text(\"x\") } } }"
+        self.assertIsNotNone(re.search(r"\bTimelineView\b", ticking))
+        prompt = "let ok = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt: true] as CFDictionary)"
+        self.assertIsNotNone(re.search(r"AXIsProcessTrustedWithOptions|kAXTrustedCheckOptionPrompt", prompt))
+
+
 def mic_read(relative):
     return (APP / relative).read_text()
 
