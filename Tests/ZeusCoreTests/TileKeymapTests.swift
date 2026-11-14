@@ -130,15 +130,60 @@ private func chord(_ code: UInt16, _ modifiers: ShortcutModifiers) -> Shortcut {
         #expect(map.action(for: chord(left, [.control, .option, .shift])) == .swap(.left))
     }
 
+    @Test func theFnFlagThatArrowKeysCarryDoesNotStopAMatch() {
+        // macOS sets the fn flag on arrow and function keys by itself, so a real Control-Option-Left press
+        // arrives as control, option and fn. It matches the same chord without fn.
+        for base in allBases {
+            let map = TileKeymap.defaults(base: base)
+            let mods = base.modifiers
+            #expect(map.action(for: chord(left, mods.union(.function))) == .focus(.left))
+            #expect(map.action(for: chord(down, mods.union(.function))) == .focus(.down))
+            #expect(map.action(for: chord(right, mods.union([.shift, .function]))) == .swap(.right))
+            #expect(map.action(for: chord(keyJ, mods.union(.function))) == .flipSplit)
+        }
+        let map = TileKeymap.defaults(base: .controlOption)
+        // Fn does not hide an extra modifier, and Fn alone is not a base.
+        #expect(map.action(for: chord(left, [.control, .option, .command, .function])) == nil)
+        #expect(map.action(for: chord(left, [.control, .function])) == nil)
+        #expect(map.action(for: chord(left, .function)) == nil)
+        #expect(map.action(for: Shortcut(modifiers: [.control, .option, .function])) == nil)
+    }
+
+    @Test func aChordBoundWithFnStillMatchesExactlyAndBeatsTheStrippedOne() throws {
+        var map = TileKeymap()
+        try map.bind(chord(keyJ, [.control, .option, .function]), to: .retile)
+        #expect(map.action(for: chord(keyJ, [.control, .option, .function])) == .retile)
+        #expect(map.action(for: chord(keyJ, [.control, .option])) == nil)
+        try map.bind(chord(keyJ, [.control, .option]), to: .flipSplit)
+        #expect(map.action(for: chord(keyJ, [.control, .option, .function])) == .retile)
+        #expect(map.action(for: chord(keyJ, [.control, .option])) == .flipSplit)
+    }
+
     // MARK: Rejections
 
-    @Test func aBareLetterIsRejected() throws {
+    @Test func aChordWithoutControlOptionOrCommandIsRejected() throws {
         var map = TileKeymap()
-        #expect(throws: TileKeymapError.invalidChord) { try map.bind(Shortcut(keyCode: keyJ, modifiers: []), to: .flipSplit) }
+        // A bare letter, a Shift letter, an Fn letter and a bare function key would all take typing or a
+        // system key from every app, so none of them can be bound.
+        let rejected: [Shortcut] = [
+            Shortcut(keyCode: keyJ, modifiers: []),
+            chord(keyJ, .shift),
+            chord(keyJ, .function),
+            chord(keyJ, [.shift, .function]),
+            Shortcut(keyCode: 122, modifiers: []),
+            chord(122, .function),
+            chord(left, .shift),
+        ]
+        for shortcut in rejected {
+            #expect(throws: TileKeymapError.invalidChord) { try map.bind(shortcut, to: .flipSplit) }
+        }
         #expect(map.bindings.isEmpty)
-        // A plain function key is allowed by Shortcut itself, so it is allowed here.
-        try map.bind(Shortcut(keyCode: 122, modifiers: []), to: .showKeys)
-        #expect(map.action(for: Shortcut(keyCode: 122, modifiers: [])) == .showKeys)
+        // Any one of control, option or command is enough, with or without Shift.
+        for modifier in [ShortcutModifiers.control, .option, .command] {
+            try map.bind(chord(keyJ, modifier), to: .flipSplit)
+            try map.bind(chord(keyJ, modifier.union(.shift)), to: .retile)
+        }
+        #expect(map.bindings.count == 6)
     }
 
     @Test func aModifierOnlyChordIsNotAKeyBind() {
@@ -207,6 +252,9 @@ private func chord(_ code: UInt16, _ modifiers: ShortcutModifiers) -> Shortcut {
             try entry(chord(keyJ, both), "retile"), // duplicate chord: the first one stays
             try entry(Shortcut(keyCode: keyR, modifiers: []), "retile"), // bare letter
             try entry(.controlOption, "retile"), // modifier only
+            try entry(chord(0, .shift), "retile"), // Shift letter would take capital letters
+            try entry(chord(0, .function), "retile"), // Fn letter
+            try entry(Shortcut(keyCode: 122, modifiers: []), "retile"), // bare function key
             "{\"shortcut\":\"not a shortcut\",\"action\":\"retile\"}",
             "{\"nothing\":true}",
             "17",

@@ -42,6 +42,42 @@ private func shape(_ node: TileNode) -> String {
 
 private func roundHalfUp(_ value: Double) -> Double { (value + 0.5).rounded(.down) }
 
+/// The space between every two frames that face each other with no other frame between them, across and
+/// down. Frames that merely line up, or that have a third frame in the way, are not counted.
+private func facingGaps(_ all: [TileRect]) -> [Double] {
+    var gaps: [Double] = []
+    for i in all.indices {
+        for j in all.indices where j != i {
+            let a = all[i], b = all[j]
+            if b.minX >= a.maxX {
+                let low = max(a.minY, b.minY), high = min(a.maxY, b.maxY)
+                if high > low {
+                    let blocked = all.indices.contains { k in
+                        let c = all[k]
+                        return k != i && k != j && c.minX < b.minX && c.maxX > a.maxX && min(c.maxY, high) > max(c.minY, low)
+                    }
+                    if !blocked { gaps.append(b.minX - a.maxX) }
+                }
+            }
+            if b.minY >= a.maxY {
+                let low = max(a.minX, b.minX), high = min(a.maxX, b.maxX)
+                if high > low {
+                    let blocked = all.indices.contains { k in
+                        let c = all[k]
+                        return k != i && k != j && c.minY < b.minY && c.maxY > a.maxY && min(c.maxX, high) > max(c.minX, low)
+                    }
+                    if !blocked { gaps.append(b.minY - a.maxY) }
+                }
+            }
+        }
+    }
+    return gaps
+}
+
+private func contains(_ outer: TileRect, _ inner: TileRect) -> Bool {
+    inner.minX >= outer.minX && inner.maxX <= outer.maxX && inner.minY >= outer.minY && inner.maxY <= outer.maxY
+}
+
 /// A small deterministic generator so the property test is the same on every run.
 private struct SplitMix {
     var state: UInt64
@@ -145,6 +181,10 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
                     #expect(apart >= cfg.innerGap)
                 }
             }
+            // Frames that face each other with nothing between them sit exactly one inner gap apart.
+            let gaps = facingGaps(all)
+            #expect(gaps.isEmpty == (count == 1))
+            #expect(gaps.allSatisfy { $0 == cfg.innerGap })
         }
     }
 
@@ -204,14 +244,21 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         #expect(shifted[id(2)]!.minX - shifted[id(1)]!.maxX == 8)
     }
 
-    @Test func aFractionalGapStillNeverOverlaps() {
+    @Test func aFractionalGapIsRoundedToWholePointsAndStaysExact() {
         let cfg = config(inner: 2.5, outer: 3.5)
+        #expect(cfg.innerGap == 3 && cfg.outerGap == 4)
         for count in 1...8 {
             let all = Array(frames(build(count, config: cfg), config: cfg).values)
             for i in all.indices {
                 for j in all.indices where j > i { #expect(!all[i].overlaps(all[j])) }
             }
+            #expect(facingGaps(all).allSatisfy { $0 == 3 })
         }
+        // The frame math rounds a fractional gap too, so a caller that skips the config still gets whole gaps.
+        let root = build(4).root!
+        let usable = TileRect(x: 16.25, y: 16.5, width: 1887.5, height: 1047.75)
+        let direct = Array(TileFrames.frames(root, in: usable, innerGap: 2.5).values)
+        #expect(facingGaps(direct).allSatisfy { $0 == 3 })
     }
 
     // MARK: 2. Determinism
@@ -414,7 +461,8 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         let before = frames(tree)
         let swapped = TileOps.swap(id(1), id(4), in: tree)
         #expect(shape(swapped.root!) == shape(tree.root!))
-        #expect(swapped.order == tree.order)
+        // The order follows the slots, so the newest slot is still the same place after a swap.
+        #expect(swapped.order == [id(4), id(2), id(3), id(1)])
         let after = frames(swapped)
         #expect(after[id(1)] == before[id(4)])
         #expect(after[id(4)] == before[id(1)])
@@ -422,6 +470,25 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         #expect(after[id(3)] == before[id(3)])
         // Swapping back restores the original, and the argument order does not matter.
         #expect(TileOps.swap(id(4), id(1), in: swapped) == tree)
+    }
+
+    @Test func theNewestSlotStaysPutAfterASwapSoTilesKeepDwindling() {
+        let tree = build(3)
+        let before = frames(tree)
+        let swapped = TileOps.swap(id(1), id(3), in: tree)
+        // Window 1 now holds the newest slot, the lower right one.
+        #expect(frames(swapped)[id(1)] == before[id(3)])
+        guard case .inserted(let grown) = TileOps.insert(id(5), into: swapped, focused: nil, display: wide, config: config()) else {
+            Issue.record("window 5 was refused")
+            return
+        }
+        // With nothing focused the next window splits that same slot, not the left column.
+        let after = frames(grown)
+        let slot = before[id(3)]!
+        #expect(contains(slot, after[id(1)]!))
+        #expect(contains(slot, after[id(5)]!))
+        #expect(after[id(3)] == before[id(1)])
+        #expect(after[id(2)] == before[id(2)])
     }
 
     @Test func swapKeepsEveryRatioAndPin() {
@@ -433,6 +500,8 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         let swapped = TileOps.swap(id(2), id(1), in: tree)
         #expect(shape(swapped.root!) == shape(root))
         #expect(swapped.windows == [id(2), id(1), id(3)])
+        // The tree was given without an order, so it started as tree order and the swap trades the two slots.
+        #expect(swapped.order == [id(2), id(1), id(3)])
     }
 
     // MARK: 7. Flip
@@ -898,6 +967,14 @@ private func randomNode(_ rng: inout SplitMix, counter: inout Int, depth: Int) -
         #expect(cfg.floating.isEmpty)
         #expect(cfg.excludedBundleIDs.isEmpty)
         #expect(TileConfig.defaults == cfg)
+    }
+
+    @Test func theConfigRoundsGapsToWholePoints() {
+        let cfg = TileConfig(innerGap: 2.4, outerGap: 7.6)
+        #expect(cfg.innerGap == 2 && cfg.outerGap == 8)
+        #expect(TileConfig(innerGap: 63.6, outerGap: 0.4).innerGap == 64)
+        #expect(TileConfig(innerGap: 63.6, outerGap: 0.4).outerGap == 0)
+        #expect(TileConfig(innerGap: 64.4).innerGap == 64)
     }
 
     @Test func theConfigClampsEveryNumber() {
