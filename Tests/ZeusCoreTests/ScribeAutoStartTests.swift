@@ -12,21 +12,22 @@ private func asSlot(_ id: String = "s1", title: String = "Design review", start:
 
 private func asEvidence(
     _ now: TimeInterval, mic: [ScribeCallApp] = [], present: [ScribeCallApp] = [], slots: [ScribeCalendarSlot] = [],
-    mode: ScribeAutoStartMode = .ask, granted: Bool = false, activity: ScribeActivity = .idle,
-    consent: Bool = false, windows: [ScribeCallApp: ScribeCallWindowState] = [:]
+    mode: ScribeAutoStartMode = .ask, ready: ScribeAutoStartReadiness? = nil, activity: ScribeActivity = .idle,
+    windows: [ScribeCallApp: ScribeCallWindowState] = [:]
 ) -> ScribeAutoStartMachine.Event {
-    .evidence(ScribeMeetingEvidence(date: asBase.addingTimeInterval(now), slots: slots, micApps: mic, presentApps: present,
-                                    mode: mode, micPermissionGranted: granted, activity: activity,
-                                    autoConsentGiven: consent, callWindows: windows), now: now)
+    // Without an explicit answer, automatic is fully ready and every other choice is simply not chosen.
+    let automatic = ready ?? (mode == .automatic ? .ready : .blocked(.notChosen))
+    return .evidence(ScribeMeetingEvidence(date: asBase.addingTimeInterval(now), slots: slots, micApps: mic, presentApps: present,
+                                           mode: mode, activity: activity, automatic: automatic, callWindows: windows), now: now)
 }
 
 private let asTeams = ScribeMeeting(key: "call:Teams", title: "Call", callApp: .teams, isLive: true)
 
 /// A machine whose Teams call has been seen at 0 and again at 3, so the "Ask me" banner is up.
-private func asPrompting(mode: ScribeAutoStartMode = .ask, granted: Bool = false, consent: Bool = true) -> ScribeAutoStartMachine {
+private func asPrompting(mode: ScribeAutoStartMode = .ask, ready: ScribeAutoStartReadiness? = nil) -> ScribeAutoStartMachine {
     var machine = ScribeAutoStartMachine()
-    machine.handle(asEvidence(0, mic: [.teams], mode: mode, granted: granted, consent: consent))
-    machine.handle(asEvidence(3, mic: [.teams], mode: mode, granted: granted, consent: consent))
+    machine.handle(asEvidence(0, mic: [.teams], mode: mode, ready: ready))
+    machine.handle(asEvidence(3, mic: [.teams], mode: mode, ready: ready))
     return machine
 }
 
@@ -354,7 +355,7 @@ struct ScribeAutoStartTests {
     // MARK: Start automatically
 
     @Test func automaticCountsDownFiveSecondsThenStarts() {
-        var machine = asPrompting(mode: .automatic, granted: true)
+        var machine = asPrompting(mode: .automatic)
         #expect(machine.state == .countingDown(meeting: asTeams, deadline: 8))
         let early = machine.handle(.tick(now: 7))
         #expect(early.isEmpty)
@@ -367,39 +368,39 @@ struct ScribeAutoStartTests {
     }
 
     @Test func cancelDuringTheCountdownNeverStarts() {
-        var machine = asPrompting(mode: .automatic, granted: true)
+        var machine = asPrompting(mode: .automatic)
         let cancel = machine.handle(.decline(now: 5))
         #expect(cancel == [.hideBanner])
         let later = machine.handle(.tick(now: 60))
         #expect(later.isEmpty)
-        let evidenceLater = machine.handle(asEvidence(70, mic: [.teams], mode: .automatic, granted: true))
+        let evidenceLater = machine.handle(asEvidence(70, mic: [.teams], mode: .automatic))
         #expect(evidenceLater.isEmpty)
     }
 
     @Test func startNowDuringTheCountdownStartsAtOnce() {
-        var machine = asPrompting(mode: .automatic, granted: true)
+        var machine = asPrompting(mode: .automatic)
         let effects = machine.handle(.accept(now: 5))
         #expect(effects == [.hideBanner, .startRecording(asTeams)])
     }
 
     @Test func automaticWithoutMicrophonePermissionAsksInstead() {
-        let machine = asPrompting(mode: .automatic, granted: false)
+        let machine = asPrompting(mode: .automatic, ready: .blocked(.microphoneNotAsked))
         #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
     }
 
     @Test func automaticNeverStartsWithoutPermissionEvenAfterTheDeadline() {
-        var machine = asPrompting(mode: .automatic, granted: false)
+        var machine = asPrompting(mode: .automatic, ready: .blocked(.microphoneNotAsked))
         let tick = machine.handle(.tick(now: 23))
         #expect(tick == [.hideBanner])
         #expect(!tick.contains(.startRecording(asTeams)))
     }
 
-    @Test func permissionWithdrawnDuringTheCountdownFallsBackToAsking() {
-        var machine = asPrompting(mode: .automatic, granted: true)
-        machine.handle(asEvidence(5, mic: [.teams], mode: .automatic, granted: false))
-        let tick = machine.handle(.tick(now: 8))
-        #expect(tick == [.showAsk(asTeams)])
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 28))
+    @Test func permissionWithdrawnDuringTheCountdownFallsBackToAskingAtOnce() {
+        var machine = asPrompting(mode: .automatic)
+        let effects = machine.handle(asEvidence(5, mic: [.teams], mode: .automatic, ready: .blocked(.microphoneNotAsked)))
+        #expect(effects == [.showAsk(asTeams)])
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 25))
+        #expect(machine.handle(.tick(now: 8)).isEmpty)
     }
 
     @Test func startingRecordingByHandWhileTheBannerIsUpHidesIt() {
@@ -558,7 +559,7 @@ struct ScribeAutoStartTests {
         var machine = ScribeAutoStartMachine()
         let event = asSlot(start: 0, app: .teams)
         for now in stride(from: 0.0, through: 3.0, by: 1.0) {
-            machine.handle(asEvidence(now, present: [.teams], slots: [event], mode: .automatic, granted: true, consent: true))
+            machine.handle(asEvidence(now, present: [.teams], slots: [event], mode: .automatic))
         }
         #expect(machine.state == .prompting(meeting: ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event),
                                             deadline: 23))
@@ -585,14 +586,14 @@ struct ScribeAutoStartTests {
     @Test func anUnansweredCardDoesNotBlockTheAutomaticCountdown() {
         var machine = ScribeAutoStartMachine()
         let event = asSlot(start: 0, app: .teams)
-        machine.handle(asEvidence(0, slots: [event], mode: .automatic, granted: true, consent: true))
-        machine.handle(asEvidence(3, slots: [event], mode: .automatic, granted: true, consent: true))
+        machine.handle(asEvidence(0, slots: [event], mode: .automatic))
+        machine.handle(asEvidence(3, slots: [event], mode: .automatic))
         machine.handle(.tick(now: 23))
         #expect(machine.state == .idle)
         let live = ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event, isLive: true)
-        machine.handle(asEvidence(30, mic: [.teams], slots: [event], mode: .automatic, granted: true, consent: true))
+        machine.handle(asEvidence(30, mic: [.teams], slots: [event], mode: .automatic))
         #expect(machine.state == .armed(meeting: live, since: 30))
-        let counting = machine.handle(asEvidence(33, mic: [.teams], slots: [event], mode: .automatic, granted: true, consent: true))
+        let counting = machine.handle(asEvidence(33, mic: [.teams], slots: [event], mode: .automatic))
         #expect(counting == [.showCountdown(live)])
         #expect(machine.state == .countingDown(meeting: live, deadline: 38))
     }
@@ -645,60 +646,87 @@ struct ScribeAutoStartTests {
         #expect(ended == [.suggestEnd(after.meeting)])
     }
 
-    // MARK: First-use consent
+    // MARK: Readiness for an automatic start
 
-    @Test func firstAutomaticStartAsksOnceAndRecordsTheConsent() {
-        var machine = asPrompting(mode: .automatic, granted: true, consent: false)
-        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23))
-        let accept = machine.handle(.accept(now: 6))
-        #expect(accept == [.hideBanner, .recordConsent, .startRecording(asTeams)])
+    @Test func everyBlockAsksAndNeverCountsDown() {
+        for block in ScribeAutoStartBlock.allCases {
+            var machine = ScribeAutoStartMachine()
+            machine.handle(asEvidence(0, mic: [.teams], mode: .automatic, ready: .blocked(block)))
+            let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .automatic, ready: .blocked(block)))
+            #expect(shown == [.showAsk(asTeams)], "\(block)")
+            #expect(machine.state == .prompting(meeting: asTeams, deadline: 23), "\(block)")
+            let timeout = machine.handle(.tick(now: 23))
+            #expect(timeout == [.hideBanner], "\(block)")
+            #expect(!timeout.contains(.startRecording(asTeams)), "\(block)")
+        }
     }
 
-    @Test func theConsentCardShowsInsteadOfTheCountdown() {
+    @Test func aBlockedMachineStartsOnlyOnATap() {
+        var machine = asPrompting(mode: .automatic, ready: .blocked(.firstRecordingOwed))
+        let tap = machine.handle(.accept(now: 6))
+        #expect(tap == [.hideBanner, .startRecording(asTeams)])
+    }
+
+    @Test func readyCountsDownOnTheFirstLiveMeeting() {
         var machine = ScribeAutoStartMachine()
-        machine.handle(asEvidence(0, mic: [.teams], mode: .automatic, granted: true, consent: false))
-        let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .automatic, granted: true, consent: false))
-        #expect(shown == [.showConsentAsk(asTeams)])
+        machine.handle(asEvidence(0, mic: [.teams], mode: .automatic, ready: .ready))
+        let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .automatic, ready: .ready))
+        #expect(shown == [.showCountdown(asTeams)])
+        #expect(machine.state == .countingDown(meeting: asTeams, deadline: 8))
     }
 
-    @Test func neverAutoRecordsBeforeConsentExistsEvenAfterTheDeadline() {
-        var machine = asPrompting(mode: .automatic, granted: true, consent: false)
-        let timeout = machine.handle(.tick(now: 23))
-        #expect(timeout == [.hideBanner])
-        #expect(!timeout.contains(.startRecording(asTeams)))
+    @Test func readyWithoutALiveCallStillAsks() {
+        var machine = ScribeAutoStartMachine()
+        let event = asSlot(start: 0, app: .teams)
+        machine.handle(asEvidence(0, present: [.teams], slots: [event], mode: .automatic, ready: .ready))
+        let shown = machine.handle(asEvidence(3, present: [.teams], slots: [event], mode: .automatic, ready: .ready))
+        let meeting = ScribeMeeting(key: "s1", title: "Design review", callApp: .teams, slot: event)
+        #expect(shown == [.showAsk(meeting)])
     }
 
-    @Test func consentWithdrawnDuringTheCountdownAsksAgain() {
-        var machine = asPrompting(mode: .automatic, granted: true, consent: true)
-        machine.handle(asEvidence(5, mic: [.teams], mode: .automatic, granted: true, consent: false))
-        let tick = machine.handle(.tick(now: 8))
-        #expect(tick == [.showConsentAsk(asTeams)])
+    @Test func readyIsNotEnoughWhenTheChoiceIsNotAutomatic() {
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, mic: [.teams], mode: .ask, ready: .ready))
+        let shown = machine.handle(asEvidence(3, mic: [.teams], mode: .ask, ready: .ready))
+        #expect(shown == [.showAsk(asTeams)])
     }
 
-    @Test func startingFromAskMeOrWithoutPermissionNeverRecordsTheConsent() {
-        var ask = asPrompting(mode: .ask, granted: true, consent: false)
-        let fromAsk = ask.handle(.accept(now: 6))
-        #expect(fromAsk == [.hideBanner, .startRecording(asTeams)])
-        var noPermission = asPrompting(mode: .automatic, granted: false, consent: false)
-        let fromAuto = noPermission.handle(.accept(now: 6))
-        #expect(fromAuto == [.hideBanner, .startRecording(asTeams)])
+    @Test func leavingAutomaticDuringTheCountdownAsksInstead() {
+        var toAsk = asPrompting(mode: .automatic)
+        #expect(toAsk.state == .countingDown(meeting: asTeams, deadline: 8))
+        let asked = toAsk.handle(asEvidence(6, mic: [.teams], mode: .ask))
+        #expect(asked == [.showAsk(asTeams)])
+        #expect(toAsk.state == .prompting(meeting: asTeams, deadline: 26))
+        let later = toAsk.handle(.tick(now: 8))
+        #expect(later.isEmpty)
+
+        var toOff = asPrompting(mode: .automatic)
+        let hidden = toOff.handle(asEvidence(6, mic: [.teams], mode: .off))
+        #expect(hidden == [.hideBanner])
+        #expect(toOff.state == .idle)
+        #expect(toOff.handle(.tick(now: 8)).isEmpty)
     }
 
-    @Test func withConsentTheCountdownStartsWithoutRecordingItAgain() {
-        var machine = asPrompting(mode: .automatic, granted: true, consent: true)
-        let start = machine.handle(.tick(now: 8))
+    @Test func readinessLostAtTheEndOfTheCountdownAsksInsteadOfStarting() {
+        var machine = asPrompting(mode: .automatic)
+        let effects = machine.handle(asEvidence(8, mic: [.teams], mode: .automatic, ready: .blocked(.microphoneDenied)))
+        #expect(effects == [.showAsk(asTeams)])
+        #expect(!effects.contains(.startRecording(asTeams)))
+        var stillReady = asPrompting(mode: .automatic)
+        let start = stillReady.handle(asEvidence(8, mic: [.teams], mode: .automatic, ready: .ready))
         #expect(start == [.hideBanner, .startRecording(asTeams)])
     }
 
-    @Test func consentIsStoredAsATimestamp() throws {
-        let name = "ScribeAutoStartConsent.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
-        #expect(!ScribeAutoStartConsent.isGiven(defaults: defaults))
-        #expect(ScribeAutoStartConsent.consentDate(defaults: defaults) == nil)
-        ScribeAutoStartConsent.record(at: Date(timeIntervalSince1970: 5_000), defaults: defaults)
-        #expect(ScribeAutoStartConsent.isGiven(defaults: defaults))
-        #expect(ScribeAutoStartConsent.consentDate(defaults: defaults) == Date(timeIntervalSince1970: 5_000))
+    @Test func aCallThatEndsDuringTheCountdownAsksInsteadOfStarting() {
+        var machine = asPrompting(mode: .automatic)
+        let effects = machine.handle(asEvidence(6, present: [.teams], mode: .automatic))
+        #expect(effects == [.showAsk(asTeams)])
+        #expect(machine.handle(.tick(now: 8)).isEmpty)
+    }
+
+    @Test func acceptingNeverAddsAnythingForTheOptIn() {
+        var machine = asPrompting(mode: .automatic, ready: .blocked(.noOptIn))
+        #expect(machine.handle(.accept(now: 6)) == [.hideBanner, .startRecording(asTeams)])
     }
 
     // MARK: Auto-stop: Zoom breakouts, call window
@@ -955,7 +983,7 @@ struct ScribeAutoStartTests {
     @Test func newBannerWordingIsPlain() {
         let next = ScribeMeeting(key: "n1", title: "Standup", callApp: .teams)
         #expect(ScribeAutoStartText.nextMeetingHeadline(next) == "Next meeting: Standup is starting. Switch notes to it?")
-        for text in [ScribeAutoStartText.nextMeetingDetail, ScribeAutoStartText.consentDetail,
+        for text in [ScribeAutoStartText.nextMeetingDetail,
                      ScribeAutoStartText.nextMeetingHeadline(next)] {
             #expect(!text.contains("\u{2014}"))
         }
@@ -980,16 +1008,6 @@ struct ScribeAutoStartTests {
                      ScribeAutoStartText.askHeadline(asTeams)] {
             #expect(!text.contains("\u{2014}"))
         }
-    }
-
-    @Test func settingNotesAreOnePlainSentenceEachWithoutDashes() {
-        for mode in ScribeAutoStartMode.allCases {
-            let note = ScribeAutoStartText.settingNote(mode)
-            #expect(!note.isEmpty)
-            #expect(!note.contains("\u{2014}"))
-        }
-        #expect(ScribeAutoStartText.settingNote(.automatic).contains("5 seconds"))
-        #expect(!ScribeAutoStartText.settingEndNote.contains("\u{2014}"))
     }
 
     @Test func activityFollowsTheScribePhase() {
@@ -1059,7 +1077,7 @@ struct ScribeAutoStartTests {
         #expect(effects == [.hideBanner])
         #expect(machine.state == .idle)
         #expect(machine.ledger.mark(of: asTeams) == .declined)
-        let later = machine.handle(asEvidence(30, mic: [.teams], mode: .automatic, granted: true, consent: true))
+        let later = machine.handle(asEvidence(30, mic: [.teams], mode: .automatic))
         #expect(later.isEmpty)
         #expect(machine.state == .idle)
     }

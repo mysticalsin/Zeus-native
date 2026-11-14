@@ -363,6 +363,14 @@
       "scope": "Actual ScribeController with fake capture/notes, synthetic temp persistence and clock; no real capture, permission, end windows or device proof."
     },
     {
+      "id": "native-SettingsCatalogTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SettingsCatalogTests",
+      "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+      "scope": "Actual SettingsStore over a throwaway defaults suite with a fixed microphone answer and a counting prompt: the opt-in stamp, an import, and a section reset. No real permission prompt, capture or device proof."
+    },
+    {
       "id": "native-RecordingFeedbackRenderTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -1186,6 +1194,48 @@
             }
           ],
           "id": "F04.1"
+        },
+        {
+          "id": "F04.opt-in",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "Choosing Start automatically in Settings is the opt-in and asks macOS once; any other choice or a section reset withdraws it; an import never selects it. Does not prove the real macOS dialog.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "choosingStartAutomaticallyIsTheOptInAndAsksOnlyWhenMacOSHasNotAsked"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "anImportNeverChoosesStartAutomatically"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "aSectionResetWithdrawsTheOptIn"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "id": "F04.opt-in-rules",
+          "acceptance": "The stamp follows the choice, an old stamp carries over only with automatic chosen, and readiness names the first missing thing before any countdown.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "choosingAnotherModeWithdrawsTheOptIn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "anOldStampWithAutomaticCarriesOver"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "everyCombinationResolvesToTheFirstMissingThing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+            }
+          ]
         },
         {
           "check": "missing-F04-native",

@@ -152,4 +152,136 @@ struct SettingsCatalogTests {
         #expect(options["assistant.model"] == "claude-sonnet-4")
         #expect(options["halo.style"] == "Crystal prism")
     }
+
+    // MARK: Start automatically is the opt-in
+
+    /// A store over a throwaway suite whose microphone answer is fixed and whose prompt only counts.
+    @MainActor private final class AutoStartRig {
+        let defaults: UserDefaults
+        let store: SettingsStore
+        private let suiteName = "zeus.autostart.\(UUID().uuidString)"
+        private(set) var prompts = 0
+
+        init(access: ScribeMicrophoneAccess = .allowed, stored: String? = nil) {
+            defaults = UserDefaults(suiteName: suiteName)!
+            defaults.removePersistentDomain(forName: suiteName)
+            if let stored { defaults.set(stored, forKey: SettingsStore.key(ScribeAutoStartMode.settingID)) }
+            store = SettingsStore(defaults: defaults)
+            store.microphoneAccess = { access }
+            store.askForMicrophone = { [unowned self] in self.prompts += 1 }
+        }
+
+        deinit { defaults.removePersistentDomain(forName: suiteName) }
+
+        var stamp: Date? { ScribeAutoStartOptIn.date(defaults: defaults) }
+        var mode: String { store.string(ScribeAutoStartMode.settingID) }
+
+        func importFile(_ choice: String) throws -> Int {
+            let root: [String: Any] = ["format": "zeus.settings", "version": 1,
+                                       "options": [ScribeAutoStartMode.settingID: choice], "app": [String: Any]()]
+            return try store.importJSON(JSONSerialization.data(withJSONObject: root))
+        }
+    }
+
+    @MainActor @Test func choosingStartAutomaticallyIsTheOptInAndAsksOnlyWhenMacOSHasNotAsked() throws {
+        let fresh = AutoStartRig(access: .notAsked)
+        fresh.store.set("scribe.autoStart", "Start automatically")
+        #expect(fresh.mode == "Start automatically")
+        #expect(fresh.stamp != nil)
+        #expect(fresh.prompts == 1)
+
+        for access in [ScribeMicrophoneAccess.allowed, .denied] {
+            let rig = AutoStartRig(access: access)
+            rig.store.set("scribe.autoStart", "Start automatically")
+            #expect(rig.stamp != nil, "\(access)")
+            #expect(rig.prompts == 0, "\(access)")
+        }
+    }
+
+    @MainActor @Test func theOtherChoicesNeverAskMacOSAndNeverStamp() throws {
+        let rig = AutoStartRig(access: .notAsked)
+        rig.store.set("scribe.autoStart", "Off")
+        rig.store.set("scribe.autoStart", "Ask me")
+        #expect(rig.prompts == 0)
+        #expect(rig.stamp == nil)
+    }
+
+    @MainActor @Test func choosingAnotherModeWithdrawsTheOptIn() throws {
+        for other in ["Ask me", "Off"] {
+            let rig = AutoStartRig()
+            rig.store.set("scribe.autoStart", "Start automatically")
+            #expect(rig.stamp != nil)
+            rig.store.set("scribe.autoStart", other)
+            #expect(rig.mode == other)
+            #expect(rig.stamp == nil, "\(other)")
+        }
+    }
+
+    @MainActor @Test func clickingTheChoiceThatAlreadyShowsStillGivesTheOptIn() throws {
+        // A raw defaults write can leave the choice automatic with no stamp; the click is what gives it.
+        let rig = AutoStartRig(stored: "Start automatically")
+        #expect(rig.stamp == nil)
+        rig.store.set("scribe.autoStart", "Start automatically")
+        #expect(rig.stamp != nil)
+    }
+
+    @MainActor @Test func anImportNeverChoosesStartAutomatically() throws {
+        let rig = AutoStartRig(access: .notAsked)
+        let changed = try rig.importFile("Start automatically")
+        #expect(changed == 0)
+        #expect(rig.mode == "Ask me")
+        #expect(rig.stamp == nil)
+        #expect(rig.prompts == 0)
+        #expect(rig.defaults.string(forKey: SettingsStore.key("scribe.autoStart")) == nil)
+    }
+
+    @MainActor @Test func anImportAskingForStartAutomaticallyLeavesAnExistingOptInAlone() throws {
+        let rig = AutoStartRig()
+        rig.store.set("scribe.autoStart", "Start automatically")
+        let stamp = rig.stamp
+        #expect(try rig.importFile("Start automatically") == 0)
+        #expect(rig.mode == "Start automatically")
+        #expect(rig.stamp == stamp)
+    }
+
+    @MainActor @Test func anImportWithOffAppliesAndRemovesTheStamp() throws {
+        let rig = AutoStartRig()
+        rig.store.set("scribe.autoStart", "Start automatically")
+        #expect(try rig.importFile("Off") == 1)
+        #expect(rig.mode == "Off")
+        #expect(rig.stamp == nil)
+        let other = AutoStartRig()
+        other.store.set("scribe.autoStart", "Start automatically")
+        #expect(try other.importFile("Ask me") == 1)
+        #expect(other.stamp == nil)
+    }
+
+    @MainActor @Test func theStampKeysAreNeverExportedOrImported() throws {
+        let keys = Set(SettingsStore.appKeys)
+        for key in [ScribeAutoStartOptIn.key, ScribeAutoStartOptIn.legacyKey, ScribeAutoStartOptIn.firstRecordingKey] {
+            #expect(!keys.contains(key), "\(key)")
+        }
+        let rig = AutoStartRig()
+        rig.store.set("scribe.autoStart", "Start automatically")
+        let text = String(decoding: try rig.store.exportJSON(), as: UTF8.self)
+        #expect(!text.contains("optInAt"))
+        #expect(!text.contains("firstRecordingAt"))
+    }
+
+    @MainActor @Test func aSectionResetWithdrawsTheOptIn() throws {
+        let rig = AutoStartRig()
+        rig.store.set("scribe.autoStart", "Start automatically")
+        #expect(rig.stamp != nil)
+        rig.store.reset(.agents)
+        #expect(rig.mode == "Ask me")
+        #expect(rig.stamp == nil)
+        #expect(rig.prompts == 0)
+    }
+
+    @MainActor @Test func aResetOfAChoiceThatAlreadyShowsAskMeStillClearsAStaleStamp() throws {
+        let rig = AutoStartRig()
+        rig.defaults.set(1_000.0, forKey: ScribeAutoStartOptIn.key)
+        rig.store.reset(.agents)
+        #expect(rig.stamp == nil)
+    }
 }

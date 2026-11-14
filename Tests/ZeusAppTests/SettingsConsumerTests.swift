@@ -80,6 +80,7 @@ struct SettingsConsumerTests {
         ("insomnia.lidClosed", "\"insomnia.lidClosed\""),
         ("privacy.driveAutonomy", "DriveAutonomy.settingsKey"),
         ("models.caps", "ModelCap"),
+        ("scribe.autoStart", "ScribeAutoStartMode.current("),
     ]
 
     @Test func recentFeaturesHaveACatalogRowAndAConsumer() {

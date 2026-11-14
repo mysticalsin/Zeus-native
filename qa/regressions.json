@@ -4426,6 +4426,42 @@
         "file": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
         "function": "microphoneReleaseNeverStopsOnItsOwn"
       }
+    },
+    {
+      "id": "REG-415",
+      "failure": "A settings file could select Start automatically, so an import alone could arm automatic recording on a Mac whose owner never chose it.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "anImportNeverChoosesStartAutomatically"
+      }
+    },
+    {
+      "id": "REG-416",
+      "failure": "The agreement to start automatically was a side effect of one meeting and was never cleared, so it survived switching to Ask me and back.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+        "function": "choosingAnotherModeWithdrawsTheOptIn"
+      }
+    },
+    {
+      "id": "REG-417",
+      "failure": "Changing the choice to Ask me during the automatic countdown was ignored, so the recording still began when the countdown ended.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+      }
     }
   ]
 }

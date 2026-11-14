@@ -69,4 +69,14 @@ import Testing
         let (defaults, cleanup) = fresh(); defer { cleanup() }
         #expect(!ScribeCallWindowNamesPolicy.isActive(accessibilityGranted: false, defaults: defaults))
     }
+
+    @Test func scribeMeetingStartIsAskMeWithNoOptInOnAFreshMac() {
+        let (defaults, cleanup) = fresh(); defer { cleanup() }
+        #expect(ScribeAutoStartMode.current(defaults: defaults) == .ask)
+        #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
+        #expect(!ScribeAutoStartOptIn.hasRecorded(defaults: defaults))
+        let readiness = ScribeAutoStartReadiness.resolve(mode: .current(defaults: defaults), optIn: false,
+                                                         microphone: .allowed, hasRecorded: false)
+        #expect(readiness == .blocked(.notChosen))
+    }
 }
