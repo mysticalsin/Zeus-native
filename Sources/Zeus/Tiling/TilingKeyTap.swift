@@ -121,7 +121,9 @@ final class TilingKeyTap: @unchecked Sendable {
         case .createTap:
             return create()
         case .enableTap:
-            if let port = run?.port { system.setEnabled(port, true) }
+            // No window server call under the lock: the callback takes it, and the window server holds every keystroke
+            // until the callback answers. The tap thread makes the call, and only while the tap is still wanted.
+            if let run { run.thread?.perform { [run] in run.owner?.enableOnTapThread(run) } }
             return true
         case .none, .disableTap, .tearDown:
             return life.isRunning
@@ -164,6 +166,14 @@ final class TilingKeyTap: @unchecked Sendable {
                 CFMachPortInvalidate(port)
             })
         return true
+    }
+
+    /// On the tap thread, from `start()`'s ask. The life is read under the lock and the system call is made outside it. A
+    /// give-up and the teardown run on this thread too, so they cannot fall between the read and the call: an enable that
+    /// was asked for before either is not applied after it.
+    private nonisolated func enableOnTapThread(_ asked: Run) {
+        guard let port = asked.port, lock.withLock({ run === asked && life.isRunning }) else { return }
+        system.setEnabled(port, true)
     }
 
     private nonisolated func installed(_ installed: Run) {

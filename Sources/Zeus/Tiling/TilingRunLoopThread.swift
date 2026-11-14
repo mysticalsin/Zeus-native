@@ -16,6 +16,9 @@ import Foundation
 /// registered with the window server, and switched on by a later enable, with no loop to service it. When the loop has
 /// ended both closures are released.
 ///
+/// `perform` runs a block of the owner's on that thread too, for a system call that must not be made under the owner's
+/// own lock: the block is queued on the loop, so it runs after `install` and in order with the teardown.
+///
 /// Nonisolated on purpose, like the tap itself: no `@MainActor` type may sit between a system callback and its owner.
 final class TilingRunLoopThread: @unchecked Sendable {
     private let lock = NSLock()
@@ -24,6 +27,8 @@ final class TilingRunLoopThread: @unchecked Sendable {
     private var runLoop: CFRunLoop?
     private var keepAlive: CFRunLoopTimer?
     private var stopRequested = false
+    /// Blocks asked for through `perform` before the loop existed, run once it does.
+    private var waiting: [@Sendable () -> Void] = []
     private var thread: Thread?
     private let finished = DispatchGroup()
 
@@ -46,6 +51,22 @@ final class TilingRunLoopThread: @unchecked Sendable {
         thread.start()
     }
 
+    /// Runs `block` on the tap thread, in its loop, after `install` and in the order asked. The caller does not wait. A
+    /// block asked for before the loop exists waits for it. A block asked for after a stop, or waiting when one comes, is
+    /// dropped; one that is already queued on the loop runs before the teardown, so it must check what it may still do.
+    func perform(_ block: @escaping @Sendable () -> Void) {
+        lock.lock()
+        guard !stopRequested else { lock.unlock(); return }
+        guard let loop = runLoop else {
+            waiting.append(block)
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+        CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue, block)
+        CFRunLoopWakeUp(loop)
+    }
+
     /// Asks the thread to tear down and end, and waits until it has, for at most `timeout` seconds. True when it
     /// ended. A stop that comes from the tap thread itself cannot wait for itself: it asks and returns false.
     /// Safe to call more than once.
@@ -54,6 +75,7 @@ final class TilingRunLoopThread: @unchecked Sendable {
         lock.lock()
         let first = !stopRequested
         stopRequested = true
+        waiting.removeAll()
         let loop = runLoop
         let onThread = thread != nil && thread === Thread.current
         lock.unlock()
@@ -81,9 +103,12 @@ final class TilingRunLoopThread: @unchecked Sendable {
             return
         }
         runLoop = loop
+        let asked = waiting
+        waiting.removeAll()
         lock.unlock()
 
         runInstall()
+        for block in asked { CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue, block) }
         // A run loop with no source or timer returns at once. This timer, a thousand million seconds away, keeps it
         // alive for the tap source; the teardown removes it.
         let timer = CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + 1e9, 0, 0, 0) { _ in }
@@ -131,6 +156,7 @@ final class TilingRunLoopThread: @unchecked Sendable {
         lock.lock()
         install = nil
         teardown = nil
+        waiting.removeAll()
         runLoop = nil
         thread = nil
         lock.unlock()
