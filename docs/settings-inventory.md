@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 178 of 178 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 178 in scope). 167 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 179 of 179 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 179 in scope). 168 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 127.
+**Before this round:** has 19, partial 27, missing 128.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -21,7 +21,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. Screens without a notch get a slim pill. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
 | Day to day | Launch at login | toggle | on | Starts the app when you log in. | missing | live | `general.launchAtLogin` | SMAppService, bundled app only. |
 | Day to day | Keep the Mac awake while agents work | toggle | off | Blocks idle sleep while an agent runs; the screen can still lock. | missing | live | `general.keepAwake` | Power assertion held only while a session is working. |
-| Day to day | Keep the display awake while music plays | toggle | - | Holds the display on only while Music or Spotify is playing. Stops on low battery or heat. | missing | live | `keepAwake.whileMusic` | M4. Display assertion with a two minute lease, renewed each minute, held only while a track plays (20 second grace). Uses the Keep awake battery floor and heat rule. Separate from sessions and the Home cup. |
+| Day to day | Keep the display awake while music plays | toggle | - | Holds the display on only while the source shown in the notch is playing. Stops on low battery or heat. | missing | live | `keepAwake.whileMusic` | M4. Display assertion with a two minute lease, renewed each minute, held only while a track plays (20 second grace). Uses the Keep awake battery floor and heat rule. Separate from sessions and the Home cup. |
 | Day to day | Welcome back recap (Recap and return) | toggle | on | After 10 minutes or more away, the notch shows what agents finished, failed or are waiting on, and Zeus says one line about it when voice answers are on. | missing | live | `general.welcomeBack` | Away is system idle time (no keys or mouse). Only agent events since you left are listed; waiting ones only while still waiting. |
 | Day to day | Meeting mode (discreet during calls and screen sharing) | toggle | on | When another app uses the mic or camera, or the display is mirrored: leave captures, mute sounds, hide details. | partial | live | `general.meetingMode` | Detects the mic in use by another app and mirrored displays. Camera detection TODO. |
 | Day to day | Show in screen sharing | toggle | - |  | missing | live | `general.showInScreenSharing` | N1. Every Zeus window uses the shared sharing helper. |
@@ -89,6 +89,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |
 | Everyday lights | Glow when AirDrop arrives | toggle | off | Blue intake glow and drops the file on the shelf. | missing | live | `lights.airDrop` | Gated by Downloads folder access. |
 | Everyday lights | Screenshot cue | toggle | off | Camera cue and shelf drop for new screenshots. | missing | live | `lights.screenshot` | Gated by Desktop folder access. |
+| Music | Show music from | menu | - | Any player shows what started playing last. | missing | live | `music.follow` | A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player. |
 | Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
 | Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 

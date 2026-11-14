@@ -104,7 +104,7 @@ private struct GeneralPage: View {
             GSDivider()
             GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working. Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
             GSDivider()
-            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while Music or Spotify is playing. Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
+            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while the source shown in the notch is playing. Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
             GSDivider()
             GSToggleRow(symbol: "person.2.wave.2", title: "Meeting mode", text: "Quiet sounds and private previews during calls and screen sharing.", isOn: bool("general.meetingMode"))
             GSDivider()
@@ -372,6 +372,7 @@ private struct AppearancePage: View {
         Group {
             hudCard
             screenCard
+            musicSourceCard
             TopBarTabsCard(context: context)
         }
     }
@@ -384,6 +385,15 @@ private struct AppearancePage: View {
             GSDivider()
             GSRow(symbol: "circle.bottomhalf.filled", title: "Corner size") {
                 GSPopup(selection: SettingsStore.binding("screen.cornerRadius"), options: SettingsCatalog.option("screen.cornerRadius")?.choices ?? []).popupLabel("Corner size")
+            }
+        }
+    }
+
+    private var musicSourceCard: some View {
+        GSCard("Music source") {
+            GSRow(symbol: "music.note.list", title: "Show music from") {
+                GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
+                        options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
             }
         }
     }
