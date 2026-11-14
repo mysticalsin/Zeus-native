@@ -170,6 +170,8 @@ Every hidden two-player assumption, and its replacement:
   timeout, and a task delegate refuses any non-`https` redirect. `ArtworkSource.pageImageAllowed(_:)`: `https` only,
   no IP literal, no `localhost`, no name ending in `.local`, `.localhost`, `.lan`, `.internal` or `.home.arpa`. A public
   name that resolves to a private address is a known gap for A3 to weigh.
+  Every cover request, a page's and the Music and Spotify lookups alike, goes through one session that accepts no cookie,
+  stores none and keeps no URL cache.
 - Lyrics: `LRCLIBQuery` (`Lyrics.swift:96`) is unchanged. `LyricsStore.load` (`LyricsViews.swift:56`) asks only with
   the `lyrics` capability, else `.none` as today; without `persistsDerivedData` it skips `cache.load` and `cache.save`.
   The store is now a thin adapter over the pure `LyricsFlow` reducer, so both rules are applied in the adapter and
