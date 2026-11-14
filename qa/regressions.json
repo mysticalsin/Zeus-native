@@ -4414,6 +4414,18 @@
         "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
         "function": "aRefusedStartLeavesNoContextBehind"
       }
+    },
+    {
+      "id": "REG-414",
+      "failure": "A call app that released the microphone for eight seconds armed a stop that saved the recording nine seconds later, against the privacy rule that a detector signal never ends capture.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+        "function": "microphoneReleaseNeverStopsOnItsOwn"
+      }
     }
   ]
 }

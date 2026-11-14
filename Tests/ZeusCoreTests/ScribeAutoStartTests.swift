@@ -430,8 +430,13 @@ struct ScribeAutoStartTests {
         let almost = machine.handle(asEvidence(19, activity: .recording))
         #expect(almost.isEmpty)
         let ended = machine.handle(asEvidence(20, activity: .recording))
-        #expect(ended == [.requestEnd(asTeams)])
-        #expect(machine.state == .endingSuggested(meeting: asTeams, since: 20))
+        #expect(ended == [.suggestEnd(asTeams)])
+        guard case .recording(let recording) = machine.state else {
+            Issue.record("expected recording, got \(machine.state)")
+            return
+        }
+        #expect(recording.endSuggested)
+        #expect(recording.meeting == asTeams)
     }
 
     @Test func noEndIsSuggestedBeforeTheCallAppEverHeldTheMicrophone() {
@@ -450,14 +455,14 @@ struct ScribeAutoStartTests {
         let beforeThirty = machine.handle(asEvidence(32, activity: .recording))
         #expect(beforeThirty.isEmpty)
         let thirty = machine.handle(asEvidence(33, activity: .recording))
-        #expect(thirty == [.requestEnd(asTeams)])
+        #expect(thirty == [.suggestEnd(asTeams)])
     }
 
     @Test func anotherAppHoldingTheMicrophoneDoesNotKeepTheCallAlive() {
         var machine = asRecordingTeams()
         machine.handle(asEvidence(12, mic: [.zoom], activity: .recording))
         let ended = machine.handle(asEvidence(20, mic: [.zoom], activity: .recording))
-        #expect(ended == [.requestEnd(asTeams)])
+        #expect(ended == [.suggestEnd(asTeams)])
     }
 
     @Test func nothingIsSuggestedWhileThePersonIsAlreadyStopping() {
@@ -488,19 +493,17 @@ struct ScribeAutoStartTests {
     @Test func keepRecordingReturnsToRecordingAndWaitsForTheCallToReturn() {
         var machine = asRecordingTeams()
         machine.handle(asEvidence(12, activity: .recording))
-        machine.handle(asEvidence(20, activity: .recording))
-        let waiting = machine.handle(asEvidence(21, activity: .recording))
-        #expect(waiting.isEmpty)
-        #expect(machine.state == .endingSuggested(meeting: asTeams, since: 20))
-        machine.handle(asEvidence(23, activity: .recording))
-        #expect(machine.state == .recording(ScribeAutoStartRecording(meeting: asTeams, since: 23, micReleasedAt: nil, sawMic: false)))
+        let suggested = machine.handle(asEvidence(20, activity: .recording))
+        #expect(suggested == [.suggestEnd(asTeams)])
+        // Keep recording leaves the phase alone, so the machine hears nothing: it stays quiet while the signal lasts.
         var quiet: [ScribeAutoStartMachine.Effect] = []
-        for now in stride(from: 30.0, through: 400.0, by: 10.0) { quiet += machine.handle(asEvidence(now, activity: .recording)) }
+        for now in stride(from: 21.0, through: 400.0, by: 10.0) { quiet += machine.handle(asEvidence(now, activity: .recording)) }
         #expect(quiet.isEmpty)
-        machine.handle(asEvidence(410, mic: [.teams], activity: .recording))
+        let back = machine.handle(asEvidence(410, mic: [.teams], activity: .recording))
+        #expect(back == [.withdrawEnd])
         machine.handle(asEvidence(415, activity: .recording))
         let again = machine.handle(asEvidence(423, activity: .recording))
-        #expect(again == [.requestEnd(asTeams)])
+        #expect(again == [.suggestEnd(asTeams)])
     }
 
     @Test func stoppingByHandAfterTheGraceReturnsToIdle() {
@@ -639,7 +642,7 @@ struct ScribeAutoStartTests {
         #expect(after.sawMic)
         machine.handle(asEvidence(11, slots: [event], activity: .recording))
         let ended = machine.handle(asEvidence(19, slots: [event], activity: .recording))
-        #expect(ended == [.requestEnd(after.meeting)])
+        #expect(ended == [.suggestEnd(after.meeting)])
     }
 
     // MARK: First-use consent
@@ -742,10 +745,70 @@ struct ScribeAutoStartTests {
         let before = machine.handle(asEvidence(20, mic: [.zoom], activity: .recording, windows: [.zoom: .gone]))
         #expect(before.isEmpty)
         let ended = machine.handle(asEvidence(21, mic: [.zoom], activity: .recording, windows: [.zoom: .gone]))
-        guard case .some(.requestEnd) = ended.first else {
-            Issue.record("expected requestEnd, got \(ended)")
+        let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
+        #expect(ended == [.suggestEnd(zoom)])
+    }
+
+    @Test func microphoneReleaseSuggestsAnEndAndNeverRequestsOne() {
+        var machine = asRecordingTeams()
+        var all: [ScribeAutoStartMachine.Effect] = []
+        for now in stride(from: 12.0, through: 3_600.0, by: 1.0) {
+            all += machine.handle(asEvidence(now, activity: .recording))
+        }
+        #expect(all == [.suggestEnd(asTeams)])
+        #expect(!all.contains(.requestEnd(asTeams)))
+    }
+
+    @Test func aClosedCallWindowSuggestsAnEndAndNeverRequestsOne() {
+        var machine = recordingZoom()
+        machine.handle(asEvidence(12, mic: [.zoom], activity: .recording, windows: [.zoom: .present]))
+        var all: [ScribeAutoStartMachine.Effect] = []
+        for now in stride(from: 13.0, through: 600.0, by: 1.0) {
+            all += machine.handle(asEvidence(now, mic: [.zoom], activity: .recording, windows: [.zoom: .gone]))
+        }
+        let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
+        #expect(all == [.suggestEnd(zoom)])
+    }
+
+    @Test func theMicrophoneComingBackWithdrawsTheSuggestion() {
+        var machine = asRecordingTeams()
+        machine.handle(asEvidence(12, activity: .recording))
+        let suggested = machine.handle(asEvidence(20, activity: .recording))
+        #expect(suggested == [.suggestEnd(asTeams)])
+        #expect(machine.needsFreshEvidence)
+        let back = machine.handle(asEvidence(22, mic: [.teams], activity: .recording))
+        #expect(back == [.withdrawEnd])
+        guard case .recording(let recording) = machine.state else {
+            Issue.record("expected recording, got \(machine.state)")
             return
         }
+        #expect(!recording.endSuggested)
+        #expect(!machine.needsFreshEvidence)
+        let quiet = machine.handle(asEvidence(23, mic: [.teams], activity: .recording))
+        #expect(quiet.isEmpty)
+    }
+
+    @Test func aSuggestionStaysWhileTheWindowIsStillGoneEvenIfTheMicrophoneIsHeld() {
+        var machine = recordingZoom()
+        machine.handle(asEvidence(12, mic: [.zoom], activity: .recording, windows: [.zoom: .present]))
+        machine.handle(asEvidence(13, mic: [.zoom], activity: .recording, windows: [.zoom: .gone]))
+        let suggested = machine.handle(asEvidence(21, mic: [.zoom], activity: .recording, windows: [.zoom: .gone]))
+        #expect(suggested.count == 1)
+        let held = machine.handle(asEvidence(22, mic: [.zoom], activity: .recording, windows: [.zoom: .gone]))
+        #expect(held.isEmpty)
+        let back = machine.handle(asEvidence(23, mic: [.zoom], activity: .recording, windows: [.zoom: .present]))
+        #expect(back == [.withdrawEnd])
+    }
+
+    @Test func aSuggestionIsMadeOnceWhileTheSignalLasts() {
+        var machine = asRecordingTeams()
+        machine.handle(asEvidence(12, activity: .recording))
+        let first = machine.handle(asEvidence(20, activity: .recording))
+        let second = machine.handle(asEvidence(21, activity: .recording))
+        let third = machine.handle(asEvidence(90, activity: .recording))
+        #expect(first == [.suggestEnd(asTeams)])
+        #expect(second.isEmpty)
+        #expect(third.isEmpty)
     }
 
     @Test func aWindowThatReturnsOrIsUnknownOrWasNeverSeenDoesNotEndTheCall() {
@@ -847,13 +910,22 @@ struct ScribeAutoStartTests {
         #expect(shown == [.showAsk(nextMeeting)])
     }
 
+    @Test func switchStillRequestsAnEndAndNeverSuggestsOne() {
+        var machine = asRecordingTeams()
+        let next = asSlot("n1", title: "Standup", start: 80)
+        machine.handle(asEvidence(20, mic: [.teams], slots: [next], activity: .recording))
+        let switchNow = machine.handle(.accept(now: 22))
+        #expect(switchNow.contains(.requestEnd(asTeams)))
+        #expect(!switchNow.contains(.suggestEnd(asTeams)))
+    }
+
     @Test func theCallEndingTakesTheNextMeetingCardDown() {
         var machine = asRecordingTeams()
         let next = asSlot("n1", title: "Standup", start: 80)
         machine.handle(asEvidence(12, slots: [], activity: .recording))
         machine.handle(asEvidence(14, slots: [next], activity: .recording))
         let ended = machine.handle(asEvidence(20, slots: [next], activity: .recording))
-        #expect(ended == [.hideBanner, .requestEnd(asTeams)])
+        #expect(ended == [.hideBanner, .suggestEnd(asTeams)])
     }
 
     @Test func theNextMeetingCardNeedsARecording() {
