@@ -131,3 +131,111 @@ public enum MusicModeRules {
         }
     }
 }
+
+/// One press of the shuffle or repeat control as a pure state machine, so the order of its steps is tested
+/// and the app layer only carries out each effect and reports what happened.
+///
+/// A known mode moves at once and its change is sent; an unknown mode is read from the player first and the
+/// change is computed from that answer. Without an answer nothing is sent: a set built from a guess could
+/// undo what the person asked for. After a send the player is read back; an answer that has been overtaken
+/// by a newer press or read is dropped.
+public struct MusicModePress: Equatable, Sendable {
+    public enum Control: Equatable, Sendable {
+        case shuffle, repeatMode
+    }
+
+    public enum Phase: Equatable, Sendable {
+        case idle, readingFirst, sending, readingBack, finished
+    }
+
+    /// What happened since the last effect.
+    public enum Event: Equatable, Sendable {
+        /// The player's modes, read directly before the send; nil when the read failed or could not be parsed.
+        case playerRead(MusicModes?)
+        /// The set script ran.
+        case sent
+        /// The read after the send. `current` is what the control shows now; `isCurrent` is false when a
+        /// newer press, read or reset has taken over since this read began.
+        case readBack(output: String?, current: MusicModes, isCurrent: Bool)
+        /// The player quit or lost consent.
+        case unavailable
+    }
+
+    /// What the app layer does next.
+    public enum Effect: Equatable, Sendable {
+        /// Read shuffle and repeat from the player, ignoring the shared read revision.
+        case readPlayer
+        case send(script: String)
+        case readBack
+        /// Put these modes on the control and end the press.
+        case show(MusicModes)
+        case stop
+    }
+
+    public let control: Control
+    public let player: NowPlaying.Player
+    public private(set) var phase: Phase = .idle
+    private var base = MusicModes()
+
+    public init(control: Control, player: NowPlaying.Player) {
+        self.control = control
+        self.player = player
+    }
+
+    /// The press itself. `optimistic` is what the control shows at once (nil while the mode is unknown);
+    /// `next` is the first effect. A press that already started does nothing.
+    public mutating func press(current: MusicModes) -> (optimistic: MusicModes?, next: Effect) {
+        guard phase == .idle else { return (nil, .stop) }
+        base = current
+        if let script = script(from: current) {
+            phase = .sending
+            var shown = current
+            switch control {
+            case .shuffle: shown.shuffle = current.shuffle.map { !$0 }
+            case .repeatMode: shown.repeatMode = MusicModeRules.nextRepeat(after: current.repeatMode, player: player)
+            }
+            return (shown, .send(script: script))
+        }
+        phase = .readingFirst
+        return (nil, .readPlayer)
+    }
+
+    /// Moves on after an effect. An event that does not belong to the current step ends the press.
+    public mutating func handle(_ event: Event) -> Effect {
+        switch (phase, event) {
+        case (.readingFirst, .playerRead(let read)):
+            guard let read, let script = script(from: read) else { return finish(.stop) }
+            base = read
+            phase = .sending
+            return .send(script: script)
+        case (.sending, .sent):
+            phase = .readingBack
+            return .readBack
+        case (.readingBack, .readBack(let output, let current, let isCurrent)):
+            guard isCurrent else { return finish(.stop) }
+            return finish(.show(MusicModeRules.resolved(output: output, player: player, current: current, afterPress: true)))
+        case (.readingBack, .unavailable):
+            // The control holds a guess the player never confirmed.
+            return finish(.show(MusicModes()))
+        default:
+            return finish(.stop)
+        }
+    }
+
+    private mutating func finish(_ effect: Effect) -> Effect {
+        phase = .finished
+        return effect
+    }
+
+    /// The set script for these modes, or nil when the mode this control changes is unknown.
+    private func script(from modes: MusicModes) -> String? {
+        switch control {
+        case .shuffle:
+            guard let on = modes.shuffle else { return nil }
+            return MusicModeRules.setShuffleScript(player: player, on: !on)
+        case .repeatMode:
+            guard let mode = modes.repeatMode else { return nil }
+            return MusicModeRules.setRepeatScript(player: player, mode: MusicModeRules.nextRepeat(after: mode, player: player))
+        }
+    }
+}

@@ -273,39 +273,63 @@ final class TopBarServices {
         isRunning(player) && Automation.allowed(player.bundleID)
     }
 
-    /// A known mode moves at once, the change is sent, then the player is read once and the control follows
-    /// what it says. An unknown mode is read first, so the press works from what the player has now.
+    /// The press itself is `MusicModePress`: a known mode moves at once and the change is sent; an unknown
+    /// mode is read from the player first. This carries out each effect and reports what happened.
     /// Runs after `music(_:)` has checked the player is running and allowed.
     private func changeMusicMode(_ command: TopBarModel.MusicCommand, player: NowPlaying.Player) {
-        let before = model.musicModes
-        var modes = before
+        let control: MusicModePress.Control
         switch command {
-        case .toggleShuffle:
-            if let on = before.shuffle { modes.shuffle = !on }
-        case .cycleRepeat:
-            if let mode = before.repeatMode { modes.repeatMode = MusicModeRules.nextRepeat(after: mode, player: player) }
-        case .playPause, .next, .previous, .open:
-            return
+        case .toggleShuffle: control = .shuffle
+        case .cycleRepeat: control = .repeatMode
+        case .playPause, .next, .previous, .open: return
         }
-        model.musicModes = modes
+        var press = MusicModePress(control: control, player: player)
+        let start = press.press(current: model.musicModes)
+        if let shown = start.optimistic { model.musicModes = shown }
         musicModesRevision += 1
         let revision = musicModesRevision
+        let started = press
         enqueueMusicModes { services in
-            // The player may have quit or lost consent while this press waited behind a read.
-            guard services.canScript(player), !Task.isCancelled else { return }
-            var base = before
-            let unknown = command == .toggleShuffle ? before.shuffle == nil : before.repeatMode == nil
-            if unknown {
-                // A newer read may drop this one; the press still goes ahead from whatever is known then.
-                await services.readMusicModes(player, revision: revision)
-                base = services.model.musicModes
+            await services.runMusicPress(started, first: start.next, revision: revision)
+        }
+    }
+
+    private func runMusicPress(_ started: MusicModePress, first: MusicModePress.Effect, revision: Int) async {
+        var press = started
+        let player = press.player
+        var effect = first
+        while !Task.isCancelled {
+            let event: MusicModePress.Event
+            switch effect {
+            case .stop:
+                return
+            case .show(let modes):
+                model.musicModes = modes
+                return
+            case .readPlayer:
+                // Read directly: a newer read bumping the shared revision must not leave this press without
+                // an answer. If the player says nothing, the press is skipped.
+                guard canScript(player) else { event = .unavailable; break }
+                let output = await SpotifyPlayer.osascript(MusicModeRules.readScript(player: player))
+                event = .playerRead(MusicModeRules.parse(output, player: player))
+            case .send(let script):
+                // The player may have quit or lost consent while this press waited behind a read.
+                guard canScript(player) else { event = .unavailable; break }
+                _ = await SpotifyPlayer.osascript(script)
+                event = .sent
+            case .readBack:
+                // A newer press, read or reset already owns the control: skip the read, drop the answer.
+                guard musicModesRevision == revision else {
+                    event = .readBack(output: nil, current: model.musicModes, isCurrent: false)
+                    break
+                }
+                guard canScript(player) else { event = .unavailable; break }
+                let output = await SpotifyPlayer.osascript(MusicModeRules.readScript(player: player))
+                let current = musicModesRevision == revision && isRunning(player)
+                event = .readBack(output: output, current: model.musicModes, isCurrent: current)
             }
-            let source = command == .toggleShuffle
-                ? MusicModeRules.setShuffleScript(player: player, on: !(base.shuffle ?? false))
-                : MusicModeRules.setRepeatScript(player: player, mode: MusicModeRules.nextRepeat(after: base.repeatMode, player: player))
-            guard services.canScript(player), !Task.isCancelled else { return }
-            _ = await SpotifyPlayer.osascript(source)
-            await services.readMusicModes(player, revision: revision, afterPress: true)
+            guard !Task.isCancelled else { return }
+            effect = press.handle(event)
         }
     }
 
@@ -331,16 +355,12 @@ final class TopBarServices {
     }
 
     /// One bounded read through Apple Events; never prompts, and only for a running player Zeus may script.
-    /// A failed read changes nothing, except after a press, where the guess goes back to unknown.
-    private func readMusicModes(_ player: NowPlaying.Player, revision: Int, afterPress: Bool = false) async {
-        guard musicModesRevision == revision else { return }
-        guard canScript(player) else {
-            if afterPress { model.musicModes = MusicModes() }
-            return
-        }
+    /// A failed read changes nothing.
+    private func readMusicModes(_ player: NowPlaying.Player, revision: Int) async {
+        guard musicModesRevision == revision, canScript(player) else { return }
         let output = await SpotifyPlayer.osascript(MusicModeRules.readScript(player: player))
         guard musicModesRevision == revision, !Task.isCancelled, isRunning(player) else { return }
-        model.musicModes = MusicModeRules.resolved(output: output, player: player, current: model.musicModes, afterPress: afterPress)
+        model.musicModes = MusicModeRules.resolved(output: output, player: player, current: model.musicModes, afterPress: false)
     }
 
     // MARK: Clipboard (concealed and transient items, like passwords, are never kept)
