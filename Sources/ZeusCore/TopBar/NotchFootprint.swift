@@ -89,11 +89,13 @@ public enum NotchFootprintRules {
     /// The hardware notch: a top inset and a menu bar area either side of it, all finite, with room between the
     /// areas. Nil for anything else.
     public static func hardwareSize(_ facts: NotchDisplayFacts) -> CGSize? {
+        // `CGRect.width` reports a negative size as positive, so the stored size is read.
         let frame = facts.frame
-        let numbers = [frame.minX, frame.minY, frame.width, frame.height, facts.safeAreaTop, facts.leftAreaWidth, facts.rightAreaWidth]
-        guard numbers.allSatisfy(\.isFinite),
+        let numbers = [frame.origin.x, frame.origin.y, frame.size.width, frame.size.height,
+                       facts.safeAreaTop, facts.leftAreaWidth, facts.rightAreaWidth]
+        guard numbers.allSatisfy(\.isFinite), frame.size.width > 0, frame.size.height > 0,
               facts.safeAreaTop > 0, facts.leftAreaWidth > 0, facts.rightAreaWidth > 0 else { return nil }
-        let width = frame.width - facts.leftAreaWidth - facts.rightAreaWidth
+        let width = frame.size.width - facts.leftAreaWidth - facts.rightAreaWidth
         guard width > 0 else { return nil }
         return CGSize(width: width, height: facts.safeAreaTop)
     }
