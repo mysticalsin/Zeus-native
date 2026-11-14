@@ -253,7 +253,7 @@ final class SettingsStore {
     /// Switches an imported file may leave alone or turn off, never on: they open the microphone, send data or
     /// loosen what Zeus may do. A person turns these on, on the Mac they are using.
     static let neverEnabledByImport: Set<String> = [
-        "voice.answers", "privacy.lyrics", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
+        "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
     ]
     private static var neverEnabledAppKeys: Set<String> {

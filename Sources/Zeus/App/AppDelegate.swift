@@ -912,6 +912,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "privacy.openAccessibility": {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
             },
+            "music.openExtensions": { ChromeInstaller.showExtensionsPage() },
             "diag.restart": { [weak self] in
                 self?.agentServer.stop()
                 self?.agentServer.start()

@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 179 of 179 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 179 in scope). 168 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 181 of 181 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 181 in scope). 170 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 128.
+**Before this round:** has 19, partial 27, missing 130.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -187,6 +187,8 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Notification details | Show project and command details | toggle | on | Off hides commands and project names outside the notch. | missing | live | `privacy.details` | Off, or Meeting mode active: approval cards hide the command. |
 | Usage data | Help improve (anonymous usage counts) | toggle | on | Daily anonymous counts. | has | live | `privacy.analytics` | ZEUS sends nothing; shown as a fact, not a switch. |
 | Music metadata | Synced lyrics (LRCLIB) | toggle | off | Sends title and artist to lrclib.net. | missing | live | `privacy.lyrics` | Fetches time-synced lyrics from lrclib.net (title, artist, album, duration; no key), cached on disk. Lyrics button on the Music page and a Lyrics Home music style. Off by default as it sends data. |
+| Music metadata | Show media playing in Chrome | toggle | off | Reads title, artist and position from Chrome tabs through the Zeus extension. | missing | live | `music.browserMedia` | A3. Chrome tab media through the Zeus extension and bridge, shown like any source. Off by default and never turned on by an import. Covers load from the page's own image link and are not saved; calls, private windows and pages written to disk are never read. |
+| Music metadata | Chrome extension needs a reload | status | - | Press Reload on the Zeus card in Chrome's extensions page. | missing | custom | `music.browserMediaStatus` | A3. Present only while Chrome runs with a Zeus extension older than 0.5.0. Its button opens chrome://extensions in the running Chrome, never starts it. |
 | Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
 
 ## Interview
