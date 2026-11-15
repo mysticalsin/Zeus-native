@@ -72,6 +72,18 @@ struct TalkChordHotkeyTests {
         #expect(log.registered.count == 2, "a registered chord is not asked again")
     }
 
+    @Test func itTakesTheKeyOnlyWhileTheTalkMonitorCanHearKeys() {
+        let log = Log()
+        let hotkey = make(log)
+        hotkey.sync(VoiceKey.talkChord, listening: false)
+        #expect(log.registered.isEmpty && !hotkey.isRegistered && hotkey.problem == nil,
+                "with no Input Monitoring a taken Space would be lost and nothing would talk")
+        hotkey.sync(VoiceKey.talkChord, listening: true)
+        #expect(log.registered.count == 1 && hotkey.isRegistered, "access came: the chord takes the key")
+        hotkey.sync(VoiceKey.talkChord, listening: false)
+        #expect(log.unregistered == 1 && !hotkey.isRegistered, "access went: the key is given back")
+    }
+
     @Test func itsHandlerAnswersOnlyItsOwnSignature() {
         #expect(TalkChordHotkey.answers(signature: CarbonHotkeySignature.talkChord.rawValue))
         #expect(!TalkChordHotkey.answers(signature: CarbonHotkeySignature.chat.rawValue))
