@@ -18,6 +18,30 @@ public enum EqualiserProbeVerdict: Sendable, Equatable {
     case inconclusive
 }
 
+/// The consent rules: what a probe proved, how long it listens and when silence stops shaping. Pure, so the controller
+/// only reads counters and carries out the answer.
+public enum EqualiserConsent {
+    /// The first probe after `notAsked` listens this long, since the owner may still be reading the prompt.
+    public static let firstProbeSeconds: TimeInterval = 30
+
+    /// Real sound is `heard`. Only zeros while the app reports output running is `silent`. No frames at all, or zeros
+    /// from an app that is not playing, prove nothing.
+    public static func verdict(nonZeroFrames: Int64, framesSeen: Int64, appPlaying: Bool) -> EqualiserProbeVerdict {
+        if nonZeroFrames > 0 { return .heard }
+        return framesSeen > 0 && appPlaying ? .silent : .inconclusive
+    }
+
+    /// How long a probe may listen.
+    public static func probeSeconds(permission: AudioCapturePermission) -> TimeInterval {
+        permission == .notAsked ? firstProbeSeconds : EqualiserLifecycle.probeSeconds
+    }
+
+    /// True once this many silent probes in a row, each at least `silentProbeSeconds` long, have been counted.
+    public static func stopsAfter(_ countedSilentProbes: Int) -> Bool {
+        countedSilentProbes >= EqualiserLifecycle.silentProbesToStop
+    }
+}
+
 public enum EqualiserLifecycle {
     /// The longest a probe listens.
     public static let probeSeconds: TimeInterval = 5
@@ -51,10 +75,20 @@ public enum EqualiserLifecycle {
         public var targets: [Target]
         /// Why every tap must go right now, from `EqualiserPolicy.pauseReason`. Nil when shaping may run.
         public var pause: EqualiserPause?
+        /// Where System Audio Recording stands. Only `SpectrumGate.decision` reads it, to decide whether a probe may
+        /// start; it never decides whether to mute.
+        public var permission: AudioCapturePermission
+        /// A person asked: the switch, "Try again", or the owner's own stored switch at launch.
+        public var personAsked: Bool
 
-        public init(targets: [Target] = [], pause: EqualiserPause? = nil) {
+        public init(
+            targets: [Target] = [], pause: EqualiserPause? = nil,
+            permission: AudioCapturePermission = .allowed, personAsked: Bool = true
+        ) {
             self.targets = targets
             self.pause = pause
+            self.permission = permission
+            self.personAsked = personAsked
         }
     }
 
@@ -124,7 +158,8 @@ public enum EqualiserLifecycle {
         switch event {
         case .switchedOff:
             return (.off, [.destroyAll, .stopWatchdog])
-        case .switchedOn(_, let snapshot):
+        case .switchedOn(let personAsked, var snapshot):
+            snapshot.personAsked = snapshot.personAsked && personAsked
             switch state {
             case .off, .stopped: return begin(snapshot)
             default: return (state, [])
@@ -308,7 +343,15 @@ public enum EqualiserLifecycle {
                 probe = (first.app, 1)
             }
             if let started = probe {
-                effects.append(.probe(started.app, maxSeconds: probeSeconds))
+                switch SpectrumGate.decision(permission: snapshot.permission, personAsked: snapshot.personAsked) {
+                case .capture:
+                    effects.append(.probe(started.app, maxSeconds: EqualiserConsent.probeSeconds(permission: snapshot.permission)))
+                case .wait:
+                    probe = nil
+                case .needsSettings:
+                    // A recorded refusal shows the stopped line and waits for "Try again". Nothing is probed or muted.
+                    return stop(.silentWhilePlaying(app: started.app.displayName))
+                }
             }
         }
 
@@ -330,7 +373,7 @@ public enum EqualiserLifecycle {
                 fresh: fresh, watchdogWasOn: !running.isEmpty, rebuild: false, posts: false, prefix: [.recordAllowed])
             return result
         case .silent where seconds >= silentProbeSeconds:
-            if attempt >= silentProbesToStop { return stop(.silentWhilePlaying(app: app.displayName)) }
+            if EqualiserConsent.stopsAfter(attempt) { return stop(.silentWhilePlaying(app: app.displayName)) }
             return settle(
                 snapshot, running: running, probing: nil, proven: [], skip: nil, next: (app, attempt + 1),
                 fresh: fresh, watchdogWasOn: !running.isEmpty, rebuild: false, posts: false, prefix: [])

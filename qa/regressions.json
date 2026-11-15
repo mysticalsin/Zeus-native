@@ -4606,6 +4606,42 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_the_controller_takes_its_audio_ports_without_defaults"
       }
+    },
+    {
+      "id": "REG-450",
+      "failure": "A recorded System Audio Recording refusal still started a probe, so Zeus kept asking instead of waiting for Try again.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserConsentTests.swift",
+        "function": "aRecordedRefusalShowsTheStoppedLineWithoutProbing"
+      }
+    },
+    {
+      "id": "REG-451",
+      "failure": "A probe ran without a person's request, so the System Audio Recording prompt could appear from nothing the owner did.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserConsentTests.swift",
+        "function": "noProbeWithoutAPersonsRequest"
+      }
+    },
+    {
+      "id": "REG-452",
+      "failure": "A muted tap could be built before a listen-only probe of that app heard sound in this launch.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/EqualiserConsentTests.swift",
+        "function": "aMutedBuildOnlyFollowsAHeardProbeFromEveryStartingState"
+      }
     }
   ]
 }
