@@ -78,6 +78,21 @@ private func asRecordingTeams() -> ScribeAutoStartMachine {
     return machine
 }
 
+/// The heads-up meeting for a slot that has not started: no call has begun, so it is not live.
+private func asHeadsUp(_ slot: ScribeCalendarSlot) -> ScribeMeeting {
+    ScribeMeeting(key: slot.id, title: slot.title, callApp: slot.callApp, slot: slot)
+}
+
+/// The same slot once a call app holds the microphone for it.
+private func asLive(_ slot: ScribeCalendarSlot) -> ScribeMeeting {
+    ScribeMeeting(key: slot.id, title: slot.title, callApp: slot.callApp, slot: slot, isLive: true)
+}
+
+private func asIsCountingDown(_ state: ScribeAutoStartState) -> Bool {
+    if case .countingDown = state { return true }
+    return false
+}
+
 @Suite("Scribe meeting start")
 struct ScribeAutoStartTests {
     // MARK: Setting
@@ -1122,5 +1137,343 @@ struct ScribeAutoStartTests {
         let gone = machine.handle(asTick(93))
         #expect(gone.isEmpty)
         #expect(machine.card(now: 93) == .hidden)
+    }
+
+    // MARK: The heads-up
+
+    @Test func headsUpWindowEdges() {
+        func upcoming(_ start: TimeInterval, end: TimeInterval? = nil) -> ScribeMeeting? {
+            ScribeMeetingEvidence(date: asBase, slots: [asSlot(start: start, end: end)]).upcoming
+        }
+        #expect(upcoming(121) == nil)
+        #expect(upcoming(120) == asHeadsUp(asSlot(start: 120)))
+        #expect(upcoming(1) == asHeadsUp(asSlot(start: 1)))
+        // At the start it is no longer upcoming: the meeting has started.
+        #expect(upcoming(0) == nil)
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [asSlot(start: 0)]).candidate?.key == "s1")
+        #expect(upcoming(60, end: -1) == nil)
+        #expect(ScribeMeetingStartPolicy.leadWindow == 120)
+
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [asSlot(start: 121)]))
+        #expect(machine.state == .idle)
+        machine.handle(asEvidence(1, slots: [asSlot(start: 121)]))
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(asSlot(start: 121)), deadline: 21))
+        var edge = ScribeAutoStartMachine()
+        edge.handle(asEvidence(0, slots: [asSlot(start: 120)]))
+        #expect(edge.state == .upcoming(meeting: asHeadsUp(asSlot(start: 120)), deadline: 20))
+        var last = ScribeAutoStartMachine()
+        last.handle(asEvidence(0, slots: [asSlot(start: 1)]))
+        #expect(last.state == .upcoming(meeting: asHeadsUp(asSlot(start: 1)), deadline: 20))
+        var started = ScribeAutoStartMachine()
+        started.handle(asEvidence(0, slots: [asSlot(start: 0)]))
+        #expect(started.state == .armed(meeting: asHeadsUp(asSlot(start: 0)), since: 0))
+    }
+
+    @Test func theClosestSlotWinsTheHeadsUp() {
+        let near = asSlot("b", start: 30)
+        let far = asSlot("a", start: 90)
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [far, near]).upcoming == asHeadsUp(near))
+        let twinA = asSlot("a", start: 60)
+        let twinB = asSlot("b", start: 60)
+        #expect(ScribeMeetingEvidence(date: asBase, slots: [twinB, twinA]).upcoming == asHeadsUp(twinA))
+        // A meeting that was already answered does not hide the next one.
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [near, far]))
+        machine.handle(.dismiss(on: .offer(asHeadsUp(near), blocked: nil), now: 2))
+        machine.handle(asEvidence(3, slots: [near, far]))
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(far), deadline: 23))
+    }
+
+    @Test func theHeadsUpIsOneCardWithTheTitleTheMinutesAndRecord() {
+        var machine = ScribeAutoStartMachine()
+        let slot = asSlot(start: 120)
+        let effects = machine.handle(asEvidence(0, slots: [slot]))
+        #expect(effects.isEmpty)
+        let card = machine.card(now: 0)
+        #expect(card == .offer(asHeadsUp(slot), blocked: nil))
+        #expect(ScribeMeetingCardText.title(asHeadsUp(slot)) == "Design review")
+        #expect(ScribeMeetingCardText.status(card, now: asBase) == "in 2 min")
+        #expect(ScribeMeetingCardText.status(card, now: asBase.addingTimeInterval(61)) == "in 1 min")
+        #expect(ScribeMeetingCardText.primary(card) == "Record")
+        #expect(ScribeMeetingCardText.canDismiss(card))
+        #expect(machine.ledger.mark(of: asHeadsUp(slot)) == .headsUp)
+    }
+
+    @Test func theHeadsUpIsShownInBothModesAndNotInOff() {
+        let slot = asSlot(start: 100)
+        for mode in [ScribeAutoStartMode.ask, .automatic] {
+            var machine = ScribeAutoStartMachine()
+            machine.handle(asEvidence(0, slots: [slot], mode: mode))
+            #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+            #expect(machine.card(now: 0) == .offer(asHeadsUp(slot), blocked: nil))
+        }
+        // What blocks an automatic start is not the heads-up's business: it only says when the meeting starts.
+        var blocked = ScribeAutoStartMachine()
+        blocked.handle(asEvidence(0, slots: [slot], mode: .automatic, ready: .blocked(.microphoneDenied)))
+        #expect(blocked.card(now: 0) == .offer(asHeadsUp(slot), blocked: nil))
+        var off = ScribeAutoStartMachine()
+        let effects = off.handle(asEvidence(0, slots: [slot], mode: .off))
+        #expect(effects.isEmpty)
+        #expect(off.state == .idle)
+        #expect(off.card(now: 0) == .hidden)
+        #expect(off.ledger.mark(of: asHeadsUp(slot)) == nil)
+        var turnedOff = ScribeAutoStartMachine()
+        turnedOff.handle(asEvidence(0, slots: [slot]))
+        turnedOff.handle(asEvidence(5, slots: [slot], mode: .off))
+        #expect(turnedOff.state == .idle)
+        #expect(turnedOff.card(now: 5) == .hidden)
+    }
+
+    @Test func theHeadsUpIsShownOncePerMeeting() {
+        let slot = asSlot(start: 100, end: 2_000)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        #expect(machine.nextWake(now: 0) == 20)
+        let early = machine.handle(asTick(19.9))
+        #expect(early.isEmpty)
+        #expect(machine.card(now: 19.9) == .offer(asHeadsUp(slot), blocked: nil))
+        // Leaving on its own is not an answer: the meeting is marked as announced, nothing more.
+        let leave = machine.handle(asTick(20))
+        #expect(leave.isEmpty)
+        #expect(machine.state == .idle)
+        #expect(machine.card(now: 20) == .hidden)
+        #expect(machine.ledger.mark(of: asHeadsUp(slot)) == .headsUp)
+        #expect(machine.ledger.mark(of: asHeadsUp(slot))?.isAnswered == false)
+        #expect(machine.nextWake(now: 20) == nil)
+        // The same slot read again, an empty or failed read, then the slot back: still one announcement.
+        var shown = 0
+        for (now, slots) in [(25.0, [slot]), (30.0, []), (35.0, [slot]), (40.0, []), (45.0, []), (50.0, [slot])] {
+            machine.handle(asEvidence(now, slots: slots))
+            if machine.card(now: now) != .hidden { shown += 1 }
+        }
+        #expect(shown == 0)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func aHeadsUpThatIsStillUpSurvivesAnEmptyCalendarRead() {
+        let slot = asSlot(start: 100)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(5, slots: []))
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+        #expect(machine.card(now: 5) == .offer(asHeadsUp(slot), blocked: nil))
+    }
+
+    @Test func dismissAtTwoMinutesStaysQuietAtStartTime() {
+        for mode in [ScribeAutoStartMode.ask, .automatic] {
+            let slot = asSlot(start: 120, end: 1_920, app: .teams)
+            var machine = ScribeAutoStartMachine()
+            machine.handle(asEvidence(0, slots: [slot], mode: mode))
+            let effects = machine.handle(.dismiss(on: .offer(asHeadsUp(slot), blocked: nil), now: 5))
+            #expect(effects.isEmpty)
+            #expect(machine.state == .idle)
+            #expect(machine.ledger.mark(of: asHeadsUp(slot)) == .declined)
+            var shown = 0
+            for now in stride(from: 100.0, through: 400.0, by: 3.0) {
+                // The start time passes, then the call opens in Teams and the microphone is held.
+                let held: [ScribeCallApp] = now >= 130 ? [.teams] : []
+                machine.handle(asEvidence(now, mic: held, present: [.teams], slots: [slot], mode: mode))
+                if machine.card(now: now) != .hidden { shown += 1 }
+            }
+            #expect(shown == 0)
+            #expect(machine.state == .idle)
+        }
+    }
+
+    @Test func aTimeoutThenALiveCallAsksInAskMe() {
+        let slot = asSlot(start: 60, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asTick(20))
+        #expect(machine.state == .idle)
+        machine.handle(asEvidence(60, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 60))
+        #expect(machine.card(now: 60) == .hidden)
+        machine.handle(asEvidence(63, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .prompting(meeting: asLive(slot), deadline: 83, blocked: .notChosen))
+    }
+
+    @Test func aTimeoutThenALiveCallCountsDownInAutomatic() {
+        let slot = asSlot(start: 60, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot], mode: .automatic))
+        machine.handle(asTick(20))
+        machine.handle(asEvidence(60, mic: [.teams], slots: [slot], mode: .automatic))
+        #expect(!asIsCountingDown(machine.state))
+        machine.handle(asEvidence(63, mic: [.teams], slots: [slot], mode: .automatic))
+        #expect(machine.state == .countingDown(meeting: asLive(slot), deadline: 68))
+        let start = machine.handle(asTick(68))
+        #expect(start == [.start(asLive(slot))])
+    }
+
+    @Test func aCallBeginningDuringTheHeadsUpKeepsTheCardThroughTheCheckThenAsksReadingNow() {
+        let slot = asSlot(start: 12, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(12, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 12, offerUntil: 20))
+        // The card does not blink out while the 3 s check runs.
+        #expect(machine.card(now: 13) == .offer(asLive(slot), blocked: nil))
+        let held = machine.handle(asEvidence(14, mic: [.teams], slots: [slot]))
+        #expect(held.isEmpty)
+        #expect(machine.card(now: 14) == .offer(asLive(slot), blocked: nil))
+        machine.handle(asEvidence(15, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .prompting(meeting: asLive(slot), deadline: 35, blocked: .notChosen))
+        let card = machine.card(now: 15)
+        #expect(card == .offer(asLive(slot), blocked: .notChosen))
+        #expect(ScribeMeetingCardText.status(card, now: asBase.addingTimeInterval(15)) == "now")
+    }
+
+    @Test func aCallBeginningDuringTheHeadsUpCountsDownInAutomaticAfterTheCheck() {
+        let slot = asSlot(start: 12, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot], mode: .automatic))
+        machine.handle(asEvidence(12, mic: [.teams], slots: [slot], mode: .automatic))
+        #expect(machine.card(now: 13) == .offer(asLive(slot), blocked: nil))
+        #expect(!asIsCountingDown(machine.state))
+        machine.handle(asEvidence(15, mic: [.teams], slots: [slot], mode: .automatic))
+        #expect(machine.state == .countingDown(meeting: asLive(slot), deadline: 20))
+    }
+
+    @Test func theHeadsUpStillLeavesOnItsDeadlineWhileTheCheckRuns() {
+        let slot = asSlot(start: 100, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(18, mic: [.teams], slots: [slot]))
+        #expect(machine.nextWake(now: 18) == 20)
+        machine.handle(asTick(20))
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 18))
+        #expect(machine.card(now: 20) == .hidden)
+        machine.handle(asEvidence(21, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .prompting(meeting: asLive(slot), deadline: 41, blocked: .notChosen))
+    }
+
+    @Test func aMicBlipDuringTheHeadsUpDoesNotCountDown() {
+        let slot = asSlot(start: 100, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot], mode: .automatic))
+        var effects: [ScribeAutoStartMachine.Effect] = []
+        var counted = false
+        func read(_ now: TimeInterval, mic: [ScribeCallApp]) {
+            effects += machine.handle(asEvidence(now, mic: mic, slots: [slot], mode: .automatic))
+            counted = counted || asIsCountingDown(machine.state)
+        }
+        read(10, mic: [.teams])
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 10, offerUntil: 20))
+        // The microphone lets go within the 3 s check: the heads-up is back as it was, with its deadline.
+        read(11, mic: [])
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+        #expect(machine.card(now: 11) == .offer(asHeadsUp(slot), blocked: nil))
+        read(14, mic: [.teams])
+        read(15, mic: [])
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+        machine.handle(asTick(20))
+        #expect(machine.state == .idle)
+        read(30, mic: [])
+        #expect(!counted)
+        #expect(effects.isEmpty)
+    }
+
+    @Test func aCallThatLastsPastTheCheckAfterABlipCountsDownOnce() {
+        let slot = asSlot(start: 100, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot], mode: .automatic))
+        machine.handle(asEvidence(10, mic: [.teams], slots: [slot], mode: .automatic))
+        machine.handle(asEvidence(11, slots: [slot], mode: .automatic))
+        machine.handle(asEvidence(14, mic: [.teams], slots: [slot], mode: .automatic))
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 14, offerUntil: 20))
+        machine.handle(asEvidence(17, mic: [.teams], slots: [slot], mode: .automatic))
+        #expect(machine.state == .countingDown(meeting: asLive(slot), deadline: 22))
+    }
+
+    @Test func recordOnTheHeadsUpStartsWithTheTitleAndGuestsAndNoCallBinding() throws {
+        let slot = ScribeCalendarSlot(id: "s1", title: "Design review", start: asBase.addingTimeInterval(100),
+                                      attendeeNames: ["Ana Costa", "Bo Lin"], hasCallLink: true, callApp: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        let effects = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 5))
+        #expect(effects == [.start(asHeadsUp(slot))])
+        let meeting = try #require(effects.compactMap { effect -> ScribeMeeting? in
+            if case .start(let meeting) = effect { return meeting } else { return nil }
+        }.first)
+        let identity = ScribeCallProcessIdentity(pid: 4_242, bundleID: "example.calls", launchedAt: 1)
+        let context = meeting.context(callIdentity: identity)
+        #expect(context.title == "Design review")
+        #expect(context.attendeeNames == ["Ana Costa", "Bo Lin"])
+        #expect(context.callIdentity == nil)
+        #expect(machine.state == .starting(ScribeStartAttempt(meeting: asHeadsUp(slot), since: 5, origin: .tap,
+                                                              previousSession: nil, session: nil)))
+    }
+
+    @Test func aTapOnTheHeadsUpWhileTheCallCheckRunsStartsTheLiveMeeting() {
+        let slot = asSlot(start: 12, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(12, mic: [.teams], slots: [slot]))
+        let effects = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 13))
+        #expect(effects == [.start(asLive(slot))])
+    }
+
+    @Test func aTapOnTheHeadsUpThatLeftInTheSameInstantStillStarts() {
+        let slot = asSlot(start: 100, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asTick(20))
+        #expect(machine.state == .idle)
+        let effects = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 20.1))
+        #expect(effects == [.start(asHeadsUp(slot))])
+    }
+
+    @Test func nothingIsShownWhileScribeIsSaving() {
+        let slot = asSlot(start: 100)
+        for activity in [ScribeActivity.ending, .processing] {
+            var machine = ScribeAutoStartMachine()
+            machine.handle(asEvidence(0, slots: [slot], activity: activity))
+            #expect(machine.state == .idle)
+            #expect(machine.card(now: 0) == .hidden)
+            // Nothing was announced, so the heads-up still comes once Scribe is free.
+            #expect(machine.ledger.mark(of: asHeadsUp(slot)) == nil)
+            machine.handle(asEvidence(10, slots: [slot]))
+            #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 30))
+        }
+    }
+
+    @Test func aRecordingStartedByHandTakesTheHeadsUpDown() {
+        let slot = asSlot(start: 100)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(5, slots: [slot], activity: .recording))
+        #expect(machine.state == .idle)
+        #expect(machine.card(now: 5) == .hidden)
+        #expect(machine.ledger.mark(of: asHeadsUp(slot)) == .started)
+        var busy = ScribeAutoStartMachine()
+        busy.handle(asEvidence(0, slots: [slot], activity: .recording))
+        #expect(busy.state == .idle)
+        #expect(busy.ledger.mark(of: asHeadsUp(slot)) == nil)
+    }
+
+    @Test func theHeadsUpDoesNotTimeOutUnderThePointer() {
+        let slot = asSlot(start: 100)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(.pointer(inside: true, now: 10))
+        let held = machine.handle(asTick(40))
+        #expect(held.isEmpty)
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+        machine.handle(.pointer(inside: false, now: 50))
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 54))
+        machine.handle(asTick(53))
+        #expect(machine.card(now: 53) == .offer(asHeadsUp(slot), blocked: nil))
+        machine.handle(asTick(54))
+        #expect(machine.state == .idle)
+    }
+
+    @Test func theHeadsUpWakesAtTheMinuteTheTimeChanges() {
+        let slot = asSlot(start: 100)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(.pointer(inside: true, now: 1))
+        #expect(machine.nextWake(now: 1) == 40)
     }
 }
