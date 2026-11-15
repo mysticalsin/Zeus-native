@@ -205,7 +205,7 @@ final class VoiceTurnController {
         }
     }
 
-    /// The talk keys became another shortcut while held (⌃⌥Space opens Chat): stop listening and send nothing.
+    /// The talk keys became another shortcut while held (⌃⌥C opens Chat): stop listening and send nothing.
     func cancelListening() {
         guard listening else { return }
         listening = false
