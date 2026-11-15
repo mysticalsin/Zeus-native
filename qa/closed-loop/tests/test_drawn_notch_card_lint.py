@@ -105,7 +105,7 @@ class DrawnNotchCardWiring(unittest.TestCase):
     def test_the_card_is_placed_on_a_page(self):
         self.assertTrue(card_is_placed(PAGES.read_text(encoding="utf-8")))
 
-    def test_new_app_files_have_no_en_or_em_dash(self):
+    def test_new_card_files_have_no_en_or_em_dash(self):
         for path in (CARD, CARD_TESTS, Path(__file__)):
             self.assertFalse(has_dash(path.read_text(encoding="utf-8")), path.name)
 
@@ -159,7 +159,7 @@ class DrawnNotchCardLintFailsOnItsFailureShapes(unittest.TestCase):
         self.assertFalse(card_is_placed("struct DrawnNotchCard: View {"))
         self.assertTrue(card_is_placed("        DrawnNotchCard(model: model)"))
 
-    def test_a_dash_is_caught(self):
+    def test_a_dash_in_a_card_file_is_caught(self):
         self.assertTrue(has_dash("a " + DASHES[0] + " b"))
         self.assertTrue(has_dash("a " + DASHES[1] + " b"))
         self.assertFalse(has_dash("a - b"))
