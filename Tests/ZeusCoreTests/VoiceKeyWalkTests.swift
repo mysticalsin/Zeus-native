@@ -102,6 +102,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let chord: Bool
     /// Carbon takes every Space: its key-down and key-up are always swallowed, and only the live key state shows it.
     let carbon: Bool
+    /// The adapter asks the live key state about the chord's Space on each flags event and tells the machine the key-down it
+    /// missed (`HotkeyMonitor.feed`). Only the regression test that the search can see its absence turns it off.
+    let injection: Bool
 
     let ownMask: UInt16
     let shiftMask: UInt16
@@ -115,8 +118,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 
     init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false,
          late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false,
-         processingTime: Bool = false, chord: Bool = false, carbon: Bool = false) {
+         processingTime: Bool = false, chord: Bool = false, carbon: Bool = false, injection: Bool = true) {
         self.name = name
+        self.injection = injection
         self.chord = chord
         self.carbon = carbon && chord
         self.processingTime = processingTime
@@ -333,6 +337,10 @@ private struct Checker: Hashable {
     /// By the physical keys, whatever any monitor heard: Space is down and went down while exactly the own set was down, and
     /// no other key has moved since. A start with a Space down that is not this one is a start the keyboard did not earn.
     var spaceClean = false
+    /// The own set came down (as the machine was told) while a Space was physically down that was not `spaceClean`: a press
+    /// beside a Space that the keyboard did not earn as a chord. The machine may have heard of that Space or not. A press
+    /// judged at the physical state when it is heard, not when its keys went down, because that is what a start can follow.
+    var dirtySpaceAtPress = false
 }
 
 private struct Edge {
@@ -671,7 +679,7 @@ private struct Sim {
 
     private mutating func feed(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)? = nil,
                                drain: Bool = true) {
-        if key != nil { sweepStale(run) }
+        if key != nil { sweepStale(run); injectSwallowedSpace(event, run) }
         edge = Edge()
         let seenBefore = seen
         let config = run.configs[cfg]
@@ -728,6 +736,16 @@ private struct Sim {
         checkEnd(wasLatched: wasLatched, seenBefore: seenBefore, key: key, config: config, run)
         runOwner(effects, config: config, run)
         if drain, held == nil, kind != .tick, kind != .sweep, kind != .echo { drainWakes(run) }
+    }
+
+    /// The adapter's answer to a Space that Carbon hides, as `HotkeyMonitor.feed` gives it: on a flags event, when the chord is
+    /// on and the live key state has Space down but the machine does not, the machine hears the Space key-down first, with
+    /// the flags it had before this event, at the time of that event (not the time it is heard).
+    private mutating func injectSwallowedSpace(_ event: VoiceKeyMachine.Event, _ run: WalkRun) {
+        guard run.chord, run.injection, pointing == nil, case .key(.flags, let time) = event, run.configs[cfg].chord != nil,
+              down & run.chordMask != 0, !machine.keys.keysDown.contains(WalkKey.space.code),
+              let index = run.keys.indices.first(where: { run.chordMask == UInt16(1) << UInt16($0) }) else { return }
+        feed(.key(.keyDown(keyCode: WalkKey.space.code, modifiers: machine.keys.flagModifiers), at: time), .key, run, key: (index, true))
     }
 
     /// A Space the machine has dropped by itself is forgotten by the rules too, but only where the machine may drop a key it
@@ -943,6 +961,7 @@ private struct Sim {
         if phys.ownAll, !wasOwn {
             checker.pressAge = 0
             checker.pressForeign = phys.foreignAny
+            checker.dirtySpaceAtPress = run.chord && down & run.chordMask != 0 && !checker.spaceClean
             edge.cameDown = true
         } else if phys.ownAll {
             checker.pressForeign = checker.pressForeign || phys.foreignAny
@@ -950,6 +969,7 @@ private struct Sim {
         if !phys.ownAll {
             checker.presses = 0
             checker.pressAge = 0
+            checker.dirtySpaceAtPress = false
         }
         if wasOwn, !phys.ownAll { edge.released = true }
         if checker.turnOpen, turnPhys.foreignAny {
@@ -978,8 +998,8 @@ private struct Sim {
                 }
                 if checker.cancelled { found.append("I2: start after a cancel, before every key was up") }
                 if checker.bigger { found.append("I6: start after the own set was down with something foreign, before every key was up") }
-                if run.chord, down & run.chordMask != 0, !checker.spaceClean {
-                    found.append("I6s: start with a Space physically down that did not join the own set alone, whether or not any monitor heard it")
+                if run.chord, checker.dirtySpaceAtPress {
+                    found.append("I6s: start of a press that came down beside a Space physically down that had not joined the own set alone, whether or not any monitor heard that Space")
                 }
                 if phys.ownAll, phys.foreignAny { found.append("I3: start on a larger chord") }
                 if config.mode == .toggle {
@@ -1308,6 +1328,17 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
             if result.effects != expected { problems.append("\(name): the machine returned \(result.effects), expected \(expected)") }
         }
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    /// The mistake finding 1 was: an adapter that never tells the machine about a Space Carbon hides. With every Space
+    /// swallowed and the live-state injection off, a start can follow a Space that was never clean.
+    @Test func theSearchSeesAnAdapterThatNeverLearnsOfASwallowedSpace() {
+        let carbon = WalkRun.all.first { $0.name.hasPrefix("A-carbon") }!
+        let blind = WalkRun("A-carbon with no live-state injection", keys: carbon.keys, own: carbon.ownCodes, configs: carbon.configs,
+                            late: true, chord: true, carbon: true, injection: false)
+        let report = search(blind, until: "I6s")
+        #expect(report.violations.contains { $0.hasPrefix("I6s") }, "\(report.violations)")
+        print("voice key walk A-carbon, injection off: \(report.violations.first ?? "no violation")")
     }
 
     /// The mistake the chord search must see: a machine that does not tolerate the chord reads a clean Space as foreign and
