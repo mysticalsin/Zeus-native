@@ -131,6 +131,14 @@
       "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift"
     },
     {
+      "id": "native-EqualiserCardTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual card actions against a fake controller; a snapshot reads and changes nothing, and no tap, listener or audio prompt exists.",
+      "suite": "EqualiserCardTests",
+      "file": "Tests/ZeusAppTests/EqualiserCardTests.swift"
+    },
+    {
       "id": "native-AppShapingRenderTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -1249,6 +1257,45 @@
             {
               "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
               "function": "theProbeBlockCountsAndWritesNothing"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-card",
+          "check": "native-EqualiserCardTests",
+          "acceptance": "The Sounds card sends the owner's switch, a clamped band gain, a preset, a reset, volume and Forget to the controller, and a snapshot shows fixed rows and never reads or changes the controller. Fake controller only.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "theSwitchCallsSetSwitch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aBandMoveSendsAClampedAndSnappedGain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aBandMoveOutsideTheTenBandsIsIgnored"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "theShapeSwitchAndVolumeKeepTheGains"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aPresetSetsItsTenGainsAndLeavesTheRest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "resetToFlatZeroesTheGainsOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "forgetCallsForgetWithTheBundleID"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aSnapshotShowsTheSampleAndNeverTouchesTheController"
             }
           ]
         }
