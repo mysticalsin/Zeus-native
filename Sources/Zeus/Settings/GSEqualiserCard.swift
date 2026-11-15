@@ -153,8 +153,9 @@ private struct EqualiserAppRow: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            AppIconView(bundleID: row.bundleID, name: row.displayName).frame(width: 30, height: 30).accessibilityHidden(true)
+        HStack(spacing: EqualiserCardLayout.iconGap) {
+            AppIconView(bundleID: row.bundleID, name: row.displayName)
+                .frame(width: EqualiserCardLayout.iconSize, height: EqualiserCardLayout.iconSize).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text(row.displayName).font(GS.rowTitle).foregroundStyle(GS.text).lineLimit(1)
@@ -283,8 +284,8 @@ private struct EqualiserBandPanel: View {
             }
             EqualiserCurveView(gains: gains).frame(height: 84)
         }
-        .padding(.leading, 42)
-        .padding(.trailing, 4)
+        .padding(.leading, EqualiserCardLayout.panelLeadingInset)
+        .padding(.trailing, EqualiserCardLayout.panelTrailingInset)
     }
 }
 

@@ -68,6 +68,17 @@ struct EqualiserBandControlTests {
     }
 }
 
+@Suite("Equaliser card layout")
+struct EqualiserCardLayoutTests {
+    @Test func theOpenedRowEndsWhereTheHeaderEnds() {
+        #expect(EqualiserCardLayout.panelTrailingInset == 0)
+    }
+
+    @Test func theOpenedRowStartsUnderTheAppName() {
+        #expect(EqualiserCardLayout.panelLeadingInset == EqualiserCardLayout.iconSize + EqualiserCardLayout.iconGap)
+    }
+}
+
 @Suite("Equaliser response curve")
 struct EqualiserCurveTests {
     @Test func aFlatSettingDrawsAFlatLine() {

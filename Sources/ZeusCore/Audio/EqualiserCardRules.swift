@@ -57,6 +57,17 @@ public enum EqualiserBandControl {
     }
 }
 
+/// The few measures the opened row shares with its header, so the two line up. Points.
+public enum EqualiserCardLayout {
+    /// The app icon at the start of a row, and the gap after it.
+    public static let iconSize = 30.0
+    public static let iconGap = 12.0
+    /// The opened row starts under the app name, past the icon and its gap.
+    public static let panelLeadingInset = iconSize + iconGap
+    /// The opened row ends where the header ends, so its last button sits over the disclosure column.
+    public static let panelTrailingInset = 0.0
+}
+
 /// The response curve the card draws under the band sliders.
 public enum EqualiserCurve {
     public struct Point: Sendable, Equatable {
