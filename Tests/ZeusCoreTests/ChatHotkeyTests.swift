@@ -4,7 +4,7 @@ import Testing
 @Suite("Chat hotkey")
 struct ChatHotkeyTests {
     @Test func symbolsAndCodes() {
-        #expect(ChatHotkey.standard.symbols == "⌃⌥Space")
+        #expect(ChatHotkey.controlOptionSpace.symbols == "⌃⌥Space")
         #expect(ChatHotkey.commandShiftSpace.symbols == "⇧⌘Space")
         #expect(ChatHotkey.controlOptionC.symbols == "⌃⌥C")
         #expect(ChatHotkey.controlOptionC.keyCode == 8)

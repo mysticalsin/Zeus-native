@@ -10,7 +10,7 @@ public enum ChatHotkey: String, CaseIterable, Codable, Identifiable, Sendable {
     case commandShiftSpace
     case controlOptionC
 
-    public static let standard = ChatHotkey.controlOptionSpace
+    public static let standard = ChatHotkey.controlOptionC
 
     public var id: String { rawValue }
 
@@ -41,6 +41,17 @@ public enum ChatHotkey: String, CaseIterable, Codable, Identifiable, Sendable {
         case .optionShiftSpace: [.option, .shift]
         case .commandShiftSpace: [.command, .shift]
         }
+    }
+
+    /// The shortcut as the key machines know it, for a clash check. Nil when Chat is off.
+    public var shortcut: Shortcut? {
+        guard let keyCode else { return nil }
+        var mods: ShortcutModifiers = []
+        if modifiers.contains(.control) { mods.insert(.control) }
+        if modifiers.contains(.option) { mods.insert(.option) }
+        if modifiers.contains(.shift) { mods.insert(.shift) }
+        if modifiers.contains(.command) { mods.insert(.command) }
+        return Shortcut(keyCode: UInt16(keyCode), modifiers: mods)
     }
 
     /// "⌃⌥Space", in the order macOS menus use (⌃ ⌥ ⇧ ⌘).
@@ -78,6 +89,6 @@ public enum CarbonHotkeySignature: UInt32, CaseIterable, Sendable {
     case center = 0x5A455553 // "ZEUS"
 
     public static func owner(signature: UInt32) -> CarbonHotkeySignature? {
-        nil
+        CarbonHotkeySignature(rawValue: signature)
     }
 }
