@@ -283,6 +283,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
+            // A turn that stops listening for its own reason (a failed start, the owner ending it) is told to the key
+            // machine, so the next press starts a turn instead of being spent on one that is gone.
+            voice?.onListeningEnded = { [weak self] in
+                WakeWordController.shared.talkKeyHeld = false
+                self?.hotkey.turnEnded()
+            }
             // A chord or a key that joins the talk keys cancels the hold instead of sending it.
             hotkey.onCancel = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false

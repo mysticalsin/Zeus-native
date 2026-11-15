@@ -103,6 +103,7 @@ final class HotkeyMonitor {
 
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
+    private var sleepObservers: [NSObjectProtocol] = []
     private var machine = VoiceKeyMachine()
 
     /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
@@ -119,6 +120,7 @@ final class HotkeyMonitor {
 
     func start() {
         observeConsumedKeys()
+        observeSleep()
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
@@ -157,7 +159,14 @@ final class HotkeyMonitor {
     func interrupt() { send(.interrupt(live: liveModifiers())) }
 
     /// Sleep and wake tell the machine to drop an open turn. Idempotent.
-    func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {}
+    func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
+        guard sleepObservers.isEmpty else { return }
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification] {
+            sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.interrupt() }
+            })
+        }
+    }
 
     private func tick() { send(.tick(at: now(), live: liveModifiers())) }
 

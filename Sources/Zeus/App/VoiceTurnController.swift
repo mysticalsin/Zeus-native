@@ -24,7 +24,11 @@ final class VoiceTurnController {
     let brain: BrainProvider
     let chrome: ChromeActions
 
-    private var listening = false
+    /// Called when a listening turn stops for any reason, so the talk key's machine and the wake word listener forget it.
+    var onListeningEnded: (() -> Void)?
+    private var listening = false {
+        didSet { if oldValue, !listening { onListeningEnded?() } }
+    }
     private var screenshotsTask: Task<[ScreenShot], Never>?
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
