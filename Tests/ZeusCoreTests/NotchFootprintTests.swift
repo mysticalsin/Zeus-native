@@ -397,4 +397,89 @@ import Testing
         #expect(NotchFootprintRules.closedSize(drawn, wings: item).width != NotchFootprintRules.closedSize(.pill, wings: item).width)
         #expect(item.motionKey == wings(none: false, extra: 58).motionKey)
     }
+
+    // MARK: The anchor frame
+
+    private func placed(_ offset: Double) -> NotchFootprint {
+        .drawn(DrawnNotchShape(width: 185, height: 32, offset: offset))
+    }
+
+    @Test func theAnchorOfEachFootprintIsTheScreenMovedByTheDrawnOffsetOnly() {
+        #expect(NotchAnchor.frame(screenFrame: laptop, footprint: .hardware(hardware)) == laptop)
+        #expect(NotchAnchor.frame(screenFrame: external, footprint: .pill) == external)
+        #expect(NotchAnchor.frame(screenFrame: external, footprint: placed(0)) == external)
+        #expect(NotchAnchor.frame(screenFrame: external, footprint: placed(200))
+                == CGRect(x: 200, y: 0, width: 1920, height: 1080))
+        #expect(NotchAnchor.frame(screenFrame: external, footprint: placed(-35))
+                == CGRect(x: -35, y: 0, width: 1920, height: 1080))
+    }
+
+    @Test func theAnchorFollowsADisplayAtANegativeOrigin() {
+        let left = CGRect(x: -1920, y: -200, width: 1920, height: 1080)
+        #expect(NotchAnchor.frame(screenFrame: left, footprint: placed(-100))
+                == CGRect(x: -2020, y: -200, width: 1920, height: 1080))
+        let anchor = NotchAnchor.frame(screenFrame: left, footprint: placed(-100))
+        #expect(NotchFootprintRules.bodyRect(placed(-100), screenFrame: anchor, topOffset: 0, wings: nil)
+                == CGRect(x: -1152.5, y: 848, width: 185, height: 32))
+    }
+
+    @Test func anOffsetThatIsNotANumberMovesNothing() {
+        for hostile in [Double.nan, .infinity, -.infinity] {
+            #expect(NotchAnchor.frame(screenFrame: external, footprint: placed(hostile)) == external)
+        }
+    }
+
+    @Test func theBodyHoverClickAndMouseRectanglesAllMoveByTheOffset() {
+        let item = wings(none: false, extra: 58)
+        for offset in [-200.0, 200.0] {
+            let footprint = placed(offset)
+            let anchor = NotchAnchor.frame(screenFrame: external, footprint: footprint)
+            for state in [nil, item] {
+                for drop: CGFloat in [0, 24] {
+                    let centred = NotchFootprintRules.bodyRect(placed(0), screenFrame: external, topOffset: drop, wings: state)
+                    let moved = centred.offsetBy(dx: CGFloat(offset), dy: 0)
+                    #expect(NotchFootprintRules.bodyRect(footprint, screenFrame: anchor, topOffset: drop, wings: state) == moved)
+                    #expect(NotchFootprintRules.hoverZone(footprint, screenFrame: anchor, topOffset: drop, wings: state) == moved)
+                    #expect(NotchFootprintRules.clickZone(footprint, screenFrame: anchor, topOffset: drop, wings: state) == moved)
+                }
+            }
+        }
+    }
+
+    @Test func theMouseIsTakenWhereTheShiftedBodyIsDrawnAndNotAtTheCentre() {
+        // At 200 right the 185 wide body is x 1067.5 to 1252.5.
+        let footprint = placed(200)
+        let anchor = NotchAnchor.frame(screenFrame: external, footprint: footprint)
+        func takes(_ x: CGFloat) -> Bool {
+            NotchFootprintRules.takesMouse(footprint, closed: true, point: CGPoint(x: x, y: 1060), screenFrame: anchor,
+                                           topOffset: 0, wings: nil)
+        }
+        #expect(takes(1160))
+        #expect(takes(1067.5))
+        #expect(takes(1252.5))
+        #expect(!takes(960))
+        #expect(!takes(1067.4))
+        #expect(!takes(1252.6))
+    }
+
+    @Test func atTheClampTheOpenPanelKeepsEightPointsInsideEveryDisplay() {
+        let panel = GlanceTopBar.panelSize(home: false).width
+        let origins: [CGFloat] = [0, -1920]
+        for width: CGFloat in [1280, 1920, 3440] {
+            for originX in origins {
+                let frame = CGRect(x: originX, y: 0, width: width, height: 1080)
+                let none = facts(frame, inset: 0, left: 0, right: 0)
+                for ask in [-400.0, 400.0] {
+                    let footprint = NotchFootprintRules.resolve(none, style: .drawn,
+                                                               shape: DrawnNotchShape(width: 185, height: 32, offset: ask))
+                    let anchor = NotchAnchor.frame(screenFrame: frame, footprint: footprint)
+                    #expect(anchor.midX - panel / 2 >= frame.minX + 8)
+                    #expect(anchor.midX + panel / 2 <= frame.maxX - 8)
+                    // The nearest edge is within one step of the margin, so the clamp is as far as it can go.
+                    let nearest = min(anchor.midX - panel / 2 - frame.minX, frame.maxX - (anchor.midX + panel / 2))
+                    #expect(nearest < 8 + DrawnNotchLimits.offsetStep || abs(anchor.midX - frame.midX) == 400)
+                }
+            }
+        }
+    }
 }

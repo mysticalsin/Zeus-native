@@ -161,4 +161,27 @@ import Testing
         #expect(DrawnNotchAvailability.resolve(targetsWithoutNotch: -3, connectedWithoutNotch: 2) == .notShown)
         #expect(DrawnNotchAvailability.resolve(targetsWithoutNotch: 1, connectedWithoutNotch: -4) == .noDisplay)
     }
+
+    // MARK: Position text
+
+    @Test func thePositionReadsCentreOrADistanceLeftOrRight() {
+        #expect(DrawnNotchLimits.positionText(0) == "Centre")
+        #expect(DrawnNotchLimits.positionText(40) == "40 pt right")
+        #expect(DrawnNotchLimits.positionText(-40) == "40 pt left")
+        #expect(DrawnNotchLimits.positionText(5) == "5 pt right")
+        #expect(DrawnNotchLimits.positionText(-400) == "400 pt left")
+        #expect(DrawnNotchLimits.positionText(400, unit: "points") == "400 points right")
+        #expect(DrawnNotchLimits.positionText(-35, unit: "points") == "35 points left")
+        #expect(DrawnNotchLimits.positionText(0, unit: "points") == "Centre")
+    }
+
+    @Test func thePositionTextReadsTheSnappedValue() {
+        #expect(DrawnNotchLimits.positionText(41) == "40 pt right")
+        #expect(DrawnNotchLimits.positionText(-2) == "Centre")
+        #expect(DrawnNotchLimits.positionText(900) == "400 pt right")
+        #expect(DrawnNotchLimits.positionText(-900) == "400 pt left")
+        for hostile in [Double.nan, .infinity, -.infinity] {
+            #expect(DrawnNotchLimits.positionText(hostile) == "Centre")
+        }
+    }
 }
