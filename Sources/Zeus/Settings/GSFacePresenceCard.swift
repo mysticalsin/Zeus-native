@@ -16,6 +16,8 @@ struct FacePresenceCardModel: Equatable {
     /// Enroll is enabled only while the switch is on and the state is watching, present or away.
     let enrollEnabled: Bool
     let lockAfterLabel: String
+    /// The lock time only matters while Face presence is on; while it is Off the row is dimmed and inert.
+    let lockAfterEnabled: Bool
 
     static let lockAfterChoices = FaceLockAfter.choices.map(\.label)
 
@@ -28,7 +30,8 @@ struct FacePresenceCardModel: Equatable {
             faces: faces.map { FaceRow(id: $0.id, name: $0.name, isEnabled: $0.isEnabled) },
             enrollEnabled: machine.canEnroll,
             // A stored label that is not one of the five reads as the default, as the lock rule does.
-            lockAfterLabel: lockAfterChoices.contains(lockAfterLabel) ? lockAfterLabel : FaceLockAfter.defaultLabel)
+            lockAfterLabel: lockAfterChoices.contains(lockAfterLabel) ? lockAfterLabel : FaceLockAfter.defaultLabel,
+            lockAfterEnabled: machine.state != .off)
     }
 }
 
@@ -53,6 +56,14 @@ struct GSFacePresenceCard: View {
                     .foregroundStyle(GS.text)
                     .accessibilityLabel(model.statusAccessibilityLabel)
             }
+            if let hint = model.status.hint {
+                Text(hint)
+                    .font(OB.font(12.5))
+                    .foregroundStyle(GS.text.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+            }
             ForEach(model.faces) { face in
                 GSDivider()
                 GSRow(symbol: "person.fill", title: face.name) {
@@ -74,7 +85,9 @@ struct GSFacePresenceCard: View {
             GSDivider()
             GSRow(symbol: "timer", title: "Lock after absent for") {
                 GSPopup(selection: $lockAfter, options: FacePresenceCardModel.lockAfterChoices, label: "Lock after absent for")
+                    .disabled(!model.lockAfterEnabled)
             }
+            .opacity(model.lockAfterEnabled ? 1 : 0.5)
         }
     }
 }

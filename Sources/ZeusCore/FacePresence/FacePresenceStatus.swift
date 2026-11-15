@@ -10,6 +10,19 @@ public struct FacePresenceStatus: Equatable, Sendable {
     public let countdown: String?
     /// "Face presence status: Away, 1 minute 42 seconds left".
     public let accessibilityText: String
+    /// Why the state is what it is and what to do about it, for the states a person has to act on. Nil otherwise.
+    public let hint: String?
+
+    public static func hint(for state: FacePresenceMachine.State) -> String? {
+        switch state {
+        case .needsCameraConsent: "Allow the camera for Zeus in System Settings, Privacy and Security, Camera."
+        case .enrolling: "Look at the camera until Zeus has learned your face."
+        case .unavailable(.camera): "Zeus can't use the camera right now. Close other apps that use it, then switch Face presence off and on."
+        case .unavailable(.lock): "This Mac can't be locked by Zeus right now. Switch Face presence off and on to try again."
+        case .unavailable(.vault): "Zeus can't read your saved faces. Switch Face presence off and on, or enroll again."
+        default: nil
+        }
+    }
 
     public static func make(state: FacePresenceMachine.State, lockAfter: Double, uptime: Double) -> FacePresenceStatus {
         switch state {
@@ -17,15 +30,15 @@ public struct FacePresenceStatus: Equatable, Sendable {
             let remaining = max(0, lockAfter - (uptime - since))
             let clock = countdownText(seconds: remaining)
             return FacePresenceStatus(word: "Away \(clock)", symbol: "person.crop.circle.badge.clock", countdown: clock,
-                                      accessibilityText: "Face presence status: Away, \(spokenDuration(seconds: remaining)) left")
-        case .off: return plain("Off", "person.crop.circle")
-        case .needsCameraConsent: return plain("Needs camera", "video.slash")
-        case .enrolling: return plain("Enrolling", "person.crop.circle.badge.plus")
-        case .watching: return plain("Watching", "eye")
-        case .present: return plain("Present", "person.crop.circle.badge.checkmark")
-        case .paused(.lockedByZeus): return plain("Locked", "lock")
-        case .paused: return plain("Paused", "pause.circle")
-        case .unavailable: return plain("Unavailable", "exclamationmark.triangle")
+                                      accessibilityText: "Face presence status: Away, \(spokenDuration(seconds: remaining)) left", hint: nil)
+        case .off: return plain("Off", "person.crop.circle", state)
+        case .needsCameraConsent: return plain("Needs camera", "video.slash", state)
+        case .enrolling: return plain("Enrolling", "person.crop.circle.badge.plus", state)
+        case .watching: return plain("Watching", "eye", state)
+        case .present: return plain("Present", "person.crop.circle.badge.checkmark", state)
+        case .paused(.lockedByZeus): return plain("Locked", "lock", state)
+        case .paused: return plain("Paused", "pause.circle", state)
+        case .unavailable: return plain("Unavailable", "exclamationmark.triangle", state)
         }
     }
 
@@ -50,7 +63,7 @@ public struct FacePresenceStatus: Equatable, Sendable {
         return Int(min(seconds, 86_400).rounded(.up))
     }
 
-    private static func plain(_ word: String, _ symbol: String) -> FacePresenceStatus {
-        FacePresenceStatus(word: word, symbol: symbol, countdown: nil, accessibilityText: "Face presence status: \(word)")
+    private static func plain(_ word: String, _ symbol: String, _ state: FacePresenceMachine.State) -> FacePresenceStatus {
+        FacePresenceStatus(word: word, symbol: symbol, countdown: nil, accessibilityText: "Face presence status: \(word)", hint: hint(for: state))
     }
 }
