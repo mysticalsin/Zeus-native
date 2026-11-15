@@ -2,7 +2,8 @@ import Foundation
 
 /// One explicit state machine for the voice hold keys (talk, dictation, the Polyglot key): docs/VOICE-KEY-MACHINE-PLAN.md.
 /// Pure and without a clock, a timer or a callback. The adapter feeds it keys, the wakes it asked for, an `abandon` when
-/// the owner ends or refuses a turn (naming it), and an `interrupt` for sleep and wake; it runs the effects that come back.
+/// the owner ends or refuses a turn (naming it), a `sweep` for ordinary keys that were let go unseen, and an `interrupt`
+/// for sleep and wake; it runs the effects that come back.
 public struct VoiceKeyMachine: Sendable, Equatable {
     public enum Role: Sendable, Equatable, Hashable { case talk, dictation }
     public enum Mode: Sendable, Equatable, Hashable { case hold, shared, toggle }
@@ -35,6 +36,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         case abandon(turn: Int)
         /// Sleep or wake.
         case interrupt(live: ShortcutModifiers?)
+        /// The ordinary keys the system reports down now, sent before an event while the picture holds any. A key the
+        /// picture holds and the system does not is a key-up nobody saw: it is dropped.
+        case sweep(live: Set<UInt16>)
     }
 
     public enum Effect: Sendable, Equatable {
@@ -153,6 +157,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         switch event {
         case .key(let shortcutEvent, _): keys.apply(shortcutEvent)
         case .interrupt(let live): if let live { keys.resync(to: live) }
+        case .sweep(let live): keys.prune(keysDown: live)
         case .tick, .abandon: break
         }
         self.config = config
@@ -170,6 +175,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         switch event {
         case .abandon(let turn):
             if turn == generation, turnIsOpen { phase = .idle; if !allUp { barred = true } }
+        case .sweep:
+            break
         case .interrupt:
             if turnIsOpen { out.append(.cancel) }
             phase = .idle

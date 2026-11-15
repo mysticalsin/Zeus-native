@@ -33,7 +33,7 @@ import Testing
         @discardableResult mutating func feed(_ event: Machine.Event) -> [Effect] {
             switch event {
             case .key(_, let at), .tick(let at, _): now = at
-            case .abandon, .interrupt: break
+            case .abandon, .interrupt, .sweep: break
             }
             let effects = machine.handle(event, config: config)
             log += effects
@@ -76,6 +76,8 @@ import Testing
         }
         /// The owner ends a turn: the latest one the machine started unless the test names another.
         @discardableResult mutating func abandon(turn: Int? = nil) -> [Effect] { feed(.abandon(turn: turn ?? machine.generation)) }
+        /// The adapter asks the system which ordinary keys are down, and tells the machine.
+        @discardableResult mutating func sweep(live: Set<UInt16> = []) -> [Effect] { feed(.sweep(live: live)) }
         @discardableResult mutating func interrupt(live: ShortcutModifiers? = nil) -> [Effect] {
             feed(.interrupt(live: live ?? mods))
         }
@@ -558,6 +560,47 @@ import Testing
         rig.release(Self.shift, at: 0.75)
         rig.release(Self.cmdR, at: 1)
         #expect(rig.press(Self.cmdR, at: 2) == [.start, .wake(after: 0.25)], "after everything is up the next press acts")
+    }
+
+    // MARK: A key-up nobody saw
+
+    static let tab: UInt16 = 48
+
+    /// Tab out of a username field into a password field: secure input turns on before Tab comes up, so no monitor sees
+    /// the key-up and the picture keeps Tab down.
+    @Test func aKeyWhoseKeyUpWasNeverSeenKillsTheVoiceKeyUntilASweepDropsIt() {
+        var rig = Rig(Self.dictation())
+        rig.type(Self.tab, at: 0)
+        #expect(rig.press(Self.cmdR, at: 1) == [], "Tab reads as a foreign key beside Right Command")
+        rig.release(Self.cmdR, at: 1.5)
+        #expect(rig.machine.barred)
+        #expect(rig.press(Self.cmdR, at: 2) == [], "and it stays dead")
+        rig.release(Self.cmdR, at: 2.5)
+
+        rig.sweep(live: [])
+        #expect(!rig.machine.barred && rig.machine.keys.keysDown.isEmpty, "the system says Tab is up")
+        #expect(rig.press(Self.cmdR, at: 3) == [.start, .wake(after: 0.25)])
+    }
+
+    @Test func aSweepKeepsTheKeysTheSystemStillReportsDown() {
+        var rig = Rig(Self.dictation())
+        rig.type(Self.tab, at: 0)
+        rig.sweep(live: [Self.tab])
+        #expect(rig.press(Self.cmdR, at: 1) == [], "Tab really is held: it stays foreign")
+        #expect(rig.machine.keys.keysDown == [Self.tab])
+    }
+
+    @Test func aSweepReachesAKeyedKeyToo() {
+        let polyglot = Config(key: Shortcut(keyCode: Self.c, modifiers: [.control, .option]), role: .dictation, mode: .toggle)
+        var rig = Rig(polyglot)
+        rig.type(Self.tab, at: 0)
+        rig.press(Self.ctrl, Self.opt, at: 1)
+        #expect(rig.type(Self.c, carrying: [.control, .option], at: 1.1) == [], "a key from before is foreign to a keyed key")
+        rig.untype(Self.c, at: 1.2)
+        rig.release(Self.opt, Self.ctrl, at: 1.3)
+        rig.sweep(live: [])
+        rig.press(Self.ctrl, Self.opt, at: 2)
+        #expect(rig.type(Self.c, carrying: [.control, .option], at: 2.1) == [.start])
     }
 
     @Test func aNewConfirmIsOnlyStoredSoSwitchingTilingOnDoesNotEndAHandsFreeTurn() {

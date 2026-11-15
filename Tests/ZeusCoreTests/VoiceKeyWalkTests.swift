@@ -467,6 +467,9 @@ private struct Sim {
             effects = Self.effects(of: gesture.interrupt(liveModifiers: live), gesture)
         case .abandon:
             effects = []
+        case .sweep(let live):
+            gesture.sweep { $0.intersection(live) }
+            effects = []
         }
         pointing = gesture
         return effects

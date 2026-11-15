@@ -97,6 +97,14 @@ struct PointingHotkeyMonitorTests {
         #expect(log.signals == [.began, .ended])
     }
 
+    @Test func anOrdinaryKeyWhoseKeyUpNoMonitorSawDoesNotKillThePointingKey() {
+        let (monitor, log) = monitor()
+        monitor.keysStillDown = { _ in [] } // the system says Tab is up
+        monitor.feed(.keyDown(keyCode: 48, modifiers: []), at: 0)
+        press(monitor, at: 1)
+        #expect(log.signals == [.began], "\(log.signals)")
+    }
+
     @Test func escapeOutsideAHoldIsReported() {
         let (monitor, log) = monitor()
         monitor.feed(.keyDown(keyCode: 53, modifiers: []), at: 0)

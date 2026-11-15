@@ -369,6 +369,12 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
         if live.isEmpty { spoiled = false }
     }
 
+    /// Forgets the ordinary keys the system no longer reports down: a key-up that no monitor saw (Tab out of a username
+    /// field into a password field turns secure input on before Tab comes up). `keysDown` is otherwise cleared only by a
+    /// key-up, so one such key would read as a foreign key for every voice key until it was pressed and let go again.
+    /// Modifiers are left alone: `resync` takes them from the system.
+    public mutating func prune(keysDown live: Set<UInt16>) { keysDown.formIntersection(live) }
+
     /// `exact`: nothing else may be down (the normal case). Otherwise extra modifiers are allowed,
     /// which the shared hold-to-dictate / double-tap-to-talk key needs.
     public func isHeld(_ shortcut: Shortcut, exact: Bool = true) -> Bool {

@@ -95,6 +95,15 @@ public struct PointingKeyGesture: Sendable, Equatable {
         return tap
     }
 
+    /// Called before a key event: while the picture holds ordinary keys, `stillDown` says which of them the system
+    /// reports down now, and the rest are dropped, so a key whose key-up nobody saw cannot read as a foreign key for ever
+    /// (`ShortcutState.prune`). When that leaves every key up, the wait for a release is over, as `feed` would find.
+    public mutating func sweep(_ stillDown: (Set<UInt16>) -> Set<UInt16>) {
+        guard !state.keysDown.isEmpty else { return }
+        state.prune(keysDown: stillDown(state.keysDown))
+        if KeyFacts(of: state, key: shortcut).allUp { waitForRelease = false }
+    }
+
     /// The confirm has passed. The hold begins if it is still exact; a live picture that no longer holds the key's
     /// modifiers means a release was missed, and nothing begins.
     public mutating func confirmElapsed(at time: TimeInterval, liveModifiers: ShortcutModifiers?) -> Output? {

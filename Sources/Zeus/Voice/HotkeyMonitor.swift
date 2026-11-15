@@ -15,6 +15,12 @@ extension ShortcutModifiers {
     }
 }
 
+/// The hardware's own answer to which of these ordinary keys are down. The hardware state is not the event stream a
+/// secure input field withholds, and a key the tiling tap consumed is still a key that is down.
+func ordinaryKeysDownInTheSystem(_ codes: Set<UInt16>) -> Set<UInt16> {
+    codes.filter { CGEventSource.keyState(.hidSystemState, key: CGKeyCode($0)) }
+}
+
 /// Whether ZEUS may see keys typed in other apps: Accessibility or Input Monitoring.
 @MainActor
 enum KeyListenAccess {
@@ -100,6 +106,9 @@ final class HotkeyMonitor {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
     }
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    /// Of these ordinary keys, the ones the system reports down now. Nil until `start()` asks the keyboard itself, so a
+    /// test that feeds keys with no key-up is not undone by the real keyboard.
+    var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
 
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
@@ -121,6 +130,7 @@ final class HotkeyMonitor {
     }
 
     func start() {
+        if keysStillDown == nil { keysStillDown = ordinaryKeysDownInTheSystem }
         observeConsumedKeys()
         observeSleep()
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
@@ -151,8 +161,14 @@ final class HotkeyMonitor {
 
     // MARK: Entries
 
-    /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests).
-    func feed(_ event: ShortcutEvent) { send(.key(event, at: now())) }
+    /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests). A key-up no
+    /// monitor saw would leave its key in the picture as a foreign key, so while the picture holds any ordinary key the
+    /// system is asked first which of them are still down.
+    func feed(_ event: ShortcutEvent) {
+        let held = machine.keys.keysDown
+        if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
+        send(.key(event, at: now()))
+    }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
     /// names the last turn the owner was given. When the machine has ended that turn itself (the echo of its own `send`

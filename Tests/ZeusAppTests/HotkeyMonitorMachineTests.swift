@@ -217,6 +217,41 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log == ["press", "release", "press", "release"], "the release sends the second turn: \(calls.log)")
     }
 
+    // MARK: A key-up nobody saw
+
+    private let tab: UInt16 = 48
+
+    /// Tab into a password field: secure input turns on before Tab comes up, so the key-up never reaches a monitor.
+    @Test func anOrdinaryKeyWhoseKeyUpNoMonitorSawDoesNotKillTheKey() {
+        let (monitor, calls) = make(key: .rightCommand, role: .dictation)
+        var clock: TimeInterval = 0
+        monitor.now = { clock }
+        monitor.keysStillDown = { _ in [] } // the system says Tab is up
+        monitor.feed(.keyDown(keyCode: tab, modifiers: []))
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(calls.log == ["press"], "the first press of the key acts: \(calls.log)")
+        clock = 1
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        clock = 2
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(calls.log == ["press", "release", "press"], "and so does the next, nothing is stuck: \(calls.log)")
+    }
+
+    @Test func anOrdinaryKeyTheSystemStillReportsDownStaysForeign() {
+        let (monitor, calls) = make(key: .rightCommand, role: .dictation)
+        var clock: TimeInterval = 0
+        monitor.now = { clock }
+        monitor.keysStillDown = { $0 }
+        monitor.feed(.keyDown(keyCode: tab, modifiers: []))
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(calls.log.isEmpty, "Tab is held: a larger chord, not the key: \(calls.log)")
+        monitor.feed(.keyUp(keyCode: tab))
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        clock = 1
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(calls.log == ["press"], "everything was up in between: \(calls.log)")
+    }
+
     // MARK: Time
 
     @Test func aReleaseNoEventReportedEndsTheTurnWithinAMoment() async throws {

@@ -135,6 +135,33 @@ import Testing
         #expect(!state.spoiled)
     }
 
+    private static let tab: UInt16 = 48
+
+    @Test func aKeyDownWithNoKeyUpIsForeignUntilThePictureIsPruned() {
+        var state = ShortcutState()
+        state.apply(.keyDown(keyCode: Self.tab, modifiers: []))
+        state.apply(.flags(keyCode: Self.cmdR, modifiers: .command))
+        var facts = KeyFacts(of: state, key: .rightCommand)
+        #expect(facts.ownDown && facts.foreignKey && !facts.allUp)
+        state.prune(keysDown: [Self.tab])
+        #expect(KeyFacts(of: state, key: .rightCommand).foreignKey, "the system still reports Tab down")
+        state.prune(keysDown: [])
+        facts = KeyFacts(of: state, key: .rightCommand)
+        #expect(facts.ownDown && !facts.foreignKey, "the system says Tab is up")
+        state.apply(.flags(keyCode: Self.cmdR, modifiers: []))
+        #expect(KeyFacts(of: state, key: .rightCommand).allUp)
+    }
+
+    @Test func aPruneLeavesModifiersAndTheKeysStillDownAlone() {
+        var state = ShortcutState()
+        state.apply(ctrl); state.apply(ctrlOpt)
+        state.apply(.keyDown(keyCode: Self.left, modifiers: [.control, .option]))
+        state.apply(.keyDown(keyCode: Self.t, modifiers: [.control, .option]))
+        state.prune(keysDown: [Self.left])
+        #expect(state.keysDown == [Self.left])
+        #expect(state.flagModifiers == [.control, .option] && state.deviceKeys == [Self.ctrlL, Self.optL])
+    }
+
     @Test func theStateIsEquatableAndHashable() {
         var a = ShortcutState(), b = ShortcutState()
         #expect(a == b)

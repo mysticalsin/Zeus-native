@@ -42,6 +42,8 @@ final class PointingHotkeyMonitor {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
     }
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    /// Of these ordinary keys, the ones the system reports down now. Nil until `start()` asks the keyboard itself.
+    var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
     /// How long an exact hold waits before it begins, when the owner sets its own. Nil asks tiling, as the voice keys do.
     var confirmProvider: (() -> TimeInterval)?
     /// Called once when the keyboard cannot be observed (neither Accessibility nor Input Monitoring).
@@ -76,6 +78,7 @@ final class PointingHotkeyMonitor {
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        if keysStillDown == nil { keysStillDown = ordinaryKeysDownInTheSystem }
         observeConsumedKeys()
         KeyListenAccess.whenGranted { [weak self] in self?.startTap() }
     }
@@ -120,6 +123,7 @@ final class PointingHotkeyMonitor {
 
     /// One keyboard event. Also the entry point for tests.
     func feed(_ event: ShortcutEvent, at time: TimeInterval) {
+        if let keysStillDown { gesture.sweep(keysStillDown) }
         let wanted = shortcutProvider()
         if wanted != gesture.shortcut, !gesture.isActive { gesture.shortcut = wanted }
         if !gesture.isActive, !gesture.isArmed {

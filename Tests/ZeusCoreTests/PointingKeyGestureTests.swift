@@ -40,6 +40,25 @@ struct PointingKeyGestureTests {
         #expect(hold(&gesture, at: 2) == .began)
     }
 
+    /// Tab into a password field: its key-up never reaches the tap, so the picture keeps Tab down.
+    @Test func aKeyWhoseKeyUpWasNeverSeenBlocksTheHoldUntilASweepDropsIt() {
+        var gesture = PointingKeyGesture()
+        _ = gesture.feed(.keyDown(keyCode: 48, modifiers: []), at: 0)
+        #expect(hold(&gesture, at: 1) == nil, "Tab reads as a foreign key")
+        _ = gesture.feed(.flags(keyCode: 58, modifiers: [.control]), at: 1.5)
+        _ = gesture.feed(.flags(keyCode: 59, modifiers: []), at: 1.6)
+        gesture.sweep { _ in [] }
+        #expect(hold(&gesture, at: 2) == .began, "the system says Tab is up")
+    }
+
+    @Test func aSweepKeepsAKeyTheSystemStillReportsDown() {
+        var gesture = PointingKeyGesture()
+        _ = gesture.feed(.keyDown(keyCode: 48, modifiers: []), at: 0)
+        gesture.sweep { $0 }
+        #expect(hold(&gesture, at: 1) == nil)
+        #expect(!gesture.isActive)
+    }
+
     @Test func commandJoiningCancels() {
         var gesture = PointingKeyGesture()
         _ = hold(&gesture)
