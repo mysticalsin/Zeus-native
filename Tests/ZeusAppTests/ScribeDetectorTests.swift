@@ -244,6 +244,30 @@ struct ScribeDetectorTests {
         #expect(harness.scheduler.delay == nil)
     }
 
+    @Test func aScanThatNeverReturnsIsGivenUpOnAndTheNextWakeScansAgain() async {
+        let harness = Harness()
+        harness.watcher.follow()
+        await harness.settle()
+        #expect(harness.scans == 1)
+        // The probe hangs. The watcher bounds the scan through its scheduler instead of waiting forever.
+        #expect(harness.scheduler.delay != nil, "a scan in flight has a deadline")
+        harness.scheduler.wakeUp()
+        await harness.settle()
+        #expect(harness.ingested.count == 1, "the gave-up scan ends as an empty reading")
+        #expect(harness.ingested.first?.calls == 0)
+        #expect(harness.scheduler.delay != nil, "the plan sets the next wake")
+
+        // The hung probe answers late: that reading belongs to a scan already given up and is dropped.
+        harness.calls = [ScribeDetectedCall(app: .zoom, pid: nil)]
+        await harness.finishScan()
+        #expect(harness.ingested.count == 1)
+
+        harness.scheduler.wakeUp()
+        await harness.settle()
+        #expect(harness.scans == 2, "the gate is free again, so the next wake scans")
+        await harness.finishScan()
+    }
+
     @Test func aStoppedDetectorIgnoresEveryWake() async {
         let harness = Harness()
         harness.watcher.follow()
