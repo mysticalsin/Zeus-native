@@ -155,6 +155,22 @@ enum SnapshotRenderer {
                  size: wide ? CGSize(width: 1000, height: 120) : CGSize(width: 960, height: tall ? 520 : 400),
                  to: directory.appendingPathComponent("topbar-\(name).png"))
         }
+        // The owner's notch (220 x 38) with long cue text: the gap between the wings is exactly the notch.
+        let ownerNotch = CGSize(width: 220, height: 38)
+        let longTrack = NotchCue.trackChanged(title: "An Extremely Long Song Title That Keeps Going", artist: "An Artist With A Rather Long Name",
+                                              source: .player(.music), sourceChanged: true)
+        let wideCues: [(String, NotchCue)] = [
+            ("hint", .hint("Turn on Accessibility in System Settings so Zeus can read the focused field and insert text")),
+            ("track", longTrack),
+            ("copied", .copied("The quick brown fox jumps over the lazy dog and keeps running across the field")),
+            ("permission", .permission("Camera access is off. Turn it on to use face presence", pane: "Privacy_Camera")),
+        ]
+        for (name, cue) in wideCues {
+            let model = NotchModel(), topBar = TopBarModel()
+            topBar.setCueForSnapshot(cue)
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(ownerNotch)), size: CGSize(width: 960, height: 400),
+                 to: directory.appendingPathComponent("topbar-wide-notch-\(name).png"))
+        }
         // Alerts page: nothing to show.
         saveSurface(ZStack { Theme.storm; AlertsAllClear() }.environment(\.colorScheme, .dark), size: CGSize(width: 480, height: 236), name: "alerts-page-empty")
         // The meeting card in every state, with synthetic meetings.
