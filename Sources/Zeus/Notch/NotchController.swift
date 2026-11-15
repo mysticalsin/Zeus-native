@@ -157,7 +157,26 @@ final class NotchController {
         model.alerts.setSuspended(presentation != .closed, now: now())
         alertsChanged()
         if opening { NotchHaptics.open() }
+        updatePanelWatch()
         onPresentationChange(presentation)
+    }
+
+    /// While the panel is open the pointer is also checked five times a second. Global mouse monitors go quiet
+    /// when macOS withholds input access from Zeus, and the panel then never saw the pointer leave. The check is
+    /// the same `mouseMoved()` the monitors call, so it closes with the owner's delay and respects a pin.
+    private var panelWatch: Timer?
+    private func updatePanelWatch() {
+        guard model.presentation == .panel else {
+            panelWatch?.invalidate()
+            panelWatch = nil
+            return
+        }
+        guard panelWatch == nil else { return }
+        let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.mouseMoved() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        panelWatch = timer
     }
 
     /// Told every time the notch changes shape (the buddy hides over the open panel).
