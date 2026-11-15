@@ -35,6 +35,48 @@ private struct GSPageSnapshot: View {
     }
 }
 
+/// The per-app sound card alone, on the Settings panel colour and at the page's content width, so a render shows
+/// the card without the rest of the Sounds page. Fixtures only: the card never starts the controller in a snapshot.
+private struct EqualiserCardStage: View {
+    let isOn: Bool
+    var openID: String? = nil
+    var fixture: EqualiserStatus? = nil
+    var body: some View {
+        GSEqualiserCard(controller: nil, isOn: .constant(isOn), openID: openID, fixture: fixture)
+            .padding(.leading, GS.pagePadding)
+            .padding(.trailing, 28)
+            .padding(.vertical, 24)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(GS.panel)
+    }
+}
+
+/// Fixed rows for the equaliser card renders: every row kind the card can show.
+private enum EqualiserCardFixtures {
+    static func settings(_ id: String, _ name: String, _ gains: [Double] = [Double](repeating: 0, count: 10),
+                         volume: Double = 1, shapes: Bool = true) -> AppSoundSettings {
+        AppSoundSettings(bundleID: id, displayName: name, gainsDB: gains, volume: volume, shapes: shapes,
+                         lastUsed: Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
+    /// A playing app that is not shaped, a call app, shared web audio, an app on another output and a quiet saved app.
+    static let mixed = EqualiserStatus(
+        line: "Paused while a call app uses the microphone.", symbol: "pause.circle",
+        rows: [
+            EqualiserRow(settings: settings("com.apple.Safari", "Safari", shapes: false), isPlaying: true),
+            EqualiserRow(settings: settings("us.zoom.xos", "Zoom"), isPlaying: true,
+                         exclusion: .callApp, exclusionLabel: EqualiserExclusion.callApp.label),
+            EqualiserRow(settings: settings("com.apple.WebKit.GPU", "Web content"), isPlaying: true,
+                         exclusion: .sharedEngine, exclusionLabel: EqualiserExclusion.sharedEngine.label),
+            EqualiserRow(settings: settings("com.spotify.client", "Spotify"), isPlaying: true,
+                         exclusion: .otherDevice, exclusionLabel: EqualiserExclusion.otherDevice.label),
+            EqualiserRow(settings: settings("com.apple.TV", "TV", [0, 0, 0, 0, 0, 1, 2, 4, 5, 6], volume: 0.4), isPlaying: false),
+        ])
+
+    static let off = EqualiserStatus(
+        line: EqualiserStatusText.line(for: .off), symbol: EqualiserStatusText.symbol(for: .off), rows: [])
+}
+
 /// `Zeus --snapshots <dir>` renders every notch and spark state to PNG and quits.
 /// Used to review the look without Screen Recording permission or a live demo.
 @MainActor
@@ -294,6 +336,13 @@ enum SnapshotRenderer {
             saveSurface(PermissionSnapshotView(name: title, symbol: sym), size: CGSize(width: 420, height: 160), name: permName)
         }
         saveSurface(DragHelperView(), size: CGSize(width: 260, height: 160), name: "drag-helper")
+
+        // The per-app sound card: collapsed, one row opened, every row kind, and switched off.
+        saveSurface(EqualiserCardStage(isOn: true), size: CGSize(width: 845, height: 340), name: "eq-card-collapsed")
+        saveSurface(EqualiserCardStage(isOn: true, openID: "com.apple.Music"), size: CGSize(width: 845, height: 640), name: "eq-card-open")
+        saveSurface(EqualiserCardStage(isOn: true, openID: "com.apple.TV", fixture: EqualiserCardFixtures.mixed),
+                    size: CGSize(width: 845, height: 900), name: "eq-card-mixed")
+        saveSurface(EqualiserCardStage(isOn: false, fixture: EqualiserCardFixtures.off), size: CGSize(width: 845, height: 230), name: "eq-card-off")
 
         for section in GSSection.allCases where section.isShown {
             gsNav.section = section
