@@ -127,8 +127,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
     private var allUp: Bool { keys.flagModifiers.isEmpty && keys.keysDown.isEmpty }
 
-    /// A turn is open: its microphone is on or its text is waiting for the gap, hands-free included.
-    private var turnIsOpen: Bool {
+    /// A turn is open: its microphone is on or its text is waiting for the gap, hands-free included. Read by the search.
+    var turnIsOpen: Bool {
         switch phase {
         case .holding, .latched: true
         case .tapped(_, let open): open

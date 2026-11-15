@@ -22,6 +22,14 @@ import Testing
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
 //
+// What the adapter does around the machine is part of the search. A timer may be late: `waitLate` lets a due wake wait
+// for the next event, so a key can reach the machine before the tick that was due ahead of it (`settle`), and the checker
+// reads the effects that timer owes on the keyboard as it was. A config change reaches the machine with the next event of
+// any kind (`flipQuiet`), a key. An ordinary key may come up with no event at all (`missUp`), and the adapter's sweep
+// asks which ordinary keys are really down before each key event. After a `send` or `cancel` the owner stops listening and
+// says so, as an `abandon` naming its turn; the owner may also refuse a turn it was asked to start (`refusing`). The
+// machine's own count of open turns must agree with the rules after every step.
+//
 // Run H walks `PointingKeyGesture` under the same checker. The harness stands in for the monitor: an armed hold asks
 // for one wake after its confirm, an active hold for the watchdog every 0.25 s, and each wake reaches the gesture as the
 // call the monitor makes (`confirmElapsed` or `tick`) with the modifiers that are really down. Began is a start; ended
@@ -54,6 +62,13 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let configs: [VoiceKeyMachine.Config]
     /// The key is read by `PointingKeyGesture`, not by the voice key machine.
     let pointing: Bool
+    /// What the adapter and the owner may do besides pressing keys, each added only where a run's rules read it (every one
+    /// multiplies the states): a due timer may run after the next key event; a config change may ride on the next event;
+    /// an ordinary key may come up with no event; the owner may refuse the turns it is asked to start.
+    let late: Bool
+    let quietFlip: Bool
+    let missed: Bool
+    let refusal: Bool
 
     let ownMask: UInt16
     let shiftMask: UInt16
@@ -61,9 +76,14 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 
     var testDescription: String { name }
 
-    init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false) {
+    init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false,
+         late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false) {
         self.name = name
         self.pointing = pointing
+        self.late = late && !pointing
+        self.quietFlip = quietFlip
+        self.missed = missed
+        self.refusal = refusal && !pointing
         self.keys = keys
         self.ownCodes = own
         self.configs = configs
@@ -88,13 +108,13 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         Config(key: key, role: role, mode: .hold, confirm: confirm)
     }
 
-    /// The ten runs of the plan.
+    /// The ten runs of the plan, and a run that lets config changes ride on key events.
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0.15)]),
+                configs: [hold(.talk, .controlOption, confirm: 0.15)], late: true),
         WalkRun("A0 talk hold Control-Option confirm 0", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0)]),
+                configs: [hold(.talk, .controlOption, confirm: 0)], late: true, refusal: true),
         // B: shipped dictation, with Left Command as a sixth key and a config that flips hold, toggle and off.
         WalkRun("B dictation Right Command hold toggle off", keys: rightCommandKeys + [.leftCommand], own: [54],
                 configs: [hold(.dictation, .rightCommand, confirm: 0.15),
@@ -103,20 +123,27 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         WalkRun("C dictation hold Control-Option confirm 0.15", keys: basic, own: controlOption,
                 configs: [hold(.dictation, .controlOption, confirm: 0.15)]),
         WalkRun("D dictation shared Control-Option", keys: basic, own: controlOption,
-                configs: [Config(key: .controlOption, role: .dictation, mode: .shared)]),
+                configs: [Config(key: .controlOption, role: .dictation, mode: .shared)], late: true),
         WalkRun("E talk shared Control-Option", keys: basic, own: controlOption,
-                configs: [Config(key: .controlOption, role: .talk, mode: .shared)]),
+                configs: [Config(key: .controlOption, role: .talk, mode: .shared)], late: true),
         WalkRun("F dictation toggle Right Command", keys: rightCommandKeys, own: [54],
-                configs: [Config(key: .rightCommand, role: .dictation, mode: .toggle)]),
+                configs: [Config(key: .rightCommand, role: .dictation, mode: .toggle)], missed: true),
         // G: the shipped Polyglot key, Control-Option-T, with T in place of the arrow.
-        WalkRun("G toggle Control-Option-T", keys: [.control, .option, .leftCommand, .shift, .letterT], own: [59, 58, 17],
-                configs: [Config(key: Shortcut(keyCode: 17, modifiers: [.control, .option]), role: .dictation, mode: .toggle)]),
+        WalkRun("G toggle Control-Option-T", keys: [.control, .option, .leftCommand, .shift, .letterT, .leftArrow], own: [59, 58, 17],
+                configs: [Config(key: Shortcut(keyCode: 17, modifiers: [.control, .option]), role: .dictation, mode: .toggle)],
+                missed: true),
         // H: shipped pointing, Control-Option, with the confirm. The config only carries the key and the confirm.
         WalkRun("H pointing Control-Option confirm 0.15", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0.15)], pointing: true),
+                configs: [hold(.talk, .controlOption, confirm: 0.15)], pointing: true, missed: true),
         // I: talk on Fn, the Globe key in place of Command.
         WalkRun("I talk hold Fn", keys: [.control, .option, .globe, .shift, .leftArrow], own: [63],
-                configs: [hold(.talk, .function, confirm: 0)]),
+                configs: [hold(.talk, .function, confirm: 0)], late: true, missed: true),
+        // J: shipped dictation again with its config changes riding on key events. Run B delivers its flips on ticks of their own, so it cannot see a press that is both.
+        WalkRun("J dictation Right Command hold toggle off, changes ride on events",
+                keys: [.control, .rightCommand, .shift, .leftArrow], own: [54],
+                configs: [hold(.dictation, .rightCommand, confirm: 0.15),
+                          Config(key: .rightCommand, role: .dictation, mode: .toggle),
+                          Config(key: nil, role: .dictation, mode: .hold)], quietFlip: true),
     ]
 }
 
@@ -155,6 +182,9 @@ private enum Move: Hashable {
     /// A key goes down or up and its event reaches the machine at once; `toggleHeld`: the event of a modifier key or an
     /// unconsumed key waits for the next forwarded key.
     case toggle(Int), toggleHeld(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
+    /// Time passes and a due timer waits for the next event. A config change that waits for the next event. An ordinary
+    /// key comes up and no monitor hears. The owner starts or stops refusing the turns it is asked to start.
+    case waitLate, flipQuiet, missUp(Int), refusing
 
     func text(_ run: WalkRun) -> String {
         switch self {
@@ -166,11 +196,15 @@ private enum Move: Hashable {
         case .abandon: "abandon"
         case .interrupt: "interrupt"
         case .flip: "flip"
+        case .waitLate: "wait 0.05 (timers late)"
+        case .flipQuiet: "flip (rides on the next event)"
+        case .missUp(let index): run.keys[index].name + " up (no event)"
+        case .refusing: "owner refuses turns"
         }
     }
 }
 
-private enum Kind { case key, tick, deliver, abandon, interrupt, flip }
+private enum Kind { case key, tick, deliver, abandon, interrupt, flip, sweep, echo }
 
 /// What the keys physically down say, for one run.
 private struct Phys {
@@ -233,6 +267,7 @@ private struct StateKey: Hashable {
     var barred: Bool
     var phase: VoiceKeyMachine.Phase
     var pointing: PointingNorm?
+    var refusing: Bool
     var checker: Checker
 }
 
@@ -293,6 +328,10 @@ private struct Sim {
     var cfg = 0
     var matcher = TileKeyMatcher()
     var checker = Checker()
+    /// The owner refuses every turn it is asked to start.
+    var refusing = false
+    /// How many `start` effects the rules have seen. Not part of the key: the open turn is always the latest.
+    var startCount = 0
 
     // Not part of the key: what the last move did.
     var edge = Edge()
@@ -309,11 +348,11 @@ private struct Sim {
     }
 
     func key(_ run: WalkRun) -> StateKey {
-        StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { $0 - step }.sorted(), cfg: cfg,
+        StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { max($0 - step, -2) }.sorted(), cfg: cfg,
                  config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
                  keysDown: machine.keys.keysDown, spoiled: machine.keys.spoiled, barred: machine.barred,
                  phase: machine.normalizedPhase(at: now), pointing: pointing.map { PointingNorm($0, now: now) },
-                 checker: checker)
+                 refusing: refusing, checker: checker)
     }
 
     func liveModifiers(_ run: WalkRun) -> ShortcutModifiers {
@@ -333,8 +372,20 @@ private struct Sim {
         // Time does not pass while an event is held back: it is a matter of one turn of the run loop.
         if held == nil { out.append(.wait) } else { out.append(.deliver) }
         if pointing == nil { out.append(.abandon) }
-        if run.configs.count > 1 { out.append(.flip) }
+        // A tick of its own is time passing, which it does not while an event is held back.
+        if run.configs.count > 1, held == nil { out.append(.flip) }
         if held == nil, down & run.ordinaryMask == 0 { out.append(.interrupt) }
+        // A due timer may wait for the next event, for up to one step past its time.
+        if run.late, held == nil, !wakes.isEmpty, wakes.allSatisfy({ step - $0 < 1 }) { out.append(.waitLate) }
+        if run.quietFlip, run.configs.count > 1 { out.append(.flipQuiet) }
+        if run.refusal { out.append(.refusing) }
+        if run.missed, held == nil {
+            // An own key whose key-up is lost is pressed again before anything can tell, so only foreign keys go missing.
+            for index in run.keys.indices where run.keys[index].flag == nil && run.ownMask & (UInt16(1) << UInt16(index)) == 0 {
+                let bit = UInt16(1) << UInt16(index)
+                if down & bit != 0, seen & bit != 0, consumed & bit == 0 { out.append(.missUp(index)) }
+            }
+        }
         return out
     }
 
@@ -353,24 +404,34 @@ private struct Sim {
         case .waitHalfSecond: for _ in 0..<10 { advance(run) }
         case .deliver: flushHeld(run)
         case .abandon: feed(.abandon(turn: machine.generation), .abandon, run)
-        case .interrupt: feed(.interrupt(live: liveModifiers(run)), .interrupt, run)
+        case .interrupt:
+            // The resync takes the system's modifiers and forgets ordinary keys; the walk lets go of them first.
+            seen &= ~run.ordinaryMask
+            seenChanged(run)
+            feed(.interrupt(live: liveModifiers(run)), .interrupt, run)
         case .flip:
             cfg = (cfg + 1) % run.configs.count
             feed(.tick(at: now, live: liveModifiers(run)), .flip, run)
+        case .waitLate: advance(run, deliver: false)
+        case .flipQuiet: cfg = (cfg + 1) % run.configs.count
+        case .missUp(let index): missUp(index, run)
+        case .refusing: refusing.toggle()
         }
         if !checker.ownWasDown { checker.pressForeign = false }
     }
 
-    private mutating func flushHeld(_ run: WalkRun) {
+    /// A held event reaches the machine. `drain`: the timers that are due run after it. They do not when the flush is
+    /// part of the next key's arrival: no time passes between the two, and the physical keys are already ahead.
+    private mutating func flushHeld(_ run: WalkRun, drain: Bool = true) {
         guard let event = held?.event else { return }
         let (index, pressed) = (Int(held?.index ?? 0), held?.pressed ?? false)
         held = nil
-        feed(.key(event, at: now), .deliver, run, key: (index, pressed))
+        feed(.key(event, at: now), .deliver, run, key: (index, pressed), drain: drain)
     }
 
     /// One monitor event reaches the machine, behind the one held back before it, or is held back itself.
     private mutating func monitor(_ event: ShortcutEvent, index: Int, pressed: Bool, hold: Bool, _ run: WalkRun) {
-        flushHeld(run)
+        flushHeld(run, drain: false)
         if hold { held = Held(event, index: index, pressed: pressed) }
         else { feed(.key(event, at: now), .key, run, key: (index, pressed)) }
     }
@@ -400,11 +461,20 @@ private struct Sim {
         }
     }
 
-    private mutating func advance(_ run: WalkRun) {
+    private mutating func advance(_ run: WalkRun, deliver: Bool = true) {
         step += 1
-        let confirmSteps = Int((run.configs[cfg].confirm / 0.05).rounded())
+        // The press ages under the confirm the machine knows; a config change that has not reached it yet changes nothing.
+        let confirmSteps = Int(((machine.config ?? run.configs[cfg]).confirm / 0.05).rounded())
         if checker.ownWasDown, confirmSteps > 0 { checker.pressAge = min(checker.pressAge + 1, confirmSteps) }
-        drainWakes(run)
+        if deliver { drainWakes(run) }
+    }
+
+    /// An ordinary key comes up and no monitor hears it. The tiling matcher, which watches every event, does.
+    private mutating func missUp(_ index: Int, _ run: WalkRun) {
+        let bit = UInt16(1) << UInt16(index)
+        down &= ~bit
+        let tile = TileKeyEvent(phase: .up, keyCode: run.keys[index].code, modifiers: liveModifiers(run))
+        _ = matcher.decide(tile, keymap: Self.keymap, gate: Self.gate)
     }
 
     /// Delivers every tick that is due, as the adapter would: each with the modifiers that are really down.
@@ -417,16 +487,16 @@ private struct Sim {
         }
     }
 
-    private mutating func feed(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)? = nil) {
+    private mutating func feed(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)? = nil,
+                               drain: Bool = true) {
+        if key != nil { sweepStale(run) }
         edge = Edge()
-        if let (index, pressed) = key {
-            let bit = UInt16(1) << UInt16(index)
-            if pressed { seen |= bit } else { seen &= ~bit }
-            seenChanged(run)
-        }
+        let seenBefore = seen
         let config = run.configs[cfg]
+        let configChange = changesConfig(config)
         let wasLatched = machine.isLatched
         let before = stage
+        let owed = key != nil && !configChange ? overdueEffects(config) : []
         let effects = handle(event, config: config)
         log += effects
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
@@ -435,8 +505,93 @@ private struct Sim {
         for effect in effects {
             if case .wake(let after) = effect { wakes.insert(step + Int((after / 0.05).rounded())) }
         }
-        check(effects, wasLatched: wasLatched, kind: kind, config: config, run)
-        if kind != .tick { drainWakes(run) }
+        if owed.isEmpty {
+            noteKey(key, run)
+            checkEffects(effects, wasLatched: wasLatched, kind: kind, config: config, configChange: configChange,
+                         seenBefore: seenBefore, run)
+        } else {
+            // A timer that was due before the key acts first, and its effects are read on the keyboard as it was.
+            let timer = Array(effects.prefix(owed.count))
+            if timer != owed { found.append("an overdue timer did not act before the key that came after it: \(effects)") }
+            checkEffects(timer, wasLatched: wasLatched, kind: .tick, config: config, configChange: false, seenBefore: seenBefore, run)
+            noteKey(key, run)
+            checkEffects(Array(effects.dropFirst(owed.count)), wasLatched: false, kind: kind, config: config, configChange: false,
+                         seenBefore: seenBefore, run)
+        }
+        if case .abandon(let turn) = event, checker.turnOpen, turn == startCount { checker.turnOpen = false }
+        checkEnd(wasLatched: wasLatched, seenBefore: seenBefore, key: key, config: config, run)
+        runOwner(effects, config: config, run)
+        if drain, held == nil, kind != .tick, kind != .sweep, kind != .echo { drainWakes(run) }
+    }
+
+    /// The keys the machine has just been told about.
+    private mutating func noteKey(_ key: (Int, Bool)?, _ run: WalkRun) {
+        guard let (index, pressed) = key else { return }
+        let bit = UInt16(1) << UInt16(index)
+        if pressed { seen |= bit } else { seen &= ~bit }
+        seenChanged(run)
+    }
+
+    /// The config differs from the one the machine last saw in what it reads (`VoiceKeyMachine.differs`).
+    fileprivate func changesConfig(_ config: VoiceKeyMachine.Config) -> Bool {
+        guard let old = machine.config else { return false }
+        return old.key != config.key || old.mode != config.mode || old.voiceOverHoldsKey != config.voiceOverHoldsKey
+    }
+
+    /// What the machine owes a timer that came due before the key that is arriving now (rows 5 and 17): the adapter has
+    /// not delivered the tick yet, and the machine must not let the key change what the timer decides. Read from the
+    /// phase and the times of the table, not from the wakes the machine asked for.
+    private func overdueEffects(_ config: VoiceKeyMachine.Config) -> [VoiceKeyMachine.Effect] {
+        guard pointing == nil, config.key != nil else { return [] }
+        let slack = 0.001
+        switch machine.phase {
+        case .tapped(let at, true):
+            return now - at >= (config.mode == .hold ? 0.4 : 0.35) - slack ? [.send] : []
+        case .armed(let since, let press):
+            let delay: TimeInterval?
+            switch config.mode {
+            case .hold: delay = config.confirm
+            case .shared: delay = config.role == .dictation ? 0.25 : nil
+            case .toggle: delay = nil
+            }
+            guard let delay, now - since >= delay - slack else { return [] }
+            return press == .ending ? [.send] : [.start, .wake(after: 0.25)]
+        default:
+            return []
+        }
+    }
+
+    /// The adapter asks the system which ordinary keys are down before a key event, while the picture holds any, and the
+    /// machine drops the others. The rules follow: a key the system says is up is up.
+    private mutating func sweepStale(_ run: WalkRun) {
+        let held = pointing?.state.keysDown ?? machine.keys.keysDown
+        guard !held.isEmpty else { return }
+        var live: Set<UInt16> = []
+        var stale: UInt16 = 0
+        for (index, key) in run.keys.enumerated() where key.flag == nil {
+            let bit = UInt16(1) << UInt16(index)
+            if down & bit != 0 { live.insert(key.code) } else if seen & bit != 0 { stale |= bit }
+        }
+        if stale != 0 { seen &= ~stale; seenChanged(run) }
+        feed(.sweep(live: live), .sweep, run)
+    }
+
+    /// What the owner does with the effects of one call, in order: it stops listening when a turn is sent or cancelled
+    /// and says so, naming its turn, and it may refuse a turn it is asked to start.
+    private mutating func runOwner(_ effects: [VoiceKeyMachine.Effect], config: VoiceKeyMachine.Config, _ run: WalkRun) {
+        guard pointing == nil else { return }
+        var owner = startCount - effects.filter { $0 == .start }.count
+        for effect in effects {
+            switch effect {
+            case .start:
+                owner += 1
+                if refusing, config.mode != .toggle { feed(.abandon(turn: owner), .echo, run) }
+            case .send, .cancel:
+                feed(.abandon(turn: owner), .echo, run)
+            case .refused, .wake:
+                break
+            }
+        }
     }
 
     /// The phase of the machine, or for run H whether the gesture is idle, armed or active.
@@ -513,14 +668,15 @@ private struct Sim {
         checker.ownWasDown = phys.ownAll
     }
 
-    private mutating func check(_ effects: [VoiceKeyMachine.Effect], wasLatched: Bool, kind: Kind,
-                                config: VoiceKeyMachine.Config, _ run: WalkRun) {
+    private mutating func checkEffects(_ effects: [VoiceKeyMachine.Effect], wasLatched: Bool, kind: Kind,
+                                       config: VoiceKeyMachine.Config, configChange: Bool, seenBefore: UInt16, _ run: WalkRun) {
         let phys = Phys(seen, run)
         let dictation = config.role == .dictation
         let confirmSteps = Int((config.confirm / 0.05).rounded())
         for effect in effects {
             switch effect {
             case .start:
+                startCount += 1
                 if run.pointing, confirmSteps > 0, checker.pressAge < confirmSteps || checker.pressForeign {
                     found.append("a pointing hold began before its own set had been down alone for the confirm")
                 }
@@ -557,15 +713,32 @@ private struct Sim {
                 checker.turnOpen = false
             case .cancel:
                 if !checker.turnOpen { found.append("I4: cancel without an open turn") }
-                if wasLatched, kind != .interrupt, kind != .flip, kind != .abandon {
+                if wasLatched, kind != .interrupt, kind != .flip, kind != .abandon, !configChange {
                     found.append("I1: a hands-free turn was cancelled by typing or a larger chord")
                 }
                 checker.turnOpen = false
-                checker.cancelled = phys.anyDown
+                // A change of config bars the keys that were down before the call; the press that reveals it is new.
+                checker.cancelled = phys.anyDown && (!configChange || seenBefore != 0)
             case .refused, .wake: break
             }
         }
-        if kind == .abandon { checker.turnOpen = false }
+    }
+
+    /// The rules that read the machine as it stands after a whole call.
+    private mutating func checkEnd(wasLatched: Bool, seenBefore: UInt16, key: (Int, Bool)?, config: VoiceKeyMachine.Config,
+                                   _ run: WalkRun) {
+        if pointing == nil {
+            if machine.generation != startCount {
+                found.append("the machine counted \(machine.generation) starts and the rules saw \(startCount)")
+            }
+            if machine.turnIsOpen != checker.turnOpen {
+                found.append("I4: the machine says a turn is \(machine.turnIsOpen ? "open" : "closed"), the rules say \(checker.turnOpen ? "open" : "closed")")
+            }
+            // A press that comes down from a keyboard with everything up is never barred, whatever else the call did.
+            if key?.1 == true, seenBefore == 0, config.key != nil, Phys(seen, run).exactOwn, machine.barred {
+                found.append("I8: a press from every key up found the machine barred")
+            }
+        }
         if machine.isLatched {
             if !checker.turnOpen { found.append("I4: hands-free with no open turn") }
             if !wasLatched, checker.foreign || checker.shiftSeen {
@@ -625,7 +798,9 @@ private func restCheck(_ sim: Sim, _ run: WalkRun) -> [String] {
             let steps = config.mode == .shared ? 7 : Int((config.confirm / 0.05).rounded()) + 2
             for _ in 0..<steps { sim.apply(.wait, run) }
         }
-        let acted: Bool = wasLatched ? sim.log.contains(.send) : sim.log.contains(.start)
+        // A config change that is waiting for this press ends a hands-free turn by cancelling it, then the press acts.
+        let changing = base.changesConfig(config)
+        let acted: Bool = wasLatched ? sim.log.contains(.send) || (changing && sim.log.contains(.cancel)) : sim.log.contains(.start)
         if !acted {
             let names = order.map { run.keys[$0].name }.joined(separator: ", ")
             out.append("I8: after letting go of everything and waiting 0.5 s, pressing \(names) did not act (latched \(wasLatched))")
