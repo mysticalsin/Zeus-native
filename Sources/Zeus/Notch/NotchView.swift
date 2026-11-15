@@ -271,11 +271,10 @@ struct NotchView: View {
                     : status.color
                 ZStack(alignment: .top) {
                     shape
-                        // Always the same black fill with Glance's open gradient over it: switching the
-                        // fill between two style types cross-fades a new layer in at the final size
-                        // instead of growing the body.
+                        // Pitch black, closed and open, so the body reads as part of the hardware notch and
+                        // only Zeus's own marks show on it. One fill type, so opening grows the body instead of
+                        // cross-fading a new layer in.
                         .fill(Color.black)
-                        .overlay { shape.fill(Glass.notchPanelFill).opacity(glanceOpen ? 1 : 0) }
                         // Glance's soft drop shadow under the open body (parity/N4: alpha 0.19 at 2 pt
                         // below, 0.10 at 15 pt, gone by 50 pt; weaker at the sides).
                         .shadow(color: .black.opacity(glanceOpen ? Glass.notchShadow.opacity : 0),
