@@ -164,8 +164,12 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
 
 public enum ScribeAutoStartState: Equatable, Sendable {
     case idle
-    /// A meeting was seen; waiting for the debounce before showing anything.
-    case armed(meeting: ScribeMeeting, since: TimeInterval)
+    /// A calendar meeting starts within two minutes and nothing else is going on: the heads-up card is up until
+    /// `deadline`. Leaving on its own is not an answer.
+    case upcoming(meeting: ScribeMeeting, deadline: TimeInterval)
+    /// A meeting was seen; waiting for the debounce before showing anything. A heads-up that was up when the
+    /// meeting began stays on screen until `offerUntil`, so the card does not blink out during the check.
+    case armed(meeting: ScribeMeeting, since: TimeInterval, offerUntil: TimeInterval? = nil)
     /// The offer is up. `blocked` is what stops an automatic start, so the card can say why.
     case prompting(meeting: ScribeMeeting, deadline: TimeInterval, blocked: ScribeAutoStartBlock?)
     /// "Start automatically": the countdown card is up with a Cancel button.
@@ -184,7 +188,8 @@ public enum ScribeAutoStartState: Equatable, Sendable {
     public var logName: String {
         switch self {
         case .idle: return "idle"
-        case .armed(let meeting, _): return "armed \(meeting.key)"
+        case .upcoming(let meeting, _): return "heads-up \(meeting.key)"
+        case .armed(let meeting, _, _): return "armed \(meeting.key)"
         case .prompting(let meeting, _, _): return "offer \(meeting.key)"
         case .countingDown(let meeting, _): return "countdown \(meeting.key)"
         case .held(let meeting, _): return "waiting \(meeting.key)"
@@ -278,8 +283,12 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     /// What is on screen. The card is a pure view of the state: nothing else decides it.
     public func card(now: TimeInterval) -> ScribeMeetingCard {
         switch state {
-        case .idle, .armed:
+        case .idle:
             return .hidden
+        case .armed(let meeting, _, let offerUntil):
+            return offerUntil == nil ? .hidden : .offer(meeting, blocked: nil)
+        case .upcoming(let meeting, _):
+            return .offer(meeting, blocked: nil)
         case .prompting(let meeting, _, let blocked):
             return .offer(meeting, blocked: blocked)
         case .countingDown(let meeting, let deadline):
@@ -304,8 +313,16 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     public func nextWake(now: TimeInterval) -> TimeInterval? {
         var wakes: [TimeInterval] = []
         switch state {
-        case .idle, .armed, .held:
+        case .idle, .held:
             break
+        case .armed(let meeting, _, let offerUntil):
+            if let offerUntil {
+                if !pointerInside { wakes.append(offerUntil) }
+                wakes += minuteChange(of: meeting, now: now)
+            }
+        case .upcoming(let meeting, let deadline):
+            if !pointerInside { wakes.append(deadline) }
+            wakes += minuteChange(of: meeting, now: now)
         case .prompting(let meeting, let deadline, _):
             if !pointerInside { wakes.append(deadline) }
             wakes += minuteChange(of: meeting, now: now)
@@ -375,7 +392,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
 
     private var hasCard: Bool {
         switch state {
-        case .idle, .armed: return false
+        case .idle: return false
+        case .armed(_, _, let offerUntil): return offerUntil != nil
         case .recording(let recording): return recording.confirmUntil != nil || recording.nextMeeting != nil
         default: return true
         }
@@ -385,6 +403,10 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         pointerInside = inside
         guard !inside else { return }
         switch state {
+        case .upcoming(let meeting, let deadline):
+            state = .upcoming(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
+        case .armed(let meeting, let since, let offerUntil?):
+            state = .armed(meeting: meeting, since: since, offerUntil: max(offerUntil, now + timing.hoverGrace))
         case .prompting(let meeting, let deadline, let blocked):
             state = .prompting(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace), blocked: blocked)
         case .failed(let attempt, let failure, let deadline):
@@ -402,7 +424,12 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             switch state {
             case .prompting(let meeting, _, _) where meeting.key == seen.key:
                 return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .idle, .armed, .prompting:
+            case .upcoming(let meeting, _) where meeting.key == seen.key:
+                return startRequest(meeting, origin: .tap, now: now, context: context)
+            case .armed(let meeting, _, _) where meeting.key == seen.key:
+                // The call began while the heads-up was up: the meeting is the live one.
+                return startRequest(meeting, origin: .tap, now: now, context: context)
+            case .idle, .upcoming, .armed, .prompting:
                 // The offer ended in the same instant (or another one replaced it): the person asked to record.
                 return startRequest(seen, origin: .tap, now: now, context: context)
             case .countingDown, .held, .starting, .recording, .failed:
@@ -456,10 +483,13 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             case .prompting(let meeting, _, _) where meeting.key == seen.key:
                 note(meeting, .declined)
                 state = .idle
+            case .upcoming(let meeting, _) where meeting.key == seen.key:
+                note(meeting, .declined)
+                state = .idle
             case .idle:
                 // The offer left in the same instant: the tap is still an answer.
                 note(seen, .declined)
-            case .armed(let meeting, _):
+            case .armed(let meeting, _, _):
                 note(seen, .declined)
                 if meeting.key == seen.key { state = .idle }
             default:
@@ -596,6 +626,14 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
 
     private mutating func expire(now: TimeInterval, context: ScribeStartContext) -> [Effect] {
         switch state {
+        case .upcoming(_, let deadline) where now >= deadline && !pointerInside:
+            // Leaving on its own is not an answer: the ledger already says the heads-up was shown.
+            state = .idle
+            return []
+        case .armed(let meeting, let since, let offerUntil?) where now >= offerUntil && !pointerInside:
+            // The heads-up has had its time; the check on the call goes on without a card.
+            state = .armed(meeting: meeting, since: since)
+            return []
         case .prompting(let meeting, let deadline, _) where now >= deadline && !pointerInside:
             note(meeting, .asked)
             state = .idle
@@ -640,7 +678,11 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         let context = evidence.context
         switch state {
         case .idle:
-            guard evidence.mode != .off, let meeting = evidence.candidate else { return [] }
+            guard evidence.mode != .off else { return [] }
+            guard let meeting = evidence.candidate else {
+                announce(evidence, now: now)
+                return []
+            }
             switch ScribeActivity(context.scribe) {
             case .starting, .recording:
                 // A recording this machine did not start: this meeting is handled.
@@ -656,8 +698,34 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 return armed(meeting, since: now, evidence: evidence, now: now)
             }
 
-        case .armed(let meeting, let since):
-            guard evidence.mode != .off, let current = evidence.candidate else { state = .idle; return [] }
+        case .upcoming(let meeting, let deadline):
+            if evidence.mode == .off {
+                state = .idle
+                return []
+            }
+            switch ScribeActivity(context.scribe) {
+            case .starting, .recording:
+                // Recording began by hand: the card goes, and only a recording is an answer.
+                note(meeting, .started)
+                state = .idle
+                return []
+            case .idle, .ending, .processing:
+                break
+            }
+            guard let candidate = evidence.candidate else { return expire(now: now, context: context) }
+            if candidate.key == meeting.key {
+                // The meeting began, or its call did: the card stays up through the check that follows.
+                state = .armed(meeting: meeting, since: now, offerUntil: deadline)
+            } else {
+                // Something else is happening now: it replaces the heads-up and goes through the check on its own.
+                state = .idle
+            }
+            return step(evidence, now: now)
+
+        case .armed(let meeting, let since, let offerUntil):
+            guard evidence.mode != .off, let current = evidence.candidate else {
+                return backToHeadsUp(meeting, offerUntil: offerUntil, evidence, now: now)
+            }
             switch ScribeActivity(context.scribe) {
             case .starting, .recording:
                 note(current, .started)
@@ -671,8 +739,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 break
             }
             guard offerable(current, evidence) else { state = .idle; return [] }
-            let origin = current.key == meeting.key ? since : now
-            state = .armed(meeting: current, since: origin)
+            let same = current.key == meeting.key
+            let origin = same ? since : now
+            state = .armed(meeting: current, since: origin, offerUntil: same ? offerUntil : nil)
             return armed(current, since: origin, evidence: evidence, now: now)
 
         case .prompting(let meeting, let deadline, _):
@@ -811,6 +880,30 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             }
             return ask(current, now: now, blocked: context.automatic.block)
         }
+    }
+
+    /// The heads-up: from `idle`, with no candidate and Scribe free, the closest meeting inside the lead window
+    /// that nothing was done about yet. The ledger notes it at once, so it is shown once per meeting and an empty
+    /// or failed calendar read cannot announce it again.
+    private mutating func announce(_ evidence: ScribeMeetingEvidence, now: TimeInterval) {
+        guard ScribeActivity(evidence.context.scribe) == .idle else { return }
+        let marked = Set(evidence.slots.map(\.id).filter { ledger.mark(ofSlot: $0) != nil })
+        guard let meeting = evidence.upcoming(excluding: marked) else { return }
+        note(meeting, .headsUp)
+        state = .upcoming(meeting: meeting, deadline: now + timing.askTimeout)
+    }
+
+    /// The call (or meeting) that armed a standing heads-up is gone before the check ended, a microphone blip
+    /// say: the heads-up is back as it was, with the time it had left, and nothing counts down.
+    private mutating func backToHeadsUp(_ armed: ScribeMeeting, offerUntil: TimeInterval?,
+                                        _ evidence: ScribeMeetingEvidence, now: TimeInterval) -> [Effect] {
+        guard evidence.mode != .off, let offerUntil, ScribeActivity(evidence.context.scribe) == .idle,
+              let meeting = evidence.upcoming, meeting.key == armed.key else {
+            state = .idle
+            return []
+        }
+        state = .upcoming(meeting: meeting, deadline: offerUntil)
+        return expire(now: now, context: evidence.context)
     }
 
     /// Debounced: shown only when the same meeting is still there once `debounce` has passed.

@@ -119,6 +119,15 @@ public struct ScribeMeetingEvidence: Equatable, Sendable {
         return ScribeMeeting(key: slot.id, title: Self.title(of: slot), callApp: slot.callApp, slot: slot)
     }
 
+    /// The heads-up meeting: the closest calendar meeting that starts within `leadWindow` and has not ended.
+    public var upcoming: ScribeMeeting? { upcoming(excluding: []) }
+
+    /// The same, skipping the slots in `excluded` (the ones already announced or answered).
+    public func upcoming(excluding excluded: Set<String>) -> ScribeMeeting? {
+        guard let slot = ScribeMeetingStartPolicy.upcomingSlot(in: slots, excluding: excluded, at: date) else { return nil }
+        return ScribeMeeting(key: slot.id, title: Self.title(of: slot), callApp: slot.callApp, slot: slot)
+    }
+
     static func title(of slot: ScribeCalendarSlot) -> String {
         let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
         return title.isEmpty ? "Meeting" : title
@@ -164,6 +173,18 @@ public enum ScribeMeetingStartPolicy {
             if let end = slot.end, date >= end { return false }
             return since >= 0 && since <= lateWindow
         })
+    }
+
+    /// A calendar meeting that has not started yet: it starts within `leadWindow` (`0 < start - date`, so a meeting
+    /// at its start time is `startedSlot`'s) and has not ended. The closest start wins.
+    public static func upcomingSlot(in slots: [ScribeCalendarSlot], excluding excluded: Set<String> = [],
+                                    at date: Date) -> ScribeCalendarSlot? {
+        slots.filter { slot in
+            guard !excluded.contains(slot.id) else { return false }
+            if let end = slot.end, date >= end { return false }
+            let until = slot.start.timeIntervalSince(date)
+            return until > 0 && until <= leadWindow
+        }.min { lhs, rhs in lhs.start != rhs.start ? lhs.start < rhs.start : lhs.id < rhs.id }
     }
 
     private static func latestStart(_ slots: [ScribeCalendarSlot]) -> ScribeCalendarSlot? {

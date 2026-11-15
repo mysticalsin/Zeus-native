@@ -640,7 +640,9 @@ struct ScribeAutoStartTests {
         let notYet = asSlot(start: 30)
         early.handle(asEvidence(0, present: [.teams], slots: [notYet]))
         #expect(early.handle(asEvidence(3, present: [.teams], slots: [notYet])).isEmpty)
-        #expect(early.state == .idle)
+        // Before the start there is only the heads-up: it is never the start-time offer or a countdown.
+        #expect(early.state == .upcoming(meeting: ScribeMeeting(key: "s1", title: "Design review", callApp: nil, slot: notYet),
+                                         deadline: 20))
     }
 
     @Test func anUnansweredCardDoesNotBlockTheAutomaticCountdown() {
