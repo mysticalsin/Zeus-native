@@ -1189,7 +1189,7 @@
         {
           "id": "F03.equaliser-controller",
           "check": "native-EqualiserControllerTests",
-          "acceptance": "Per-app shaping probes before any muted tap, destroys every tap first on a call, a Zeus capture, sleep, an output change or a stall, never builds while another copy holds the claim, and keeps the raw copy of unreadable settings. Fakes only; no real tap.",
+          "acceptance": "Per-app shaping probes before any muted tap, destroys every tap first on a call, a Zeus capture, sleep, an output change or a stall, never builds while another copy holds the claim, and keeps the raw copy of unreadable settings, and carries the owner's stored switch over a launch. Fakes only; no real tap.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
@@ -1234,6 +1234,14 @@
             {
               "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
               "function": "aFailedDecodeKeepsTheRawCopyAndShapesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aLaunchThatFindsTheSwitchOnStartsListeningAndProbesAPlayingApp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aLaunchThatFindsTheSwitchOffListensToNothing"
             }
           ]
         },

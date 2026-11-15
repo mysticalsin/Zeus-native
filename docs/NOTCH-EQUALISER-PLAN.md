@@ -54,7 +54,8 @@ Out of scope, each waiting on an owner decision:
 
 - Off by default: `audio.equaliser` joins the `opt_in` tuple in `scripts/gen-settings-catalog.py` (`:238` today).
 - The only path to the System Audio Recording prompt is the owner turning the switch on, or pressing "Try again".
-  Never at launch, never from the permission sweep or onboarding, never from a test.
+  At launch only the owner's own stored switch carries over, with the listener first and a probe only while an app
+  plays. Never from the permission sweep or onboarding, never from a test.
 - A stored `allowed` never permits muting. `AudioSpectrumService` writes `allowed` after any `open()` that does not
   throw (`Sources/Zeus/Audio/AudioSpectrumService.swift:96-109`), and tap calls return `noErr` without a grant.
 - The prompt must describe this use: B3 extends `NSAudioCaptureUsageDescription` (`Resources/Info.plist:29-30`).

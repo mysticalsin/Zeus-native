@@ -691,6 +691,29 @@ struct EqualiserControllerTests {
         #expect(rig.controller.launchNotice == nil)
     }
 
+    @Test func aLaunchThatFindsTheSwitchOnStartsListeningAndProbesAPlayingApp() {
+        let rig = Rig()
+        rig.controller.launch(switchOn: true)
+        #expect(rig.monitor.started)
+        #expect(rig.factory.log == ["probe:Music"])
+    }
+
+    @Test func aLaunchThatFindsTheSwitchOffListensToNothing() {
+        let rig = Rig()
+        rig.controller.launch(switchOn: false)
+        rig.controller.launch()
+        #expect(!rig.monitor.started)
+        #expect(rig.factory.log.isEmpty)
+    }
+
+    @Test func aLaunchWithTheSwitchOnStillSweepsAndReportsAPreviousStop() {
+        let rig = Rig { $0.set(Date().timeIntervalSince1970, forKey: EqualiserController.shapingSinceKey) }
+        rig.controller.launch(switchOn: true)
+        #expect(rig.factory.sweeps == 1)
+        #expect(rig.controller.launchNotice != nil)
+        #expect(rig.monitor.started)
+    }
+
     @Test func aFailedDecodeKeepsTheRawCopyAndShapesNothing() {
         let junk = Data("not a book".utf8)
         let rig = Rig(book: []) { $0.set(junk, forKey: AppSoundBook.storageKey) }

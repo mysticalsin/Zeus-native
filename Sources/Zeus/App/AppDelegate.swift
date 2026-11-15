@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pointingProviders: PointingProviders?
     private var pointingSettingsObserver: NSObjectProtocol?
     private var explanationQuitToken: UUID?
-    /// The per-app equaliser. Built with its live ports, started by nothing: only the owner's switch starts it.
+    /// The per-app equaliser. Built with its live ports; only the owner's switch starts it, live or as stored at launch.
     private var equaliser: EqualiserController?
     private var explanationDeletionTasks: [UUID: Task<Void, Never>] = [:]
     /// History UUID -> conversation UUID. Retained until exact deletion succeeds.
@@ -884,8 +884,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let notificationPeeker = NotificationPeeker()
     private var menuBarBadgeHost: NSHostingView<MenuBarUpdateBadge>?
 
-    /// Builds the equaliser with its live ports and runs the launch housekeeping. Nothing is switched on here: no
-    /// listener, no tap, no prompt. The owner's switch is the only start.
+    /// Builds the equaliser with its live ports and runs the launch housekeeping. Only the owner's own stored switch
+    /// starts it, so a switch left on carries over and one left off leaves no listener, no tap and no prompt.
     private func makeEqualiser() {
         let controller = EqualiserController(
             defaults: .standard,
@@ -904,7 +904,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     recordlySystemAudio: recordly.isRecording && recordly.audio.systemAudio)
             },
             observesSystem: true)
-        controller.launch()
+        controller.launch(switchOn: SettingsStore.shared.bool("audio.equaliser"))
         equaliser = controller
     }
 

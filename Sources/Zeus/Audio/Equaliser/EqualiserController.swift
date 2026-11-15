@@ -185,14 +185,17 @@ final class EqualiserController: EqualiserControlling {
 
     // MARK: Launch and quit
 
-    /// At launch, before anything is switched on: destroys aggregates a crashed run left behind and notes whether the
-    /// last run stopped while shaping. Reads and destroys only; nothing here can raise a prompt.
-    func launch() {
+    /// At launch: destroys aggregates a crashed run left behind and notes whether the last run stopped while shaping.
+    /// The housekeeping reads and destroys only; nothing in it can raise a prompt. `switchOn` is the owner's own
+    /// stored switch, so a switch left on carries over. Then only the listener starts, and a probe follows only while
+    /// an app plays, as when the owner flips the switch.
+    func launch(switchOn: Bool = false) {
         _ = factory.sweepLeftovers()
         if defaults.object(forKey: Self.shapingSinceKey) != nil {
             launchNotice = Self.launchNoticeText
             defaults.removeObject(forKey: Self.shapingSinceKey)
         }
+        if switchOn { setSwitch(true) }
     }
 
     func acknowledgeLaunchNotice() {
