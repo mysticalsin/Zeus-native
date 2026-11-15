@@ -22,6 +22,11 @@ final class NotchController {
     var footprint: NotchFootprint {
         screen.map { drawnNotch.footprint(for: Self.facts(of: $0)) } ?? .pill
     }
+    /// The frame every zone centres on: the screen's, moved sideways when a drawn shape is placed off centre. The
+    /// real frame stays for picking a display and placing the window.
+    private func anchorFrame(_ screen: NSScreen) -> CGRect {
+        NotchAnchor.frame(screenFrame: screen.frame, footprint: footprint)
+    }
     /// How far the closed bar and the peek card sit below the screen top on the active display
     /// (Settings > Appearance > Top bar position); 0 while the panel is open.
     private var topOffset: CGFloat {
@@ -349,6 +354,7 @@ final class NotchController {
             if topBar?.menuOpen == true { return }
             let mouse = NSEvent.mouseLocation
             let top = screen.frame.maxY
+            let centre = anchorFrame(screen)
             let barHeight = max(footprint.layoutSize.height, 30)
             let size: CGSize
             if topBar != nil {
@@ -360,10 +366,10 @@ final class NotchController {
                 size = CGSize(width: 560, height: barHeight + 34 + rows * 62 + (model.approval != nil ? 110 : 0))
             }
             // Glance-like slack: a little room past the sides and bottom before it closes.
-            let outside = abs(mouse.x - screen.frame.midX) > size.width / 2 + 36 || mouse.y < top - size.height - 48
+            let outside = abs(mouse.x - centre.midX) > size.width / 2 + 36 || mouse.y < top - size.height - 48
             let over = topBar != nil
-                ? GlanceTopBar.openShapeContains(mouse, screen: screen.frame, size: size)
-                : abs(mouse.x - screen.frame.midX) <= size.width / 2 && mouse.y >= top - size.height
+                ? GlanceTopBar.openShapeContains(mouse, screen: centre, size: size)
+                : abs(mouse.x - centre.midX) <= size.width / 2 && mouse.y >= top - size.height
             if PointerZone.shared.overNotchPanel != over { PointerZone.shared.overNotchPanel = over }
             // The window spans the screen: it takes the mouse only over the notch's shape, so clicks
             // beside or below it reach the app underneath.
@@ -414,7 +420,7 @@ final class NotchController {
     private func openOnClick() -> Bool {
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
         guard !drawnNotch.isCalibrating else { return false }
-        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: screen.frame, topOffset: topOffset)
+        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
         guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
                                           point: NSEvent.mouseLocation, zone: zone) else { return false }
         hoverTask?.cancel()
@@ -444,7 +450,7 @@ final class NotchController {
     /// Glance's trigger (TOPBAR-SPEC §6): the closed island plus the 27.5 pt ears either side, as
     /// tall as the bar. With wings showing, the island is the notch and both wings.
     private func inHotZone(_ screen: NSScreen) -> Bool {
-        let zone = NotchFootprintRules.hoverZone(footprint, screenFrame: screen.frame, topOffset: topOffset,
+        let zone = NotchFootprintRules.hoverZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset,
                                                  wings: topBar.map(ClosedWingsFacts.init(of:)))
         let mouse = NSEvent.mouseLocation
         // The top edge counts (the pointer can rest on the screen's top row) and the bottom edge does not.
@@ -463,7 +469,7 @@ final class NotchController {
             }
         }
         let mouse = NSEvent.mouseLocation
-        let near = abs(mouse.x - screen.frame.midX) < 330 && mouse.y > screen.frame.maxY - 110
+        let near = abs(mouse.x - anchorFrame(screen).midX) < 330 && mouse.y > screen.frame.maxY - 110
         if near, !(model.presentation == .panel && topBar.selectedTab == .shelf) {
             topBar.selectedTab = .shelf
             show(.panel)
@@ -489,7 +495,7 @@ final class NotchController {
         let wide = detailHeight > 0
         let peekWidth = max(footprint.layoutSize.width + 16 + 240, wide ? 520 : 440)
         let rowOffset: CGFloat = 55 + (wide ? detailHeight + 8 : 0) + (model.approval?.previewHeight ?? 0)
-        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - rowOffset)
+        return CGPoint(x: anchorFrame(screen).midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - rowOffset)
     }
 
     // MARK: Window
@@ -503,7 +509,7 @@ final class NotchController {
     /// so what the shape hides is not pressed; the hardware notch and the pill stay click-through.
     private func ignoresMouseWhileClosed() -> Bool {
         guard let screen else { return true }
-        return !NotchFootprintRules.takesMouse(footprint, closed: true, point: NSEvent.mouseLocation, screenFrame: screen.frame,
+        return !NotchFootprintRules.takesMouse(footprint, closed: true, point: NSEvent.mouseLocation, screenFrame: anchorFrame(screen),
                                                topOffset: topOffset, wings: topBar.map(ClosedWingsFacts.init(of:)))
     }
 
@@ -699,7 +705,7 @@ final class NotchController {
         let top = screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - 6
         // Room for the fanned stack and the hover actions, so the pointer stays on the capsule while it grows.
         let height = AlertCapsule.actionHeight + 24
-        return CGRect(x: screen.frame.midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)
+        return CGRect(x: anchorFrame(screen).midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)
     }
 
     // MARK: Keyboard agent picker
