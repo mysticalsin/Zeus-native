@@ -75,7 +75,30 @@ final class PermissionsModel {
         }
     }
 
+    /// Calendar and Reminders requests, and what follows a Calendar grant. Tests inject both instead of
+    /// raising the system prompt.
+    @MainActor
+    struct EventAccess {
+        /// Asks for full access to the kind and answers whether it was granted.
+        var request: (Kind) async -> Bool
+        /// Called once Calendar full access has just been granted.
+        var calendarGranted: () -> Void
+
+        static var live: Self {
+            Self(
+                request: { kind in
+                    let store = EKEventStore()
+                    let answer = kind == .calendar ? try? await store.requestFullAccessToEvents()
+                                                   : try? await store.requestFullAccessToReminders()
+                    return answer ?? false
+                },
+                calendarGranted: { ScribeCallWatcher.shared.follow() }
+            )
+        }
+    }
+
     @ObservationIgnored private let captureAccess: CaptureAccess
+    @ObservationIgnored private let eventAccess: EventAccess
 
     var cameraPermissionState: PermissionState {
         captureAccess.camera()
@@ -92,8 +115,9 @@ final class PermissionsModel {
 
     var allGranted: Bool { Kind.allCases.allSatisfy { granted[$0] == true } }
 
-    init(captureAccess: CaptureAccess = .live) {
+    init(captureAccess: CaptureAccess = .live, eventAccess: EventAccess = .live) {
         self.captureAccess = captureAccess
+        self.eventAccess = eventAccess
         Automation.onCacheUpdated = { [weak self] in self?.refreshAutomationOnly() }
         refreshInstallFlagsInBackground()
     }
@@ -224,11 +248,8 @@ final class PermissionsModel {
     /// Calendar or Reminders full access, one prompt at a time. Returns once macOS has an answer
     /// (Allow all waits for it before the next prompt).
     func requestEventAccess(_ kind: Kind) async {
-        await PermissionPrompts.shared.run(kind.rawValue) {
-            let store = EKEventStore()
-            if kind == .calendar { _ = try? await store.requestFullAccessToEvents() }
-            else { _ = try? await store.requestFullAccessToReminders() }
-        }
+        var allowed = false
+        await PermissionPrompts.shared.run(kind.rawValue) { allowed = await self.eventAccess.request(kind) }
         refresh()
     }
 
