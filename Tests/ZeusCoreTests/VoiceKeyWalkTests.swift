@@ -317,6 +317,10 @@ private struct Checker: Hashable {
     var ownWasDown = false
     /// Space went down while the own set was down alone and neither it nor an own modifier has come up since.
     var chordClean = false
+    /// Space came down clean and has not come up: it never makes an open turn foreign, even after a modifier has been let
+    /// go with Space still down (a clean release). A new press of the own set beside it is another matter: only a clean
+    /// Space is left out of I3 and I6.
+    var chordForgiven = false
 }
 
 private struct Edge {
@@ -325,7 +329,7 @@ private struct Edge {
 }
 
 /// The state of one search node. The machine is held as the four things it reads: the config, the flags-only modifier
-/// set, the physical keys and the spoilers of its keyboard picture, `barred` and the phase with ages in place of
+/// set, the physical keys and the spoilers of its keyboard picture, `barred`, `chordSpoiled` and the phase with ages in place of
 /// times. `ShortcutState.modifiers` is left out because nothing in the machine reads it.
 private struct StateKey: Hashable {
     var down: UInt16
@@ -340,6 +344,7 @@ private struct StateKey: Hashable {
     var keysDown: Set<UInt16>
     var spoilers: Set<UInt16>
     var barred: Bool
+    var chordSpoiled: Bool
     var phase: VoiceKeyMachine.Phase
     var pointing: PointingNorm?
     var refusing: Bool
@@ -451,7 +456,7 @@ private struct Sim {
         }
         return StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { max($0 - step, -2) }.sorted(), cfg: cfg,
                  config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
-                 keysDown: machine.keys.keysDown, spoilers: machine.keys.spoilers, barred: machine.barred,
+                 keysDown: machine.keys.keysDown, spoilers: machine.keys.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
                  phase: machine.normalizedPhase(at: now), pointing: pointing.map { PointingNorm($0, now: now) },
                  refusing: refusing, checker: checker,
                  aloneAge: armed ? aloneSince.map { min(9, step - $0) } : nil, upAge: gapOpen ? ownUpSince.map { min(9, step - $0) } : nil)
@@ -661,6 +666,7 @@ private struct Sim {
         if key != nil, !configChange, case .key(let shortcut, let time) = event { due = overdue(config, at: time, event: shortcut) }
         let owed = due?.effects ?? []
         let effects = handle(event, config: config)
+        forgetDroppedSpace(run)
         log += effects
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
         // phase that forgets to ask for its own wake is caught, not covered by a stale one.
@@ -692,6 +698,15 @@ private struct Sim {
         checkEnd(wasLatched: wasLatched, seenBefore: seenBefore, key: key, config: config, run)
         runOwner(effects, config: config, run)
         if drain, held == nil, kind != .tick, kind != .sweep, kind != .echo { drainWakes(run) }
+    }
+
+    /// A Space the machine has dropped by itself is forgotten by the rules too: a tick that found a modifier gone resyncs the
+    /// picture, which forgets every ordinary key whether or not it is still down, the limit the header names for an arrow
+    /// key. A Space whose release was swallowed is the same once the machine has dropped it. Only for the chord runs.
+    private mutating func forgetDroppedSpace(_ run: WalkRun) {
+        guard run.chord, pointing == nil, seen & run.chordMask != 0, !machine.keys.keysDown.contains(WalkKey.space.code) else { return }
+        seen &= ~run.chordMask
+        seenChanged(run)
     }
 
     /// The keys the machine has just been told about.
@@ -880,7 +895,10 @@ private struct Sim {
         let spaceCame = run.chordMask & seen != 0 && run.chordMask & previouslySeen == 0
         let hidden: UInt16 = checker.chordClean || (spaceCame && arrivingChord) ? run.chordMask : 0
         let phys = Phys(seen, run, hidden: hidden)
+        let forgiven: UInt16 = hidden != 0 || checker.chordForgiven ? run.chordMask : 0
+        let turnPhys = Phys(seen, run, hidden: forgiven)
         checker.chordClean = hidden != 0 && run.chordMask & seen != 0 && seen & run.ownMask == run.ownMask
+        checker.chordForgiven = forgiven != 0 && run.chordMask & seen != 0
         previouslySeen = seen
         // The times are the ones the keys carried, so a key heard late moves them back.
         let stampStep = step - arrivalLag
@@ -899,8 +917,8 @@ private struct Sim {
             checker.pressAge = 0
         }
         if wasOwn, !phys.ownAll { edge.released = true }
-        if checker.turnOpen, phys.foreignAny {
-            if run.configs[0].role == .dictation, phys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
+        if checker.turnOpen, turnPhys.foreignAny {
+            if run.configs[0].role == .dictation, turnPhys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
         }
         if phys.ownAll, phys.foreignAny { checker.bigger = true }
         if !phys.anyDown {
@@ -913,6 +931,7 @@ private struct Sim {
     private mutating func checkEffects(_ effects: [VoiceKeyMachine.Effect], wasLatched: Bool, kind: Kind,
                                        config: VoiceKeyMachine.Config, configChange: Bool, seenBefore: UInt16, _ run: WalkRun) {
         let phys = Phys(seen, run, hidden: checker.chordClean ? run.chordMask : 0)
+        let turnPhys = Phys(seen, run, hidden: checker.chordForgiven ? run.chordMask : 0)
         let dictation = config.role == .dictation
         let confirmSteps = Int((config.confirm / 0.05).rounded())
         for effect in effects {
@@ -933,8 +952,8 @@ private struct Sim {
                     checker.turnOpen = true
                     checker.foreign = false
                     checker.shiftSeen = false
-                    if phys.foreignAny {
-                        if dictation, phys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
+                    if turnPhys.foreignAny {
+                        if dictation, turnPhys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
                     }
                 }
             case .send:
