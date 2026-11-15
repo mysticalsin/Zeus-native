@@ -520,6 +520,14 @@
       "file": "Tests/ZeusAppTests/OwnedWindowEventDriver.swift"
     },
     {
+      "id": "native-ClosedWingsNotchTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual closed top bar wings hosted in an owned test window at a 220 x 38 notch; laid-out frames only. Synthetic cues and a synthetic Scribe controller; no capture, permission, display change or device acceptance.",
+      "suite": "ClosedWingsNotchTests",
+      "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift"
+    },
+    {
       "id": "portable-bridge-transport",
       "kind": "portable",
       "tier": "contract",
@@ -5904,6 +5912,76 @@
             {
               "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
               "function": "aBuiltPanelCarriesTheFlagsAndTheCapturePolicy"
+            }
+          ]
+        },
+        {
+          "id": "F13.closed-wings-geometry",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The closed wings are two equal widths either side of a gap that is exactly the notch, for every notch width and every cue extra, and the body width grows both wings by the extra.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "theNotchGapIsExactlyTheNotchForEveryNotchAndExtra"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "wingsAreSymmetricAndNeverOverlapTheGap"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "theWingsFillTheContentBoxInsideTheBodyPadding"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "bodyWidthGrowsBothWingsByTheExtra"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "aBarWithoutANotchKeepsAFortyPointGap"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "theRestingMascotFitsItsWing"
+            }
+          ]
+        },
+        {
+          "id": "F13.closed-wings-notch",
+          "check": "native-ClosedWingsNotchTests",
+          "acceptance": "At a 220 x 38 notch the laid-out left and right wing frames and their content never intersect the centred notch rectangle for long hint, copied, track, permission, volume, mascot, music and Scribe ticker cues. Layout evidence in an owned window; not device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "aLongHintSentenceStaysClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "aLongCopiedTextStaysClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "aLongTrackChangeStaysClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "thePermissionCueStaysClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "theVolumeCueStaysClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "theMascotAndItsStateWordStayClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "theMusicWingsStayClearOfTheNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "theScribeTickerStaysClearOfTheNotch"
             }
           ]
         },

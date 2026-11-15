@@ -5542,6 +5542,18 @@
         "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
         "function": "aHoldKeyOnThePairPlusShiftIsRefused"
       }
+    },
+    {
+      "id": "REG-636",
+      "failure": "A closed bar cue grew only the right wing, so the notch gap shifted left by half the extra and long cue text (hint, copied, track, permission, Scribe ticker) started 67 to 150 pt under the camera.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+        "function": "theNotchGapIsExactlyTheNotchForEveryNotchAndExtra"
+      }
     }
   ]
 }

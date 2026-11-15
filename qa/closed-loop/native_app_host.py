@@ -11,7 +11,7 @@ from contracts import ROOT, digest, require
 SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests",
           "ScribeMeetingCardJourneyTests", "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests",
           "ExplanationRendererTests", "ExplanationTalkButtonTests", "ExplanationScreenContextTests",
-          "ExplanationChatLifecycleTests", "ScribeTrustedAccessibilityJourneyTests"}
+          "ExplanationChatLifecycleTests", "ScribeTrustedAccessibilityJourneyTests", "ClosedWingsNotchTests"}
 # Launchable by the host, but only by the local trusted runner. `selected` never picks these for CI.
 TRUSTED_SUITES = {"ScribeTrustedAccessibilityJourneyTests"}
 INFO = {
