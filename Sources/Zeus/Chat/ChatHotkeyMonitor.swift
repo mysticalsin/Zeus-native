@@ -62,8 +62,11 @@ final class ChatHotkeyMonitor {
     func set(_ new: ChatHotkey) {
         hotkey = new
         defaults.set(new.rawValue, forKey: "chat.hotkey")
-        register(new)
+        // The old key goes first and the talk chord hears of the change before the new key is asked for: moving Chat onto
+        // Control-Option-Space fails while the chord still holds it, and moving it off lets the chord take the key at once.
+        ops.unregister()
         onChange()
+        register(new)
     }
 
     private func installHandler() {
@@ -84,11 +87,12 @@ final class ChatHotkeyMonitor {
     func setPaused(_ paused: Bool) {
         guard self.paused != paused else { return }
         self.paused = paused
+        ops.unregister()
         register(hotkey)
     }
 
+    /// Asks for the key; whatever held the old one has already been let go.
     private func register(_ hotkey: ChatHotkey) {
-        ops.unregister()
         problem = nil
         guard !paused, let code = hotkey.keyCode else { return }
         if !ops.register(code, hotkey.modifiers.rawValue) {
