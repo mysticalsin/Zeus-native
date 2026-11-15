@@ -33,9 +33,12 @@ public struct ScribeCalendarSlot: Equatable, Sendable {
     public var hasCallLink: Bool
     /// The call app of the event's link, set by the calendar reader. Nil without a link.
     public var callApp: ScribeCallApp?
+    /// The call link itself, when the calendar event holds one. Only the meeting card's Join action reads it;
+    /// it is never logged or stored.
+    public var callLink: URL?
 
     public init(id: String, title: String, start: Date, end: Date? = nil, attendeeNames: [String] = [],
-                hasCallLink: Bool = false, callApp: ScribeCallApp? = nil) {
+                hasCallLink: Bool = false, callApp: ScribeCallApp? = nil, callLink: URL? = nil) {
         self.id = id
         self.title = title
         self.start = start
@@ -43,6 +46,7 @@ public struct ScribeCalendarSlot: Equatable, Sendable {
         self.attendeeNames = ScribeAttendeeNames.clean(attendeeNames)
         self.hasCallLink = hasCallLink
         self.callApp = callApp
+        self.callLink = callLink
     }
 }
 

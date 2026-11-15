@@ -62,6 +62,7 @@ final class ScribeCalendarReader {
             // Display names only; the slot drops anything that looks like an address.
             attendeeNames: event.attendeeNames,
             hasCallLink: link != nil,
-            callApp: ScribeUpNext.callApp(link: link))
+            callApp: ScribeUpNext.callApp(link: link),
+            callLink: link)
     }
 }

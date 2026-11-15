@@ -141,6 +141,12 @@ private final class Journey {
         try await driver.click(id, in: window)
     }
 
+    /// The pointer arriving over the card, as the window's tracking area reports it. The close glyph appears with it.
+    func pointerEnters() throws {
+        let host = try #require(panel.window?.contentView as? ScribeCardHostingView<ScribeMeetingCardView>)
+        host.onPointer?(true)
+    }
+
     func waitUntil(_ what: String, _ condition: () -> Bool) async throws {
         for _ in 0..<400 {
             if condition() { return }
@@ -359,6 +365,8 @@ struct ScribeMeetingCardJourneyTests {
             journey.ingest(slots: [upcoming])
             #expect(journey.panel.isOnScreen)
 
+            // The glyph is drawn with the pointer: before it arrives the control is not there to click.
+            try journey.pointerEnters()
             try await journey.click("scribe.meetingCard.dismiss")
             #expect(journey.controller.drawn == .hidden)
             #expect(!journey.panel.isOnScreen)
@@ -383,13 +391,15 @@ struct ScribeMeetingCardJourneyTests {
             journey.ingest(slots: [slot(startsIn: 120)])
             let window = try #require(journey.panel.window)
             let frame = window.frame
-            let margin = ScribeMeetingCardPanel.margin
-            #expect(frame.size.width == ScribeMeetingCardView.width)
-            #expect(frame.origin == ScribeMeetingCardPlacement.origin(
-                size: frame.size, visibleFrame: Journey.screen, margin: margin))
-            // The same place, from the corner: top right, one margin in from each edge.
-            #expect(frame.maxX == Journey.screen.maxX - margin)
-            #expect(frame.maxY == Journey.screen.maxY - margin)
+            let margin = ScribeMeetingCardMetrics.margin
+            let room = ScribeMeetingCardMetrics.shadowRoom
+            #expect(frame.size == ScribeMeetingCardMetrics.windowSize)
+            #expect(frame.origin == ScribeMeetingCardPlacement.windowOrigin(
+                windowSize: frame.size, visibleFrame: Journey.screen))
+            // The same place, from the corner: the slab sits `room` inside the window, top right, one margin in
+            // from each edge.
+            #expect(frame.maxX - room == Journey.screen.maxX - margin)
+            #expect(frame.maxY - room == Journey.screen.maxY - margin)
         }
     }
 
