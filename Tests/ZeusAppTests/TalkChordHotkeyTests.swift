@@ -59,6 +59,19 @@ struct TalkChordHotkeyTests {
         #expect(hotkey.problem == nil)
     }
 
+    @Test func aRefusedRegistrationIsAskedAgainOnTheNextSync() {
+        let log = Log()
+        log.succeed = false
+        let hotkey = make(log)
+        hotkey.sync(VoiceKey.talkChord)
+        #expect(!hotkey.isRegistered && hotkey.problem != nil)
+        log.succeed = true // the other holder let go
+        hotkey.sync(VoiceKey.talkChord)
+        #expect(log.registered.count == 2 && hotkey.isRegistered && hotkey.problem == nil, "a chord that was refused once takes the key when it frees")
+        hotkey.sync(VoiceKey.talkChord)
+        #expect(log.registered.count == 2, "a registered chord is not asked again")
+    }
+
     @Test func itsHandlerAnswersOnlyItsOwnSignature() {
         #expect(TalkChordHotkey.answers(signature: CarbonHotkeySignature.talkChord.rawValue))
         #expect(!TalkChordHotkey.answers(signature: CarbonHotkeySignature.chat.rawValue))
