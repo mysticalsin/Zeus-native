@@ -163,7 +163,7 @@ private struct ScribeMeetingCardBody: View {
                 .fill(LinearGradient(colors: [Color(hex: 0x9378FF), Color(hex: 0x3D5BFF), Color(hex: 0x1F8CFF)],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: M.orb, height: M.orb)
-                .shadow(color: Color(hex: 0x4D7BFF).opacity(0.6), radius: 9)
+                .shadow(color: Color(hex: 0x9DBAFF).opacity(0.5), radius: 9)
                 .overlay {
                     // A bright cap, like light on a glass sphere.
                     Ellipse()
@@ -435,7 +435,7 @@ struct ScribeMeetingCardGlow: View {
 
     var body: some View {
         Circle()
-            .fill(Color(hex: 0x4D7BFF))
+            .fill(Color(hex: 0x9DBAFF))
             .frame(width: ScribeMeetingCardMetrics.orb + 8, height: ScribeMeetingCardMetrics.orb + 8)
             .blur(radius: 15)
             .opacity(level)
