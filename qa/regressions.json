@@ -4546,6 +4546,18 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "dismissAtTwoMinutesStaysQuietAtStartTime"
       }
+    },
+    {
+      "id": "REG-425",
+      "failure": "The meeting detector polled every 5 seconds forever in every mode, even with the choice Off and nothing on the calendar.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+        "function": "offWithAnIdleMachineIsStoppedWhateverElseHappens"
+      }
     }
   ]
 }

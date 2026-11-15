@@ -1238,6 +1238,25 @@
           ]
         },
         {
+          "check": "portable-scribe",
+          "id": "F04.detector",
+          "acceptance": "The detector is stopped when Off and idle, waits for the next meeting when nothing is near, and polls only while a meeting is near; a wake during a scan runs one more scan.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+              "function": "offWithAnIdleMachineIsStoppedWhateverElseHappens"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+              "function": "theWakeIsTwoMinutesBeforeTheEarliestMeetingThatHasNotStarted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+              "function": "aWakeWhileScanningWaitsAndScansOnceMoreWhenTheFirstEnds"
+            }
+          ]
+        },
+        {
           "check": "missing-F04-native",
           "acceptance": "Inject calendar/clock/session and activate actual popup Start once; assert one session, screen placement and refreshed headline.",
           "cases": [],
