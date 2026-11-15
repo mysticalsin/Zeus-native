@@ -337,7 +337,7 @@ struct NotchView: View {
         case .closed:
             if let topBar {
                 // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
-                ClosedWings(topBar: topBar).frame(height: barHeight)
+                ClosedWings(topBar: topBar, notchGap: footprint.wingBase).frame(height: barHeight)
                     .allowsHitTesting(false)
             }
         case .peek:
@@ -393,24 +393,30 @@ struct NotchView: View {
     private var peekBar: some View {
         let status = model.status
         return HStack(spacing: 7) {
-            BoltShape()
-                .fill(status.color)
-                .frame(width: 11, height: 13)
-                .shadow(color: status.color.opacity(0.9), radius: 4)
-            Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Theme.cloudPrimary)
-                .lineLimit(1)
-            Spacer(minLength: hasNotch ? notch.width + 8 : 12)
-            if !peekStatusText.isEmpty {
-                Text(peekStatusText)
+            HStack(spacing: 7) {
+                BoltShape()
+                    .fill(status.color)
+                    .frame(width: 11, height: 13)
+                    .shadow(color: status.color.opacity(0.9), radius: 4)
+                Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(status.color)
+                    .foregroundStyle(Theme.cloudPrimary)
                     .lineLimit(1)
             }
-            if let session = model.peekSession, model.approval == nil, session.status == .working {
-                ElapsedText(since: session.startedAt)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Color.clear.frame(width: hasNotch ? notch.width + 8 : 12, height: 1)
+            HStack(spacing: 7) {
+                if !peekStatusText.isEmpty {
+                    Text(peekStatusText)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(status.color)
+                        .lineLimit(1)
+                }
+                if let session = model.peekSession, model.approval == nil, session.status == .working {
+                    ElapsedText(since: session.startedAt)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(height: barHeight)
     }
@@ -644,15 +650,19 @@ private struct PanelBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
-                BoltShape().fill(Theme.bolt).frame(width: 11, height: 13)
-                    .shadow(color: Theme.bolt.opacity(0.8), radius: 4)
-                Text("Zeus")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Theme.cloudPrimary)
-                Spacer(minLength: notchWidth + 8)
+                HStack(spacing: 7) {
+                    BoltShape().fill(Theme.bolt).frame(width: 11, height: 13)
+                        .shadow(color: Theme.bolt.opacity(0.8), radius: 4)
+                    Text("Zeus")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.cloudPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Color.clear.frame(width: notchWidth + 8, height: 1)
                 Text("\(model.sessions.count) agent\(model.sessions.count == 1 ? "" : "s")")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cloudSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .frame(height: barHeight)
 

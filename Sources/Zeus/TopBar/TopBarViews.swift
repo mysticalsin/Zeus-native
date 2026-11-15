@@ -1382,6 +1382,8 @@ struct NotchActionButton: View {
 /// dictation, a focus countdown or the track that's playing (in that order of importance).
 struct ClosedWings: View {
     let topBar: TopBarModel
+    /// The width between the wings: the footprint's wing base, so the gap is exactly the notch.
+    var notchGap: CGFloat = NotchClosedBodyLayout.noNotchGap
 
     enum Kind: Equatable { case recordly, scribe, recordingFeedback, cue(NotchCue), dictation, avatar(AvatarState), focus, music, none }
 
@@ -1466,7 +1468,7 @@ struct ClosedWings: View {
             wings { cueIcon(cue) } right: { cueDetail(cue) }
         case .avatar(let state):
             // ZEUS itself: the v2 mascot posed for what it is doing, and a word for it.
-            wings { MiniMascotView(state: state, size: 22) } right: {
+            wings { MiniMascotView(state: state, size: NotchClosedBodyLayout.miniMascotSize) } right: {
                 if state != .idle {
                     Text(state.short).font(TopBarStyle.label(10.5, .semibold)).foregroundStyle(.white.opacity(0.88))
                         .lineLimit(1).contentTransition(.opacity)
@@ -1497,15 +1499,11 @@ struct ClosedWings: View {
 
     private func wings<L: View, R: View>(@ViewBuilder left: () -> L, @ViewBuilder right: () -> R) -> some View {
         // Width springs via `NotchView.wingsSpring`; scale insertion caused a one-frame full-size jump (R24 C1).
-        HStack(spacing: 0) {
-            left().frame(width: Self.wingWidth - 14, alignment: .leading)
-            Spacer(minLength: 0)
-            right().frame(width: Self.wingWidth - 14 + Self.extraWidth(for: topBar), alignment: .trailing)
-        }
+        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar), left: left(), right: right())
     }
 
-    static let wingWidth: CGFloat = 62
-    /// Cues with text get a wider right wing.
+    static let wingWidth: CGFloat = NotchClosedBodyLayout.wingWidth
+    /// Cues with text widen both wings by the same extra.
     static func extraWidth(for topBar: TopBarModel) -> CGFloat {
         switch kind(of: topBar) {
         case .cue(let cue):
@@ -1517,7 +1515,7 @@ struct ClosedWings: View {
             default: return 30
             }
         // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
-        case .avatar(let state): return state == .idle ? -36 : 14
+        case .avatar(let state): return state == .idle ? NotchClosedBodyLayout.idleMascotExtra : 14
         case .dictation: return 60
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }
@@ -1726,10 +1724,14 @@ enum ScribeWings {
                 let rgb = ScribeSpeakerPalette.color(for: segment.speaker)
                 pill {
                     Circle().fill(Color(red: rgb.red, green: rgb.green, blue: rgb.blue)).frame(width: 6, height: 6)
-                    Text(ScribeTickerText.tail(shown, words: Self.tailWords))
-                        .font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
-                        .lineLimit(1).fixedSize()
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    // The words overlay a flexible spacer, so a long sentence is clipped to the wing and
+                    // never widens the pill leftwards under the notch.
+                    Color.clear.frame(maxWidth: .infinity).frame(height: 14)
+                        .overlay(alignment: .trailing) {
+                            Text(ScribeTickerText.tail(shown, words: Self.tailWords))
+                                .font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
+                                .lineLimit(1).fixedSize()
+                        }
                         .clipped()
                         .mask(LinearGradient(
                             stops: [
@@ -1785,6 +1787,30 @@ struct DictationWave: View {
         }
         .frame(height: 18)
         .animation(Motion.reduced ? nil : .linear(duration: 0.08), value: levels)
+    }
+}
+
+/// The closed wings as `NotchClosedBodyLayout.closedWingGeometry` places them: two equal wings and a gap that
+/// is exactly the notch, so no wing content can start under the camera.
+struct ClosedWingsRow<L: View, R: View>: View {
+    let notchGap: CGFloat
+    let extra: CGFloat
+    let left: L
+    let right: R
+
+    var body: some View {
+        let geometry = NotchClosedBodyLayout.closedWingGeometry(notchWidth: notchGap, shoulder: 0, extra: extra)
+        // Each wing is a fixed-width clear box with its content overlaid: a wing with nothing in it (the resting
+        // mascot's right side) still takes its width, so the gap cannot slide off the notch.
+        HStack(spacing: 0) {
+            Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .overlay(alignment: .leading) { left.ownedJourneyControl("closed-wings.left.content") }
+                .ownedJourneyControl("closed-wings.left")
+            Color.clear.frame(width: geometry.gapWidth)
+            Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .overlay(alignment: .trailing) { right.ownedJourneyControl("closed-wings.right.content") }
+                .ownedJourneyControl("closed-wings.right")
+        }
     }
 }
 
