@@ -119,7 +119,7 @@ def build_reports_displays(text):
 
 
 def closed_wings_ignore_hits(text):
-    return re.search(r"ClosedWings\(topBar: topBar\)[^\n]*\n?[^\n]*\.allowsHitTesting\(false\)", text) is not None
+    return re.search(r"ClosedWings\(topBar: topBar(?:, [^)]*)?\)[^\n]*\n?[^\n]*\.allowsHitTesting\(false\)", text) is not None
 
 
 def closed_width_key_free_of_footprint(text):
