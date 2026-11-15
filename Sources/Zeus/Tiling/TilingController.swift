@@ -11,6 +11,12 @@ protocol TilingKeyControlling: AnyObject {
     var onUnavailable: () -> Void { get set }
     /// Idempotent: installs, updates or removes the tap to match the three values.
     func apply(enabled: Bool, paused: Bool, keymap: TileKeymap)
+    /// How long a hold key waits before it acts while the tap runs; 0 with no tap.
+    func holdConfirm(for key: Shortcut) -> TimeInterval
+}
+
+extension TilingKeyControlling {
+    func holdConfirm(for key: Shortcut) -> TimeInterval { 0 }
 }
 
 extension TilingKeyLayer: TilingKeyControlling {}
@@ -99,6 +105,10 @@ final class TilingController {
     static let passBudget = AXTilingWindowDriver.passBudget + TileApplier.defaultBudget
 
     static let shared = TilingController(services: .live())
+
+    /// How long a hold key (talk, pointing, dictation) waits before it acts. It is 0 unless the tiling tap is installed
+    /// and a bound chord holds the key's modifiers (`TileBaseConflicts.confirm(for:keymap:)`).
+    func holdConfirm(for key: Shortcut) -> TimeInterval { services.keys.holdConfirm(for: key) }
     /// The key of the controller's own no-prompt wait. The key layer waits under its own key.
     static let gateKey = "tiling.controller"
 

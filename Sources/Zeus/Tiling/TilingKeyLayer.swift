@@ -68,7 +68,9 @@ final class TilingKeyLayer {
     var isInstalled: Bool { tap != nil }
 
     /// How long `key`, a hold key, waits before it acts while this tap runs.
-    func holdConfirm(for key: Shortcut) -> TimeInterval { 0 }
+    func holdConfirm(for key: Shortcut) -> TimeInterval {
+        tap == nil ? 0 : TileBaseConflicts.confirm(for: key, keymap: keymap)
+    }
 
     /// Idempotent. Call it whenever tiling is switched, paused, or its keys change.
     func apply(enabled: Bool, paused: Bool, keymap: TileKeymap) {

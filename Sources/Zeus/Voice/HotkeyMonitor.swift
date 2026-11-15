@@ -94,7 +94,7 @@ final class HotkeyMonitor {
     /// How long a hold key must be down alone before it acts, when the owner sets its own. Nil asks tiling.
     var confirmProvider: (() -> TimeInterval)?
     /// What tiling says a hold key must wait: 0 unless the tap is installed and a bound chord holds the key's modifiers.
-    static var tilingConfirm: (Shortcut) -> TimeInterval = { _ in 0 }
+    static var tilingConfirm: (Shortcut) -> TimeInterval = { TilingController.shared.holdConfirm(for: $0) }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
     var liveModifiers: () -> ShortcutModifiers? = {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
@@ -180,7 +180,7 @@ final class HotkeyMonitor {
                                       role: role == .talk ? .talk : .dictation,
                                       mode: shared ? .shared : toggle ? .toggle : .hold,
                                       voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
-                                      confirm: confirmProvider?() ?? 0)
+                                      confirm: confirmProvider?() ?? key.map(Self.tilingConfirm) ?? 0)
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
