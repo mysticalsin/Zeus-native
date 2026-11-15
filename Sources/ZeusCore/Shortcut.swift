@@ -296,6 +296,8 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
     /// A normal key joined while modifiers were down; the chord is not "alone" until all are released.
     public private(set) var spoiled = false
 
+    public var spoilers: Set<UInt16> { [] }
+
     public init() {}
 
     public mutating func apply(_ event: ShortcutEvent) {
