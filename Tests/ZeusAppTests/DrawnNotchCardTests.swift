@@ -69,12 +69,12 @@ struct DrawnNotchCardTests {
     }
 
     @Test func calibrateSendsBeginWithTheSavedShapeAndTheRowBecomesThree() throws {
-        let saved = DrawnNotchShape(width: 200, height: 36, offset: 0)
+        let saved = DrawnNotchShape(width: 200, height: 36, offset: 40)
         let controller = RecordingController(saved: saved)
         let model = try card(controller)
         model.calibrate()
         #expect(controller.events == [.begin(saved: saved)])
-        #expect(model.rows == [.shape(.drawn), .width(200), .height(36), .actions])
+        #expect(model.rows == [.shape(.drawn), .width(200), .height(36), .offset(40), .actions])
     }
 
     @Test func theSlidersShowTheDraftNotTheSavedShape() throws {
@@ -83,7 +83,8 @@ struct DrawnNotchCardTests {
         model.calibrate()
         model.setWidth(240)
         model.setHeight(40)
-        #expect(model.rows == [.shape(.drawn), .width(240), .height(40), .actions])
+        model.setOffset(-60)
+        #expect(model.rows == [.shape(.drawn), .width(240), .height(40), .offset(-60), .actions])
         #expect(controller.saved == DrawnNotchLimits.defaultShape)
     }
 
@@ -116,7 +117,11 @@ struct DrawnNotchCardTests {
         model.setWidth(187)
         model.setHeight(99)
         model.setHeight(1)
-        #expect(controller.afterBegin == [.setWidth(280), .setWidth(140), .setWidth(185), .setHeight(44), .setHeight(30)])
+        model.setOffset(999)
+        model.setOffset(-999)
+        model.setOffset(42)
+        #expect(controller.afterBegin == [.setWidth(280), .setWidth(140), .setWidth(185), .setHeight(44), .setHeight(30),
+                                         .setOffset(400), .setOffset(-400), .setOffset(40)])
     }
 
     @Test func aNonFiniteSliderValueSendsTheDefault() throws {
@@ -125,7 +130,8 @@ struct DrawnNotchCardTests {
         model.calibrate()
         model.setWidth(.nan)
         model.setHeight(.infinity)
-        #expect(controller.afterBegin == [.setWidth(185), .setHeight(32)])
+        model.setOffset(-.infinity)
+        #expect(controller.afterBegin == [.setWidth(185), .setHeight(32), .setOffset(0)])
     }
 
     @Test func arrowStepsSendOneStepEach() throws {
@@ -134,7 +140,8 @@ struct DrawnNotchCardTests {
         model.calibrate()
         model.step(.width, .up)
         model.step(.height, .down)
-        #expect(controller.afterBegin == [.step(.width, .up), .step(.height, .down)])
+        model.step(.offset, .up)
+        #expect(controller.afterBegin == [.step(.width, .up), .step(.height, .down), .step(.offset, .up)])
     }
 
     @Test func resetCancelAndDoneSendTheirEvents() throws {
@@ -214,6 +221,19 @@ struct DrawnNotchCardTests {
         #expect(height.defaultValue == "32")
     }
 
+    @Test func theCatalogHoldsThePositionRowCentredByDefault() throws {
+        let position = try #require(SettingsCatalog.option(DrawnNotchModel.Row.offset))
+        #expect(position.section == .appearance)
+        #expect(position.group == "Displays without a notch")
+        #expect(position.title == "Position")
+        #expect(position.kind == .slider)
+        #expect(position.state == .live)
+        #expect(position.range?.min == DrawnNotchLimits.offsetRange.lowerBound)
+        #expect(position.range?.max == DrawnNotchLimits.offsetRange.upperBound)
+        #expect(position.range?.step == DrawnNotchLimits.offsetStep)
+        #expect(position.defaultValue == "0")
+    }
+
     private func importing(_ options: [String: String], over start: [String: String] = [:]) throws -> SettingsStore {
         let suite = "zeus.drawn.card.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -242,6 +262,14 @@ struct DrawnNotchCardTests {
         let store = try importing([DrawnNotchModel.Row.width: "220", DrawnNotchModel.Row.height: "99"])
         #expect(store.string(DrawnNotchModel.Row.width) == "220")
         #expect(store.string(DrawnNotchModel.Row.height) == "32")
+    }
+
+    @Test func anImportAppliesAPositionInsideTheRangeAndRejectsOneOutsideIt() throws {
+        let inside = try importing([DrawnNotchModel.Row.offset: "-120"])
+        #expect(inside.string(DrawnNotchModel.Row.offset) == "-120")
+        let outside = try importing([DrawnNotchModel.Row.offset: "900"])
+        #expect(outside.string(DrawnNotchModel.Row.offset) == "0")
+        #expect(!SettingsStore.importWouldSelectDrawnNotch(id: DrawnNotchModel.Row.offset, value: "Notch"))
     }
 
     @Test func onlyTheStyleRowIsGuarded() {
