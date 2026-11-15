@@ -36,6 +36,17 @@ private func row(
 
 @MainActor @Suite("Equaliser card")
 struct EqualiserCardTests {
+    @Test func aStopOffersTryAgainAndASilentOneAlsoSystemSettings() {
+        #expect(EqualiserCardActions.stopButtons(for: nil).isEmpty)
+        #expect(EqualiserCardActions.stopButtons(for: .silentWhilePlaying(app: "Music"))
+            == ["Open System Settings", "Try again"])
+        #expect(EqualiserCardActions.stopButtons(for: .repeatedFailures(app: "Music")) == ["Try again"])
+        #expect(EqualiserCardActions.stopButtons(for: .startFailed(status: -50)) == ["Try again"])
+        let fake = FakeEqualiser()
+        EqualiserCardActions(controller: fake).tryAgain()
+        #expect(fake.retries == 1)
+    }
+
     @Test func theSwitchCallsSetSwitch() {
         let fake = FakeEqualiser()
         let actions = EqualiserCardActions(controller: fake)

@@ -217,6 +217,7 @@ private final class Rig {
     let claim = FakeClaim()
     let scheduler = FakeScheduler()
     var captures = false
+    var permission: AudioCapturePermission = .allowed
     private(set) var allowedCount = 0
     var controller: EqualiserController!
 
@@ -233,7 +234,8 @@ private final class Rig {
             defaults: defaults, factory: factory, monitor: monitor, claim: claim, scheduler: scheduler,
             ownBundleID: "app.zeus.test", ownPID: ownPID,
             zeusCaptures: { [unowned self] in self.captures },
-            onProvenAllowed: { [unowned self] in self.allowedCount += 1 })
+            onProvenAllowed: { [unowned self] in self.allowedCount += 1 },
+            capturePermission: { [unowned self] in self.permission })
     }
 
     /// The listen-only probe hears sound, and the next poll ends it.
@@ -303,6 +305,60 @@ struct EqualiserControllerTests {
         #expect(rig.factory.taps.isEmpty)
         #expect(rig.factory.liveProbes.isEmpty)
         #expect(rig.allowedCount == 0)
+    }
+
+    @Test func noMutedTapIsBuiltBeforeAHeardProbeEvenWithAllowedStored() {
+        let rig = Rig()
+        rig.permission = .allowed
+        rig.controller.setSwitch(true)
+        #expect(rig.factory.tapAttempts == 0)
+        #expect(rig.factory.log == ["probe:Music"])
+        // Zeros keep every app unmuted: the first silent probe ends and the next one starts.
+        rig.factory.liveProbes.last!.meter = ShapingMeterReading(callbacks: 100, frames: 240_000, zeroFrames: 240_000)
+        rig.scheduler.advance(by: 5)
+        #expect(rig.factory.tapAttempts == 0)
+        #expect(rig.allowedCount == 0)
+        rig.heardProbe()
+        #expect(rig.factory.tapAttempts == 1)
+        #expect(rig.factory.log.suffix(2) == ["stop-probe:Music", "tap:Music"])
+        #expect(rig.allowedCount == 1)
+    }
+
+    @Test func theFirstProbeAfterNotAskedListensThirtySeconds() {
+        let rig = Rig()
+        rig.permission = .notAsked
+        rig.controller.setSwitch(true)
+        rig.scheduler.advance(by: 29.75)
+        #expect(rig.factory.liveProbes.count == 1)
+        rig.scheduler.advance(by: 0.5)
+        #expect(rig.factory.liveProbes.isEmpty)
+        #expect(rig.factory.tapAttempts == 0)
+    }
+
+    @Test func aRefusalOnRecordWaitsForTryAgainAtLaunch() {
+        let rig = Rig()
+        rig.permission = .refused
+        rig.controller.launch(switchOn: true)
+        #expect(rig.controller.state == .stopped(.silentWhilePlaying(app: "Music")))
+        #expect(rig.controller.status.stop == .silentWhilePlaying(app: "Music"))
+        #expect(rig.factory.log == [])
+        rig.monitor.fire(.processes)
+        rig.scheduler.advance(by: 30)
+        #expect(rig.factory.log == [])
+        #expect(rig.allowedCount == 0)
+        rig.controller.tryAgain()
+        #expect(rig.factory.log == ["probe:Music"])
+        rig.heardProbe()
+        #expect(rig.factory.tapAttempts == 1)
+        #expect(rig.allowedCount == 1)
+    }
+
+    @Test func theOwnersSwitchProbesEvenWithARefusalOnRecord() {
+        let rig = Rig()
+        rig.permission = .refused
+        rig.controller.setSwitch(true)
+        #expect(rig.factory.log == ["probe:Music"])
+        #expect(rig.factory.tapAttempts == 0)
     }
 
     @Test func aProbeThatSawNoFramesIsInconclusiveAndDoesNotStop() {

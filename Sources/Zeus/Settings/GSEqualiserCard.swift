@@ -76,6 +76,19 @@ struct EqualiserCardActions {
     func forget(_ row: EqualiserRow) {
         controller.forget(bundleID: row.bundleID)
     }
+
+    func tryAgain() {
+        controller.tryAgain()
+    }
+
+    /// The buttons a stop offers: "Try again" for any stop, and the System Settings link when Zeus heard nothing.
+    static func stopButtons(for stop: EqualiserStop?) -> [String] {
+        switch stop {
+        case .none: return []
+        case .silentWhilePlaying: return [systemSettingsTitle, tryAgainTitle]
+        case .repeatedFailures, .startFailed: return [tryAgainTitle]
+        }
+    }
 }
 
 struct GSEqualiserCard: View {
@@ -116,6 +129,20 @@ struct GSEqualiserCard: View {
             }
             .padding(.vertical, 14)
             .accessibilityElement(children: .combine)
+            let buttons = EqualiserCardActions.stopButtons(for: status.stop)
+            if !buttons.isEmpty {
+                HStack(spacing: 10) {
+                    if buttons.contains(EqualiserCardActions.systemSettingsTitle) {
+                        // The same link the spectrum's "Allow" uses for a refusal.
+                        Button(EqualiserCardActions.systemSettingsTitle) { AudioSpectrumService.shared.openSystemSettings() }
+                            .buttonStyle(GSButtonStyle())
+                    }
+                    Button(EqualiserCardActions.tryAgainTitle) { controller.map(EqualiserCardActions.init)?.tryAgain() }
+                        .buttonStyle(GSButtonStyle())
+                    Spacer(minLength: 0)
+                }
+                .padding(.bottom, 14)
+            }
             ForEach(status.rows) { row in
                 GSDivider()
                 EqualiserAppRow(

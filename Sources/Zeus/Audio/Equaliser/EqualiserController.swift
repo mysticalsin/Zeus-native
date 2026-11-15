@@ -46,6 +46,7 @@ final class EqualiserController: EqualiserControlling {
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let zeusCaptures: @MainActor () -> Bool
     @ObservationIgnored private let onProvenAllowed: @MainActor () -> Void
+    @ObservationIgnored private let capturePermission: @MainActor () -> AudioCapturePermission
     @ObservationIgnored private let observesSystem: Bool
 
     // MARK: Working state
@@ -105,6 +106,9 @@ final class EqualiserController: EqualiserControlling {
     @ObservationIgnored private var asleep = false
     @ObservationIgnored private var otherShaper = false
     @ObservationIgnored private var hasBuiltAny = false
+    /// True after the owner pressed the switch or "Try again": that request outweighs a recorded refusal for this run,
+    /// so the probe can find out whether the grant has changed. A start at launch never sets it.
+    @ObservationIgnored private var retryAfterRefusal = false
     @ObservationIgnored private var confirmedUnreadable = Set<Int32>()
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var captureGeneration = 0
@@ -122,6 +126,7 @@ final class EqualiserController: EqualiserControlling {
         now: @escaping () -> Date = Date.init,
         zeusCaptures: @escaping @MainActor () -> Bool = { false },
         onProvenAllowed: @escaping @MainActor () -> Void = {},
+        capturePermission: @escaping @MainActor () -> AudioCapturePermission = { .allowed },
         observesSystem: Bool = false
     ) {
         self.defaults = defaults
@@ -134,6 +139,7 @@ final class EqualiserController: EqualiserControlling {
         self.now = now
         self.zeusCaptures = zeusCaptures
         self.onProvenAllowed = onProvenAllowed
+        self.capturePermission = capturePermission
         self.observesSystem = observesSystem
 
         let stored = defaults.data(forKey: AppSoundBook.storageKey)
@@ -155,7 +161,7 @@ final class EqualiserController: EqualiserControlling {
     // MARK: EqualiserControlling
 
     func setSwitch(_ on: Bool) {
-        if on { switchOn() } else { switchOff() }
+        if on { switchOn(personRetry: true) } else { switchOff() }
     }
 
     func update(_ settings: AppSoundSettings) {
@@ -179,6 +185,7 @@ final class EqualiserController: EqualiserControlling {
     func tryAgain() {
         guard case .stopped = state else { return }
         resetRun()
+        retryAfterRefusal = true
         otherShaper = !claim.take()
         send(.switchedOn(personAsked: true, makeSnapshot()))
     }
@@ -195,7 +202,7 @@ final class EqualiserController: EqualiserControlling {
             launchNotice = Self.launchNoticeText
             defaults.removeObject(forKey: Self.shapingSinceKey)
         }
-        if switchOn { setSwitch(true) }
+        if switchOn { self.switchOn(personRetry: false) }
     }
 
     func acknowledgeLaunchNotice() {
@@ -209,9 +216,10 @@ final class EqualiserController: EqualiserControlling {
 
     // MARK: Switching
 
-    private func switchOn() {
+    private func switchOn(personRetry: Bool) {
         guard state == .off else { return }
         resetRun()
+        retryAfterRefusal = personRetry
         otherShaper = !claim.take()
         monitor.onEvent = { [weak self] event in self?.monitorFired(event) }
         monitor.start()
@@ -230,6 +238,7 @@ final class EqualiserController: EqualiserControlling {
         cancelEveryTimer()
         asleep = false
         otherShaper = false
+        retryAfterRefusal = false
         confirmedUnreadable = []
         lastReading = EqualiserReading()
         lastGroups = []
@@ -356,7 +365,13 @@ final class EqualiserController: EqualiserControlling {
             asleep: asleep,
             format: formatVerdict(reading))
         refreshStatus()
-        return Life.Snapshot(targets: lastTargets, pause: pause)
+        return Life.Snapshot(targets: lastTargets, pause: pause, permission: permission())
+    }
+
+    /// What the consent rules see. A refusal on record only holds back a start the owner did not ask for.
+    private func permission() -> AudioCapturePermission {
+        let stored = capturePermission()
+        return stored == .refused && retryAfterRefusal ? .allowed : stored
     }
 
     private func formatVerdict(_ reading: EqualiserReading) -> EqualiserFormat.Verdict {
@@ -397,6 +412,11 @@ final class EqualiserController: EqualiserControlling {
         if confirmed { send(.callRecordingChanged(snapshot(from: reading))) }
     }
 
+    private var stopReason: EqualiserStop? {
+        if case .stopped(let reason) = state { return reason }
+        return nil
+    }
+
     private func refreshStatus() {
         let groups = EqualiserPolicy.playingGroups(lastGroups, names: lastReading.names)
         let exclusions = EqualiserPolicy.exclusions(
@@ -404,7 +424,8 @@ final class EqualiserController: EqualiserControlling {
         let next = EqualiserStatus(
             line: EqualiserStatusText.line(for: state),
             symbol: EqualiserStatusText.symbol(for: state),
-            rows: EqualiserListRules.rows(groups: groups, book: book, exclusions: exclusions))
+            rows: EqualiserListRules.rows(groups: groups, book: book, exclusions: exclusions),
+            stop: stopReason)
         if next != status { status = next }
     }
 
@@ -486,10 +507,13 @@ final class EqualiserController: EqualiserControlling {
         guard let run = probe else { return }
         let meter = run.handle.meter
         let elapsed = scheduler.now - run.startedAt
-        if meter.frames - meter.zeroFrames > 0 {
+        let playing = lastTargets.first { $0.app.bundleID == run.app.bundleID }?.isPlaying ?? false
+        let verdict = EqualiserConsent.verdict(
+            nonZeroFrames: meter.frames - meter.zeroFrames, framesSeen: meter.frames, appPlaying: playing)
+        if verdict == .heard {
             finishProbe(.heard, elapsed: elapsed)
         } else if elapsed >= run.maxSeconds {
-            finishProbe(meter.frames > 0 ? .silent : .inconclusive, elapsed: elapsed)
+            finishProbe(verdict, elapsed: elapsed)
         }
     }
 

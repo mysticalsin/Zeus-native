@@ -125,11 +125,15 @@ public struct EqualiserStatus: Sendable, Equatable {
     /// An SF Symbol name. The line carries the meaning; the symbol only repeats it.
     public let symbol: String
     public let rows: [EqualiserRow]
+    /// Why shaping stopped, when it did. The card shows "Try again" for any stop and a System Settings link for a
+    /// silent one.
+    public let stop: EqualiserStop?
 
-    public init(line: String, symbol: String, rows: [EqualiserRow]) {
+    public init(line: String, symbol: String, rows: [EqualiserRow], stop: EqualiserStop? = nil) {
         self.line = line
         self.symbol = symbol
         self.rows = rows
+        self.stop = stop
     }
 
     /// Fixed content for snapshots, so a render never starts the controller or reads a real app list.

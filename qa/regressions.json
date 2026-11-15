@@ -4642,6 +4642,30 @@
         "file": "Tests/ZeusCoreTests/EqualiserConsentTests.swift",
         "function": "aMutedBuildOnlyFollowsAHeardProbeFromEveryStartingState"
       }
+    },
+    {
+      "id": "REG-453",
+      "failure": "The controller built a muted tap for an app before a listen-only probe of it heard sound, because a stored allowed was trusted.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "noMutedTapIsBuiltBeforeAHeardProbeEvenWithAllowedStored"
+      }
+    },
+    {
+      "id": "REG-454",
+      "failure": "A refusal on record was probed again at launch, or Try again could not start a probe after one.",
+      "features": [
+        "F03"
+      ],
+      "check": "native-EqualiserControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+        "function": "aRefusalOnRecordWaitsForTryAgainAtLaunch"
+      }
     }
   ]
 }

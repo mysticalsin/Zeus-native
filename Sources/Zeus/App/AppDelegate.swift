@@ -903,6 +903,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     polyglotActive: polyglot.isListening || polyglot.isStarting,
                     recordlySystemAudio: recordly.isRecording && recordly.audio.systemAudio)
             },
+            onProvenAllowed: { AudioSpectrumService.shared.recordProvenAllowed() },
+            capturePermission: { AudioSpectrumService.shared.permission },
             observesSystem: true)
         controller.launch(switchOn: SettingsStore.shared.bool("audio.equaliser"))
         equaliser = controller
