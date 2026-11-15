@@ -178,6 +178,20 @@ struct HotkeyMonitorMachineTests {
         try await wait(0.6)
     }
 
+    /// The pair at 0.00 and 0.01 arms a press that waits 0.15 s. Control comes up at 0.05, Space goes down with no event, and
+    /// the main thread is busy until 0.30. The Space is found on the flags event of Control, which is read at its own time
+    /// and not at the time it is heard: the pair never stood for the confirm, so nothing starts.
+    @Test func aSwallowedSpaceFoundOnALateFlagsEventIsReadAtThatEventsTime() {
+        let live = LiveSpace()
+        let (monitor, calls) = swallowing(live)
+        monitor.confirmProvider = { 0.15 }
+        let clock = Clock()
+        armedThenBusy(monitor, clock)
+        live.down = true
+        monitor.feed(.flags(keyCode: 59, modifiers: [.option]), at: 0.05)
+        #expect(calls.log.isEmpty, "a tap shorter than the confirm does nothing, Space or not: \(calls.log)")
+    }
+
     // MARK: Cancel and release
 
     @Test func aKeyJoiningADedicatedDictationHoldCancelsIt() async throws {
