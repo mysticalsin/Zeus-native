@@ -19,6 +19,14 @@ struct RecordlySnapshotFixtureTests {
         #expect(counting.countdownRemaining == 2)
     }
 
+    /// The snapshot renderer draws one fixture at 1x, 2x and again flat; each render ends with the page going away,
+    /// which cancels a real countdown. Only the first draw showed it, so the files people open were idle.
+    @Test func theCountdownFixtureSurvivesTheRenderEndingThePage() {
+        let counting = controller(.countdown(2))
+        counting.pageDisappeared()
+        #expect(counting.isCountingDown, "later renders of the same fixture must still show the countdown")
+    }
+
     @Test func everyFixtureStateShowsItsOwnState() {
         #expect(!controller(.idle).isCountingDown)
         #expect(controller(.recording(elapsed: 74)).elapsed == 74)
