@@ -287,6 +287,20 @@ def swift_summary(log, returncode):
     return int(count), int(suites), functions
 
 
+SWIFT_OUTCOME_LINE = re.compile(
+    r'^(?:✔|➜|✘) Test (?:[A-Za-z_]\w*\([^\n]*?\)|"[^\n]*?") (?:passed after|skipped|failed after)\b', re.MULTILINE)
+
+
+def swift_log_complete(log):
+    """True when the log holds one outcome line for every test its summary counts.
+
+    swift test can drop or cut console lines when the machine is loaded, even though the run
+    itself passed. A log that lost lines cannot show which cases ran, so the caller reruns it.
+    """
+    summaries = re.findall(r"Test run with (\d+) tests? in ", log)
+    return len(summaries) == 1 and len(SWIFT_OUTCOME_LINE.findall(log)) == int(summaries[0])
+
+
 def manifest_matches(actual_root, expected_root):
     """Compare a fresh deterministic re-generation, including every compiled byte.
 

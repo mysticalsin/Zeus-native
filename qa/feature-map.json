@@ -123,6 +123,30 @@
       "file": "Tests/ZeusAppTests/PermissionsCaptureTests.swift"
     },
     {
+      "id": "native-EqualiserControllerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual EqualiserController against a fake tap factory, monitor, claim and clock; no tap, aggregate, listener or audio prompt.",
+      "suite": "EqualiserControllerTests",
+      "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift"
+    },
+    {
+      "id": "native-EqualiserCardTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual card actions against a fake controller; a snapshot reads and changes nothing, and no tap, listener or audio prompt exists.",
+      "suite": "EqualiserCardTests",
+      "file": "Tests/ZeusAppTests/EqualiserCardTests.swift"
+    },
+    {
+      "id": "native-AppShapingRenderTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual render and probe blocks run on synthetic buffer lists; no device, tap or capture.",
+      "suite": "AppShapingRenderTests",
+      "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift"
+    },
+    {
       "id": "native-RecordlyDebugWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -332,6 +356,13 @@
       "tier": "contract",
       "group": "buddy",
       "scope": "Actual companion pointing, flight and coordinate math; Linux Foundation geometry shim, no native display or renderer proof."
+    },
+    {
+      "id": "portable-equaliser",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "equaliser",
+      "scope": "Actual equaliser types, band table, filter maths, policy, lifecycle reducer and card rules; Apple platform only, no tap, device or audio."
     },
     {
       "id": "portable-dictation-insertion",
@@ -1262,6 +1293,162 @@
             {
               "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
               "function": "invalidOrBackwardsTimingDoesNotLaunchReplacementReaders"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-controller",
+          "check": "native-EqualiserControllerTests",
+          "acceptance": "Per-app shaping probes before any muted tap, destroys every tap first on a call, a Zeus capture, sleep, an output change or a stall, never builds while another copy holds the claim, and keeps the raw copy of unreadable settings, and carries the owner's stored switch over a launch. Fakes only; no real tap.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aPlayingAppIsProbedThenTapped"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aCallStartingDestroysTheTapFirst"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "zeusCapturingPausesAndEndingResumes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "sleepTearsDownAndWakeRebuildsTwoSecondsLater"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "deviceRemovalDestroysTheTapThenRebuildsWithoutAProbe"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aHeldClaimBuildsNothingAndResumesWhenItFrees"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aStalledCallbackDestroysTheTapThenRebuilds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "zerosUnderAMutedTapDestroyTheTapBeforeAnythingElseThenProbe"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "theFifthBuildFailureStopsThatApp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "switchingOffLeavesNoTapProbeListenerOrTimer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aFailedDecodeKeepsTheRawCopyAndShapesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aLaunchThatFindsTheSwitchOnStartsListeningAndProbesAPlayingApp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
+              "function": "aLaunchThatFindsTheSwitchOffListensToNothing"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-rules",
+          "check": "portable-equaliser",
+          "acceptance": "The equaliser value types, band table, biquad coefficients, app grouping policy, lifecycle reducer and card rules hold on their own, with no tap, device or audio.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserTypesTests.swift",
+              "function": "aMainActorFakeConformsToTheControlProtocol"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserModelTests.swift",
+              "function": "theRangeIsPlusOrMinusTwelveInHalfDecibelSteps"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserDSPTests.swift",
+              "function": "coefficientsMatchReferenceValues"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserPolicyTests.swift",
+              "function": "theLongestRunningAppWins"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserLifecycleTests.swift",
+              "function": "onWithAnAppPlayingProbesItBeforeAnyTap"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserCardRulesTests.swift",
+              "function": "aGainIsCentredOnlyWhenItSnapsToZero"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserCardRulesTests.swift",
+              "function": "theOpenedRowEndsWhereTheHeaderEnds"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-render",
+          "check": "native-AppShapingRenderTests",
+          "acceptance": "The shaping render block routes channels to the device, counts frames and zeros, runs callbacks longer than its scratch in chunks, and writes nothing from the probe block. Synthetic buffers only.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "stereoInterleavedGoesToAStereoDeviceUnchangedWhenFlat"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "aStereoPairOnALargerDeviceLeavesTheOtherChannelsSilent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "aCallbackLongerThanTheScratchRunsInChunks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/AppShapingRenderTests.swift",
+              "function": "theProbeBlockCountsAndWritesNothing"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-card",
+          "check": "native-EqualiserCardTests",
+          "acceptance": "The Sounds card sends the owner's switch, a clamped band gain, a preset, a reset, volume and Forget to the controller, and a snapshot shows fixed rows and never reads or changes the controller. Fake controller only.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "theSwitchCallsSetSwitch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aBandMoveSendsAClampedAndSnappedGain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aBandMoveOutsideTheTenBandsIsIgnored"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "theShapeSwitchAndVolumeKeepTheGains"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aPresetSetsItsTenGainsAndLeavesTheRest"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "resetToFlatZeroesTheGainsOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "forgetCallsForgetWithTheBundleID"
+            },
+            {
+              "file": "Tests/ZeusAppTests/EqualiserCardTests.swift",
+              "function": "aSnapshotShowsTheSampleAndNeverTouchesTheController"
             }
           ]
         }

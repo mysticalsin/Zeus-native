@@ -141,6 +141,17 @@ GROUPS = {
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
+    # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
+    "equaliser": (
+        core("Audio/EqualiserTypes.swift", "Audio/EqualiserModel.swift", "Audio/EqualiserDSP.swift",
+             "Audio/EqualiserCardRules.swift", "Audio/EqualiserPolicy.swift", "Audio/EqualiserLifecycle.swift",
+             "MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift",
+             "Scribe/ScribeLiveLogic.swift", "Scribe/ScribeCallPrompt.swift", "Intent/WakePhrase.swift",
+             "Intent/Utterance.swift", "Dictation/TranscriptionEngine.swift", "ZeusPaths.swift"),
+        tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
+              "EqualiserPolicyTests", "EqualiserLifecycleTests"),
+    ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",

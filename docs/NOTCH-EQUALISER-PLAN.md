@@ -54,13 +54,17 @@ Out of scope, each waiting on an owner decision:
 
 - Off by default: `audio.equaliser` joins the `opt_in` tuple in `scripts/gen-settings-catalog.py` (`:238` today).
 - The only path to the System Audio Recording prompt is the owner turning the switch on, or pressing "Try again".
-  Never at launch, never from the permission sweep or onboarding, never from a test.
+  At launch only the owner's own stored switch carries over, with the listener first and a probe only while an app
+  plays. Never from the permission sweep or onboarding, never from a test.
 - A stored `allowed` never permits muting. `AudioSpectrumService` writes `allowed` after any `open()` that does not
   throw (`Sources/Zeus/Audio/AudioSpectrumService.swift:96-109`), and tap calls return `noErr` without a grant.
 - The prompt must describe this use: B3 extends `NSAudioCaptureUsageDescription` (`Resources/Info.plist:29-30`).
 - Audio never leaves the render callback. The store holds bundle ids, names, gains and volumes only.
 - Tests never create a tap or a live monitor. A lint fails if `Tests/` names `AudioHardwareCreateProcessTap`,
-  `CATapDescription`, `LiveShapingTapFactory` or `AudioProcessMonitor(`.
+  `AudioHardwareCreateAggregateDevice`, `CATapDescription`, `LiveShapingTapFactory`, `AudioProcessMonitor(`,
+  `AppShapingTap.build(`, `SystemAudioTap`, `SpectrumPipeline`, `AudioSpectrumService` or `ScribeLiveCaptureProvider`.
+  Tests reach `Sources` through the module, so a second lint allows `LiveShapingTapFactory(` and `AudioProcessMonitor(`
+  only in `AppDelegate.swift`, and a third keeps every audio port of `EqualiserController.init` free of a default.
 
 ## B0. Shared types
 

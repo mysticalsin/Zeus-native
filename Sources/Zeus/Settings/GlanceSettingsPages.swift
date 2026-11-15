@@ -23,6 +23,8 @@ final class GSContext {
     @ObservationIgnored var sweep: PermissionSweepRunner?
     /// The drawn notch's model. Nil until the app sets it, and then the Appearance card is not placed.
     @ObservationIgnored var drawnNotch: (any DrawnNotchControlling)?
+    /// The per-app equaliser behind the Sounds card. The app delegate builds it; Settings only asks it.
+    @ObservationIgnored var equaliser: () -> (any EqualiserControlling)? = { nil }
 
     init(services: OnboardingServices) {
         self.services = services
@@ -47,7 +49,7 @@ struct GSPageView: View {
             switch section {
             case .general: GeneralPage(navigation: navigation, openGuide: context.openGuide)
             case .appearance: AppearancePage(context: context, navigation: navigation)
-            case .sounds: SoundsPage()
+            case .sounds: SoundsPage(context: context)
             case .notifications: GSNotificationsPage()
             case .shortcuts: ShortcutsPage()
             case .insomnia: InsomniaSettingsPage()
@@ -566,6 +568,7 @@ private struct TopBarTabsCard: View {
 // MARK: Sounds
 
 private struct SoundsPage: View {
+    let context: GSContext
     var body: some View {
         GSPageHeading(section: .sounds, subtitle: "Choose your cues. Listen to each one before you begin.")
             .padding(.bottom, -GS.cardGap)
@@ -619,6 +622,8 @@ private struct SoundsPage: View {
         }
         .disabled(!ExtraPreferences.shared.soundsOn)
         .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
+        // Shaping does not depend on Zeus's own sounds, so this card sits outside the dimmed cards above.
+        GSEqualiserCard(controller: context.equaliser(), isOn: bool("audio.equaliser"))
     }
 
     private func cue(_ symbol: String, _ title: String, _ text: String, _ id: String, _ options: [String], _ event: ZeusSound.Event) -> some View {

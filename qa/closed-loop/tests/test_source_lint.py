@@ -115,6 +115,7 @@ class SourceLint(unittest.TestCase):
             r"SFSpeechRecognizer\.requestAuthorization": "NSSpeechRecognitionUsageDescription",
             r"requestFullAccessToEvents": "NSCalendarsFullAccessUsageDescription",
             r"requestFullAccessToReminders": "NSRemindersFullAccessUsageDescription",
+            r"AudioHardwareCreateProcessTap": "NSAudioCaptureUsageDescription",
         }
         missing = []
         for pattern, key in required.items():
@@ -1008,6 +1009,194 @@ class FacePresenceLint(unittest.TestCase):
         self.assertEqual(face_presence_offenders("_ = ScreenLock.canLockWithoutEvents", pattern=FACE_LOCK_CALL), [])
         self.assertEqual(face_presence_offenders("_ = ScreenLock.lockWithoutEvents()", pattern=FACE_LOCK_CALL), [])
         self.assertEqual(face_presence_offenders("_ = ScreenLock.lockWithoutEventsAnyway()", pattern=FACE_LOCK_CALL), ["sample:1"])
+
+
+# --- Per-app equaliser (docs/NOTCH-EQUALISER-PLAN.md, ticket B2b) --------------------------------------------
+# The render callback runs on a realtime thread; the lints below keep it free of allocation and main-actor hops,
+# keep IOProc blocks in audited files, keep every Core Audio listener block in a nonisolated function, and keep
+# real taps out of tests.
+EQ_DIR = APP / "Audio/Equaliser"
+EQ_SHAPING_TAP = EQ_DIR / "AppShapingTap.swift"
+EQ_MONITOR = EQ_DIR / "AudioProcessMonitor.swift"
+EQ_KERNEL = ROOT / "Sources/ZeusCore/Audio/EqualiserDSP.swift"
+EQ_RENDER_START = "// MARK: - Render (realtime)"
+EQ_RENDER_END = "// MARK: - End of render"
+KERNEL_CLASS_HEADER = "public final class EqualiserKernel"
+KERNEL_PROCESS_HEADER = "    public func process("
+IO_PROC_API = re.compile(r"\bAudioDeviceCreateIOProcID(?:WithBlock)?\b")
+AUDITED_IO_PROC_FILES = {"Audio/SystemAudioTap.swift", "Scribe/ScribeLiveCapture.swift", "Audio/Equaliser/AppShapingTap.swift"}
+# Nothing on the render path may allocate, lock, log or reach the main actor or Swift concurrency.
+RENDER_FORBIDDEN = re.compile(
+    r"\.append\(|\bArray\(|\bString\(|\bDispatchQueue\b|\bMainActor\b|\bprint\(|\bNSLog\(|\bos_log\b"
+    r"|\bTask\s*[{(.]|\bawait\b|\bNSLock\b|\.lock\(\)|\.withLock\b"
+    r"|(?:[=(,:]|\breturn\b|\bin\b)\s*\[|\]\s*\(")
+# Names that open a tap, a live monitor or the System Audio Recording prompt. Tests use fakes and pure rules.
+TAP_CREATION_NAMES = re.compile(
+    r"AudioHardwareCreateProcessTap|AudioHardwareCreateAggregateDevice|CATapDescription|LiveShapingTapFactory"
+    r"|AudioProcessMonitor\(|AppShapingTap\.build\(|\bSystemAudioTap\b|\bSpectrumPipeline\b|\bAudioSpectrumService\b"
+    r"|\bScribeLiveCaptureProvider\b")
+LIVE_PORT_CONSTRUCTORS = re.compile(r"\b(?:LiveShapingTapFactory|AudioProcessMonitor)\(")
+EQ_CONTROLLER = EQ_DIR / "EqualiserController.swift"
+APP_DELEGATE = APP / "App/AppDelegate.swift"
+PORT_NAMES = ("factory", "monitor", "claim", "scheduler")
+EQ_LISTENER_APIS = re.compile(r"AudioObjectAddPropertyListenerBlock|AudioObjectRemovePropertyListenerBlock")
+DASHES = ("—", "–")
+
+
+def render_offenders(text, label="sample"):
+    """`label:line` for each forbidden construct in the code part of `text`."""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        code = strip_trailing_comment(line)
+        if code.strip().startswith("//"):
+            continue
+        if RENDER_FORBIDDEN.search(code):
+            found.append(f"{label}:{number}")
+    return found
+
+
+def live_port_offenders(text, label="sample"):
+    """`label:line` for each line that builds a live tap factory or process monitor."""
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if not line.strip().startswith("//") and LIVE_PORT_CONSTRUCTORS.search(strip_trailing_comment(line))]
+
+
+def port_default_offenders(signature):
+    """Port parameters in an initializer signature that carry a default value."""
+    return [port for port in PORT_NAMES
+            if re.search(rf"^\s*{port}:[^\n]*=", signature, re.MULTILINE)]
+
+
+def io_proc_offenders(text, label="sample"):
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if not line.strip().startswith("//") and IO_PROC_API.search(strip_trailing_comment(line))]
+
+
+def listener_offenders(text, label="sample"):
+    """Core Audio listener calls outside a function declared `nonisolated`."""
+    lines = text.splitlines()
+    offenders = []
+    for index, line in enumerate(lines):
+        if line.strip().startswith("//") or not EQ_LISTENER_APIS.search(strip_trailing_comment(line)):
+            continue
+        header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
+        if "nonisolated" not in header:
+            offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
+def between(text, start, end=None):
+    first = text.index(start)
+    return text[first:text.index(end, first)] if end else text[first:]
+
+
+class EqualiserLint(unittest.TestCase):
+    def test_io_proc_blocks_only_in_audited_files(self):
+        offenders = []
+        for path in swift_files():
+            if path.relative_to(APP).as_posix() not in AUDITED_IO_PROC_FILES:
+                offenders += io_proc_offenders(path.read_text(), path.relative_to(ROOT).as_posix())
+        self.assertEqual(offenders, [], "an IOProc block belongs in an audited non-main-actor file")
+
+    def test_shaping_render_has_no_allocation_or_main_hops(self):
+        render = between(EQ_SHAPING_TAP.read_text(), EQ_RENDER_START, EQ_RENDER_END)
+        self.assertRegex(render, r"nonisolated static func makeRenderBlock\(\s*kernel:")
+        self.assertIn("kernel.process(", render)
+        kernel = between(between(EQ_KERNEL.read_text(), KERNEL_CLASS_HEADER), KERNEL_PROCESS_HEADER)
+        self.assertIn("private func processChunk(", kernel)
+        offenders = render_offenders(render, "AppShapingTap.swift") + render_offenders(kernel, "EqualiserDSP.swift")
+        self.assertEqual(offenders, [], "no allocation, lock, log or main-actor hop on the render path")
+
+    def test_the_io_proc_block_is_built_by_the_nonisolated_render_function(self):
+        text = EQ_SHAPING_TAP.read_text()
+        self.assertEqual(len(re.findall(r"AudioDeviceCreateIOProcIDWithBlock\(", text)), 1)
+        self.assertIn("AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue, block)", text)
+        self.assertIn("block = Self.makeRenderBlock(", text)
+        self.assertIn("block = Self.makeProbeBlock(", text)
+        self.assertRegex(text, r"nonisolated static func makeProbeBlock\(")
+
+    def test_core_audio_listeners_are_installed_from_nonisolated_functions(self):
+        text = EQ_MONITOR.read_text()
+        self.assertTrue(EQ_LISTENER_APIS.search(text))
+        self.assertEqual(listener_offenders(text, "AudioProcessMonitor.swift"), [])
+
+    def test_tests_never_create_a_tap(self):
+        offenders = []
+        for path in sorted((ROOT / "Tests").rglob("*.swift")):
+            offenders += [f"{path.relative_to(ROOT)}:{n}" for n, line in code_lines(path)
+                          if TAP_CREATION_NAMES.search(strip_trailing_comment(line))]
+        self.assertEqual(offenders, [], "tests use fakes; a real tap or monitor raises the system audio prompt")
+
+    def test_live_audio_ports_are_built_only_by_the_app_delegate(self):
+        offenders = []
+        for path in swift_files():
+            relative = path.relative_to(APP).as_posix()
+            if relative != "App/AppDelegate.swift":
+                offenders += live_port_offenders(path.read_text(), relative)
+        self.assertEqual(offenders, [], "a test reaches Sources through the module, so only the launch builds live ports")
+        launch = between(APP_DELEGATE.read_text(), "private func makeEqualiser()", "equaliser = controller")
+        self.assertEqual(len(live_port_offenders(launch, "AppDelegate.swift")), 2)
+
+    def test_the_controller_takes_its_audio_ports_without_defaults(self):
+        signature = between(EQ_CONTROLLER.read_text(), "    init(\n", "    ) {")
+        for port in PORT_NAMES:
+            self.assertRegex(signature, rf"\n\s+{port}: ", port)
+        self.assertEqual(port_default_offenders(signature), [], "a test that forgets a port must not get a live one")
+
+    def test_prompt_lints_detect_their_failure_shapes(self):
+        for shape in ("let t = SystemAudioTap()", "let p = SpectrumPipeline()", "AudioSpectrumService.shared.allowPressed()",
+                      "ScribeLiveCaptureProvider(monitor: m)", "try AppShapingTap.build(request, mode: .probe)",
+                      "AudioHardwareCreateAggregateDevice(d, &id)"):
+            self.assertTrue(TAP_CREATION_NAMES.search(shape), shape)
+        for quiet in ("AppShapingTap.makeRenderBlock(kernel: k)", "let m = FakeMonitor()", "SpectrumMath.gain(sensitivityPercent: 50)"):
+            self.assertFalse(TAP_CREATION_NAMES.search(quiet), quiet)
+        self.assertEqual(live_port_offenders("let f = LiveShapingTapFactory()", "s"), ["s:1"])
+        self.assertEqual(live_port_offenders("monitor: AudioProcessMonitor(),", "s"), ["s:1"])
+        self.assertEqual(live_port_offenders("// AudioProcessMonitor() is built at launch", "s"), [])
+        self.assertEqual(live_port_offenders("final class AudioProcessMonitor: EqualiserMonitoring {", "s"), [])
+        self.assertEqual(port_default_offenders("    init(\n        factory: any ShapingTapFactory = LiveShapingTapFactory(),\n"), ["factory"])
+        self.assertEqual(port_default_offenders("        monitor: any EqualiserMonitoring,\n        claim: any EqualiserClaiming,\n"), [])
+
+    def test_device_pickers_never_offer_a_zeus_aggregate(self):
+        for relative in ("TopBar/OutputDevices.swift", "Dictation/Microphones.swift"):
+            text = "\n".join(line for _, line in code_lines(APP / relative))
+            self.assertIn("ZeusAudioDevices.isOwnAggregate(", text, relative)
+
+    def test_equaliser_files_carry_no_dash(self):
+        paths = sorted(EQ_DIR.glob("*.swift")) + sorted((ROOT / "Sources/ZeusCore/Audio").glob("Equaliser*.swift"))
+        paths += sorted((ROOT / "Tests").rglob("Equaliser*.swift"))
+        self.assertTrue(paths)
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in paths
+                     for n, line in enumerate(p.read_text().splitlines(), 1) if any(d in line for d in DASHES)]
+        self.assertEqual(offenders, [])
+
+    def test_equaliser_lints_detect_their_failure_shapes(self):
+        # Fail-first samples: the exact shapes each lint exists to catch.
+        self.assertEqual(render_offenders("scratch.append(sample)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let copy = Array(buffer)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let name = String(count)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let order = [0, 1]", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let silent = [Float](repeating: 0, count: n)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("DispatchQueue.main.async { tick() }", "s"), ["s:1"])
+        self.assertEqual(render_offenders("MainActor.assumeIsolated { tick() }", "s"), ["s:1"])
+        self.assertEqual(render_offenders("print(frames)", "s"), ["s:1"])
+        self.assertEqual(render_offenders('NSLog("late")', "s"), ["s:1"])
+        self.assertEqual(render_offenders("Task { await tick() }", "s"), ["s:1"])
+        self.assertEqual(render_offenders("lock.lock()", "s"), ["s:1"])
+        self.assertEqual(render_offenders("samples[frame * channels + channel] = 0", "s"), [])
+        self.assertEqual(render_offenders("kinds[band], frequency: frequencies[band],", "s"), [])
+        self.assertEqual(render_offenders("// scratch.append(sample) is forbidden here", "s"), [])
+        self.assertEqual(io_proc_offenders("AudioDeviceCreateIOProcIDWithBlock(&id, device, queue) { }", "s"), ["s:1"])
+        self.assertEqual(io_proc_offenders("// AudioDeviceCreateIOProcIDWithBlock is audited", "s"), [])
+        bad = "@MainActor final class A {\n    func start() {\n        AudioObjectAddPropertyListenerBlock(o, &a, q) { _, _ in }\n    }\n}"
+        self.assertEqual(listener_offenders(bad), ["sample:3"])
+        good = "enum B {\n    nonisolated static func start() {\n        AudioObjectAddPropertyListenerBlock(o, &a, q) { _, _ in }\n    }\n}"
+        self.assertEqual(listener_offenders(good), [])
+        self.assertTrue(TAP_CREATION_NAMES.search("let t = CATapDescription(stereoMixdownOfProcesses: [])"))
+        self.assertTrue(TAP_CREATION_NAMES.search("_ = AudioHardwareCreateProcessTap(d, &id)"))
+        self.assertTrue(TAP_CREATION_NAMES.search("let f = LiveShapingTapFactory()"))
+        self.assertTrue(TAP_CREATION_NAMES.search("let m = AudioProcessMonitor()"))
+        self.assertFalse(TAP_CREATION_NAMES.search("let m = FakeMonitor()"))
 
 
 if __name__ == "__main__":

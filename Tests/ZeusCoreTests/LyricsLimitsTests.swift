@@ -38,9 +38,9 @@ import Testing
     @Test func aFloodOfTimestampsOnOneLineIsBounded() {
         let body = String(repeating: "[00:01.00]", count: 100_000) + "x"
         var lines: [LyricLine] = []
-        let time = ContinuousClock().measure { lines = LRC.parse(body) }
+        let cpuSeconds = ThreadCPUTime.measure { lines = LRC.parse(body) }
         #expect(lines.count == LyricsLimits.maxLines)
-        #expect(time < .seconds(2))
+        #expect(cpuSeconds < 2)
     }
 
     @Test func clippingKeepsShortTextAndTrimsTheCut() {
