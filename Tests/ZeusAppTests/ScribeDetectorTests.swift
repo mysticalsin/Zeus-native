@@ -52,6 +52,10 @@ private final class Harness {
     var ingested: [(calls: Int, slots: Int)] = []
     var resets = 0
     var exits: [ScribeCallProcessIdentity] = []
+    /// A test that runs the real meeting-start controller behind the watcher connects it here.
+    var idleSource: (() -> Bool)?
+    var onIngest: ((ScribeCallScan, [ScribeCalendarSlot], Date) -> Void)?
+    var onReset: (() -> Void)?
     var waiting: [CheckedContinuation<ScribeCallScan, Never>] = []
     var listeners: [Listener] = []
     var micHandlers: [@MainActor @Sendable () -> Void] = []
@@ -64,7 +68,7 @@ private final class Harness {
         watcher = ScribeCallWatcher(
             ports: .init(
                 mode: { [unowned self] in mode },
-                machineIdle: { [unowned self] in idle },
+                machineIdle: { [unowned self] in idleSource?() ?? idle },
                 slots: { [unowned self] _, lookAhead in
                     calendarReads += 1
                     lookAheads.append(lookAhead)
@@ -74,8 +78,14 @@ private final class Harness {
                     scans += 1
                     return await withCheckedContinuation { waiting.append($0) }
                 },
-                ingest: { [unowned self] scan, slots, _ in ingested.append((scan.calls.count, slots.count)) },
-                reset: { [unowned self] in resets += 1 },
+                ingest: { [unowned self] scan, slots, date in
+                    ingested.append((scan.calls.count, slots.count))
+                    onIngest?(scan, slots, date)
+                },
+                reset: { [unowned self] in
+                    resets += 1
+                    onReset?()
+                },
                 terminated: { [unowned self] in exits.append($0) },
                 now: { [unowned self] in now }),
             micObserver: { [unowned self] onChange in
@@ -101,6 +111,25 @@ private final class Harness {
         waiting.removeFirst().resume(returning: ScribeCallScan(calls: calls))
         await settle()
     }
+}
+
+/// Scribe as the meeting-start controller sees it, with nothing recording.
+@MainActor
+private final class IdleScribe: ScribeStartPort {
+    var phase: ScribePhase = .idle
+    var onPhaseChange: ((ScribePhase) -> Void)?
+    private(set) var starts = 0
+    func start(context: ScribeMeetingContext?) { starts += 1 }
+    func cancel(session: ScribeSessionID) {}
+    func endNow() {}
+    func suggestEnd() {}
+    func withdrawEndSuggestion() {}
+}
+
+@MainActor
+private final class DrawnCards: ScribeMeetingCardRendering {
+    private(set) var latest: ScribeMeetingCard = .hidden
+    func render(_ card: ScribeMeetingCard) { latest = card }
 }
 
 @MainActor
@@ -318,6 +347,50 @@ struct ScribeDetectorTests {
         exit(harness)
         await harness.settle()
         #expect(harness.exits.count == 1, "halt removed the observer")
+    }
+
+    @Test func offThenAskInsideTheMeetingWindowShowsNoCardForAMeetingAlreadyDismissed() async throws {
+        let suite = "scribe-detector-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = FeatureSettings.key(ScribeAutoStartMode.settingID)
+        let cards = DrawnCards()
+        let controller = ScribeAutoStartController(
+            scribe: IdleScribe(), clock: { 100 }, scheduler: Harness.Scheduler(), panel: cards,
+            microphone: { .allowed }, defaults: defaults)
+        let harness = Harness()
+        harness.calendar = [sdSlot("standup", start: 100, end: 1_900)]
+        harness.idleSource = { controller.isIdle }
+        harness.onIngest = { controller.ingest(scan: $0, slots: $1, date: $2) }
+        harness.onReset = { controller.stop() }
+
+        // Ask: the heads-up shows, and the owner dismisses it.
+        defaults.set(ScribeAutoStartMode.ask.title, forKey: key)
+        harness.mode = ScribeAutoStartMode.current(defaults: defaults)
+        harness.watcher.follow()
+        await harness.finishScan()
+        let offer = cards.latest
+        guard case .offer = offer else {
+            Issue.record("the heads-up did not draw an offer: \(offer)")
+            return
+        }
+        controller.dismiss(offer)
+        #expect(cards.latest == .hidden)
+
+        // Off stops the detector and the machine; back to Ask, still before the meeting starts.
+        defaults.set(ScribeAutoStartMode.off.title, forKey: key)
+        harness.mode = ScribeAutoStartMode.current(defaults: defaults)
+        harness.watcher.follow()
+        #expect(!harness.watcher.isRunning)
+        #expect(harness.resets == 1)
+        defaults.set(ScribeAutoStartMode.ask.title, forKey: key)
+        harness.mode = ScribeAutoStartMode.current(defaults: defaults)
+        harness.now = sdBase.addingTimeInterval(30)
+        harness.watcher.follow()
+        await harness.finishScan()
+        #expect(harness.watcher.isRunning)
+        #expect(cards.latest == .hidden, "a dismissed meeting stays dismissed across Off and back")
+        #expect(controller.machine.ledger.mark(ofSlot: harness.calendar[0].id) == .declined)
     }
 
     @Test func aStoppedDetectorIgnoresEveryWake() async {
