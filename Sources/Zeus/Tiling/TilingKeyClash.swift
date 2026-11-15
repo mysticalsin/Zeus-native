@@ -39,6 +39,8 @@ enum TilingKeyClash {
         var dictationToggles = false
         /// The other global hot keys with a key: Quick to-do, the notch, the prompter pause and the approval answer keys.
         var others: [TileBaseConflicts.NamedShortcut] = []
+        /// Control-Option-Space while the talk chord is active (it is not when Chat or another hot key holds it), else nil.
+        var talkChord: Shortcut?
 
         /// The prompter's pause key (`PrompterHub.hotkeys`). It is registered only while the prompter shows, but it is
         /// fixed, so the tiling keys must never bind it.
@@ -60,6 +62,11 @@ enum TilingKeyClash {
             let extras = ExtraPreferences.shared
             let polyglot = PolyglotSettings.shared
             let presets: [(String, ShortcutPreset)] = [("Open the notch", extras.openNotch), ("Quick to-do", extras.quickTodo)]
+            // The key the talk monitor listens on, as `HotkeyMonitor.keyProvider` reads it.
+            let heard = VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk,
+                                                  dictation: dictation.enabled ? dictation.key : nil,
+                                                  pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
+                                                  voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled)
             return Keys(talk: Preferences.shared.pushToTalk,
                         dictation: dictation.enabled ? dictation.key : nil,
                         pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
@@ -69,7 +76,8 @@ enum TilingKeyClash {
                         dictationToggles: dictation.enabled && dictation.selectedBehavior == .pressToToggle,
                         others: presets.compactMap { name, preset in
                             preset.tilingShortcut.map { TileBaseConflicts.NamedShortcut(name: name, shortcut: $0) }
-                        } + [prompterPause] + (answerKeysOn ? approvalAnswers : []))
+                        } + [prompterPause] + (answerKeysOn ? approvalAnswers : []),
+                        talkChord: TalkChordRouting.current(heard: heard, shared: dictation.enabled && Preferences.shared.pushToTalk == dictation.key).chord)
         }
     }
 
@@ -80,7 +88,8 @@ enum TilingKeyClash {
         return TileBaseConflicts.notes(
             base: base, keymap: keymap ?? TileKeymap.defaults(base: base),
             talk: keys.talk, dictation: keys.dictation, pointing: keys.pointing, polyglot: keys.polyglot, chat: keys.chat,
-            voiceOverOn: keys.voiceOverOn, dictationToggles: keys.dictationToggles, others: keys.others).first
+            voiceOverOn: keys.voiceOverOn, dictationToggles: keys.dictationToggles, others: keys.others,
+            talkChord: keys.talkChord).first
     }
 
     /// Calls `changed` on the main actor each time VoiceOver starts or stops, and returns the way to stop watching.

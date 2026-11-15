@@ -101,6 +101,9 @@ final class HotkeyMonitor {
     var confirmProvider: (() -> TimeInterval)?
     /// What tiling says a hold key must wait: 0 unless the tap is installed and a bound chord holds the key's modifiers.
     static var tilingConfirm: (Shortcut) -> TimeInterval = { TilingController.shared.holdConfirm(for: $0) }
+    /// The code of the key that may join this hold without spoiling it (Space on Control-Option, the talk chord), nil for
+    /// none. Only the talk role reads it, and only in hold mode.
+    var chordProvider: () -> UInt16? = { nil }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
     var liveModifiers: () -> ShortcutModifiers? = {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
@@ -174,7 +177,17 @@ final class HotkeyMonitor {
         let held = machine.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
-        send(.key(event, at: time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived))
+        let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
+        // The talk chord's Space may be held by Carbon, which hides its key-down from the monitors. On a flags event the
+        // system is asked about it, and the machine hears the key-down it missed, on the flags it had before this event, so
+        // a Space that came before the set spoils the hold and a Space that joined the set does not. It is read at the time
+        // of the flags event, not the time that event is heard: a busy main thread must not make a short tap stand for the
+        // confirm.
+        if case .flags = event, let chord = chordProvider(), !machine.keys.keysDown.contains(chord),
+           keysStillDown?([chord]).contains(chord) == true {
+            send(.key(.keyDown(keyCode: chord, modifiers: machine.keys.flagModifiers), at: at))
+        }
+        send(.key(event, at: at))
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
@@ -207,7 +220,8 @@ final class HotkeyMonitor {
                                       role: role == .talk ? .talk : .dictation,
                                       mode: shared ? .shared : toggle ? .toggle : .hold,
                                       voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
-                                      confirm: confirmProvider?() ?? key.map(Self.tilingConfirm) ?? 0)
+                                      confirm: confirmProvider?() ?? key.map(Self.tilingConfirm) ?? 0,
+                                      chord: role == .talk ? chordProvider() : nil)
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from

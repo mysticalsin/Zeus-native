@@ -107,10 +107,11 @@ public enum TileBaseConflicts {
     /// chord it means is another set. `talk` is the key the owner chose; `dictation`, `pointing` and `polyglot` are nil when
     /// off. The rule works out the key the talk monitor listens on from `voiceOverOn`. `dictationToggles` is true when the
     /// dictation key toggles on a press (the Press to toggle behaviour) instead of being held. `others` are the remaining
-    /// keyed global shortcuts. The VoiceOver sentence comes first.
+    /// keyed global shortcuts. `talkChord` is the chord on the talk key while it is active. The VoiceOver sentence comes first.
     public static func notes(base: TileModifierBase, keymap: TileKeymap, talk: Shortcut, dictation: Shortcut?,
                              pointing: Shortcut?, polyglot: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool,
-                             dictationToggles: Bool = false, others: [NamedShortcut] = []) -> [String] {
+                             dictationToggles: Bool = false, others: [NamedShortcut] = [],
+                             talkChord: Shortcut? = nil) -> [String] {
         var out: [String] = []
         let bound = boundSets(of: keymap)
         if voiceOverOn, let set = bound.first(where: { $0.isSuperset(of: voiceOverPair) }) {
@@ -158,6 +159,9 @@ public enum TileBaseConflicts {
            let modifiers = ShortcutConflicts.chatShortcutModifiers(chat),
            keymap.action(for: Shortcut(keyCode: UInt16(code), modifiers: modifiers)) != nil {
             out.append("\(chat.symbols) is both the Chat shortcut and a tiling key.")
+        }
+        if let talkChord, keymap.action(for: talkChord) != nil {
+            out.append("Control-Option-Space is both your Talk to Zeus chord and a tiling key.")
         }
         for other in others where keymap.action(for: other.shortcut) != nil {
             out.append("\(other.shortcut.symbol) is both the \(other.name) shortcut and a tiling key.")

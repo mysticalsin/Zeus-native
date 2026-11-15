@@ -16,13 +16,18 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         public var voiceOverHoldsKey: Bool
         /// How long a hold key must be down alone before it acts. 0 except while a tiling chord holds its modifiers.
         public var confirm: TimeInterval
+        /// The code of an ordinary key that may join the held key without spoiling it (Space on Control-Option). Read only
+        /// for the talk role in hold mode. Like `confirm` it is stored, not compared: switching it never ends a turn.
+        public var chord: UInt16?
 
-        public init(key: Shortcut?, role: Role, mode: Mode, voiceOverHoldsKey: Bool = false, confirm: TimeInterval = 0) {
+        public init(key: Shortcut?, role: Role, mode: Mode, voiceOverHoldsKey: Bool = false, confirm: TimeInterval = 0,
+                    chord: UInt16? = nil) {
             self.key = key
             self.role = role
             self.mode = mode
             self.voiceOverHoldsKey = voiceOverHoldsKey
             self.confirm = confirm
+            self.chord = chord
         }
     }
 
@@ -75,6 +80,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     public internal(set) var keys = ShortcutState()
     /// Nothing may begin until everything is up.
     public internal(set) var barred = false
+    /// The chord key went down while the held key's own set was not down alone (Control, Space, Option; a Command beside the
+    /// pair; Space typed with nothing held), so it is foreign until every key is up, as any other key.
+    public internal(set) var chordSpoiled = false
     public internal(set) var phase: Phase = .idle
     /// How many `start` effects the machine has returned. The first is turn 1. An `abandon` names a turn by this number,
     /// so the owner's echo of a turn the machine ended cannot end the turn that the same call went on to open.
@@ -121,12 +129,22 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         /// A dictation key with Shift the one foreign thing down.
         case shifted
         case foreign
+        /// The whole own set is down, nothing foreign, and the chord key is down too (reading C).
+        case chorded
     }
 
     private static func reading(_ facts: KeyFacts, role: Role) -> Reading {
-        guard facts.foreignModifier || facts.foreignKey else { return facts.ownDown ? .exact : .released }
+        guard facts.foreignModifier || facts.foreignKey else {
+            guard facts.ownDown else { return .released }
+            return facts.chordDown ? .chorded : .exact
+        }
         if role == .dictation, facts.foreignModifiers == .shift, !facts.otherSideDown, !facts.foreignKey { return .shifted }
         return .foreign
+    }
+
+    /// The chord key the facts may let through: the talk role in hold mode, until the chord key has spoiled the hold.
+    private func chord(_ config: Config) -> UInt16? {
+        config.role == .talk && config.mode == .hold && !chordSpoiled ? config.chord : nil
     }
 
     private var allUp: Bool { keys.flagModifiers.isEmpty && keys.keysDown.isEmpty }
@@ -161,7 +179,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         }
         let wasAllUp = allUp
         switch event {
-        case .key(let shortcutEvent, _): keys.apply(shortcutEvent)
+        case .key(let shortcutEvent, _):
+            spoilIfChordKeyIsNotClean(shortcutEvent, config)
+            keys.apply(shortcutEvent)
         case .interrupt(let live): if let live { keys.resync(to: live) }
         case .sweep(let live): keys.prune(keysDown: live)
         case .tick, .abandon: break
@@ -180,8 +200,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
             return out
         }
 
-        let facts = KeyFacts(of: keys, key: key)
-        updateBarred(facts)
+        if allUp { chordSpoiled = false }
+        let facts = KeyFacts(of: keys, key: key, chord: chord(config))
+        updateBarred(facts, config)
         switch event {
         case .abandon(let turn):
             if turn == generation, turnIsOpen { phase = .idle; if !allUp { barred = true } }
@@ -199,13 +220,28 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         return out
     }
 
-    /// Nothing may begin until everything is up; a key down with something foreign beside it bars the press.
-    private mutating func updateBarred(_ facts: KeyFacts) {
+    /// Nothing may begin until everything is up; a key down with something foreign beside it bars the press, and so does
+    /// the chord key down beside the whole set when no press of this set is open (prelude 3): it came before the set.
+    private mutating func updateBarred(_ facts: KeyFacts, _ config: Config) {
         if facts.allUp {
             barred = false
-        } else if facts.ownDown, facts.foreignModifier || facts.foreignKey {
+        } else if facts.ownDown, facts.foreignModifier || facts.foreignKey || chordSpoiled {
+            // A chord key that spoiled the hold stays a spoiler even after the sweep has found it up: the set came after it.
             barred = true
+        } else if Self.reading(facts, role: config.role) == .chorded {
+            switch phase {
+            case .armed, .holding: break
+            default: barred = true
+            }
         }
+    }
+
+    /// The chord key going down when the own set is not down alone spoils the hold, like any other key. Only a Space that
+    /// joins the whole set, with nothing else down, is the chord.
+    private mutating func spoilIfChordKeyIsNotClean(_ event: ShortcutEvent, _ config: Config) {
+        guard case .keyDown(let code, _) = event, let chord = chord(config), code == chord, let key = config.key else { return }
+        let before = KeyFacts(of: keys, key: key, chord: chord)
+        if !(before.ownDown && !before.foreignModifier && !before.foreignKey) { chordSpoiled = true }
     }
 
     /// The turn ends without being sent, and nothing begins again until every key is up.
@@ -291,12 +327,13 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         let lost = !joinedOnly && !live.isSuperset(of: key.modifiers)
         var liveKeys = keys
         if lost { liveKeys.resync(to: live) } else { liveKeys.adopt(modifiers: joinedOnly ? live.union(keys.flagModifiers) : live) }
-        let facts = KeyFacts(of: liveKeys, key: key)
-        guard lost || Self.reading(facts, role: config.role) != Self.reading(KeyFacts(of: keys, key: key), role: config.role) else {
+        let facts = KeyFacts(of: liveKeys, key: key, chord: chord(config))
+        guard lost || Self.reading(facts, role: config.role)
+                != Self.reading(KeyFacts(of: keys, key: key, chord: chord(config)), role: config.role) else {
             return false
         }
         keys = liveKeys
-        updateBarred(facts)
+        updateBarred(facts, config)
         react(at: t, facts, config, &out)
         return true
     }
@@ -319,8 +356,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
         case .armed(let since, let press):
             switch reading {
-            case .exact:
-                break
+            case .exact, .chorded:
+                break                                                                       // rows 5 and 5c
             case .released:
                 if config.mode == .shared, config.role == .dictation {
                     phase = .idle                                                           // row 7
@@ -340,8 +377,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
         case .holding(let since, let second, let check, let shifted):
             switch reading {
-            case .exact:
-                break
+            case .exact, .chorded:
+                break                                                                       // rows 11c and 14
             case .released:
                 if config.mode == .shared || shifted || t - since > Self.tapMax(config) {
                     phase = .idle                                                           // rows 9 and 10: sent at the release
@@ -372,7 +409,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
                     phase = .armed(since: t, press: t - tapAt <= Self.gap(config) ? .second : .first)
                     if config.mode == .hold { out.append(.wake(after: config.confirm)) }
                 }
-            } else if reading == .foreign || reading == .shifted {
+            } else if reading == .foreign || reading == .shifted || reading == .chorded {
                 if open { cancelTurn(&out) } else { phase = .idle }                         // rows 16 and 19
             }
 

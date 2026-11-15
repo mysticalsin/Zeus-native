@@ -137,6 +137,7 @@ o(S,'History','Third-party licenses','button','-','Model licences.','missing','d
 
 S='shortcuts'
 o(S,'Global shortcut','Open the agent picker (Control Option Space)','toggle','on','Arrows pick a session, Return opens, Esc closes.','partial','shortcut.openNotch','choice',[],'','custom','ZEUS: a preset menu for opening the notch.')
+o('shortcuts','Global shortcut','Open the chat window','menu','-','Opens the chat window from any app.','missing','chat.hotkey','choice',['Off','Control-Option-Space','Option-Space','Option-Shift-Space','Command-Shift-Space','Control-Option-C'],'Control-Option-C','custom','Carbon hot key; an explicit choice is kept.')
 o(S,'Answer from the keyboard','Answer permissions from the keyboard (Control Option Y, N, O)','toggle','on','Approve, deny or open, live only while a request waits.','missing','shortcut.answerKeys','toggle',[],'true','live','Registered only while a card is waiting.')
 
 S='integrations'
@@ -214,7 +215,7 @@ o(S,'Beamer','Beamer: light the notch when control crosses','toggle','-','A Zeus
 S='voice'
 o(S,'Fast path','Fast path (instant commands)','toggle','-','Simple commands run the moment you finish speaking; off sends everything to the AI.','missing','fastPath.enabled','toggle',[],'true','live','Zeus addition. Jev is on the Engine page.')
 o(S,'Hey Zeus','Listen for "Hey Zeus"','toggle','-','Say it, then your request. Off until you turn it on.','missing','voice.heyZeus','toggle',[],'false','custom','Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off).')
-o(S,'Talk to Zeus','Talk shortcut','recorder','-','Hold Control + Option to talk, let go to send. Point at something while you hold and Zeus sees what you mean.','missing','voice.talkKey','choice',[],'','custom','Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept.')
+o(S,'Talk to Zeus','Talk shortcut','recorder','-','Hold Control + Option, or Control + Option + Space, to talk, let go to send. Point at something while you hold and Zeus sees what you mean.','missing','voice.talkKey','choice',[],'','custom','Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept.')
 o(S,'Voice','Personality (Ultron or Plain) and Design voice','menu','-','How Zeus sounds and what it calls itself.','missing','voice.personality','choice',['Ultron','Plain'],'Ultron','custom','Zeus addition. Voice page.')
 o(S,'Dictation','Murmure speech engines','menu','-','Which speech recognition writes your words.','missing','dictation.engine','choice',[],'','custom','Zeus addition. Murmure page.')
 

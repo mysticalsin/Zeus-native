@@ -42,4 +42,36 @@ public enum VoiceKey {
               !(voiceOverOn && pointing == .controlOption) else { return nil }
         return .pointing
     }
+
+    /// Control-Option-Space: Space joins the held talk key without spoiling it (docs/ULTRON-CHORD-PLAN.md).
+    public static let talkChord = Shortcut(keyCode: 49, modifiers: [.control, .option])
+
+    public struct ChatClash: Equatable, Sendable {
+        public let sentence: String
+        public let fix: ChatHotkey
+    }
+
+    /// The chord on this keyboard right now. Only the bare Control-Option talk key as heard has one, in hold mode (not shared
+    /// with dictation) and with VoiceOver off, since Control-Option-Space is VoiceOver's own activate key. A Carbon shortcut
+    /// that holds Control-Option-Space keeps it: the chord yields and `heldBy` names the holder.
+    public static func talkChord(heard: Shortcut, shared: Bool, voiceOverOn: Bool,
+                                 holders: [(name: String, shortcut: Shortcut?)]) -> (chord: Shortcut?, heldBy: String?) {
+        guard heard == .controlOption, !shared, !voiceOverOn else { return (nil, nil) }
+        if let holder = holders.first(where: { $0.shortcut == talkChord }) { return (nil, holder.name) }
+        return (talkChord, nil)
+    }
+
+    /// Chat against the talk chord. Nil when they do not meet. Chat wins either clash, so the fix moves Chat.
+    public static func chatClash(talk: Shortcut, heard: Shortcut, chat: ChatHotkey, shared: Bool, voiceOverOn: Bool,
+                                 holders: [(name: String, shortcut: Shortcut?)]) -> ChatClash? {
+        guard let chatKey = chat.shortcut else { return nil }
+        if chatKey == heard {
+            // The recorded talk key is the Chat key. Moving Chat to C would meet a talk key that is already on C.
+            return ChatClash(sentence: "This is also your Talk to Zeus key. Chat takes it.",
+                             fix: heard == ChatHotkey.controlOptionC.shortcut ? .off : .controlOptionC)
+        }
+        guard chatKey == talkChord, heard == .controlOption, !shared, !voiceOverOn else { return nil }
+        return ChatClash(sentence: "Control-Option-Space also talks to Zeus. While Chat uses it, it opens Chat instead.",
+                         fix: .controlOptionC)
+    }
 }

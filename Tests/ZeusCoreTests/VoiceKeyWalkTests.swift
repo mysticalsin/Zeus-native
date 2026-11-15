@@ -29,6 +29,15 @@ import Testing
 // modifier the machine has not heard of stands for that flags event, so a forwarded key ahead of a held Command does
 // not start a turn either.
 //
+// The chord (docs/ULTRON-CHORD-PLAN.md). A run with `chord` has Space as a key. A Space that goes down while the own set is
+// down alone, by the keys the machine has been told about and by the modifiers the key itself reports, is a clean chord: it
+// is not foreign for I1, I3 and I6 until it or an own modifier goes up (the bookkeeping of that very step still reads it as
+// clean, so a modifier let go with Space down is a clean release). I9: an event that only moves a clean chord's Space gives
+// no start, send or cancel, but the effects an overdue timer owes ahead of it. The `swallowed` move is the Carbon hot key
+// that takes Space away from the monitors: the key goes down or up and no event comes. Runs that read Space as a plain
+// foreign key (dictation, shared, keyed, pointing, Fn) carry it as a full key; the costly runs B and B2 offer it only
+// while Control and Option are down.
+//
 // The whole search takes minutes under load. `WALK_ONLY=A,B2` runs only the runs whose names start with one of those.
 //
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
@@ -54,6 +63,8 @@ struct WalkKey: Hashable, Sendable {
     let code: UInt16
     /// The modifier flag this key sets, nil for an ordinary key.
     let flag: ShortcutModifiers?
+    /// The key is offered to the search only while these modifiers are down (or while it is itself down, so it can come up).
+    var onlyWith: ShortcutModifiers?
 
     static let control = WalkKey(name: "Control", code: 59, flag: .control)
     static let option = WalkKey(name: "Option", code: 58, flag: .option)
@@ -63,6 +74,9 @@ struct WalkKey: Hashable, Sendable {
     static let globe = WalkKey(name: "Fn", code: 63, flag: .function)
     static let leftArrow = WalkKey(name: "Left", code: 123, flag: nil)
     static let letterT = WalkKey(name: "T", code: 17, flag: nil)
+    static let space = WalkKey(name: "Space", code: 49, flag: nil)
+    /// Space, offered only while Control and Option are down: for the runs that are too costly with a full extra key.
+    static let spaceOnPair = WalkKey(name: "Space", code: 49, flag: nil, onlyWith: [.control, .option])
 }
 
 /// One run: the physical keys, which of them are the key's own set, and the configs the key cycles through.
@@ -84,17 +98,31 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     /// The adapter before it stamped keys with their own time: a held event reaches the machine at the time it is handled.
     /// Only the regression test that the search can see that mistake sets it.
     let processingTime: Bool
+    /// The checker applies the chord rules and the search has the `swallowed` move: Space is the chord key.
+    let chord: Bool
+    /// Carbon takes every Space: its key-down and key-up are always swallowed, and only the live key state shows it.
+    let carbon: Bool
+    /// The adapter asks the live key state about the chord's Space on each flags event and tells the machine the key-down it
+    /// missed (`HotkeyMonitor.feed`). Only the regression test that the search can see its absence turns it off.
+    let injection: Bool
 
     let ownMask: UInt16
     let shiftMask: UInt16
     let ordinaryMask: UInt16
+    /// The Space key's bit, 0 in a run without the chord.
+    let chordMask: UInt16
+    /// The modifier flags of the own set, what a key-down beside it reports.
+    let ownFlags: ShortcutModifiers
 
     var testDescription: String { name }
 
     init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false,
          late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false,
-         processingTime: Bool = false) {
+         processingTime: Bool = false, chord: Bool = false, carbon: Bool = false, injection: Bool = true) {
         self.name = name
+        self.injection = injection
+        self.chord = chord
+        self.carbon = carbon && chord
         self.processingTime = processingTime
         self.pointing = pointing
         self.late = late && !pointing
@@ -104,36 +132,41 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         self.keys = keys
         self.ownCodes = own
         self.configs = configs
-        var ownBits: UInt16 = 0, shiftBits: UInt16 = 0, ordinaryBits: UInt16 = 0
+        var ownBits: UInt16 = 0, shiftBits: UInt16 = 0, ordinaryBits: UInt16 = 0, chordBits: UInt16 = 0
+        var flags: ShortcutModifiers = []
         for (index, key) in keys.enumerated() {
             let bit = UInt16(1) << UInt16(index)
-            if own.contains(key.code) { ownBits |= bit }
+            if own.contains(key.code) { ownBits |= bit; if let flag = key.flag { flags.insert(flag) } }
+            if chord, key.code == WalkKey.space.code { chordBits |= bit }
             if key.flag == .shift { shiftBits |= bit }
             if key.flag == nil { ordinaryBits |= bit }
         }
         ownMask = ownBits
         shiftMask = shiftBits
         ordinaryMask = ordinaryBits
+        chordMask = chordBits
+        ownFlags = flags
     }
 
     private typealias Config = VoiceKeyMachine.Config
-    private static let basic: [WalkKey] = [.control, .option, .leftCommand, .shift, .leftArrow]
-    private static let rightCommandKeys: [WalkKey] = [.control, .option, .rightCommand, .shift, .leftArrow]
+    private static let basic: [WalkKey] = [.control, .option, .leftCommand, .shift, .leftArrow, .space]
+    private static let rightCommandKeys: [WalkKey] = [.control, .option, .rightCommand, .shift, .leftArrow, .space]
+    private static let rightCommandKeysOnPair: [WalkKey] = [.control, .option, .rightCommand, .shift, .leftArrow, .spaceOnPair]
     private static let controlOption: [UInt16] = [59, 58]
 
-    private static func hold(_ role: VoiceKeyMachine.Role, _ key: Shortcut, confirm: TimeInterval) -> Config {
-        Config(key: key, role: role, mode: .hold, confirm: confirm)
+    private static func hold(_ role: VoiceKeyMachine.Role, _ key: Shortcut, confirm: TimeInterval, chord: UInt16? = nil) -> Config {
+        Config(key: key, role: role, mode: .hold, confirm: confirm, chord: chord)
     }
 
     /// The runs of the search: A to I with A0 and E2, J (config changes ride on key events) and B2 (shipped dictation, late).
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0.15)], late: true),
+                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true),
         WalkRun("A0 talk hold Control-Option confirm 0", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0)], late: true, refusal: true),
+                configs: [hold(.talk, .controlOption, confirm: 0, chord: 49)], late: true, refusal: true, chord: true),
         // B: shipped dictation, with Left Command as a sixth key and a config that flips hold, toggle and off.
-        WalkRun("B dictation Right Command hold toggle off", keys: rightCommandKeys + [.leftCommand], own: [54],
+        WalkRun("B dictation Right Command hold toggle off", keys: rightCommandKeysOnPair + [.leftCommand], own: [54],
                 configs: [hold(.dictation, .rightCommand, confirm: 0.15),
                           Config(key: .rightCommand, role: .dictation, mode: .toggle),
                           Config(key: nil, role: .dictation, mode: .hold)]),
@@ -149,25 +182,31 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         WalkRun("F dictation toggle Right Command", keys: rightCommandKeys, own: [54],
                 configs: [Config(key: .rightCommand, role: .dictation, mode: .toggle)], missed: true),
         // G: the shipped Polyglot key, Control-Option-T, with T in place of the arrow.
-        WalkRun("G toggle Control-Option-T", keys: [.control, .option, .leftCommand, .shift, .letterT, .leftArrow], own: [59, 58, 17],
+        WalkRun("G toggle Control-Option-T", keys: [.control, .option, .leftCommand, .shift, .letterT, .leftArrow, .space], own: [59, 58, 17],
                 configs: [Config(key: Shortcut(keyCode: 17, modifiers: [.control, .option]), role: .dictation, mode: .toggle)],
                 missed: true),
         // H: shipped pointing, Control-Option, with the confirm. The config only carries the key and the confirm.
         WalkRun("H pointing Control-Option confirm 0.15", keys: basic, own: controlOption,
                 configs: [hold(.talk, .controlOption, confirm: 0.15)], pointing: true, missed: true),
         // I: talk on Fn, the Globe key in place of Command.
-        WalkRun("I talk hold Fn", keys: [.control, .option, .globe, .shift, .leftArrow], own: [63],
+        WalkRun("I talk hold Fn", keys: [.control, .option, .globe, .shift, .leftArrow, .space], own: [63],
                 configs: [hold(.talk, .function, confirm: 0)], late: true, missed: true),
         // J: shipped dictation again with its config changes riding on key events. Run B delivers its flips on ticks of their own, so it cannot see a press that is both.
         WalkRun("J dictation Right Command hold toggle off, changes ride on events",
-                keys: [.control, .rightCommand, .shift, .leftArrow], own: [54],
+                keys: [.control, .rightCommand, .shift, .leftArrow, .space], own: [54],
                 configs: [hold(.dictation, .rightCommand, confirm: 0.15),
                           Config(key: .rightCommand, role: .dictation, mode: .toggle),
                           Config(key: nil, role: .dictation, mode: .hold)], quietFlip: true),
         // B2: shipped dictation with late timers and keys heard late. B's three configs and these together took 450 s, so
         // the late search keeps B's keys and only its hold config.
-        WalkRun("B2 dictation Right Command hold, late", keys: rightCommandKeys + [.leftCommand], own: [54],
+        WalkRun("B2 dictation Right Command hold, late", keys: rightCommandKeysOnPair + [.leftCommand], own: [54],
                 configs: [hold(.dictation, .rightCommand, confirm: 0.15)], late: true),
+        // A1: shipped talk with no chord (VoiceOver is on, or Chat holds Control-Option-Space): Space is a plain foreign key.
+        WalkRun("A1 talk hold Control-Option confirm 0.15, no chord", keys: basic, own: controlOption,
+                configs: [hold(.talk, .controlOption, confirm: 0.15)], late: true),
+        // A-carbon: the shipped chord where Carbon swallows every Space down and up, so no monitor ever hears it.
+        WalkRun("A-carbon talk hold Control-Option confirm 0.15, every Space swallowed", keys: basic, own: controlOption,
+                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true, carbon: true),
     ]
 }
 
@@ -220,7 +259,7 @@ private struct Held: Hashable {
 private enum Move: Hashable {
     /// A key goes down or up and its event reaches the machine at once; `toggleHeld`: the event of a modifier key or an
     /// unconsumed key waits for the next forwarded key.
-    case toggle(Int), toggleHeld(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
+    case toggle(Int), toggleHeld(Int), swallowed(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
     /// The main thread was busy for this many steps while an event was held back: the event is then heard at the time it
     /// happened, ahead of the wakes that fell due meanwhile (`busy`), or after them (`catchUp`).
     case busy(Int), catchUp(Int)
@@ -232,6 +271,7 @@ private enum Move: Hashable {
         switch self {
         case .toggle(let index): run.keys[index].name
         case .toggleHeld(let index): run.keys[index].name + " (event held)"
+        case .swallowed(let index): run.keys[index].name + " (swallowed, no event)"
         case .wait: "wait 0.05"
         case .waitHalfSecond: "wait 0.5"
         case .deliver: "deliver"
@@ -258,7 +298,9 @@ private struct Phys {
     var exactOwn = false
     var anyDown = false
 
-    init(_ down: UInt16, _ run: WalkRun) {
+    /// `hidden`: keys that are down but do not count, a clean chord's Space.
+    init(_ keysDown: UInt16, _ run: WalkRun, hidden: UInt16 = 0) {
+        let down = keysDown & ~hidden
         ownAll = down & run.ownMask == run.ownMask
         let foreign = down & ~run.ownMask
         foreignAny = foreign != 0
@@ -286,6 +328,19 @@ private struct Checker: Hashable {
     /// Something foreign was down at any time since this press began.
     var pressForeign = false
     var ownWasDown = false
+    /// Space went down while the own set was down alone and neither it nor an own modifier has come up since.
+    var chordClean = false
+    /// Space came down clean and has not come up: it never makes an open turn foreign, even after a modifier has been let
+    /// go with Space still down (a clean release). A new press of the own set beside it is another matter: only a clean
+    /// Space is left out of I3 and I6.
+    var chordForgiven = false
+    /// By the physical keys, whatever any monitor heard: Space is down and went down while exactly the own set was down, and
+    /// no other key has moved since. A start with a Space down that is not this one is a start the keyboard did not earn.
+    var spaceClean = false
+    /// The own set came down (as the machine was told) while a Space was physically down that was not `spaceClean`: a press
+    /// beside a Space that the keyboard did not earn as a chord. The machine may have heard of that Space or not. A press
+    /// judged at the physical state when it is heard, not when its keys went down, because that is what a start can follow.
+    var dirtySpaceAtPress = false
 }
 
 private struct Edge {
@@ -294,7 +349,7 @@ private struct Edge {
 }
 
 /// The state of one search node. The machine is held as the four things it reads: the config, the flags-only modifier
-/// set, the physical keys and the spoiled flag of its keyboard picture, `barred` and the phase with ages in place of
+/// set, the physical keys and the spoilers of its keyboard picture, `barred`, `chordSpoiled` and the phase with ages in place of
 /// times. `ShortcutState.modifiers` is left out because nothing in the machine reads it.
 private struct StateKey: Hashable {
     var down: UInt16
@@ -307,8 +362,9 @@ private struct StateKey: Hashable {
     var flags: ShortcutModifiers
     var deviceKeys: Set<UInt16>
     var keysDown: Set<UInt16>
-    var spoiled: Bool
+    var spoilers: Set<UInt16>
     var barred: Bool
+    var chordSpoiled: Bool
     var phase: VoiceKeyMachine.Phase
     var pointing: PointingNorm?
     var refusing: Bool
@@ -368,6 +424,11 @@ private struct Sim {
     /// The keys the machine has been told are down: the physical keys, less the events that are still on the way.
     /// The rules are read against this, because a key the machine was never told about cannot be told from no key.
     var seen: UInt16 = 0
+    /// `seen` as it stood at the last `seenChanged`, to tell a key that has just arrived. Not part of the key: it always
+    /// equals `seen` between two steps.
+    var previouslySeen: UInt16 = 0
+    /// The Space that is arriving is a clean chord by what the key itself reports. Not part of the key.
+    var arrivingChord = false
     var consumed: UInt16 = 0
     /// At most one monitor event waits behind the next forwarded key.
     var held: Held?
@@ -415,7 +476,7 @@ private struct Sim {
         }
         return StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { max($0 - step, -2) }.sorted(), cfg: cfg,
                  config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
-                 keysDown: machine.keys.keysDown, spoiled: machine.keys.spoiled, barred: machine.barred,
+                 keysDown: machine.keys.keysDown, spoilers: machine.keys.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
                  phase: machine.normalizedPhase(at: now), pointing: pointing.map { PointingNorm($0, now: now) },
                  refusing: refusing, checker: checker,
                  aloneAge: armed ? aloneSince.map { min(9, step - $0) } : nil, upAge: gapOpen ? ownUpSince.map { min(9, step - $0) } : nil)
@@ -432,8 +493,17 @@ private struct Sim {
     func moves(_ run: WalkRun) -> [Move] {
         var out: [Move] = []
         for index in run.keys.indices {
+            // A restricted key is offered while its modifiers are down, or while it is down itself and can come up.
+            if let only = run.keys[index].onlyWith, down & (UInt16(1) << UInt16(index)) == 0, !liveModifiers(run).isSuperset(of: only) {
+                continue
+            }
+            if run.carbon, run.chordMask == UInt16(1) << UInt16(index) {
+                out.append(.swallowed(index))
+                continue
+            }
             out.append(.toggle(index))
             if held == nil { out.append(.toggleHeld(index)) }
+            if run.chord, run.chordMask == UInt16(1) << UInt16(index) { out.append(.swallowed(index)) }
         }
         // Time passes while an event is held back: the main thread may be busy, and a wake runs on the same queue. Time
         // passes only inside one of the moves that end by handing the event over, for up to `lagLimit` steps, so no state
@@ -466,7 +536,7 @@ private struct Sim {
         return out
     }
 
-    /// The eight moves of the plain walk: the keys, a short and a long wait, and an abandon.
+    /// The moves of the plain walk: the keys, a short and a long wait, and an abandon.
     func plainMoves(_ run: WalkRun) -> [Move] {
         run.keys.indices.map { Move.toggle($0) } + [.wait, .waitHalfSecond, .abandon]
     }
@@ -477,6 +547,7 @@ private struct Sim {
         switch move {
         case .toggle(let index): toggle(index, hold: false, run)
         case .toggleHeld(let index): toggle(index, hold: true, run)
+        case .swallowed(let index): swallow(index, run)
         case .wait: advance(run)
         case .waitHalfSecond: for _ in 0..<10 { advance(run) }
         case .deliver: flushHeld(run)
@@ -529,10 +600,24 @@ private struct Sim {
         }
     }
 
+    /// The Carbon hot key takes Space from the monitors: the key goes down or up and no event comes. The machine hears of a
+    /// Space it never saw go down only when it comes up, and a Space whose release was swallowed is dropped by the sweep.
+    private mutating func swallow(_ index: Int, _ run: WalkRun) {
+        let bit = UInt16(1) << UInt16(index)
+        let pressing = down & bit == 0
+        notePhysical(index, pressing: pressing, run)
+        down ^= bit
+        if !pressing {
+            let tile = TileKeyEvent(phase: .up, keyCode: run.keys[index].code, modifiers: liveModifiers(run))
+            _ = matcher.decide(tile, keymap: Self.keymap, gate: Self.gate)
+        }
+    }
+
     private mutating func toggle(_ index: Int, hold: Bool, _ run: WalkRun) {
         let bit = UInt16(1) << UInt16(index)
         let key = run.keys[index]
         let pressing = down & bit == 0
+        notePhysical(index, pressing: pressing, run)
         down ^= bit
         let live = liveModifiers(run)
         if key.flag != nil {
@@ -565,9 +650,21 @@ private struct Sim {
     /// An ordinary key comes up and no monitor hears it. The tiling matcher, which watches every event, does.
     private mutating func missUp(_ index: Int, _ run: WalkRun) {
         let bit = UInt16(1) << UInt16(index)
+        notePhysical(index, pressing: false, run)
         down &= ~bit
         let tile = TileKeyEvent(phase: .up, keyCode: run.keys[index].code, modifiers: liveModifiers(run))
         _ = matcher.decide(tile, keymap: Self.keymap, gate: Self.gate)
+    }
+
+    /// A physical key moves, before `down` changes: Space comes down clean only beside exactly the own set, and any other
+    /// key moving while it is down ends that.
+    private mutating func notePhysical(_ index: Int, pressing: Bool, _ run: WalkRun) {
+        guard run.chord else { return }
+        if run.chordMask == UInt16(1) << UInt16(index) {
+            checker.spaceClean = pressing && down == run.ownMask
+        } else {
+            checker.spaceClean = false
+        }
     }
 
     /// Delivers every tick that is due, as the adapter would: each with the modifiers that are really down.
@@ -582,7 +679,7 @@ private struct Sim {
 
     private mutating func feed(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)? = nil,
                                drain: Bool = true) {
-        if key != nil { sweepStale(run) }
+        if key != nil { sweepStale(run); injectSwallowedSpace(event, run) }
         edge = Edge()
         let seenBefore = seen
         let config = run.configs[cfg]
@@ -592,10 +689,22 @@ private struct Sim {
         let before = stage
         let stampStep = step - arrivalLag
         arriving = key == nil ? nil : Arrival(alone: aloneSince.map { min(9, stampStep - $0) }, up: ownUpSince.map { min(9, stampStep - $0) })
+        // A Space that comes down beside the own set alone, by what the machine knows and by what the key reports, is clean.
+        arrivingChord = false
+        var chordMoved = false
+        if run.chord, let (index, pressed) = key, run.chordMask == UInt16(1) << UInt16(index) {
+            if pressed, case .key(.keyDown(_, let reported), _) = event {
+                arrivingChord = Phys(seen, run).exactOwn && reported.subtracting(.function) == run.ownFlags
+                chordMoved = arrivingChord
+            } else if !pressed {
+                chordMoved = !pressed && checker.chordClean
+            }
+        }
         var due: Overdue?
         if key != nil, !configChange, case .key(let shortcut, let time) = event { due = overdue(config, at: time, event: shortcut) }
         let owed = due?.effects ?? []
         let effects = handle(event, config: config)
+        forgetDroppedSpace(after: event, run)
         log += effects
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
         // phase that forgets to ask for its own wake is caught, not covered by a stale one.
@@ -618,10 +727,39 @@ private struct Sim {
             checkEffects(Array(effects.dropFirst(owed.count)), wasLatched: false, kind: kind, config: config, configChange: false,
                          seenBefore: seenBefore, run)
         }
+        if chordMoved, kind == .key || kind == .deliver {
+            let own = Array(effects.dropFirst(owed.count)).filter { if case .wake = $0 { return false } else { return true } }
+            if !own.isEmpty { found.append("I9: an event that only moved a clean chord's Space gave \(own)") }
+        }
+        arrivingChord = false
         if case .abandon(let turn) = event, checker.turnOpen, turn == startCount { checker.turnOpen = false }
         checkEnd(wasLatched: wasLatched, seenBefore: seenBefore, key: key, config: config, run)
         runOwner(effects, config: config, run)
         if drain, held == nil, kind != .tick, kind != .sweep, kind != .echo { drainWakes(run) }
+    }
+
+    /// The adapter's answer to a Space that Carbon hides, as `HotkeyMonitor.feed` gives it: on a flags event, when the chord is
+    /// on and the live key state has Space down but the machine does not, the machine hears the Space key-down first, with
+    /// the flags it had before this event, at the time of that event (not the time it is heard).
+    private mutating func injectSwallowedSpace(_ event: VoiceKeyMachine.Event, _ run: WalkRun) {
+        guard run.chord, run.injection, pointing == nil, case .key(.flags, let time) = event, run.configs[cfg].chord != nil,
+              down & run.chordMask != 0, !machine.keys.keysDown.contains(WalkKey.space.code),
+              let index = run.keys.indices.first(where: { run.chordMask == UInt16(1) << UInt16($0) }) else { return }
+        feed(.key(.keyDown(keyCode: WalkKey.space.code, modifiers: machine.keys.flagModifiers), at: time), .key, run, key: (index, true))
+    }
+
+    /// A Space the machine has dropped by itself is forgotten by the rules too, but only where the machine may drop a key it
+    /// was told about: a tick that found a modifier gone resyncs the picture, which forgets every ordinary key whether or not
+    /// it is still down (the limit the header names for an arrow key), and an interrupt does the same. A Space dropped by any
+    /// other event is the machine losing a key, which the rules must still see. Only for the chord runs.
+    private mutating func forgetDroppedSpace(after event: VoiceKeyMachine.Event, _ run: WalkRun) {
+        switch event {
+        case .tick, .interrupt: break
+        default: return
+        }
+        guard run.chord, pointing == nil, seen & run.chordMask != 0, !machine.keys.keysDown.contains(WalkKey.space.code) else { return }
+        seen &= ~run.chordMask
+        seenChanged(run)
     }
 
     /// The keys the machine has just been told about.
@@ -805,7 +943,16 @@ private struct Sim {
     // MARK: The rules
 
     private mutating func seenChanged(_ run: WalkRun) {
-        let phys = Phys(seen, run)
+        // The step that makes Space clean, or ends its being clean, still reads it as clean: a modifier let go with Space
+        // down is a clean release, and Space joining the own set is not foreign in the step it comes.
+        let spaceCame = run.chordMask & seen != 0 && run.chordMask & previouslySeen == 0
+        let hidden: UInt16 = checker.chordClean || (spaceCame && arrivingChord) ? run.chordMask : 0
+        let phys = Phys(seen, run, hidden: hidden)
+        let forgiven: UInt16 = hidden != 0 || checker.chordForgiven ? run.chordMask : 0
+        let turnPhys = Phys(seen, run, hidden: forgiven)
+        checker.chordClean = hidden != 0 && run.chordMask & seen != 0 && seen & run.ownMask == run.ownMask
+        checker.chordForgiven = forgiven != 0 && run.chordMask & seen != 0
+        previouslySeen = seen
         // The times are the ones the keys carried, so a key heard late moves them back.
         let stampStep = step - arrivalLag
         if phys.exactOwn { if aloneSince == nil { aloneSince = stampStep } } else { aloneSince = nil }
@@ -814,6 +961,7 @@ private struct Sim {
         if phys.ownAll, !wasOwn {
             checker.pressAge = 0
             checker.pressForeign = phys.foreignAny
+            checker.dirtySpaceAtPress = run.chord && down & run.chordMask != 0 && !checker.spaceClean
             edge.cameDown = true
         } else if phys.ownAll {
             checker.pressForeign = checker.pressForeign || phys.foreignAny
@@ -821,10 +969,11 @@ private struct Sim {
         if !phys.ownAll {
             checker.presses = 0
             checker.pressAge = 0
+            checker.dirtySpaceAtPress = false
         }
         if wasOwn, !phys.ownAll { edge.released = true }
-        if checker.turnOpen, phys.foreignAny {
-            if run.configs[0].role == .dictation, phys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
+        if checker.turnOpen, turnPhys.foreignAny {
+            if run.configs[0].role == .dictation, turnPhys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
         }
         if phys.ownAll, phys.foreignAny { checker.bigger = true }
         if !phys.anyDown {
@@ -836,7 +985,8 @@ private struct Sim {
 
     private mutating func checkEffects(_ effects: [VoiceKeyMachine.Effect], wasLatched: Bool, kind: Kind,
                                        config: VoiceKeyMachine.Config, configChange: Bool, seenBefore: UInt16, _ run: WalkRun) {
-        let phys = Phys(seen, run)
+        let phys = Phys(seen, run, hidden: checker.chordClean ? run.chordMask : 0)
+        let turnPhys = Phys(seen, run, hidden: checker.chordForgiven ? run.chordMask : 0)
         let dictation = config.role == .dictation
         let confirmSteps = Int((config.confirm / 0.05).rounded())
         for effect in effects {
@@ -848,6 +998,9 @@ private struct Sim {
                 }
                 if checker.cancelled { found.append("I2: start after a cancel, before every key was up") }
                 if checker.bigger { found.append("I6: start after the own set was down with something foreign, before every key was up") }
+                if run.chord, checker.dirtySpaceAtPress {
+                    found.append("I6s: start of a press that came down beside a Space physically down that had not joined the own set alone, whether or not any monitor heard that Space")
+                }
                 if phys.ownAll, phys.foreignAny { found.append("I3: start on a larger chord") }
                 if config.mode == .toggle {
                     checker.presses += 1
@@ -857,8 +1010,8 @@ private struct Sim {
                     checker.turnOpen = true
                     checker.foreign = false
                     checker.shiftSeen = false
-                    if phys.foreignAny {
-                        if dictation, phys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
+                    if turnPhys.foreignAny {
+                        if dictation, turnPhys.onlyShift { checker.shiftSeen = true } else { checker.foreign = true }
                     }
                 }
             case .send:
@@ -901,7 +1054,7 @@ private struct Sim {
                 found.append("I4: the machine says a turn is \(machine.turnIsOpen ? "open" : "closed"), the rules say \(checker.turnOpen ? "open" : "closed")")
             }
             // A press that comes down from a keyboard with everything up is never barred, whatever else the call did.
-            if key?.1 == true, seenBefore == 0, config.key != nil, Phys(seen, run).exactOwn, machine.barred {
+            if key?.1 == true, seenBefore == 0, config.key != nil, Phys(seen, run, hidden: checker.chordClean ? run.chordMask : 0).exactOwn, machine.barred {
                 found.append("I8: a press from every key up found the machine barred")
             }
         }
@@ -954,7 +1107,12 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
     let config = run.configs[base.cfg]
     guard config.key != nil, !config.voiceOverHoldsKey else { return out }
     let ownIndices = run.keys.indices.filter { run.ownMask & (UInt16(1) << UInt16($0)) != 0 }
-    for order in [ownIndices, ownIndices.reversed()] {
+    // I8c: from rest, pressing the own set and then Space acts as I8.
+    var orders = [ownIndices, ownIndices.reversed()]
+    if run.chord, let space = run.keys.indices.first(where: { run.chordMask == UInt16(1) << UInt16($0) }) {
+        orders.append(ownIndices + [space])
+    }
+    for order in orders {
         var sim = base
         sim.log = []
         let wasLatched = sim.machine.isLatched
@@ -976,14 +1134,16 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
         let acted: Bool = wasLatched ? sim.log.contains(.send) || (changing && sim.log.contains(.cancel)) : sim.log.contains(.start)
         if !acted {
             let names = order.map { run.keys[$0].name }.joined(separator: ", ")
-            out.append("I8: after letting go of everything and waiting 0.5 s, pressing \(names) did not act (latched \(wasLatched))")
+            let rule = order.contains { run.chordMask == UInt16(1) << UInt16($0) } ? "I8c" : "I8"
+            out.append("\(rule): after letting go of everything and waiting 0.5 s, pressing \(names) did not act (latched \(wasLatched))")
         }
         out += sim.found
     }
     return out
 }
 
-private func search(_ run: WalkRun, stopAtFirst: Bool = false) -> Report {
+/// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
+private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
     let start = Date()
     var report = Report()
     var seen: [Int: Int] = [:]
@@ -1008,6 +1168,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false) -> Report {
     var cursor = 0
     while cursor < frontier.count {
         if stopAtFirst, !report.violations.isEmpty { break }
+        if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
         guard let sim = frontier[cursor] else { cursor += 1; continue }
         frontier[cursor] = nil
         record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
@@ -1035,6 +1196,12 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false) -> Report {
 
 /// Replays one order of moves through the harness and returns what the checker found.
 private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
+    replayWithLog(run, names).found
+}
+
+/// The same, with the effects the machine returned on the way (without its wakes), in order. The rest check that follows
+/// the moves runs on a copy and adds none.
+private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String], effects: [VoiceKeyMachine.Effect]) {
     var sim = Sim(run)
     var out: [String] = []
     for name in names {
@@ -1044,14 +1211,17 @@ private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
         case "wait 0.5": move = .waitHalfSecond
         case "deliver": move = .deliver
         default:
-            guard let index = run.keys.firstIndex(where: { $0.name == name }) else { return ["unknown move \(name)"] }
-            move = .toggle(index)
+            let swallowing = name.hasSuffix(" swallowed")
+            let key = swallowing ? String(name.dropLast(" swallowed".count)) : name
+            guard let index = run.keys.firstIndex(where: { $0.name == key }) else { return (["unknown move \(name)"], []) }
+            move = swallowing ? .swallowed(index) : .toggle(index)
         }
         sim.found = []
         sim.apply(move, run)
         out += sim.found
     }
-    return out + restCheck(sim, run)
+    let effects = sim.log.filter { if case .wake = $0 { return false } else { return true } }
+    return (out + restCheck(sim, run), effects)
 }
 
 @Suite struct VoiceKeyWalkTests {
@@ -1101,7 +1271,90 @@ private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
-    /// As a check on the state key: run A walked plainly from rest, every order up to five steps over eight moves.
+    /// The chord orders the plan names, replayed with the effects asserted: the rules hold and the machine did exactly this.
+    @Test func theChordOrdersKeepTheRules() {
+        let talk = WalkRun.all[0]
+        let release = ["Option", "Control", "wait 0.5"]
+        typealias E = VoiceKeyMachine.Effect
+        let cases: [(String, [String], [E])] = [
+            ("the pair, then Space, held past the confirm, Space let go, then the pair",
+             ["Control", "Option", "Space", "wait 0.5", "Space", "wait 0.5"] + release, [.start, .send]),
+            ("the pair, Space, then a modifier let go with Space still down",
+             ["Control", "Option", "wait 0.5", "Space", "Option", "Space", "Control", "wait 0.5"], [.start, .send]),
+            ("Space first, then the pair", ["Space", "Control", "Option", "wait 0.5", "Space"] + release, []),
+            ("Control, Space, Option", ["Control", "Space", "Option", "wait 0.5", "Space"] + release, []),
+            ("Control, Space let go, Option", ["Control", "Space", "Space", "Option", "wait 0.5"] + release, []),
+            ("the pair, then Space swallowed down and up",
+             ["Control", "Option", "wait 0.5", "Space swallowed", "wait 0.5", "Space swallowed", "wait 0.5"] + release, [.start, .send]),
+            ("the pair, Space down seen and up swallowed",
+             ["Control", "Option", "wait 0.5", "Space", "Space swallowed", "wait 0.5"] + release, [.start, .send]),
+            ("the pair then Space then Shift cancels",
+             ["Control", "Option", "wait 0.5", "Space", "Shift", "wait 0.5", "Shift", "Space"] + release, [.start, .cancel]),
+        ]
+        var problems: [String] = []
+        for (name, moves, expected) in cases {
+            for run in [talk, WalkRun.all[1]] {
+                let result = replayWithLog(run, moves)
+                if !result.found.isEmpty { problems.append("\(name), \(run.name): \(result.found[0])") }
+                if run.name == talk.name, result.effects != expected {
+                    problems.append("\(name): the machine returned \(result.effects), expected \(expected)")
+                }
+            }
+        }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    /// The orders of the Eighth pass (finding 1): Carbon swallows Space, and only the live key state shows it.
+    @Test func theSwallowedSpaceOrdersKeepTheRules() {
+        let carbon = WalkRun.all.first { $0.name.hasPrefix("A-carbon") }!
+        let release = ["Option", "Control", "wait 0.5"]
+        typealias E = VoiceKeyMachine.Effect
+        let cases: [(String, [String], [E])] = [
+            ("Space first, then the pair: not a chord, nothing starts",
+             ["Space swallowed", "Control", "Option", "wait 0.5", "Space swallowed"] + release, []),
+            ("the pair sends, Space stays, the pair again: nothing starts (I6)",
+             ["Control", "Option", "wait 0.5", "Space swallowed", "Option", "Control", "wait 0.5", "Control", "Option", "wait 0.5",
+              "Space swallowed"] + release, [.start, .send]),
+            ("Control, Space, Option: Space came before the set",
+             ["Control", "Space swallowed", "Option", "wait 0.5", "Space swallowed"] + release, []),
+            ("the pair, Space clean, released, Space let go, the pair again starts",
+             ["Control", "Option", "wait 0.5", "Space swallowed"] + release + ["Space swallowed", "Control", "Option", "wait 0.5"] + release,
+             [.start, .send, .start, .send]),
+        ]
+        var problems: [String] = []
+        for (name, moves, expected) in cases {
+            let result = replayWithLog(carbon, moves)
+            if !result.found.isEmpty { problems.append("\(name): \(result.found[0])") }
+            if result.effects != expected { problems.append("\(name): the machine returned \(result.effects), expected \(expected)") }
+        }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    /// The mistake finding 1 was: an adapter that never tells the machine about a Space Carbon hides. With every Space
+    /// swallowed and the live-state injection off, a start can follow a Space that was never clean.
+    @Test func theSearchSeesAnAdapterThatNeverLearnsOfASwallowedSpace() {
+        let carbon = WalkRun.all.first { $0.name.hasPrefix("A-carbon") }!
+        let blind = WalkRun("A-carbon with no live-state injection", keys: carbon.keys, own: carbon.ownCodes, configs: carbon.configs,
+                            late: true, chord: true, carbon: true, injection: false)
+        let report = search(blind, until: "I6s")
+        #expect(report.violations.contains { $0.hasPrefix("I6s") }, "\(report.violations)")
+        print("voice key walk A-carbon, injection off: \(report.violations.first ?? "no violation")")
+    }
+
+    /// The mistake the chord search must see: a machine that does not tolerate the chord reads a clean Space as foreign and
+    /// cancels the turn. Run A with the chord rules on and the config's chord off must report I9.
+    @Test func theSearchSeesAMachineThatDoesNotTolerateTheChord() {
+        let shipped = WalkRun.all[0]
+        let config = shipped.configs[0]
+        let intolerant = WalkRun("A with the chord rules and a machine that has no chord", keys: shipped.keys, own: shipped.ownCodes,
+                                 configs: [VoiceKeyMachine.Config(key: config.key, role: config.role, mode: config.mode,
+                                                                  confirm: config.confirm, chord: nil)],
+                                 late: true, chord: true)
+        let report = search(intolerant, until: "I9")
+        #expect(report.violations.contains { $0.hasPrefix("I9") }, "\(report.violations)")
+    }
+
+    /// As a check on the state key: run A walked plainly from rest, every order up to five steps over nine moves (the eight of before and Space).
     /// It must meet no state the search did not, and break no rule.
     @Test func aPlainWalkOfRunAMeetsNoStateTheSearchDidNotAndBreaksNoRule() {
         let run = WalkRun.all[0]
@@ -1131,7 +1384,7 @@ private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
         }
         walk(Sim(run), depth: 0, trail: [])
         print("voice key walk, plain: \(sequences) sequences")
-        #expect(sequences == 37_448)
+        #expect(sequences == 66_429)
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 }

@@ -23,7 +23,7 @@ struct HotkeyMonitorMachineTests {
 
     private func make(key: Shortcut = .controlOption, role: HotkeyMonitor.Role = .talk, shared: Bool = false,
                       toggle: Bool = false, voiceOver: Bool = false, confirm: TimeInterval = 0,
-                      live: ShortcutModifiers? = nil) -> (HotkeyMonitor, Calls) {
+                      live: ShortcutModifiers? = nil, chord: UInt16? = nil) -> (HotkeyMonitor, Calls) {
         let monitor = HotkeyMonitor()
         let calls = Calls()
         monitor.role = role
@@ -33,6 +33,7 @@ struct HotkeyMonitorMachineTests {
         monitor.voiceOverProvider = { voiceOver }
         monitor.confirmProvider = { confirm }
         monitor.liveModifiers = { live }
+        monitor.chordProvider = { chord }
         monitor.onPress = { calls.presses += 1; calls.log.append("press"); return calls.takes }
         monitor.onRelease = { calls.releases += 1; calls.log.append("release") }
         monitor.onCancel = { calls.cancels += 1; calls.log.append("cancel") }
@@ -91,6 +92,104 @@ struct HotkeyMonitorMachineTests {
         swapChord(direct, consumed: false)
         try await wait(0.6)
         #expect(tapCalls.log == directCalls.log, "\(tapCalls.log) against \(directCalls.log)")
+    }
+
+    // MARK: The talk chord (docs/ULTRON-CHORD-PLAN.md)
+
+    private let space: UInt16 = 49
+
+    /// Control and Option held, Space down for a while and up again, then the pair let go.
+    private func chordHold(_ monitor: HotkeyMonitor) async throws {
+        controlOption(monitor)
+        try await wait(0.1)
+        monitor.feed(.keyDown(keyCode: space, modifiers: [.control, .option]))
+        try await wait(0.35)
+        monitor.feed(.keyUp(keyCode: space))
+        try await wait(0.05)
+        allUp(monitor)
+        try await wait(0.6)
+    }
+
+    @Test func theTalkChordCallsPressOnceAndReleaseOnce() async throws {
+        let (monitor, calls) = make(chord: space)
+        try await chordHold(monitor)
+        #expect(calls.presses == 1 && calls.releases == 1 && calls.cancels == 0, "\(calls.log)")
+        #expect(calls.log == ["press", "release"], "\(calls.log)")
+    }
+
+    @Test func theTalkChordWithTheChordOffCancelsAsBefore() async throws {
+        let (monitor, calls) = make(chord: nil)
+        try await chordHold(monitor)
+        #expect(calls.presses == 1 && calls.cancels == 1 && calls.releases == 0, "\(calls.log)")
+    }
+
+    @Test func aSpaceTypedAloneCallsNothing() async throws {
+        let (monitor, calls) = make(chord: space)
+        monitor.feed(.keyDown(keyCode: space, modifiers: []))
+        monitor.feed(.keyUp(keyCode: space))
+        try await wait(0.6)
+        #expect(calls.log.isEmpty, "\(calls.log)")
+    }
+
+    // MARK: A Space no monitor heard (Carbon holds the talk chord, so its key-down never reaches the monitors)
+
+    private final class LiveSpace { var down = false }
+
+    private func swallowing(_ live: LiveSpace) -> (HotkeyMonitor, Calls) {
+        let (monitor, calls) = make(chord: space)
+        monitor.keysStillDown = { $0.filter { $0 == 49 && live.down } }
+        return (monitor, calls)
+    }
+
+    @Test func aSwallowedSpaceHeldBeforeTheSetKeepsTheSetFromStarting() async throws {
+        let live = LiveSpace()
+        let (monitor, calls) = swallowing(live)
+        live.down = true // Space went down first and no event said so
+        controlOption(monitor)
+        try await wait(0.1)
+        #expect(calls.presses == 0, "Space came before the set: not the chord: \(calls.log)")
+        allUp(monitor)
+        live.down = false
+        try await wait(0.1)
+        controlOption(monitor)
+        #expect(calls.presses == 1, "everything was up in between: \(calls.log)")
+        allUp(monitor)
+        try await wait(0.6)
+    }
+
+    @Test func aSwallowedSpaceHeldPastTheSendDoesNotLetTheSetStartAgain() async throws {
+        let live = LiveSpace()
+        let (monitor, calls) = swallowing(live)
+        controlOption(monitor)
+        try await wait(0.1)
+        live.down = true // the chord Space, swallowed
+        allUp(monitor)
+        try await wait(0.6)
+        #expect(calls.log == ["press", "release"], "the clean chord sends: \(calls.log)")
+        controlOption(monitor)
+        try await wait(0.1)
+        #expect(calls.presses == 1, "Space is still down: the set is not alone, nothing starts (I6): \(calls.log)")
+        allUp(monitor)
+        live.down = false
+        try await wait(0.1)
+        controlOption(monitor)
+        #expect(calls.presses == 2, "Space is up and so is everything else: \(calls.log)")
+        allUp(monitor)
+        try await wait(0.6)
+    }
+
+    /// The pair at 0.00 and 0.01 arms a press that waits 0.15 s. Control comes up at 0.05, Space goes down with no event, and
+    /// the main thread is busy until 0.30. The Space is found on the flags event of Control, which is read at its own time
+    /// and not at the time it is heard: the pair never stood for the confirm, so nothing starts.
+    @Test func aSwallowedSpaceFoundOnALateFlagsEventIsReadAtThatEventsTime() {
+        let live = LiveSpace()
+        let (monitor, calls) = swallowing(live)
+        monitor.confirmProvider = { 0.15 }
+        let clock = Clock()
+        armedThenBusy(monitor, clock)
+        live.down = true
+        monitor.feed(.flags(keyCode: 59, modifiers: [.option]), at: 0.05)
+        #expect(calls.log.isEmpty, "a tap shorter than the confirm does nothing, Space or not: \(calls.log)")
     }
 
     // MARK: Cancel and release

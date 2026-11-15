@@ -6,8 +6,8 @@ import Foundation
 /// It reads the keyboard through `KeyFacts`, as the voice key machine does, so one rule decides what is a clean press,
 /// a release and a larger chord (docs/VOICE-KEY-MACHINE-PLAN.md, 4.5). Rules: the chord starts the moment it is held
 /// exactly, or after `confirm` when a tiling chord holds the key's modifiers. Any other key or modifier joining
-/// cancels the turn (the "spoil" rule), so Control+Option+Space (Chat) and other chords that
-/// share the modifiers keep working. Nothing starts again until every key is up, and the wait begins as soon as the
+/// cancels the turn (the "spoil" rule), so Control+Option+C (Chat) and other chords that
+/// share the modifiers keep working. Space is no exception here: the talk chord (Control+Option+Space) belongs to the talk key. Nothing starts again until every key is up, and the wait begins as soon as the
 /// key's own set is down with something foreign, even before a hold began.
 public struct PointingKeyGesture: Sendable, Equatable {
     public enum Output: Equatable, Sendable {

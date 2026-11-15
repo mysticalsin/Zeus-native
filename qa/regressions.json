@@ -5554,6 +5554,103 @@
         "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
         "function": "theNotchGapIsExactlyTheNotchForEveryNotchAndExtra"
       }
+    },
+    {
+      "id": "REG-628",
+      "failure": "Space joining a held Control-Option talk turn cancelled it: the Space press made the hold foreign, so Control-Option-Space could not continue a turn.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+        "function": "aChordJoiningAHeldTalkTurnContinuesIt"
+      }
+    },
+    {
+      "id": "REG-629",
+      "failure": "A Space pressed before the Control-Option pair still started a talk turn once the pair came down, so a Space with the modifiers pressed after it opened the microphone.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+        "function": "theChordKeyFirstStartsNothingUntilEverythingIsUp"
+      }
+    },
+    {
+      "id": "REG-630",
+      "failure": "Beside tiling, a fast Control-Option-Space press dropped the talk turn or started it before the 0.15 s confirm, instead of starting once after the confirm.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+        "function": "aChordPressedFastBesideTilingStartsAfterTheConfirm"
+      }
+    },
+    {
+      "id": "REG-631",
+      "failure": "A Space pressed first, then Control and Option, ended a hands-free talk turn that only a clean Control-Option press may end.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+        "function": "aChordKeyFirstNeverEndsAHandsFreeTurn"
+      }
+    },
+    {
+      "id": "REG-632",
+      "failure": "The Control-Option-Space chord was offered where it does not belong: shared dictation, VoiceOver, a recorded talk key, or keys that Chat, the agent picker or Quick to-do already hold.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theChordIsOnlyOnTheBareControlOptionTalkKey"
+      }
+    },
+    {
+      "id": "REG-633",
+      "failure": "A fresh install opened Chat on Control-Option-Space, the keys of the talk chord, and a stored Chat choice could be overwritten by a new default.",
+      "features": [
+        "F11",
+        "F12"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ChatHotkeyTests.swift",
+        "function": "aFreshInstallOpensChatOnControlOptionCAndAChoiceIsKept"
+      }
+    },
+    {
+      "id": "REG-634",
+      "failure": "Two Carbon hot key handlers on one application target answered every Zeus hot key, so a new registration could open Chat or the agent picker.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ChatHotkeyTests.swift",
+        "function": "eachCarbonHotkeyAnswersOnlyItsOwnSignature"
+      }
+    },
+    {
+      "id": "REG-635",
+      "failure": "A tiling binding on Control-Option-Space was not named as a clash with the talk chord, so the tiling tap could consume the chord.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
+        "function": "aTilingBindingOnTheTalkChordIsNamed"
+      }
     }
   ]
 }

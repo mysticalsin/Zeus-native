@@ -4780,6 +4780,49 @@
               "function": "aTechnicalErrorBecomesAnInCharacterLine"
             }
           ]
+        },
+        {
+          "id": "F11.talk-chord",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Control-Option-Space joins a held talk turn without a second start or a typed key, only on the bare Control-Option key in hold mode with VoiceOver off, never ends a hands-free turn when Space comes first, yields to an explicit Chat choice, and every Carbon hot key answers only its own signature.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+              "function": "aChordJoiningAHeldTalkTurnContinuesIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+              "function": "theChordKeyFirstStartsNothingUntilEverythingIsUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+              "function": "aChordPressedFastBesideTilingStartsAfterTheConfirm"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+              "function": "aChordKeyFirstNeverEndsAHandsFreeTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "theChordIsOnlyOnTheBareControlOptionTalkKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChatHotkeyTests.swift",
+              "function": "aFreshInstallOpensChatOnControlOptionCAndAChoiceIsKept"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChatHotkeyTests.swift",
+              "function": "eachCarbonHotkeyAnswersOnlyItsOwnSignature"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
+              "function": "aTilingBindingOnTheTalkChordIsNamed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theChordOrdersKeepTheRules"
+            }
+          ]
         }
       ]
     },

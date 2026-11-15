@@ -1054,6 +1054,222 @@ import Testing
         rig.down = []
         #expect(rig.press(Self.ctrl, Self.opt, at: 5) == [.start, .wake(after: 0.25)])
     }
+
+    // MARK: The chord: Space joins the held Control-Option (docs/ULTRON-CHORD-PLAN.md)
+
+    static func talkChord(confirm: TimeInterval = 0) -> Config {
+        Config(key: .controlOption, role: .talk, mode: .hold, confirm: confirm, chord: space)
+    }
+
+    private static func withoutWakes(_ log: [Effect]) -> [Effect] {
+        log.filter { if case .wake = $0 { return false } else { return true } }
+    }
+
+    @Test func aChordJoiningAHeldTalkTurnContinuesIt() {
+        var rig = Rig(Self.talkChord())
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0) == [.start, .wake(after: 0.25)])
+        #expect(rig.type(Self.space, at: 0.5) == [], "Space is not foreign: same turn, no second start")
+        #expect(rig.tag == "holding")
+        #expect(rig.tick(at: 0.75) == [.wake(after: 0.25)], "the check finds the turn still running")
+        #expect(rig.release(Self.opt, at: 1) == [.send], "the release sends it, with Space still down")
+        #expect(rig.tag == "idle")
+        #expect(Self.withoutWakes(rig.log) == [.start, .send])
+    }
+
+    @Test func theChordReleasedBeforeTheModifiersKeepsTheTurn() {
+        var rig = Rig(Self.talkChord())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        rig.type(Self.space, at: 0.5)
+        #expect(rig.untype(Self.space, at: 0.75) == [], "letting go of Space leaves the hold clean")
+        #expect(rig.tag == "holding" && !rig.machine.barred)
+        #expect(rig.tick(at: 1) == [.wake(after: 0.25)])
+        #expect(rig.release(Self.opt, at: 1.5) == [.send])
+        #expect(Self.withoutWakes(rig.log) == [.start, .send])
+    }
+
+    @Test func releasingAModifierWithTheChordKeyDownSends() {
+        var rig = Rig(Self.talkChord())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        rig.type(Self.space, at: 0.5)
+        #expect(rig.release(Self.opt, at: 1) == [.send])
+        #expect(rig.release(Self.ctrl, at: 1.0625) == [])
+        #expect(rig.untype(Self.space, at: 1.125) == [])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 2) == [.start, .wake(after: 0.25)], "everything was up, so a new press starts")
+        var quick = Rig(Self.talkChord())
+        quick.press(Self.ctrl, Self.opt, at: 0)
+        quick.type(Self.space, at: 0.0625)
+        #expect(quick.release(Self.opt, at: 0.125) == [.wake(after: 0.4)], "a quick chord is a quick tap, the gap decides the rest")
+        #expect(quick.tag == "tapped open")
+    }
+
+    @Test func aChordPressedFastBesideTilingStartsAfterTheConfirm() {
+        var rig = Rig(Self.talkChord(confirm: 0.15))
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0) == [.wake(after: 0.15)])
+        #expect(rig.type(Self.space, at: 0.05) == [])
+        #expect(rig.tag == "armed first", "Space does not drop the press")
+        #expect(rig.tick(at: 0.15) == [.start, .wake(after: 0.25)], "one start at since + confirm")
+        #expect(rig.tag == "holding")
+        var short = Rig(Self.talkChord(confirm: 0.15))
+        short.press(Self.ctrl, Self.opt, at: 0)
+        short.type(Self.space, at: 0.0125)
+        #expect(short.release(Self.opt, at: 0.0625) == [], "a chord tap shorter than the confirm does nothing, as the bare key")
+        #expect(!short.log.contains(.start))
+    }
+
+    @Test func theChordKeyFirstStartsNothingUntilEverythingIsUp() {
+        var rig = Rig(Self.talkChord())
+        #expect(rig.type(Self.space, at: 0) == [])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0.25) == [], "Space came before the pair")
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        #expect(rig.untype(Self.space, at: 0.5) == [])
+        #expect(rig.tag == "idle" && rig.machine.barred, "letting go of Space does not lift the bar")
+        #expect(rig.tick(at: 0.75) == [])
+        rig.release(Self.opt, Self.ctrl, at: 1)
+        #expect(!rig.machine.barred)
+        #expect(rig.press(Self.ctrl, Self.opt, at: 2) == [.start, .wake(after: 0.25)])
+    }
+
+    @Test func aChordKeyBeforeTheWholePairIsForeign() {
+        var rig = Rig(Self.talkChord())
+        rig.press(Self.ctrl, at: 0)
+        #expect(rig.type(Self.space, at: 0.0625) == [])
+        #expect(rig.press(Self.opt, at: 0.125) == [], "Control, Space, Option starts nothing")
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        var gone = Rig(Self.talkChord())
+        gone.press(Self.ctrl, at: 0)
+        gone.type(Self.space, at: 0.0625)
+        gone.untype(Self.space, at: 0.125)
+        #expect(gone.press(Self.opt, at: 0.25) == [], "Space let go before Option was still before the whole pair")
+        #expect(gone.tag == "idle" && gone.machine.barred)
+        gone.release(Self.opt, Self.ctrl, at: 0.5)
+        #expect(gone.press(Self.ctrl, Self.opt, at: 1) == [.start, .wake(after: 0.25)])
+    }
+
+    @Test func aChordWithCommandCancels() {
+        var rig = Rig(Self.talkChord())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        rig.type(Self.space, at: 0.5)
+        #expect(rig.press(Self.cmdL, at: 0.75) == [.cancel])
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        var typed = Rig(Self.talkChord())
+        typed.press(Self.ctrl, Self.opt, at: 0)
+        typed.type(Self.space, at: 0.5)
+        #expect(typed.type(Self.left, carrying: .function, at: 0.75) == [.cancel], "another key beside the chord is foreign")
+        var armed = Rig(Self.talkChord(confirm: 0.15))
+        armed.press(Self.ctrl, Self.opt, at: 0)
+        armed.type(Self.space, at: 0.0125)
+        #expect(armed.press(Self.shift, at: 0.05) == [], "an armed press with something foreign is dropped")
+        #expect(armed.tag == "idle" && armed.machine.barred)
+        #expect(armed.tick(at: 0.15) == [])
+    }
+
+    @Test func theChordKeyDuringAnOpenTapCancelsIt() {
+        var rig = Rig(Self.talkChord())
+        rig.tap(Self.pair, at: 0)
+        #expect(rig.tag == "tapped open")
+        #expect(rig.type(Self.space, at: 0.25) == [.cancel], "Space typed inside the gap is typing, as any other key")
+        #expect(rig.tag == "idle")
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0.3125) == [], "the pair after it starts nothing")
+        #expect(rig.machine.barred)
+        var closed = Rig(Self.talkChord(confirm: 0.15))
+        closed.tap(Self.pair, at: 0)
+        #expect(closed.tag == "tapped")
+        closed.type(Self.space, at: 0.25)
+        #expect(closed.press(Self.ctrl, Self.opt, at: 0.3125) == [])
+        #expect(closed.tag == "idle" && closed.machine.barred)
+    }
+
+    @Test func theChordEndsAHandsFreeTurnOnlyAfterTheConfirm() {
+        var rig = Rig(Self.talkChord(confirm: 0.15))
+        rig.tap(Self.pair, at: 0)
+        rig.press(Self.ctrl, Self.opt, at: 0.25)
+        rig.release(Self.opt, at: 0.375)
+        rig.release(Self.ctrl, at: 0.375)
+        #expect(rig.tag == "latched" && rig.machine.isLatched)
+        #expect(rig.press(Self.ctrl, Self.opt, at: 4) == [.wake(after: 0.15)])
+        #expect(rig.type(Self.space, at: 4.05) == [])
+        #expect(rig.tag == "armed ending" && rig.machine.isLatched)
+        #expect(rig.tick(at: 4.15) == [.send], "the chord sends once the confirm has passed")
+        #expect(rig.tag == "spent")
+        rig.untype(Self.space, at: 4.25)
+        #expect(rig.tag == "spent" || rig.tag == "idle")
+        var atPress = Rig(Self.talkChord())
+        atPress.tap(Self.pair, at: 0)
+        atPress.tap(Self.pair, at: 0.25)
+        #expect(atPress.tag == "latched")
+        #expect(atPress.press(Self.ctrl, Self.opt, at: 4) == [.send], "with no confirm it sends at the press")
+        #expect(atPress.type(Self.space, at: 4.05) == [], "Space after the send does nothing more")
+        #expect(atPress.untype(Self.space, at: 4.1) == [])
+        atPress.release(Self.opt, Self.ctrl, at: 4.2)
+        #expect(atPress.press(Self.ctrl, Self.opt, at: 5) == [.start, .wake(after: 0.25)])
+    }
+
+    @Test func aChordKeyFirstNeverEndsAHandsFreeTurn() {
+        var rig = Rig(Self.talkChord())
+        rig.tap(Self.pair, at: 0)
+        rig.tap(Self.pair, at: 0.25)
+        #expect(rig.tag == "latched")
+        #expect(rig.type(Self.space, at: 4) == [])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 4.0625) == [], "Space first: the pair does not end the turn")
+        #expect(rig.tick(at: 4.5) == [])
+        #expect(rig.tag == "latched" && rig.machine.isLatched)
+        rig.untype(Self.space, at: 4.75)
+        #expect(rig.release(Self.opt, Self.ctrl, at: 5) == [])
+        #expect(rig.tag == "latched" && rig.machine.isLatched)
+        #expect(!Self.withoutWakes(rig.log).contains(.send) && !rig.log.contains(.cancel))
+    }
+
+    @Test func aRepeatedChordKeyDownStartsNothingMore() {
+        var rig = Rig(Self.talkChord())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        rig.type(Self.space, at: 0.5)
+        #expect(rig.type(Self.space, at: 0.5625) == [])
+        #expect(rig.type(Self.space, at: 0.625) == [])
+        #expect(rig.tag == "holding")
+        #expect(rig.log.filter { $0 == .start }.count == 1)
+        var armed = Rig(Self.talkChord(confirm: 0.15))
+        armed.press(Self.ctrl, Self.opt, at: 0)
+        armed.type(Self.space, at: 0.025)
+        #expect(armed.type(Self.space, at: 0.05) == [])
+        #expect(armed.tick(at: 0.15) == [.start, .wake(after: 0.25)])
+    }
+
+    @Test func withoutAChordSpaceStillCancels() {
+        var rig = Rig(Self.talk())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        #expect(rig.type(Self.space, at: 0.5) == [.cancel])
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        var gone = Rig(Self.talkChord())
+        gone.press(Self.ctrl, Self.opt, at: 0)
+        gone.type(Self.space, at: 0.5)
+        gone.config = Self.talk()
+        #expect(gone.untype(Self.space, at: 0.75) == [.cancel], "after the chord is turned off the Space that was down reads foreign")
+        #expect(gone.tag == "idle" && gone.machine.barred)
+        var still = Rig(Self.talkChord())
+        still.press(Self.ctrl, Self.opt, at: 0)
+        still.type(Self.space, at: 0.5)
+        still.config = Self.talk()
+        #expect(still.tick(at: 0.75) == [.wake(after: 0.25)], "a tick reads the same picture and finds no change")
+        #expect(still.tag == "holding", "switching the chord off never cancels a turn by itself")
+    }
+
+    @Test func dictationAndSharedKeysIgnoreTheChord() {
+        var dictation = Rig(Config(key: .controlOption, role: .dictation, mode: .hold, chord: Self.space))
+        dictation.press(Self.ctrl, Self.opt, at: 0)
+        #expect(dictation.type(Self.space, at: 0.5) == [.cancel])
+        var shared = Rig(Config(key: .controlOption, role: .talk, mode: .shared, chord: Self.space))
+        shared.press(Self.ctrl, Self.opt, at: 0)
+        #expect(shared.type(Self.space, at: 0.0625) == [])
+        #expect(shared.tag == "idle" && shared.machine.barred)
+        var sharedDictation = Rig(Config(key: .controlOption, role: .dictation, mode: .shared, chord: Self.space))
+        sharedDictation.press(Self.ctrl, Self.opt, at: 0)
+        #expect(sharedDictation.type(Self.space, at: 0.0625) == [])
+        #expect(sharedDictation.tag == "idle" && sharedDictation.machine.barred)
+        var toggle = Rig(Config(key: .rightCommand, role: .talk, mode: .toggle, chord: Self.space))
+        toggle.press(Self.cmdR, at: 0)
+        toggle.type(Self.space, at: 0.5)
+        #expect(toggle.tag == "idle", "a toggle key never reads the chord")
+    }
 }
 
 private extension VoiceKeyMachine {

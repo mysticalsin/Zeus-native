@@ -7,10 +7,10 @@ import Testing
     private static let ctrlL: UInt16 = 59, optL: UInt16 = 58, shiftL: UInt16 = 56, cmdL: UInt16 = 55, cmdR: UInt16 = 54
     private static let fn: UInt16 = 63, left: UInt16 = 123, space: UInt16 = 49, t: UInt16 = 17
 
-    private func facts(_ events: [ShortcutEvent], _ key: Shortcut) -> KeyFacts {
+    private func facts(_ events: [ShortcutEvent], _ key: Shortcut, chord: UInt16? = nil) -> KeyFacts {
         var state = ShortcutState()
         for event in events { state.apply(event) }
-        return KeyFacts(of: state, key: key)
+        return KeyFacts(of: state, key: key, chord: chord)
     }
 
     private let ctrl: ShortcutEvent = .flags(keyCode: ctrlL, modifiers: .control)
@@ -79,6 +79,61 @@ import Testing
         let globe = Shortcut(keyCode: Self.t, modifiers: .function)
         let asked = facts([.flags(keyCode: Self.fn, modifiers: .function), .keyDown(keyCode: Self.t, modifiers: .function)], globe)
         #expect(asked.ownDown && !asked.foreignModifier)
+    }
+
+    // MARK: A chord key beside a modifier-only key
+
+    @Test func aChordKeyJoiningTheOwnSetIsNotForeign() {
+        let joined = facts([ctrl, ctrlOpt, .keyDown(keyCode: Self.space, modifiers: [.control, .option])], .controlOption, chord: Self.space)
+        #expect(joined.ownDown && joined.chordDown && !joined.foreignKey && !joined.foreignModifier)
+        let released = facts([ctrl, ctrlOpt, .keyDown(keyCode: Self.space, modifiers: [.control, .option]), .keyUp(keyCode: Self.space)],
+                             .controlOption, chord: Self.space)
+        #expect(released.ownDown && !released.chordDown && !released.foreignKey, "letting go of the chord key leaves the hold clean")
+    }
+
+    @Test func aChordKeyWithShiftOrAnotherKeyIsForeign() {
+        let shift = facts([ctrl, ctrlOpt, .keyDown(keyCode: Self.space, modifiers: [.control, .option]),
+                           .flags(keyCode: Self.shiftL, modifiers: [.control, .option, .shift])], .controlOption, chord: Self.space)
+        #expect(shift.chordDown && shift.foreignModifiers == .shift)
+        let other = facts([ctrl, ctrlOpt, .keyDown(keyCode: Self.space, modifiers: [.control, .option]),
+                           .keyDown(keyCode: Self.t, modifiers: [.control, .option])], .controlOption, chord: Self.space)
+        #expect(other.foreignKey && other.chordDown)
+    }
+
+    @Test func aKeyThatSpoiledTheChordStaysForeignAfterItIsUp() {
+        let tUp = facts([ctrl, ctrlOpt, .keyDown(keyCode: Self.space, modifiers: [.control, .option]),
+                         .keyDown(keyCode: Self.t, modifiers: [.control, .option]), .keyUp(keyCode: Self.t),
+                         .keyUp(keyCode: Self.space)], .controlOption, chord: Self.space)
+        #expect(tUp.foreignKey, "T spoiled the hold; only the chord key is forgiven")
+        let tFirst = facts([ctrl, ctrlOpt, .keyDown(keyCode: Self.t, modifiers: [.control, .option]), .keyUp(keyCode: Self.t)],
+                           .controlOption, chord: Self.space)
+        #expect(tFirst.foreignKey)
+    }
+
+    @Test func withoutAChordSpaceSpoilsAsBefore() {
+        let events: [ShortcutEvent] = [ctrl, ctrlOpt, .keyDown(keyCode: Self.space, modifiers: [.control, .option]), .keyUp(keyCode: Self.space)]
+        #expect(facts(events, .controlOption).foreignKey)
+        #expect(facts(events, .controlOption, chord: nil) == facts(events, .controlOption))
+        #expect(!facts(events, .controlOption, chord: nil).chordDown)
+        let held = facts(Array(events.dropLast()), .controlOption)
+        #expect(held.foreignKey && !held.chordDown)
+    }
+
+    @Test func spoilersClearWhenEveryModifierIsUp() {
+        var state = ShortcutState()
+        state.apply(ctrl); state.apply(ctrlOpt)
+        state.apply(.keyDown(keyCode: Self.space, modifiers: [.control, .option]))
+        state.apply(.keyDown(keyCode: Self.t, modifiers: [.control, .option]))
+        #expect(state.spoilers == [Self.space, Self.t] && state.spoiled)
+        state.apply(.keyUp(keyCode: Self.space)); state.apply(.keyUp(keyCode: Self.t))
+        #expect(state.spoilers == [Self.space, Self.t], "a key up does not clear the spoilers")
+        state.apply(.flags(keyCode: Self.ctrlL, modifiers: .option))
+        #expect(state.spoiled)
+        state.apply(.flags(keyCode: Self.optL, modifiers: []))
+        #expect(state.spoilers.isEmpty && !state.spoiled)
+        var typed = ShortcutState()
+        typed.apply(.keyDown(keyCode: Self.space, modifiers: []))
+        #expect(typed.spoilers.isEmpty, "a key typed with nothing held spoils nothing")
     }
 
     // MARK: The picture

@@ -83,6 +83,54 @@ struct TilingKeyClashTests {
         #expect(TilingKeyClash.Keys.live().dictationToggles == (dictation.enabled && dictation.selectedBehavior == .pressToToggle))
     }
 
+    // MARK: The talk chord, and one signature for each Carbon registration
+
+    @Test func theLiveKeysCarryTheTalkChordOnlyWhileItIsActive() {
+        let live = TilingKeyClash.Keys.live()
+        let dictation = DictationSettings.shared
+        let heard = VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk, dictation: dictation.enabled ? dictation.key : nil,
+                                              pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
+                                              voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled)
+        let shared = dictation.enabled && Preferences.shared.pushToTalk == dictation.key
+        #expect(live.talkChord == TalkChordRouting.current(heard: heard, shared: shared).chord)
+        if let chord = live.talkChord { #expect(chord == VoiceKey.talkChord) }
+    }
+
+    @Test func aTilingKeyOnTheTalkChordIsRefusedWithItsName() throws {
+        var keymap = TileKeymap()
+        try keymap.bind(VoiceKey.talkChord, to: .retile)
+        func keys(_ chord: Shortcut?) -> TilingKeyClash.Keys {
+            TilingKeyClash.Keys(talk: .rightOption, dictation: nil, pointing: nil, polyglot: nil, chat: .off,
+                                voiceOverOn: false, others: [], talkChord: chord)
+        }
+        let found = TilingKeyClash.note(base: .controlOption, keymap: keymap, keys: keys(VoiceKey.talkChord))
+        #expect(found?.contains("Talk to Zeus chord") == true, "\(String(describing: found))")
+        #expect(TilingKeyClash.note(base: .controlOption, keymap: keymap, keys: keys(nil)) == nil, "no chord, no note")
+    }
+
+    /// Every Carbon registration answers one signature, and its handler answers only that one: two handlers on one
+    /// application target both see every hot key, so a shared signature would let one key run another's action.
+    @Test func everyCarbonRegistrationHasItsOwnSignature() throws {
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Zeus")
+        let files = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        var registering: [String: String] = [:]
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            if text.contains("RegisterEventHotKey(") { registering[url.lastPathComponent] = text }
+        }
+        #expect(registering.keys.sorted() == ["ChatHotkeyMonitor.swift", "ExtraPreferences.swift", "TalkChordHotkey.swift"],
+                "a new Carbon hot key needs its own signature: \(registering.keys.sorted())")
+        let own = ["ChatHotkeyMonitor.swift": "chat", "ExtraPreferences.swift": "center", "TalkChordHotkey.swift": "talkChord"]
+        for (file, text) in registering {
+            let name = own[file] ?? "?"
+            #expect(text.contains("CarbonHotkeySignature.\(name).rawValue"), "\(file) registers with the \(name) signature")
+            #expect(!text.contains("0x5A455553"), "\(file) must not spell the ZEUS signature itself")
+            #expect(text.contains("signature") && (text.contains("CarbonHotkeySignature.owner(signature:") || text.contains("answers(signature:"))
+                    || !text.contains("InstallEventHandler("), "\(file)'s handler checks which hot key fired")
+        }
+    }
+
     // MARK: Polyglot, and every monitor key in one place
 
     @Test func theShippedPolyglotKeyIsRefusedOnTheControlOptionPair() {

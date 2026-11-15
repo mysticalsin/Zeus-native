@@ -18,9 +18,12 @@ public struct KeyFacts: Equatable, Sendable {
     /// No modifier and no ordinary key is down.
     public let allUp: Bool
 
+    /// The chord key the caller allows beside a modifier-only key is down.
+    public let chordDown: Bool
+
     public var foreignModifier: Bool { !foreignModifiers.isEmpty || otherSideDown }
 
-    public init(of state: ShortcutState, key: Shortcut) {
+    public init(of state: ShortcutState, key: Shortcut, chord: UInt16? = nil) {
         let mods = state.flagModifiers
         let own = key.modifiers
         var down = key.isValid && mods.isSuperset(of: own)
@@ -30,8 +33,12 @@ public struct KeyFacts: Equatable, Sendable {
             down = down && state.keysDown.contains(code)
             if !own.contains(.function) { foreign.remove(.function) }
             foreignKey = !state.keysDown.subtracting([code]).isEmpty
+            chordDown = false
         } else {
-            foreignKey = !state.keysDown.isEmpty || state.spoiled
+            // The chord key the caller allows is not foreign; any other key, down now or earlier, is.
+            let allowed: Set<UInt16> = chord.map { [$0] } ?? []
+            foreignKey = !state.keysDown.subtracting(allowed).isEmpty || !state.spoilers.subtracting(allowed).isEmpty
+            chordDown = chord.map { state.keysDown.contains($0) } ?? false
             if key.side != .any, let entry = ShortcutModifiers.keyCodes.first(where: { $0.0 == own }) {
                 let mine = key.side == .right ? entry.right : entry.left
                 let theirs = key.side == .right ? entry.left : entry.right
