@@ -581,3 +581,44 @@ The talk chord (docs/ULTRON-CHORD-PLAN.md, 15 November 2026): Control+Option+Spa
 | --- | --- |
 | 32 | Not folded in and not reachable in a new way. The change adds a `chordProvider` read in the adapter's `config` and does not touch `HotkeyMonitor.feed`. A Space key-down reports Control and Option, already in `flagModifiers`, so `readLive(joinedOnly:)` adds nothing |
 | 33 | Not reachable in a new way. Space first reaches the queue before the modifiers, so no wake can exist yet; Space after the pair turns the "start then cancel" into a correct start with no cancel. Note for whoever fixes it: a tick that reads `keysStillDown` must pass `chord` to `KeyFacts`, or a held Space reads foreign |
+
+### Eighth pass
+
+Review of 15 November 2026 of the talk chord branch (an independent model, Opus). Every finding was checked against the code first; all nine held. Each change has a failing test commit before its fix commit.
+
+| # | Finding | Verdict | Change |
+| --- | --- | --- | --- |
+| 1 | Carbon hides Space's key-down from the monitors, so the machine never learns Space is down: hold Control+Option, Space (swallowed), release the pair (sends), keep Space, press the pair again, and the second press starts (breaks I6). Space first reads clean the same way. The watchdog resync forgets a Space that is still down (the gap in the Seventh pass) | Real, reproduced by `aSwallowedSpaceHeldPastTheSendDoesNotLetTheSetStartAgain` and `aSwallowedSpaceHeldBeforeTheSetKeepsTheSetFromStarting` | `HotkeyMonitor.feed`: on each flags event while the chord is on, if Space is not in the machine's keys and `keysStillDown([49])` has it, the machine first hears `keyDown(49)` on the flags it had before the event, so a Space-first one spoils the hold and a clean one passes. The walk found a flaw in the first version: stamped with the time the event is heard, a busy main thread made a short tap stand for the confirm and start a turn. It is now stamped with the flags event's own time (`aSwallowedSpaceFoundOnALateFlagsEventIsReadAtThatEventsTime`) |
+| 2 | A refused ZTLK registration was cached in `attempted` and never retried; Chat to C migration order could leave Space unregistered for good, leaking Space and showing a false "another app" note | Real | `TalkChordHotkey.apply` asks again when `want != nil && !isRegistered` (`aRefusedRegistrationIsAskedAgainOnTheNextSync`). The adapter's `chordProvider` syncs on every key event, so a freed key is taken at the next key |
+| 3 | `ChatHotkeyMonitor.set` registered the new key before the chord yielded: moving Chat onto Control+Option+Space while ZTLK held it failed, then ZTLK let go and nobody owned it | Real | `set` unregisters the old key, calls `onChange` (the chord yields or takes), then registers the new key. The monitor takes its Carbon calls and defaults through a seam (`Ops`, `defaults`) so the order is tested: `movingChatLetsGoThenTellsTheChordThenRegisters` |
+| 4 | `registerShortcuts()` ran before `syncTalkChord()`: an agent picker or Quick to-do preset on Control+Option+Space failed silently while ZTLK held it | Real, in the shortcut change handler (the launch call runs before ZTLK exists) | The handler syncs the chord, registers the shortcuts, then syncs again so a preset that moved off the key gives it back to the chord. Source-order lint `TalkChordOrderLint` |
+| 5 | The walk's `forgetDroppedSpace` dropped Space from `seen` whenever the machine's keys lacked it, so the walk trusted the machine | Real | Dropped only after a tick or an interrupt, the two events that resync. Any other loss now reaches the rules |
+| 6 | The checker judged I3 and I6 on `seen` only, so a swallowed Space-down was invisible | Real | New rule I6s: a start of a press that came down beside a Space that was physically down and had not joined the own set alone is a violation, whether or not any monitor heard that Space. The adapter's injection (finding 1) is modelled in the walk (`injection`); with it off, the search finds I6s (`theSearchSeesAnAdapterThatNeverLearnsOfASwallowedSpace`: Control, Space swallowed, Option, Left held, wait 4 steps, then the held event). One counter-example of the first rule version was an artefact: it judged the physical state at the start, not at the press, and a start owed by a late-heard pair is legitimate |
+| 7 | Run A had the chord on only; no run carried the shipped config with the chord off (VoiceOver on, Chat holds the chord) | Real | Run A1: confirm 0.15, `chord` nil, Space a plain foreign key |
+| 8 | `ShortcutRecorderModel` paused the hot keys with a bool: two recorders, or a recorder that began again, gave the keys back early; an app switch left the recorder listening, keys paused | Real | A counter of listening recorders (pause at 0 to 1, resume at 1 to 0); `begin` on a recording model keeps the pause; the app resigning active ends the recording. `ShortcutRecorderModelTests` |
+| 9 | ZTLK registered even when the talk monitor could hear no keys, so Space was taken and nothing talked | Real | `TalkChordHotkey.sync(_:listening:)`; the app passes `KeyListenAccess.granted` and syncs again when access is granted (`itTakesTheKeyOnlyWhileTheTalkMonitorCanHearKeys`) |
+
+Not changed: the `readLive` minor in `VoiceKeyMachine.swift` (documented; the cancel always comes).
+
+New walk runs. A1 (no chord) and A-carbon (the shipped chord with every Space key-down and key-up swallowed: no monitor ever hears Space, only `keysStillDown` shows it, the adapter injection modelled). A-carbon passes all rules (I1 to I9, I8c and I6s) and the negative variant with the injection off is found. Measured on a Mac under a load average of about 34, the whole walk and the rest of the core suite in one run took 853 s:
+
+| Run | States | Moves | Time |
+| --- | --- | --- | --- |
+| A, chord on | 1,883,647 | 28,473,473 | 844 s |
+| A0, chord on, confirm 0 | 406,896 | 6,524,802 | 304 s |
+| A1, no chord (new) | 253,450 | 3,581,849 | 195 s |
+| A-carbon, every Space swallowed (new) | 1,302,124 | 18,199,394 | 589 s |
+| A-carbon with the injection off | stops at the first I6s | | under 1 s |
+| B | 734,915 | 7,728,597 | 284 s |
+| B2 | 871,099 | 12,882,265 | 412 s |
+| C | 357,149 | 5,044,016 | 273 s |
+| D | 156,302 | 2,206,734 | 135 s |
+| E | 29,843 | 418,601 | 26 s |
+| E2 | 44,455 | 623,633 | 37 s |
+| F | 11,511 | 113,622 | 5 s |
+| G | 108,306 | 1,179,887 | 58 s |
+| H | 81,932 | 726,566 | 48 s |
+| I | 30,968 | 438,562 | 18 s |
+| J | 222,639 | 2,199,960 | 74 s |
+
+Run A grew from 1,434,509 states (before the injection, with the I6s bookkeeping) because the swallowed Space now reaches the machine on flags events. The plain walk of run A is unchanged at 66,429 sequences. The Seventh pass state counts in the Sixth pass text above are from before the chord and are out of date.

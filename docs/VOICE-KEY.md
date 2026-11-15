@@ -67,6 +67,15 @@ Carbon hides Space from the monitors nothing changes, if they see it Space is al
   overdue timer owes, settled first. New rule **I8c**: from rest, pressing Control, Option, Space acts as I8.
 - The walk models the Carbon swallow as a move with no event (`swallowed`). A watchdog tick that finds a modifier gone
   resyncs the picture and forgets every ordinary key, Space included: an existing limit the walk header names for an arrow.
+- Carbon hides Space from the key monitors, so `HotkeyMonitor.feed` asks the live key state on each flags event while the
+  chord is on: a Space that is down and unknown to the machine is told to it first, on the flags the machine had, at the
+  time of that flags event. A Space that came before the set then spoils the hold, and one that joined it does not. The walk
+  run A-carbon swallows every Space and checks this with rule I6s (no start beside a Space the keyboard did not earn as a
+  chord); with the injection off the search finds the violation.
+- The Carbon hot key behind the chord (`ZTLK`) is asked for again on every sync while it is refused, is taken only while
+  Accessibility or Input Monitoring is on, and is registered after the Chat key has moved and the shortcuts have been told.
+  Moving Chat lets go of the old key, tells the chord, then registers the new key. Settings recorders pause the Carbon hot
+  keys by count, and an app switch ends a recording.
 
 ### Chat moved to Control+Option+C
 
