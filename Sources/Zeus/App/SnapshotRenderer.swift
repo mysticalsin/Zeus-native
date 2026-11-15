@@ -792,7 +792,7 @@ enum SnapshotRenderer {
         func render(_ name: String, closed: Bool = false, _ configure: @escaping (TopBarModel) -> Void) {
             let (model, topBar) = sampleModel(configure)
             if closed { model.presentation = .closed }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("source-\(name).png"))
         }
         render("music-player") { $0.selectedTab = .music }
