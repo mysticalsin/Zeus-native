@@ -284,8 +284,13 @@ struct MCPStdioClientTests {
         let started = Date()
         await #expect(throws: MCPClientError.timedOut("slow", 1)) { try await client.callTool("slow", arguments: [:], timeout: 1) }
         #expect(Date().timeIntervalSince(started) < 5)
-        // The connection is still good after a timeout.
-        #expect(try await client.callTool("browser_navigate", arguments: ["url": .string("https://a.test")], timeout: 5).text.hasPrefix("Navigated"))
+        // A timeout closes the connection on purpose: a late answer from a server that went quiet could otherwise be
+        // matched to a newer request. The next call fails as "not running", so the caller reconnects.
+        do {
+            _ = try await client.callTool("browser_navigate", arguments: ["url": .string("https://a.test")], timeout: 5)
+            Issue.record("a call after a timeout reached a connection that should be closed")
+        } catch MCPClientError.notRunning { }
+        #expect(await client.isRunning == false)
         await client.close()
     }
 
