@@ -79,6 +79,7 @@ private enum NativeAppTestHost {
                 "^ZeusAppTests\\.OwnedWindowEventDriverTests/",
                 "^ZeusAppTests\\.ScribeComponentJourneyTests/",
                 "^ZeusAppTests\\.ScribeAccessibilityJourneyTests/",
+                "^ZeusAppTests\\.ScribeMeetingCardJourneyTests/",
                 "^ZeusAppTests\\.OnboardingComponentJourneyTests/",
                 "^ZeusAppTests\\.OnboardingFilmLifecycleTests/",
                 "^ZeusAppTests\\.ExplanationRendererTests/",
