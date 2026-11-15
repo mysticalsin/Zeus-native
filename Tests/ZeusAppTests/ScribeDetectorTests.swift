@@ -51,6 +51,7 @@ private final class Harness {
     var lookAheads: [TimeInterval] = []
     var ingested: [(calls: Int, slots: Int)] = []
     var resets = 0
+    var exits: [ScribeCallProcessIdentity] = []
     var waiting: [CheckedContinuation<ScribeCallScan, Never>] = []
     var listeners: [Listener] = []
     var micHandlers: [@MainActor @Sendable () -> Void] = []
@@ -75,7 +76,7 @@ private final class Harness {
                 },
                 ingest: { [unowned self] scan, slots, _ in ingested.append((scan.calls.count, slots.count)) },
                 reset: { [unowned self] in resets += 1 },
-                terminated: { _ in },
+                terminated: { [unowned self] in exits.append($0) },
                 now: { [unowned self] in now }),
             micObserver: { [unowned self] onChange in
                 let listener = Listener()
@@ -290,6 +291,33 @@ struct ScribeDetectorTests {
                 "the full look-ahead is read once, to choose the wake")
         #expect(listening.watcher.plan == .listening(wakeAt: sdBase.addingTimeInterval(3_600 - 120)))
         #expect(listening.scheduler.delay == TimeInterval(3_480))
+    }
+
+    @Test func theExitObserverWatchesWhileOffAndBusyAndIsRemovedByHalt() async throws {
+        // The observer reads a real app's pid, bundle id and launch date; any app of this login session has them.
+        let app = try #require(NSWorkspace.shared.runningApplications.first {
+            $0.processIdentifier > 0 && $0.bundleIdentifier != nil && $0.launchDate != nil
+        })
+        let exit = { (harness: Harness) in
+            harness.workspace.post(name: NSWorkspace.didTerminateApplicationNotification, object: nil,
+                                   userInfo: [NSWorkspace.applicationUserInfoKey: app])
+        }
+        let harness = Harness()
+        harness.mode = .off
+        harness.idle = false
+        harness.watcher.follow()
+        await harness.settle()
+        #expect(harness.watcher.isRunning, "Off with a busy machine keeps the detector reading")
+        exit(harness)
+        await harness.settle()
+        #expect(harness.exits.count == 1, "a recording bound to the app still hears that it quit")
+
+        harness.idle = true
+        harness.watcher.follow()
+        #expect(!harness.watcher.isRunning)
+        exit(harness)
+        await harness.settle()
+        #expect(harness.exits.count == 1, "halt removed the observer")
     }
 
     @Test func aStoppedDetectorIgnoresEveryWake() async {
