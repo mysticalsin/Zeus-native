@@ -23,7 +23,7 @@ struct HotkeyMonitorMachineTests {
 
     private func make(key: Shortcut = .controlOption, role: HotkeyMonitor.Role = .talk, shared: Bool = false,
                       toggle: Bool = false, voiceOver: Bool = false, confirm: TimeInterval = 0,
-                      live: ShortcutModifiers? = nil) -> (HotkeyMonitor, Calls) {
+                      live: ShortcutModifiers? = nil, chord: UInt16? = nil) -> (HotkeyMonitor, Calls) {
         let monitor = HotkeyMonitor()
         let calls = Calls()
         monitor.role = role
@@ -33,6 +33,7 @@ struct HotkeyMonitorMachineTests {
         monitor.voiceOverProvider = { voiceOver }
         monitor.confirmProvider = { confirm }
         monitor.liveModifiers = { live }
+        monitor.chordProvider = { chord }
         monitor.onPress = { calls.presses += 1; calls.log.append("press"); return calls.takes }
         monitor.onRelease = { calls.releases += 1; calls.log.append("release") }
         monitor.onCancel = { calls.cancels += 1; calls.log.append("cancel") }
@@ -91,6 +92,43 @@ struct HotkeyMonitorMachineTests {
         swapChord(direct, consumed: false)
         try await wait(0.6)
         #expect(tapCalls.log == directCalls.log, "\(tapCalls.log) against \(directCalls.log)")
+    }
+
+    // MARK: The talk chord (docs/ULTRON-CHORD-PLAN.md)
+
+    private let space: UInt16 = 49
+
+    /// Control and Option held, Space down for a while and up again, then the pair let go.
+    private func chordHold(_ monitor: HotkeyMonitor) async throws {
+        controlOption(monitor)
+        try await wait(0.1)
+        monitor.feed(.keyDown(keyCode: space, modifiers: [.control, .option]))
+        try await wait(0.35)
+        monitor.feed(.keyUp(keyCode: space))
+        try await wait(0.05)
+        allUp(monitor)
+        try await wait(0.6)
+    }
+
+    @Test func theTalkChordCallsPressOnceAndReleaseOnce() async throws {
+        let (monitor, calls) = make(chord: space)
+        try await chordHold(monitor)
+        #expect(calls.presses == 1 && calls.releases == 1 && calls.cancels == 0, "\(calls.log)")
+        #expect(calls.log == ["press", "release"], "\(calls.log)")
+    }
+
+    @Test func theTalkChordWithTheChordOffCancelsAsBefore() async throws {
+        let (monitor, calls) = make(chord: nil)
+        try await chordHold(monitor)
+        #expect(calls.presses == 1 && calls.cancels == 1 && calls.releases == 0, "\(calls.log)")
+    }
+
+    @Test func aSpaceTypedAloneCallsNothing() async throws {
+        let (monitor, calls) = make(chord: space)
+        monitor.feed(.keyDown(keyCode: space, modifiers: []))
+        monitor.feed(.keyUp(keyCode: space))
+        try await wait(0.6)
+        #expect(calls.log.isEmpty, "\(calls.log)")
     }
 
     // MARK: Cancel and release

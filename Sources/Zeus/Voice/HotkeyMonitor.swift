@@ -101,6 +101,9 @@ final class HotkeyMonitor {
     var confirmProvider: (() -> TimeInterval)?
     /// What tiling says a hold key must wait: 0 unless the tap is installed and a bound chord holds the key's modifiers.
     static var tilingConfirm: (Shortcut) -> TimeInterval = { TilingController.shared.holdConfirm(for: $0) }
+    /// The code of the key that may join this hold without spoiling it (Space on Control-Option, the talk chord), nil for
+    /// none. Only the talk role reads it, and only in hold mode.
+    var chordProvider: () -> UInt16? = { nil }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
     var liveModifiers: () -> ShortcutModifiers? = {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
