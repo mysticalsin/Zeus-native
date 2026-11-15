@@ -1346,5 +1346,25 @@ class EqualiserLint(unittest.TestCase):
         self.assertFalse(TAP_CREATION_NAMES.search("let m = FakeMonitor()"))
 
 
+class TalkChordOrderLint(unittest.TestCase):
+    """The talk chord's Carbon key (ZTLK) holds Control-Option-Space until the chord has been synced. A Carbon shortcut
+    registered before that sync fails silently while it holds, so the sync comes first where both run together."""
+
+    def test_the_chord_is_synced_before_the_shortcuts_are_registered(self):
+        lines = [line for _, line in code_lines(APP / "App/AppDelegate.swift")]
+        pairs = 0
+        for index, line in enumerate(lines):
+            if "registerShortcuts()" not in line or "func registerShortcuts" in line:
+                continue
+            nearby = lines[max(0, index - 3):index + 4]
+            if not any("syncTalkChord()" in other for other in nearby):
+                continue
+            pairs += 1
+            before = lines[max(0, index - 3):index]
+            self.assertTrue(any("syncTalkChord()" in other for other in before),
+                            f"syncTalkChord() must run before registerShortcuts(): {line.strip()}")
+        self.assertGreaterEqual(pairs, 1, "the shortcut change handler runs both")
+
+
 if __name__ == "__main__":
     unittest.main()
