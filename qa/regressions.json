@@ -4510,6 +4510,30 @@
         "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
         "function": "anImportHoldingNotchLeavesThePillInPlace"
       }
+    },
+    {
+      "id": "REG-572",
+      "failure": "A drawn notch placed off centre was drawn at its place while its hover, click and mouse zones stayed at the screen centre, so the pointer opened it where it was not drawn.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "theBodyHoverClickAndMouseRectanglesAllMoveByTheOffset"
+      }
+    },
+    {
+      "id": "REG-573",
+      "failure": "The open panel of a drawn notch placed at an extreme ran past the edge of a narrow or a wide display, because the offset was not held inside the room the panel leaves.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "atTheClampTheOpenPanelKeepsEightPointsInsideEveryDisplay"
+      }
     }
   ]
 }
