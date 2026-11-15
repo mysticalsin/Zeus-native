@@ -117,11 +117,11 @@ import Testing
     @Test func hoverZoneWidensByTheWingsAndTheirExtraWidth() {
         let plain = wings(none: false)
         let cue = wings(none: false, extra: 58)
-        // Each wing is 62 pt and the ear 8 pt: 140 pt for the pair.
+        // Each wing is 62 pt and the ear 8 pt: 140 pt for the pair, and a cue grows both wings by its extra.
         #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: plain).width == 300)
-        #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: cue).width == 358)
+        #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: cue).width == 416)
         #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: plain).width == 324)
-        #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: cue).width == 382)
+        #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: cue).width == 440)
         let zone = NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 24, wings: cue)
         #expect(zone.midX == external.midX)
         #expect(zone.height == 53)
@@ -268,7 +268,7 @@ import Testing
         #expect(NotchFootprintRules.closedSize(drawn, wings: wings(none: true, live: true)) == CGSize(width: 309, height: 32))
         // A wing kind brings the 8 pt shoulders: 185 + 16 + 124.
         #expect(NotchFootprintRules.closedSize(drawn, wings: wings(none: false)) == CGSize(width: 325, height: 32))
-        #expect(NotchFootprintRules.closedSize(drawn, wings: wings(none: false, extra: 58)) == CGSize(width: 383, height: 32))
+        #expect(NotchFootprintRules.closedSize(drawn, wings: wings(none: false, extra: 58)) == CGSize(width: 441, height: 32))
         #expect(NotchFootprintRules.closedSize(smallDrawn, wings: wings(none: true)) == CGSize(width: 140, height: 30))
     }
 
@@ -318,9 +318,9 @@ import Testing
     @Test func theHardwareNotchAndThePillKeepTheirZones() {
         let item = wings(none: false, extra: 58)
         #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: item)
-                == CGRect(x: 565, y: 951, width: 382, height: 31))
+                == CGRect(x: 536, y: 951, width: 440, height: 31))
         #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 24, wings: item)
-                == CGRect(x: 565, y: 927, width: 382, height: 55))
+                == CGRect(x: 536, y: 927, width: 440, height: 55))
         #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: nil)
                 == CGRect(x: 880, y: 1051, width: 160, height: 29))
         for offset: CGFloat in [0, 24] {

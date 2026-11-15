@@ -170,7 +170,7 @@ public enum NotchFootprintRules {
         let size = footprint.layoutSize
         var island = max(size.width, 160)
         if let wings, !wings.kindIsNone {
-            island += 2 * (NotchClosedBodyLayout.wingWidth + 8) + wings.extraWidth
+            island += 2 * (NotchClosedBodyLayout.wingWidth + 8 + wings.extraWidth)
         }
         return GlanceTopBar.hoverZone(screen: screenFrame, notch: CGSize(width: island, height: max(size.height, 30) + topOffset))
     }
