@@ -18,6 +18,15 @@ SPEC.loader.exec_module(gate)
 
 
 class RequiredGateTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Hashing every tracked file takes seconds, and each test froze its own identical copy. Freeze it
+        # once for the class: still one fixed snapshot per test, and no test edits a tracked file.
+        cls.snapshot_output = tempfile.TemporaryDirectory(prefix="zeus-gate-snapshot-")
+        cls.addClassCleanup(cls.snapshot_output.cleanup)
+        policy = gate.policy_modules()
+        cls.frozen_snapshot = policy[1].source_snapshot(policy[0], Path(cls.snapshot_output.name))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="zeus-gate-")
         self.addCleanup(self.temporary.cleanup)
@@ -27,7 +36,7 @@ class RequiredGateTests(unittest.TestCase):
         # Freeze only the source-snapshot provider for unit isolation while other agents edit.
         # The gate still compares every manifest/hash and regenerates real portable packages.
         policy = gate.policy_modules()
-        self.source_snapshot = policy[1].source_snapshot(policy[0], self.inputs)
+        self.source_snapshot = self.frozen_snapshot
         provider = patch.object(gate, "policy_modules", return_value=policy)
         provider.start()
         self.addCleanup(provider.stop)
