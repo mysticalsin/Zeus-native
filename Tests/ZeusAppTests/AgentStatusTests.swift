@@ -73,8 +73,12 @@ struct AgentStatusTests {
 
     @Test func agentAlertTextHidesTheProjectWhenDetailsAreHidden() {
         let alert = AgentAlert.failed(agent: "Codex", project: "secret-app", reason: "Rate limit reached")
-        #expect(alert.payload(showDetails: true).body.contains("secret-app"))
-        #expect(!alert.payload(showDetails: false).body.contains("secret-app"))
+        // The project name rides in the title (and thread) when details are shown, never in the body.
+        let shown = alert.payload(showDetails: true), hidden = alert.payload(showDetails: false)
+        #expect(shown.title.contains("secret-app"))
+        for text in [hidden.title, hidden.body, hidden.threadIdentifier ?? ""] {
+            #expect(!text.contains("secret-app"), "hidden details keep the project name out of the banner: \(text)")
+        }
         #expect(AgentAlert.stalled(agent: "Codex", project: "p", minutes: 5).payload(showDetails: true).body.contains("5 min"))
     }
 }
