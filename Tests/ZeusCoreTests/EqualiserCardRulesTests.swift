@@ -63,6 +63,17 @@ struct EqualiserBandControlTests {
         #expect(EqualiserBandControl.adjusted(-11.5, steps: -5) == -12)
     }
 
+    @Test func aGainIsCentredOnlyWhenItSnapsToZero() {
+        #expect(EqualiserBandControl.isCentred(0))
+        #expect(EqualiserBandControl.isCentred(0.2))
+        #expect(EqualiserBandControl.isCentred(-0.2))
+        #expect(EqualiserBandControl.isCentred(.nan))
+        #expect(!EqualiserBandControl.isCentred(0.5))
+        #expect(!EqualiserBandControl.isCentred(-0.5))
+        #expect(!EqualiserBandControl.isCentred(12))
+        #expect(!EqualiserBandControl.isCentred(-12))
+    }
+
     @Test func ticksMarkMinusTwelveToPlusTwelveInSixes() {
         #expect(EqualiserBandControl.ticks == [-12, -6, 0, 6, 12])
     }

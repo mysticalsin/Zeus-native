@@ -302,7 +302,7 @@ struct GSBandSlider: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(valueText).font(OB.font(11.5, .semibold)).foregroundStyle(gain == 0 ? GS.secondary : GS.text)
+            Text(valueText).font(OB.font(11.5, .semibold)).foregroundStyle(EqualiserBandControl.isCentred(gain) ? GS.secondary : GS.text)
                 .monospacedDigit().lineLimit(1).frame(height: 14)
             track
             Text(EqualiserBandControl.label(at: index)).font(OB.font(11.5, .medium)).foregroundStyle(GS.secondary)
@@ -343,7 +343,9 @@ struct GSBandSlider: View {
             Capsule().fill(OB.toggleOn)
                 .frame(width: 6, height: max(abs(thumbY - centre), 0.5))
                 .offset(y: min(thumbY, centre))
+            // A small gain leaves less fill than the thumb covers, so the thumb itself wears the fill colour.
             Circle().fill(Color(rgb: 223, 224, 224)).frame(width: thumb, height: thumb)
+                .overlay(Circle().strokeBorder(OB.toggleOn, lineWidth: EqualiserBandControl.isCentred(gain) ? 0 : 2))
                 .shadow(color: .black.opacity(0.25), radius: 1.5, y: 0.5)
                 .offset(y: thumbY - thumb / 2)
         }

@@ -27,6 +27,11 @@ public enum EqualiserBandControl {
         return EqualiserGain.clamp((clamped / EqualiserGain.step).rounded() * EqualiserGain.step)
     }
 
+    /// True when the gain sits at the centre once snapped, so the slider draws no fill and no tint.
+    public static func isCentred(_ gain: Double) -> Bool {
+        snapped(gain) == 0
+    }
+
     /// 0 at the bottom of the track (-12 dB), 0.5 at the centre (0 dB) and 1 at the top (+12 dB).
     public static func fraction(for gain: Double) -> Double {
         let span = EqualiserGain.range.upperBound - EqualiserGain.range.lowerBound
