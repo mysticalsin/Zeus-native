@@ -1549,7 +1549,7 @@
         {
           "check": "native-ScribeDetectorTests",
           "id": "F04.detector-watcher",
-          "acceptance": "The real call watcher stops everything when the choice is Off, keeps reading while the machine is busy and removes its exit observer when it stops; a scan whose probe never returns is given up on; polling scans read a short calendar window and only a listening plan reads the full look-ahead.",
+          "acceptance": "The real call watcher stops everything when the choice is Off, keeps reading while the machine is busy and removes its exit observer when it stops; a scan whose probe never returns is given up on; polling scans read a short calendar window and only a listening plan reads the full look-ahead; a meeting card dismissed before the choice went Off stays dismissed when it returns to Ask.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
@@ -1570,6 +1570,10 @@
             {
               "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
               "function": "theExitObserverWatchesWhileOffAndBusyAndIsRemovedByHalt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+              "function": "offThenAskInsideTheMeetingWindowShowsNoCardForAMeetingAlreadyDismissed"
             }
           ]
         },

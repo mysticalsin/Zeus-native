@@ -4956,6 +4956,18 @@
       }
     },
     {
+      "id": "REG-427",
+      "failure": "A meeting card the owner dismissed came back when the choice went Off and then back to Ask inside the meeting window, because stopping the detector forgot the dismissal.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ScribeDetectorTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+        "function": "offThenAskInsideTheMeetingWindowShowsNoCardForAMeetingAlreadyDismissed"
+      }
+    },
+    {
       "id": "REG-600",
       "failure": "Face presence code could post a keystroke or synthetic event, read or type a password, call the network, write an image or load the ArcFace model.",
       "features": [
