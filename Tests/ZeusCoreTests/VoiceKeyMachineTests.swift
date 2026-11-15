@@ -378,6 +378,40 @@ import Testing
         #expect(command.tick(at: 0.25, live: Self.pairAndCommand) == [.cancel], "any other modifier cancels it")
     }
 
+    // MARK: A key that is heard late
+
+    /// The adapter stamps a key with the time it happened, so a busy main thread that hears Command at 0.30 reports 0.05.
+    @Test func aKeyThatCameBeforeTheConfirmElapsedIsReadAsAKeyThatCameBeforeIt() {
+        var rig = Rig(Self.talk(confirm: 0.15))
+        rig.press(Self.ctrl, Self.opt, at: 0.01)
+        #expect(rig.press(Self.cmdL, at: 0.05) == [], "0.04 s after the pair: nothing starts, nothing is cancelled")
+        #expect(rig.tick(at: 0.30) == [], "and the wake that was due earlier finds nothing")
+        #expect(rig.tag == "idle" && rig.machine.barred)
+    }
+
+    @Test func aKeyDownThatReportsAModifierBeforeItsFlagsEventWasHeardStartsNothing() {
+        var rig = Rig(Self.talk(confirm: 0.15))
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        // Left is heard at 0.30, past the confirm, ahead of the flags event of the Command it was pressed with.
+        #expect(rig.type(Self.left, carrying: [.command], at: 0.30) == [], "the press was a chord: no turn opens")
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        #expect(rig.press(Self.cmdL, at: 0.31) == [], "the flags event that comes after finds nothing to cancel")
+    }
+
+    @Test func aKeyDownThatReportsAModifierBeforeItsFlagsEventWasHeardDoesNotSendAHandsFreeTurn() {
+        var rig = Self.latchedTalk(confirm: 0.15)
+        rig.press(Self.ctrl, Self.opt, at: 4)
+        #expect(rig.type(Self.left, carrying: [.command], at: 4.30) == [], "the press that was to end the turn was a chord")
+        #expect(rig.tag == "latched" && rig.machine.isLatched)
+    }
+
+    @Test func theFnFlagOfAnArrowKeyIsNoNewsAndALongPressStillStartsBeforeTheKey() {
+        var rig = Rig(Self.talk(confirm: 0.15))
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        #expect(rig.type(Self.left, carrying: [.function], at: 0.30) == [.start, .wake(after: 0.25), .cancel],
+                "the arrow carries Fn by itself: a slow press is a start and then a cancel, as before")
+    }
+
     // MARK: Rows 15 to 19: after a quick tap
 
     @Test func row15APressInsideTheGapContinuesTheTurnAsASecondTap() {

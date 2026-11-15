@@ -20,6 +20,15 @@ struct TilingConsumedKeyTests {
         #expect(TilingConsumedKey.event(in: Notification(name: TilingConsumedKey.notification)) == nil)
     }
 
+    @Test func theNotificationCarriesTheTimeTheKeyWentDownWhenTheTapKnowsIt() {
+        let timed = Notification(name: TilingConsumedKey.notification, object: nil,
+                                 userInfo: ["event": ShortcutEvent.keyUp(keyCode: 123), "time": 12.5])
+        #expect(TilingConsumedKey.timestamp(in: timed) == 12.5)
+        let untimed = Notification(name: TilingConsumedKey.notification, object: nil,
+                                   userInfo: ["event": ShortcutEvent.keyUp(keyCode: 123)])
+        #expect(TilingConsumedKey.timestamp(in: untimed) == nil)
+    }
+
     // MARK: Talk and dictation
 
     private final class Presses { var count = 0; var cancels = 0 }

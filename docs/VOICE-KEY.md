@@ -54,6 +54,7 @@ the key's own. The rules:
 3. Nothing starts on a larger chord, and nothing starts when a larger chord shrinks to the key's own set.
 4. Every turn ends exactly once, by `send`, `cancel` or the owner's own end.
 5. A consumed key is a key. A chord key the tiling tap forwards and the same key from a monitor give the same effects.
+   Each is read at the time it went down or up, not the time a busy main thread handled it.
 6. A toggle key (press to toggle dictation, the Polyglot key) fires once per press.
 7. A hands-free turn is sent only by a press of exactly the key's own set. Typing and larger chords neither send nor
    cancel it.

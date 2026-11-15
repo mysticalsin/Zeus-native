@@ -21,6 +21,16 @@ import Testing
 // clean press. The rules are therefore read against the keys the machine was told about, not against the keys physically
 // down; a tick that is due for an armed press or a running hold tells the machine the live modifiers.
 //
+// A key is stamped with the time it happened, as the adapter does with `NSEvent.timestamp` and the tap's own timestamp:
+// a held monitor event reaches the machine at its own earlier time, after up to `lagLimit` steps in which the main thread
+// was busy, and a due wake may run before or after it. The rules read the keyboard as the machine had been told of it,
+// at the key's own time: a start or a send that an overdue timer owes ahead of a key needs the own set to have been down
+// alone for the delay, or the tap to have been let go for the gap, by then (`checkSettled`). A key-down that reports a
+// modifier the machine has not heard of stands for that flags event, so a forwarded key ahead of a held Command does
+// not start a turn either.
+//
+// The whole search takes minutes under load. `WALK_ONLY=A,B2` runs only the runs whose names start with one of those.
+//
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
 //
@@ -71,6 +81,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let quietFlip: Bool
     let missed: Bool
     let refusal: Bool
+    /// The adapter before it stamped keys with their own time: a held event reaches the machine at the time it is handled.
+    /// Only the regression test that the search can see that mistake sets it.
+    let processingTime: Bool
 
     let ownMask: UInt16
     let shiftMask: UInt16
@@ -79,8 +92,10 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     var testDescription: String { name }
 
     init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false,
-         late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false) {
+         late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false,
+         processingTime: Bool = false) {
         self.name = name
+        self.processingTime = processingTime
         self.pointing = pointing
         self.late = late && !pointing
         self.quietFlip = quietFlip
@@ -110,7 +125,7 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         Config(key: key, role: role, mode: .hold, confirm: confirm)
     }
 
-    /// The eleven runs of the plan, and a run that lets config changes ride on key events.
+    /// The runs of the search: A to I with A0 and E2, J (config changes ride on key events) and B2 (shipped dictation, late).
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
@@ -123,7 +138,7 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
                           Config(key: .rightCommand, role: .dictation, mode: .toggle),
                           Config(key: nil, role: .dictation, mode: .hold)]),
         WalkRun("C dictation hold Control-Option confirm 0.15", keys: basic, own: controlOption,
-                configs: [hold(.dictation, .controlOption, confirm: 0.15)]),
+                configs: [hold(.dictation, .controlOption, confirm: 0.15)], late: true),
         WalkRun("D dictation shared Control-Option", keys: basic, own: controlOption,
                 configs: [Config(key: .controlOption, role: .dictation, mode: .shared)], late: true),
         WalkRun("E talk shared Control-Option", keys: basic, own: controlOption,
@@ -149,10 +164,29 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
                 configs: [hold(.dictation, .rightCommand, confirm: 0.15),
                           Config(key: .rightCommand, role: .dictation, mode: .toggle),
                           Config(key: nil, role: .dictation, mode: .hold)], quietFlip: true),
+        // B2: shipped dictation with late timers and keys heard late. B's three configs and these together took 450 s, so
+        // the late search keeps B's keys and only its hold config.
+        WalkRun("B2 dictation Right Command hold, late", keys: rightCommandKeys + [.leftCommand], own: [54],
+                configs: [hold(.dictation, .rightCommand, confirm: 0.15)], late: true),
     ]
 }
 
 // MARK: - The harness
+
+/// How long a held monitor event may wait, in steps of 0.05 s: the main thread is busy for up to this long. It is as long
+/// as the longest window (0.4 s), so a key can come inside a tap's gap and be heard after it.
+private let lagLimit = 8
+/// The lags the search tries: one inside the shortest delay (0.05 s), one just past the confirm (0.2 s), and the longest.
+/// Every other lag falls in one of the same three cases against the delays (0.15, 0.25) and the gaps (0.35, 0.4).
+private let lags = [1, 4, lagLimit]
+
+/// What the machine had been told about the keyboard, at the time a key that arrives went down or up, as ages in steps
+/// capped at 9: how long exactly the own set had been down (nil: it was not), and how long the own set had been let go
+/// (nil: it was down).
+private struct Arrival: Hashable {
+    var alone: Int?
+    var up: Int?
+}
 
 /// A monitor event held back for one event: the machine hears the next forwarded key first.
 private struct Held: Hashable {
@@ -187,6 +221,9 @@ private enum Move: Hashable {
     /// A key goes down or up and its event reaches the machine at once; `toggleHeld`: the event of a modifier key or an
     /// unconsumed key waits for the next forwarded key.
     case toggle(Int), toggleHeld(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
+    /// The main thread was busy for this many steps while an event was held back: the event is then heard at the time it
+    /// happened, ahead of the wakes that fell due meanwhile (`busy`), or after them (`catchUp`).
+    case busy(Int), catchUp(Int)
     /// Time passes and a due timer waits for the next event. A config change that waits for the next event. An ordinary
     /// key comes up and no monitor hears. The owner starts or stops refusing the turns it is asked to start.
     case waitLate, flipQuiet, missUp(Int), refusing
@@ -201,6 +238,8 @@ private enum Move: Hashable {
         case .abandon: "abandon"
         case .interrupt: "interrupt"
         case .flip: "flip"
+        case .busy(let steps): "busy \(steps) steps, then the held event, then the timers"
+        case .catchUp(let steps): "wait \(steps) steps with the timers, then the held event"
         case .waitLate: "wait 0.05 (timers late)"
         case .flipQuiet: "flip (rides on the next event)"
         case .missUp(let index): run.keys[index].name + " up (no event)"
@@ -274,6 +313,9 @@ private struct StateKey: Hashable {
     var pointing: PointingNorm?
     var refusing: Bool
     var checker: Checker
+    /// How long the keyboard has been exactly the own set, read by an armed press, and without it, read by a tap's gap.
+    var aloneAge: Int?
+    var upAge: Int?
 }
 
 /// A pointing gesture with ages in place of times, capped at 0.45 s like the machine's phase: the confirm and the 0.25 s
@@ -300,7 +342,8 @@ private struct PointingNorm: Hashable {
 
 private extension VoiceKeyMachine {
     /// The phase with ages in place of times, capped at 0.45 s, past every window (the longest is 0.4 s): the same
-    /// phase whenever it was reached.
+    /// phase whenever it was reached. A key heard late is read at its own time inside one move, before any state is
+    /// recorded, and every key after it is stamped no earlier than the state, so the cap holds.
     func normalizedPhase(at now: TimeInterval) -> Phase {
         func age(_ time: TimeInterval) -> TimeInterval { Double(min(9, max(0, Int(((now - time) / 0.05).rounded())))) * 0.05 }
         func ahead(_ time: TimeInterval) -> TimeInterval { Double(min(9, max(0, Int(((time - now) / 0.05).rounded())))) * 0.05 }
@@ -328,6 +371,15 @@ private struct Sim {
     var consumed: UInt16 = 0
     /// At most one monitor event waits behind the next forwarded key.
     var held: Held?
+    /// The step at which the held event happened: the time it carries when it reaches the machine.
+    var heldStep = 0
+    /// The step (the time its key carried) at which the keys the machine has been told about became exactly the own set,
+    /// nil while they are not; the step at which the own set was let go, nil while it is down.
+    var aloneSince: Int?
+    var ownUpSince: Int? = 0
+    /// What the machine had been told when the key now arriving went down or up, and how late it arrives.
+    var arriving: Arrival?
+    var arrivalLag = 0
     var wakes: Set<Int> = []
     var step = 0
     var cfg = 0
@@ -353,11 +405,20 @@ private struct Sim {
     }
 
     func key(_ run: WalkRun) -> StateKey {
-        StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { max($0 - step, -2) }.sorted(), cfg: cfg,
+        // The keyboard's own history is read only by a timer that is settled ahead of a key: a start of an armed press, a send
+        // of a tap that waits out its gap.
+        var armed = false, gapOpen = false
+        switch machine.phase {
+        case .armed: armed = true
+        case .tapped(_, true): gapOpen = true
+        default: break
+        }
+        return StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { max($0 - step, -2) }.sorted(), cfg: cfg,
                  config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
                  keysDown: machine.keys.keysDown, spoiled: machine.keys.spoiled, barred: machine.barred,
                  phase: machine.normalizedPhase(at: now), pointing: pointing.map { PointingNorm($0, now: now) },
-                 refusing: refusing, checker: checker)
+                 refusing: refusing, checker: checker,
+                 aloneAge: armed ? aloneSince.map { min(9, step - $0) } : nil, upAge: gapOpen ? ownUpSince.map { min(9, step - $0) } : nil)
     }
 
     func liveModifiers(_ run: WalkRun) -> ShortcutModifiers {
@@ -374,9 +435,19 @@ private struct Sim {
             out.append(.toggle(index))
             if held == nil { out.append(.toggleHeld(index)) }
         }
-        // Time passes while an event is held back: the main thread may be busy, and a wake runs on the same queue.
-        out.append(.wait)
-        if held != nil { out.append(.deliver) }
+        // Time passes while an event is held back: the main thread may be busy, and a wake runs on the same queue. Time
+        // passes only inside one of the moves that end by handing the event over, for up to `lagLimit` steps, so no state
+        // holds an event that is late. Pointing hears every key at the time it is handled.
+        if held == nil || run.pointing || !run.late { out.append(.wait) }
+        if held != nil {
+            out.append(.deliver)
+            if !run.pointing, run.late {
+                for steps in lags {
+                    out.append(.catchUp(steps))
+                    if run.late { out.append(.busy(steps)) }
+                }
+            }
+        }
         if pointing == nil { out.append(.abandon) }
         // A config change arrives on a tick of its own, which the walk keeps to a quiet keyboard.
         if run.configs.count > 1, held == nil { out.append(.flip) }
@@ -418,6 +489,12 @@ private struct Sim {
         case .flip:
             cfg = (cfg + 1) % run.configs.count
             feed(.tick(at: now, live: liveModifiers(run)), .flip, run)
+        case .busy(let steps):
+            for _ in 0..<steps { advance(run, deliver: false) }
+            flushHeld(run)
+        case .catchUp(let steps):
+            for _ in 0..<steps { advance(run) }
+            flushHeld(run)
         case .waitLate: advance(run, deliver: false)
         case .flipQuiet: cfg = (cfg + 1) % run.configs.count
         case .missUp(let index): missUp(index, run)
@@ -431,15 +508,25 @@ private struct Sim {
     private mutating func flushHeld(_ run: WalkRun, drain: Bool = true) {
         guard let event = held?.event else { return }
         let (index, pressed) = (Int(held?.index ?? 0), held?.pressed ?? false)
+        // The key carries the time it happened. Pointing, and an adapter that stamps keys with the time it handles them,
+        // hear it at the time it is handled.
+        // A run whose rules do not read lateness hears every key at the time it is handled, as pointing does.
+        let stamped = run.pointing || run.processingTime || !run.late
+        arrivalLag = run.pointing || !run.late ? 0 : step - heldStep
         held = nil
-        feed(.key(event, at: now), .deliver, run, key: (index, pressed), drain: drain)
+        feed(.key(event, at: stamped ? now : Double(step - arrivalLag) * 0.05), .deliver, run, key: (index, pressed), drain: drain)
+        arrivalLag = 0
     }
 
     /// One monitor event reaches the machine, behind the one held back before it, or is held back itself.
     private mutating func monitor(_ event: ShortcutEvent, index: Int, pressed: Bool, hold: Bool, _ run: WalkRun) {
         flushHeld(run, drain: false)
-        if hold { held = Held(event, index: index, pressed: pressed) }
-        else { feed(.key(event, at: now), .key, run, key: (index, pressed)) }
+        if hold {
+            held = Held(event, index: index, pressed: pressed)
+            heldStep = step
+        } else {
+            feed(.key(event, at: now), .key, run, key: (index, pressed))
+        }
     }
 
     private mutating func toggle(_ index: Int, hold: Bool, _ run: WalkRun) {
@@ -503,7 +590,11 @@ private struct Sim {
         let wasLatched = machine.isLatched
         let ticking = tickReadsLive
         let before = stage
-        let owed = key != nil && !configChange ? overdueEffects(config) : []
+        let stampStep = step - arrivalLag
+        arriving = key == nil ? nil : Arrival(alone: aloneSince.map { min(9, stampStep - $0) }, up: ownUpSince.map { min(9, stampStep - $0) })
+        var due: Overdue?
+        if key != nil, !configChange, case .key(let shortcut, let time) = event { due = overdue(config, at: time, event: shortcut) }
+        let owed = due?.effects ?? []
         let effects = handle(event, config: config)
         log += effects
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
@@ -522,6 +613,7 @@ private struct Sim {
             let timer = Array(effects.prefix(owed.count))
             if timer != owed { found.append("an overdue timer did not act before the key that came after it: \(effects)") }
             checkEffects(timer, wasLatched: wasLatched, kind: .tick, config: config, configChange: false, seenBefore: seenBefore, run)
+            if let due { checkSettled(due) }
             noteKey(key, run)
             checkEffects(Array(effects.dropFirst(owed.count)), wasLatched: false, kind: kind, config: config, configChange: false,
                          seenBefore: seenBefore, run)
@@ -538,6 +630,9 @@ private struct Sim {
         let bit = UInt16(1) << UInt16(index)
         if pressed { seen |= bit } else { seen &= ~bit }
         seenChanged(run)
+        // A key heard late was pressed that long ago: the press has been down for that time already.
+        let confirmSteps = Int(((machine.config ?? run.configs[cfg]).confirm / 0.05).rounded())
+        if edge.cameDown, confirmSteps > 0 { checker.pressAge = min(arrivalLag, confirmSteps) }
     }
 
     /// A due tick of an armed press or a running hold carries the modifiers the system reports, and the machine has to read
@@ -576,15 +671,16 @@ private struct Sim {
         return old.key != config.key || old.mode != config.mode || old.voiceOverHoldsKey != config.voiceOverHoldsKey
     }
 
-    /// What the machine owes a timer that came due before the key that is arriving now (rows 5 and 17): the adapter has
-    /// not delivered the tick yet, and the machine must not let the key change what the timer decides. Read from the
-    /// phase and the times of the table, not from the wakes the machine asked for.
-    private func overdueEffects(_ config: VoiceKeyMachine.Config) -> [VoiceKeyMachine.Effect] {
-        guard pointing == nil, config.key != nil else { return [] }
+    /// What the machine owes a timer that came due before the key that is arriving now (rows 5 and 17), by the key's own
+    /// time: the adapter has not delivered the tick yet, and the machine must not let the key change what the timer
+    /// decides. Read from the phase and the times of the table, not from the wakes the machine asked for.
+    private func overdue(_ config: VoiceKeyMachine.Config, at time: TimeInterval, event: ShortcutEvent) -> Overdue? {
+        guard pointing == nil, let key = config.key else { return nil }
         let slack = 0.001
         switch machine.phase {
         case .tapped(let at, true):
-            return now - at >= (config.mode == .hold ? 0.4 : 0.35) - slack ? [.send] : []
+            let gap = config.mode == .hold ? 0.4 : 0.35
+            return time - at >= gap - slack ? Overdue(effects: [.send], steps: Int((gap / 0.05).rounded()), gap: true) : nil
         case .armed(let since, let press):
             let delay: TimeInterval?
             switch config.mode {
@@ -592,10 +688,38 @@ private struct Sim {
             case .shared: delay = config.role == .dictation ? 0.25 : press == .ending && config.confirm > 0 ? config.confirm : nil
             case .toggle: delay = nil
             }
-            guard let delay, now - since >= delay - slack else { return [] }
-            return press == .ending ? [.send] : [.start, .wake(after: 0.25)]
+            guard let delay, time - since >= delay - slack else { return nil }
+            // A key-down that reports a modifier the machine has not heard of stands for its flags event: the press is
+            // dropped, and no timer is owed.
+            if case .keyDown(_, let modifiers) = event,
+               !modifiers.subtracting(.function).subtracting(machine.keys.flagModifiers).subtracting(key.modifiers).isEmpty {
+                return nil
+            }
+            return Overdue(effects: press == .ending ? [.send] : [.start, .wake(after: 0.25)], steps: Int((delay / 0.05).rounded()), gap: false)
         default:
-            return []
+            return nil
+        }
+    }
+
+    private struct Overdue {
+        var effects: [VoiceKeyMachine.Effect]
+        /// The delay or the gap, in steps.
+        var steps: Int
+        var gap: Bool
+    }
+
+    /// A timer the machine settled ahead of a key is judged at that key's own time, on the keys the machine had been told
+    /// about (the times they carried): a start needs the own set to have been down alone for the delay by then, a send after
+    /// a tap needs the own set to have been let go for the gap. A machine that read a key at the time it handled it fails
+    /// this when the key had been pressed before the timer was due.
+    private mutating func checkSettled(_ due: Overdue) {
+        guard let arrival = arriving else { return }
+        if due.gap {
+            if let up = arrival.up, up < due.steps {
+                found.append("I1: a quick tap's turn was sent by a key that came inside its gap, by the key's own time")
+            }
+        } else if (arrival.alone ?? -1) < due.steps {
+            found.append("I1: a timer was settled ahead of a key that came before it was due: the own set had not been down alone for the delay at the key's own time")
         }
     }
 
@@ -682,6 +806,10 @@ private struct Sim {
 
     private mutating func seenChanged(_ run: WalkRun) {
         let phys = Phys(seen, run)
+        // The times are the ones the keys carried, so a key heard late moves them back.
+        let stampStep = step - arrivalLag
+        if phys.exactOwn { if aloneSince == nil { aloneSince = stampStep } } else { aloneSince = nil }
+        if phys.ownAll { ownUpSince = nil } else if ownUpSince == nil { ownUpSince = stampStep }
         let wasOwn = checker.ownWasDown
         if phys.ownAll, !wasOwn {
             checker.pressAge = 0
@@ -738,7 +866,7 @@ private struct Sim {
                     found.append("I4: send without an open turn")
                 } else if wasLatched {
                     let atPress = confirmSteps == 0 && edge.cameDown && phys.exactOwn
-                    let stayedAlone = confirmSteps > 0 && kind == .tick && phys.exactOwn && !checker.pressForeign
+                    let stayedAlone = confirmSteps > 0 && (kind == .tick || kind == .flip) && phys.exactOwn && !checker.pressForeign
                         && checker.pressAge >= confirmSteps
                     let cleanRelease = confirmSteps > 0 && edge.released && !checker.pressForeign
                     if !(atPress || stayedAlone || cleanRelease) {
@@ -803,8 +931,14 @@ private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) ->
     return steps.reversed().joined(separator: ", ")
 }
 
+/// The rest states already pressed, so a state that comes to rest where an earlier one did is not pressed again.
+private final class RestMemo {
+    var seen: Set<Int> = []
+}
+
 /// The rest check of one state, on a copy: let go of everything, wait 0.5 s, press the own set (I8, last clause of I4).
-private func restCheck(_ sim: Sim, _ run: WalkRun) -> [String] {
+/// What the press does depends only on the state at rest, which a great many states share, so it is tried once for each.
+private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [String] {
     var base = sim
     base.found = []
     base.apply(.deliver, run)
@@ -816,6 +950,7 @@ private func restCheck(_ sim: Sim, _ run: WalkRun) -> [String] {
     if base.checker.turnOpen != base.machine.isLatched {
         out.append("I4: with every key up and every timer run out, a turn is open and the machine is not hands-free (or the reverse)")
     }
+    if let memo, !memo.seen.insert(base.key(run).hashValue).inserted { return out }
     let config = run.configs[base.cfg]
     guard config.key != nil, !config.voiceOverHoldsKey else { return out }
     let ownIndices = run.keys.indices.filter { run.ownMask & (UInt16(1) << UInt16($0)) != 0 }
@@ -848,7 +983,7 @@ private func restCheck(_ sim: Sim, _ run: WalkRun) -> [String] {
     return out
 }
 
-private func search(_ run: WalkRun) -> Report {
+private func search(_ run: WalkRun, stopAtFirst: Bool = false) -> Report {
     let start = Date()
     var report = Report()
     var seen: [Int: Int] = [:]
@@ -858,6 +993,7 @@ private func search(_ run: WalkRun) -> Report {
     seen[root.key(run).hashValue] = 0
     frontier.append(root)
     var seenRules: Set<String> = []
+    let memo = RestMemo()
 
     func record(_ messages: [String], at index: Int, move: Move?) {
         for message in messages {
@@ -871,9 +1007,10 @@ private func search(_ run: WalkRun) -> Report {
 
     var cursor = 0
     while cursor < frontier.count {
+        if stopAtFirst, !report.violations.isEmpty { break }
         guard let sim = frontier[cursor] else { cursor += 1; continue }
         frontier[cursor] = nil
-        record(restCheck(sim, run), at: cursor, move: nil)
+        record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
         for move in sim.moves(run) {
             var next = sim
             next.found = []
@@ -918,12 +1055,26 @@ private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
 }
 
 @Suite struct VoiceKeyWalkTests {
-    @Test(arguments: WalkRun.all)
+    @Test(arguments: WalkRun.all.filter { run in
+        let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
+        return only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
+    })
     fileprivate func everyOrderOfPressesKeepsTheRules(run: WalkRun) {
         let report = search(run)
         print("voice key walk \(run.name): \(report.states) states, \(report.moves) moves, \(String(format: "%.2f", report.seconds)) s")
         #expect(report.violations.isEmpty, "\(run.name): \(report.violations.joined(separator: "\n"))")
         #expect(report.states > 100, "the search found too few states to be a search")
+    }
+
+    /// The mistake the search was blind to: an adapter that stamps a key with the time it handles it. A Command pressed
+    /// 0.04 s after the pair and heard 0.2 s later then settles the confirm that was not due at its own time.
+    @Test func theSearchSeesAnAdapterThatStampsKeysWithTheTimeItHandlesThem() {
+        let shipped = WalkRun.all[0]
+        let old = WalkRun("A with processing time", keys: shipped.keys, own: shipped.ownCodes, configs: shipped.configs,
+                          late: true, processingTime: true)
+        let report = search(old, stopAtFirst: true)
+        #expect(report.violations.contains { $0.contains("own set had not been down alone for the delay") },
+                "\(report.violations)")
     }
 
     /// The orders the reviews found (F1, and the swap chord on a dictation key), replayed by name: the first is the

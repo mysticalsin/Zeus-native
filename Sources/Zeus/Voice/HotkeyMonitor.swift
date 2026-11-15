@@ -125,7 +125,8 @@ final class HotkeyMonitor {
         consumedKeys = NotificationCenter.default.addObserver(
             forName: TilingConsumedKey.notification, object: nil, queue: .main) { [weak self] note in
             guard let event = TilingConsumedKey.event(in: note) else { return }
-            MainActor.assumeIsolated { self?.feed(event) }
+            let time = TilingConsumedKey.timestamp(in: note)
+            MainActor.assumeIsolated { self?.feed(event, at: time) }
         }
     }
 
@@ -136,7 +137,8 @@ final class HotkeyMonitor {
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
-            MainActor.assumeIsolated { if let converted { self?.feed(converted) } }
+            let time = event.timestamp
+            MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
             return event
         }) { keyMonitors.append(local) }
     }
@@ -145,7 +147,8 @@ final class HotkeyMonitor {
     private func startGlobal() {
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
-            MainActor.assumeIsolated { if let converted { self?.feed(converted) } }
+            let time = event.timestamp
+            MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
         }) { keyMonitors.append(global) }
     }
 
@@ -161,13 +164,17 @@ final class HotkeyMonitor {
 
     // MARK: Entries
 
-    /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests). A key-up no
-    /// monitor saw would leave its key in the picture as a foreign key, so while the picture holds any ordinary key the
-    /// system is asked first which of them are still down.
-    func feed(_ event: ShortcutEvent) {
+    /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests). `time` is
+    /// when the key went down or up, on the clock of `now`: the machine reads a key at its own time, because a busy main
+    /// thread hears it later and a timer that came due in between must not be judged by that delay. Without one, or with
+    /// a zero, the event is taken as it arrives, and a time still to come is read as now. A key-up no monitor saw would leave its key in the
+    /// picture as a foreign key, so while the picture holds any ordinary key the system is asked first which of them
+    /// are still down.
+    func feed(_ event: ShortcutEvent, at time: TimeInterval? = nil) {
         let held = machine.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
-        send(.key(event, at: now()))
+        let arrived = now()
+        send(.key(event, at: time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived))
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It

@@ -27,7 +27,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     }
 
     public enum Event: Sendable, Equatable {
-        /// From a monitor or from the consumed key feed: the machine cannot tell which.
+        /// From a monitor or from the consumed key feed: the machine cannot tell which. `at` is the time the key itself
+        /// went down or up, not the time it was handled: a busy main thread hears a key late, and a timer that is
+        /// overdue acts first only when the key came after it (`settle`).
         case key(ShortcutEvent, at: TimeInterval)
         /// A wake the machine asked for, with the modifiers the system reports now (nil when it cannot say).
         case tick(at: TimeInterval, live: ShortcutModifiers?)
@@ -154,7 +156,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         defer { generation += out.filter { $0 == .start }.count }
         let changed = self.config.map { Self.differs($0, config) } ?? false
         // A timer that is overdue acts first, on the keyboard as it was, so a late tick cannot change what a key did.
-        if case .key(_, let at) = event, !changed, config.key != nil { settle(at: at, config, &out) }
+        if case .key(let shortcutEvent, let at) = event, !changed, config.key != nil {
+            settle(at: at, joined: Self.joinedModifiers(shortcutEvent), config, &out)
+        }
         let wasAllUp = allUp
         switch event {
         case .key(let shortcutEvent, _): keys.apply(shortcutEvent)
@@ -211,11 +215,24 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         if !allUp { barred = true }
     }
 
-    /// A timer that came due before the event that is being handled: rows 5 and 17 on the picture before the event.
-    private mutating func settle(at t: TimeInterval, _ config: Config, _ out: inout [Effect]) {
+    /// The modifiers a key-down reports: what was down when that key went down, so they stand for flags events that may
+    /// still be on their way. Fn is left out, an arrow key carries it by itself.
+    private static func joinedModifiers(_ event: ShortcutEvent) -> ShortcutModifiers? {
+        if case .keyDown(_, let modifiers) = event { return modifiers.subtracting(.function) }
+        return nil
+    }
+
+    /// A timer that came due before the event that is being handled: rows 5 and 17 on the picture before the event. It
+    /// is due only by the event's own time. A key-down that reports a modifier outside the key's set, before the flags
+    /// event of that modifier was heard, is read as that event would be, as a tick reads the live modifiers: the press
+    /// is dropped, not started.
+    private mutating func settle(at t: TimeInterval, joined: ShortcutModifiers?, _ config: Config, _ out: inout [Effect]) {
         switch phase {
         case .armed(let since, let press):
-            if let delay = Self.delay(config, press), t - since >= delay - Self.slack { delayElapsed(at: t, config, &out) }
+            guard let delay = Self.delay(config, press), t - since >= delay - Self.slack else { return }
+            if let joined, let key = config.key,
+               readLive(joined, joinedOnly: true, key: key, at: t, config, &out) { return }
+            delayElapsed(at: t, config, &out)
         case .tapped(let tapAt, true):
             if t - tapAt >= Self.gap(config) - Self.slack { phase = .idle; out.append(.send) }
         default:
@@ -255,24 +272,33 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         // The live modifiers say what a flags event still on its way would: a modifier of the key let go (a release no
         // event reported), or a foreign one joined (the wake ran before that event). Take them into the picture and read
         // the keys again, so the order of the wake and the queued event decides nothing.
-        if let live {
-            let lost = !live.isSuperset(of: key.modifiers)
-            var liveKeys = keys
-            if lost { liveKeys.resync(to: live) } else { liveKeys.adopt(modifiers: live) }
-            let facts = KeyFacts(of: liveKeys, key: key)
-            if lost || Self.reading(facts, role: config.role) != Self.reading(KeyFacts(of: keys, key: key), role: config.role) {
-                keys = liveKeys
-                updateBarred(facts)
-                react(at: t, facts, config, &out)
-                rearmHold(at: t, &out)
-                return
-            }
+        if let live, readLive(live, joinedOnly: false, key: key, at: t, config, &out) {
+            rearmHold(at: t, &out)
+            return
         }
         if case .holding = phase {
             rearmHold(at: t, &out)
         } else {
             delayElapsed(at: t, config, &out)
         }
+    }
+
+    /// Takes modifiers that stand for a flags event still on its way into the picture and reads the keys again. True when
+    /// that changed the reading, or a modifier of the key was let go, and the row for the new reading ran. `joinedOnly`:
+    /// the modifiers come from a key-down, which can say a modifier joined but not that one was let go.
+    private mutating func readLive(_ live: ShortcutModifiers, joinedOnly: Bool, key: Shortcut, at t: TimeInterval,
+                                   _ config: Config, _ out: inout [Effect]) -> Bool {
+        let lost = !joinedOnly && !live.isSuperset(of: key.modifiers)
+        var liveKeys = keys
+        if lost { liveKeys.resync(to: live) } else { liveKeys.adopt(modifiers: joinedOnly ? live.union(keys.flagModifiers) : live) }
+        let facts = KeyFacts(of: liveKeys, key: key)
+        guard lost || Self.reading(facts, role: config.role) != Self.reading(KeyFacts(of: keys, key: key), role: config.role) else {
+            return false
+        }
+        keys = liveKeys
+        updateBarred(facts)
+        react(at: t, facts, config, &out)
+        return true
     }
 
     /// Row 14: a hold that is still running looks again after `checkEvery`.

@@ -247,7 +247,7 @@ final class TilingKeyTap: @unchecked Sendable {
         case .passThrough:
             return Unmanaged.passUnretained(event)
         case .consume(let action):
-            deliver(action, joined: decision.monitorEvent(for: key))
+            deliver(action, joined: decision.monitorEvent(for: key), at: TimeInterval(event.timestamp) / 1_000_000_000)
             return nil
         }
     }
@@ -283,7 +283,8 @@ final class TilingKeyTap: @unchecked Sendable {
         }
     }
 
-    /// Hands a consumed key to the other monitors and puts the action in the mailbox, scheduling the one drain that runs
+    /// Hands a consumed key to the other monitors, with the time the key went down (an event's timestamp is nanoseconds
+    /// since boot, the clock of `systemUptime`), and puts the action in the mailbox, scheduling the one drain that runs
     /// the waiting actions when none is scheduled yet. Everything hops to the main queue, even from the main thread, so
     /// the callback returns before any work starts.
     ///
@@ -293,9 +294,9 @@ final class TilingKeyTap: @unchecked Sendable {
     /// that forms after a larger set was down (`barred`), so the forwarded key only confirms it, and a hold that
     /// forms in the gap sends nothing (`TilingConsumedKeyTests` covers the order). Internal so a test can send actions
     /// without a system event.
-    nonisolated func deliver(_ action: TileAction?, joined: ShortcutEvent?) {
+    nonisolated func deliver(_ action: TileAction?, joined: ShortcutEvent?, at time: TimeInterval? = nil) {
         if let joined {
-            DispatchQueue.main.async { MainActor.assumeIsolated { TilingConsumedKey.post(joined) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { TilingConsumedKey.post(joined, at: time) } }
         }
         if let action, lock.withLock({ mailbox.push(action) }) {
             DispatchQueue.main.async { [self] in drain() }

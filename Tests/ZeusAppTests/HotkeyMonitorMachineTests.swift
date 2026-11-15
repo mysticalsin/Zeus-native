@@ -277,6 +277,43 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log.isEmpty, "the chord pressed as a chord opens nothing: \(calls.log)")
     }
 
+    /// Control at 0.00 and Option at 0.01 arm a talk press that waits 0.15 s. The main thread is then busy, and the
+    /// monitor handles at 0.30 an event that happened at 0.05, before the wake that was due at 0.16 has run.
+    private func armedThenBusy(_ monitor: HotkeyMonitor, _ clock: Clock) {
+        monitor.now = { clock.time }
+        monitor.feed(.flags(keyCode: 59, modifiers: [.control]), at: 0)
+        clock.time = 0.01
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 0.01)
+        clock.time = 0.30
+    }
+
+    private final class Clock { var time: TimeInterval = 0 }
+
+    @Test func aFlagsEventHandledLateIsReadAtTheTimeItHappened() async throws {
+        let (monitor, calls) = make(confirm: 0.15)
+        armedThenBusy(monitor, Clock())
+        monitor.feed(.flags(keyCode: 55, modifiers: all), at: 0.05)
+        try await wait(0.3) // the wake arrives and finds nothing
+        #expect(calls.log.isEmpty, "Command came 0.04 s after the pair: a chord, nothing opens: \(calls.log)")
+    }
+
+    @Test func aConsumedKeyHandledLateIsReadAtTheTimeItHappened() async throws {
+        let (monitor, calls) = make(confirm: 0.15)
+        monitor.observeConsumedKeys()
+        armedThenBusy(monitor, Clock())
+        // The key reports no modifier beyond the pair, so only its own time can say it came before the confirm elapsed.
+        TilingConsumedKey.post(.keyDown(keyCode: leftArrow, modifiers: [.control, .option]), at: 0.06)
+        try await wait(0.3)
+        #expect(calls.log.isEmpty, "the key came 0.05 s after the pair: \(calls.log)")
+    }
+
+    @Test func aKeyThatCameAfterTheConfirmStillStartsTheTurnWhateverTheHandlingTime() async throws {
+        let (monitor, calls) = make(confirm: 0.15)
+        armedThenBusy(monitor, Clock())
+        monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option, .shift]), at: 0.2)
+        #expect(calls.log == ["press", "cancel"], "a slow press is a start and then a cancel, as always: \(calls.log)")
+    }
+
     // MARK: Sleep and wake
 
     @Test func sleepCancelsAnOpenTurnAndNothingStartsUntilEveryKeyIsUp() {
