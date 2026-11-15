@@ -251,6 +251,8 @@ final class PermissionsModel {
         var allowed = false
         await PermissionPrompts.shared.run(kind.rawValue) { allowed = await self.eventAccess.request(kind) }
         refresh()
+        // Access granted mid-session: the meeting detector may be asleep until a wake chosen without the calendar.
+        if allowed, kind == .calendar { eventAccess.calendarGranted() }
     }
 
     /// Automation can only be asked about a running app. With none running, say so instead of doing nothing;
