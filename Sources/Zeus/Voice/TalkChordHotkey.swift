@@ -75,7 +75,8 @@ final class TalkChordHotkey {
     private let registrar: Registrar
     private var desired: Shortcut?
     private var paused = false
-    /// The chord last handed to the registrar, whether or not it took: a refused chord is not asked again until it changes.
+    /// The chord last handed to the registrar. A chord that was refused is asked again on the next sync, since the holder
+    /// that refused it (Chat or a shortcut being moved) may have let go since.
     private var attempted: Shortcut?
 
     init(registrar: Registrar = .carbon()) { self.registrar = registrar }
@@ -95,7 +96,7 @@ final class TalkChordHotkey {
 
     private func apply() {
         let want = paused ? nil : desired
-        guard want != attempted else { return }
+        guard want != attempted || (want != nil && !isRegistered) else { return }
         if isRegistered { registrar.unregister() }
         isRegistered = false
         problem = nil
