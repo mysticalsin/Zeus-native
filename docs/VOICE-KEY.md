@@ -36,9 +36,47 @@ turn with drawings; Control+Option then stays the Zeus talk key.
 
 ## Chords built on Control+Option
 
-Control+Option+Space (Chat), Control+Option+C, Control+Option+T, Control+Option+Y/N/O are not the bare hold. A key
-joining the held chord cancels the talk turn: nothing is sent, and the chord cannot restart until every key is up. The
-listen sound can still play for the instant before the extra key lands, as the pointing hold did before.
+Control+Option+C (Chat), Control+Option+T, Control+Option+Y/N/O are not the bare hold. A key joining the held chord
+cancels the talk turn: nothing is sent, and the chord cannot restart until every key is up. The listen sound can still
+play for the instant before the extra key lands, as the pointing hold did before.
+
+### The talk chord: Control+Option+Space
+
+Space is the one key that may join a held Control+Option without cancelling the turn (`VoiceKey.talkChord`,
+docs/ULTRON-CHORD-PLAN.md). It is the same turn: one start, one listen sound, the hold sends when a modifier is let go.
+The chord exists only when all of these hold: the talk key as heard is exactly the bare Control+Option, talk is a hold
+key (not shared with dictation), VoiceOver is off (Control+Option+Space is VoiceOver's own activate key), and no
+Carbon shortcut (Chat, the agent picker, Quick to-do) is Control+Option+Space. `Config.chord` carries it to the machine
+for the talk role in hold mode only; dictation, Polyglot, pointing and the shared gesture treat Space as foreign.
+
+A Carbon hot key on Control+Option+Space (`TalkChordHotkey`, signature `ZTLK`, handler that does nothing) takes the press
+away from other apps and the input-source shortcut while the chord is active. The machine is correct either way: if
+Carbon hides Space from the monitors nothing changes, if they see it Space is allowed, and if the registration fails
+(another app holds it) Space is still allowed and Settings says so.
+
+- A **clean chord** is Space going down while the talk key's own set is down alone. It stays clean until Space or an own
+  modifier goes up. A Space that is not clean (before the pair, beside a third modifier, typed with nothing held) is
+  foreign: the machine marks it (`chordSpoiled`) until every key is up, and nothing starts on a pair that came after it.
+- Space then Control+Option starts nothing until every key is up; Control, Space, Option starts nothing.
+- Space let go before the modifiers keeps the turn; a modifier let go with Space still down is a clean release (sends,
+  taps or latches). Control+Option+Space+Command, Shift or any other key is foreign: cancel when holding, drop when armed.
+- Beside tiling the turn starts 0.15 s after the pair as before; a chord tap shorter than that does nothing.
+- Double-tap latches hands-free. Space does not end a hands-free turn when it comes first; the pair then Space does, after
+  the confirm (at the press when confirm is 0).
+- New rule **I9**: an event that only moves a clean chord's Space gives no `start`, `send` or `cancel`, except what an
+  overdue timer owes, settled first. New rule **I8c**: from rest, pressing Control, Option, Space acts as I8.
+- The walk models the Carbon swallow as a move with no event (`swallowed`). A watchdog tick that finds a modifier gone
+  resyncs the picture and forgets every ordinary key, Space included: an existing limit the walk header names for an arrow.
+
+### Chat moved to Control+Option+C
+
+`ChatHotkey.standard` is Control+Option+C. Nothing is written to UserDefaults by the change: no `chat.hotkey` value means
+Control+Option+C. A stored `controlOptionSpace` is an explicit choice (`ChatHotkeyMonitor.set` is the only writer) and is
+kept: the chord then yields, Space stays foreign, Chat keeps the press, and Settings shows the clash with one button to
+move Chat to Control+Option+C (`VoiceKey.chatClash`). A tiling binding on Control+Option+Space is named by
+`TileBaseConflicts.notes(talkChord:)`. Every Carbon registration has its own signature (`CarbonHotkeySignature`: `ZCHT`
+Chat, `ZTLK` the chord, `ZEUS` the other hot keys) and each handler answers only its own, so one Zeus hot key can no longer
+run another's action. The recorder lets go of the Carbon hot keys while it listens.
 
 The hold keys (talk, dictation, the Polyglot key) follow one explicit state machine, `VoiceKeyMachine`
 (`Sources/ZeusCore/VoiceKeyMachine.swift`). `HotkeyMonitor` is a stateless adapter: it feeds the machine every key, wake
@@ -46,7 +84,7 @@ and sleep notice and runs the effects that come back (`start`, `send`, `cancel`,
 every step of every press order, and `VoiceKeyWalkTests` walks the orders to check them.
 
 Foreign means a modifier outside the key's own set (the other side of a sided key counts) or an ordinary key that is not
-the key's own. The rules:
+the key's own (the talk chord's Space is the one exception, below). The rules:
 
 1. A press that something foreign joined never sends and never latches. Shift on a dictation key is the one exception:
    it marks the turn (Return) and the turn is sent when the key is let go. On a talk key Shift is foreign like any other.
@@ -58,7 +96,9 @@ the key's own. The rules:
 6. A toggle key (press to toggle dictation, the Polyglot key) fires once per press.
 7. A hands-free turn is sent only by a press of exactly the key's own set. Typing and larger chords neither send nor
    cancel it.
-8. Never stuck: let go of everything, wait half a second, press the key's own set, and it acts.
+8. Never stuck: let go of everything, wait half a second, press the key's own set, and it acts. With the chord on, pressing
+   Control, Option, Space from rest acts the same (I8c).
+9. A clean chord's Space is not foreign for rules 1, 3 and 7, and moving it alone gives no start, send or cancel (I9).
 
 A hold key waits `confirm` seconds alone before it acts. It is 0 except while a tiling chord holds the key's modifiers
 (see below), and 0.25 s for dictation on a key it shares with talk. A hold sends when the key is let go, a quick tap
@@ -124,11 +164,13 @@ Control+Option is the talk key again.
 pixels), `Tests/ZeusCoreTests/VoiceKeyMachineTests.swift` (one test per row of the transition table),
 `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift` (every press order against the rules above),
 `Tests/ZeusCoreTests/KeyFactsTests.swift`, `Tests/ZeusCoreTests/TileBaseConflictsTests.swift` (the clash table),
-`Tests/ZeusAppTests/HotkeyMonitorMachineTests.swift` (the adapter), `Tests/ZeusAppTests/TilingConsumedKeyTests.swift`
+`Tests/ZeusAppTests/HotkeyMonitorMachineTests.swift` (the adapter and `theTalkChordCallsPressOnceAndReleaseOnce`),
+`Tests/ZeusAppTests/TalkChordHotkeyTests.swift` (the Carbon registration), `Tests/ZeusAppTests/TilingKeyClashTests.swift`
+(`everyCarbonRegistrationHasItsOwnSignature`), `Tests/ZeusCoreTests/ChatHotkeyTests.swift`, `Tests/ZeusAppTests/TilingConsumedKeyTests.swift`
 (`aTalkTurnThatTheRestOfTheTilingPairEndsIsCancelledNotSent`,
 `aDedicatedDictationHoldThatTheRestOfThePairEndsIsCancelledNotInserted`,
 `aModifierJoiningThePressThatEndedAHandsFreeTurnDoesNotCancelIt`,
 `aSharedHoldOfAPairInsideTheTilingPairDoesNotStartDictationWhenCommandComesFirst`),
 `Tests/ZeusAppTests/PointingHotkeyMonitorTests.swift` (`theTalkKeyHoldStartsNoPointingTurn`),
 `Tests/ZeusCoreTests/ShortcutConflictsPointingTests.swift`, `Tests/ZeusCoreTests/ShortcutTests.swift`. Rows REG-380 to
-REG-384 in `qa/regressions.json`.
+REG-384 and REG-628 to REG-635 (the chord) in `qa/regressions.json`.
