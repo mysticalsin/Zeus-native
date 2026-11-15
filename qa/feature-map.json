@@ -365,6 +365,13 @@
       "scope": "Actual companion pointing, flight and coordinate math; Linux Foundation geometry shim, no native display or renderer proof."
     },
     {
+      "id": "portable-equaliser",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "equaliser",
+      "scope": "Actual equaliser types, band table, filter maths, policy, lifecycle reducer and card rules; Apple platform only, no tap, device or audio."
+    },
+    {
       "id": "portable-dictation-insertion",
       "kind": "portable",
       "tier": "contract",
@@ -1242,6 +1249,41 @@
             {
               "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
               "function": "aLaunchThatFindsTheSwitchOffListensToNothing"
+            }
+          ]
+        },
+        {
+          "id": "F03.equaliser-rules",
+          "check": "portable-equaliser",
+          "acceptance": "The equaliser value types, band table, biquad coefficients, app grouping policy, lifecycle reducer and card rules hold on their own, with no tap, device or audio.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserTypesTests.swift",
+              "function": "aMainActorFakeConformsToTheControlProtocol"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserModelTests.swift",
+              "function": "theRangeIsPlusOrMinusTwelveInHalfDecibelSteps"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserDSPTests.swift",
+              "function": "coefficientsMatchReferenceValues"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserPolicyTests.swift",
+              "function": "theLongestRunningAppWins"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserLifecycleTests.swift",
+              "function": "onWithAnAppPlayingProbesItBeforeAnyTap"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserCardRulesTests.swift",
+              "function": "aGainIsCentredOnlyWhenItSnapsToZero"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/EqualiserCardRulesTests.swift",
+              "function": "theOpenedRowEndsWhereTheHeaderEnds"
             }
           ]
         },
