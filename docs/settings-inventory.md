@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 181 of 181 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 181 in scope). 170 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 182 of 182 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 182 in scope). 171 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 130.
+**Before this round:** has 19, partial 27, missing 131.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -58,6 +58,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Displays without a notch | Shape (Pill, Notch) | segmented | Pill | The closed notch on a display without one: the slim pill, or a notch shape you size yourself. | missing | live | `notch.shapeWithoutNotch` | D3. One shape for every such display. Notch makes the closed window take clicks over its own shape, so an import can never select it. |
 | Displays without a notch | Width | slider | 185 pt | Width of the drawn notch, shown while calibrating. | missing | live | `notch.drawnWidth` | D3. Points, 140 to 280 in steps of 5. Never wider than a quarter of the display. |
 | Displays without a notch | Height | slider | 32 pt | Height of the drawn notch, shown while calibrating. | missing | live | `notch.drawnHeight` | D3. Points, 30 to 44 in steps of 1. Never under 30 because the closed wings are laid out for that bar. |
+| Displays without a notch | Position | slider | Centre | Where the drawn notch sits sideways, shown while calibrating. | missing | live | `notch.drawnOffset` | D4. Points, minus 400 to 400 in steps of 5; below 0 is left. The drawn shape only: the hardware notch and the pill stay centred. Never further than the open panel leaves room for on the display. |
 | Notch behavior | Show Zeus next to cursor | toggle | off | When summoned, Zeus anchors beside the mouse pointer instead of the notch. | missing | live | `presence.nearCursor` | P0 item I. Offset 18 pt right and down from the pointer, clamped and flipped at screen edges, multi-display aware, 60 fps with a light spring; off keeps the notch/top-bar placement. Also in the menu bar menu and `zeus debug presence`. |
 | Halo | Halo style | menu | Classic halo | The closed-notch glow while an agent works or needs you. One setting: the notch, Settings and the welcome guide all read it. | partial | custom | `halo.style` | Stable ids; titles come from ZeusCore.HaloStyle. Replaces the old topBar.halo key (migrated at launch). |
 | Halo | Halo entrance | menu | Sweep | Animation as the halo lights up. | partial | custom | `halo.entrance` | Stable ids; titles come from ZeusCore.HaloEntrance. Each has its own choreography. |
