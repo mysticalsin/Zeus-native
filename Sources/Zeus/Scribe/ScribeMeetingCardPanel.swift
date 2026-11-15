@@ -61,9 +61,11 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     /// Moves the panel's alpha to `alpha`, then calls `completion`. A test replaces it to decide when a fade ends.
     typealias Fade = @MainActor (NSPanel, CGFloat, (@MainActor @Sendable () -> Void)?) -> Void
 
-    private static let margin: CGFloat = 16
+    static let margin: CGFloat = 16
 
     private let actions: Actions
+    /// An owned-window journey passes one so the card's controls report their place; the shipped panel has none.
+    private let journeyRegistry: OwnedWindowControlRegistry?
     private let now: () -> Date
     private let uptime: () -> TimeInterval
     private let visibleFrame: () -> CGRect
@@ -87,8 +89,10 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
          visibleFrame: @escaping () -> CGRect = {
              (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
          },
-         fade: Fade? = nil) {
+         fade: Fade? = nil,
+         journeyRegistry: OwnedWindowControlRegistry? = nil) {
         self.actions = actions
+        self.journeyRegistry = journeyRegistry
         self.now = now
         self.uptime = uptime
         self.visibleFrame = visibleFrame
@@ -142,7 +146,7 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     private func view(_ card: ScribeMeetingCard) -> ScribeMeetingCardView {
         ScribeMeetingCardView(card: card, now: now(), uptime: uptime(),
                               onPrimary: actions.primary, onCancel: actions.cancel,
-                              onDismiss: actions.dismiss)
+                              onDismiss: actions.dismiss, journeyRegistry: journeyRegistry)
     }
 
     private static let animatedFade: Fade = { panel, alpha, completion in

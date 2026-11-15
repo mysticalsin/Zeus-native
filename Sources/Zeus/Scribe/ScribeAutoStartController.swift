@@ -80,15 +80,19 @@ final class ScribeAutoStartController {
     private let scheduler: ScribeOneShotScheduling
     private let panel: ScribeMeetingCardRendering
     private let microphone: () -> ScribeMicrophoneAccess
+    /// Where the choice, the owner's click and the first recording are read. A test passes its own suite.
+    private let defaults: UserDefaults
     private var lastLogged = ScribeAutoStartMachine().state.logName
 
     init(scribe: ScribeStartPort, clock: @escaping () -> TimeInterval, scheduler: ScribeOneShotScheduling,
-         panel: ScribeMeetingCardRendering, microphone: @escaping () -> ScribeMicrophoneAccess) {
+         panel: ScribeMeetingCardRendering, microphone: @escaping () -> ScribeMicrophoneAccess,
+         defaults: UserDefaults = .standard) {
         self.scribe = scribe
         self.clock = clock
         self.scheduler = scheduler
         self.panel = panel
         self.microphone = microphone
+        self.defaults = defaults
         scribe.onPhaseChange = { [weak self] phase in self?.scribeChanged(phase) }
     }
 
@@ -105,9 +109,9 @@ final class ScribeAutoStartController {
 
     /// One reading from the call watcher, every poll and every microphone wake-up.
     func ingest(scan: ScribeCallScan, slots: [ScribeCalendarSlot], date: Date) {
-        let mode = ScribeAutoStartMode.current()
+        let mode = ScribeAutoStartMode.current(defaults: defaults)
         // A stamp that outlived its choice (a raw defaults write, say) is removed before it can be read.
-        ScribeAutoStartOptIn.reconcile(mode: mode)
+        ScribeAutoStartOptIn.reconcile(mode: mode, defaults: defaults)
         let evidence = ScribeMeetingEvidence(
             date: date,
             slots: slots,
@@ -155,13 +159,14 @@ final class ScribeAutoStartController {
 
     // MARK: Machine
 
-    private func startContext(mode: ScribeAutoStartMode = ScribeAutoStartMode.current()) -> ScribeStartContext {
+    private func startContext(mode: ScribeAutoStartMode? = nil) -> ScribeStartContext {
+        let mode = mode ?? ScribeAutoStartMode.current(defaults: defaults)
         let access = microphone()
         let readiness = ScribeAutoStartReadiness.resolve(
             mode: mode,
-            optIn: ScribeAutoStartOptIn.date() != nil,
+            optIn: ScribeAutoStartOptIn.date(defaults: defaults) != nil,
             microphone: access,
-            hasRecorded: ScribeAutoStartOptIn.hasRecorded()
+            hasRecorded: ScribeAutoStartOptIn.hasRecorded(defaults: defaults)
         )
         return ScribeStartContext(scribe: scribe.phase, microphone: access, automatic: readiness)
     }

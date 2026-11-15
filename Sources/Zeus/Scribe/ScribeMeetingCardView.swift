@@ -52,11 +52,14 @@ struct ScribeMeetingCardView: View {
     var onPrimary: (ScribeMeetingCard) -> Void = { _ in }
     var onCancel: (ScribeMeetingCard) -> Void = { _ in }
     var onDismiss: (ScribeMeetingCard) -> Void = { _ in }
+    /// Set only by an owned-window journey, so the controls report where they are drawn. Nil in the app.
+    var journeyRegistry: OwnedWindowControlRegistry?
 
     var body: some View {
         if card != .hidden {
             ScribeMeetingCardBody(card: card, now: now, uptime: uptime, settled: settled,
                                   onPrimary: onPrimary, onCancel: onCancel, onDismiss: onDismiss)
+                .environment(\.ownedWindowControlRegistry, journeyRegistry)
         }
     }
 }
