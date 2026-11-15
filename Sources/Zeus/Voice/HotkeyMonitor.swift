@@ -210,7 +210,8 @@ final class HotkeyMonitor {
                                       role: role == .talk ? .talk : .dictation,
                                       mode: shared ? .shared : toggle ? .toggle : .hold,
                                       voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
-                                      confirm: confirmProvider?() ?? key.map(Self.tilingConfirm) ?? 0)
+                                      confirm: confirmProvider?() ?? key.map(Self.tilingConfirm) ?? 0,
+                                      chord: role == .talk ? chordProvider() : nil)
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from

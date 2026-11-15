@@ -302,6 +302,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
+            // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one.
+            hotkey.chordProvider = { [weak self] in
+                guard let self else { return nil }
+                return TalkChordRouting.current(heard: self.hotkey.keyProvider(), shared: self.hotkey.sharedProvider()).chord?.keyCode
+            }
             // A turn that stops listening for its own reason (a failed start, the owner ending it) is told to the key
             // machine, so the next press starts a turn instead of being spent on one that is gone.
             voice?.onListeningEnded = { [weak self] in
