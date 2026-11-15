@@ -257,6 +257,8 @@ final class ScribeCallWatcher {
 
     /// The backup poll while a meeting is near.
     private static let interval: TimeInterval = 5
+    /// The longest one scan may take. A probe that hangs is given up on, so the gate cannot stay in `scanning`.
+    static let scanTimeout: TimeInterval = 10
 
     private let ports: Ports
     private let makeMicObserver: MicObserverFactory
@@ -268,6 +270,10 @@ final class ScribeCallWatcher {
     /// Bumped each time the detector stops, so a scan that began before the stop is dropped when it ends.
     private var generation = 0
     private var gate = ScribeScanGate()
+    /// The scan in flight, by number; nil when none is. A reading for any other number is dropped, so a probe
+    /// that answers after it was given up on cannot be mistaken for the scan that replaced it.
+    private var scanNumber = 0
+    private var scanInFlight: Int?
     private var latestCalls: [ScribeDetectedCall] = []
     private var lastMicActive = false
     private var lastSlots: [ScribeCalendarSlot] = []
@@ -364,6 +370,7 @@ final class ScribeCallWatcher {
         micObserver = nil
         scheduler.schedule(after: nil) {}
         gate = ScribeScanGate()
+        scanInFlight = nil
         plan = .stopped
         latestCalls = []
         lastMicActive = false
@@ -382,18 +389,28 @@ final class ScribeCallWatcher {
 
     private func scan() {
         let started = generation
+        scanNumber += 1
+        let number = scanNumber
+        scanInFlight = number
         Task { @MainActor [weak self] in
             // The detector may have stopped since the wake: then nothing is read.
             guard let self, running, started == generation else { return }
             let now = ports.now()
             let slots = ports.slots(now)
+            // The one scheduler slot is free while a scan runs; `applyPlan` takes it back when the scan ends. If the
+            // probe never answers, this fires and the scan ends as an empty reading.
+            scheduler.schedule(after: Self.scanTimeout) { [weak self] in
+                self?.finish(ScribeCallScan(calls: []), slots: slots, now: now, generation: started, number: number)
+            }
             let reading = await ports.scan()
-            finish(reading, slots: slots, now: now, generation: started)
+            finish(reading, slots: slots, now: now, generation: started, number: number)
         }
     }
 
-    private func finish(_ scan: ScribeCallScan, slots: [ScribeCalendarSlot], now: Date, generation started: Int) {
-        guard running, started == generation else { return }
+    private func finish(_ scan: ScribeCallScan, slots: [ScribeCalendarSlot], now: Date, generation started: Int,
+                        number: Int) {
+        guard running, started == generation, scanInFlight == number else { return }
+        scanInFlight = nil
         latestCalls = scan.calls
         lastMicActive = !scan.calls.isEmpty
         lastSlots = slots
