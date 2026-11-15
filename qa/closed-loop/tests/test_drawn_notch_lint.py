@@ -151,8 +151,8 @@ def view_offset_comes_last(text):
     marker = "value: model.alerts.isEmpty)"
     if body.count(".offset(x:") != 1 or marker not in body:
         return False
-    after = body[body.index(marker) + len(marker):]
-    return ".offset(x: NotchAnchor.offset(footprint))" in after and after.strip() == ".offset(x: NotchAnchor.offset(footprint))"
+    after = "\n".join(code_lines(body[body.index(marker) + len(marker):])).strip()
+    return after == ".offset(x: NotchAnchor.offset(footprint))"
 
 
 def has_dash(text):
@@ -287,6 +287,7 @@ class DrawnNotchLintFailsOnItsFailureShapes(unittest.TestCase):
         self.assertTrue(view_offset_comes_last(late))
         twice = late.replace(offset, offset + "\n            " + offset)
         self.assertFalse(view_offset_comes_last(twice))
+        self.assertTrue(view_offset_comes_last(late.replace(offset, "// the place\n            " + offset)))
         self.assertFalse(view_offset_comes_last(late.replace(offset, ".offset(x: 0)")))
         self.assertFalse(view_offset_comes_last(late.replace(offset, offset + "\n            .opacity(1)")))
 
