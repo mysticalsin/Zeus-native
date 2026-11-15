@@ -8,7 +8,7 @@ import ZeusCore
 /// The real closed-bar wings in an owned window at the owner's notch (220 x 38). Each wing and its content is read
 /// back as laid out and must stay clear of the centred notch rectangle. Synthetic cues and a synthetic Scribe
 /// controller only: no device, permission, capture or user input is involved. Hosted: see qa/closed-loop/native_app_host.py.
-@MainActor @Suite("Closed wings clear the notch")
+@MainActor @Suite("Closed wings clear the notch", .inNativeHost)
 struct ClosedWingsNotchTests {
     private static let notch = CGSize(width: 220, height: 38)
     private static let shoulder: CGFloat = 8

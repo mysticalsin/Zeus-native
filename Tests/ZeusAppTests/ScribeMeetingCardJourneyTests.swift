@@ -184,7 +184,7 @@ private func slot(_ title: String = "Weekly sync", startsIn seconds: TimeInterva
 /// The meeting card as a person meets it: the real panel on screen, its real controls clicked with events sent to
 /// the owned window, a fake clock, and the real controller and Scribe behind them. Evidence is synthetic and enters
 /// through `ingest`. No device, calendar, permission prompt or capture is involved, and this is not device proof.
-@MainActor @Suite("Scribe meeting card journey", .serialized)
+@MainActor @Suite("Scribe meeting card journey", .inNativeHost, .serialized)
 struct ScribeMeetingCardJourneyTests {
     @Test func theRealRecordButtonStartsExactlyOneSession() async throws {
         try await OwnedWindowJourneyLease.perform {

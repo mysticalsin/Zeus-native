@@ -936,7 +936,7 @@ private struct ScribeComponentFixture {
 
 
 /// Actual production controls activated with locally targeted AppKit events and current layout.
-@MainActor @Suite("Scribe native component event journey", .serialized)
+@MainActor @Suite("Scribe native component event journey", .inNativeHost, .serialized)
 struct ScribeComponentJourneyTests {
     @Test func layoutResolvedEventsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
         try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: true) }
@@ -955,7 +955,7 @@ struct ScribeComponentJourneyTests {
 /// roles/children still fails these assertions; a successful pointer event must never be substituted
 /// for a missing accessibility result. The SwiftUI button journey lives in
 /// `ScribeTrustedAccessibilityJourneyTests` because it cannot run in CI.
-@MainActor @Suite("Scribe native accessibility journey", .serialized)
+@MainActor @Suite("Scribe native accessibility journey", .inNativeHost, .serialized)
 struct ScribeAccessibilityJourneyTests {
     @Test func waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl() async throws {
         try await OwnedWindowJourneyLease.perform {
@@ -981,7 +981,7 @@ struct ScribeAccessibilityJourneyTests {
 /// (`trusted-native-fixture`) that stays open until it runs with a trusted assistive client on a Mac
 /// (`scripts/trusted-ax-journey.sh`: bundled host, own-PID AX client API on a background thread).
 /// The pointer journey in `ScribeComponentJourneyTests` must never be substituted for it.
-@MainActor @Suite("Scribe trusted accessibility journey", .serialized)
+@MainActor @Suite("Scribe trusted accessibility journey", .inNativeHost, .serialized)
 struct ScribeTrustedAccessibilityJourneyTests {
     @Test func realButtonsDriveStartKeepStopFailedSaveRetryAndClose() async throws {
         try await OwnedWindowJourneyLease.perform { try await ScribeComponentFixture().runJourney(useWindowEvents: false, trustedAXClient: true) }

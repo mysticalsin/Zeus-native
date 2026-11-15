@@ -9,6 +9,24 @@ private func recordOwnedWindowProcessExit() {
     FileHandle.standardError.write(Data("Owned-window fixture: process exit callback\n\(trace)\n".utf8))
 }
 
+/// Tells the native test host (`zeus-native-test-host`, where NSApplication owns the main loop) from a plain
+/// `swift test` process. Hosted AppKit suites carry `.inNativeHost` so a plain run skips them instead of letting
+/// the first real window event end the process through exit() before the summary.
+enum NativeTestHost {
+    static func isHost(arguments: [String]) -> Bool {
+        arguments.first.map { URL(fileURLWithPath: $0).lastPathComponent == "zeus-native-test-host" } ?? false
+    }
+
+    static var isRunningInHost: Bool { isHost(arguments: CommandLine.arguments) }
+}
+
+extension Trait where Self == ConditionTrait {
+    static var inNativeHost: Self {
+        .enabled(if: NativeTestHost.isRunningInHost,
+                 "AppKit journey: run it in zeus-native-test-host (see qa/native-app-host); a plain swift test process would exit mid-run")
+    }
+}
+
 @MainActor
 enum OwnedWindowFixtureApplication {
     private(set) static var launchFinished = false
@@ -94,7 +112,7 @@ private struct TextFixture: View {
     }
 }
 
-@MainActor @Suite("Owned native window event driver", .serialized)
+@MainActor @Suite("Owned native window event driver", .inNativeHost, .serialized)
 struct OwnedWindowEventDriverTests {
     private final class Target: NSObject {
         var calls = 0
