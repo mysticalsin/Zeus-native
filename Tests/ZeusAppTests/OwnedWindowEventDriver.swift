@@ -90,7 +90,7 @@ private struct TextFixture: View {
     let words: Words
     var body: some View {
         let shown = words.value
-        Text(shown).ownedJourneyText("fixture.text", shown)
+        Text(shown).ownedJourneyWords("fixture.text", shown)
     }
 }
 

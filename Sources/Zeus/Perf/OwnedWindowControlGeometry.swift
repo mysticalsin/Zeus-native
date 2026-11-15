@@ -48,7 +48,7 @@ extension View {
 extension View {
     /// Records the exact string this view's body rendered, for the owned host to read back. Outside the host
     /// there is no registry in the environment, so nothing is added.
-    func ownedJourneyText(_ id: String, _ text: String) -> some View {
+    func ownedJourneyWords(_ id: String, _ text: String) -> some View {
         modifier(OwnedWindowTextGeometry(id: id, text: text))
     }
 }

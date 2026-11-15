@@ -255,7 +255,7 @@ private struct ScribeMeetingCardBody: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ScribeMeetingCardText.label(card, now: spec.now))
         // Outside the ignored accessibility subtree, so the owned host can read what the time Text drew.
-        .ownedJourneyText("scribe.meetingCard.time", line?.relative ?? "")
+        .ownedJourneyWords("scribe.meetingCard.time", line?.relative ?? "")
     }
 
     private var pill: some View {
