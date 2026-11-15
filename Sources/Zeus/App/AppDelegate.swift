@@ -833,6 +833,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         context.showLicenses = { [weak self] in self?.showThirdPartyLicenses() }
         context.topBar = topBar
         context.sweep = permissionSweep
+        context.equaliser = { [weak self] in self?.equaliser }
         context.continuityTabShown = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
         context.setContinuityTabShown = { [weak self] on in
             guard let layout = self?.topBar.layout, layout.contains(.continuity) != on else { return }
@@ -921,6 +922,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "about.autoUpdate", "about.updateFeedURL":
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))
+            case "audio.equaliser": self?.equaliser?.setSwitch(store.bool(id))
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
             case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break
