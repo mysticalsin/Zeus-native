@@ -273,6 +273,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if on(.shortcuts) {
             ExtraPreferences.shared.onShortcutsChange = { [weak self] in
+                // The chord first, so it lets go of Control-Option-Space for a preset that moved onto it; then the shortcuts;
+                // then the chord again, in case a preset moved off it and the chord can take it back.
+                self?.syncTalkChord()
                 self?.registerShortcuts()
                 self?.syncTalkChord()
             }
