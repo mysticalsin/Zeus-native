@@ -84,7 +84,7 @@ public enum MusicModeRules {
     /// (Automation was not confirmed yet, or was just granted). Play and pause on a known track do not.
     public static func shouldRead(previous: NowPlaying?, current: NowPlaying, modes: MusicModes) -> Bool {
         guard let previous else { return true }
-        if previous.player != current.player || previous.title != current.title || previous.artist != current.artist {
+        if previous.source != current.source || previous.title != current.title || previous.artist != current.artist {
             return true
         }
         return modes.shuffle == nil || modes.repeatMode == nil

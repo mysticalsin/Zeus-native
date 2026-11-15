@@ -89,6 +89,7 @@ enum SnapshotRenderer {
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
         renderParityStates(into: directory, notch: notch)
+        renderSourceStates(into: directory, notch: notch)
         // The agent hub: sessions with a reply field, then the New chat form.
         let hub = AgentHub.shared
         let hubStarted = Date().addingTimeInterval(-300)
@@ -234,6 +235,12 @@ enum SnapshotRenderer {
                 save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: section,
                      to: directory.appendingPathComponent("gs-\(section.rawValue).png"))
             }
+            // The Chrome media switch with its reload hint, shown only while Chrome runs an older extension.
+            SettingsStore.shared.statusOverrides[BrowserMediaFeed.statusID] = (false, BrowserMediaFeed.reloadStatus)
+            nav.section = .privacy
+            save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: .privacy,
+                 to: directory.appendingPathComponent("gs-privacy-chrome-reload.png"))
+            SettingsStore.shared.statusOverrides[BrowserMediaFeed.statusID] = nil
         }
         let navigation = SettingsNavigation()
         let obServices = OnboardingServices(permissions: permissions)
@@ -729,6 +736,45 @@ enum SnapshotRenderer {
             model.presentation = .closed
             save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-quit-peek.png"))
+        }
+    }
+
+    /// The source on screen: its name above the title, only the controls it can honour, and the track cue.
+    /// No feed reports a browser tab yet, so a browser item is made here with the same rules the views read.
+    private static func renderSourceStates(into directory: URL, notch: CGSize) {
+        let store = SettingsStore.shared
+        let ids = (1...4).map { HomeSlots.settingID(slot: $0) } + ["home.variant.music"]
+        let saved = ids.map { ($0, store.string($0)) }
+        defer { for (id, value) in saved { store.set(id, value) } }
+        for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name) }
+        store.set("home.variant.music", "Art")
+        let tab = NowPlayingSource.browser(BrowserMediaKey(tabID: 7, documentID: "doc-7", host: "radio.example.com", fingerprint: "ab12cd"))
+        let spotify = NowPlayingSource.player(.spotify)
+        func item(_ source: NowPlayingSource, duration: Double = 243) -> NowPlaying {
+            NowPlaying(source: source, title: "Midnight City", artist: "M83", album: "Hurry Up, We're Dreaming", isPlaying: true,
+                       duration: duration, position: 96)
+        }
+        func render(_ name: String, closed: Bool = false, _ configure: @escaping (TopBarModel) -> Void) {
+            let (model, topBar) = sampleModel(configure)
+            if closed { model.presentation = .closed }
+            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+                 to: directory.appendingPathComponent("source-\(name).png"))
+        }
+        render("music-player") { $0.selectedTab = .music }
+        render("music-spotify") { $0.selectedTab = .music; $0.nowPlaying = item(spotify) }
+        render("music-browser") { $0.selectedTab = .music; $0.nowPlaying = item(tab) }
+        render("music-browser-no-length") { $0.selectedTab = .music; $0.nowPlaying = item(tab, duration: 0) }
+        render("music-nothing") { $0.selectedTab = .music; $0.nowPlaying = nil }
+        render("home-player") { $0.selectedTab = .home }
+        render("home-browser") { $0.selectedTab = .home; $0.nowPlaying = item(tab) }
+        render("closed-browser", closed: true) { $0.nowPlaying = item(tab) }
+        render("cue-new-source", closed: true) {
+            $0.nowPlaying = item(tab)
+            $0.setCueForSnapshot(.trackChanged(title: "Midnight City", artist: "M83", source: tab, sourceChanged: true))
+        }
+        render("cue-same-source", closed: true) {
+            $0.nowPlaying = item(spotify)
+            $0.setCueForSnapshot(.trackChanged(title: "Midnight City", artist: "M83", source: spotify, sourceChanged: false))
         }
     }
 

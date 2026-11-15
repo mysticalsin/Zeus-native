@@ -4366,6 +4366,222 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-450",
+      "failure": "Moving music onto one source model would rename the cover files of Music and Spotify, so every cover already on disk was fetched again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ArtworkTests.swift",
+        "function": "playerCacheKeysAreUnchanged"
+      }
+    },
+    {
+      "id": "REG-451",
+      "failure": "A cover or lyrics for a browser item could be written to the cache folders, leaving a trace of a page on disk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageArtworkDiskTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+        "function": "aPageCoverShowsAndLeavesTheDirectoryEmpty"
+      }
+    },
+    {
+      "id": "REG-452",
+      "failure": "A playing browser tab counted as a player session, so the voice command to play stopped resuming Spotify.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
+        "function": "aBrowserTabIsNotAPlayerSession"
+      }
+    },
+    {
+      "id": "REG-453",
+      "failure": "Dictation resumed whatever the notch fell back to after its source went away, so it could start Music.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NowPlayingHubTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+        "function": "aResumeAfterTheSourceWasRemovedDoesNothingAndNeverReachesMusic"
+      }
+    },
+    {
+      "id": "REG-454",
+      "failure": "A source heard paused for the first time took the notch from the one that was playing.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
+        "function": "aSourceFirstSeenPausedNeverDisplacesTheShownOne"
+      }
+    },
+    {
+      "id": "REG-455",
+      "failure": "A player that was not shown reset or read the shuffle and repeat of the one that was.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NowPlayingHubTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+        "function": "theModesBelongToTheShownSource"
+      }
+    },
+    {
+      "id": "REG-456",
+      "failure": "Lyrics for a browser item were read from or written to the lyric cache folder, leaving a trace of a page on disk.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LyricsStoreTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+        "function": "aBrowserItemNeverReadsOrWritesTheLyricCache"
+      }
+    },
+    {
+      "id": "REG-457",
+      "failure": "A page cover host could set a cookie that the app sent back on every later cover fetch, which let a host follow the owner across pages.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageArtworkDiskTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+        "function": "aCookieSetByACoverHostIsNeverSentBack"
+      }
+    },
+    {
+      "id": "REG-458",
+      "failure": "With nothing playing the notch jumped to the source that had started later but stopped earlier, so pausing Music handed the notch to a paused tab.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingArbiterTests.swift",
+        "function": "whenNothingPlaysTheOneThatStoppedLastStaysWhateverStartedFirst"
+      }
+    },
+    {
+      "id": "REG-459",
+      "failure": "A browser item drew Previous, Next, Shuffle and Repeat, buttons the source cannot honour, so they took presses and did nothing.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NowPlayingDisplayTests.swift",
+        "function": "aBrowserItemDrawsNoPreviousNextShuffleOrRepeat"
+      }
+    },
+    {
+      "id": "REG-460",
+      "failure": "A call that ran in a browser tab could be read as media and paused by dictation, because its tab looked like any other playing tab.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserMediaTests.swift",
+        "function": "whileACallRunsInABrowserNoItemIsShownAndNoCommandIsSent"
+      }
+    },
+    {
+      "id": "REG-461",
+      "failure": "A page opened from a file, or one in a private window, could be reported as playing media, so a page written to disk or a private tab could reach the notch.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserMediaTests.swift",
+        "function": "onlyAWebPageIsAnItemNeverAFileOrAPrivateWindow"
+      }
+    },
+    {
+      "id": "REG-462",
+      "failure": "A bridge that refused the app and a bridge that was slow looked the same, so the poll could never back off against a refusal.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-socket-safety",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
+        "function": "exchangeTellsAMissingPathASilentListenerAndAClosingOneApart"
+      }
+    },
+    {
+      "id": "REG-463",
+      "failure": "Failed polls retried every few seconds forever, which made the bridge check Zeus's signature again and again while Chrome was not connected.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserPollMachineTests.swift",
+        "function": "theBackOffIsFiveTenTwentyFortySixtyAndStaysAtSixty"
+      }
+    },
+    {
+      "id": "REG-464",
+      "failure": "With Show music from set to one player, Chrome was still asked what its tabs play.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrowserPollMachineTests.swift",
+        "function": "aPinStopsPollingAndDropsTheEntriesAndAnyPlayerStartsItAgain"
+      }
+    },
+    {
+      "id": "REG-465",
+      "failure": "A media command could be sent to a tab from code other than the feed, such as a voice or tag path, which would let a model pause a page.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_media_command_goes_out_only_through_the_bridge_and_the_feed"
+      }
+    },
+    {
+      "id": "REG-466",
+      "failure": "The Chrome output gate could tap or read audio instead of listening to property changes.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_output_gate_listens_to_properties_and_never_taps_audio"
+      }
+    },
+    {
+      "id": "REG-467",
+      "failure": "A settings file could turn on reading Chrome tab media for a person who had not chosen it.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_media_toggle_is_never_turned_on_by_an_import"
+      }
     }
   ]
 }

@@ -280,7 +280,8 @@ final class DictationController {
     private var turnContext: DictationTurnContext?
     /// The chosen engine hears this turn (ready and chosen); Apple otherwise.
     private var useLocal = false
-    private var pausedMedia = false
+    /// The source dictation paused, so the same one is resumed afterwards and never another.
+    private var pausedMedia: NowPlayingSource?
     /// Every dictation job (live turn, file, history re-run) as one state; `topBar.dictationPhase` only mirrors it.
     private(set) var flow: DictationFlow.State = .idle {
         didSet { topBar.dictationPhase = flow.phase }
@@ -605,10 +606,7 @@ final class DictationController {
         topBar.dictationModeSymbol = mode.symbol
         topBar.dictationPartial = ""
         apply(.micOpened(turn: turnGeneration))
-        if settings.pauseMedia, topBar.nowPlaying?.isPlaying == true {
-            topBar.musicCommand(.playPause)
-            pausedMedia = true
-        }
+        if settings.pauseMedia { pausedMedia = topBar.pauseForDictation() }
         guard AccessibilityGate.trusted else { return }
         escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
@@ -1064,9 +1062,9 @@ final class DictationController {
     }
 
     private func resumeMedia() {
-        guard pausedMedia else { return }
-        pausedMedia = false
-        topBar.musicCommand(.playPause)
+        guard let source = pausedMedia else { return }
+        pausedMedia = nil
+        topBar.resumeAfterDictation(source)
     }
 
     /// Start, stop and cancel sounds (DictationCueRule says when). Played on the key press and release

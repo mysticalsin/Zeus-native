@@ -78,7 +78,7 @@ final class FastActions {
             return .plan(query.isEmpty ? resumeSpotify(intent) : playOnSpotify(query, intent: intent))
         case .media(let command):
             if command == .play {
-                let choice = MediaPlayPolicy.choose(hasSession: topBar?.nowPlaying != nil, spotifyInstalled: SpotifyPlayer.isInstalled)
+                let choice = MediaPlayPolicy.choose(hasSession: topBar?.nowPlayingHub?.hasPlayerSession ?? false, spotifyInstalled: SpotifyPlayer.isInstalled)
                 if choice == .resumeSpotify { return .plan(resumeSpotify(intent)) }
             }
             return .plan(media(command, intent: intent))
@@ -287,9 +287,9 @@ final class FastActions {
 
     private func playOnSpotify(_ query: String, intent: FastIntent) -> Plan {
         Plan(intent: intent, summary: "Spotify: \(query)", ack: acks.line(.searchingSpotify(query))) { [weak self] started in
+            // Spotify's own state, even while a Music pin or another source is shown.
             let outcome = await SpotifyPlayer.play(query, started: started) { [weak self] in
-                guard let playing = self?.topBar?.nowPlaying, playing.player == .spotify else { return nil }
-                return playing.isPlaying
+                self?.topBar?.nowPlayingHub?.entry(.player(.spotify))?.isPlaying
             }
             switch outcome {
             case .accessibility, .appleScript: return nil

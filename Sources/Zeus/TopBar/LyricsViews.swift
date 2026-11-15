@@ -29,22 +29,27 @@ final class LyricsStore {
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     /// The track the flow is on, for the effects that need its request URLs or its cache file.
     @ObservationIgnored private var query: LRCLIBQuery?
+    /// Whether the track's source lets its lyrics rest on disk. A browser page's never do: its lyrics stay in memory.
+    @ObservationIgnored private var persists = true
     @ObservationIgnored private let cache: LyricsCache
     @ObservationIgnored private let session: URLSession
+    /// The privacy switch. Tests give their own so no setting is written.
+    @ObservationIgnored private let isEnabled: @MainActor () -> Bool
 
-    init(cache: LyricsCache = LyricsCache()) {
+    init(cache: LyricsCache = LyricsCache(), session: URLSession? = nil, enabled: @escaping @MainActor () -> Bool = { LyricsStore.enabled }) {
         self.cache = cache
+        isEnabled = enabled
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 8
         config.timeoutIntervalForResource = 15
-        session = URLSession(configuration: config)
+        self.session = session ?? URLSession(configuration: config)
     }
 
     static var enabled: Bool { SettingsStore.shared.bool("privacy.lyrics") }
 
     /// The state for this very track; `.idle` while another track's answer is still current.
     func state(for playing: NowPlaying?) -> State {
-        guard Self.enabled else { return .off }
+        guard isEnabled() else { return .off }
         guard let playing, currentKey == LRCLIBQuery(playing).cacheKey else { return .idle }
         return state
     }
@@ -58,9 +63,11 @@ final class LyricsStore {
         if let playing {
             let asked = LRCLIBQuery(playing)
             query = asked
-            track = LyricsFlow.Track(key: asked.cacheKey, isAskable: asked.isAskable, isPlaying: playing.isPlaying)
+            persists = playing.source.persistsDerivedData
+            // Asks only with the lyrics capability. For a player that is exactly `asked.isAskable`, as before.
+            track = LyricsFlow.Track(key: asked.cacheKey, isAskable: playing.capabilities.contains(.lyrics), isPlaying: playing.isPlaying)
         }
-        send(.load(enabled: Self.enabled, track: track, now: Date()))
+        send(.load(enabled: isEnabled(), track: track, now: Date()))
     }
 
     /// Runs the flow's decision for one event, shows its phase, then runs its effects.
@@ -81,14 +88,14 @@ final class LyricsStore {
             retryTask?.cancel(); retryTask = nil
         case .readCache:
             guard let query else { return }
-            send(.cacheRead(key: query.cacheKey, cached: cache.load(query), mayAsk: !TopBarStyle.isSnapshot, now: Date()))
+            send(.cacheRead(key: query.cacheKey, cached: persists ? cache.load(query) : nil, mayAsk: !TopBarStyle.isSnapshot, now: Date()))
         case .sendLookup:
             guard let query else { return }
             task = Task { [weak self] in await self?.run(query) }
         case .scheduleRetry:
             if let query { scheduleRetry(query) }
         case .saveCache(let result):
-            if let query { cache.save(result, for: query) }
+            if persists, let query { cache.save(result, for: query) }
         }
     }
 
@@ -96,7 +103,7 @@ final class LyricsStore {
     /// else is going on, so no step after the switch sends the title and artist anywhere.
     private func mayRequest(_ key: String) -> Bool {
         guard !Task.isCancelled else { return false }
-        let enabled = Self.enabled
+        let enabled = isEnabled()
         if !enabled { send(.privacyOff) }
         return flow.accepts(key: key, enabled: enabled)
     }
@@ -132,7 +139,7 @@ final class LyricsStore {
         let key = query.cacheKey
         retryTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let plan = self?.flow.retryPlan(for: key, now: Date(), enabled: Self.enabled) else { return }
+                guard let plan = self?.flow.retryPlan(for: key, now: Date(), enabled: self?.isEnabled() ?? false) else { return }
                 switch plan {
                 case .wait(let seconds): try? await Task.sleep(for: .seconds(seconds))
                 case .askNow: self?.send(.retryDue(key: key, now: Date())); return

@@ -85,27 +85,47 @@ public enum UnixSocket {
         }
     }
 
+    /// How reading one line ended.
+    enum LineRead: Equatable {
+        case line(Data)
+        /// The other end closed or reset before a line arrived.
+        case closed
+        case timedOut
+        /// An unusable limit or timeout, or a line over the limit.
+        case failed
+    }
+
     /// Accept a complete line or clean EOF only. Oversize and timed-out partial messages
     /// never reach a handler, even if their current prefix happens to be valid JSON.
     static func readLine(_ fd: Int32, limit: Int = maximumMessageBytes,
                          timeout: TimeInterval = requestReadTimeout) -> Data? {
-        guard limit > 0, limit <= maximumMessageBytes, let deadline = deadline(after: timeout) else { return nil }
+        if case .line(let line) = readLineOutcome(fd, limit: limit, timeout: timeout) { return line }
+        return nil
+    }
+
+    /// `readLine`, saying how a read that gave nothing ended.
+    static func readLineOutcome(_ fd: Int32, limit: Int = maximumMessageBytes,
+                                timeout: TimeInterval = requestReadTimeout) -> LineRead {
+        guard limit > 0, limit <= maximumMessageBytes, let deadline = deadline(after: timeout) else { return .failed }
         var result = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         while true {
-            guard DispatchTime.now().uptimeNanoseconds < deadline else { return nil }
+            guard DispatchTime.now().uptimeNanoseconds < deadline else { return .timedOut }
             let count = recv(fd, &chunk, chunk.count, 0)
-            if count == 0 { return result.isEmpty ? nil : result }
+            if count == 0 { return result.isEmpty ? .closed : .line(result) }
             if count < 0 {
                 if errno == EINTR { continue }
-                if (errno == EAGAIN || errno == EWOULDBLOCK), wait(fd, for: Int16(POLLIN), until: deadline) { continue }
-                return nil
+                if errno == EAGAIN || errno == EWOULDBLOCK {
+                    if wait(fd, for: Int16(POLLIN), until: deadline) { continue }
+                    return .timedOut
+                }
+                return .closed
             }
             let newline = chunk[0..<count].firstIndex(of: 0x0A)
             let length = newline ?? count
-            guard length <= limit - result.count else { return nil }
+            guard length <= limit - result.count else { return .failed }
             result.append(contentsOf: chunk[0..<length])
-            if newline != nil { return result }
+            if newline != nil { return .line(result) }
         }
     }
 
@@ -118,26 +138,57 @@ public enum UnixSocket {
         return id.utf8.count <= maximumIdentifierBytes
     }
 
-    /// Sends one line. Returns nil on connect/write/read failure. No capture or permission API runs.
-    public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval) -> Data? {
-        guard boundedMessage(payload), var address = address(for: path) else { return nil }
+    /// A connected, non-blocking socket to `path`, or nil. The caller closes it.
+    static func connectedSocket(to path: String) -> Int32? {
+        guard var address = address(for: path) else { return nil }
         let fd = makeSocket()
         guard fd >= 0 else { return nil }
-        defer { close(fd) }
-        guard prepare(fd), let connectDeadline = deadline(after: 1) else { return nil }
+        guard prepare(fd), let connectDeadline = deadline(after: 1) else { close(fd); return nil }
         let connected = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
         }
         if connected != 0 {
-            guard errno == EINPROGRESS, wait(fd, for: Int16(POLLOUT), until: connectDeadline) else { return nil }
+            guard errno == EINPROGRESS, wait(fd, for: Int16(POLLOUT), until: connectDeadline) else { close(fd); return nil }
             var error: Int32 = 0
             var size = socklen_t(MemoryLayout<Int32>.size)
-            guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &size) == 0, error == 0 else { return nil }
+            guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &size) == 0, error == 0 else { close(fd); return nil }
         }
+        return fd
+    }
+
+    /// Sends one line. Returns nil on connect/write/read failure. No capture or permission API runs.
+    public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval) -> Data? {
+        guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return nil }
+        defer { close(fd) }
         guard writeAll(fd, payload + Data([0x0A])) else { return nil }
         guard expectReply else { return Data() }
         guard let reply = readLine(fd, timeout: timeout), boundedMessage(reply) else { return nil }
         return reply
+    }
+
+    /// How a request that wanted a reply ended.
+    public enum Outcome: Equatable, Sendable {
+        /// Nothing to connect to, or the payload could not be sent at all.
+        case notConnected
+        /// Connected and sent, and no line came within the bound.
+        case timedOut
+        /// Connected, then the other end closed or reset first, a write failed, or the reply was unusable. A peer
+        /// that refuses this program closes its connection without writing, which looks the same.
+        case closedEarly
+        case reply(Data)
+    }
+
+    /// `request` with a reply, saying how a failure happened. It shares `request`'s connect, write and read steps,
+    /// so both keep the same bounds.
+    public static func exchange(path: String, payload: Data, timeout: TimeInterval) -> Outcome {
+        guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return .notConnected }
+        defer { close(fd) }
+        guard writeAll(fd, payload + Data([0x0A])) else { return .closedEarly }
+        switch readLineOutcome(fd, timeout: timeout) {
+        case .line(let reply): return boundedMessage(reply) ? .reply(reply) : .closedEarly
+        case .timedOut: return .timedOut
+        case .closed, .failed: return .closedEarly
+        }
     }
 }
 

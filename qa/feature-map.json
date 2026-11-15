@@ -659,6 +659,30 @@
       "scope": "Actual MusicAwakeHold with injected clock, power, rules, assertion and timer ports; a real PowerMonitor is started and stopped in a few cases. No real display assertion, no real timers, no capture or permission, no device acceptance."
     },
     {
+      "id": "native-NowPlayingHubTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "NowPlayingHubTests",
+      "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+      "scope": "Actual NowPlayingHub and TopBarModel with recording closures for every effect: no player, browser, Apple Event, artwork fetch or permission, and no device acceptance."
+    },
+    {
+      "id": "native-PageArtworkDiskTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "PageArtworkDiskTests",
+      "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+      "scope": "Actual ArtworkStore with a temporary directory and a stub URLProtocol: no network, no real cache folder, no permission, no device acceptance."
+    },
+    {
+      "id": "native-LyricsStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "LyricsStoreTests",
+      "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+      "scope": "Actual LyricsStore with a temporary cache folder, a stub URLProtocol and the privacy switch given as on: no network, no real cache folder, no setting written, no device acceptance."
+    },
+    {
       "id": "native-LiveDiagnosticsCardTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5204,6 +5228,191 @@
             {
               "file": "Tests/ZeusAppTests/MusicAwakeHoldTests.swift",
               "function": "theMusicHoldLeavesTheKeepAwakeSessionsReadingsOn"
+            }
+          ]
+        },
+        {
+          "id": "F13.now-playing-hub",
+          "check": "native-NowPlayingHubTests",
+          "acceptance": "The actual hub with recording closures: one shown source from many entries, commands checked against the shown item's capabilities and ignored outside them, a nil browser closure does nothing, a pin holds, entries go when a feed stops, an equal sample writes nothing, a quick double toggle gives pause then play, dictation pauses and resumes only the same live source and never reaches Music, a played or paused player is read back and a browser source is not, the track cue and the shuffle and repeat reads follow the shown item. Real players, a real Chrome and VoiceOver remain device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "commandsOutsideTheCapabilitiesAreRefused"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aNilBrowserCommandDoesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "commandsGoToTheShownSource"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "thePinHoldsAndTargetsTheCommands"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "withNothingShownTheTargetIsMusicAndOpenNamesIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "openOnABrowserItemOpensThatSource"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "entriesGoWhenAFeedTurnsOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aPlayerQuitRemovesItsEntryThroughTheFeed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "anIdenticalSampleWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "twoQuickTogglesGivePauseThenPlay"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aPlayerKeepsItsToggleAndFlipsAtOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theFlipKeepsTheBarWhereItWas"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aPlayerThatCannotBeReachedIsNotFlippedAndNotReadBack"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aPlayPauseSentToAPlayerAsksTheFeedToReadItBack"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aSeekIsClampedAndMovesTheBarAtOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "dictationPausesTheShownSourceAndResumesThatSource"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "dictationPausesAPlayerWithAnExplicitPause"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "dictationLeavesAPausedOrEmptyNotchAlone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aResumeAfterTheSourceWasRemovedDoesNothingAndNeverReachesMusic"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aResumeForASourceThatAlreadyPlaysSendsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theTrackCueFiresOnTheShownItemAsToday"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theModesBelongToTheShownSource"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "artworkIsRequestedForTheShownItem"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theMusicPageHookReachesEveryObserverOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theFollowSettingOffersExactlyTheArbitersChoicesAndDefaultsToAnyPlayer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "attachingWiresTheModelsClosures"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aDictationPauseOfTheShownSourceKeepsItShown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "aChangeOfShownSourceFromTheSettingOrARemovalReadsTheNewOnesModes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NowPlayingHubTests.swift",
+              "function": "theCommandTargetIsObservedAndFollowsTheSetting"
+            }
+          ]
+        },
+        {
+          "id": "F13.page-artwork-disk",
+          "check": "native-PageArtworkDiskTests",
+          "acceptance": "A cover taken from a browser page is shown from the page's own https link, never read from or written to the artwork folder, ignores a file seeded at its key, and is refused when the link is not allowed, the answer is not an image, it is over 2 MB, or a redirect leaves allowed https, and the fetch session takes and sends no cookie. A real page and a real cache folder remain device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aPageCoverShowsAndLeavesTheDirectoryEmpty"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aFileSeededAtThePageKeyIsIgnoredAndLeftAlone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aLinkThatIsNotAllowedIsNeverRequested"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aFailedAnswerLeavesTheTileAndWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aCoverOverTwoMegabytesIsRefused"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aRedirectToAnythingButAnAllowedHTTPSAddressIsRefused"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aPageCoverSessionKeepsNoCookies"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageArtworkDiskTests.swift",
+              "function": "aCookieSetByACoverHostIsNeverSentBack"
+            }
+          ]
+        },
+        {
+          "id": "F13.lyrics-store-disk",
+          "check": "native-LyricsStoreTests",
+          "acceptance": "The actual lyric store never reads the lyric cache for a browser item, even with a file seeded at its key, writes nothing after an answer, and asks nothing for a browser item without a length; a player still reads and writes the cache as before. A real page and a real cache folder remain device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aBrowserItemNeverReadsOrWritesTheLyricCache"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aBrowserItemLeavesNoFileInAnEmptyCacheFolder"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aBrowserItemWithNoDurationAsksNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LyricsStoreTests.swift",
+              "function": "aPlayerStillReadsAndWritesTheLyricCache"
             }
           ]
         },
