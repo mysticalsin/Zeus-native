@@ -93,6 +93,16 @@ struct ScribeMeetingCardDesignTests {
         #expect(ScribeMeetingCardText.pill(card) == phrase)
     }
 
+    /// QA m1: a meeting already under way read "Starting soon" next to its "Now" time.
+    @Test func aMeetingThatHasStartedDoesNotSayStartingSoon() {
+        let started = ScribeMeetingCard.offer(meeting(startsIn: -30), blocked: nil)
+        #expect(ScribeMeetingCardText.pill(started, now: t0) == "Meeting started")
+        #expect(ScribeMeetingCardText.pill(.next(meeting(startsIn: 0)), now: t0) == "Meeting started")
+        #expect(ScribeMeetingCardText.pill(.offer(meeting(startsIn: 120), blocked: nil), now: t0) == "Starting soon")
+        #expect(ScribeMeetingCardText.pill(.offer(meeting(startsIn: -30), blocked: nil)) == "Starting soon",
+                "with no clock the pill keeps its old phrase")
+    }
+
     @Test func theDotColourFollowsTheState() {
         #expect(ScribeMeetingCardText.tone(.offer(meeting(), blocked: nil)) == .soon)
         #expect(ScribeMeetingCardText.tone(.countdown(meeting(), seconds: 3, deadline: 103, total: 5)) == .soon)
@@ -210,7 +220,7 @@ struct ScribeMeetingCardDesignTests {
 
     @Test func noNewWordHasADashOrAProductName() {
         let m = meeting(guests: ["Ana"])
-        var words = ["Starting soon", "Recording in 5", ScribeMeetingCardText.join("App")]
+        var words = ["Starting soon", "Meeting started", "Recording in 5", ScribeMeetingCardText.join("App")]
         for card in [ScribeMeetingCard.offer(m, blocked: nil), .offer(m, blocked: .firstRecordingOwed),
                      .countdown(m, seconds: 5, deadline: 105, total: 5), .waiting(m), .starting(m, cancellable: true),
                      .recording(m), .failed(m, .stillSaving), .next(m)] {

@@ -62,7 +62,7 @@ private let rows: [Row] = [
         status: "No input device", primary: "Try again", cancel: nil, dismiss: true),
     Row(name: "failed, blank capture reason", card: .failed(m, .captureFailed(" \n")), title: "Weekly sync",
         status: "Couldn't start", primary: "Try again", cancel: nil, dismiss: true),
-    Row(name: "failed, no response", card: .failed(m, .noResponse), title: "Weekly sync", status: "Didn't start",
+    Row(name: "failed, no response", card: .failed(m, .noResponse), title: "Weekly sync", status: "Didn't start. Try again.",
         primary: "Try again", cancel: nil, dismiss: true),
     Row(name: "next meeting", card: .next(m), title: "Weekly sync", status: "in 2 min", primary: "Switch", cancel: nil,
         dismiss: true),

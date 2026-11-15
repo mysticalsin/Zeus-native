@@ -42,6 +42,13 @@ struct FacePresenceCardTests {
         }
     }
 
+    /// QA m8: "Lock after absent for" stayed live while Face presence was Off.
+    @Test func theLockTimeIsOnlyChangeableWhileFacePresenceIsOn() {
+        #expect(!Self.model(Machine()).lockAfterEnabled)
+        #expect(Self.model(Self.machine([Self.on])).lockAfterEnabled)
+        #expect(Self.model(Self.machine([.switchOn(camera: .notDetermined, enabledFaces: 1, canLock: true, vaultReadable: true, uptime: 1)])).lockAfterEnabled)
+    }
+
     @Test func statusRowNamesTheCountdownForVoiceOver() {
         // Away since 100, two minutes: 18 seconds in, 1:42 left.
         let away = Self.machine([Self.on, .observed(.notOwner, uptime: 101)])

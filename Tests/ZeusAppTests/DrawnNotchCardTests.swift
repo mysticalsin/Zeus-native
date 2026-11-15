@@ -103,7 +103,7 @@ struct DrawnNotchCardTests {
         #expect(DrawnNotchCardModel.statusText(.notShown) == "Not shown on that display")
         #expect(DrawnNotchCardModel.statusText(.noDisplay) == "No display without a notch")
         #expect(DrawnNotchCardModel.statusSymbol == "display.trianglebadge.exclamationmark")
-        #expect(DrawnNotchCardModel.statusButtonTitle == "Show the notch on")
+        #expect(DrawnNotchCardModel.statusButtonTitle == "Choose displays")
     }
 
     // MARK: Events

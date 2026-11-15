@@ -10,6 +10,21 @@ struct FacePresenceStatusTests {
         FacePresenceStatus.make(state: state, lockAfter: lockAfter, uptime: uptime)
     }
 
+    /// QA m9: a state a person has to act on says why and what to do; a plain state says nothing extra.
+    @Test func statesThatNeedAnActionSayWhyAndWhatToDo() {
+        #expect(Self.status(.needsCameraConsent).hint == "Allow the camera for Zeus in System Settings, Privacy and Security, Camera.")
+        #expect(Self.status(.enrolling(token: 1)).hint == "Look at the camera until Zeus has learned your face.")
+        for reason in [Machine.UnavailableReason.camera, .lock, .vault] {
+            let hint = Self.status(.unavailable(reason)).hint
+            #expect(hint?.isEmpty == false, "\(reason)")
+            #expect(hint?.contains("\u{2014}") == false)
+        }
+        #expect(Self.status(.unavailable(.camera)).hint != Self.status(.unavailable(.vault)).hint)
+        for state in [Machine.State.off, .watching(since: 0), .present(lastSeen: 0), .paused(.launch), .away(since: 0)] {
+            #expect(Self.status(state).hint == nil, "\(state)")
+        }
+    }
+
     @Test func everyStateHasItsWordAndSymbol() {
         let rows: [(Machine.State, String, String)] = [
             (.off, "Off", "person.crop.circle"),
