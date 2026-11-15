@@ -101,6 +101,9 @@ import Testing
     }
     static let sharedDictation = Config(key: .controlOption, role: .dictation, mode: .shared)
     static let sharedTalk = Config(key: .controlOption, role: .talk, mode: .shared)
+    static func sharedTalk(confirm: TimeInterval) -> Config {
+        Config(key: .controlOption, role: .talk, mode: .shared, confirm: confirm)
+    }
     static let toggle = Config(key: .rightCommand, role: .dictation, mode: .toggle)
 
     static let pair: [UInt16] = [ctrl, opt]
@@ -453,6 +456,46 @@ import Testing
         var rig = Self.latchedTalk(confirm: 0.15)
         #expect(rig.press(Self.ctrl, Self.opt, at: 3) == [.wake(after: 0.15)])
         #expect(rig.tag == "armed ending")
+    }
+
+    /// A shared talk key beside tiling: two quick taps open a hands-free command turn, and the press that ends it waits
+    /// out the confirm like the ending press of a hold key.
+    private static func latchedSharedTalk(confirm: TimeInterval) -> Rig {
+        var rig = Rig(sharedTalk(confirm: confirm))
+        rig.tap(pair, at: 0)
+        rig.tap(pair, at: 0.25)
+        return rig
+    }
+
+    @Test func row21OnTheSharedKeyAConfirmedEndingPressWaitsForTheConfirmAndThenSends() {
+        var rig = Self.latchedSharedTalk(confirm: 0.15)
+        #expect(rig.log.filter { $0 == .start }.count == 1, "two quick taps open the command turn")
+        #expect(rig.press(Self.ctrl, Self.opt, at: 3) == [.wake(after: 0.15)], "nothing is sent at the key-down")
+        #expect(rig.tag == "armed ending")
+        #expect(rig.tick(at: 3.15) == [.send], "the set stayed down alone for the confirm")
+        #expect(rig.tag == "armed first", "the same press counts as a first tap, as with a confirm of 0")
+    }
+
+    @Test func row6OnTheSharedKeyAConfirmedEndingPressLetGoCleanlySendsAtTheReleaseAndIsAFirstTap() {
+        var rig = Self.latchedSharedTalk(confirm: 0.15)
+        rig.press(Self.ctrl, Self.opt, at: 3)
+        #expect(rig.release(Self.opt, at: 3.0625) == [.send])
+        #expect(rig.tag == "tapped", "a quick press that ended a turn still counts as the first of two taps")
+        #expect(rig.release(Self.ctrl, at: 3.125) == [])
+        #expect(rig.tick(at: 3.15) == [], "the wake of the ending press is stale")
+    }
+
+    @Test func row8AFastTilingChordDoesNotEndASharedHandsFreeTurnWithAConfirm() {
+        var rig = Self.latchedSharedTalk(confirm: 0.15)
+        rig.press(Self.ctrl, at: 3)
+        rig.press(Self.opt, at: 3.005)
+        #expect(rig.press(Self.cmdL, at: 3.02) == [], "Command lands before the confirm: nothing is sent")
+        #expect(rig.tag == "latched" && rig.machine.isLatched)
+        #expect(rig.tick(at: 3.155) == [], "the wake finds the turn as it was")
+        #expect(rig.release(Self.cmdL, Self.opt, Self.ctrl, at: 3.5) == [])
+        #expect(rig.log.filter { $0 == .send || $0 == .cancel }.isEmpty, "the turn is neither sent nor cancelled")
+        #expect(rig.press(Self.ctrl, Self.opt, at: 5) == [.wake(after: 0.15)], "a clean press ends it")
+        #expect(rig.tick(at: 5.15) == [.send])
     }
 
     @Test func row22AFinishedPressIsForgottenWhenItsKeyIsLetGo() {

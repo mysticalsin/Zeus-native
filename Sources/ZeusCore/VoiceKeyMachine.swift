@@ -97,13 +97,15 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     /// A wake may arrive this much early: the clock that schedules it and the clock that stamps events differ.
     private static let slack: TimeInterval = 0.001
 
-    /// How long a press waits before it acts: the confirm of a hold key, 0.25 s on a shared dictation key, never on
-    /// the talk side of a shared key (it waits for its second tap) or a toggle.
-    private static func delay(_ config: Config) -> TimeInterval? {
+    /// How long a press waits before it acts: the confirm of a hold key, 0.25 s on a shared dictation key, the confirm
+    /// on the press that ends a hands-free turn on the talk side of a shared key. Otherwise never: that side waits for
+    /// its second tap, and a toggle acts at the press.
+    private static func delay(_ config: Config, _ press: Press) -> TimeInterval? {
         switch config.mode {
         case .hold: config.confirm
-        case .shared: config.role == .dictation ? 0.25 : nil
-        case .toggle: nil
+        case .shared where config.role == .dictation: 0.25
+        case .shared: press == .ending && config.confirm > 0 ? config.confirm : nil
+        case .shared, .toggle: nil
         }
     }
 
@@ -212,8 +214,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     /// A timer that came due before the event that is being handled: rows 5 and 17 on the picture before the event.
     private mutating func settle(at t: TimeInterval, _ config: Config, _ out: inout [Effect]) {
         switch phase {
-        case .armed(let since, _):
-            if let delay = Self.delay(config), t - since >= delay - Self.slack { delayElapsed(at: t, &out) }
+        case .armed(let since, let press):
+            if let delay = Self.delay(config, press), t - since >= delay - Self.slack { delayElapsed(at: t, config, &out) }
         case .tapped(let tapAt, true):
             if t - tapAt >= Self.gap(config) - Self.slack { phase = .idle; out.append(.send) }
         default:
@@ -222,10 +224,11 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     }
 
     /// Row 5: the press has been down alone for its delay.
-    private mutating func delayElapsed(at t: TimeInterval, _ out: inout [Effect]) {
+    private mutating func delayElapsed(at t: TimeInterval, _ config: Config, _ out: inout [Effect]) {
         guard case .armed(let since, let press) = phase else { return }
         if press == .ending {
-            phase = .spent
+            // On the shared key the press that ended the turn is also the first tap of the next command turn.
+            phase = config.mode == .shared ? .armed(since: since, press: .first) : .spent
             out.append(.send)
         } else {
             phase = .holding(since: since, second: press == .second, check: t + Self.checkEvery, shifted: false)
@@ -239,8 +242,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     private mutating func tick(at t: TimeInterval, live: ShortcutModifiers?, key: Shortcut, _ config: Config,
                                _ out: inout [Effect]) {
         switch phase {
-        case .armed(let since, _):
-            guard let delay = Self.delay(config), t - since >= delay - Self.slack else { return }
+        case .armed(let since, let press):
+            guard let delay = Self.delay(config, press), t - since >= delay - Self.slack else { return }
         case .holding(_, _, let check, _):
             guard t >= check - Self.slack else { return }
         case .tapped(let tapAt, true):
@@ -268,7 +271,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         if case .holding = phase {
             rearmHold(at: t, &out)
         } else {
-            delayElapsed(at: t, &out)
+            delayElapsed(at: t, config, &out)
         }
     }
 
@@ -296,7 +299,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
                 if config.mode == .shared, config.role == .dictation {
                     phase = .idle                                                           // row 7
                 } else if press == .ending {
-                    phase = .idle                                                           // row 6, the ending press
+                    // Row 6, the ending press. On the shared key a quick one is also the first tap of the next turn.
+                    phase = config.mode == .shared && t - since <= Self.tapMax(config) ? .tapped(at: t, open: false) : .idle
                     out.append(.send)
                 } else if t - since <= Self.tapMax(config) {
                     if press == .second { phase = .latched; out.append(.start) }            // row 6, the second quick tap
@@ -377,13 +381,16 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         }
     }
 
-    /// Rows 20 and 21: the press that ends a hands-free turn.
+    /// Rows 20 and 21: the press that ends a hands-free turn. With a confirm it waits for it on a shared key too.
     private mutating func endHandsFreeTurn(at t: TimeInterval, _ config: Config, _ out: inout [Effect]) {
         switch config.mode {
         case .hold where config.confirm <= 0:
             phase = .spent
             out.append(.send)
         case .hold:
+            phase = .armed(since: t, press: .ending)
+            out.append(.wake(after: config.confirm))
+        case .shared where config.confirm > 0:
             phase = .armed(since: t, press: .ending)
             out.append(.wake(after: config.confirm))
         case .shared:

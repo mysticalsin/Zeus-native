@@ -61,7 +61,8 @@ the key's own. The rules:
 
 A hold key waits `confirm` seconds alone before it acts. It is 0 except while a tiling chord holds the key's modifiers
 (see below), and 0.25 s for dictation on a key it shares with talk. A hold sends when the key is let go, a quick tap
-sends after the gap, and two quick taps latch a hands-free turn until the next tap.
+sends after the gap, and two quick taps latch a hands-free turn until the next tap. The press that ends a hands-free
+turn waits for `confirm` too, on a shared key as well as a hold key.
 
 ### Tiling chords and the voice keys
 

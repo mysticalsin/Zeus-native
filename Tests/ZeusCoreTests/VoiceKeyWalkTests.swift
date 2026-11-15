@@ -110,7 +110,7 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         Config(key: key, role: role, mode: .hold, confirm: confirm)
     }
 
-    /// The ten runs of the plan, and a run that lets config changes ride on key events.
+    /// The eleven runs of the plan, and a run that lets config changes ride on key events.
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
@@ -128,6 +128,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
                 configs: [Config(key: .controlOption, role: .dictation, mode: .shared)], late: true),
         WalkRun("E talk shared Control-Option", keys: basic, own: controlOption,
                 configs: [Config(key: .controlOption, role: .talk, mode: .shared)], late: true),
+        // E2: the same beside tiling, where the press that ends a hands-free command turn waits out the confirm.
+        WalkRun("E2 talk shared Control-Option confirm 0.15", keys: basic, own: controlOption,
+                configs: [Config(key: .controlOption, role: .talk, mode: .shared, confirm: 0.15)], late: true),
         WalkRun("F dictation toggle Right Command", keys: rightCommandKeys, own: [54],
                 configs: [Config(key: .rightCommand, role: .dictation, mode: .toggle)], missed: true),
         // G: the shipped Polyglot key, Control-Option-T, with T in place of the arrow.
@@ -586,7 +589,7 @@ private struct Sim {
             let delay: TimeInterval?
             switch config.mode {
             case .hold: delay = config.confirm
-            case .shared: delay = config.role == .dictation ? 0.25 : nil
+            case .shared: delay = config.role == .dictation ? 0.25 : press == .ending && config.confirm > 0 ? config.confirm : nil
             case .toggle: delay = nil
             }
             guard let delay, now - since >= delay - slack else { return [] }
