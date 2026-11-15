@@ -39,6 +39,8 @@ enum TilingKeyClash {
         var dictationToggles = false
         /// The other global hot keys with a key: Quick to-do, the notch, the prompter pause and the approval answer keys.
         var others: [TileBaseConflicts.NamedShortcut] = []
+        /// Control-Option-Space while the talk chord is active (it is not when Chat or another hot key holds it), else nil.
+        var talkChord: Shortcut?
 
         /// The prompter's pause key (`PrompterHub.hotkeys`). It is registered only while the prompter shows, but it is
         /// fixed, so the tiling keys must never bind it.

@@ -20,3 +20,34 @@ enum TalkChordRouting {
                                   holders: holders())
     }
 }
+
+/// The Carbon hot key that takes Control-Option-Space away from other apps and from the input-source shortcut while the
+/// talk chord is active. Its handler does nothing: the press only has to be taken. The talk turn itself is read from the
+/// key monitors, so a failed registration costs only a typed space (Settings says so).
+@MainActor
+final class TalkChordHotkey {
+    static let shared = TalkChordHotkey()
+
+    /// How the key reaches the system: injected in tests.
+    struct Registrar {
+        var register: (_ keyCode: UInt32, _ modifiers: UInt32) -> Bool
+        var unregister: () -> Void
+        static func carbon() -> Registrar { Registrar(register: { _, _ in false }, unregister: {}) }
+    }
+
+    static let problemText = "Another app uses Control-Option-Space. Hold Control + Option alone to talk."
+
+    private(set) var problem: String?
+    private(set) var isRegistered = false
+
+    init(registrar: Registrar = .carbon()) {}
+
+    /// Registers the chord, or lets go of it when it is nil. Idempotent.
+    func sync(_ chord: Shortcut?) {}
+
+    /// Lets go of the key while a recorder listens, and takes it back after.
+    func setPaused(_ paused: Bool) {}
+
+    /// Whether a hot key event with this signature is this one's to answer.
+    nonisolated static func answers(signature: UInt32) -> Bool { false }
+}
