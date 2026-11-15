@@ -160,6 +160,20 @@ struct PointingKeyGestureTests {
         #expect(!gesture.isActive)
     }
 
+    /// The confirm's wake runs before the flags event of a Command pressed 0.08 s in: the live modifiers already show it.
+    @Test func aModifierOnlyTheLiveFlagsShowBeginsNothingAndBarsTheShrink() {
+        var gesture = PointingKeyGesture()
+        gesture.confirm = 0.15
+        _ = hold(&gesture)
+        #expect(gesture.confirmElapsed(at: 0.2, liveModifiers: [.control, .option, .command]) == nil)
+        #expect(!gesture.isActive && !gesture.isArmed)
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option, .command]), at: 0.25) == nil, "the queued event finds nothing to cancel")
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option]), at: 0.4) == nil, "no start on the shrink")
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: []), at: 0.5) == nil)
+        gesture.confirm = 0
+        #expect(hold(&gesture, at: 2) == .began)
+    }
+
     @Test func aSlowControlPressIsNotATap() {
         var gesture = PointingKeyGesture()
         _ = gesture.feed(control, at: 0)

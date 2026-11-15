@@ -360,12 +360,18 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
     /// modifier is still down, and ordinary keys are forgotten (nothing reports them). Unlike `reset()`, a modifier
     /// still held stays held, so a key that was let go and pressed again is a new press, not a continuation.
     public mutating func resync(to live: ShortcutModifiers) {
+        adopt(modifiers: live)
+        keysDown.removeAll()
+    }
+
+    /// Takes the modifiers the system reports now and leaves the ordinary keys as they are: what a flags event that is
+    /// still queued would have said, read from the live flags instead. A modifier that joined is foreign from here on.
+    public mutating func adopt(modifiers live: ShortcutModifiers) {
         modifiers = live
         flagModifiers = live
         for (flag, left, right) in ShortcutModifiers.keyCodes where !live.contains(flag) {
             deviceKeys.remove(left); deviceKeys.remove(right)
         }
-        keysDown.removeAll()
         if live.isEmpty { spoiled = false }
     }
 

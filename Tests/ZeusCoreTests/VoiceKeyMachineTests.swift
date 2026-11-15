@@ -320,6 +320,61 @@ import Testing
         #expect(rig.tag == "tapped", "Option was let go unseen: a quick first tap that started nothing")
     }
 
+    // MARK: Rows 5, 14 and 21 when the wake runs before the flags event of a modifier that joined
+
+    /// The wake can run while the flags event of a Command pressed after the pair is still queued behind a busy main
+    /// thread: the tick's live modifiers are the only word the machine has of it, and they read as that event would.
+    private static let pairAndCommand: ShortcutModifiers = [.control, .option, .command]
+
+    @Test func row5ACommandOnlyTheLiveModifiersShowStartsNothing() {
+        var rig = Rig(Self.talk(confirm: 0.15))
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        #expect(rig.tick(at: 0.15, live: Self.pairAndCommand) == [], "no turn opens on a chord pressed as a chord")
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        #expect(rig.press(Self.cmdL, at: 0.2) == [], "the queued event finds nothing to cancel")
+        #expect(rig.release(Self.cmdL, Self.opt, Self.ctrl, at: 0.5) == [])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 2) == [.wake(after: 0.15)], "everything was up in between")
+    }
+
+    @Test func row8ShiftOnlyTheLiveModifiersShowDropsADictationPressToo() {
+        var rig = Rig(Self.dictation(confirm: 0.15))
+        rig.press(Self.cmdR, at: 0)
+        #expect(rig.tick(at: 0.15, live: [.command, .shift]) == [])
+        #expect(rig.tag == "idle" && rig.machine.barred)
+    }
+
+    @Test func row21ACommandOnlyTheLiveModifiersShowDoesNotSendAHandsFreeTurn() {
+        var rig = Self.latchedTalk(confirm: 0.15)
+        rig.press(Self.ctrl, Self.opt, at: 4)
+        #expect(rig.tick(at: 4.15, live: Self.pairAndCommand) == [], "the press that was to end the turn was a chord")
+        #expect(rig.tag == "latched" && rig.machine.isLatched)
+        #expect(rig.press(Self.cmdL, at: 4.2) == [])
+        #expect(rig.release(Self.cmdL, Self.opt, Self.ctrl, at: 4.5) == [])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 6) == [.wake(after: 0.15)], "a clean press ends it")
+        #expect(rig.tick(at: 6.15) == [.send])
+    }
+
+    @Test func row14ACommandOnlyTheLiveModifiersShowCancelsTheOpenTurn() {
+        var rig = Rig(Self.talk())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        #expect(rig.tick(at: 0.25, live: Self.pairAndCommand) == [.cancel])
+        #expect(rig.tag == "idle" && rig.machine.barred)
+        #expect(rig.press(Self.cmdL, at: 0.3) == [], "the queued event cancels nothing again")
+        #expect(rig.release(Self.cmdL, Self.opt, Self.ctrl, at: 0.5) == [])
+    }
+
+    @Test func row14ShiftOnlyTheLiveModifiersShowMarksADictationHoldAndKeepsTheCheck() {
+        var rig = Rig(Self.dictationOnControlOption())
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        #expect(rig.tick(at: 0.25, live: [.control, .option, .shift]) == [.wake(after: 0.25)], "the next check is still asked for")
+        #expect(rig.tag == "holding shifted")
+        #expect(rig.press(Self.shift, at: 0.3) == [])
+        #expect(rig.release(Self.opt, at: 1) == [.send], "the key let go with Shift still down: Return")
+        var command = Rig(Self.dictationOnControlOption())
+        command.press(Self.ctrl, Self.opt, at: 0)
+        #expect(command.tick(at: 0.25, live: Self.pairAndCommand) == [.cancel], "any other modifier cancels it")
+    }
+
     // MARK: Rows 15 to 19: after a quick tap
 
     @Test func row15APressInsideTheGapContinuesTheTurnAsASecondTap() {

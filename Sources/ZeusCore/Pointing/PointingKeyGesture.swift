@@ -104,14 +104,23 @@ public struct PointingKeyGesture: Sendable, Equatable {
         if KeyFacts(of: state, key: shortcut).allUp { waitForRelease = false }
     }
 
-    /// The confirm has passed. The hold begins if it is still exact; a live picture that no longer holds the key's
-    /// modifiers means a release was missed, and nothing begins.
+    /// The confirm has passed. The hold begins if it is still exact. A live picture that no longer holds the key's
+    /// modifiers means a release was missed, and nothing begins. One that holds a modifier more is the flags event of
+    /// a key pressed after the chord, still queued behind this wake: it spoils the press as the event would have, and
+    /// nothing begins until every key is up.
     public mutating func confirmElapsed(at time: TimeInterval, liveModifiers: ShortcutModifiers?) -> Output? {
         guard let since = armedSince, time - since >= confirm - Self.slack else { return nil }
         armedSince = nil
-        if let live = liveModifiers, !live.isSuperset(of: shortcut.modifiers) {
-            state.resync(to: live)
-            return nil
+        if let live = liveModifiers {
+            if !live.isSuperset(of: shortcut.modifiers) {
+                state.resync(to: live)
+                return nil
+            }
+            state.adopt(modifiers: live)
+            if KeyFacts(of: state, key: shortcut).foreignModifier {
+                waitForRelease = true
+                return nil
+            }
         }
         isActive = true
         // The hold is counted from now, on the clock the watchdog's `tick` uses, whatever clock stamped the key events.

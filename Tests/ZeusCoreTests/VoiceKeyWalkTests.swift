@@ -14,10 +14,12 @@ import Testing
 // What reaches the machine, and when. A modifier key and a key the tiling matcher passes on send a monitor event; a key
 // the real `TileKeyMatcher` consumes is forwarded as the event a monitor would have seen. The forwarded key reaches the
 // machine at once, and a monitor event may be held back for one event, so the machine can hear a forwarded key before
-// the flags event of the modifier pressed ahead of it. Time does not pass while an event is held. A forwarded key that
-// waited behind several later events is not modelled: with three modifiers let go and the arrow still held, the machine
-// sees every key up and a start can follow, and no reducer can tell that from a clean press. The rules are therefore
-// read against the keys the machine was told about, not against the keys physically down.
+// the flags event of the modifier pressed ahead of it. Time passes while an event is held, as it does when the main
+// thread is busy: a wake can run with the event still queued, and then the live modifiers it carries are all the machine
+// has of that key. A forwarded key that waited behind several later events is not modelled: with three modifiers let go
+// and the arrow still held, the machine sees every key up and a start can follow, and no reducer can tell that from a
+// clean press. The rules are therefore read against the keys the machine was told about, not against the keys physically
+// down; a tick that is due for an armed press or a running hold tells the machine the live modifiers.
 //
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
@@ -369,10 +371,11 @@ private struct Sim {
             out.append(.toggle(index))
             if held == nil { out.append(.toggleHeld(index)) }
         }
-        // Time does not pass while an event is held back: it is a matter of one turn of the run loop.
-        if held == nil { out.append(.wait) } else { out.append(.deliver) }
+        // Time passes while an event is held back: the main thread may be busy, and a wake runs on the same queue.
+        out.append(.wait)
+        if held != nil { out.append(.deliver) }
         if pointing == nil { out.append(.abandon) }
-        // A tick of its own is time passing, which it does not while an event is held back.
+        // A config change arrives on a tick of its own, which the walk keeps to a quiet keyboard.
         if run.configs.count > 1, held == nil { out.append(.flip) }
         if held == nil, down & run.ordinaryMask == 0 { out.append(.interrupt) }
         // A due timer may wait for the next event, for up to one step past its time.
@@ -495,6 +498,7 @@ private struct Sim {
         let config = run.configs[cfg]
         let configChange = changesConfig(config)
         let wasLatched = machine.isLatched
+        let ticking = tickReadsLive
         let before = stage
         let owed = key != nil && !configChange ? overdueEffects(config) : []
         let effects = handle(event, config: config)
@@ -507,6 +511,7 @@ private struct Sim {
         }
         if owed.isEmpty {
             noteKey(key, run)
+            noteLive(event, acting: ticking && !configChange, run)
             checkEffects(effects, wasLatched: wasLatched, kind: kind, config: config, configChange: configChange,
                          seenBefore: seenBefore, run)
         } else {
@@ -530,6 +535,36 @@ private struct Sim {
         let bit = UInt16(1) << UInt16(index)
         if pressed { seen |= bit } else { seen &= ~bit }
         seenChanged(run)
+    }
+
+    /// A due tick of an armed press or a running hold carries the modifiers the system reports, and the machine has to read
+    /// them as the flags events they stand for: from then on it has been told about every modifier key down, held back
+    /// events included, and the rules are read against that. Of two keys that set one flag, only a key the machine was
+    /// told about, or the only one down, counts: the live modifiers cannot say which side.
+    private mutating func noteLive(_ event: VoiceKeyMachine.Event, acting: Bool, _ run: WalkRun) {
+        guard acting, case .tick(_, let live?) = event else { return }
+        var next = seen
+        for (index, key) in run.keys.enumerated() {
+            guard let flag = key.flag else { continue }
+            let bit = UInt16(1) << UInt16(index)
+            if !live.contains(flag) {
+                next &= ~bit
+            } else if down & bit != 0, !run.keys.indices.contains(where: { run.keys[$0].flag == flag && next & (UInt16(1) << UInt16($0)) != 0 }) {
+                next |= bit
+            }
+        }
+        guard next != seen else { return }
+        seen = next
+        seenChanged(run)
+    }
+
+    /// A tick would act on the live modifiers: the machine has a press armed or a hold running, the gesture an armed hold.
+    private var tickReadsLive: Bool {
+        if let pointing { return pointing.isArmed }
+        switch machine.phase {
+        case .armed, .holding: return true
+        default: return false
+        }
     }
 
     /// The config differs from the one the machine last saw in what it reads (`VoiceKeyMachine.differs`).

@@ -249,20 +249,34 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         default:
             return
         }
-        // The live modifiers no longer hold the key's: a release was missed. Take the live picture and read the keys again.
-        if let live, !live.isSuperset(of: key.modifiers) {
-            keys.resync(to: live)
-            let facts = KeyFacts(of: keys, key: key)
-            updateBarred(facts)
-            react(at: t, facts, config, &out)
-            return
+        // The live modifiers say what a flags event still on its way would: a modifier of the key let go (a release no
+        // event reported), or a foreign one joined (the wake ran before that event). Take them into the picture and read
+        // the keys again, so the order of the wake and the queued event decides nothing.
+        if let live {
+            let lost = !live.isSuperset(of: key.modifiers)
+            var liveKeys = keys
+            if lost { liveKeys.resync(to: live) } else { liveKeys.adopt(modifiers: live) }
+            let facts = KeyFacts(of: liveKeys, key: key)
+            if lost || Self.reading(facts, role: config.role) != Self.reading(KeyFacts(of: keys, key: key), role: config.role) {
+                keys = liveKeys
+                updateBarred(facts)
+                react(at: t, facts, config, &out)
+                rearmHold(at: t, &out)
+                return
+            }
         }
-        if case .holding(let since, let second, _, let shifted) = phase {
-            phase = .holding(since: since, second: second, check: t + Self.checkEvery, shifted: shifted)
-            out.append(.wake(after: Self.checkEvery))
+        if case .holding = phase {
+            rearmHold(at: t, &out)
         } else {
             delayElapsed(at: t, &out)
         }
+    }
+
+    /// Row 14: a hold that is still running looks again after `checkEvery`.
+    private mutating func rearmHold(at t: TimeInterval, _ out: inout [Effect]) {
+        guard case .holding(let since, let second, _, let shifted) = phase else { return }
+        phase = .holding(since: since, second: second, check: t + Self.checkEvery, shifted: shifted)
+        out.append(.wake(after: Self.checkEvery))
     }
 
     // MARK: A key event
