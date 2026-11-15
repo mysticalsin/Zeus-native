@@ -707,6 +707,14 @@
       "scope": "Actual face vault file and key handling in a temp folder with an in-memory Keychain: a damaged vault or a missing key is unreadable and never overwritten, and deleting the last face removes the file and the key. The real Keychain, the support folder and the camera are never touched."
     },
     {
+      "id": "native-FaceVisionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FaceVisionTests",
+      "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+      "scope": "Actual Vision detection, alignment, feature print and glare extraction on generated images and synthetic landmarks. No camera, no stored image and no real face: the analysis result carries numbers only."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -5402,6 +5410,45 @@
             {
               "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
               "function": "eraseRemovesAnUnreadableVaultOnlyWhenAsked"
+            }
+          ]
+        },
+        {
+          "id": "F14.5",
+          "check": "native-FaceVisionTests",
+          "acceptance": "A blank image has no face; an aligned crop is 112 pixels square and falls back to a padded crop; glare and bezel cues come only from bright, uncoloured blobs and the share of the face inside a rectangle; the feature print revision is recorded; the analysis result holds numbers and no image.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "aBlankImageHasNoFace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "alignedCropIs112Square"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "aWrongNumberOfPointsFallsBackAndNothingUsableGivesNil"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "glareExtractorFindsOneBlob"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "glareIgnoresDarkAndColouredPixels"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "theBezelOverlapIsTheShareOfTheFaceInsideTheRectangle"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "featurePrintRevisionIsRecorded"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "noImageLeavesTheAnalyzer"
             }
           ]
         }
