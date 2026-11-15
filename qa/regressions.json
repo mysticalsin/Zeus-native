@@ -4942,6 +4942,246 @@
         "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
         "function": "offWithAnIdleMachineIsStoppedWhateverElseHappens"
       }
+    },
+    {
+      "id": "REG-600",
+      "failure": "Face presence code could post a keystroke or synthetic event, read or type a password, call the network, write an image or load the ArcFace model.",
+      "features": [
+        "F14"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_face_presence_never_posts_events_or_touches_passwords"
+      }
+    },
+    {
+      "id": "REG-601",
+      "failure": "The face presence lint passed silently on the shapes it exists to catch, or flagged comments and the allowed event-free lock members.",
+      "features": [
+        "F14"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_face_presence_lint_detects_its_failure_shapes"
+      }
+    },
+    {
+      "id": "REG-602",
+      "failure": "Face presence locked the Mac through the shortcut fallback of lock(), or SACLockScreenImmediate was reached outside ScreenLock.",
+      "features": [
+        "F14"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_face_presence_locks_only_through_the_event_free_call"
+      }
+    },
+    {
+      "id": "REG-610",
+      "failure": "A phone or screen showing the owner, seen through a latched spoof cue, still read as the owner and held the Mac awake.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
+        "function": "aSpoofCueTurnsAMatchIntoNotOwner"
+      }
+    },
+    {
+      "id": "REG-615",
+      "failure": "A face the owner switched off in Settings still matched and read as the owner.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
+        "function": "aSwitchedOffFaceNeverMatches"
+      }
+    },
+    {
+      "id": "REG-616",
+      "failure": "Samples taken with another Vision feature print revision were compared with the current one and produced a confident wrong match.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
+        "function": "samplesFromAnotherRevisionNeverMatch"
+      }
+    },
+    {
+      "id": "REG-613",
+      "failure": "An embedding was readable in the face vault file, so a copy of the file would hand over the owner's face print.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceVaultTests.swift",
+        "function": "sealedFileHoldsNoPlaintextEmbedding"
+      }
+    },
+    {
+      "id": "REG-614",
+      "failure": "A damaged or unreadable face vault was treated as empty and overwritten by the next save, losing every enrolled face.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-FaceVaultStoreTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+        "function": "anUnreadableVaultIsNeverOverwritten"
+      }
+    },
+    {
+      "id": "REG-603",
+      "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "launchWithTheSwitchOnKeepsTheCameraOff"
+      }
+    },
+    {
+      "id": "REG-605",
+      "failure": "The camera kept running after the screen locked, from one of the states that hold it.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "lockingTheScreenStopsTheCameraFromEveryOnState"
+      }
+    },
+    {
+      "id": "REG-606",
+      "failure": "The camera came back on at wake while the session was still locked, or stayed on through sleep.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "sleepStopsTheCameraAndWakeWhileLockedKeepsItOff"
+      }
+    },
+    {
+      "id": "REG-607",
+      "failure": "Switching face presence off left the camera running from some state.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "switchingOffStopsTheCameraFromEveryState"
+      }
+    },
+    {
+      "id": "REG-608",
+      "failure": "An absent owner was locked out more than once, or the lock was asked for before the chosen time.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "awayLocksExactlyOnceWhenTheTimeRunsOut"
+      }
+    },
+    {
+      "id": "REG-609",
+      "failure": "One missed frame turned a present owner into away and started the lock countdown.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "aMissShorterThanTheGraceKeepsPresent"
+      }
+    },
+    {
+      "id": "REG-611",
+      "failure": "A failed lock call was retried in a loop, or left the feature saying it was watching.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "aFailedLockGoesUnavailableAndNeverRetries"
+      }
+    },
+    {
+      "id": "REG-618",
+      "failure": "A lock during enrollment left the enrollment, and the camera it holds, running or saved a partial face.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "lockingDuringEnrollmentSavesNothing"
+      }
+    },
+    {
+      "id": "REG-619",
+      "failure": "A camera that sent no frames left the feature saying Watching forever, so an absent owner was never locked.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "aCameraThatSendsNoFramesGoesUnavailable"
+      }
+    },
+    {
+      "id": "REG-612",
+      "failure": "A forged unlock notice, while the session dictionary still said locked, started the camera on the lock screen.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-FacePresenceControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+        "function": "anUnlockNoticeWhileTheSessionIsLockedStartsNothing"
+      }
+    },
+    {
+      "id": "REG-604",
+      "failure": "A settings file that said face presence was on switched the camera feature on without the owner.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "faceSwitchIsNeverTurnedOnByImport"
+      }
+    },
+    {
+      "id": "REG-617",
+      "failure": "An exported settings file held a face name, id or embedding.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "exportHoldsNoFaceData"
+      }
     }
   ]
 }

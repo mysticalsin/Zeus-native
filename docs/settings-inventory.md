@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 185 of 185 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 185 in scope). 174 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 188 of 188 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 188 in scope). 177 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 134.
+**Before this round:** has 19, partial 27, missing 137.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -193,6 +193,9 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Music metadata | Synced lyrics (LRCLIB) | toggle | off | Sends title and artist to lrclib.net. | missing | live | `privacy.lyrics` | Fetches time-synced lyrics from lrclib.net (title, artist, album, duration; no key), cached on disk. Lyrics button on the Music page and a Lyrics Home music style. Off by default as it sends data. |
 | Music metadata | Show media playing in Chrome | toggle | off | Reads title, artist and position from Chrome tabs through the Zeus extension. | missing | live | `music.browserMedia` | A3. Chrome tab media through the Zeus extension and bridge, shown like any source. Off by default and never turned on by an import. Covers load from the page's own image link and are not saved; calls, private windows and pages written to disk are never read. |
 | Music metadata | Chrome extension needs a reload | status | - | Press Reload on the Zeus card in Chrome's extensions page. | missing | custom | `music.browserMediaStatus` | A3. Present only while Chrome runs with a Zeus extension older than 0.5.0. Its button opens chrome://extensions in the running Chrome, never starts it. |
+| Face presence | Face presence | toggle | - | Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on. | missing | live | `face.presence` | Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on. |
+| Face presence | Lock after absent for | menu | - | How long no enrolled face may be missing before the Mac locks. | missing | live | `face.lockAfter` | Zeus addition. Counted from the last time an enrolled face was seen. |
+| Face presence | Status | status | - |  | missing | custom | `face.status` | Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away. |
 | Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
 
 ## Interview

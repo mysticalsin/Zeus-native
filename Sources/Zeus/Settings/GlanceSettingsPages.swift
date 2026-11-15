@@ -1168,6 +1168,7 @@ private struct PrivacyPage: View {
                 }
             }
         }
+        GSFacePresenceCardHost()
         GSCard("Control from the notch") {
             GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())

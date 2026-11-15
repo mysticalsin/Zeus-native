@@ -50,6 +50,20 @@ private struct ScribeCardSnapshot: View {
     }
 }
 
+/// The Face presence card alone on the Settings panel colour, for one fixture state.
+private struct FacePresenceCardSnapshot: View {
+    let fixture: FacePresenceCardFixtures.Fixture
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
+            GSFacePresenceCard(model: fixture.model, isOn: .constant(fixture.isOn), lockAfter: .constant(fixture.model.lockAfterLabel))
+                .padding(.horizontal, GS.pagePadding)
+                .padding(.vertical, 25)
+        }
+        .background(GS.window)
+    }
+}
+
 /// `Zeus --snapshots <dir>` renders every notch and spark state to PNG and quits.
 /// Used to review the look without Screen Recording permission or a live demo.
 @MainActor
@@ -465,6 +479,11 @@ enum SnapshotRenderer {
         murmurCardState.text = "Send the draft by Friday."
         murmurCardState.modeName = "Murmure"
         saveSurface(DictationPreviewView(state: murmurCardState, insert: {}, cancel: {}).padding(20).background(Color(hex: 0x1B2030)), size: CGSize(width: 520, height: 180), name: "murmur-overlay")
+
+        // Face presence card: every status word, from fixed values (no controller, camera, vault or Keychain).
+        for fixture in FacePresenceCardFixtures.all {
+            saveSurface(FacePresenceCardSnapshot(fixture: fixture), size: CGSize(width: GS.panelFrame.width, height: 520), name: fixture.name)
+        }
 
         // QA tooling gate: a capture that shows the wrong pane, or two panes with identical bytes, fails the run.
         if !harnessFailures.isEmpty {

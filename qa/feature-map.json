@@ -361,7 +361,7 @@
       "tier": "native-integration",
       "suite": "SettingsCatalogTests",
       "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
-      "scope": "Actual SettingsStore over a throwaway defaults suite with a fixed microphone answer and a counting prompt: the opt-in stamp, an import, and a section reset. No real permission prompt, capture or device proof."
+      "scope": "Actual SettingsStore over a throwaway defaults suite with a fixed microphone answer and a counting prompt, the face vault in a temp folder and an in-memory Keychain: the opt-in stamp, import and export, and a section reset. No real permission prompt, capture or device proof; the real defaults, Keychain and support folder are never touched."
     },
     {
       "id": "native-RecordingFeedbackRenderTests",
@@ -738,6 +738,60 @@
       "suite": "DrawnNotchCardTests",
       "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
       "scope": "Actual DrawnNotchCardModel and card view with a recording controller, the real window controller's two delegate methods and a disposable settings store: rows per availability, the events the card sends, the losses, the import guard and a render that never touches the controller. No real display, window on screen, pointer, keyboard focus or VoiceOver."
+    },
+    {
+      "id": "native-ScreenLockTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ScreenLockTests",
+      "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+      "scope": "Actual ScreenLock event-free call with an injected lock function: a missing function fails, a zero result succeeds, any other result fails. The real login framework is never called, so nothing locks and no event is posted."
+    },
+    {
+      "id": "native-FaceVaultStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FaceVaultStoreTests",
+      "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+      "scope": "Actual face vault file and key handling in a temp folder with an in-memory Keychain: a damaged vault or a missing key is unreadable and never overwritten, and deleting the last face removes the file and the key. The real Keychain, the support folder and the camera are never touched."
+    },
+    {
+      "id": "native-FaceVisionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FaceVisionTests",
+      "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+      "scope": "Actual Vision detection, alignment, feature print and glare extraction on generated images and synthetic landmarks. No camera, no stored image and no real face: the analysis result carries numbers only."
+    },
+    {
+      "id": "native-FacePresenceControllerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FacePresenceControllerTests",
+      "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+      "scope": "Actual FacePresenceController with a fake camera, lock, clock, session reader, permissions and vault in a temp folder. No camera opens, no permission prompt is raised, the real Keychain is never read and nothing locks the Mac."
+    },
+    {
+      "id": "native-FacePresenceCardTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FacePresenceCardTests",
+      "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+      "scope": "Actual Face presence card model and fixtures from fixed machine values and face names. The card is never drawn from the controller, the camera, the vault or the Keychain."
+    },
+    {
+      "id": "missing-F14-contract",
+      "kind": "unimplemented",
+      "tier": "contract",
+      "scope": "Face presence rules in ZeusCore (landmark math, face selection, spoof cues, face match, vault records, presence machine) run through a portable group with injected inputs and no camera.",
+      "reason": "The Core rules are built and run in native-ZeusCoreTests and in the darwin-only face-presence group of qa/portable-core/prepare.py. They use CoreGraphics transforms and CryptoKit, so no Linux portable group can run them."
+    },
+    {
+      "id": "missing-F14-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "On an owner-run Mac: the camera opens only after the switch is on, the system camera indicator shows, the camera stops on lock, sleep and switch off, an absent owner locks the Mac after the chosen time, and a present owner never is locked.",
+      "reason": "No Mac executor can enrol a face or sit in front of a camera in CI; only a person at the Mac can check it."
     }
   ],
   "features": [
@@ -6014,6 +6068,314 @@
           "acceptance": "Developer ID signature+secure timestamp+runtime, accepted notarization, stapled app/DMG, Gatekeeper clean-machine launch and rollback; exact app/DMG hashes, licenses/assets/version and commercial gating settled.",
           "cases": [],
           "id": "S06.3"
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "title": "Face presence locks when the owner is away",
+      "obligations": [
+        {
+          "id": "F14.1",
+          "check": "native-ScreenLockTests",
+          "acceptance": "The event-free lock call reports failure when the login framework's lock function is missing and never falls back to a posted shortcut; success follows the function's zero result. An injected function stands in, so no test locks the Mac.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+              "function": "aMissingLockFunctionReportsFailureAndPostsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+              "function": "aLockFunctionThatSucceedsReportsSuccess"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScreenLockTests.swift",
+              "function": "aLockFunctionThatFailsReportsFailure"
+            }
+          ]
+        },
+        {
+          "id": "F14.2",
+          "check": "missing-F14-device",
+          "acceptance": "Owner-run proof on the exact binary: camera consent, camera off at launch, camera stops on lock, sleep and switch off, an absent enrolled owner locks the Mac after the chosen time, an unlock stays with the system.",
+          "cases": []
+        },
+        {
+          "id": "F14.3",
+          "check": "missing-F14-contract",
+          "acceptance": "Presence rules (selection, spoof cues, match, vault, machine) hold with injected inputs and no camera, run through a portable group once the Core files exist.",
+          "cases": []
+        },
+        {
+          "id": "F14.4",
+          "check": "native-FaceVaultStoreTests",
+          "acceptance": "The face vault file is private, holds sealed embeddings only, and is never overwritten when it cannot be read; deleting the last face removes the file and its key.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aNewStoreIsEmptyAndTouchesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "savedFacesComeBackAndTheFileIsPrivate"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "anUnreadableVaultIsNeverOverwritten"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aMissingKeyWithAFileIsUnreadableNotEmpty"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aKeyThatIsNotThirtyTwoBytesIsUnreadable"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "deletingTheLastFaceRemovesFileAndKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aKeychainThatRefusesTheKeyWritesNoFile"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "eraseRemovesAnUnreadableVaultOnlyWhenAsked"
+            }
+          ]
+        },
+        {
+          "id": "F14.5",
+          "check": "native-FaceVisionTests",
+          "acceptance": "A blank image has no face; an aligned crop is 112 pixels square and falls back to a padded crop; glare and bezel cues come only from bright, uncoloured blobs and the share of the face inside a rectangle; the feature print revision is recorded; the analysis result holds numbers and no image.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "aBlankImageHasNoFace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "alignedCropIs112Square"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "aWrongNumberOfPointsFallsBackAndNothingUsableGivesNil"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "glareExtractorFindsOneBlob"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "glareIgnoresDarkAndColouredPixels"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "theBezelOverlapIsTheShareOfTheFaceInsideTheRectangle"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "featurePrintRevisionIsRecorded"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
+              "function": "noImageLeavesTheAnalyzer"
+            }
+          ]
+        },
+        {
+          "id": "F14.6",
+          "check": "native-FacePresenceControllerTests",
+          "acceptance": "Launch opens no camera; the switch asks for camera access only through the permissions model; an unlock notice while the session reads locked starts nothing; the lock is called once and only through the event-free call; the teleprompter pauses and resumes it; a frame after stop is dropped; other features read presence and nothing else; enrollment saves ten different samples and nothing less.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "launchNeverStartsTheCamera"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "launchReadsTheStoredLockAfterChoice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchOnAsksForConsentThroughPermissions"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aRefusedConsentKeepsTheCameraOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aDeniedCameraOpensSystemSettingsAndAsksNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchOnWithNoFacesStartsEnrolling"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchOnWithoutTheEventFreeLockIsUnavailableAndStartsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "anUnreadableVaultMakesTheFeatureUnavailable"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSettingChangeThatMatchesTheMachineDoesNothingTwice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchingOffStopsTheCameraAtOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "anUnlockNoticeWhileTheSessionIsLockedStartsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "lockingTheScreenOrSleepingStopsTheCameraAndWakingLockedKeepsItOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theLockerIsCalledOnceAndOnlyTheEventFreeCall"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aLockThatFailsIsNeverRetried"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "teleprompterRecordingPausesAndResumes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aFrameAfterStopIsDropped"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theEnrolledOwnerIsPresentAndAStrangerIsNot"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSwitchedOffFaceIsNeverTheOwner"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aLatchedSpoofCueMakesTheOwnerAbsent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "presenceIsReadOnlyForOtherFeatures"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "framesThatVisionCannotReadStopTheCameraAfterAFewInARow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "cameraReportsMoveTheMachineOnlyForTheCurrentRun"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "tenDifferentSamplesSaveAFaceAndStartWatching"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "nineSamplesAndAClosedWindowSaveNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSilentCameraCannotKeepAnEnrollmentOpenPastItsWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "lockingDuringEnrollmentSavesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSampleWithASpoofCueIsRefusedSoNothingSavesFromAPhone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "enrollFromWatchingAddsASecondFaceWithTheNextName"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aDeletedNumberIsUsedAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchingFacesOffAndOnAndDeletingThemIsImmediateAndStored"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aFaceChangeThatCannotBeSavedIsNotShown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theEnrollButtonFollowsTheMachine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theCameraUsageStringNamesBothFeaturesAndSaysNoImageIsSaved"
+            }
+          ]
+        },
+        {
+          "id": "F14.7",
+          "check": "native-FacePresenceCardTests",
+          "acceptance": "Enroll is enabled only while watching, present or away; the status row names the countdown for VoiceOver; the lock choice falls back to two minutes; one row per face with its switch; no face data reaches the view; the catalog rows come from the generator; the rendered fixtures show every status word.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "enrollIsDisabledOutsideWatchingPresentAndAway"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "statusRowNamesTheCountdownForVoiceOver"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theLockChoiceFollowsTheMachinesLimitAndFallsBackToTwoMinutes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "oneRowPerEnrolledFaceInOrderWithItsSwitchState"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theModelHoldsNoFaceDataButNamesAndSwitches"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theCatalogRowsComeFromTheGenerator"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theRenderedFixturesShowEveryStatusWordAndTheFaceRows"
+            }
+          ]
+        },
+        {
+          "id": "F14.8",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "A settings import never switches face presence on, an export holds no face data, and an unknown lock time reads as two minutes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "faceSwitchIsNeverTurnedOnByImport"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "exportHoldsNoFaceData"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "unknownLockAfterFallsBackToTwoMinutes"
+            }
+          ]
         }
       ]
     }

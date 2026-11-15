@@ -322,6 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // "Hey Zeus": off until the user turns it on (WakeWordController reads `wake.enabled`, default false),
         // on-device wake detection, and launch never prompts for a permission.
         if on(.wakeWord) { WakeWordController.shared.start(voice: voice, topBar: topBar) }
+        // Face presence: off until the owner turns it on; with it on, launch reads the vault and opens no camera.
+        if on(.facePresence) { FacePresenceController.shared.start(permissions: .live(permissions)) }
 
         if on(.panelUI), let preferences {
             panel = MenuBarPanel(
@@ -898,6 +900,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case ScribeAutoStartMode.settingID: ScribeCallWatcher.shared.follow()
             case ZeusScreenSharePolicy.showInSharingKey:
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: self?.teleprompterPrivate ?? false)
+            case FacePresenceController.switchID, FacePresenceController.lockAfterID:
+                FacePresenceController.shared.settingChanged(id)
             case "about.autoUpdate", "about.updateFeedURL":
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))

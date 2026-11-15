@@ -473,12 +473,24 @@ enum SystemVolume {
 /// Locks the screen at once, like Control-Command-Q. Uses the login framework's
 /// `SACLockScreenImmediate` when present, else posts the shortcut.
 enum ScreenLock {
-    private typealias Lock = @convention(c) () -> Int32
+    typealias Lock = @convention(c) () -> Int32
     private static let lockFunction: Lock? = {
         guard let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_LAZY),
               let symbol = dlsym(handle, "SACLockScreenImmediate") else { return nil }
         return unsafeBitCast(symbol, to: Lock.self)
     }()
+
+    /// True when the login framework's lock function exists. Reading it locks nothing.
+    static var canLockWithoutEvents: Bool { lockFunction != nil }
+
+    /// Locks through `SACLockScreenImmediate` only. Returns false when it is missing and never posts an event,
+    /// so a feature that must not synthesize input can lock the Mac without the shortcut fallback of `lock()`.
+    static func lockWithoutEvents() -> Bool { lockWithoutEvents(using: lockFunction) }
+
+    static func lockWithoutEvents(using function: Lock?) -> Bool {
+        guard let function else { return false }
+        return function() == 0
+    }
 
     static func lock() -> Bool {
         if let lockFunction { return lockFunction() == 0 }
