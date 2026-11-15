@@ -4608,7 +4608,7 @@
       }
     },
     {
-      "id": "REG-450",
+      "id": "REG-620",
       "failure": "A recorded System Audio Recording refusal still started a probe, so Zeus kept asking instead of waiting for Try again.",
       "features": [
         "F03"
@@ -4620,7 +4620,7 @@
       }
     },
     {
-      "id": "REG-451",
+      "id": "REG-621",
       "failure": "A probe ran without a person's request, so the System Audio Recording prompt could appear from nothing the owner did.",
       "features": [
         "F03"
@@ -4632,7 +4632,7 @@
       }
     },
     {
-      "id": "REG-452",
+      "id": "REG-622",
       "failure": "A muted tap could be built before a listen-only probe of that app heard sound in this launch.",
       "features": [
         "F03"
@@ -4644,7 +4644,7 @@
       }
     },
     {
-      "id": "REG-453",
+      "id": "REG-623",
       "failure": "The controller built a muted tap for an app before a listen-only probe of it heard sound, because a stored allowed was trusted.",
       "features": [
         "F03"
@@ -4656,7 +4656,7 @@
       }
     },
     {
-      "id": "REG-454",
+      "id": "REG-624",
       "failure": "A refusal on record was probed again at launch, or Try again could not start a probe after one.",
       "features": [
         "F03"
