@@ -16,13 +16,18 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         public var voiceOverHoldsKey: Bool
         /// How long a hold key must be down alone before it acts. 0 except while a tiling chord holds its modifiers.
         public var confirm: TimeInterval
+        /// The code of an ordinary key that may join the held key without spoiling it (Space on Control-Option). Read only
+        /// for the talk role in hold mode. Like `confirm` it is stored, not compared: switching it never ends a turn.
+        public var chord: UInt16?
 
-        public init(key: Shortcut?, role: Role, mode: Mode, voiceOverHoldsKey: Bool = false, confirm: TimeInterval = 0) {
+        public init(key: Shortcut?, role: Role, mode: Mode, voiceOverHoldsKey: Bool = false, confirm: TimeInterval = 0,
+                    chord: UInt16? = nil) {
             self.key = key
             self.role = role
             self.mode = mode
             self.voiceOverHoldsKey = voiceOverHoldsKey
             self.confirm = confirm
+            self.chord = chord
         }
     }
 
