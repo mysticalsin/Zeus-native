@@ -42,6 +42,19 @@ import ZeusCore
         }
     }
 
+    /// Offline rendering never touches an audio device, so a refusal there is a wiring bug, not the host. The
+    /// reverb refuses a mono bus, which left every engine silent or dry on the owner's Mac (-10868).
+    @Test func theOfflineChainAlwaysConnectsAndChangesTheVoice() throws {
+        #expect(Self.hostRefusesChain() == nil)
+        let input = tone()
+        let out = try #require(UltronOfflineRender.render(input, parameters: .make(percent: 60)))
+        let original = samples(input), processed = samples(out)
+        let overlap = min(original.count, processed.count)
+        let difference = (0..<overlap).reduce(Float(0)) { $0 + abs(original[$1] - processed[$1]) }
+        #expect(difference > 1, "the effect left the voice unchanged")
+        #expect(UltronVoiceEffect.isNonSilent(processed))
+    }
+
     /// Why this host's AVFAudio refuses the offline effect chain, or nil when it accepts it.
     private static func hostRefusesChain() -> String? {
         let engine = AVAudioEngine()
