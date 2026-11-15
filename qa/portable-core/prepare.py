@@ -144,13 +144,13 @@ GROUPS = {
     # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
     "equaliser": (
         core("Audio/EqualiserTypes.swift", "Audio/EqualiserModel.swift", "Audio/EqualiserDSP.swift",
-             "Audio/EqualiserCardRules.swift", "Audio/EqualiserPolicy.swift", "Audio/EqualiserLifecycle.swift",
+             "Audio/EqualiserCardRules.swift", "Audio/EqualiserPolicy.swift", "Audio/EqualiserLifecycle.swift", "Audio/Spectrum.swift",
              "MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift",
-             "Scribe/ScribeLiveLogic.swift", "Scribe/ScribeCallPrompt.swift", "Intent/WakePhrase.swift",
+             "Scribe/ScribeLiveLogic.swift", "Intent/WakePhrase.swift",
              "Intent/Utterance.swift", "Dictation/TranscriptionEngine.swift", "ZeusPaths.swift"),
         tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
-              "EqualiserPolicyTests", "EqualiserLifecycleTests"),
+              "EqualiserPolicyTests", "EqualiserLifecycleTests", "EqualiserConsentTests"),
     ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
