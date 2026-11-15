@@ -803,8 +803,12 @@ New file `Sources/ZeusCore/Scribe/ScribeDetectorPlan.swift`:
 App side: `ScribeCalendarReader` is the one calendar reader, used by the watcher and `ScribeUpNextModel`
 (`ScribeUpNextModel.swift:41-60` and `ScribeCallWatcher.swift:364-385` are the two copies today). The watcher
 takes a microphone-observer factory and a scheduler in its initialiser, applies the plan after each scan, on the
-setting change, on `EKEventStoreChanged` and on wake from sleep. `stop()` resets the machine. The process-exit
-observer for a bound call app stays installed while a recording is bound.
+setting change, on `EKEventStoreChanged`, on wake from sleep and after a Calendar grant. `stop()` returns the machine
+to rest and keeps its ledger, so a dismissed meeting stays dismissed across Off and back to Ask. A scan is bounded
+(10 s through the scheduler); a probe that never returns ends as an empty reading and its late answer is dropped.
+Scans read the calendar from `lateWindow` before now to `leadWindow` after it; the full 24 h look-ahead is read only
+when the plan is `listening`, to choose the wake. The process-exit observer for a bound call app stays installed
+while a recording is bound.
 
 ### Tests first
 
