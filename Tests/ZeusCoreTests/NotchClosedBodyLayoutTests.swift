@@ -22,8 +22,8 @@ import ZeusCore
         #expect(!NotchClosedBodyLayout.showWings(closedWingKindIsNone: true, hasLights: false, hasLiveActivity: false))
     }
 
-    /// Every extra width `ClosedWings.extraWidth(for:)` can return, plus the idle mascot's -36 and no extra.
-    private static let everyExtra: [CGFloat] = [-36, 0, 14, 30, 58, 60, 70, 110, 150, 180, 230, 300]
+    /// Every extra width `ClosedWings.extraWidth(for:)` can return, plus the idle mascot's and no extra (-36 was the old idle value).
+    private static let everyExtra: [CGFloat] = [-36, NotchClosedBodyLayout.idleMascotExtra, 0, 14, 30, 58, 60, 70, 110, 150, 180, 230, 300]
     private static let notchWidths: [CGFloat] = [160, 185, 200, 220, 250]
 
     @Test func theNotchGapIsExactlyTheNotchForEveryNotchAndExtra() {
@@ -83,9 +83,18 @@ import ZeusCore
         }
     }
 
+    @Test func theRestingMascotFitsItsWing() {
+        for notch in Self.notchWidths {
+            let g = NotchClosedBodyLayout.closedWingGeometry(
+                notchWidth: notch, shoulder: 8, extra: NotchClosedBodyLayout.idleMascotExtra)
+            #expect(g.wingContentWidth >= NotchClosedBodyLayout.miniMascotSize)
+        }
+    }
+
     @Test func theOldRightOnlyGrowthIsGone() {
         let g = NotchClosedBodyLayout.closedWingGeometry(notchWidth: 220, shoulder: 8, extra: 150)
-        #expect(g.bodyWidth == 220 + 16 + 2 * (62 + 150))
+        let expected: CGFloat = 220 + 16 + 2 * (62 + 150)
+        #expect(g.bodyWidth == expected)
         #expect(g.rightWing.lowerBound == 110)
     }
 }

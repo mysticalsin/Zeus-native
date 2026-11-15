@@ -9,6 +9,10 @@ public enum NotchClosedBodyLayout {
     public static let contentInset: CGFloat = 14
     /// The gap a bar without a hardware notch keeps between its wings.
     public static let noNotchGap: CGFloat = 40
+    /// The mini mascot beside the notch, and the extra the resting mascot (no word beside it) uses. Each wing is
+    /// `wingWidth - contentInset + extra` wide, so the resting wing must stay at least as wide as the mascot.
+    public static let miniMascotSize: CGFloat = 22
+    public static let idleMascotExtra: CGFloat = -22
     public static let slimPillSize = CGSize(width: 96, height: 9)
 
     /// Spring for HUD cues widening the closed notch (R24: settle in under 120 ms).
