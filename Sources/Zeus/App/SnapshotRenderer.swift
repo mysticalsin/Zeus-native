@@ -250,7 +250,7 @@ enum SnapshotRenderer {
         // The floating teleprompter, mid-read.
         let prompter = PrompterWindowModel(topBar: TopBarModel())
         prompter.viewHeight = 262
-        prompter.notice = "Follow my words"
+        prompter.notice = "Imported launch-script.txt."
         save(PrompterWindowView(model: prompter, actions: .preview).background(Color(hex: 0x1B2030)), size: CGSize(width: 640, height: 300),
              to: directory.appendingPathComponent("prompter-window.png"))
         // Sticky notes: preview, editing on the right edge, and the save-to-brain sheet.

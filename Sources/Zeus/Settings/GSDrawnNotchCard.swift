@@ -18,7 +18,7 @@ struct DrawnNotchCardModel {
     }
 
     static let statusSymbol = "display.trianglebadge.exclamationmark"
-    static let statusButtonTitle = "Show the notch on"
+    static let statusButtonTitle = "Choose displays"
 
     static func statusText(_ availability: DrawnNotchAvailability) -> String {
         switch availability {
