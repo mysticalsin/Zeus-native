@@ -10,20 +10,34 @@ final class ShortcutRecorderModel: ObservableObject {
     /// Called with true when a recorder starts listening and false when it stops: the app lets go of its Carbon hot keys
     /// (Chat, the talk chord) meanwhile, so a chord such as Control-Option-Space reaches the window and can be recorded.
     static var pauseGlobalHotkeys: (Bool) -> Void = { _ in }
+    /// How many recorders listen now. The hot keys are let go when the first starts and given back when the last stops, so
+    /// two recorders, or one that begins again, cannot hand them back while another still listens.
+    private static var listening = 0
 
     @Published var recording = false
     @Published var preview = ""
     private var monitor: Any?
+    private var resignObserver: NSObjectProtocol?
     private var state = ShortcutRecorderState()
     private var onCapture: ((Shortcut) -> Void)?
 
     func begin(onCapture: @escaping (Shortcut) -> Void) {
-        end()
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        if !recording {
+            Self.listening += 1
+            if Self.listening == 1 { Self.pauseGlobalHotkeys(true) }
+        }
         self.onCapture = onCapture
         state = ShortcutRecorderState()
         recording = true
         preview = ""
-        Self.pauseGlobalHotkeys(true)
+        // A local monitor hears nothing once another app is in front, so switching away ends the recording and gives the keys back.
+        if resignObserver == nil {
+            resignObserver = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification,
+                                                                    object: nil, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated { self?.end() }
+            }
+        }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp]) { [weak self] event in
             guard let self, let converted = Self.convert(event) else { return event }
             let swallow = MainActor.assumeIsolated { self.handle(converted) }
@@ -34,7 +48,12 @@ final class ShortcutRecorderModel: ObservableObject {
     func end() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        if recording { Self.pauseGlobalHotkeys(false) }
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        resignObserver = nil
+        if recording {
+            Self.listening -= 1
+            if Self.listening == 0 { Self.pauseGlobalHotkeys(false) }
+        }
         recording = false
         preview = ""
     }
