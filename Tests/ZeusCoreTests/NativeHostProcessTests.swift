@@ -18,9 +18,13 @@ struct NativeHostProcessTests {
         var path: String { root.appendingPathComponent("chrome.sock").path }
 
         init() throws {
+            // The helper is built beside the test bundle, wherever the scratch path points. The default package
+            // `.build` folder is only the fallback for a plain `swift test` run.
             let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            let executable = package.appendingPathComponent(".build/debug/zeus-bridge")
-            guard FileManager.default.isExecutableFile(atPath: executable.path) else {
+            let products = Bundle(for: Fixture.self).bundleURL.deletingLastPathComponent()
+            let candidates = [products.appendingPathComponent("zeus-bridge"),
+                              package.appendingPathComponent(".build/debug/zeus-bridge")]
+            guard let executable = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
                 throw CocoaError(.fileNoSuchFile)
             }
             root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-nh-\(UUID().uuidString.prefix(8))")
