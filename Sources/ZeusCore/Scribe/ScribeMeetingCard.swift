@@ -156,7 +156,7 @@ public enum ScribeMeetingCardText {
             let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? "Couldn't start" : trimmed
         case .noResponse:
-            return "Didn't start"
+            return "Didn't start. Try again."
         }
     }
 
@@ -204,10 +204,14 @@ public enum ScribeMeetingCardText {
     public static let cancelSymbol = "xmark"
 
     /// The status pill's short phrase. Empty for a hidden card.
-    public static func pill(_ card: ScribeMeetingCard) -> String {
+    /// With `now`, a meeting that has already begun reads "Meeting started" instead of "Starting soon", so the
+    /// pill never contradicts a "Now" time beside it.
+    public static func pill(_ card: ScribeMeetingCard, now: Date? = nil) -> String {
         switch card {
         case .hidden: return ""
-        case .offer, .next: return "Starting soon"
+        case .offer(let meeting, _), .next(let meeting):
+            if let now, let start = meeting.slot?.start, start <= now { return "Meeting started" }
+            return "Starting soon"
         case .countdown(_, let seconds, _, _): return "Recording in \(seconds)"
         case .waiting: return "Waiting to record"
         case .starting: return "Starting"

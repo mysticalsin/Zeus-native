@@ -19,7 +19,8 @@ enum ScribeMeetingCardSurface: Equatable {
 
 enum ScribeMeetingCardPalette {
     static let tintTop = Color(hex: 0x8FA0FF)
-    static let tintMid = Color(hex: 0x6A55E8)
+    static let tintMidHex: UInt32 = 0x6A55E8
+    static let tintMid = Color(hex: tintMidHex)
     static let tintBottom = Color(hex: 0x2F45C8)
     static let deepTop = Color(hex: 0x22328A)
     static let deepBottom = Color(hex: 0x131D5E)
@@ -27,7 +28,9 @@ enum ScribeMeetingCardPalette {
     static let rimCool = Color(hex: 0xA9BAFF)
     static let shadow = Color(hex: 0x0A1040)
     /// The relative time and the countdown's accent.
-    static let violet = Color(hex: 0xBBA8FF)
+    /// Light enough for WCAG AA (4.5:1) on `tintMid`, the mid tone behind the text; still a little violet.
+    static let violetHex: UInt32 = 0xF5F0FF
+    static let violet = Color(hex: violetHex)
     static let dotSoon = Color(hex: 0xC59BFF)
     static let dotRecording = Color(hex: 0xFF5C6C)
     static let dotProblem = Color(hex: 0xFFA14A)

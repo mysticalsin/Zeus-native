@@ -265,7 +265,7 @@ private struct ScribeMeetingCardBody: View {
             } else {
                 Circle().fill(ScribeMeetingCardPalette.dot(ScribeMeetingCardText.tone(card))).frame(width: 6, height: 6)
             }
-            Text(ScribeMeetingCardText.pill(card))
+            Text(ScribeMeetingCardText.pill(card, now: spec.now))
                 .font(TopBarStyle.label(11.5, .semibold).monospacedDigit())
                 .foregroundStyle(ScribeMeetingCardPalette.ink)
                 .lineLimit(1)

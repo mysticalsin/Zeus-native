@@ -4,7 +4,7 @@ import Testing
 
 @Suite("Meeting card text contrast")
 struct MeetingCardContrastTests {
-    private static func luminance(_ hex: Int) -> Double {
+    private static func luminance(_ hex: UInt32) -> Double {
         func lin(_ shift: Int) -> Double {
             let c = Double((hex >> shift) & 0xFF) / 255
             return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
@@ -12,7 +12,7 @@ struct MeetingCardContrastTests {
         return 0.2126 * lin(16) + 0.7152 * lin(8) + 0.0722 * lin(0)
     }
 
-    static func ratio(_ a: Int, _ b: Int) -> Double {
+    static func ratio(_ a: UInt32, _ b: UInt32) -> Double {
         let (hi, lo) = (max(luminance(a), luminance(b)), min(luminance(a), luminance(b)))
         return (hi + 0.05) / (lo + 0.05)
     }
