@@ -3,6 +3,7 @@
 This validates our versioned schema and semantic cross-references, not arbitrary
 JSON Schema. The adjacent *.schema.json files document the wire format.
 """
+import functools
 import hashlib
 import json
 import os
@@ -141,6 +142,18 @@ def runnable_functions(text, python=False):
     return re.findall(r"(?m)^[ \t]*(?:@MainActor[ \t]+)?@Test\b(?:(?!\bfunc\b)[\s\S])*?\bfunc\s+([A-Za-z_][A-Za-z_0-9]*)\s*\(", text)
 
 
+@functools.lru_cache(maxsize=None)
+def _declared_in_version(path, python, version):
+    return tuple(runnable_functions(Path(path).read_text(), python))
+
+
+def declared_tests(path):
+    """Runnable test names in one file, scanned once per file version (path, size, mtime, inode)."""
+    path = Path(path)
+    status = path.stat()
+    return _declared_in_version(str(path), path.suffix == ".py", (status.st_size, status.st_mtime_ns, status.st_ino))
+
+
 def validate_case(case, root=ROOT):
     fields(case, {"file", "function"})
     file = relative_file(case["file"], root)
@@ -151,7 +164,7 @@ def validate_case(case, root=ROOT):
         "qa/closed-loop/tests/test_execution_cleanup.py", "qa/closed-loop/tests/test_ax_crash_report.py",
         "qa/closed-loop/tests/test_settings_catalog.py", "qa/closed-loop/tests/test_source_lint.py"}, "case must be a repository test")
     require(type(case["function"]) is str and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", case["function"]), "invalid test function")
-    require(runnable_functions(file.read_text(), file.suffix == ".py").count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
+    require(declared_tests(file).count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
 
 
 def validate_map(data, portable, root=ROOT):
@@ -325,7 +338,7 @@ def case_passed(case, check, output, root=ROOT):
         selected = list((root / "qa/closed-loop/tests").glob("test_*.py"))
     else:
         selected = [root / case["file"]]
-    count = sum(runnable_functions(p.read_text(), p.suffix == ".py").count(case["function"]) for p in selected)
+    count = sum(declared_tests(p).count(case["function"]) for p in selected)
     require(count == 1, f"passed log identity is ambiguous or not runnable in selected sources: {case['function']}")
 
 
