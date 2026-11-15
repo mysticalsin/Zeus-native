@@ -134,7 +134,7 @@ struct DrawnNotchCard: View {
             sliderRow(symbol: "arrow.left.arrow.right", label: "Position", value: value,
                       range: DrawnNotchLimits.offsetRange, step: DrawnNotchLimits.offsetStep,
                       shown: DrawnNotchLimits.positionText(value), spoken: DrawnNotchLimits.positionText(value, unit: "points"),
-                      valueWidth: 88, onSet: model.setOffset, onStep: { model.step(.offset, $0) })
+                      onSet: model.setOffset, onStep: { model.step(.offset, $0) })
         case .actions:
             HStack(spacing: 10) {
                 Spacer(minLength: 0)
@@ -154,9 +154,10 @@ struct DrawnNotchCard: View {
         }
     }
 
-    /// `shown` and `spoken` default to the value in points; Position reads "Centre" or a side instead.
+    /// `shown` and `spoken` default to the value in points; Position reads "Centre" or a side instead. The value
+    /// column is wide enough for "400 pt right" in every row, so the three tracks line up.
     private func sliderRow(symbol: String, label: String, value: Double, range: ClosedRange<Double>, step: Double,
-                           shown: String? = nil, spoken: String? = nil, valueWidth: CGFloat = 52,
+                           shown: String? = nil, spoken: String? = nil,
                            onSet: @escaping (Double) -> Void,
                            onStep: @escaping (DrawnNotchCalibration.Direction) -> Void) -> some View {
         GSRow(symbol: symbol, title: label) {
@@ -165,7 +166,7 @@ struct DrawnNotchCard: View {
                               onSet: onSet, onStep: onStep)
                     .frame(width: 200)
                 Text(shown ?? "\(Int(value)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
-                    .frame(width: valueWidth, alignment: .trailing)
+                    .frame(width: 88, alignment: .trailing)
                     .accessibilityHidden(true)
             }
         }
