@@ -83,6 +83,17 @@ enum OwnedWindowJourneyLease {
     }
 }
 
+@MainActor @Observable
+private final class Words { var value = "in 2 min" }
+
+private struct TextFixture: View {
+    let words: Words
+    var body: some View {
+        let shown = words.value
+        Text(shown).ownedJourneyText("fixture.text", shown)
+    }
+}
+
 @MainActor @Suite("Owned native window event driver", .serialized)
 struct OwnedWindowEventDriverTests {
     private final class Target: NSObject {
@@ -168,6 +179,31 @@ struct OwnedWindowEventDriverTests {
             driver.register(window)
             try await driver.click("fixture.swiftui", in: window)
             #expect(target.calls == 1)
+        }
+    }
+
+    @Test func hostedSwiftUITextRecordsWhatItRenderedAndFollowsState() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let registry = OwnedWindowControlRegistry(), words = Words()
+            let root = TextFixture(words: words)
+                .frame(width: 320, height: 120)
+                .environment(\.ownedWindowControlRegistry, registry)
+            let window = host(NSHostingView(rootView: root))
+            defer { OwnedWindowFixtureApplication.close(window) }
+            @MainActor func drawn() -> [String?] { registry.probes(for: "fixture.text", in: window).map { $0.renderedText } }
+            try await waitFor("the first words") { drawn() == ["in 2 min"] }
+            words.value = "in 1 min"
+            try await waitFor("the new words") { drawn() == ["in 1 min"] }
+        }
+    }
+
+    private func waitFor(_ what: String, _ condition: @MainActor () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(5)
+        while !condition() {
+            if Date() > deadline { Issue.record("timed out waiting for \(what)"); return }
+            try await Task.sleep(nanoseconds: 20_000_000)
         }
     }
 

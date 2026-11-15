@@ -45,6 +45,26 @@ extension View {
     }
 }
 
+extension View {
+    /// Records the exact string this view's body rendered, for the owned host to read back. Outside the host
+    /// there is no registry in the environment, so nothing is added.
+    func ownedJourneyText(_ id: String, _ text: String) -> some View {
+        modifier(OwnedWindowTextGeometry(id: id, text: text))
+    }
+}
+
+private struct OwnedWindowTextGeometry: ViewModifier {
+    let id: String
+    let text: String
+    @Environment(\.ownedWindowControlRegistry) private var registry
+
+    func body(content: Content) -> some View {
+        content.background {
+            if let registry { OwnedWindowControlProbe(registry: registry, id: id, enabled: true, text: text) }
+        }
+    }
+}
+
 private struct OwnedWindowControlGeometry: ViewModifier {
     let id: String
     @Environment(\.ownedWindowControlRegistry) private var registry
@@ -62,13 +82,14 @@ private struct OwnedWindowControlProbe: NSViewRepresentable {
     let registry: OwnedWindowControlRegistry
     let id: String
     let enabled: Bool
+    var text: String?
 
     func makeNSView(context: Context) -> OwnedWindowControlProbeView {
-        OwnedWindowControlProbeView(registry: registry, id: id, enabled: enabled)
+        OwnedWindowControlProbeView(registry: registry, id: id, enabled: enabled, text: text)
     }
 
     func updateNSView(_ view: OwnedWindowControlProbeView, context: Context) {
-        view.update(registry: registry, id: id, enabled: enabled)
+        view.update(registry: registry, id: id, enabled: enabled, text: text)
     }
 
     static func dismantleNSView(_ view: OwnedWindowControlProbeView, coordinator: ()) { view.detach() }
@@ -79,11 +100,14 @@ final class OwnedWindowControlProbeView: NSView {
     private weak var registry: OwnedWindowControlRegistry?
     private var id: String
     private(set) var controlEnabled: Bool
+    /// The string a text probe's view rendered; nil for a control probe.
+    private(set) var renderedText: String?
 
-    init(registry: OwnedWindowControlRegistry, id: String, enabled: Bool) {
+    init(registry: OwnedWindowControlRegistry, id: String, enabled: Bool, text: String? = nil) {
         self.registry = registry
         self.id = id
         controlEnabled = enabled
+        renderedText = text
         super.init(frame: .zero)
         setAccessibilityElement(false)
         registry.register(self, id: id)
@@ -93,11 +117,12 @@ final class OwnedWindowControlProbeView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override var acceptsFirstResponder: Bool { false }
 
-    func update(registry: OwnedWindowControlRegistry, id: String, enabled: Bool) {
+    func update(registry: OwnedWindowControlRegistry, id: String, enabled: Bool, text: String? = nil) {
         self.registry?.unregister(self)
         self.registry = registry
         self.id = id
         controlEnabled = enabled
+        renderedText = text
         registry.register(self, id: id)
     }
 
