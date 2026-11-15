@@ -237,6 +237,9 @@ struct NotchView: View {
                 }
             }
             .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
+            // The place of a drawn shape, applied last so the alerts move with the body. It moves the drawing and not
+            // the layout, which is why it cannot sit under the alert overlay. It has no animation of its own.
+            .offset(x: NotchAnchor.offset(footprint))
     }
 
     /// Whether the outline itself glows (and so breathes). With the top bar, the closed notch glows
