@@ -18,7 +18,7 @@ private final class FakeDrawnStore: DrawnNotchStore {
         return rows[id] ?? ""
     }
 
-    func set(_ id: String, _ value: String) {
+    func write(_ id: String, _ value: String) {
         writes.append((id, value))
         rows[id] = value
     }

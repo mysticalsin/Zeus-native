@@ -7,10 +7,13 @@ import ZeusCore
 @MainActor
 protocol DrawnNotchStore: AnyObject {
     func string(_ id: String) -> String
-    func set(_ id: String, _ value: String)
+    func write(_ id: String, _ value: String)
 }
 
-extension SettingsStore: DrawnNotchStore {}
+/// A drawn notch row is written by the person at this Mac (the card or calibration), so it carries that origin.
+extension SettingsStore: DrawnNotchStore {
+    func write(_ id: String, _ value: String) { set(id, value, origin: .person) }
+}
 
 /// The drawn notch on displays without a hardware notch: the saved shape, the calibration draft, and the
 /// answer to "what does the closed notch look like on this display". Observed, so a change moves the notch
@@ -83,7 +86,7 @@ final class DrawnNotchModel: DrawnNotchControlling {
     }
 
     func setStyle(_ style: NotchlessStyle) {
-        store.set(Row.style, style == .drawn ? "Notch" : "Pill")
+        store.write(Row.style, style == .drawn ? "Notch" : "Pill")
         if style == .pill { send(.surfaceGone(.pillChosen)) }
     }
 
@@ -101,9 +104,9 @@ final class DrawnNotchModel: DrawnNotchControlling {
     private func perform(_ effect: DrawnNotchCalibration.Effect) {
         switch effect {
         case .persist(let shape):
-            store.set(Row.width, String(Int(shape.width)))
-            store.set(Row.height, String(Int(shape.height)))
-            store.set(Row.offset, String(Int(shape.offset)))
+            store.write(Row.width, String(Int(shape.width)))
+            store.write(Row.height, String(Int(shape.height)))
+            store.write(Row.offset, String(Int(shape.offset)))
         case .announce(let text):
             announce(text)
         }
