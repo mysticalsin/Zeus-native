@@ -1282,6 +1282,20 @@ struct ScribeAutoStartTests {
         }
     }
 
+    @Test func resetLeavesTheMachineAtRestAndKeepsWhatWasAnswered() {
+        let slot = asSlot(start: 120, end: 1_920, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(.dismiss(on: .offer(asHeadsUp(slot), blocked: nil), now: 5))
+        machine.handle(.pointer(inside: true, now: 6))
+        machine.reset()
+        #expect(machine.state == .idle)
+        #expect(!machine.pointerInside)
+        #expect(machine.ledger.mark(of: asHeadsUp(slot)) == .declined)
+        machine.handle(asEvidence(60, slots: [slot]))
+        #expect(machine.card(now: 60) == .hidden)
+    }
+
     @Test func aTimeoutThenALiveCallAsksInAskMe() {
         let slot = asSlot(start: 60, end: 2_000, app: .teams)
         var machine = ScribeAutoStartMachine()

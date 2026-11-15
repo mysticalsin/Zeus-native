@@ -149,9 +149,10 @@ final class ScribeAutoStartController {
         if machine.needsFreshEvidence { ScribeCallWatcher.shared.pollNow() }
     }
 
-    /// Forgets the machine and takes the card down.
+    /// Takes the card down and leaves the machine at rest. The ledger stays: a meeting the owner dismissed is
+    /// still dismissed when the choice goes Off and back to Ask inside its window.
     func stop() {
-        machine = ScribeAutoStartMachine()
+        machine.reset()
         lastLogged = machine.state.logName
         scheduler.schedule(after: nil) {}
         render()

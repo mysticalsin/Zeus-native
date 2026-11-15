@@ -278,6 +278,14 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         self.timing = timing
     }
 
+    /// Nothing in hand and no clock, as at launch, but what was answered is kept: the choice going Off and back to
+    /// Ask must not bring a dismissed meeting's card back.
+    public mutating func reset() {
+        state = .idle
+        clock = nil
+        pointerInside = false
+    }
+
     // MARK: Views
 
     /// What is on screen. The card is a pure view of the state: nothing else decides it.
