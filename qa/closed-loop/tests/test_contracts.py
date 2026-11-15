@@ -316,6 +316,106 @@ class EvidenceContractTests(unittest.TestCase):
             self.assertIn("COULD NOT START", log.read_text())
 
 
+def swift_log(names, summary_count=None, lost=()):
+    """A Swift Testing console log: one outcome line per test, minus the lines the runner dropped."""
+    lines = [f"◇ Test {name}() started.\n" for name in names]
+    lines += [f"✔ Test {name}() passed after 0.1 seconds.\n" for name in names if name not in lost]
+    count = len(names) if summary_count is None else summary_count
+    return "".join(lines) + f"✔ Test run with {count} tests in 1 suite passed after 0.1 seconds.\n"
+
+
+class DroppedLogLineTests(unittest.TestCase):
+    """swift test can drop console lines under machine load; a log that lost any is not evidence."""
+
+    def test_log_with_every_outcome_line_is_complete(self):
+        self.assertTrue(c.swift_log_complete(swift_log(["one", "two", "three"])))
+
+    def test_log_missing_an_outcome_line_is_incomplete(self):
+        self.assertFalse(c.swift_log_complete(swift_log(["one", "two", "three"], lost=("two",))))
+
+    def test_skipped_and_display_named_tests_and_case_lines_still_count_once(self):
+        log = ("◇ Test one() started.\n✔ Test one() passed after 0.1 seconds.\n"
+               "➜ Test skippedOne() skipped.\n"
+               '✔ Test "A display name" passed after 0.1 seconds.\n'
+               "◇ Test many(_:) started.\n"
+               '✔ Test case passing 1 argument x → "a" to many(_:) passed after 0.1 seconds.\n'
+               '✔ Test case passing 1 argument x → "b" to many(_:) passed after 0.1 seconds.\n'
+               "✔ Test many(_:) passed after 0.1 seconds with 2 test cases.\n"
+               "✔ Test run with 4 tests in 1 suite passed after 0.1 seconds.\n")
+        self.assertTrue(c.swift_log_complete(log))
+        self.assertFalse(c.swift_log_complete(log.replace("4 tests", "5 tests")))
+
+    def test_a_line_cut_by_another_write_does_not_count(self):
+        log = swift_log(["one", "two"]).replace(
+            "✔ Test two() passed after 0.1 seconds.\n", "✔ Test two✔ Suite Cut passed after 0.1 seconds.\n")
+        self.assertFalse(c.swift_log_complete(log))
+
+    def test_log_without_one_summary_is_incomplete(self):
+        self.assertFalse(c.swift_log_complete(""))
+        self.assertFalse(c.swift_log_complete(swift_log(["one"]) * 2))
+
+
+class PortableRetryTests(unittest.TestCase):
+    ATTEMPT_LIMIT = 3
+
+    def run_portable(self, logs):
+        """Run one portable check whose successive attempts write the given logs; return row and call count."""
+        calls = []
+        def execute(command, log, timeout, environment=None):
+            log.write_text(logs[min(len(calls), len(logs) - 1)])
+            calls.append(command)
+            return 0, 0.1
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            def prepare(folder, group, **keywords):
+                package = Path(folder) / "package"
+                package.mkdir(exist_ok=True)
+                (package / "validation-manifest.json").write_text("{}")
+                return package
+            portable = SimpleNamespace(prepare=prepare)
+            definition = {"id": "portable-synthetic", "kind": "portable", "scope": "Synthetic.", "group": "synthetic"}
+            with patch.object(runner, "execute", side_effect=execute), patch.object(runner, "manifest_matches"), \
+                 patch.object(runner, "portable_module", return_value=portable), patch("builtins.print"):
+                row = runner.run_check(definition, SimpleNamespace(mode="development", jobs=1, timeout=5), output, portable)
+            kept = sorted(path.name for path in (output / "portable-synthetic").glob("test*.log"))
+        return row, len(calls), kept
+
+    def test_a_dropped_line_is_retried_and_the_complete_log_is_the_evidence(self):
+        lossy = swift_log(["one", "two"], lost=("two",))
+        row, calls, kept = self.run_portable([lossy, swift_log(["one", "two"])])
+        self.assertEqual((row["status"], calls, row["passed_functions"]), ("passed", 2, ["one", "two"]))
+        self.assertEqual(kept, ["test.attempt-1.log", "test.log"])
+
+    def test_a_complete_log_runs_once(self):
+        row, calls, kept = self.run_portable([swift_log(["one", "two"])])
+        self.assertEqual((row["status"], calls, kept), ("passed", 1, ["test.log"]))
+
+    def test_a_log_that_stays_incomplete_stops_at_the_attempt_limit(self):
+        lossy = swift_log(["one", "two"], lost=("two",))
+        row, calls, _ = self.run_portable([lossy])
+        self.assertEqual(calls, self.ATTEMPT_LIMIT)
+        self.assertEqual(row["passed_functions"], ["one"])
+
+    def test_a_failing_run_is_never_retried(self):
+        failed = "✘ Test one() recorded an issue: expected value\n✘ Test run with 1 test in 1 suite failed after 0.1 seconds.\n"
+        calls = []
+        def execute(command, log, timeout, environment=None):
+            log.write_text(failed)
+            calls.append(command)
+            return 1, 0.1
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            def prepare(folder, group, **keywords):
+                package = Path(folder) / "package"
+                package.mkdir(exist_ok=True)
+                return package
+            portable = SimpleNamespace(prepare=prepare)
+            definition = {"id": "portable-synthetic", "kind": "portable", "scope": "Synthetic.", "group": "synthetic"}
+            with patch.object(runner, "execute", side_effect=execute), patch("builtins.print"):
+                row = runner.run_check(definition, SimpleNamespace(mode="development", jobs=1, timeout=5), output, portable)
+        self.assertEqual((row["status"], len(calls)), ("failed", 1))
+
+
 class NativeBuildBarrierTests(unittest.TestCase):
     def definitions(self):
         return [{"id": "native-" + name, "kind": "native-fixture", "tier": "native-integration",
