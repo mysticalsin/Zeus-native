@@ -88,6 +88,7 @@ struct PointingHotkeyMonitorTests {
     @Test func withAConfirmAnExactHoldBeginsOnceItsTimeHasPassed() async throws {
         let (monitor, log) = monitor()
         monitor.confirmProvider = { 0.05 }
+        monitor.liveModifiers = { [.control, .option] }
         press(monitor)
         #expect(log.signals.isEmpty, "nothing at the key-down")
         try await Task.sleep(for: .seconds(0.5))

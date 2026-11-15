@@ -87,9 +87,11 @@ and Command last. A start is not cheap: it stops speech and drops the answer Zeu
 listener release the microphone, plays the listen sound, dips other audio, shows listening, and starts a screen capture
 and a browser tab read. The cancel that follows sends nothing and brings none of that back. With the confirm the answer
 is: only on a chord pressed one key at a time, with the first keys held alone for 0.15 s. Pressed as a chord, nothing
-opens. `TileBaseConflicts.confirm(for:keymap:)` is the middle cell as a pure function. The three owners do not read it
-yet (`confirmProvider` in `HotkeyMonitor` is still 0), so until they do a chord pressed Control, Option, then Command
-can open a turn that the machine then cancels and never sends. 0.15 s is a first value, not measured.
+opens. `TileBaseConflicts.confirm(for:keymap:)` is the middle cell as a pure function. Talk, dictation and pointing
+read it through `TilingController.holdConfirm(for:)`, which asks the installed tap's keymap and says 0 with no tap, so
+the keys act at once while tiling is off. A tap shorter than the confirm does nothing; a double tap still latches. The
+same facts and the same start rule hold for pointing (`PointingKeyGesture` reads `KeyFacts`): a larger chord that shrinks
+to the key starts nothing, and a sleep, wake or timeout takes the live modifiers. 0.15 s is a first value, not measured.
 
 When talk and dictation share one key, the hold begins only on an exact match: nothing else may be down when it is armed
 (Command pressed first, then Control and Option, starts nothing). Once the hold runs, a foreign key or modifier cancels it (Shift on dictation only marks the turn).

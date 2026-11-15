@@ -91,7 +91,7 @@ final class PointingHotkeyMonitor {
 
     /// Sleep, wake or a display change: drops a hold in progress. Nothing is sent.
     func interruptGesture() {
-        _ = gesture.interrupt()
+        _ = gesture.interrupt(liveModifiers: liveModifiers())
         stopWatchdog()
         turnOpen = false
     }
@@ -118,13 +118,13 @@ final class PointingHotkeyMonitor {
         tap = created
     }
 
-    /// The confirm has passed: the hold begins if it is still exact. Also the entry point for tests.
-    func confirmElapsed() {}
-
     /// One keyboard event. Also the entry point for tests.
     func feed(_ event: ShortcutEvent, at time: TimeInterval) {
         let wanted = shortcutProvider()
         if wanted != gesture.shortcut, !gesture.isActive { gesture.shortcut = wanted }
+        if !gesture.isActive, !gesture.isArmed {
+            gesture.confirm = confirmProvider?() ?? HotkeyMonitor.tilingConfirm(wanted)
+        }
         let voiceOverOn = voiceOverProvider()
         let output = gesture.feed(event, at: time, voiceOverOn: voiceOverOn)
         let startsTurns = startsTurnsProvider()
@@ -134,8 +134,21 @@ final class PointingHotkeyMonitor {
         }
         // Announce once per VoiceOver session, not on every attempt: re-arm only when VoiceOver goes off.
         if !voiceOverOn { announcedBlock = false }
+        handle(output, startsTurns: startsTurns)
+    }
+
+    /// The confirm has passed: the hold begins if it is still exact. Also the entry point for tests.
+    func confirmElapsed() {
+        handle(gesture.confirmElapsed(at: now(), liveModifiers: liveModifiers()), startsTurns: startsTurnsProvider())
+    }
+
+    private func handle(_ output: PointingKeyGesture.Output?, startsTurns: Bool) {
         switch output {
-        case .armed?: break
+        case .armed?:
+            let after = gesture.confirm
+            DispatchQueue.main.asyncAfter(deadline: .now() + after) { [weak self] in
+                MainActor.assumeIsolated { self?.confirmElapsed() }
+            }
         case .began?:
             // One hold, one turn: the talk turn already answers this key.
             guard startsTurns else { return }
