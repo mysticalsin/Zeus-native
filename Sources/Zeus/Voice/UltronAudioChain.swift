@@ -11,13 +11,15 @@ final class UltronEffectGraph {
     let eq = AVAudioUnitEQ(numberOfBands: 2)
     let distortion = AVAudioUnitDistortion()
     let comb = AVAudioUnitDelay()
+    /// Mono in, stereo out: the reverb refuses a one-channel bus (-10868), so it and the limiter run in stereo.
+    let upmix = AVAudioMixerNode()
     let reverb = AVAudioUnitReverb()
     /// Peak limiter last in the chain, so the added warmth and edge can never clip the output.
     let limiter = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
         componentType: kAudioUnitType_Effect, componentSubType: kAudioUnitSubType_PeakLimiter,
         componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0))
 
-    var nodes: [AVAudioNode] { [timePitch, eq, distortion, comb, reverb, limiter] }
+    var nodes: [AVAudioNode] { [timePitch, eq, distortion, comb, upmix, reverb, limiter] }
 
     init() {
         distortion.loadFactoryPreset(.speechRadioTower)
@@ -72,13 +74,18 @@ final class UltronEffectGraph {
         // AVFAudio raises (not throws) when a unit refuses the format, for example -10868 on a Mac
         // whose output device vanished. Caught here, the partial wiring is undone and the caller
         // falls back to passthrough instead of the process ending.
+        // The voice stays in `format` up to the upmix; from there on the same rate in stereo.
+        guard let stereo = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: format.sampleRate, channels: 2,
+                                         interleaved: false) else { return "no stereo format at \(format.sampleRate) Hz" }
         let failure = ZeusCatchObjCException {
             var previous = source
+            var link = format
             for node in chain {
-                engine.connect(previous, to: node, format: format)
+                engine.connect(previous, to: node, format: link)
+                if node === upmix { link = stereo }
                 previous = node
             }
-            engine.connect(previous, to: destination, format: format)
+            engine.connect(previous, to: destination, format: link)
         }
         guard let failure else { return nil }
         for node in [source] + chain { engine.disconnectNodeOutput(node) }
