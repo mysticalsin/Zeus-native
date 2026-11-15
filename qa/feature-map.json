@@ -715,6 +715,14 @@
       "scope": "Actual Vision detection, alignment, feature print and glare extraction on generated images and synthetic landmarks. No camera, no stored image and no real face: the analysis result carries numbers only."
     },
     {
+      "id": "native-FacePresenceControllerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FacePresenceControllerTests",
+      "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+      "scope": "Actual FacePresenceController with a fake camera, lock, clock, session reader, permissions and vault in a temp folder. No camera opens, no permission prompt is raised, the real Keychain is never read and nothing locks the Mac."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -5449,6 +5457,145 @@
             {
               "file": "Tests/ZeusAppTests/FaceVisionTests.swift",
               "function": "noImageLeavesTheAnalyzer"
+            }
+          ]
+        },
+        {
+          "id": "F14.6",
+          "check": "native-FacePresenceControllerTests",
+          "acceptance": "Launch opens no camera; the switch asks for camera access only through the permissions model; an unlock notice while the session reads locked starts nothing; the lock is called once and only through the event-free call; the teleprompter pauses and resumes it; a frame after stop is dropped; other features read presence and nothing else; enrollment saves ten different samples and nothing less.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "launchNeverStartsTheCamera"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "launchReadsTheStoredLockAfterChoice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchOnAsksForConsentThroughPermissions"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aRefusedConsentKeepsTheCameraOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aDeniedCameraOpensSystemSettingsAndAsksNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchOnWithNoFacesStartsEnrolling"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchOnWithoutTheEventFreeLockIsUnavailableAndStartsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "anUnreadableVaultMakesTheFeatureUnavailable"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSettingChangeThatMatchesTheMachineDoesNothingTwice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchingOffStopsTheCameraAtOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "anUnlockNoticeWhileTheSessionIsLockedStartsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "lockingTheScreenOrSleepingStopsTheCameraAndWakingLockedKeepsItOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theLockerIsCalledOnceAndOnlyTheEventFreeCall"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aLockThatFailsIsNeverRetried"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "teleprompterRecordingPausesAndResumes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aFrameAfterStopIsDropped"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theEnrolledOwnerIsPresentAndAStrangerIsNot"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSwitchedOffFaceIsNeverTheOwner"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aLatchedSpoofCueMakesTheOwnerAbsent"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "presenceIsReadOnlyForOtherFeatures"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "framesThatVisionCannotReadStopTheCameraAfterAFewInARow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "cameraReportsMoveTheMachineOnlyForTheCurrentRun"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "tenDifferentSamplesSaveAFaceAndStartWatching"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "nineSamplesAndAClosedWindowSaveNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSilentCameraCannotKeepAnEnrollmentOpenPastItsWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "lockingDuringEnrollmentSavesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aSampleWithASpoofCueIsRefusedSoNothingSavesFromAPhone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "enrollFromWatchingAddsASecondFaceWithTheNextName"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aDeletedNumberIsUsedAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "switchingFacesOffAndOnAndDeletingThemIsImmediateAndStored"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "aFaceChangeThatCannotBeSavedIsNotShown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theEnrollButtonFollowsTheMachine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+              "function": "theCameraUsageStringNamesBothFeaturesAndSaysNoImageIsSaved"
             }
           ]
         }

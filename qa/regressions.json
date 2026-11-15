@@ -4570,6 +4570,18 @@
         "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
         "function": "aCameraThatSendsNoFramesGoesUnavailable"
       }
+    },
+    {
+      "id": "REG-612",
+      "failure": "A forged unlock notice, while the session dictionary still said locked, started the camera on the lock screen.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-FacePresenceControllerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
+        "function": "anUnlockNoticeWhileTheSessionIsLockedStartsNothing"
+      }
     }
   ]
 }

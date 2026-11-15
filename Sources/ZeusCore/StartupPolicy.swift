@@ -14,7 +14,7 @@ public enum StartupService: String, CaseIterable, Sendable {
     case sleepWatch, notificationPeeker, settingsCatalog, updates, agentServer
     case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord, pointingHotkey
     case connectionsRefresh, autoOnboarding, demoArg, motionOpenArg, deepLinks
-    case settingsWindow, onboardingWindow, chatWindow, demoPlayback
+    case settingsWindow, onboardingWindow, chatWindow, demoPlayback, facePresence
 }
 
 public enum StartupMode: Equatable, Sendable {
