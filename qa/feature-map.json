@@ -435,6 +435,14 @@
       "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift"
     },
     {
+      "id": "native-ScribeDetectorTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual ScribeCallWatcher with a fake clock, setting, calendar, probe, microphone listeners, wake scheduler and notification centers. No calendar, microphone, permission prompt or device acceptance.",
+      "suite": "ScribeDetectorTests",
+      "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift"
+    },
+    {
       "id": "native-ZeusCoreTests",
       "kind": "native-module",
       "tier": "native-integration",
@@ -1535,6 +1543,33 @@
             {
               "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
               "function": "aWakeWhileScanningWaitsAndScansOnceMoreWhenTheFirstEnds"
+            }
+          ]
+        },
+        {
+          "check": "native-ScribeDetectorTests",
+          "id": "F04.detector-watcher",
+          "acceptance": "The real call watcher stops everything when the choice is Off, keeps reading while the machine is busy and removes its exit observer when it stops; a scan whose probe never returns is given up on; polling scans read a short calendar window and only a listening plan reads the full look-ahead.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+              "function": "offStopsTheDetector"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+              "function": "switchingToOffStopsEverythingAtOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+              "function": "aScanThatNeverReturnsIsGivenUpOnAndTheNextWakeScansAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+              "function": "pollingScansReadAShortWindowAndOnlyAListeningPlanReadsTheFullLookAhead"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeDetectorTests.swift",
+              "function": "theExitObserverWatchesWhileOffAndBusyAndIsRemovedByHalt"
             }
           ]
         },
