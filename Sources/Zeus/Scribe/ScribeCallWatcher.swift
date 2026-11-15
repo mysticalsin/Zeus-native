@@ -226,7 +226,8 @@ final class ScribeCallWatcher {
         var mode: () -> ScribeAutoStartMode
         /// The meeting-start machine has nothing in hand: no card, no start, no recording to follow.
         var machineIdle: () -> Bool
-        var slots: (Date) -> [ScribeCalendarSlot]
+        /// The meetings from a little before `now` to `lookAhead` after it.
+        var slots: (Date, TimeInterval) -> [ScribeCalendarSlot]
         var scan: @MainActor () async -> ScribeCallScan
         var ingest: (ScribeCallScan, [ScribeCalendarSlot], Date) -> Void
         /// Forgets the machine when the detector stops.
@@ -241,9 +242,9 @@ final class ScribeCallWatcher {
         ports: Ports(
             mode: { ScribeAutoStartMode.current() },
             machineIdle: { ScribeAutoStartController.shared.isIdle },
-            slots: { now in
+            slots: { now, lookAhead in
                 ScribeCalendarReader.shared.slots(from: now.addingTimeInterval(-ScribeMeetingStartPolicy.lateWindow),
-                                                  to: now.addingTimeInterval(ScribeDetectorPlan.lookAhead))
+                                                  to: now.addingTimeInterval(lookAhead))
             },
             scan: { await Task.detached(priority: .utility) { ScribeCallProbe.scan() }.value },
             ingest: { scan, slots, now in ScribeAutoStartController.shared.ingest(scan: scan, slots: slots, date: now) },
@@ -396,7 +397,7 @@ final class ScribeCallWatcher {
             // The detector may have stopped since the wake: then nothing is read.
             guard let self, running, started == generation else { return }
             let now = ports.now()
-            let slots = ports.slots(now)
+            let slots = ports.slots(now, ScribeDetectorPlan.lookAhead)
             // The one scheduler slot is free while a scan runs; `applyPlan` takes it back when the scan ends. If the
             // probe never answers, this fires and the scan ends as an empty reading.
             scheduler.schedule(after: Self.scanTimeout) { [weak self] in

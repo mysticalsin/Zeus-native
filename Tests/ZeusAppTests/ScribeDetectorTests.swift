@@ -47,6 +47,8 @@ private final class Harness {
     var calls: [ScribeDetectedCall] = []
     var scans = 0
     var calendarReads = 0
+    /// How far ahead each calendar read asked.
+    var lookAheads: [TimeInterval] = []
     var ingested: [(calls: Int, slots: Int)] = []
     var resets = 0
     var waiting: [CheckedContinuation<ScribeCallScan, Never>] = []
@@ -62,8 +64,9 @@ private final class Harness {
             ports: .init(
                 mode: { [unowned self] in mode },
                 machineIdle: { [unowned self] in idle },
-                slots: { [unowned self] _ in
+                slots: { [unowned self] _, lookAhead in
                     calendarReads += 1
+                    lookAheads.append(lookAhead)
                     return calendar
                 },
                 scan: { [unowned self] in
@@ -266,6 +269,27 @@ struct ScribeDetectorTests {
         await harness.settle()
         #expect(harness.scans == 2, "the gate is free again, so the next wake scans")
         await harness.finishScan()
+    }
+
+    @Test func pollingScansReadAShortWindowAndOnlyAListeningPlanReadsTheFullLookAhead() async {
+        let near = ScribeMeetingStartPolicy.leadWindow
+        let polling = Harness()
+        polling.calendar = [sdSlot("soon", start: 60)]
+        polling.watcher.follow()
+        await polling.finishScan()
+        #expect(polling.watcher.plan == .polling)
+        polling.scheduler.wakeUp()
+        await polling.finishScan()
+        #expect(polling.lookAheads == [near, near], "every polling scan asks for the short window only")
+
+        let listening = Harness()
+        listening.calendar = [sdSlot("later", start: 3_600)]
+        listening.watcher.follow()
+        await listening.finishScan()
+        #expect(listening.lookAheads == [near, ScribeDetectorPlan.lookAhead],
+                "the full look-ahead is read once, to choose the wake")
+        #expect(listening.watcher.plan == .listening(wakeAt: sdBase.addingTimeInterval(3_600 - 120)))
+        #expect(listening.scheduler.delay == TimeInterval(3_480))
     }
 
     @Test func aStoppedDetectorIgnoresEveryWake() async {
