@@ -330,7 +330,7 @@ App side, one line: `ScribeCallWatcher.upcomingSlots` sets `callApp` from `Scrib
 
 ### Tests first
 
-`Tests/ZeusCoreTests/ScribeMeetingLedgerTests.swift` (new): `dismissAtTwoMinutesStaysQuietAtStartTime`,
+`Tests/ZeusCoreTests/ScribeMeetingLedgerTests.swift` (new): `theLedgerKeepsATwoMinuteDismissalAtStartTime`,
 `aBackToBackMeetingInTheSameAppIsOffered`, `aDismissedCallStaysQuietWhenItsCalendarWindowOpens`,
 `aDismissedMeetingStaysQuietWhenItRunsOver`, `aNewCallInTheSameAppAfterAGapIsANewMeeting`,
 `marksNeverGoDown`, `entriesLeaveWhenTheSlotEnds`.

@@ -21,7 +21,7 @@ private func mlMeeting(_ evidence: ScribeMeetingEvidence) throws -> ScribeMeetin
 
 @Suite("Scribe meeting ledger")
 struct ScribeMeetingLedgerTests {
-    @Test func dismissAtTwoMinutesStaysQuietAtStartTime() throws {
+    @Test func theLedgerKeepsATwoMinuteDismissalAtStartTime() throws {
         let slot = mlSlot("s1", start: 120, end: 1_920)
         var ledger = ScribeMeetingLedger()
         let headsUp = ScribeMeeting(key: "s1", title: "Meeting s1", callApp: .teams, slot: slot)
