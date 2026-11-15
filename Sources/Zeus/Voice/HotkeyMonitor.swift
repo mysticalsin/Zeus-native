@@ -177,14 +177,17 @@ final class HotkeyMonitor {
         let held = machine.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
+        let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
         // The talk chord's Space may be held by Carbon, which hides its key-down from the monitors. On a flags event the
-        // system is asked about it, and the machine hears the key-down it missed, on the flags it had before this event,
-        // so a Space that came before the set spoils the hold and a Space that joined the set does not.
+        // system is asked about it, and the machine hears the key-down it missed, on the flags it had before this event, so
+        // a Space that came before the set spoils the hold and a Space that joined the set does not. It is read at the time
+        // of the flags event, not the time that event is heard: a busy main thread must not make a short tap stand for the
+        // confirm.
         if case .flags = event, let chord = chordProvider(), !machine.keys.keysDown.contains(chord),
            keysStillDown?([chord]).contains(chord) == true {
-            send(.key(.keyDown(keyCode: chord, modifiers: machine.keys.flagModifiers), at: arrived))
+            send(.key(.keyDown(keyCode: chord, modifiers: machine.keys.flagModifiers), at: at))
         }
-        send(.key(event, at: time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived))
+        send(.key(event, at: at))
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
