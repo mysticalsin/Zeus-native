@@ -246,21 +246,29 @@ struct MascotMotionTests {
         #expect(store.frame("idle", elapsed: 0.3, points: 22) === small) // cached, not decoded again
     }
 
-    /// Checked on disk: every state in the manifest has both atlases, timed from the manifest, with
-    /// metadata that matches the PNG on disk. Together they stay inside the bundle-size budget.
+    /// Checked on disk: every shipped state has both atlases, with metadata that matches the PNG on disk.
+    /// Together they stay inside the bundle-size budget. The design pack (`Design/mascot-v2`) is not in git, so
+    /// the shipped resources are what is always tested; when the pack is present on this machine its manifest
+    /// is also compared (same states, same kind, same timing).
     @Test func everyStateShipsAnAtlasMatchingItsMetadataAndTheManifest() throws {
         let manifestURL = Self.animDir.appendingPathComponent("../../../../Design/mascot-v2/ZEUS_Mascot_Pack_v2/manifest.json").standardizedFileURL
-        let manifest = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
-        let states = try #require(manifest["states"] as? [[String: Any]])
-        #expect(states.count == 24)
+        let manifestStates = try? (JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])?["states"] as? [[String: Any]]
+        let shipped = try FileManager.default.contentsOfDirectory(atPath: Self.animDir.path)
+            .filter { $0.hasSuffix(".json") && $0 != "index.json" }.map { String($0.dropLast(5)) }.sorted()
+        #expect(shipped.count == 24)
+        if let manifestStates {
+            #expect(manifestStates.compactMap { $0["id"] as? String }.sorted() == shipped, "the shipped states match the design manifest")
+        }
         var bytes = 0
-        for state in states {
-            let id = try #require(state["id"] as? String)
+        for id in shipped {
+            let state = manifestStates?.first { ($0["id"] as? String) == id }
             let clip = try JSONDecoder().decode(MascotClip.self, from: Data(contentsOf: Self.animDir.appendingPathComponent("\(id).json")))
             #expect(clip.state == id)
-            #expect(clip.kind == (state["timing_kind"] as? String))
-            let seconds = (state["seconds"] as? NSNumber)?.doubleValue ?? 0
-            #expect(abs(clip.length - seconds) < 0.002, "\(id) lasts \(clip.length)s, manifest says \(seconds)s")
+            if let state {
+                #expect(clip.kind == (state["timing_kind"] as? String))
+                let seconds = (state["seconds"] as? NSNumber)?.doubleValue ?? 0
+                #expect(abs(clip.length - seconds) < 0.002, "\(id) lasts \(clip.length)s, manifest says \(seconds)s")
+            }
             #expect(clip.frameDurationsMs.count == clip.frameCount && clip.frameCount >= 4)
             #expect(clip.fps >= 12 && clip.fps <= 24, "\(id) runs at \(clip.fps) fps")
             #expect(Set(clip.sizes.keys) == ["128", "320"])
