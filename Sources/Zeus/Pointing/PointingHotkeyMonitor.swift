@@ -42,6 +42,8 @@ final class PointingHotkeyMonitor {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
     }
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    /// How long an exact hold waits before it begins, when the owner sets its own. Nil asks tiling, as the voice keys do.
+    var confirmProvider: (() -> TimeInterval)?
     /// Called once when the keyboard cannot be observed (neither Accessibility nor Input Monitoring).
     var onUnavailable: (() -> Void)?
 
@@ -116,6 +118,9 @@ final class PointingHotkeyMonitor {
         tap = created
     }
 
+    /// The confirm has passed: the hold begins if it is still exact. Also the entry point for tests.
+    func confirmElapsed() {}
+
     /// One keyboard event. Also the entry point for tests.
     func feed(_ event: ShortcutEvent, at time: TimeInterval) {
         let wanted = shortcutProvider()
@@ -130,6 +135,7 @@ final class PointingHotkeyMonitor {
         // Announce once per VoiceOver session, not on every attempt: re-arm only when VoiceOver goes off.
         if !voiceOverOn { announcedBlock = false }
         switch output {
+        case .armed?: break
         case .began?:
             // One hold, one turn: the talk turn already answers this key.
             guard startsTurns else { return }

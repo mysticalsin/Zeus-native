@@ -6,8 +6,10 @@ import Foundation
 /// Rules: the chord starts the moment it is held exactly. Any other key or modifier joining
 /// cancels the turn (the "spoil" rule), so Control+Option+Space (Chat) and other chords that
 /// share the modifiers keep working. A cancelled hold cannot restart until every modifier is up.
-public struct PointingKeyGesture: Sendable {
+public struct PointingKeyGesture: Sendable, Equatable {
     public enum Output: Equatable, Sendable {
+        /// An exact hold waits for its confirm. The owner asks for `confirmElapsed` after `confirm` seconds.
+        case armed
         case began
         case ended
         case cancelled
@@ -26,6 +28,8 @@ public struct PointingKeyGesture: Sendable {
     public static let maxHold: TimeInterval = 95
 
     public var shortcut: Shortcut
+    /// How long an exact hold waits before it begins: 0 except while a tiling chord holds the key's modifiers.
+    public var confirm: TimeInterval = 0
     public private(set) var isActive = false
     /// True while the chord is held but unusable (Control+Option with VoiceOver on).
     public private(set) var blockedByVoiceOver = false
@@ -67,6 +71,11 @@ public struct PointingKeyGesture: Sendable {
         return tap
     }
 
+    /// Whether an exact hold is waiting for its confirm.
+    public var isArmed: Bool { false }
+
+    public mutating func confirmElapsed(at time: TimeInterval, liveModifiers: ShortcutModifiers?) -> Output? { nil }
+
     public mutating func reset() { self = PointingKeyGesture(shortcut: shortcut) }
 
     /// Watchdog, called a few times a second while a hold is active. `liveModifiers` is what the
@@ -85,7 +94,7 @@ public struct PointingKeyGesture: Sendable {
 
     /// Sleep, wake or a display change: a hold in progress is cancelled and cannot restart until every
     /// modifier is up. Nothing is sent. Returns `.cancelled` only when a hold was active.
-    public mutating func interrupt() -> Output? {
+    public mutating func interrupt(liveModifiers: ShortcutModifiers? = nil) -> Output? {
         let wasActive = isActive
         isActive = false; activeSince = nil
         state.reset(); controlDownAt = nil; controlTapClean = false; lastControlTap = nil
