@@ -377,6 +377,16 @@ enum SnapshotRenderer {
         let drawnGuide = NotchModel()
         saveSurface(NotchStage(model: drawnGuide, topBar: TopBarModel(), footprint: drawn, guide: true), size: CGSize(width: 960, height: 120), name: "notch-drawn-guide")
 
+        // D4: the shape placed 200 pt right with an alert under it. The capsule is centred under the shape, not the screen.
+        let placedAlertTime = Date()
+        let placedAlert = NotchModel()
+        placedAlert.presentation = .closed
+        placedAlert.alerts.post(AlertItem(id: "1", appID: "com.apple.MobileSMS", appName: "Messages", title: "Anna",
+                                          body: "Deck looks great, ship it", postedAt: placedAlertTime), now: placedAlertTime)
+        saveSurface(NotchStage(model: placedAlert, topBar: TopBarModel(),
+                               footprint: .drawn(DrawnNotchShape(width: 200, height: 34, offset: 200))),
+                    size: CGSize(width: 960, height: 200), name: "notch-drawn-placed-alert")
+
         // The Settings card for the drawn notch, one fixture per row set it can show. Each pins its own controller.
         let drawnCardContext = GSContext(services: OnboardingServices(permissions: PermissionsModel()))
         func drawnCard(_ name: String, height: CGFloat, _ pinned: SnapshotDrawnNotch) {
