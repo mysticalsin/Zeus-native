@@ -293,10 +293,10 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
     public private(set) var flagModifiers: ShortcutModifiers = []
     public private(set) var deviceKeys: Set<UInt16> = []
     public private(set) var keysDown: Set<UInt16> = []
-    /// A normal key joined while modifiers were down; the chord is not "alone" until all are released.
-    public private(set) var spoiled = false
-
-    public var spoilers: Set<UInt16> { [] }
+    /// The codes of the normal keys pressed while modifiers were down; cleared when every modifier is up. The chord is
+    /// not "alone" until then.
+    public private(set) var spoilers: Set<UInt16> = []
+    public var spoiled: Bool { !spoilers.isEmpty }
 
     public init() {}
 
@@ -334,7 +334,7 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
         for (flag, left, right) in ShortcutModifiers.keyCodes where !mods.contains(flag) {
             deviceKeys.remove(left); deviceKeys.remove(right)
         }
-        if mods.isEmpty { spoiled = false }
+        if mods.isEmpty { spoilers = [] }
     }
 
     private mutating func keyDown(keyCode: UInt16, modifiers mods: ShortcutModifiers) {
@@ -352,7 +352,7 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
         // auto-insert paste "spoiled" every dictation key-down after it). `deviceKeys` is only
         // ever populated by real flagsChanged holds, so its emptiness is the right signal for
         // "nothing we're tracking is actually down right now".
-        if !mods.isEmpty, !deviceKeys.isEmpty { spoiled = true }
+        if !mods.isEmpty, !deviceKeys.isEmpty { spoilers.insert(keyCode) }
     }
 
     public mutating func reset() { self = ShortcutState() }
@@ -374,7 +374,7 @@ public struct ShortcutState: Sendable, Equatable, Hashable {
         for (flag, left, right) in ShortcutModifiers.keyCodes where !live.contains(flag) {
             deviceKeys.remove(left); deviceKeys.remove(right)
         }
-        if live.isEmpty { spoiled = false }
+        if live.isEmpty { spoilers = [] }
     }
 
     /// Forgets the ordinary keys the system no longer reports down: a key-up that no monitor saw (Tab out of a username
