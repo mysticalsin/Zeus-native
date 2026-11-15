@@ -4582,6 +4582,30 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_io_proc_blocks_only_in_audited_files"
       }
+    },
+    {
+      "id": "REG-448",
+      "failure": "A test could reach a live tap factory or process monitor built outside the launch code.",
+      "features": [
+        "F03"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_live_audio_ports_are_built_only_by_the_app_delegate"
+      }
+    },
+    {
+      "id": "REG-449",
+      "failure": "The equaliser controller gained a default audio port, so a test that left one out got a live one.",
+      "features": [
+        "F03"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_the_controller_takes_its_audio_ports_without_defaults"
+      }
     }
   ]
 }

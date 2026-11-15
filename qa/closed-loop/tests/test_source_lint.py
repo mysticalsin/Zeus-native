@@ -859,7 +859,15 @@ RENDER_FORBIDDEN = re.compile(
     r"\.append\(|\bArray\(|\bString\(|\bDispatchQueue\b|\bMainActor\b|\bprint\(|\bNSLog\(|\bos_log\b"
     r"|\bTask\s*[{(.]|\bawait\b|\bNSLock\b|\.lock\(\)|\.withLock\b"
     r"|(?:[=(,:]|\breturn\b|\bin\b)\s*\[|\]\s*\(")
-TAP_CREATION_NAMES = re.compile(r"AudioHardwareCreateProcessTap|CATapDescription|LiveShapingTapFactory|AudioProcessMonitor\(")
+# Names that open a tap, a live monitor or the System Audio Recording prompt. Tests use fakes and pure rules.
+TAP_CREATION_NAMES = re.compile(
+    r"AudioHardwareCreateProcessTap|AudioHardwareCreateAggregateDevice|CATapDescription|LiveShapingTapFactory"
+    r"|AudioProcessMonitor\(|AppShapingTap\.build\(|\bSystemAudioTap\b|\bSpectrumPipeline\b|\bAudioSpectrumService\b"
+    r"|\bScribeLiveCaptureProvider\b")
+LIVE_PORT_CONSTRUCTORS = re.compile(r"\b(?:LiveShapingTapFactory|AudioProcessMonitor)\(")
+EQ_CONTROLLER = EQ_DIR / "EqualiserController.swift"
+APP_DELEGATE = APP / "App/AppDelegate.swift"
+PORT_NAMES = ("factory", "monitor", "claim", "scheduler")
 EQ_LISTENER_APIS = re.compile(r"AudioObjectAddPropertyListenerBlock|AudioObjectRemovePropertyListenerBlock")
 DASHES = ("—", "–")
 
@@ -874,6 +882,18 @@ def render_offenders(text, label="sample"):
         if RENDER_FORBIDDEN.search(code):
             found.append(f"{label}:{number}")
     return found
+
+
+def live_port_offenders(text, label="sample"):
+    """`label:line` for each line that builds a live tap factory or process monitor."""
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if not line.strip().startswith("//") and LIVE_PORT_CONSTRUCTORS.search(strip_trailing_comment(line))]
+
+
+def port_default_offenders(signature):
+    """Port parameters in an initializer signature that carry a default value."""
+    return [port for port in PORT_NAMES
+            if re.search(rf"^\s*{port}:[^\n]*=", signature, re.MULTILINE)]
 
 
 def io_proc_offenders(text, label="sample"):
@@ -935,6 +955,36 @@ class EqualiserLint(unittest.TestCase):
             offenders += [f"{path.relative_to(ROOT)}:{n}" for n, line in code_lines(path)
                           if TAP_CREATION_NAMES.search(strip_trailing_comment(line))]
         self.assertEqual(offenders, [], "tests use fakes; a real tap or monitor raises the system audio prompt")
+
+    def test_live_audio_ports_are_built_only_by_the_app_delegate(self):
+        offenders = []
+        for path in swift_files():
+            relative = path.relative_to(APP).as_posix()
+            if relative != "App/AppDelegate.swift":
+                offenders += live_port_offenders(path.read_text(), relative)
+        self.assertEqual(offenders, [], "a test reaches Sources through the module, so only the launch builds live ports")
+        launch = between(APP_DELEGATE.read_text(), "private func makeEqualiser()", "equaliser = controller")
+        self.assertEqual(len(live_port_offenders(launch, "AppDelegate.swift")), 2)
+
+    def test_the_controller_takes_its_audio_ports_without_defaults(self):
+        signature = between(EQ_CONTROLLER.read_text(), "    init(\n", "    ) {")
+        for port in PORT_NAMES:
+            self.assertRegex(signature, rf"\n\s+{port}: ", port)
+        self.assertEqual(port_default_offenders(signature), [], "a test that forgets a port must not get a live one")
+
+    def test_prompt_lints_detect_their_failure_shapes(self):
+        for shape in ("let t = SystemAudioTap()", "let p = SpectrumPipeline()", "AudioSpectrumService.shared.allowPressed()",
+                      "ScribeLiveCaptureProvider(monitor: m)", "try AppShapingTap.build(request, mode: .probe)",
+                      "AudioHardwareCreateAggregateDevice(d, &id)"):
+            self.assertTrue(TAP_CREATION_NAMES.search(shape), shape)
+        for quiet in ("AppShapingTap.makeRenderBlock(kernel: k)", "let m = FakeMonitor()", "SpectrumMath.gain(sensitivityPercent: 50)"):
+            self.assertFalse(TAP_CREATION_NAMES.search(quiet), quiet)
+        self.assertEqual(live_port_offenders("let f = LiveShapingTapFactory()", "s"), ["s:1"])
+        self.assertEqual(live_port_offenders("monitor: AudioProcessMonitor(),", "s"), ["s:1"])
+        self.assertEqual(live_port_offenders("// AudioProcessMonitor() is built at launch", "s"), [])
+        self.assertEqual(live_port_offenders("final class AudioProcessMonitor: EqualiserMonitoring {", "s"), [])
+        self.assertEqual(port_default_offenders("    init(\n        factory: any ShapingTapFactory = LiveShapingTapFactory(),\n"), ["factory"])
+        self.assertEqual(port_default_offenders("        monitor: any EqualiserMonitoring,\n        claim: any EqualiserClaiming,\n"), [])
 
     def test_device_pickers_never_offer_a_zeus_aggregate(self):
         for relative in ("TopBar/OutputDevices.swift", "Dictation/Microphones.swift"):

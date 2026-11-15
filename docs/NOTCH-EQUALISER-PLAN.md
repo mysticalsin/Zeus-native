@@ -61,7 +61,10 @@ Out of scope, each waiting on an owner decision:
 - The prompt must describe this use: B3 extends `NSAudioCaptureUsageDescription` (`Resources/Info.plist:29-30`).
 - Audio never leaves the render callback. The store holds bundle ids, names, gains and volumes only.
 - Tests never create a tap or a live monitor. A lint fails if `Tests/` names `AudioHardwareCreateProcessTap`,
-  `CATapDescription`, `LiveShapingTapFactory` or `AudioProcessMonitor(`.
+  `AudioHardwareCreateAggregateDevice`, `CATapDescription`, `LiveShapingTapFactory`, `AudioProcessMonitor(`,
+  `AppShapingTap.build(`, `SystemAudioTap`, `SpectrumPipeline`, `AudioSpectrumService` or `ScribeLiveCaptureProvider`.
+  Tests reach `Sources` through the module, so a second lint allows `LiveShapingTapFactory(` and `AudioProcessMonitor(`
+  only in `AppDelegate.swift`, and a third keeps every audio port of `EqualiserController.init` free of a default.
 
 ## B0. Shared types
 
