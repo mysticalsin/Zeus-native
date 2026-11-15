@@ -109,6 +109,7 @@ o(S,'Sound categories','Dictation sounds','toggle','on','Cue when recording star
 o(S,'Sound categories','Timer alarms','toggle','on','Sound when a focus round ends.','missing','sound.timer','toggle',[],'true','live','')
 o(S,'Sound categories','Ambient loop while an agent works','toggle','off','A quiet looping sound under a running agent.','missing','sound.runningLoop','toggle',[],'false','live','Zeus addition. Plays the bundled running loop at half volume while any agent is working; fades out when none is.')
 o(S,'Sound categories','Failure sound','toggle','on','A short sound when an agent turn fails.','missing','sound.failure','toggle',[],'true','live','Plays the Failure sound when a session turns red (rate limit, auth or API error).')
+o(S,'Per-app sound','Shape sound per app','toggle','off','Taps only the apps you shape, with System Audio Recording. Off removes every tap.','missing','audio.equaliser','toggle',[],'false','custom','Zeus addition. Off by default. Only this switch can raise the System Audio Recording prompt.')
 
 S='voice'
 o(S,'Voice answer','Listen for approval keywords','toggle','off','Say a keyword to answer a permission card. The microphone opens only while a card is waiting. Off until you turn it on.','partial','voice.answers','toggle',[],'false','live','Opt-in: it opens the microphone. ZEUS also answers out loud (Answers card).')
@@ -241,7 +242,7 @@ def validate_table():
         if row[11] != 'excluded':
             by_id.setdefault(row[7], row)  # Same first-row-wins rule as write_swift.
     opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
-              'lights.liveSpectrum', 'general.showInScreenSharing',
+              'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl')
     for key in opt_in:

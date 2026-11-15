@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 178 of 178 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 178 in scope). 167 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 179 of 179 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 179 in scope). 168 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 127.
+**Before this round:** has 19, partial 27, missing 128.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -121,6 +121,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Sound categories | Timer alarms | toggle | on | Sound when a focus round ends. | missing | live | `sound.timer` |  |
 | Sound categories | Ambient loop while an agent works | toggle | off | A quiet looping sound under a running agent. | missing | live | `sound.runningLoop` | Zeus addition. Plays the bundled running loop at half volume while any agent is working; fades out when none is. |
 | Sound categories | Failure sound | toggle | on | A short sound when an agent turn fails. | missing | live | `sound.failure` | Plays the Failure sound when a session turns red (rate limit, auth or API error). |
+| Per-app sound | Shape sound per app | toggle | off | Taps only the apps you shape, with System Audio Recording. Off removes every tap. | missing | custom | `audio.equaliser` | Zeus addition. Off by default. Only this switch can raise the System Audio Recording prompt. |
 
 ## Voice
 
