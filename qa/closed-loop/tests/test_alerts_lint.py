@@ -56,8 +56,9 @@ class AlertsStyleLint(unittest.TestCase):
     def test_alert_sources_have_no_em_dash_and_use_the_shared_material(self):
         for path in sorted(ALERTS.glob("*.swift")):
             self.assertNotIn("—", "\n".join(line for _, line in code_lines(path.read_text())), path.name)
-        for relative in ("Sources/Zeus/Proactive/BriefCard.swift", "Sources/Zeus/Scribe/ScribeMeetingCardView.swift"):
-            self.assertIn(".alertGlass(", (ROOT / relative).read_text(), relative)
+        self.assertIn(".alertGlass(", (ROOT / "Sources/Zeus/Proactive/BriefCard.swift").read_text())
+        # The meeting card draws its own liquid-glass slab, not the shared alert material.
+        self.assertIn(".scribeCardGlass(", (ROOT / "Sources/Zeus/Scribe/ScribeMeetingCardView.swift").read_text())
 
 
 if __name__ == "__main__":
