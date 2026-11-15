@@ -461,31 +461,6 @@ struct ScribeLiveLogicTests {
         #expect(ScribeCallDetection.displayName(.other("Slack")) == "Slack")
     }
 
-    // MARK: Popup wording
-
-    @Test func upcomingHeadlineCountsMinutesRoundedUp() {
-        let now = Date(timeIntervalSince1970: 1_000)
-        let slot = ScribeCalendarSlot(id: "a", title: "Design review", start: now.addingTimeInterval(61))
-        #expect(ScribeCallPromptText.headline(for: .upcoming(slot), now: now) == "Starts in 2 min: Design review")
-        let soon = ScribeCalendarSlot(id: "b", title: "Standup", start: now.addingTimeInterval(20))
-        #expect(ScribeCallPromptText.headline(for: .upcoming(soon), now: now) == "Starts in 1 min: Standup")
-    }
-
-    @Test func startedAndUntitledMeetingsAndCallsHaveHonestHeadlines() {
-        let now = Date(timeIntervalSince1970: 1_000)
-        let started = ScribeCalendarSlot(id: "a", title: "  ", start: now.addingTimeInterval(-30))
-        #expect(ScribeCallPromptText.headline(for: .upcoming(started), now: now) == "Started: Meeting")
-        #expect(ScribeCallPromptText.headline(for: .callDetected(.teams), now: now) == "Meeting detected: Teams")
-        #expect(ScribeCallPromptText.headline(for: .none, now: now) == nil)
-    }
-
-    @Test func meetingTitleComesFromTheEventOrTheCallApp() {
-        let slot = ScribeCalendarSlot(id: "a", title: " Roadmap ", start: Date())
-        #expect(ScribeCallPromptText.meetingTitle(for: .upcoming(slot)) == "Roadmap")
-        #expect(ScribeCallPromptText.meetingTitle(for: .callDetected(.zoom)) == "Zoom call")
-        #expect(ScribeCallPromptText.meetingTitle(for: .none) == nil)
-    }
-
     // MARK: Record and store
 
     private func sampleRecord(id: UUID = UUID(), dismissedAt: Date? = nil) -> ScribeMeetingRecord {

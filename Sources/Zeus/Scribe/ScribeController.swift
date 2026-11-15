@@ -240,7 +240,13 @@ final class ScribeController {
     static let shared = ScribeController.makeProduction()
 
     /// The machine is the single source of truth. Everything the page shows derives from `machine.phase`.
-    private(set) var machine = ScribeSessionMachine()
+    private(set) var machine = ScribeSessionMachine() {
+        // Both writers (`run` and the reset to idle) pass through here, so the meeting-start controller hears every
+        // phase change in the same turn.
+        didSet { if machine.phase != oldValue.phase { onPhaseChange?(machine.phase) } }
+    }
+    /// Called after every change of `phase`. Set by `ScribeAutoStartController`.
+    @ObservationIgnored var onPhaseChange: ((ScribePhase) -> Void)?
     /// Transient feedback only after final persistence succeeds. A late expiry cannot clear a newer session.
     private(set) var completedNoticeID: ScribeSessionID?
     @ObservationIgnored private var completedNoticeTask: Task<Void, Never>?
@@ -300,9 +306,6 @@ final class ScribeController {
     private(set) var incomingWordsRevealUntil: Date?
     /// The person pressed the trash button and hasn't confirmed throwing the recording away yet.
     private(set) var discardRequested = false
-    @ObservationIgnored var meetingTitleHint: String?
-    /// Display names from the calendar invite the call popup matched; for the next recording only.
-    @ObservationIgnored var meetingAttendeeHint: [String] = []
     /// This recording's attendee names, and each finished meeting's (display names only). Saved with the meeting file.
     @ObservationIgnored private var sessionAttendees: [String] = []
     @ObservationIgnored private var attendeesByMeeting: [UUID: [String]] = [:]
@@ -322,11 +325,16 @@ final class ScribeController {
     @ObservationIgnored private var speakerHistories: [UUID: ScribeSpeakerEditHistory] = [:]
     /// Bumps when an undo entry is added or used, so the recap redraws its Undo button.
     private(set) var speakerHistoryRevision = 0
-    @ObservationIgnored var meetingCallHint: ScribeCallProcessIdentity?
     private var endWorkflow = ScribeEndWorkflow()
     private(set) var endingRemaining: Int?
     var endingReason: ScribeEndWorkflow.Reason? { endWorkflow.reason }
     var endStopRequested: Bool { endWorkflow.stopRequested }
+    /// The call looks over and the end window asks. Capture keeps running: only a tap or the bound call app
+    /// closing stops it.
+    var endSuggested: Bool {
+        if case .recording = machine.phase { return endWorkflow.isSuggested }
+        return false
+    }
     @ObservationIgnored private var levelBox: ScribeLevelBox?
     @ObservationIgnored private var levelTimer: Timer?
     @ObservationIgnored private var wordReveals: [String: ScribeWordRevealEntry] = [:]
@@ -347,6 +355,8 @@ final class ScribeController {
     @ObservationIgnored private let monotonicClock: () -> TimeInterval
     @ObservationIgnored private let store: ScribeMeetingStore?
     @ObservationIgnored private let cancellationDefaults: UserDefaults
+    /// Where the first recording on this Mac is noted for the automatic start readiness.
+    @ObservationIgnored private let optInDefaults: UserDefaults
     @ObservationIgnored private let transcriptionEngine: () -> TranscriptionEngineKind
     @ObservationIgnored private let writeMeeting: (ScribeMeetingRecord) throws -> Void
     @ObservationIgnored private let muteSourceFactory: () -> any ScribeMicMuteSource
@@ -398,6 +408,7 @@ final class ScribeController {
         showsEndWindow: Bool = false,
         writeMeeting: ((ScribeMeetingRecord) throws -> Void)? = nil,
         cancellationDefaults: UserDefaults = .standard,
+        optInDefaults: UserDefaults = .standard,
         endWindow: ScribeEndWindow? = nil,
         transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine },
         motionReduced: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
@@ -408,6 +419,7 @@ final class ScribeController {
         self.monotonicClock = monotonicClock
         self.store = store
         self.cancellationDefaults = cancellationDefaults
+        self.optInDefaults = optInDefaults
         self.transcriptionEngine = transcriptionEngine
         self.motionReduced = motionReduced
         self.writeMeeting = writeMeeting ?? { record in try store?.save(record) }
@@ -433,7 +445,6 @@ final class ScribeController {
             showsEndWindow: true
         )
         controller.speakerMonitor = MeetingSpeakerMonitor()
-        ScribeCallWatcher.shared.start()
         return controller
     }
 
@@ -553,10 +564,11 @@ final class ScribeController {
 
     // MARK: Actions
 
-    func start() {
+    /// Starts a recording. `context` is the meeting it is for, if any; a refused start keeps nothing of it.
+    func start(context: ScribeMeetingContext? = nil) {
         guard !machine.phase.isActive else {
-            NSLog("[ZEUS] scribe: start refused, already %@", ScribePopupDriver.describe(machine.phase))
-            FlightRecorder.shared.record("scribe", "start refused", ScribePopupDriver.describe(machine.phase))
+            NSLog("[ZEUS] scribe: start refused, already %@", machine.phase.logName)
+            FlightRecorder.shared.record("scribe", "start refused", machine.phase.logName)
             return
         }
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -567,8 +579,7 @@ final class ScribeController {
         checkpointIssue = nil
         retryCleanup()
         let id = ScribeSessionID()
-        endWorkflow.begin(session: id, boundCall: meetingCallHint)
-        meetingCallHint = nil
+        endWorkflow.begin(session: id, boundCall: context?.callIdentity)
         endingRemaining = nil
         transcript = ScribeTranscript(session: id)
         notes = nil
@@ -595,10 +606,8 @@ final class ScribeController {
         flushPendingSaves()
         openedRecapID = nil
         pendingDeleteID = nil
-        sessionTitle = meetingTitleHint
-        meetingTitleHint = nil
-        sessionAttendees = meetingAttendeeHint
-        meetingAttendeeHint = []
+        sessionTitle = context?.title
+        sessionAttendees = context?.attendeeNames ?? []
         liveTurns = []
         liveNaming = ScribeLiveNaming()
         streamingUsed = false
@@ -654,8 +663,6 @@ final class ScribeController {
         }
         NSLog("[ZEUS] scribe: start session")
         FlightRecorder.shared.record("scribe", "start session")
-        // The prompt has done its job; the watcher won't offer another while a session is active.
-        ScribeCallWatcher.shared.recordingDidStart()
         let frames: @Sendable (ScribeAudioFrame) -> Void = { [weak self] frame in
             _ = router.route(frame)
             if frame.source == .system, readout.noteSystemFrame() {
@@ -677,13 +684,42 @@ final class ScribeController {
 
     /// Explicit Stop starts a nine-second end window. Only the provider's acknowledgment ends capture.
     func requestEnd() {
-        guard case .recording(let id, _) = machine.phase else { return }
+        guard case .recording(let id, _) = machine.phase, armEnd(id) else { return }
+        endWindow?.present(scribe: self)
+    }
+
+    /// Switch: ends the recording at once. It arms and confirms an explicit end without opening the end window,
+    /// and closes the one a suggestion opened.
+    func endNow() {
+        if case .recording(let id, _) = machine.phase, !armEnd(id) { return }
+        hideEndWindow()
+        guard case .ending(let id, _) = machine.phase, endWorkflow.endNow(session: id) else { return }
+        provider.stop(session: id)
+    }
+
+    /// The explicit end: the nine-second window starts. False when the workflow refuses it.
+    private func armEnd(_ id: ScribeSessionID) -> Bool {
         discardRequested = false
         let now = nowSeconds()
-        guard endWorkflow.requestEnd(session: id, now: now) else { return }
+        guard endWorkflow.requestEnd(session: id, now: now) else { return false }
         run { $0.requestEnd(id, now: now, grace: ScribeEndWorkflow.grace) }
         updateEndingCountdown(now: now)
+        return true
+    }
+
+    /// A detector signal (the call app let go of the microphone, its call window closed): opens the end window with
+    /// "The call looks over". The phase stays `.recording` and there is no deadline.
+    func suggestEnd() {
+        guard case .recording(let id, _) = machine.phase,
+              endWorkflow.suggestEnd(session: id, now: nowSeconds()) else { return }
+        announce("The call looks over")
         endWindow?.present(scribe: self)
+    }
+
+    /// The call took the microphone again: the suggestion closes by itself.
+    func withdrawEndSuggestion() {
+        guard case .recording(let id, _) = machine.phase, endWorkflow.withdrawSuggestion(session: id) else { return }
+        hideEndWindow()
     }
 
     /// Positive termination of the exact native call-app instance bound when Record was chosen.
@@ -724,15 +760,33 @@ final class ScribeController {
     }
 
     func confirmEnd() {
+        // End meeting now on a suggestion is an explicit stop: it takes the same path as Stop, then confirms.
+        if endSuggested { requestEnd() }
         guard case .ending(let id, _) = machine.phase, endWorkflow.endNow(session: id) else { return }
         provider.stop(session: id)
     }
 
     func keepRecording() {
-        guard case .ending(let id, _) = machine.phase, endWorkflow.keepRecording(session: id) else { return }
-        run { $0.keepRecording(id) }
-        endingRemaining = nil
-        hideEndWindow()
+        switch machine.phase {
+        case .recording(let id, _):
+            // Only a suggestion can be kept here; with nothing suggested the workflow refuses.
+            guard endWorkflow.keepRecording(session: id) else { return }
+            hideEndWindow()
+        case .ending(let id, _):
+            guard endWorkflow.keepRecording(session: id) else { return }
+            run { $0.keepRecording(id) }
+            endingRemaining = nil
+            hideEndWindow()
+        default:
+            return
+        }
+    }
+
+    /// Throws away the recording of `session` and saves nothing, when it is the one running. The meeting-start card
+    /// uses this to abandon an automatic start.
+    func cancel(session: ScribeSessionID) {
+        guard machine.phase.sessionID == session else { return }
+        cancel()
     }
 
     func cancel() {
@@ -1190,6 +1244,7 @@ final class ScribeController {
     private func react(to event: ScribeLifecycleEvent) {
         switch event {
         case .recordingStarted:
+            ScribeAutoStartOptIn.noteRecordingBegan(defaults: optInDefaults)
             recordingSince = nowSeconds()
             elapsed = 0
             startClock()
@@ -1912,3 +1967,5 @@ final class ScribeController {
         }
     }
 }
+
+extension ScribeController: ScribeStartPort {}

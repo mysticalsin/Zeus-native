@@ -9,7 +9,7 @@ import subprocess
 from contracts import ROOT, digest, require
 
 SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeAccessibilityJourneyTests",
-          "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests",
+          "ScribeMeetingCardJourneyTests", "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests",
           "ExplanationRendererTests", "ExplanationTalkButtonTests", "ExplanationScreenContextTests",
           "ExplanationChatLifecycleTests", "ScribeTrustedAccessibilityJourneyTests"}
 # Launchable by the host, but only by the local trusted runner. `selected` never picks these for CI.

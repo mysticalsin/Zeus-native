@@ -80,6 +80,7 @@ struct SettingsConsumerTests {
         ("insomnia.lidClosed", "\"insomnia.lidClosed\""),
         ("privacy.driveAutonomy", "DriveAutonomy.settingsKey"),
         ("models.caps", "ModelCap"),
+        ("scribe.autoStart", "ScribeAutoStartMode.current("),
     ]
 
     @Test func recentFeaturesHaveACatalogRowAndAConsumer() {
@@ -157,9 +158,11 @@ struct ParityWiringTests {
 
     @Test func everySoundSlotIsPlayedSomewhere() {
         let text = Self.sourceText()
-        for event in ["approval", "done", "todo", "start", "answer", "timer", "listenStart", "listenStop", "voiceDone", "voiceError", "failure", "dictationBegin", "dictationEnd"] {
+        for event in ["approval", "done", "todo", "start", "answer", "timer", "listenStart", "listenStop", "voiceDone", "voiceError", "failure"] {
             #expect(text.contains("play(.\(event)") || text.contains("cue(.\(event)"), "\(event) is never played")
         }
+        // The dictation slots sound through the cue player, which resolves a slot from the style and phase.
+        #expect(text.contains("DictationCueSource.resolve(style, phase)"), "dictation cues are never resolved")
         #expect(text.contains("startRunningLoop()"))
     }
 }

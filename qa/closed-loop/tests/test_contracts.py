@@ -232,6 +232,16 @@ class EvidenceContractTests(unittest.TestCase):
             with self.assertRaises(c.Invalid):
                 c.manifest_matches(actual, linux)
 
+    def test_scribe_group_gets_the_linux_geometry_import_for_its_card_file(self):
+        portable = runner.portable_module()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            linux = portable.prepare(output / "linux", "scribe", platform_name="linux")
+            self.assertTrue((linux / "Sources/CoreGraphics/FoundationGeometry.swift").is_file())
+            self.assertIn("CoreGraphics", c.load(linux / "validation-manifest.json")["compatibility"])
+            darwin = portable.prepare(output / "darwin", "scribe", platform_name="darwin")
+            self.assertFalse((darwin / "Sources/CoreGraphics").exists())
+
     def test_extra_versioned_package_manifest_cannot_change_compiled_recipe(self):
         portable = runner.portable_module()
         with tempfile.TemporaryDirectory() as directory:

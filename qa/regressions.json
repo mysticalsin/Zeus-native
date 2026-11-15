@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy": "A caught product failure must gain a reproducible production-path test/type/lint guard before resolution. These historical defects have executable test guards. New failed runs emit regression-candidates.json and stay red; candidates are not automatically declared fixed or counted as tests. Native guards remain not-run until executed on macOS.",
+  "policy": "A caught product failure must gain a reproducible production-path test/type/lint guard before resolution. These historical defects have executable test guards. New failed runs emit regression-candidates.json and stay red; candidates are not automatically declared fixed or counted as tests. Native guards remain not-run until executed on macOS. REG-410 to REG-429 are reserved for docs/MEETING-START-PLAN.md.",
   "regressions": [
     {
       "id": "REG-001",
@@ -4279,7 +4279,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aDoubleTapStartsScribeOnlyOnce"
       }
     },
@@ -4291,7 +4291,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aTapWhileTheAutomaticStartIsRunningConfirmsInsteadOfStartingTwice"
       }
     },
@@ -4303,7 +4303,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "theCardNeverExpiresUnderThePointer"
       }
     },
@@ -4315,7 +4315,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aCaptureFailureIsShownWithItsReason"
       }
     },
@@ -4327,7 +4327,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "theMicrophoneBeingOffIsSaidAndAllowOpensSettings"
       }
     },
@@ -4339,7 +4339,7 @@
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "aStaleFailureFromThePreviousMeetingIsNotThisTapsFailure"
       }
     },
@@ -4749,6 +4749,198 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
         "function": "atTheClampTheOpenPanelKeepsEightPointsInsideEveryDisplay"
+      }
+    },
+    {
+      "id": "REG-410",
+      "failure": "The meeting card read \"Meeting started\" and automatic recording could begin up to two minutes before the calendar meeting started.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "aLinkMeetingIsNotStartedBeforeItsStartTime"
+      }
+    },
+    {
+      "id": "REG-411",
+      "failure": "Automatic start counted down for a calendar meeting whose call app was merely open, and could record a room nobody had joined.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "automaticNeverCountsDownWithoutALiveCall"
+      }
+    },
+    {
+      "id": "REG-412",
+      "failure": "One meeting had two names, its calendar id and its call app, so a dismissed meeting was offered again when its calendar window closed.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingLedgerTests.swift",
+        "function": "aDismissedMeetingStaysQuietWhenItRunsOver"
+      }
+    },
+    {
+      "id": "REG-413",
+      "failure": "A start refused while Scribe was busy left the meeting's title, guests and call binding behind, and the next unrelated recording took them.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ScribeLifecycleScenarioTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeLifecycleScenarioTests.swift",
+        "function": "aRefusedStartLeavesNoContextBehind"
+      }
+    },
+    {
+      "id": "REG-414",
+      "failure": "A call app that released the microphone for eight seconds armed a stop that saved the recording nine seconds later, against the privacy rule that a detector signal never ends capture.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeEndWorkflowTests.swift",
+        "function": "microphoneReleaseNeverStopsOnItsOwn"
+      }
+    },
+    {
+      "id": "REG-415",
+      "failure": "A settings file could select Start automatically, so an import alone could arm automatic recording on a Mac whose owner never chose it.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "anImportNeverChoosesStartAutomatically"
+      }
+    },
+    {
+      "id": "REG-416",
+      "failure": "The agreement to start automatically was a side effect of one meeting and was never cleared, so it survived switching to Ask me and back.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+        "function": "choosingAnotherModeWithdrawsTheOptIn"
+      }
+    },
+    {
+      "id": "REG-417",
+      "failure": "Changing the choice to Ask me during the automatic countdown was ignored, so the recording still began when the countdown ended.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+      }
+    },
+    {
+      "id": "REG-418",
+      "failure": "An automatic start that did not begin capture failed silently: the card was gone and nothing said why.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "anAutomaticStartThatFailsShowsItsReason"
+      }
+    },
+    {
+      "id": "REG-419",
+      "failure": "The card said Recording before Scribe had begun capture, while it was still starting or already ending.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "recordingAppearsOnlyForTheRecordingPhase"
+      }
+    },
+    {
+      "id": "REG-420",
+      "failure": "A Cancel that arrived after the countdown timer fired was dropped, so an automatic start could not be taken back.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "cancelAfterExpiryAbandonsTheAutomaticStart"
+      }
+    },
+    {
+      "id": "REG-421",
+      "failure": "A meeting sighted while Scribe was still saving the last one was dropped with no card and never offered again.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "aMeetingHeldWhileSavingIsShownAndStartsWhenFree"
+      }
+    },
+    {
+      "id": "REG-422",
+      "failure": "Switch on the next meeting card asked a second question before the next meeting could start.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "function": "switchStartsTheNextMeetingOnceWithoutAskingAgain"
+      }
+    },
+    {
+      "id": "REG-423",
+      "failure": "A heads-up before a calendar meeting could be lost for good: it was marked as shown before the card could appear, and it never showed in automatic mode.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "theHeadsUpIsShownOncePerMeeting"
+      }
+    },
+    {
+      "id": "REG-424",
+      "failure": "Dismissing the heads-up two minutes before a meeting was forgotten, so the card asked again at the start time.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "dismissAtTwoMinutesStaysQuietAtStartTime"
+      }
+    },
+    {
+      "id": "REG-425",
+      "failure": "The meeting detector polled every 5 seconds forever in every mode, even with the choice Off and nothing on the calendar.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+        "function": "offWithAnIdleMachineIsStoppedWhateverElseHappens"
       }
     }
   ]

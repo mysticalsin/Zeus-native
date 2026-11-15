@@ -84,16 +84,21 @@ GROUPS = {
               "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests", "ThinkingOrbMathTests"),
     ),
     "scribe": (
-        core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift", "Scribe/ScribeCallPrompt.swift",
+        core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift",
              "Scribe/ScribeCapture.swift", "Scribe/ScribeMicGate.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribePresentation.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeSpeakerStats.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift",
              "Scribe/ScribeMuteReadScheduler.swift", "Scribe/ScribeIncomingWordLayout.swift", "Scribe/MicInputOwnership.swift",
-             "Scribe/ScribePopupLifecycle.swift"),
+             "Scribe/ScribeMeetingCard.swift", "Scribe/ScribeAutoStart.swift",
+             "Scribe/ScribeMeetingSignals.swift", "Scribe/ScribeMeetingLedger.swift", "Scribe/ScribeMeetingContext.swift",
+             "Scribe/ScribeAutoStartOptIn.swift", "Scribe/ScribeDetectorPlan.swift", "Scribe/ScribeJoinApps.swift",
+             "Alerts/AppBrandCatalog.swift"),
         tests("ScribeCoreTests", "ScribePresentationTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
               "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
               "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
-              "ScribePopupLifecycleTests"),
+              "ScribeMeetingCardTests", "ScribeAutoStartTests", "ScribeMeetingLedgerTests",
+              "ScribeMeetingContextTests", "ScribeAutoStartOptInTests", "ScribeMeetingStartOutcomeTests",
+              "ScribeDetectorPlanTests", "ScribeMeetingCardDesignTests"),
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
@@ -176,6 +181,10 @@ def write_excerpts(root, group, manifest):
             text, evidence = section(path, start, end)
             pieces.append(text)
             manifest["excerpts"].append(evidence)
+        # The meeting-start rules read two Settings helpers; the whole file needs types this group does not carry.
+        text, evidence = section(CORE + "FeatureSettings.swift", "public enum FeatureSettings {", "    // MARK: Fast path")
+        pieces.append(text + "}\n")
+        manifest["excerpts"].append(evidence)
         text, evidence = section(TESTS + "ScribeLiveLogicTests.swift",
                                  "    @Test func freshEvidenceIsServedAndExpiredEvidenceIsUnknown()",
                                  "    // MARK: Evidence coverage")
@@ -239,7 +248,7 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy", "pointing") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe") and platform_name == "linux"
     extra_target = ''
     products = ''
     core_dependencies = '[]'

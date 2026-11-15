@@ -166,13 +166,6 @@
       "reason": "Strict literal no-capture guarantee and supported mute evidence are not yet proven."
     },
     {
-      "id": "missing-F04-native",
-      "kind": "unimplemented",
-      "tier": "native-integration",
-      "scope": "Inject calendar/clock/session and activate actual popup Start once; assert one session, screen placement and refreshed headline.",
-      "reason": "Native popup automation fixture is absent."
-    },
-    {
       "id": "missing-F04-device",
       "kind": "unimplemented",
       "tier": "device-proof",
@@ -363,6 +356,14 @@
       "scope": "Actual ScribeController with fake capture/notes, synthetic temp persistence and clock; no real capture, permission, end windows or device proof."
     },
     {
+      "id": "native-SettingsCatalogTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SettingsCatalogTests",
+      "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+      "scope": "Actual SettingsStore over a throwaway defaults suite with a fixed microphone answer and a counting prompt: the opt-in stamp, an import, and a section reset. No real permission prompt, capture or device proof."
+    },
+    {
       "id": "native-RecordingFeedbackRenderTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -393,6 +394,14 @@
       "scope": "Actual production Scribe controls activated by layout-resolved mouse events sent only to an owned NSWindow, plus isolated model defaults/storage. No global input injection, AX fallback, controller action substitution, capture or device acceptance.",
       "suite": "ScribeComponentJourneyTests",
       "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift"
+    },
+    {
+      "id": "native-ScribeMeetingCardJourneyTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual meeting card panel and controller over the real Scribe with an inert capture provider and a fake clock. Synthetic evidence enters through ingest; the real Record, Cancel and dismiss controls are clicked with events sent only to the owned panel. No calendar, microphone, permission prompt, display change or device acceptance.",
+      "suite": "ScribeMeetingCardJourneyTests",
+      "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift"
     },
     {
       "id": "native-ZeusCoreTests",
@@ -1210,27 +1219,121 @@
       "obligations": [
         {
           "check": "portable-scribe",
-          "acceptance": "Upcoming windows, dismissal dedupe and active recording suppress prompts.",
+          "acceptance": "The heads-up window, a dismissal that holds at the start time and a recording started by hand suppress prompts.",
           "cases": [
             {
-              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "upcomingWindowEdges"
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "headsUpWindowEdges"
             },
             {
-              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "dismissedSlotIsSkipped"
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "dismissAtTwoMinutesStaysQuietAtStartTime"
             },
             {
-              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "recordingSuppressesEveryPrompt"
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "aRecordingStartedByHandIsNeverPromptedOver"
             }
           ],
           "id": "F04.1"
         },
         {
-          "check": "missing-F04-native",
-          "acceptance": "Inject calendar/clock/session and activate actual popup Start once; assert one session, screen placement and refreshed headline.",
-          "cases": [],
+          "id": "F04.opt-in",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "Choosing Start automatically in Settings is the opt-in and asks macOS once; any other choice or a section reset withdraws it; an import never selects it. Does not prove the real macOS dialog.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "choosingStartAutomaticallyIsTheOptInAndAsksOnlyWhenMacOSHasNotAsked"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "anImportNeverChoosesStartAutomatically"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "aSectionResetWithdrawsTheOptIn"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "id": "F04.opt-in-rules",
+          "acceptance": "The stamp follows the choice, an old stamp carries over only with automatic chosen, and readiness names the first missing thing before any countdown.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "choosingAnotherModeWithdrawsTheOptIn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "anOldStampWithAutomaticCarriesOver"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "everyCombinationResolvesToTheFirstMissingThing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+            }
+          ]
+        },
+        {
+          "check": "portable-scribe",
+          "id": "F04.detector",
+          "acceptance": "The detector is stopped when Off and idle, waits for the next meeting when nothing is near, and polls only while a meeting is near; a wake during a scan runs one more scan.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+              "function": "offWithAnIdleMachineIsStoppedWhateverElseHappens"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+              "function": "theWakeIsTwoMinutesBeforeTheEarliestMeetingThatHasNotStarted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeDetectorPlanTests.swift",
+              "function": "aWakeWhileScanningWaitsAndScansOnceMoreWhenTheFirstEnds"
+            }
+          ]
+        },
+        {
+          "check": "native-ScribeMeetingCardJourneyTests",
+          "acceptance": "The real Record button starts exactly one session, the card sits at its placement origin and its time text refreshes when the clock crosses the minute. The real Cancel ends a countdown or a start with no session and no saved meeting, a countdown that ends reaches Starting then Recording, a failing provider shows its reason and the dismiss glyph quiets the meeting. Synthetic evidence and an owned panel only; not device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "theRealRecordButtonStartsExactlyOneSession"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "theRealCancelEndsACountdownWithNoSession"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "aCountdownThatEndsReachesStartingThenRecording"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "aCancelAfterTheCountdownEndedLeavesNoSessionAndNoSavedMeeting"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "aProviderThatFailsShowsItsReason"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "theRealDismissGlyphQuietsTheMeeting"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "theCardSitsAtThePlacementOriginOfItsScreen"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",
+              "function": "theTimeOnTheCardChangesWhenTheClockCrossesTheMinute"
+            }
+          ],
           "id": "F04.2"
         },
         {
