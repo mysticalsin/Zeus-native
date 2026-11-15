@@ -525,6 +525,41 @@ import Testing
         #expect(voiceOver.tick(at: 0.125) == [.cancel])
     }
 
+    /// The adapter hands over the config with an event, so the press that reveals a change made with the mouse is also
+    /// a key down. Nothing was held through the change, so that press is an ordinary press (I8).
+    @Test func aPressThatRevealsAChangeOfConfigWithEveryKeyUpActsLikeAnyPress() {
+        var rig = Rig(Self.dictation())
+        rig.tap([Self.cmdR], at: 0, length: 1)
+        rig.config = Self.toggle
+        #expect(rig.press(Self.cmdR, at: 2) == [.start], "hold flipped to toggle")
+        #expect(!rig.machine.barred)
+        rig.release(Self.cmdR, at: 2.5)
+        rig.config = Config(key: .rightCommand, role: .dictation, mode: .shared)
+        #expect(rig.press(Self.cmdR, at: 3) == [.wake(after: 0.25)], "shared dictation waits out its 0.25 s delay")
+        #expect(rig.tick(at: 3.25) == [.start, .wake(after: 0.25)])
+        rig.release(Self.cmdR, at: 4)
+        rig.config.voiceOverHoldsKey = true
+        #expect(rig.press(Self.cmdR, at: 5) == [.refused], "VoiceOver took the key")
+    }
+
+    @Test func aPressThatRevealsAChangeCancelsTheHandsFreeTurnItLeavesAndThenActs() {
+        var rig = Self.latchedTalk()
+        rig.config = Config(key: .controlOption, role: .talk, mode: .toggle)
+        #expect(rig.press(Self.ctrl, at: 5) == [.cancel])
+        #expect(rig.press(Self.opt, at: 5) == [.start], "the turn is cancelled and the press toggles")
+        #expect(rig.tag == "spent")
+    }
+
+    @Test func aChangeOfConfigStillBarsAKeyHeldThroughIt() {
+        var rig = Rig(Self.toggle)
+        rig.press(Self.cmdR, at: 0)
+        rig.config = Config(key: .rightCommand, role: .dictation, mode: .hold)
+        #expect(rig.press(Self.shift, at: 0.5) == [], "Right Command is down across the change: the press already counted")
+        rig.release(Self.shift, at: 0.75)
+        rig.release(Self.cmdR, at: 1)
+        #expect(rig.press(Self.cmdR, at: 2) == [.start, .wake(after: 0.25)], "after everything is up the next press acts")
+    }
+
     @Test func aNewConfirmIsOnlyStoredSoSwitchingTilingOnDoesNotEndAHandsFreeTurn() {
         var rig = Self.latchedTalk()
         rig.config.confirm = 0.15

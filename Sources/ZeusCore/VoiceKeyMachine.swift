@@ -140,14 +140,16 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     // MARK: Handling an event
 
     /// One event in, the effects out, in the order the adapter runs them. The order of one call is: the event is
-    /// applied to the keyboard picture; a changed config ends the turn it leaves; `barred` is brought up to date; then
-    /// the row of the transition table for the phase and the reading runs.
+    /// applied to the keyboard picture; a changed config ends the turn it leaves and bars the keys that were already
+    /// down before the event; `barred` is brought up to date; then the row of the transition table for the phase and
+    /// the reading runs.
     public mutating func handle(_ event: Event, config: Config) -> [Effect] {
         var out: [Effect] = []
         defer { generation += out.filter { $0 == .start }.count }
         let changed = self.config.map { Self.differs($0, config) } ?? false
         // A timer that is overdue acts first, on the keyboard as it was, so a late tick cannot change what a key did.
         if case .key(_, let at) = event, !changed, config.key != nil { settle(at: at, config, &out) }
+        let wasAllUp = allUp
         switch event {
         case .key(let shortcutEvent, _): keys.apply(shortcutEvent)
         case .interrupt(let live): if let live { keys.resync(to: live) }
@@ -157,7 +159,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         if changed {
             if turnIsOpen { out.append(.cancel) }
             phase = .idle
-            if !allUp { barred = true }
+            // Only a key held through the change is barred. A key that comes down with the event that reveals the change
+            // is a new press: the adapter hands the config over with an event, so that event is often the press itself.
+            if case .key = event { if !wasAllUp { barred = true } } else if !allUp { barred = true }
         }
         guard let key = config.key else { return out }
 

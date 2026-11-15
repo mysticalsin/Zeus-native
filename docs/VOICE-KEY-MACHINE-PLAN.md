@@ -220,7 +220,9 @@ key Shift is plain foreign). **F**, foreign: anything else.
 
 Before the row, in this order: (1) a key event is applied to `keys`; an `interrupt` resyncs `keys`; (2) the first
 config is stored and is no change; when a later one differs (4.1), emit `cancel` if a turn is open (holding, tapped
-open, latched, armed ending), go to idle, store it, and set `barred` unless `allUp` (a nil key stops here); (3) `barred`
+open, latched, armed ending), go to idle, store it, and set `barred` unless every key was up before this event (the
+adapter hands the config over with an event, so the press that reveals a change made with the mouse is itself a key
+down, and nothing was held through the change; a nil key stops here); (3) `barred`
 becomes false when `allUp`, else true when `ownDown` with anything foreign; (4) the row. **Begin** means reading E and
 not `barred`. Every `cancel` also sets `barred` unless `allUp`. Quick means within the mode's tap time.
 
