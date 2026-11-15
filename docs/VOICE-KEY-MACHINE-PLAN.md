@@ -167,7 +167,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     public enum Event: Sendable, Equatable {
         case key(ShortcutEvent, at: TimeInterval)              // from a monitor or from the feed: no way to tell
         case tick(at: TimeInterval, live: ShortcutModifiers?)  // a wake the machine asked for, with the modifiers the system reports now
-        case abandon                                           // the owner refused the press or ended the turn itself
+        case abandon(turn: Int)                                // the owner refused the press or ended that turn itself
         case interrupt(live: ShortcutModifiers?)               // sleep or wake
     }
     public enum Effect: Sendable, Equatable { case start, send, cancel, refused, wake(after: TimeInterval) }
@@ -248,7 +248,7 @@ not `barred`. Every `cancel` also sets `barred` unless `allUp`. Quick means with
 | 20 | latched | begin, `confirm` 0 | hold; shared talk | spent; shared talk: armed(t, first) | `send` |
 | 21 | latched | begin, `confirm` above 0 | hold | armed(t, ending) | `wake(confirm)` |
 | 22 | spent | R, F or S | any | idle | none |
-| 23 | holding, tapped open, latched, armed ending | `abandon` | any | idle, `barred` unless `allUp` | none. In any other phase an `abandon` is row 25: a toggle has no turn to abandon |
+| 23 | holding, tapped open, latched, armed ending | `abandon(turn)`, `turn` the machine's `generation` | any | idle, `barred` unless `allUp` | none. In any other phase, or for any other `turn`, an `abandon` is row 25: a toggle has no turn to abandon, and the echo of a turn the machine ended or replaced is not the turn now open |
 | 24 | any | `interrupt` | any | idle, `barred` unless `allUp` | `cancel` when a turn was open |
 | 25 | any | anything else | any | unchanged | none |
 
@@ -275,9 +275,11 @@ pressed slowly. The swap chord on a dictation key: Shift is row 8 or 12, Command
 `.key(event, at: now())`, `tick()` sends `.tick(at: now(), live: liveModifiers())`, `turnEnded()` sends `.abandon`, and
 the sleep and wake notices (as `PointingController.swift:297-300`) send `.interrupt`. The effects map `start` to
 `onPress`, `send` to `onRelease`, `cancel` to `onCancel`, `refused` to `onBlocked` with today's sentence (`:241`), and
-`wake(after:)` to one `asyncAfter` that calls `tick()`. It stores no timer and no flag: only `machine` changes after
-`start()`. The effects of one `handle` run in order after it has returned, so an owner that calls `turnEnded()` from
-inside `onRelease` meets the machine in its new state. Both monitors and the feed call the same `feed`, which is I5 at
+`wake(after:)` to one `asyncAfter` that calls `tick()`. It stores no timer and no flag; besides `machine` it keeps one number, the `generation` the machine gave the last turn
+`onPress` was asked to start, which `turnEnded()` sends as the turn it ends (the k-th `start` of a `handle` is turn
+`generation before + k`). The effects of one `handle` run in order after it has returned, so an owner that calls `turnEnded()` from
+inside `onRelease` meets the machine in its new state; when the same `handle` also opened a turn (`[send, start, wake]`: a
+quick tap, a late tick, the next press), the echo names the old turn and the machine leaves the new one alone. Both monitors and the feed call the same `feed`, which is I5 at
 the adapter.
 
 The owners change in three small ways, so the machine is never wrong about the turn. An `abandon` that reaches a

@@ -194,6 +194,29 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.presses == 1 && calls.releases == 1 && calls.cancels == 0, "\(calls.log)")
     }
 
+    /// A quick tap leaves its turn waiting out the gap. The tick that would send it is late, so the next press is handled
+    /// first: one call sends the old turn and opens the new one. The owner stops listening the moment it is sent and says
+    /// so from inside `onRelease`, which must not end the turn that the same call opened.
+    @Test func anOwnersEchoOfASendDoesNotEndTheTurnTheSameCallOpens() {
+        let (monitor, calls) = make(key: .rightCommand, role: .dictation)
+        var clock: TimeInterval = 0
+        monitor.now = { clock }
+        monitor.onRelease = { [weak monitor] in
+            calls.releases += 1
+            calls.log.append("release")
+            monitor?.turnEnded()
+        }
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        clock = 0.1
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        clock = 0.55 // the 0.4 s gap is over (the tap ended at 0.1) and its tick has not run
+        monitor.feed(.flags(keyCode: 54, modifiers: [.command]))
+        #expect(calls.log == ["press", "release", "press"], "the old turn is sent, the new one opens: \(calls.log)")
+        clock = 1.0
+        monitor.feed(.flags(keyCode: 54, modifiers: []))
+        #expect(calls.log == ["press", "release", "press", "release"], "the release sends the second turn: \(calls.log)")
+    }
+
     // MARK: Time
 
     @Test func aReleaseNoEventReportedEndsTheTurnWithinAMoment() async throws {

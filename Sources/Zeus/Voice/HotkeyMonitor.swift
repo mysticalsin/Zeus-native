@@ -105,6 +105,8 @@ final class HotkeyMonitor {
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
     private var machine = VoiceKeyMachine()
+    /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
+    private var ownerTurn = 0
 
     /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
     /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
@@ -152,8 +154,10 @@ final class HotkeyMonitor {
     /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests).
     func feed(_ event: ShortcutEvent) { send(.key(event, at: now())) }
 
-    /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it.
-    func turnEnded() { send(.abandon) }
+    /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
+    /// names the last turn the owner was given. When the machine has ended that turn itself (the echo of its own `send`
+    /// or `cancel`) or has opened another since, the machine leaves everything as it is.
+    func turnEnded() { send(.abandon(turn: ownerTurn)) }
 
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
     func interrupt() { send(.interrupt(live: liveModifiers())) }
@@ -184,14 +188,19 @@ final class HotkeyMonitor {
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
-    /// inside a callback meets the machine in its new state.
+    /// inside a callback meets the machine in its new state. The k-th `start` of a call is turn `generation before + k`.
     private func send(_ event: VoiceKeyMachine.Event) {
         let config = config
+        let before = machine.generation
+        var started = 0
         for effect in machine.handle(event, config: config) {
             switch effect {
             case .start:
+                started += 1
+                let turn = before + started
+                ownerTurn = turn
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(config.key?.title ?? "none"))")
-                if onPress?() == false { send(.abandon) }
+                if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
                 onRelease?()
             case .cancel:

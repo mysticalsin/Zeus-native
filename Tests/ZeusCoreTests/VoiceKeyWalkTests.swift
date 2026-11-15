@@ -352,7 +352,7 @@ private struct Sim {
         case .wait: advance(run)
         case .waitHalfSecond: for _ in 0..<10 { advance(run) }
         case .deliver: flushHeld(run)
-        case .abandon: feed(.abandon, .abandon, run)
+        case .abandon: feed(.abandon(turn: machine.generation), .abandon, run)
         case .interrupt: feed(.interrupt(live: liveModifiers(run)), .interrupt, run)
         case .flip:
             cfg = (cfg + 1) % run.configs.count

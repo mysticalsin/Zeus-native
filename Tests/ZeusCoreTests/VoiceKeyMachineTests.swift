@@ -74,7 +74,8 @@ import Testing
         @discardableResult mutating func tick(at t: TimeInterval, live: ShortcutModifiers? = nil) -> [Effect] {
             feed(.tick(at: t, live: live ?? mods))
         }
-        @discardableResult mutating func abandon() -> [Effect] { feed(.abandon) }
+        /// The owner ends a turn: the latest one the machine started unless the test names another.
+        @discardableResult mutating func abandon(turn: Int? = nil) -> [Effect] { feed(.abandon(turn: turn ?? machine.generation)) }
         @discardableResult mutating func interrupt(live: ShortcutModifiers? = nil) -> [Effect] {
             feed(.interrupt(live: live ?? mods))
         }
@@ -440,6 +441,32 @@ import Testing
         idle.press(Self.ctrl, at: 0)
         idle.abandon()
         #expect(idle.tag == "idle" && !idle.machine.barred)
+    }
+
+    /// A quick tap leaves tapped(open) and its tick is late, so the next press settles the old turn and opens a new one in
+    /// one call: `[send, start, wake]`. The owner's echo of that `send` names the old turn.
+    @Test func row23AnAbandonNamesItsTurnSoTheEchoOfASendCannotEndTheTurnOpenedWithIt() {
+        var rig = Rig(Self.dictation())
+        rig.tap([Self.cmdR], at: 0)
+        #expect(rig.tag == "tapped open" && rig.machine.generation == 1)
+        #expect(rig.press(Self.cmdR, at: 0.575) == [.send, .start, .wake(after: 0.25)])
+        #expect(rig.machine.generation == 2 && rig.tag == "holding")
+        #expect(rig.abandon(turn: 1) == [])
+        #expect(rig.tag == "holding" && !rig.machine.barred, "the echo of the first turn leaves the second as it was")
+        #expect(rig.release(Self.cmdR, at: 1) == [.send], "its key release still sends it")
+    }
+
+    @Test func row23AnAbandonOfTheCurrentTurnStillEndsIt() {
+        var rig = Rig(Self.dictation())
+        rig.tap([Self.cmdR], at: 0)
+        rig.press(Self.cmdR, at: 0.575)
+        #expect(rig.abandon(turn: 2) == [])
+        #expect(rig.tag == "idle" && rig.machine.barred, "the key is still down")
+        var refused = Rig(Self.talk())
+        refused.press(Self.ctrl, Self.opt, at: 0)
+        #expect(refused.abandon(turn: 1) == [])
+        #expect(refused.tag == "idle", "the owner refused the press: the machine forgets the turn it started")
+        #expect(refused.abandon(turn: 0) == [], "a number the machine never gave out changes nothing")
     }
 
     @Test func row24AnInterruptCancelsAnOpenTurnAndTakesTheLiveModifiers() {

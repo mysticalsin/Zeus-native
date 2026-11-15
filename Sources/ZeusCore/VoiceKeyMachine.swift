@@ -2,7 +2,7 @@ import Foundation
 
 /// One explicit state machine for the voice hold keys (talk, dictation, the Polyglot key): docs/VOICE-KEY-MACHINE-PLAN.md.
 /// Pure and without a clock, a timer or a callback. The adapter feeds it keys, the wakes it asked for, an `abandon` when
-/// the owner ends or refuses a turn, and an `interrupt` for sleep and wake; it runs the effects that come back.
+/// the owner ends or refuses a turn (naming it), and an `interrupt` for sleep and wake; it runs the effects that come back.
 public struct VoiceKeyMachine: Sendable, Equatable {
     public enum Role: Sendable, Equatable, Hashable { case talk, dictation }
     public enum Mode: Sendable, Equatable, Hashable { case hold, shared, toggle }
@@ -30,8 +30,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         case key(ShortcutEvent, at: TimeInterval)
         /// A wake the machine asked for, with the modifiers the system reports now (nil when it cannot say).
         case tick(at: TimeInterval, live: ShortcutModifiers?)
-        /// The owner refused the press or ended the turn itself.
-        case abandon
+        /// The owner refused the press or ended the turn itself. `turn` names the turn it ends: the value `generation`
+        /// had once that turn's `start` was counted. A turn the machine has already ended or replaced is not touched.
+        case abandon(turn: Int)
         /// Sleep or wake.
         case interrupt(live: ShortcutModifiers?)
     }
@@ -69,6 +70,9 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     /// Nothing may begin until everything is up.
     public internal(set) var barred = false
     public internal(set) var phase: Phase = .idle
+    /// How many `start` effects the machine has returned. The first is turn 1. An `abandon` names a turn by this number,
+    /// so the owner's echo of a turn the machine ended cannot end the turn that the same call went on to open.
+    public internal(set) var generation = 0
 
     public init() {}
 
@@ -140,6 +144,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     /// the row of the transition table for the phase and the reading runs.
     public mutating func handle(_ event: Event, config: Config) -> [Effect] {
         var out: [Effect] = []
+        defer { generation += out.filter { $0 == .start }.count }
         let changed = self.config.map { Self.differs($0, config) } ?? false
         // A timer that is overdue acts first, on the keyboard as it was, so a late tick cannot change what a key did.
         if case .key(_, let at) = event, !changed, config.key != nil { settle(at: at, config, &out) }
@@ -159,8 +164,8 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         let facts = KeyFacts(of: keys, key: key)
         updateBarred(facts)
         switch event {
-        case .abandon:
-            if turnIsOpen { phase = .idle; if !allUp { barred = true } }
+        case .abandon(let turn):
+            if turn == generation, turnIsOpen { phase = .idle; if !allUp { barred = true } }
         case .interrupt:
             if turnIsOpen { out.append(.cancel) }
             phase = .idle
