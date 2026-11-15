@@ -4462,6 +4462,114 @@
         "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
         "function": "anUnreadableVaultIsNeverOverwritten"
       }
+    },
+    {
+      "id": "REG-603",
+      "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "launchWithTheSwitchOnKeepsTheCameraOff"
+      }
+    },
+    {
+      "id": "REG-605",
+      "failure": "The camera kept running after the screen locked, from one of the states that hold it.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "lockingTheScreenStopsTheCameraFromEveryOnState"
+      }
+    },
+    {
+      "id": "REG-606",
+      "failure": "The camera came back on at wake while the session was still locked, or stayed on through sleep.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "sleepStopsTheCameraAndWakeWhileLockedKeepsItOff"
+      }
+    },
+    {
+      "id": "REG-607",
+      "failure": "Switching face presence off left the camera running from some state.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "switchingOffStopsTheCameraFromEveryState"
+      }
+    },
+    {
+      "id": "REG-608",
+      "failure": "An absent owner was locked out more than once, or the lock was asked for before the chosen time.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "awayLocksExactlyOnceWhenTheTimeRunsOut"
+      }
+    },
+    {
+      "id": "REG-609",
+      "failure": "One missed frame turned a present owner into away and started the lock countdown.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "aMissShorterThanTheGraceKeepsPresent"
+      }
+    },
+    {
+      "id": "REG-611",
+      "failure": "A failed lock call was retried in a loop, or left the feature saying it was watching.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "aFailedLockGoesUnavailableAndNeverRetries"
+      }
+    },
+    {
+      "id": "REG-618",
+      "failure": "A lock during enrollment left the enrollment, and the camera it holds, running or saved a partial face.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "lockingDuringEnrollmentSavesNothing"
+      }
+    },
+    {
+      "id": "REG-619",
+      "failure": "A camera that sent no frames left the feature saying Watching forever, so an absent owner was never locked.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceMachineTests.swift",
+        "function": "aCameraThatSendsNoFramesGoesUnavailable"
+      }
     }
   ]
 }
