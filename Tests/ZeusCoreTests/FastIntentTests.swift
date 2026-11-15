@@ -347,18 +347,14 @@ import Testing
         var vad = VoiceActivity()
         let samples = (0..<4096).map { Float(sin(Double($0) * 0.01)) * 0.002 }
         let buffers = 60 * 48_000 / 4096
-        func threadCPUSeconds() -> Double {
-            var ts = timespec()
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts)
-            return Double(ts.tv_sec) + Double(ts.tv_nsec) / 1e9
+        let cpuSeconds = ThreadCPUTime.measure {
+            for _ in 0..<buffers {
+                var sum: Float = 0
+                for s in samples { sum += s * s }
+                vad.feed(rms: (sum / Float(samples.count)).squareRoot(), seconds: 4096 / 48_000)
+            }
         }
-        let start = threadCPUSeconds()
-        for _ in 0..<buffers {
-            var sum: Float = 0
-            for s in samples { sum += s * s }
-            vad.feed(rms: (sum / Float(samples.count)).squareRoot(), seconds: 4096 / 48_000)
-        }
-        let perBuffer = (threadCPUSeconds() - start) * 1000 / Double(buffers)
+        let perBuffer = cpuSeconds * 1000 / Double(buffers)
         print("[fast] wake gate: \(String(format: "%.4f", perBuffer)) ms per 85 ms buffer (debug build, scalar RMS, thread CPU time)")
         #expect(perBuffer < 1.0)
     }
