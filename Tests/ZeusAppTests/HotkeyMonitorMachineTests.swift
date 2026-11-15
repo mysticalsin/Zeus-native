@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ZeusCore
@@ -201,6 +202,39 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.presses == 1)
         try await wait(0.9) // the first look is at 0.25 s, a quick tap then waits out its 0.4 s gap
         #expect(calls.releases == 1 && calls.cancels == 0, "the live modifiers say it was let go: \(calls.log)")
+    }
+
+    /// A monitor whose owner sets no confirm asks tiling for it, by the key it listens for.
+    @Test func aMonitorWithNoConfirmOfItsOwnAsksTilingForOne() {
+        let saved = HotkeyMonitor.tilingConfirm
+        defer { HotkeyMonitor.tilingConfirm = saved }
+        HotkeyMonitor.tilingConfirm = { $0 == .controlOption ? 0.15 : 0 }
+        let (monitor, calls) = make()
+        monitor.confirmProvider = nil
+        controlOption(monitor)
+        monitor.feed(.flags(keyCode: 55, modifiers: all))
+        monitor.feed(.keyDown(keyCode: leftArrow, modifiers: all))
+        monitor.feed(.keyUp(keyCode: leftArrow))
+        allUp(monitor)
+        #expect(calls.log.isEmpty, "the chord pressed as a chord opens nothing: \(calls.log)")
+    }
+
+    // MARK: Sleep and wake
+
+    @Test func sleepCancelsAnOpenTurnAndNothingStartsUntilEveryKeyIsUp() {
+        let center = NotificationCenter()
+        let (monitor, calls) = make()
+        monitor.observeSleep(center: center)
+        monitor.observeSleep(center: center)
+        controlOption(monitor)
+        #expect(calls.log == ["press"])
+        center.post(name: NSWorkspace.willSleepNotification, object: nil)
+        #expect(calls.log == ["press", "cancel"], "one cancel, never a send: \(calls.log)")
+        center.post(name: NSWorkspace.didWakeNotification, object: nil)
+        #expect(calls.log == ["press", "cancel"], "nothing is open to cancel on wake: \(calls.log)")
+        monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option, .shift]))
+        monitor.feed(.flags(keyCode: 56, modifiers: [.control, .option]))
+        #expect(calls.presses == 1, "the keys are still down: \(calls.log)")
     }
 
     @Test func aHoldKeyInsideATilingChordActsOnlyAfterItsConfirm() async throws {

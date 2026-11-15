@@ -91,8 +91,10 @@ final class HotkeyMonitor {
     var role: Role = .talk
     var sharedProvider: () -> Bool = { DictationSettings.shared.enabled && Preferences.shared.pushToTalk == DictationSettings.shared.key }
     var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
-    /// How long a hold key must be down alone before it acts: 0 unless a tiling chord holds its modifiers.
-    var confirmProvider: () -> TimeInterval = { 0 }
+    /// How long a hold key must be down alone before it acts, when the owner sets its own. Nil asks tiling.
+    var confirmProvider: (() -> TimeInterval)?
+    /// What tiling says a hold key must wait: 0 unless the tap is installed and a bound chord holds the key's modifiers.
+    static var tilingConfirm: (Shortcut) -> TimeInterval = { _ in 0 }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
     var liveModifiers: () -> ShortcutModifiers? = {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
@@ -154,6 +156,9 @@ final class HotkeyMonitor {
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
     func interrupt() { send(.interrupt(live: liveModifiers())) }
 
+    /// Sleep and wake tell the machine to drop an open turn. Idempotent.
+    func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {}
+
     private func tick() { send(.tick(at: now(), live: liveModifiers())) }
 
     // MARK: Effects
@@ -166,7 +171,7 @@ final class HotkeyMonitor {
                                       role: role == .talk ? .talk : .dictation,
                                       mode: shared ? .shared : toggle ? .toggle : .hold,
                                       voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
-                                      confirm: confirmProvider())
+                                      confirm: confirmProvider?() ?? 0)
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from

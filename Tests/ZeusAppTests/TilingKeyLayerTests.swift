@@ -132,6 +132,18 @@ struct TilingKeyLayerTests {
         #expect(rig.taps[0].stopped == 0)
     }
 
+    @Test func aHoldKeyInsideTheBoundChordsWaitsOnlyWhileTheTapIsInstalled() {
+        let rig = Rig(trusted: false)
+        rig.apply()
+        #expect(rig.layer.holdConfirm(for: .controlOption) == 0, "no tap yet: the key acts at once")
+        rig.grant()
+        #expect(rig.layer.holdConfirm(for: .controlOption) == TileBaseConflicts.holdConfirm, "inside the pair")
+        #expect(rig.layer.holdConfirm(for: .rightCommand) == TileBaseConflicts.holdConfirm, "inside the pair")
+        #expect(rig.layer.holdConfirm(for: .function) == 0, "Fn alone is free")
+        rig.apply(enabled: false)
+        #expect(rig.layer.holdConfirm(for: .controlOption) == 0, "the tap is gone")
+    }
+
     @Test func turningTilingOffRemovesTheTapAndCancelsTheWait() {
         let rig = Rig(trusted: true)
         rig.apply()
