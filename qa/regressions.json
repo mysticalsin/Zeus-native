@@ -4582,6 +4582,174 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_the_media_toggle_is_never_turned_on_by_an_import"
       }
+    },
+    {
+      "id": "REG-560",
+      "failure": "A display that reported a top inset but no side areas was called notched by the describe step and sized as not notched by the size step, so it got an empty closed notch instead of the pill.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "anInsetWithoutSideAreasIsNotANotch"
+      }
+    },
+    {
+      "id": "REG-561",
+      "failure": "The Built-in display target picked a display with only a top inset ahead of the built-in panel.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentHubTests.swift",
+        "function": "anInsetOnlyDisplayThatIsNotBuiltInIsNotPickedAheadOfTheBuiltInPanel"
+      }
+    },
+    {
+      "id": "REG-562",
+      "failure": "A calibration draft could be saved by Cancel or by the card going away, so a shape the owner never accepted stayed on the notch.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DrawnNotchCalibrationTests.swift",
+        "function": "noPathThroughCancelOrALossEmitsPersist"
+      }
+    },
+    {
+      "id": "REG-563",
+      "failure": "A drawn shape could be wider than a quarter of a narrow display, or shifted past the room the open panel leaves, so the notch crowded the menu bar or the panel went off screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DrawnNotchTests.swift",
+        "function": "aFittedShapeIsOnTheStepAndInsideEveryLimit"
+      }
+    },
+    {
+      "id": "REG-564",
+      "failure": "A lowered drawn notch could claim the menu bar strip above it, or its hover and click zones could differ from the body that is drawn.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "forADrawnShapeTheBodyHoverAndClickRectanglesAreOne"
+      }
+    },
+    {
+      "id": "REG-565",
+      "failure": "A stored shape that was not a number reached the layout as a size, because nothing replaced it with the default.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DrawnNotchTests.swift",
+        "function": "aNonFiniteFieldTakesItsDefaultAndTheOthersKeepTheirValue"
+      }
+    },
+    {
+      "id": "REG-566",
+      "failure": "Calibration kept running after the last display that shows the notch without one went away, so the notch stopped opening by pointer with no card left to end it.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "noTargetLeftEndsCalibrationAndWritesNothing"
+      }
+    },
+    {
+      "id": "REG-567",
+      "failure": "A pinned snapshot or preview read the stored rows, so a fixture changed with the owner's settings.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "snapshotsReadNoStore"
+      }
+    },
+    {
+      "id": "REG-568",
+      "failure": "A stored row that was missing or hostile reached the notch as a size, because the model did not clean what it read.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "storedRowsAreSanitizedAndAMissingRowTakesItsDefault"
+      }
+    },
+    {
+      "id": "REG-569",
+      "failure": "Choosing Pill left calibration running behind the scenes, so the pointer stopped opening a notch that shows no guide.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchModelTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+        "function": "choosingPillEndsCalibration"
+      }
+    },
+    {
+      "id": "REG-570",
+      "failure": "Closing or minimising the Settings window left calibration running with no card to end it, so the notch stopped opening by pointer.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchCardTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+        "function": "closingAndMinimisingTheWindowSendTheirLosses"
+      }
+    },
+    {
+      "id": "REG-571",
+      "failure": "A settings file could switch the notch shape to Notch, which makes the closed window take clicks over its own shape, without the owner choosing it on this Mac.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-DrawnNotchCardTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+        "function": "anImportHoldingNotchLeavesThePillInPlace"
+      }
+    },
+    {
+      "id": "REG-572",
+      "failure": "A drawn notch placed off centre was drawn at its place while its hover, click and mouse zones stayed at the screen centre, so the pointer opened it where it was not drawn.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "theBodyHoverClickAndMouseRectanglesAllMoveByTheOffset"
+      }
+    },
+    {
+      "id": "REG-573",
+      "failure": "The open panel of a drawn notch placed at an extreme ran past the edge of a narrow or a wide display, because the offset was not held inside the room the panel leaves.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "atTheClampTheOpenPanelKeepsEightPointsInsideEveryDisplay"
+      }
     }
   ]
 }

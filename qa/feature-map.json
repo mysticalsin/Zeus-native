@@ -713,6 +713,22 @@
       "suite": "ScreenCornerPanelTests",
       "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
       "scope": "Actual panel flag value and an unshown owned NSPanel; no display ordering, capture or device acceptance."
+    },
+    {
+      "id": "native-DrawnNotchModelTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "DrawnNotchModelTests",
+      "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+      "scope": "Actual DrawnNotchModel with a fake store and fake notification centres: Done and Cancel writes, the footprint following the draft, hostile rows, the display and system losses, and a pinned view that reads no store. No real display, window, settings file or capture."
+    },
+    {
+      "id": "native-DrawnNotchCardTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "DrawnNotchCardTests",
+      "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+      "scope": "Actual DrawnNotchCardModel and card view with a recording controller, the real window controller's two delegate methods and a disposable settings store: rows per availability, the events the card sends, the losses, the import guard and a render that never touches the controller. No real display, window on screen, pointer, keyboard focus or VoiceOver."
     }
   ],
   "features": [
@@ -5505,6 +5521,68 @@
             {
               "file": "Tests/ZeusAppTests/ScreenCornerPanelTests.swift",
               "function": "aBuiltPanelCarriesTheFlagsAndTheCapturePolicy"
+            }
+          ]
+        },
+        {
+          "id": "F13.drawn-notch-model",
+          "check": "native-DrawnNotchModelTests",
+          "acceptance": "The drawn notch model saves only on Done, follows the draft on a display without a notch, leaves a notched display alone, ends calibration when no display is left, and a pinned view never reads the store.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "doneWritesTheSizeRowsOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "cancelWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "theFootprintOnADisplayWithoutANotchFollowsTheDraft"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "noTargetLeftEndsCalibrationAndWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchModelTests.swift",
+              "function": "snapshotsReadNoStore"
+            }
+          ]
+        },
+        {
+          "id": "F13.drawn-notch-card",
+          "check": "native-DrawnNotchCardTests",
+          "acceptance": "The drawn notch card is absent without a controller, shows the row each availability calls for, sends clamped sets and the calibration events, ends calibration when its page is left or Settings closes or minimises, keeps an import from choosing Notch, and renders without touching the controller.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "theCardIsAbsentWithoutAController"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "calibrateSendsBeginWithTheSavedShapeAndTheRowBecomesThree"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "aSliderSendsAClampedSnappedSet"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "leavingThePageSendsPageLeftAndNothingElse"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "closingAndMinimisingTheWindowSendTheirLosses"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "anImportHoldingNotchLeavesThePillInPlace"
+            },
+            {
+              "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
+              "function": "renderingTheCardNeverTouchesTheController"
             }
           ]
         }

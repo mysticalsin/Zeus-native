@@ -62,16 +62,43 @@ extension Theme {
     static let amber = Color(hex: 0xFFB833)
 }
 
+extension ClosedWingsFacts {
+    /// What the closed wings show right now. The extra width is read only while the body grows wings.
+    @MainActor init(of topBar: TopBarModel) {
+        self.init(kindIsNone: ClosedWings.kind(of: topBar) == .none, hasLights: !topBar.lights.isEmpty,
+                  hasLiveActivity: topBar.hasLiveActivity, extraWidth: 0)
+        if showsWings { extraWidth = ClosedWings.extraWidth(for: topBar) }
+    }
+}
+
 struct NotchView: View {
     let model: NotchModel
     /// The top bar (tabs, pages, closed wings). Nil keeps the classic agents-only notch.
     var topBar: TopBarModel? = nil
-    /// The hardware notch (width 0 on Macs without one).
-    let notch: CGSize
-    /// A slim pill on a display without a notch, so the notch still has a place to glow and open from.
-    var slimPill = false
+    /// What this display reports about its top edge. The closed shape is resolved from it: the hardware notch,
+    /// or where there is none the slim pill or the shape the owner drew.
+    var facts: NotchDisplayFacts? = nil
+    /// Snapshots and previews pin the closed shape and the guide, so they never read a store; nil asks the model.
+    var footprintOverride: NotchFootprint? = nil
+    var guideOverride: Bool? = nil
+    /// Tests pass their own model; nil is the app's.
+    var drawnNotch: DrawnNotchModel? = nil
     /// Snapshots and previews pin the drop; nil reads Settings > Appearance > Top bar position.
     var topOffsetOverride: Double? = nil
+
+    /// The closed shape on this display.
+    var footprint: NotchFootprint {
+        if let footprintOverride { return footprintOverride }
+        guard let facts else { return .pill }
+        return (drawnNotch ?? .shared).footprint(for: facts)
+    }
+
+    /// A guide outline on the drawn notch while it is closed and being calibrated: a black shape on a dark menu
+    /// bar cannot be seen otherwise.
+    var showsGuide: Bool {
+        guard model.presentation == .closed, case .drawn = footprint else { return false }
+        return guideOverride ?? DrawnNotchCalibration.showsGuide((drawnNotch ?? .shared).state)
+    }
 
     /// How far the closed bar and the peek card sit below the top of the screen. The open panel stays
     /// flush with the top; the notch light, ticker and wings are part of the closed bar and move with it.
@@ -80,6 +107,9 @@ struct NotchView: View {
         return CGFloat(TopBarPosition.applied(resolved: resolved, panelOpen: model.presentation == .panel))
     }
 
+    /// The hardware size (width 0 for the pill).
+    private var notch: CGSize { footprint.layoutSize }
+    private var slimPill: Bool { footprint.isPill }
     private var barHeight: CGFloat { max(notch.height, 30) }
     private var hasNotch: Bool { notch.width > 0 }
 
@@ -115,35 +145,27 @@ struct NotchView: View {
         response: NotchClosedBodyLayout.wingsSpringResponse,
         dampingFraction: NotchClosedBodyLayout.wingsSpringDamping)
 
-    /// The closed width while closed (nil otherwise), the trigger for `wingsSpring`.
-    var closedWidthKey: CGFloat? {
-        model.presentation == .closed ? size(for: .closed).width : nil
-    }
+    private var closedWings: ClosedWingsFacts { topBar.map(ClosedWingsFacts.init(of:)) ?? .noWings }
 
-    /// The pill on displays without a notch.
-    static let pillSize = CGSize(width: 96, height: 9)
+    /// While closed (nil otherwise), what the closed width depends on besides the footprint: the trigger for
+    /// `wingsSpring`. It never reads the footprint, so a footprint change moves the body without the spring.
+    var closedWidthKey: ClosedWingsFacts.MotionKey? {
+        model.presentation == .closed ? closedWings.motionKey : nil
+    }
 
     private func size(for presentation: NotchModel.Presentation) -> CGSize {
         switch presentation {
         case .closed:
-            if let topBar {
-                let wingKind = ClosedWings.kind(of: topBar)
-                let showWings = NotchClosedBodyLayout.showWings(
-                    closedWingKindIsNone: wingKind == .none,
-                    hasLights: !topBar.lights.isEmpty,
-                    hasLiveActivity: topBar.hasLiveActivity)
-                if showWings {
-                    let extra = ClosedWings.extraWidth(for: topBar)
-                    let base = hasNotch ? notch.width : 40
-                    return CGSize(
-                        width: NotchClosedBodyLayout.bodyWidth(
-                            notchWidth: base, shoulder: shoulder, showWings: true,
-                            extraWidth: extra, hasNotch: hasNotch, slimPill: slimPill),
-                        height: barHeight)
-                }
+            let wings = closedWings
+            if wings.showsWings {
+                return CGSize(
+                    width: NotchClosedBodyLayout.bodyWidth(
+                        notchWidth: footprint.wingBase, shoulder: shoulder, showWings: true,
+                        extraWidth: wings.extraWidth, hasNotch: hasNotch, slimPill: slimPill),
+                    height: barHeight)
             }
             if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: notch.height) }
-            return slimPill ? CGSize(width: Self.pillSize.width, height: Self.pillSize.height) : .zero
+            return footprint.idleSize
         case .peek:
             if let approval = model.approval {
                 let wide = (approval.detail?.height ?? 0) > 0
@@ -215,6 +237,9 @@ struct NotchView: View {
                 }
             }
             .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
+            // The place of a drawn shape, applied last so the alerts move with the body. It moves the drawing and not
+            // the layout, which is why it cannot sit under the alert overlay. It has no animation of its own.
+            .offset(x: NotchAnchor.offset(footprint))
     }
 
     /// Whether the outline itself glows (and so breathes). With the top bar, the closed notch glows
@@ -272,6 +297,12 @@ struct NotchView: View {
                 // corners, and the page (inserted at its final layout) showed outside the body
                 // while it grew.
                 .clipShape(shape)
+
+            if showsGuide {
+                shape.stroke(Color.white.opacity(0.6), lineWidth: 1)
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: size.width, height: size.height)
         // Glance (parity/N7, frames 139 to 143): the glass rim sits on the final open outline from
@@ -305,7 +336,9 @@ struct NotchView: View {
         switch model.presentation {
         case .closed:
             if let topBar {
+                // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
                 ClosedWings(topBar: topBar).frame(height: barHeight)
+                    .allowsHitTesting(false)
             }
         case .peek:
             VStack(spacing: 10) {

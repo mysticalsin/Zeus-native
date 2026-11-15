@@ -117,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         notch.topBar = topBar
         notch.onPresentationChange = { [weak self] presentation in self?.buddy.setHiddenForPanel(presentation == .panel) }
-        if on(.notchUI) { notch.start() }
+        if on(.notchUI) { notch.start(); DrawnNotchModel.shared.start() }
         if on(.notchUI) { ScreenCornerOverlay.shared.start() }
         // A permission cue is eligible for a system notification, which reads SettingsStore.shared (migration
         // writes), so a QA startup never wires it.
@@ -827,6 +827,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         context.openGuide = { [weak self] in self?.showOnboarding() }
         context.showLicenses = { [weak self] in self?.showThirdPartyLicenses() }
         context.topBar = topBar
+        context.drawnNotch = DrawnNotchModel.shared
         context.sweep = permissionSweep
         context.continuityTabShown = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
         context.setContinuityTabShown = { [weak self] on in
