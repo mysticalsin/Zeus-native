@@ -75,15 +75,18 @@ final class TalkChordHotkey {
     private let registrar: Registrar
     private var desired: Shortcut?
     private var paused = false
+    private var listening = true
     /// The chord last handed to the registrar. A chord that was refused is asked again on the next sync, since the holder
     /// that refused it (Chat or a shortcut being moved) may have let go since.
     private var attempted: Shortcut?
 
     init(registrar: Registrar = .carbon()) { self.registrar = registrar }
 
-    /// Registers the chord, or lets go of it when it is nil. Idempotent.
-    func sync(_ chord: Shortcut?) {
+    /// Registers the chord, or lets go of it when it is nil. Idempotent. `listening` is whether the talk monitor can hear
+    /// keys at all (Accessibility or Input Monitoring): without it a taken Space would be lost and nothing would talk.
+    func sync(_ chord: Shortcut?, listening: Bool = true) {
         desired = chord
+        self.listening = listening
         apply()
     }
 
@@ -95,7 +98,7 @@ final class TalkChordHotkey {
     }
 
     private func apply() {
-        let want = paused ? nil : desired
+        let want = paused || !listening ? nil : desired
         guard want != attempted || (want != nil && !isRegistered) else { return }
         if isRegistered { registrar.unregister() }
         isRegistered = false

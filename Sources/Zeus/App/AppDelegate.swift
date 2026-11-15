@@ -326,6 +326,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             hotkey.start()
             syncTalkChord()
+            // The chord only takes Space once the monitors can hear keys; when access comes later, it takes it then.
+            KeyListenAccess.whenGranted { [weak self] in self?.syncTalkChord() }
             ChatHotkeyMonitor.shared.onChange = { [weak self] in self?.syncTalkChord() }
             // A recorder in Settings listens for any chord, so the Carbon hot keys let go while it does.
             ShortcutRecorderModel.pauseGlobalHotkeys = { paused in
@@ -1088,7 +1090,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @discardableResult
     private func syncTalkChord() -> Shortcut? {
         let chord = TalkChordRouting.current(heard: hotkey.keyProvider(), shared: hotkey.sharedProvider()).chord
-        TalkChordHotkey.shared.sync(chord)
+        TalkChordHotkey.shared.sync(chord, listening: KeyListenAccess.granted)
         return chord
     }
 
