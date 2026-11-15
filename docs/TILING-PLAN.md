@@ -108,7 +108,8 @@ No app file is touched. Files live under `Sources/ZeusCore/Tiling/`.
   `.refused`, and the caller floats the window. An empty tree takes the window as the root leaf.
 - `TileOps.remove(_ window:from tree:)`: replaces the parent split with the sibling subtree; a root leaf empties the
   tree. No other ratios change.
-- `TileOps.swap(_ a:_ b:in tree:)`: swaps the two leaves' window ids. Nothing else changes.
+- `TileOps.swap(_ a:_ b:in tree:)`: swaps the two leaves' window ids and the two ids in the tree's order, so the newest
+  slot stays the newest. Nothing else changes.
 - `TileOps.flip(at window:in tree:)`: toggles the focused leaf's parent split axis and sets its pinned flag.
 - `TileOps.nudgeRatio(at window:direction:step:in tree:)`: finds the nearest ancestor split whose axis matches the
   direction and in which the window lies on the matching side, adds or subtracts the step, clamps.
@@ -132,8 +133,10 @@ chord type is added):
   anything unknown falls back to `controlOption`; `modifiers` returns the `ShortcutModifiers` set.
 - `TileKeymap`: maps a `Shortcut` to a `TileAction`. `defaults(base:)` is the one function that builds the default
   table. `action(for:)` is a lookup over an immutable copy. It rejects duplicate chords and rejects a chord that
-  `Shortcut` reports invalid (a bare letter with no modifier). `encode`/`decode` use a stable `Codable` form and skip
-  unknown actions, so a newer file does not break an older build. `conflicts(with:)` returns the chords that collide
+  `Shortcut` reports invalid (a bare letter with no modifier), and any key chord without Control, Option or Command
+  (Shift or Fn plus a key, a bare F key), because the tap consumes what the keymap binds. `action(for:)` ignores the
+  fn flag that macOS adds to arrow, function (F1 to F20) and navigation keys (Home, End, Page Up, Page Down, Forward Delete), unless the chord was bound with it; fn with any other key is a different chord and passes through. `encode`/`decode` use a
+  stable `Codable` form and skip unknown actions, so a newer file does not break an older build. `conflicts(with:)` returns the chords that collide
   with a supplied set of reserved shortcuts.
 
 Default binds, base `B` (the chosen modifier set): `B` plus Left, Right, Up, Down is focus; `B` plus Shift plus an
@@ -198,16 +201,23 @@ in parallel with T3 and T5 after T1 lands.
 
 ### Rules and shape
 
-- `TilingWindowDriver` protocol: `windows() -> [TileWindowRef]`, `setFrame(_:for:) -> Bool`, `focus(_:)`,
-  `displays() -> [TileDisplay]`. `TileWindowRef` carries the `TileWindowID`, the owning pid, the AppKit frame and the
-  element identity. `TileDisplay` carries the display id and its visible frame.
+- `TilingWindowDriver` protocol (shipped in `Sources/ZeusCore/Tiling/TileWindowDriver.swift`): `isTrusted`,
+  `windows(config:) -> [TileWindowRef]`, `unreadPIDs`, `setFrame(_:for:) -> Bool`, `focus(_:)`,
+  `displays() -> [TileDisplay]`. `TileWindowRef` carries the `TileWindowID` (the pid and a per-app number that is the
+  element identity as far as ZeusCore goes), the bundle id and the frame in engine coordinates. `TileDisplay` carries
+  the display id, its AppKit frames and its engine frame. `windows(config:)` reads every window fresh in the call: a
+  window it could not read in time is left out, never reported from an earlier call, and its app's process id is in `unreadPIDs`.
+  `setFrame` and `focus` act only on a window the last `windows(config:)` returned. `focus` also reads the app again
+  first and does nothing for a window that no longer passes admission (minimized or moved to another Space since).
 - `AXTilingWindowDriver` is the real one, main actor like `AXSnapshotter` and `AXFinder`, with a per-pass time budget.
   It builds `AXUIElementCreateApplication(pid)` per regular app, calls `AXUIElementSetMessagingTimeout(app, 0.25)` as
   `AXSnapshotter` does, reads `kAXWindowsAttribute`, and reads role, subrole, minimized, full-screen, position and
-  size in one round trip with `AXUIElementCopyMultipleAttributeValues`. It writes with `AXUIElementSetAttributeValue`
+  size in one round trip with `AXUIElementCopyMultipleAttributeValues`. The pass budget is checked before every app
+  and every window, and a hidden app is skipped. It writes with `AXUIElementSetAttributeValue`
   on `kAXPositionAttribute` then `kAXSizeAttribute` using `AXValueCreate`, and focuses by setting `kAXMainAttribute`
   and `kAXFocusedAttribute` and performing `kAXRaiseAction`. It reuses `AXFinder.frame(of:)`,
-  `AXSnapshotter.quartzRect`, and `AXFinder.string`, `number` and `isSettable`.
+  `AXSnapshotter.quartzRect`, and `AXFinder.string`, `number` and `isSettable`. As shipped it reads and writes frames
+  in engine coordinates directly with type-checked values and asks `AXUIElementIsAttributeSettable` itself, to keep the error.
 - Coordinate conversion lives here. The engine's `TileRect` (top-left, y down) converts to the AppKit frame per
   display using that display's own height, not the main screen's, so a display above or left of the main one with a
   negative origin converts correctly.
@@ -229,12 +239,30 @@ insert.
 - Accessibility denied: the driver reports not trusted and does nothing. No frame is written.
 - A window that refuses to move: after the write the frame is read back; a difference beyond the tolerance marks the
   window floating for the session and asks the controller to rebuild without it. Never retried in a loop.
-- A hung app: the 0.25 s messaging timeout and the per-pass budget bound the cost.
+- A hung app: the 0.25 s messaging timeout and the per-pass budget bound the cost. An app that does not answer in
+  time is left out of the listing and its process id is in `unreadPIDs`; the controller keeps the slots of windows
+  that belong to an unread app (`TilePlanner.slotsToKeep`) and writes to none of them. A window missing from an app that
+  was read is gone, so one slow app never pins the slots of windows that closed in other apps. An app that answers
+  "no value" or "attribute unsupported" to the window list has no windows: it counts as read (`TileWindowsAnswer`), so
+  only a timeout, another failure or the pass budget leaves an app unread. So does a window whose own attribute read
+  does not complete (`TileWindowsAnswer.windowRead`): that window is slow, not closed, so the whole app is unread. The
+  size-settable check is part of that read: success gives the answer, "unsupported" means not resizable, and a timeout or
+  any other failure leaves the app unread (`TileWindowsAnswer.sizeSettable`).
+- Accessibility revoked part way through a plan: `TileApplier` checks trust again after a write that fails and stops with
+  `.accessibilityOff` and nothing in `refused`, so the controller never floats those windows for the session.
+- Two windows of one app at the same frame, one on another Space: the window list cannot tell them apart, so when more
+  windows of the app could be the on-screen entry than the list has entries for it, none of the candidates is admitted.
+  A window could be the entry when it sits at the frame whatever else is wrong with it (a panel, a fixed-size window,
+  full screen), or when its frame did not read; only a minimized window certainly is not.
 - A stale element after an app quits: dropped on the next read.
 - The driver's own writes fire move notifications: writes carry the intended frame, and the controller ignores a
   change that matches it, so the layout does not react to itself.
 
-### Tests first (`Tests/ZeusAppTests/TilingDriverTests.swift`, `.serialized`)
+### Tests first (`Tests/ZeusCoreTests/TilingDriverTests.swift`, with `Tests/ZeusAppTests/TilingDriverTests.swift`)
+
+As shipped, the pure rules are in ZeusCoreTests under the parent suite `TilingDriverTests`, so
+`swift test --filter TilingDriverTests` runs them. The app target keeps only the trust and no-element tests of the real
+driver (`.serialized`), also named `TilingDriverTests`. The list below is the intent.
 
 Coordinate conversion round-trips for an ordinary display, a display at a negative origin, and a second display to
 the right and above; the admission filter drops Zeus's own window, a system window, a sheet, a minimized window, a
@@ -262,15 +290,44 @@ It must not touch the top-bar or settings files.
   C function that reaches the owner through `userInfo` with `Unmanaged`. The tap and the callback are never inside a
   `@MainActor` type, because Swift 6 inserts an executor check and Zeus traps at run time on the first call.
 - `start()` and `stop()` are `nonisolated` and are the only places that call `CGEvent.tapCreate`
-  (`.cgSessionEventTap`, `.headInsertEventTap`, `.defaultTap`, because the tap must consume the chord). They add and
-  remove the source on `CFRunLoopGetMain()` in `.commonModes`; `stop()` disables the tap, removes the source and calls
-  `CFMachPortInvalidate`. The tap is created only when `AccessibilityGate.trusted`, re-armed through
-  `AccessibilityGate.whenTrusted(key: "tiling")`, and never left installed when tiling is off.
+  (`.cgSessionEventTap`, `.headInsertEventTap`, `.defaultTap`, because the tap must consume the chord). The tap is
+  serviced by a thread of its own with its own run loop (`TilingRunLoopThread`), never the main one: a consuming tap
+  makes the window server hold every keystroke in every app until the callback answers, and every Accessibility pass runs
+  on the main thread, where one slow app can take a second. `start()` creates the port and switches it off at once (a new tap
+  starts switched on, and no loop services it yet), then starts the thread, which adds the source to its own loop in
+  `.commonModes` and switches the tap on. A second `start()` while live asks the tap thread to switch it on again
+  (`TilingRunLoopThread.perform`), only while the life is still running, so no window server call is made under the lock
+  the callback takes, and a give-up or a teardown, which run on that thread too, cannot be followed by a late enable.
+  `stop()` closes the callback's gate under the same lock that moves the life to `stopping`, so a chord decided before
+  the teardown runs passes through; `start()` expects an `update` first, because a stop leaves the gate closed.
+  `stop()` asks the thread to tear down and waits for it to end
+  (2 s at most, normally microseconds): on the thread's own loop, after any callback in flight, it turns the tap off,
+  removes the source, calls `CFMachPortInvalidate` and ends the loop, so a callback never meets a freed port, and no key
+  is consumed once `stop()` has returned. A stop that reaches the thread before its first step still runs the teardown
+  there (the port is made before the thread starts and is switched off from the start), so no port is ever left registered with
+  no loop. A second caller waits for the same thread. If the thread has not ended after the 2 s wait, `stop()` returns false
+  with the life still `stopping` and the run kept, `start()` is refused, and a later `stop()` waits again, so a second tap is
+  never created beside an old one. `TilingKeyLayer` honours that across tiling off and on: it keeps a removed tap whose stop
+  returned false, stops it again before installing, and when it still has not ended it builds no second tap, reports the
+  tap unavailable once, and stays off until tiling is turned off and on (turning it off stops the old tap once more). The system calls (make the tap, turn it on or off) sit behind `TilingTapSystem`, so
+  a test can drive the real object on a stand-in source. Switching tiling off and on many times leaves no thread and no object behind.
+  The life of the tap (off, starting, live, stopping, failed) is the pure `TileTapLife` in ZeusCore, and the lock only
+  makes its decisions atomic. The tap is created only when `AccessibilityGate.trusted`, re-armed through
+  `AccessibilityGate.whenTrusted(key: "tiling")`, and never left installed when tiling is off. The source lint fails
+  when any file under `Sources/Zeus/Tiling` names the main run loop.
 - The callback stays tiny: it builds a `ShortcutEvent` (`Sources/ZeusCore/Shortcut.swift`), masks modifiers as
   `PointingEventTap` does, looks the chord up in an immutable, lock-protected keymap snapshot, returns nil to consume
-  or passes the event through, and hands the matched action to the main actor (assume isolation when already on main,
-  else dispatch to main). All Accessibility work runs after the callback returns.
-- It re-enables itself on `.tapDisabledByTimeout` and `.tapDisabledByUserInput`. It ignores autorepeat for the toggle
+  or passes the event through, and makes no Accessibility call and waits on nothing. The matched action goes into a
+  `TileActionMailbox` and a drain on the main queue runs it after the callback has returned its answer. A held focus
+  key repeats faster than a window scan runs, so the mailbox keeps only the newest of a run of focus requests: at most
+  one scan waits behind a running one. A held nudge key repeats too, but every step counts, so a run of equal nudges is
+  one entry with a step count (at most 16, the range a ratio can travel); the controller applies all the steps
+  (`TileResolver.resolve(_:times:...)`) and lays the windows out once. Every other action is kept, in order. The
+  consumed key reaches the other monitors through the main queue, while modifier changes reach them from the window
+  server, so the two are not ordered while main is busy; a smaller hold that forms in that gap is cancelled the moment
+  the key arrives and sends nothing.
+- It re-enables itself on `.tapDisabledByTimeout` and `.tapDisabledByUserInput` (`TileTapHealth` still counts them, and
+  `TileTapLife` turns its verdict into an effect). It ignores autorepeat for the toggle
   actions and allows it for focus and ratio. It passes through every event that carries Zeus's own input tag
   (`DriveInputAttribution.eventTag`). It consumes the key-up for every consumed key-down, tracked in a small set.
 - There is no fallback global monitor: a global monitor cannot consume, so on failure the tap reports unavailable and
@@ -281,8 +338,10 @@ It must not touch the top-bar or settings files.
 
 Extend `qa/closed-loop/tests/test_source_lint.py` so the nonisolated-callback check that scans `Sources/Zeus/Pointing`
 also scans `Sources/Zeus/Tiling`, and add `AXObserverCreate` to its watched callback APIs for the later observer
-upgrade. Add a fail-first sample as the file already does for the pointing case. This is the only shared file T3
-touches, and no other ticket edits it.
+upgrade. Add a fail-first sample as the file already does for the pointing case. A second check fails when any file
+under `Sources/Zeus/Tiling` names the main run loop (`CFRunLoopGetMain` or `RunLoop.main`), with its own fail-first
+sample, and the one bounded wait in `TilingRunLoopThread.stop()` is on the blocking-wait audit list with its reason.
+This is the only shared file T3 touches, and no other ticket edits it.
 
 ### Fail-closed paths
 
@@ -290,13 +349,20 @@ touches, and no other ticket edits it.
 - The tap is disabled by the system: it is re-enabled; if it keeps failing the controller pauses tiling and the
   section shows the state.
 - Tiling paused or off, or a secure input field active: every event passes through.
-- A slow callback would get the tap disabled, so no Accessibility work happens inside it.
+- A slow callback would get the tap disabled, so no Accessibility work happens inside it, and the tap is not serviced by
+  the main thread, which a slow pass can hold.
 
 ### Tests first (`Tests/ZeusCoreTests/TileKeymapTests.swift` plus a lint fail-first sample)
 
 The keymap tests are the pure ones already listed under T1 (unique defaults, invalid and duplicate chords rejected,
 conflicts reported). The lint sample proves a `CGEvent.tapCreate` in a non-`nonisolated` func under
-`Sources/Zeus/Tiling` fails the check.
+`Sources/Zeus/Tiling` fails the check. The tap's life and its mailbox are proved in ZeusCoreTests (`TileTapLifeTests`,
+`TileActionMailboxTests`); the thread (run on its own thread, stop during a callback, a stop that wins the race,
+300 start and stop cycles that release everything) and the real tap object (start and stop cycles, a burst of focus
+repeats while main is busy, and on a stand-in system: serviced on its own thread while main is blocked, a port
+invalidated on every stop path, a stop that times out, the port made switched off and switched on by the tap thread, a
+chord decided after the stop took the lock passing through, an enable that takes no lock call and does not outlive a stop) are proved in `TilingRunLoopThreadTests`,
+`TilingKeyTapLifecycleTests` and `TilingKeyTapStandInTests`.
 
 ---
 
@@ -375,6 +441,71 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
   `.statusBar` level, built from the same ZeusCore keybind table, dismissible by Escape through the tap. Write a
   `DESIGN.md` for the section and overlays before building, per the standing rule and `docs/DESIGN-DIRECTION.md`.
 
+### As shipped (T4)
+
+- Row capacity, option (a): `GlanceTopBar.maxTabs` is 14 and `tabSpacing` is 8, so the worst case (the widest label and
+  three 3-digit counts) is 796.75 of the 803 point row room. Tiling is second in `defaultRow`. `TopBarLayout.toggle`
+  keeps Tiling at its place after Home (a private canonical order), so a tab switched back on never lands in front of
+  it. The flag is `topBar.row14.v1`, saved with the row; `TopBarLayoutRepair.version` is 2.
+- Pure rules in ZeusCore (`Sources/ZeusCore/Tiling/`): `TilingPhase`, `TileGeneration`, `TileResolver` with
+  `TileLayoutState` and `TileEffect`, `TilingPicture`, `TileKeyList`, `TileConfig.fromSettings`, `TileFrontmost`, and
+  `TileModifierBase.label` and `glyphs`. They are tested by `TilingSectionTests`.
+- The driver protocol gained one requirement with a default (nothing in front): `frontmost() -> TileFrontmost`, the
+  focused admitted window and whether the front app is full screen. `AXTilingWindowDriver` reads it with two
+  Accessibility reads. The controller needs it to know which window the keys act on and to pause over a full-screen app.
+- `TilingController` takes its parts as `Services` (driver, key layer, config reader, scheduler, notification centres,
+  overlay closures, settings writer), so the controller suite runs against a fake driver that uses the real admission
+  filter. Seven system notifications are observed, only while Accessibility is on: screen parameters, Space, sleep,
+  wake, and app activate, launch and terminate. A display, Space, sleep or wake change advances the generation counter.
+- No Accessibility move observers and no `TileSelfWrites`: this slice re-reads on those seven events and after each
+  action, so the controller does not react to its own writes. The pre-tiling frames are kept for a later undo and are
+  never restored.
+- The key sheet hides on a six second timer, on the next tiling key, and when tiling stops. It does not take Escape:
+  the tap sees only chords the owner bound, and the rule that Zeus never consumes an unbound key is kept.
+- Key clash: `TileBaseConflicts.notes` compares the tiling keys with the keys the other monitors really use, and it reads
+  every modifier set the keymap binds (with the shipped table, the pair and the pair plus Shift), without Fn; a key that
+  differs from a bound set only by Fn counts as equal, and Fn alone is free. The talk key is the effective one
+  (`VoiceKey.effectiveTalkKey`), which moves off Control-Option while VoiceOver runs. The hold keys (talk, dictation,
+  pointing, Polyglot) follow `VoiceKeyMachine`, which cancels a turn that a foreign key or modifier joins and starts
+  nothing again until every key is up (`docs/VOICE-KEY.md`, `docs/VOICE-KEY-MACHINE-PLAN.md`), so the rule needs no
+  knowledge of how a monitor cancels. A modifier-only hold key is refused when its modifiers equal a bound set (a
+  dictation hold key: with or without Shift), and a key that switches on at the press (press to toggle dictation, a
+  modifier-only Polyglot key) is refused when its modifiers are inside a bound set, because a toggle cannot be taken
+  back. A hold key strictly inside a bound set is free and waits `TileBaseConflicts.holdConfirm` (0.15 s) while the tap
+  is installed, so a chord pressed as a chord opens nothing; `confirm(for:keymap:)` is that wait as a pure function, and
+  the owners' `confirmProvider` reading it is a later step. The tap forwards every key it consumes, key-down and
+  key-up, to the voice monitors through `TilingConsumedKey`, which the machine takes as a second witness: a consumed
+  key and the same key from a monitor give the same effects. Every bound tiling chord (base plus key) is compared with
+  every keyed talk, pointing, dictation and Polyglot shortcut, with the fn flag handled as the tap handles it; a chat
+  chord the keymap binds is a clash, and so is a chord of Quick to-do, the notch, the prompter pause or the approval
+  answer keys (Control-Option Y, N and O while "Answer permissions from the keyboard" is on); and while VoiceOver runs
+  every bound chord that holds Control and Option is refused, which VoiceOver uses alone and with Command and a letter
+  (the shipped pair included). A note names the bound chord's modifiers, not the base. The controller checks it on every
+  settings write, before any tap exists, and refuses a clash: no tap, no observer, the phase is Key clash, and the page
+  and Settings show the note. VoiceOver writes no setting, so the controller watches it (key value observing on the
+  workspace) from the first start with the switch on until the switch goes off, including while a clash holds tiling
+  back, and checks the clash again when VoiceOver starts or stops. The tap consumes a chord before the other keys'
+  monitors can see it spoil a hold, so refusing is the only fail-closed option for a key that is the same set or a
+  toggle inside it. The default pair is Control-Option-Command: no shipped key holds it (Talk to Zeus and pointing are
+  Control-Option, dictation is Right Command, Talk to Zeus moves to Option-Command while VoiceOver runs), and
+  `TileBaseConflictsTests` keeps it that way (while VoiceOver runs the pair is refused, with a note). An unknown stored
+  pair reads as the default.
+- Other review fixes: the pause and key sheet chords work over a full-screen app; swap, flip, nudge and float do nothing
+  while an app tiling does not read has the keyboard; the ring follows its setting while running; a revoked
+  Accessibility is noticed on a settings change; `frontmost()` skips Zeus itself and has no protocol default; the undo
+  memory drops windows that are gone; an equal settings write does not notify the page; the key pair picker shows a
+  check on the chosen pair; the permission row reads again when Zeus is activated; quitting stops tiling only when the
+  startup service is allowed; an unchanged settings write, paused or not, still notices a revoked Accessibility; and a
+  focus key draws the ring from the keyboard as the system reports it after the call, so a neighbour that was
+  minimized or unread since the last pass gets no ring.
+- Second review round: the Polyglot key (on by default, Control-Option-T) is read by `TilingKeyClash.Keys.live()` like
+  the other monitor keys, and `TilingKeyClashTests` lists every `HotkeyMonitor` and key provider in the app, so a new
+  global key fails a test until it is added; the whole pass shares one deadline (`TilingController.passBudget`, the
+  listing's budget plus the writes' budget) that every display's writes check before each move; `TilingKeyLayer` takes
+  its trust check and tap factory, so its rules (no tap while off or untrusted, removed on revoke, off after a failed
+  start) are tested.
+- Not done here, still open: the acceptance-map decision in `qa/feature-map.json`.
+
 ### Fail-closed paths
 
 - Accessibility denied: the section shows the off state and the permission row; no controller start, no tap, no
@@ -389,7 +520,10 @@ Either way the row-count and index tests in `Tests/ZeusCoreTests/TopBarLayoutUpg
 The overlay suite follows `PointingOverlayTests`: never key or main, ignores the mouse, non-activating,
 `sharingType == .none`, removed on hide, vacuous with no display. The controller suite uses the fake
 `TilingWindowDriver` and checks every fail-closed path: Accessibility denied, a move refused, a display change, a
-full-screen app frontmost, a minimized window, Zeus's own window and a system window all left alone.
+full-screen app frontmost, a minimized window, Zeus's own window and a system window all left alone. The refused-to-floating
+step belongs to this suite: ids in `TileApplyOutcome.refused` are added to `TileConfig.floating` for the session and
+the tree is rebuilt without them, while `deferred` ids are not floated. It also checks that a window missing from a
+listing keeps its slot and is not written when its app is in `unreadPIDs`, and loses it when its app was read.
 
 ---
 
@@ -401,7 +535,7 @@ it runs in parallel with them after T1. T4 reads the ids T5 creates, so T5 lands
 ### Rows (added to the table in `scripts/gen-settings-catalog.py`)
 
 - `tiling.enabled` (toggle, default `false`): "Arrange my windows from the keyboard".
-- `tiling.keyBase` (choice, Control-Option, Option-Command, Control-Option-Command, default Control-Option):
+- `tiling.keyBase` (choice, Control-Option, Option-Command, Control-Option-Command, default Control-Option-Command):
   "Tiling keys".
 - `tiling.innerGap` and `tiling.outerGap` (sliders, 0 to 64, default 8): "Gap between windows" and "Gap to the screen
   edge".
@@ -483,9 +617,10 @@ routes to the one existing place that prompts.
   feature entry with a portable or native check and an `unimplemented` device-proof entry for the real-Mac run that
   does not exist yet. If the owner prefers, bind the Tiling tests in `qa/regressions.json` instead and leave the
   acceptance map at 19.
-- The default modifier base. Control-Option is already Talk to Zeus and pointing, and Control-Option-Space is the chat
-  hotkey, so validate the chosen base with `ShortcutConflicts.warnings` against talk, pointing, dictation, chat and
-  VoiceOver, show a conflict note, and keep the base user-selectable.
+- The default modifier base, decided in the review pass: Control-Option-Command, because Control-Option is already
+  Talk to Zeus and pointing, VoiceOver uses it, and Control-Option-Space is the chat hotkey. The chosen base is
+  validated by `TileBaseConflicts` against talk, pointing, dictation, chat and VoiceOver, a conflict note is shown, and
+  the base stays user-selectable. Reverting to Control-Option is one commit if the owner prefers it.
 
 ## Verification for this slice
 

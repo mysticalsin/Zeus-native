@@ -55,6 +55,8 @@ enum ZeusWindowSharing {
         ScreenEdgeGlowController.shared.applyScreenSharePolicy(visibleInShare: visible)
         EdgeWaveController.shared.applyScreenSharePolicy(visibleInShare: visible)
         ScreenCornerOverlay.shared.applyScreenSharePolicy(visibleInShare: visible)
+        TilingFocusBorder.shared.applyScreenSharePolicy(visibleInShare: visible)
+        TilingKeySheet.shared.applyScreenSharePolicy(visibleInShare: visible)
         PolyglotCaptionBridge.shared?.applyScreenSharePolicy(visibleInShare: visible)
     }
 

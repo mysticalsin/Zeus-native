@@ -15,6 +15,12 @@ extension ShortcutModifiers {
     }
 }
 
+/// The hardware's own answer to which of these ordinary keys are down. The hardware state is not the event stream a
+/// secure input field withholds, and a key the tiling tap consumed is still a key that is down.
+func ordinaryKeysDownInTheSystem(_ codes: Set<UInt16>) -> Set<UInt16> {
+    codes.filter { CGEventSource.keyState(.hidSystemState, key: CGKeyCode($0)) }
+}
+
 /// Whether ZEUS may see keys typed in other apps: Accessibility or Input Monitoring.
 @MainActor
 enum KeyListenAccess {
@@ -59,16 +65,21 @@ enum KeyAccessNotice {
     }
 }
 
-/// Push-to-talk: fires while the shortcut chosen in Settings is held. Modifier chords, single
-/// modifiers (Right Command, Fn) and keys with modifiers (⌥Space) are tracked from the event
-/// stream by `ShortcutState`. Global monitoring needs Accessibility or Input Monitoring; the
-/// local monitor covers ZEUS's own windows.
+/// The adapter of the voice key machine (`VoiceKeyMachine`, docs/VOICE-KEY-MACHINE-PLAN.md): it turns keyboard events,
+/// keys the tiling tap consumed and timer firings into machine events and runs the effects that come back. It keeps no
+/// state of its own: after `start()` only `machine` changes. Modifier chords, single modifiers (Right Command, Fn) and
+/// keys with modifiers (Option-Space) are read from the event stream by the machine. Global monitoring needs
+/// Accessibility or Input Monitoring; the local monitor covers Zeus's own windows.
 @MainActor
 final class HotkeyMonitor {
-    var onPress: (() -> Void)?
+    /// A press the machine starts a turn for. Answers whether the owner took it: false (a transcribing job, a failed
+    /// start) tells the machine the turn never opened, so no release or cancel follows.
+    var onPress: (() -> Bool)?
     var onRelease: (() -> Void)?
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
+    /// A turn the key ended without sending it: a shortcut or a larger chord took the press over.
+    var onCancel: (() -> Void)?
     /// Which shortcut this monitor listens for; nil turns it off. Push-to-talk by default (moved off
     /// Control+Option while VoiceOver uses it, `VoiceKey.effectiveTalkKey`); dictation supplies its own.
     var keyProvider: () -> Shortcut? = {
@@ -78,38 +89,56 @@ final class HotkeyMonitor {
                                          pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
                                          voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled)
     }
-    /// Dedicated dictation keys can toggle on each key-down instead of using TalkKeyLatch's
-    /// hold/double-tap timing. Shared keys always use the existing gesture arbitration.
+    /// Dedicated dictation keys can toggle on each press instead of holding. Shared keys never toggle.
     var directPressProvider: () -> Bool = { false }
     /// When talk and dictation share one key, each monitor reacts to its own gesture of it:
     /// dictation to a hold, talk (command mode) to a double-tap.
     enum Role { case talk, dictation }
     var role: Role = .talk
     var sharedProvider: () -> Bool = { DictationSettings.shared.enabled && Preferences.shared.pushToTalk == DictationSettings.shared.key }
-    /// A held dictation interrupted by a shortcut (the press became ⌘C). Defaults to release.
-    var onCancel: (() -> Void)?
-    /// The talk key: a hold of a modifier-only key that another key joins (⌃⌥Space for Chat) became a
-    /// different shortcut, so the turn is cancelled through `onCancel` and nothing is sent.
-    var cancelsWhenSpoiled = false
+    var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
+    /// How long a hold key must be down alone before it acts, when the owner sets its own. Nil asks tiling.
+    var confirmProvider: (() -> TimeInterval)?
+    /// What tiling says a hold key must wait: 0 unless the tap is installed and a bound chord holds the key's modifiers.
+    static var tilingConfirm: (Shortcut) -> TimeInterval = { TilingController.shared.holdConfirm(for: $0) }
+    /// The modifiers the system reports right now, to find a release no event told the machine about.
+    var liveModifiers: () -> ShortcutModifiers? = {
+        ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
+    }
+    var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    /// Of these ordinary keys, the ones the system reports down now. Nil until `start()` asks the keyboard itself, so a
+    /// test that feeds keys with no key-up is not undone by the real keyboard.
+    var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
 
     private var keyMonitors: [Any] = []
-    private var gesture = SharedKeyGesture()
-    private var sharedDown = false
-    private var holdTimer: DispatchWorkItem?
-    private var commandLatched = false
+    private var consumedKeys: NSObjectProtocol?
+    private var sleepObservers: [NSObjectProtocol] = []
+    private var machine = VoiceKeyMachine()
+    /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
+    private var ownerTurn = 0
 
-    private var isDown = false
-    private var latch = TalkKeyLatch()
-    private var pendingStop: DispatchWorkItem?
-    private var directPressActive = false
-
-    private var state = ShortcutState()
+    /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
+    /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
+    /// unconsumed give the same callbacks. Idempotent.
+    func observeConsumedKeys() {
+        guard consumedKeys == nil else { return }
+        consumedKeys = NotificationCenter.default.addObserver(
+            forName: TilingConsumedKey.notification, object: nil, queue: .main) { [weak self] note in
+            guard let event = TilingConsumedKey.event(in: note) else { return }
+            let time = TilingConsumedKey.timestamp(in: note)
+            MainActor.assumeIsolated { self?.feed(event, at: time) }
+        }
+    }
 
     func start() {
+        if keysStillDown == nil { keysStillDown = ordinaryKeysDownInTheSystem }
+        observeConsumedKeys()
+        observeSleep()
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
-            MainActor.assumeIsolated { if let converted { self?.feed(converted) } }
+            let time = event.timestamp
+            MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
             return event
         }) { keyMonitors.append(local) }
     }
@@ -118,7 +147,8 @@ final class HotkeyMonitor {
     private func startGlobal() {
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
-            MainActor.assumeIsolated { if let converted { self?.feed(converted) } }
+            let time = event.timestamp
+            MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
         }) { keyMonitors.append(global) }
     }
 
@@ -132,134 +162,80 @@ final class HotkeyMonitor {
         }
     }
 
-    /// One keyboard event from either monitor (also the entry point for tests and the self-test).
-    func feed(_ event: ShortcutEvent) {
-        state.apply(event)
-        if case .keyDown(let code, _) = event {
-            // Only to spot shortcuts made with the shared key (⌘C): never reads or keeps the key.
-            if keyProvider()?.keyCode != code { otherKeyPressed(); spoilHold() }
-        }
-        evaluate()
+    // MARK: Entries
+
+    /// One keyboard event from either monitor or from the consumed key feed (also the entry point for tests). `time` is
+    /// when the key went down or up, on the clock of `now`: the machine reads a key at its own time, because a busy main
+    /// thread hears it later and a timer that came due in between must not be judged by that delay. Without one, or with
+    /// a zero, the event is taken as it arrives, and a time still to come is read as now. A key-up no monitor saw would leave its key in the
+    /// picture as a foreign key, so while the picture holds any ordinary key the system is asked first which of them
+    /// are still down.
+    func feed(_ event: ShortcutEvent, at time: TimeInterval? = nil) {
+        let held = machine.keys.keysDown
+        if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
+        let arrived = now()
+        send(.key(event, at: time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived))
     }
 
-    private func otherKeyPressed() {
-        guard sharedDown else { return }
-        if gesture.otherKey() == .holdCancelled { (onCancel ?? onRelease)?() }
-        holdTimer?.cancel()
-    }
+    /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
+    /// names the last turn the owner was given. When the machine has ended that turn itself (the echo of its own `send`
+    /// or `cancel`) or has opened another since, the machine leaves everything as it is.
+    func turnEnded() { send(.abandon(turn: ownerTurn)) }
 
-    /// A held modifier-only talk key met another key: that press was a shortcut, not a question.
-    /// `ShortcutState` keeps the chord unheld until every modifier is up, so it cannot restart mid-chord.
-    private func spoilHold() {
-        guard cancelsWhenSpoiled, role == .talk, isDown, let key = keyProvider(), key.isModifierOnly, !sharedProvider() else { return }
-        isDown = false
-        pendingStop?.cancel()
-        pendingStop = nil
-        latch = TalkKeyLatch()
-        VoiceLog.log("key", "talk shortcut became another shortcut (\(key.title) + a key): cancelled, nothing sent")
-        (onCancel ?? onRelease)?()
-    }
+    /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
+    func interrupt() { send(.interrupt(live: liveModifiers())) }
 
-    /// Shared-key path: raw down/up of the key plus "another modifier joined in".
-    private func handleShared(_ key: Shortcut) {
-        let now = ProcessInfo.processInfo.systemUptime
-        let down = state.isHeld(key, exact: false)
-        let extra = state.modifiers.subtracting(key.modifiers).subtracting(.function)
-        if down, !gesture.isHolding, !extra.isEmpty { otherKeyPressed() }
-        if down, !sharedDown {
-            sharedDown = true
-            if commandLatched, role == .talk {
-                // Any tap ends a hands-free command.
-                commandLatched = false
-                onRelease?()
-            }
-            gesture.keyDown(at: now)
-            holdTimer?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    if self.gesture.holdTimerFired(at: ProcessInfo.processInfo.systemUptime) == .holdBegan, self.role == .dictation { self.onPress?() }
-                }
-            }
-            holdTimer = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + gesture.holdDelay, execute: work)
-        } else if !down, sharedDown {
-            sharedDown = false
-            holdTimer?.cancel()
-            switch gesture.keyUp(at: now) {
-            case .holdEnded?: if role == .dictation { onRelease?() }
-            case .doubleTap?: if role == .talk { commandLatched = true; onPress?() }
-            default: break
-            }
+    /// Sleep and wake tell the machine to drop an open turn. Idempotent.
+    func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
+        guard sleepObservers.isEmpty else { return }
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification] {
+            sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.interrupt() }
+            })
         }
     }
 
-    private func evaluate() {
-        guard let key = keyProvider() else {
-            if isDown { isDown = false; onRelease?() }
-            return
-        }
+    private func tick() { send(.tick(at: now(), live: liveModifiers())) }
+
+    // MARK: Effects
+
+    private var config: VoiceKeyMachine.Config {
+        let key = keyProvider()
         let shared = sharedProvider()
-        let directPress = role == .dictation && !shared && directPressProvider()
-        if directPress != directPressActive {
-            directPressActive = directPress
-            pendingStop?.cancel()
-            pendingStop = nil
-            latch = TalkKeyLatch()
-            isDown = false
-        }
-        if shared {
-            handleShared(key)
-            return
-        }
-        let pressed = state.isHeld(key, exact: true)
-        if directPress {
-            if pressed, !isDown {
-                if key == .controlOption, NSWorkspace.shared.isVoiceOverEnabled {
-                    onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
-                    return
-                }
-                isDown = true
-                onPress?()
-            } else if !pressed, isDown {
-                isDown = false
-            }
-            return
-        }
-        if pressed, !isDown {
-            if key == .controlOption, NSWorkspace.shared.isVoiceOverEnabled {
-                onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
-                return
-            }
-            isDown = true
-            VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(key.title))")
-            fire(latch.keyDown(at: ProcessInfo.processInfo.systemUptime))
-        } else if !pressed, isDown {
-            isDown = false
-            fire(latch.keyUp(at: ProcessInfo.processInfo.systemUptime))
-        }
+        let toggle = role == .dictation && !shared && directPressProvider()
+        return VoiceKeyMachine.Config(key: key,
+                                      role: role == .talk ? .talk : .dictation,
+                                      mode: shared ? .shared : toggle ? .toggle : .hold,
+                                      voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
+                                      confirm: confirmProvider?() ?? key.map(Self.tilingConfirm) ?? 0)
     }
 
-    /// Hold to talk; double-tap to keep listening hands-free until the next tap.
-    private func fire(_ action: TalkKeyLatch.Action?) {
-        switch action {
-        case .start?: onPress?()
-        case .stop?: onRelease?()
-        case .stopLater(let gap)?:
-            pendingStop?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.pendingStop = nil
-                    self.fire(self.latch.pendingStopFired())
+    /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
+    /// inside a callback meets the machine in its new state. The k-th `start` of a call is turn `generation before + k`.
+    private func send(_ event: VoiceKeyMachine.Event) {
+        let config = config
+        let before = machine.generation
+        var started = 0
+        for effect in machine.handle(event, config: config) {
+            switch effect {
+            case .start:
+                started += 1
+                let turn = before + started
+                ownerTurn = turn
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(config.key?.title ?? "none"))")
+                if onPress?() == false { send(.abandon(turn: turn)) }
+            case .send:
+                onRelease?()
+            case .cancel:
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut became another shortcut: cancelled, nothing sent")
+                onCancel?()
+            case .refused:
+                onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
+            case .wake(let after):
+                DispatchQueue.main.asyncAfter(deadline: .now() + after) { [weak self] in
+                    MainActor.assumeIsolated { self?.tick() }
                 }
             }
-            pendingStop = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + gap, execute: work)
-        case .cancelPendingStop?:
-            pendingStop?.cancel()
-            pendingStop = nil
-        case nil: break
         }
     }
 }

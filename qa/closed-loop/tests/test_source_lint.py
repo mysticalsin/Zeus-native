@@ -24,10 +24,11 @@ HANDLER_APIS = re.compile(r"\b(?:SFSpeechRecognizer\.requestAuthorization|INFocu
 
 
 POINTING = APP / "Pointing"
+TILING = APP / "Tiling"
 # Pointing must advance on real events, never a sleep, and must never use the word-count clock.
 POINTING_FORBIDDEN = re.compile(r"\bTask\.sleep\b|SpeechDrawingTimeline\.estimate|\.installTap\(|\brequestAccess\(|\brequestAuthorization\b|CGRequestScreenCaptureAccess|CGRequestListenEventAccess")
-# System callbacks that must be installed from a nonisolated function.
-POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents")
+# System callbacks that must be installed from a nonisolated function (Pointing and Tiling both follow this).
+POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents|AXObserverCreate")
 
 
 def pointing_callback_offenders(text, label="sample"):
@@ -40,6 +41,32 @@ def pointing_callback_offenders(text, label="sample"):
         header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
         if "nonisolated" not in header:
             offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
+# The tiling tap consumes keys, so the thread that services it must never be the main thread: the window server holds
+# every keystroke in every app until the tap callback runs, and Accessibility passes run on main.
+MAIN_RUN_LOOP = re.compile(r"CFRunLoopGetMain\s*\(|\bRunLoop\.main\b")
+
+
+def main_run_loop_offenders(text, label="sample"):
+    """Lines that name the main run loop, where a tap source could be added to it."""
+    return [f"{label}:{index + 1}" for index, line in enumerate(text.splitlines())
+            if not line.strip().startswith("//") and MAIN_RUN_LOOP.search(strip_trailing_comment(line))]
+
+
+def main_run_loop_offenders_under(directory):
+    offenders = []
+    for p in sorted(directory.rglob("*.swift")):
+        offenders += main_run_loop_offenders(p.read_text(), str(p.relative_to(directory.parent)))
+    return offenders
+
+
+def callback_offenders_under(directory):
+    """Every system-callback install under `directory` that is not in a nonisolated function."""
+    offenders = []
+    for p in sorted(directory.rglob("*.swift")):
+        offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(directory.parent)))
     return offenders
 
 
@@ -155,6 +182,23 @@ class SourceLint(unittest.TestCase):
             offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(ROOT)))
         self.assertEqual(offenders, [])
 
+    def test_tiling_system_callbacks_are_installed_from_nonisolated_functions(self):
+        self.assertEqual(callback_offenders_under(TILING), [])
+
+    def test_the_tiling_tap_source_is_never_added_to_the_main_run_loop(self):
+        self.assertEqual(main_run_loop_offenders_under(TILING), [])
+
+    def test_main_run_loop_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: the exact shape the first tiling tap had, and the ones that mean the same thing.
+        bad = "nonisolated func start() {\n    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)\n}\n"
+        self.assertEqual(main_run_loop_offenders(bad), ["sample:2"])
+        self.assertEqual(main_run_loop_offenders("RunLoop.main.add(timer, forMode: .common)"), ["sample:1"])
+        self.assertEqual(main_run_loop_offenders("CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)"), ["sample:1"])
+        good = "nonisolated func install(on loop: CFRunLoop) {\n    CFRunLoopAddSource(loop, source, .commonModes)\n}\n"
+        self.assertEqual(main_run_loop_offenders(good), [])
+        self.assertEqual(main_run_loop_offenders("// never CFRunLoopGetMain() here\nlet loop = CFRunLoopGetCurrent()"), [])
+        self.assertEqual(main_run_loop_offenders("let loop = CFRunLoopGetCurrent() // not CFRunLoopGetMain()"), [])
+
     def test_pointing_lint_detects_its_failure_shapes(self):
         # Fail-first samples: the exact shapes the lint exists to catch.
         self.assertTrue(POINTING_FORBIDDEN.search("try await Task.sleep(for: .seconds(1))"))
@@ -164,6 +208,25 @@ class SourceLint(unittest.TestCase):
         self.assertEqual(pointing_callback_offenders(bad), ["sample:3"])
         good = "enum B {\n    nonisolated static func start() {\n        CGEvent.tapCreate(tap: x)\n    }\n}"
         self.assertEqual(pointing_callback_offenders(good), [])
+
+    def test_tiling_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: a tap installed from a main-actor function under a Tiling folder is reported.
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "Tiling"
+            folder.mkdir()
+            (folder / "Bad.swift").write_text(
+                "@MainActor final class K {\n    func start() {\n"
+                "        CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap)\n    }\n}\n")
+            self.assertEqual(callback_offenders_under(folder), ["Tiling/Bad.swift:3"])
+            (folder / "Bad.swift").write_text(
+                "enum K {\n    nonisolated func start() {\n        CGEvent.tapCreate(tap: .cgSessionEventTap)\n    }\n}\n")
+            self.assertEqual(callback_offenders_under(folder), [])
+        # The observer API the later Accessibility upgrade will use is watched too.
+        observer = "@MainActor final class K {\n    func watch() {\n        AXObserverCreate(pid, callback, &observer)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(observer), ["sample:3"])
+        fine = "enum K {\n    nonisolated func watch() {\n        AXObserverCreate(pid, callback, &observer)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(fine), [])
 
     def test_lint_detects_the_original_crash_shapes(self):
         # Fail-first evidence kept as a test: the exact pre-fix lines must be flagged.
@@ -246,6 +309,7 @@ AUDITED_BLOCKING_FILES = {
     "Zeus/Watch/ZeusWatchRunner.swift": "Child wait inside a continuation on a global queue, killed after 3 s.",
     "Zeus/App/KeychainSelfTest.swift": "Command-line self test: no window exists.",
     "Zeus/Voice/VoiceSample.swift": "Command-line sample mode: no window exists.",
+    "Zeus/Tiling/TilingRunLoopThread.swift": "stop() waits for the tap thread to remove its tap. That thread runs only the tap callback and the teardown, so it ends in microseconds, and the wait is bounded to 2 s.",
     "ZeusCore/Insomnia/InsomniaCommands.swift": "ProcessCommandRunner runs on the Insomnia serial queue; every wait has a timeout.",
     "ZeusCore/Diagnostics/FlightRecorder.swift": "The ditto zip is exported from Task.detached (GSDiagnosticsLogs).",
 }
@@ -765,6 +829,89 @@ class PointingMainActorLint(unittest.TestCase):
         controller = (self.POINTING / "PointingController.swift").read_text()
         self.assertNotIn("show(capturingMouse: true)", controller)
         self.assertIn("show(capturingMouse: false)", controller)
+
+
+class TilingWiringLint(unittest.TestCase):
+    """Tiling is off until the owner turns it on, never prompts, never ticks, and its panels are in every hand-kept list."""
+    DELEGATE = (APP / "App/AppDelegate.swift").read_text()
+
+    @staticmethod
+    def body(text, start, end):
+        first = text.index(start)
+        return text[first:text.index(end, first)]
+
+    def tiling_sources(self):
+        return sorted(TILING.rglob("*.swift")) + [APP / "TopBar/TilingPage.swift"]
+
+    def test_the_controller_starts_only_from_the_gated_sync_and_stops_at_quit(self):
+        self.assertIn("if on(.tiling)", self.DELEGATE)
+        self.assertEqual(self.DELEGATE.count("TilingController.shared.start()"), 1)
+        sync = self.body(self.DELEGATE, "private func syncTiling()", "\n    }\n")
+        self.assertIn("guard on(.tiling)", sync)
+        self.assertIn("TilingController.shared.start()", sync)
+        self.assertIn("UserDefaults.didChangeNotification", self.body(self.DELEGATE, "if on(.tiling) {\n", "\n        }\n"))
+        terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertIn("TilingController.shared.stop()", terminate)
+
+    def test_quitting_stops_tiling_only_when_the_startup_service_is_allowed(self):
+        terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertRegex(terminate, r"if on\(\.tiling\) \{\s*TilingController\.shared\.stop\(\)\s*\}")
+
+    def test_the_driver_never_reads_zeus_itself_and_every_driver_must_say_what_is_in_front(self):
+        ax = (TILING / "AXTilingWindowDriver.swift").read_text()
+        front = self.body(ax, "func frontmost()", "\n    }\n")
+        self.assertIn("ProcessInfo.processInfo.processIdentifier", front)
+        protocol = (ROOT / "Sources/ZeusCore/Tiling/TileWindowDriver.swift").read_text()
+        self.assertNotIn("extension TilingWindowDriver", protocol)
+
+    def test_the_page_marks_the_key_pair_by_shape_and_rechecks_accessibility_when_zeus_is_activated(self):
+        page = (APP / "TopBar/TilingPage.swift").read_text()
+        keys = self.body(page, "private var keysRow", "\n    }\n")
+        self.assertIn("checkmark", keys)
+        self.assertIn("NSApplication.didBecomeActiveNotification", page)
+
+    def test_both_overlays_are_in_the_sharing_refresh_and_the_debug_capture_boost(self):
+        sharing = (APP / "App/ZeusWindowSharing.swift").read_text()
+        for name in ("TilingFocusBorder", "TilingKeySheet"):
+            self.assertIn(f"{name}.shared.applyScreenSharePolicy(visibleInShare: visible)", sharing)
+            self.assertIn(f"{name}.shared.boostCaptureVisibility(for: captureBoost)", self.DELEGATE)
+
+    def test_every_tiling_panel_is_registered_with_the_window_sharing_policy_when_it_is_made(self):
+        for name in ("TilingFocusBorder", "TilingKeySheet"):
+            text = (TILING / f"{name}.swift").read_text()
+            self.assertIn("ZeusWindowSharing.apply(to: panel", text, name)
+            self.assertIn("surface: .zeusStandard", text, name)
+            self.assertIn("TopBarStyle.isSnapshot", text, name)
+
+    def test_tiling_never_prompts_for_a_permission(self):
+        forbidden = re.compile(r"AXIsProcessTrustedWithOptions|kAXTrustedCheckOptionPrompt|requestAccess\(|requestAuthorization|CGRequestListenEventAccess|CGRequestPostEventAccess|CGRequestScreenCaptureAccess")
+        for path in self.tiling_sources():
+            self.assertIsNone(forbidden.search(path.read_text()), path.name)
+
+    def test_tiling_has_no_ticking_clock_and_no_sleeping_task(self):
+        forbidden = re.compile(r"\bTimelineView\b|Timer\.scheduledTimer|\bTask\.sleep\b|\bTickingView\b|\bEdgeLightClock\b")
+        for path in self.tiling_sources():
+            self.assertIsNone(forbidden.search(path.read_text()), path.name)
+
+    def test_the_page_makes_no_accessibility_or_overlay_call_of_its_own(self):
+        page = (APP / "TopBar/TilingPage.swift").read_text()
+        for name in ("AXIsProcessTrusted", "AXUIElement", "AccessibilityGate", "TilingFocusBorder", "TilingKeySheet", "NSScreen"):
+            self.assertNotIn(name, page)
+
+    def test_the_page_is_routed_from_the_page_switch(self):
+        views = (APP / "TopBar/TopBarViews.swift").read_text()
+        self.assertIn("case .tiling: TilingPage(topBar: topBar, tiling: topBar.tilingForSnapshot ?? .shared)", views)
+
+    def test_tiling_is_a_startup_service_a_qa_startup_denies(self):
+        core = (ROOT / "Sources/ZeusCore/StartupPolicy.swift").read_text()
+        self.assertRegex(core, r"\bcase\b[^\n]*\btiling\b")
+        self.assertNotRegex(core.split("qaAllowed", 1)[1].split("\n", 1)[0], r"tiling")
+
+    def test_the_lint_notices_a_ticking_clock_and_a_prompt(self):
+        ticking = "struct V: View { var body: some View { TimelineView(.animation) { _ in Text(\"x\") } } }"
+        self.assertIsNotNone(re.search(r"\bTimelineView\b", ticking))
+        prompt = "let ok = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt: true] as CFDictionary)"
+        self.assertIsNotNone(re.search(r"AXIsProcessTrustedWithOptions|kAXTrustedCheckOptionPrompt", prompt))
 
 
 def mic_read(relative):

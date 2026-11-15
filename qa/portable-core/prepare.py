@@ -120,7 +120,7 @@ GROUPS = {
              "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
              "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
              "Explanation/ExplanationChartMath.swift", "Pointing/PointingCardAnchors.swift", "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
-             "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
+             "KeyFacts.swift", "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
              "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
              "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
              "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",

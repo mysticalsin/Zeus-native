@@ -15,6 +15,8 @@ public enum StartupService: String, CaseIterable, Sendable {
     case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord, pointingHotkey
     case connectionsRefresh, autoOnboarding, demoArg, motionOpenArg, deepLinks
     case settingsWindow, onboardingWindow, chatWindow, demoPlayback, facePresence
+    // Arranging other apps' windows from the keyboard. Off until the owner turns it on; a QA startup denies it.
+    case tiling
 }
 
 public enum StartupMode: Equatable, Sendable {

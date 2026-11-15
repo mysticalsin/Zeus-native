@@ -5482,6 +5482,42 @@
         "file": "Tests/ZeusAppTests/EqualiserControllerTests.swift",
         "function": "aRefusalOnRecordWaitsForTryAgainAtLaunch"
       }
+    },
+    {
+      "id": "REG-625",
+      "failure": "Shift joining a talk hold was read as a release: Control, Option, Shift, Command, Left sent the turn 0.4 s later, and two quick swaps latched hands-free.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+        "function": "f1ControlOptionShiftCommandLeftSendsAndLatchesNothingWithTheConfirm"
+      }
+    },
+    {
+      "id": "REG-626",
+      "failure": "The window swap chord (Control, Option, Shift, Command, Left; or Right Command, Shift, Control, Option, Left) inserted text through a dictation key that shares its modifiers.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyMachineTests.swift",
+        "function": "theSwapChordOnADictationKeyOfControlOptionInsertsNothing"
+      }
+    },
+    {
+      "id": "REG-627",
+      "failure": "A modifier-only talk, dictation or Polyglot key on the tiling pair plus Shift was compared with the bare pair only, so the tiling tap and the voice key both acted on one chord.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
+        "function": "aHoldKeyOnThePairPlusShiftIsRefused"
+      }
     }
   ]
 }

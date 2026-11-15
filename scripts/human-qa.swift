@@ -484,8 +484,8 @@ let settingsPages: [(raw: String, title: String)] = [
     ("general", "General"), ("appearance", "Appearance"), ("sounds", "Sounds"), ("notifications", "Notifications"),
     ("shortcuts", "Shortcuts"), ("insomnia", "Insomnia"), ("integrations", "Integrations"), ("murmure", "Murmure"),
     ("polyglot", "Polyglot"), ("dictation", "Dictation"), ("voice", "Voice"), ("engine", "Engine"),
-    ("features", "Features"), ("beamer", "Beamer"), ("license", "License"), ("permissions", "Permissions"),
-    ("privacy", "Privacy"), ("diagnostics", "Diagnostics"), ("about", "About"),
+    ("features", "Features"), ("beamer", "Beamer"), ("tiling", "Tiling"), ("license", "License"),
+    ("permissions", "Permissions"), ("privacy", "Privacy"), ("diagnostics", "Diagnostics"), ("about", "About"),
 ]
 
 func settingsWindow() -> AXN? { window(titleContaining: "Zeus Settings") }

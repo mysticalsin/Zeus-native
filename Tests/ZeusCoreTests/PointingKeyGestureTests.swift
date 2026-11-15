@@ -40,6 +40,25 @@ struct PointingKeyGestureTests {
         #expect(hold(&gesture, at: 2) == .began)
     }
 
+    /// Tab into a password field: its key-up never reaches the tap, so the picture keeps Tab down.
+    @Test func aKeyWhoseKeyUpWasNeverSeenBlocksTheHoldUntilASweepDropsIt() {
+        var gesture = PointingKeyGesture()
+        _ = gesture.feed(.keyDown(keyCode: 48, modifiers: []), at: 0)
+        #expect(hold(&gesture, at: 1) == nil, "Tab reads as a foreign key")
+        _ = gesture.feed(.flags(keyCode: 58, modifiers: [.control]), at: 1.5)
+        _ = gesture.feed(.flags(keyCode: 59, modifiers: []), at: 1.6)
+        gesture.sweep { _ in [] }
+        #expect(hold(&gesture, at: 2) == .began, "the system says Tab is up")
+    }
+
+    @Test func aSweepKeepsAKeyTheSystemStillReportsDown() {
+        var gesture = PointingKeyGesture()
+        _ = gesture.feed(.keyDown(keyCode: 48, modifiers: []), at: 0)
+        gesture.sweep { $0 }
+        #expect(hold(&gesture, at: 1) == nil)
+        #expect(!gesture.isActive)
+    }
+
     @Test func commandJoiningCancels() {
         var gesture = PointingKeyGesture()
         _ = hold(&gesture)
@@ -80,6 +99,79 @@ struct PointingKeyGestureTests {
         _ = chord.feed(.flags(keyCode: 59, modifiers: []), at: 0.15)
         _ = chord.feed(control, at: 0.2)
         #expect(chord.feed(.flags(keyCode: 59, modifiers: []), at: 0.3) == nil)
+    }
+
+    // MARK: The same facts and the same start rule as the voice keys
+
+    @Test func aLargerChordThatShrinksToTheKeyStartsNothing() {
+        var gesture = PointingKeyGesture()
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.command]), at: 0) == nil)
+        #expect(gesture.feed(.flags(keyCode: 59, modifiers: [.command, .control]), at: 0.1) == nil)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.command, .control, .option]), at: 0.2) == nil)
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option]), at: 0.3) == nil, "the shrink begins nothing")
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: []), at: 0.4) == nil)
+        #expect(hold(&gesture, at: 2) == .began, "a clean press after every key was up works")
+    }
+
+    @Test func theOtherSideOfASidedKeyIsForeign() {
+        var gesture = PointingKeyGesture(shortcut: .rightOption)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.option]), at: 0) == nil, "Left Option is not Right Option")
+        #expect(gesture.feed(.flags(keyCode: 61, modifiers: [.option]), at: 0.1) == nil, "and it bars the press")
+    }
+
+    @Test func anExactHoldWaitsForItsConfirmAndThenBegins() {
+        var gesture = PointingKeyGesture()
+        gesture.confirm = 0.15
+        _ = gesture.feed(control, at: 0)
+        #expect(gesture.feed(controlOption, at: 0.01) == .armed)
+        #expect(gesture.isArmed && !gesture.isActive)
+        #expect(gesture.confirmElapsed(at: 0.05, liveModifiers: nil) == nil, "not due yet")
+        #expect(gesture.confirmElapsed(at: 0.2, liveModifiers: [.control, .option]) == .began)
+        #expect(gesture.isActive && !gesture.isArmed)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control]), at: 1) == .ended)
+    }
+
+    @Test func aTapShorterThanTheConfirmBeginsNothing() {
+        var gesture = PointingKeyGesture()
+        gesture.confirm = 0.15
+        _ = hold(&gesture)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control]), at: 0.05) == nil)
+        #expect(gesture.confirmElapsed(at: 0.3, liveModifiers: nil) == nil)
+        #expect(!gesture.isActive && !gesture.isArmed)
+    }
+
+    @Test func aLargerChordWhileArmedBeginsNothingAndBarsTheShrink() {
+        var gesture = PointingKeyGesture()
+        gesture.confirm = 0.15
+        _ = hold(&gesture)
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option, .command]), at: 0.05) == nil)
+        #expect(gesture.confirmElapsed(at: 0.3, liveModifiers: nil) == nil)
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option]), at: 0.4) == nil, "no start on the shrink")
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: []), at: 0.5) == nil)
+        gesture.confirm = 0
+        #expect(hold(&gesture, at: 2) == .began)
+    }
+
+    @Test func aMissedReleaseIsFoundAtTheConfirm() {
+        var gesture = PointingKeyGesture()
+        gesture.confirm = 0.15
+        _ = hold(&gesture)
+        #expect(gesture.confirmElapsed(at: 0.3, liveModifiers: []) == nil, "the live keys are up: nothing begins")
+        #expect(!gesture.isActive)
+    }
+
+    /// The confirm's wake runs before the flags event of a Command pressed 0.08 s in: the live modifiers already show it.
+    @Test func aModifierOnlyTheLiveFlagsShowBeginsNothingAndBarsTheShrink() {
+        var gesture = PointingKeyGesture()
+        gesture.confirm = 0.15
+        _ = hold(&gesture)
+        #expect(gesture.confirmElapsed(at: 0.2, liveModifiers: [.control, .option, .command]) == nil)
+        #expect(!gesture.isActive && !gesture.isArmed)
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option, .command]), at: 0.25) == nil, "the queued event finds nothing to cancel")
+        #expect(gesture.feed(.flags(keyCode: 55, modifiers: [.control, .option]), at: 0.4) == nil, "no start on the shrink")
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: []), at: 0.5) == nil)
+        gesture.confirm = 0
+        #expect(hold(&gesture, at: 2) == .began)
     }
 
     @Test func aSlowControlPressIsNotATap() {

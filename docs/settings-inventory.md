@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 189 of 189 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 189 in scope). 178 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 196 of 196 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 196 in scope). 185 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 138.
+**Before this round:** has 19, partial 27, missing 145.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -299,6 +299,18 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Models | Models Zeus uses (read-only) | status | - | Which model each engine uses, never above Haiku or Sonnet. | missing | custom | `models.caps` | Zeus addition. Read-only display of ModelCap. |
 | Drive | When Zeus may drive your Mac | menu | - | How much Zeus may do on its own on your Mac. | missing | custom | `privacy.driveAutonomy` | Zeus addition. Privacy page; stored under drive.autonomy. |
 | Drive | Move the system pointer | toggle | - | Drive mode may glide and click with CGEvent when Accessibility cannot. | missing | live | `present.physicalPointer` | L5. Off by default. Key present.physicalPointer. |
+
+## Tiling
+
+| Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Arrange | Arrange my windows from the keyboard | toggle | - | Snaps the windows on each screen into a tidy grid, and keys move focus, swap windows and flip a split. Off until you turn it on. | missing | live | `tiling.enabled` | Zeus addition. Off by default, and a settings import never turns it on. It reads the frames of other apps' windows and moves them with Accessibility; no window title or content is read or stored. |
+| Arrange | Tiling keys | menu | - | The keys you hold with a letter or an arrow to move, swap and resize windows. Control-Option is also Talk to Zeus and pointing, and VoiceOver uses it, so Zeus asks you to pick another pair when they clash. | missing | live | `tiling.keyBase` | Zeus addition. An unknown stored choice reads as Control-Option-Command. |
+| Layout | Gap between windows | slider | - | Space between two tiled windows, in points. | missing | live | `tiling.innerGap` | Zeus addition. Whole points; the engine keeps it between 0 and 64. |
+| Layout | Gap to the screen edge | slider | - | Space between the tiled windows and the edge of the screen, in points. | missing | live | `tiling.outerGap` | Zeus addition. Whole points; the engine keeps it between 0 and 64. |
+| Layout | Default split | slider | - | How much of a slot the window already there keeps when a new window joins it. | missing | live | `tiling.splitRatio` | Zeus addition. A percentage; the engine keeps it between 15 and 85. |
+| Focus | Ring the focused window | toggle | - | Draws a thin ring around the window the tiling keys act on. | missing | live | `tiling.focusBorder` | Zeus addition. Applies while tiling is on. |
+| Left out | Apps Zeus never tiles | text | - | Bundle ids, separated by commas. Their windows are left where they are. | missing | live | `tiling.excludedApps` | Zeus addition. Bundle ids, comma separated; case is kept. |
 
 ## Zeus additions beyond the reference app
 

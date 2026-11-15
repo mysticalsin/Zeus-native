@@ -11,6 +11,8 @@ final class TopBarModel {
     @ObservationIgnored private let defaults: UserDefaults
     /// Offscreen snapshots give the Record page its own controller with fake displays; nil in the app.
     @ObservationIgnored var recordlyForSnapshot: RecordlyController?
+    /// Offscreen snapshots give the Tiling page a seeded controller that reads and starts nothing; nil in the app.
+    @ObservationIgnored var tilingForSnapshot: TilingController?
     struct CalendarItem: Identifiable, Equatable {
         let id: String
         var title: String
@@ -287,6 +289,10 @@ final class TopBarModel {
         let addAgents = !defaults.bool(forKey: "topBar.row13.v2")
         if addAgents, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row13.v2") }
         if addAgents { upgraded = upgraded.upgradedToAgentsRow() }
+        // Tiling joins the row right after Home (fourteen tabs). The flag is saved together with the row below.
+        let addTiling = !defaults.bool(forKey: "topBar.row14.v1")
+        if addTiling, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row14.v1") }
+        if addTiling { upgraded = upgraded.upgradedToTilingRow() }
         // Repair, once per version: an earlier launch saved the flags above without the upgraded row, so on
         // this launch none of them is true and the row would stay old. Only a row that was saved is repaired.
         let needsRepair = defaults.integer(forKey: "topBar.layoutRepair") < TopBarLayoutRepair.version
@@ -300,7 +306,7 @@ final class TopBarModel {
         // Property observers don't run inside init, so save the upgraded row here. Otherwise the
         // one-time flags above stop the upgrade from running again while the old row stays saved.
         if !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA {
-            if reorder || addPolyglot || addRecordly || addScribe || addAgents || repairedRow {
+            if reorder || addPolyglot || addRecordly || addScribe || addAgents || addTiling || repairedRow {
                 defaults.set(upgraded.encoded(), forKey: "topBar.tabs")
                 defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
             }

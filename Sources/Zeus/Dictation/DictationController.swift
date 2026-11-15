@@ -284,7 +284,11 @@ final class DictationController {
     private var pausedMedia: NowPlayingSource?
     /// Every dictation job (live turn, file, history re-run) as one state; `topBar.dictationPhase` only mirrors it.
     private(set) var flow: DictationFlow.State = .idle {
-        didSet { topBar.dictationPhase = flow.phase }
+        didSet {
+            topBar.dictationPhase = flow.phase
+            // Whatever ended the listening turn (the key, Escape, a failed start), the key machine forgets it.
+            if oldValue.isListening, !flow.isListening { hotkey.turnEnded() }
+        }
     }
     /// The local model's download and load: one state, mirrored into `SpeechEngineStatus` for the views.
     private var modelState = ModelPreparation.State.idle
@@ -363,9 +367,13 @@ final class DictationController {
         }
         hotkey.directPressProvider = { [weak self] in self?.settings.selectedBehavior == .pressToToggle }
         hotkey.role = .dictation
-        hotkey.onPress = { [weak self] in self?.handleDictationKeyPress() }
+        hotkey.onPress = { [weak self] in self?.handleDictationKeyPress() ?? false }
         hotkey.onRelease = { [weak self] in self?.handleDictationKeyRelease() }
-        hotkey.onCancel = { [weak self] in self?.cancel() }
+        // A cancel reaches only a listening turn: a job that is transcribing or rewriting is not the key's to drop.
+        hotkey.onCancel = { [weak self] in
+            guard let self, self.flow.isListening else { return }
+            self.cancel()
+        }
         hotkey.start()
         DictationCuePlayer.prepare()
         speech.onLevel = { [weak self] level in
@@ -390,10 +398,15 @@ final class DictationController {
         settings.selectedBehavior
     }
 
-    private func handleDictationKeyPress() {
+    /// Whether the press took: a begin that left the flow listening did, and so did a finish.
+    private func handleDictationKeyPress() -> Bool {
         switch effectiveBehavior.actionOnPress(isDictating: topBar.isDictating) {
-        case .begin: begin()
-        case .finish: finish()
+        case .begin:
+            begin()
+            return flow.isListening
+        case .finish:
+            finish()
+            return true
         }
     }
 

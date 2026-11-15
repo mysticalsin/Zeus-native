@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pointing: PointingController?
     private var pointingProviders: PointingProviders?
     private var pointingSettingsObserver: NSObjectProtocol?
+    private var tilingSettingsObserver: NSObjectProtocol?
     private var explanationQuitToken: UUID?
     /// The per-app equaliser. Built with its live ports; only the owner's switch starts it, live or as stored at launch.
     private var equaliser: EqualiserController?
@@ -94,6 +95,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointing?.stop()
         // Every shaping tap is destroyed and the claim released, so no app is left muted.
         equaliser?.shutdown()
+        // Tiling removes its key tap, observers and overlays. It never moves a window on the way out. The controller
+        // is not even made when the service is denied.
+        if on(.tiling) { TilingController.shared.stop() }
         // A lid-closed session puts sleep, sound, Low Power and frozen apps back before Zeus goes.
         if on(.insomniaShutdown) { InsomniaController.shared.shutdown() }
         // A Memory edit typed inside its 600 ms pause is written before Zeus goes.
@@ -292,14 +296,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.cliInstall) { CLIInstaller.install() }
         if on(.assistantKeyImport) { AssistantKeyImporter.importDefaultIfNeeded() }
         if on(.talkHotkey) {
-            hotkey.onPress = { [weak self] in self?.talkKeyPressed() }
+            hotkey.onPress = { [weak self] in self?.talkKeyPressed() ?? false }
             hotkey.onRelease = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
-            // ⌃⌥Space, ⌃⌥C and other chords built on the talk keys cancel the hold instead of sending it.
-            hotkey.cancelsWhenSpoiled = true
+            // A turn that stops listening for its own reason (a failed start, the owner ending it) is told to the key
+            // machine, so the next press starts a turn instead of being spent on one that is gone.
+            voice?.onListeningEnded = { [weak self] in
+                WakeWordController.shared.talkKeyHeld = false
+                self?.hotkey.turnEnded()
+            }
+            // A chord or a key that joins the talk keys cancels the hold instead of sending it.
             hotkey.onCancel = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.cancelListening()
@@ -312,6 +321,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pointingSettingsObserver = NotificationCenter.default.addObserver(
                 forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.syncPointing() }
+            }
+        }
+        if on(.tiling) {
+            syncTiling()
+            // The switch can change while Zeus runs; tiling starts or stops with it.
+            tilingSettingsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncTiling() }
             }
         }
         if on(.polyglotHotkey) {
@@ -534,6 +551,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenEdgeGlowController.shared.boostCaptureVisibility(for: captureBoost)
             EdgeWaveController.shared.boostCaptureVisibility(for: captureBoost)
             ScreenCornerOverlay.shared.boostCaptureVisibility(for: captureBoost)
+            TilingFocusBorder.shared.boostCaptureVisibility(for: captureBoost)
+            TilingKeySheet.shared.boostCaptureVisibility(for: captureBoost)
             return NotchDebugAnimator.run(lower, topBar: self.topBar)
         }
     }
@@ -587,8 +606,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    private func talkKeyPressed() {
-        guard on(.talkHotkey), voice != nil else { return }
+    /// Whether a turn opened: false tells the key machine nothing is listening, so no release or cancel is owed.
+    private func talkKeyPressed() -> Bool {
+        guard on(.talkHotkey), voice != nil else { return false }
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
@@ -603,9 +623,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let access = await VoicePermissions.ensure(explicit: true)
                 if access == .ready { self.topBar.show(.hint("Zeus can hear you now: press the talk key again")) }
             }
-            return
+            return false
         }
-        voice?.press()
+        let took = voice?.press() ?? false
+        // No release follows a press that opened nothing, so the wake word listener must not stay held off.
+        if !took { WakeWordController.shared.talkKeyHeld = false }
+        return took
     }
 
     /// Desktop pointing: on by default (`docs/FIRST-RUN-DEFAULTS.md`). Starting it only installs the key
@@ -616,6 +639,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         syncDictationPreset()
         if PointingSettings.enabled { pointingController().start() }
         else if let pointing { pointing.stop(); self.pointing = nil; pointingProviders = nil }
+    }
+
+    /// Tiling: off until the owner turns it on (`tiling.enabled`). Starting it installs the key layer and waits for
+    /// Accessibility without a prompt; turning it off removes everything. Cheap when nothing changed, because the
+    /// settings notify on every preference write.
+    private func syncTiling() {
+        guard on(.tiling) else { return }
+        if FeatureSettings.tilingEnabled() { TilingController.shared.start() } else { TilingController.shared.stop() }
     }
 
     /// The optional Fn+Control dictation key. Off by default; turning it off restores the previous key.
