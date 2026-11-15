@@ -21,6 +21,12 @@ import Testing
 //
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
+//
+// Run H walks `PointingKeyGesture` under the same checker. The harness stands in for the monitor: an armed hold asks
+// for one wake after its confirm, an active hold for the watchdog every 0.25 s, and each wake reaches the gesture as the
+// call the monitor makes (`confirmElapsed` or `tick`) with the modifiers that are really down. Began is a start; ended
+// and a timed out hold are a send; cancelled is a cancel. The gesture has no owner that abandons a turn and no config to
+// flip, so those two moves are left out. Its 95 s bound is past the cap and stays with `PointingRobustnessTests`.
 
 /// One physical key of a run.
 struct WalkKey: Hashable, Sendable {
@@ -46,6 +52,8 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let ownCodes: [UInt16]
     /// The first is the start; a `flip` move goes to the next, and round to the first.
     let configs: [VoiceKeyMachine.Config]
+    /// The key is read by `PointingKeyGesture`, not by the voice key machine.
+    let pointing: Bool
 
     let ownMask: UInt16
     let shiftMask: UInt16
@@ -53,8 +61,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 
     var testDescription: String { name }
 
-    init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config]) {
+    init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false) {
         self.name = name
+        self.pointing = pointing
         self.keys = keys
         self.ownCodes = own
         self.configs = configs
@@ -79,7 +88,7 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         Config(key: key, role: role, mode: .hold, confirm: confirm)
     }
 
-    /// The nine runs of the plan.
+    /// The ten runs of the plan.
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
@@ -102,6 +111,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         // G: the shipped Polyglot key, Control-Option-T, with T in place of the arrow.
         WalkRun("G toggle Control-Option-T", keys: [.control, .option, .leftCommand, .shift, .letterT], own: [59, 58, 17],
                 configs: [Config(key: Shortcut(keyCode: 17, modifiers: [.control, .option]), role: .dictation, mode: .toggle)]),
+        // H: shipped pointing, Control-Option, with the confirm. The config only carries the key and the confirm.
+        WalkRun("H pointing Control-Option confirm 0.15", keys: basic, own: controlOption,
+                configs: [hold(.talk, .controlOption, confirm: 0.15)], pointing: true),
         // I: talk on Fn, the Globe key in place of Command.
         WalkRun("I talk hold Fn", keys: [.control, .option, .globe, .shift, .leftArrow], own: [63],
                 configs: [hold(.talk, .function, confirm: 0)]),
@@ -220,7 +232,30 @@ private struct StateKey: Hashable {
     var spoiled: Bool
     var barred: Bool
     var phase: VoiceKeyMachine.Phase
+    var pointing: PointingNorm?
     var checker: Checker
+}
+
+/// A pointing gesture with ages in place of times, capped at 0.45 s like the machine's phase: the confirm and the 0.25 s
+/// watchdog are inside it. The double Control tap (three timers in the gesture) is left out of the key: it only ever
+/// returns `doubleTapControl`, which no rule reads, and it never changes what `feed` decides about a hold.
+private struct PointingNorm: Hashable {
+    var state: ShortcutState
+    var active: Bool
+    var blocked: Bool
+    var waitForRelease: Bool
+    var activeAge: Int?
+    var armedAge: Int?
+
+    init(_ gesture: PointingKeyGesture, now: TimeInterval) {
+        func age(_ time: TimeInterval?) -> Int? { time.map { min(9, max(0, Int(((now - $0) / 0.05).rounded()))) } }
+        state = gesture.state
+        active = gesture.isActive
+        blocked = gesture.blockedByVoiceOver
+        waitForRelease = gesture.waitForRelease
+        activeAge = age(gesture.activeSince)
+        armedAge = age(gesture.armedSince)
+    }
 }
 
 private extension VoiceKeyMachine {
@@ -244,6 +279,8 @@ private struct Sim {
     static let gate = TileKeyGate(enabled: true)
 
     var machine = VoiceKeyMachine()
+    /// Run H: the gesture stands in for the machine; the machine stays as it was made.
+    var pointing: PointingKeyGesture?
     var down: UInt16 = 0
     /// The keys the machine has been told are down: the physical keys, less the events that are still on the way.
     /// The rules are read against this, because a key the machine was never told about cannot be told from no key.
@@ -264,11 +301,19 @@ private struct Sim {
 
     var now: TimeInterval { Double(step) * 0.05 }
 
+    init(_ run: WalkRun) {
+        guard run.pointing, let key = run.configs[0].key else { return }
+        var gesture = PointingKeyGesture(shortcut: key)
+        gesture.confirm = run.configs[0].confirm
+        pointing = gesture
+    }
+
     func key(_ run: WalkRun) -> StateKey {
         StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { $0 - step }.sorted(), cfg: cfg,
                  config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
                  keysDown: machine.keys.keysDown, spoiled: machine.keys.spoiled, barred: machine.barred,
-                 phase: machine.normalizedPhase(at: now), checker: checker)
+                 phase: machine.normalizedPhase(at: now), pointing: pointing.map { PointingNorm($0, now: now) },
+                 checker: checker)
     }
 
     func liveModifiers(_ run: WalkRun) -> ShortcutModifiers {
@@ -287,7 +332,7 @@ private struct Sim {
         }
         // Time does not pass while an event is held back: it is a matter of one turn of the run loop.
         if held == nil { out.append(.wait) } else { out.append(.deliver) }
-        out.append(.abandon)
+        if pointing == nil { out.append(.abandon) }
         if run.configs.count > 1 { out.append(.flip) }
         if held == nil, down & run.ordinaryMask == 0 { out.append(.interrupt) }
         return out
@@ -381,17 +426,60 @@ private struct Sim {
         }
         let config = run.configs[cfg]
         let wasLatched = machine.isLatched
-        let before = machine.phase
-        let effects = machine.handle(event, config: config)
+        let before = stage
+        let effects = handle(event, config: config)
         log += effects
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
         // phase that forgets to ask for its own wake is caught, not covered by a stale one.
-        if machine.phase != before { wakes.removeAll() }
+        if stage != before { wakes.removeAll() }
         for effect in effects {
             if case .wake(let after) = effect { wakes.insert(step + Int((after / 0.05).rounded())) }
         }
         check(effects, wasLatched: wasLatched, kind: kind, config: config, run)
         if kind != .tick { drainWakes(run) }
+    }
+
+    /// The phase of the machine, or for run H whether the gesture is idle, armed or active.
+    private var stage: Stage { Stage(phase: machine.phase, pointing: pointing.map { $0.isActive ? 2 : $0.isArmed ? 1 : 0 } ?? 0) }
+
+    private struct Stage: Equatable {
+        var phase: VoiceKeyMachine.Phase
+        var pointing: Int
+    }
+
+    private mutating func handle(_ event: VoiceKeyMachine.Event, config: VoiceKeyMachine.Config) -> [VoiceKeyMachine.Effect] {
+        guard var gesture = pointing else { return machine.handle(event, config: config) }
+        let effects: [VoiceKeyMachine.Effect]
+        switch event {
+        case .key(let key, let time):
+            effects = Self.effects(of: gesture.feed(key, at: time), gesture)
+        case .tick(let time, let live):
+            // The calls the monitor makes when a wake arrives: the confirm of an armed hold, the watchdog of an active one.
+            if gesture.isArmed {
+                effects = Self.effects(of: gesture.confirmElapsed(at: time, liveModifiers: live), gesture)
+            } else if gesture.isActive {
+                let output = gesture.tick(at: time, liveModifiers: live)
+                effects = output == nil ? [.wake(after: 0.25)] : Self.effects(of: output, gesture)
+            } else {
+                effects = []
+            }
+        case .interrupt(let live):
+            effects = Self.effects(of: gesture.interrupt(liveModifiers: live), gesture)
+        case .abandon:
+            effects = []
+        }
+        pointing = gesture
+        return effects
+    }
+
+    private static func effects(of output: PointingKeyGesture.Output?, _ gesture: PointingKeyGesture) -> [VoiceKeyMachine.Effect] {
+        switch output {
+        case .armed?: [.wake(after: gesture.confirm)]
+        case .began?: [.start, .wake(after: 0.25)]
+        case .ended?, .holdTimedOut?: [.send]
+        case .cancelled?: [.cancel]
+        case .escape?, .doubleTapControl?, nil: []
+        }
     }
 
     // MARK: The rules
@@ -430,6 +518,9 @@ private struct Sim {
         for effect in effects {
             switch effect {
             case .start:
+                if run.pointing, confirmSteps > 0, checker.pressAge < confirmSteps || checker.pressForeign {
+                    found.append("a pointing hold began before its own set had been down alone for the confirm")
+                }
                 if checker.cancelled { found.append("I2: start after a cancel, before every key was up") }
                 if checker.bigger { found.append("I6: start after the own set was down with something foreign, before every key was up") }
                 if phys.ownAll, phys.foreignAny { found.append("I3: start on a larger chord") }
@@ -547,7 +638,7 @@ private func search(_ run: WalkRun) -> Report {
     var seen: [Int: Int] = [:]
     var parents = [0], via: [Move] = [.wait]
     var frontier: [Sim?] = []
-    let root = Sim()
+    let root = Sim(run)
     seen[root.key(run).hashValue] = 0
     frontier.append(root)
     var seenRules: Set<String> = []
@@ -591,7 +682,7 @@ private func search(_ run: WalkRun) -> Report {
 
 /// Replays one order of moves through the harness and returns what the checker found.
 private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
-    var sim = Sim()
+    var sim = Sim(run)
     var out: [String] = []
     for name in names {
         let move: Move
@@ -671,7 +762,7 @@ private func replay(_ run: WalkRun, _ names: [String]) -> [String] {
                 walk(next, depth: depth + 1, trail: trail)
             }
         }
-        walk(Sim(), depth: 0, trail: [])
+        walk(Sim(run), depth: 0, trail: [])
         print("voice key walk, plain: \(sequences) sequences")
         #expect(sequences == 37_448)
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
