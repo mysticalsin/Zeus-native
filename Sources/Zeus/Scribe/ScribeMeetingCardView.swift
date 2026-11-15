@@ -237,21 +237,25 @@ private struct ScribeMeetingCardBody: View {
 
     /// One element for the words, "<title>, <status>"; the buttons stay elements of their own.
     private var words: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // One value for the Text and for the owned host's probe, so what is read back cannot drift from what is drawn.
+        let line = card.meeting.map(timeLineText)
+        return VStack(alignment: .leading, spacing: 0) {
             pill
-            if let meeting = card.meeting {
+            if let meeting = card.meeting, let line {
                 Text(ScribeMeetingCardText.title(meeting))
                     .font(TopBarStyle.label(M.titleSize, .bold))
                     .foregroundStyle(Color.white)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .padding(.top, 3)
-                timeLine(meeting).padding(.top, 1)
+                timeLine(line).padding(.top, 1)
                 thirdLine(meeting).padding(.top, 2)
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ScribeMeetingCardText.label(card, now: spec.now))
+        // Outside the ignored accessibility subtree, so the owned host can read what the time Text drew.
+        .ownedJourneyText("scribe.meetingCard.time", line?.relative ?? "")
     }
 
     private var pill: some View {
@@ -272,9 +276,12 @@ private struct ScribeMeetingCardBody: View {
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.75))
     }
 
-    private func timeLine(_ meeting: ScribeMeeting) -> some View {
-        let line = ScribeMeetingCardText.timeLine(meeting, now: spec.now, locale: spec.locale, timeZone: spec.timeZone)
-        return HStack(spacing: 7) {
+    private func timeLineText(_ meeting: ScribeMeeting) -> ScribeMeetingCardText.TimeLine {
+        ScribeMeetingCardText.timeLine(meeting, now: spec.now, locale: spec.locale, timeZone: spec.timeZone)
+    }
+
+    private func timeLine(_ line: ScribeMeetingCardText.TimeLine) -> some View {
+        HStack(spacing: 7) {
             Image(systemName: "clock")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(ScribeMeetingCardPalette.inkSecondary)

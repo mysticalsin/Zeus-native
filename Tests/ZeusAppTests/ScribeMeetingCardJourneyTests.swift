@@ -160,6 +160,13 @@ private final class Journey {
         panel.hostedView.map { ScribeMeetingCardText.status($0.card, now: $0.now) }
     }
 
+    /// The time words the card's view rendered, read from the text probe the view records them into. Unlike
+    /// `shownStatus` this is not the model: it is the string the view body produced for the Text.
+    var drawnTime: [String] {
+        guard let window = panel.window else { return [] }
+        return registry.probes(for: "scribe.meetingCard.time", in: window).compactMap { $0.renderedText }
+    }
+
     /// Everything the test made, taken down. Not an asserted action.
     func teardown() {
         scribe.cancel()
@@ -210,6 +217,48 @@ struct ScribeMeetingCardJourneyTests {
                 journey.registry.probes(for: "scribe.meetingCard.primary", in: window).isEmpty
             }
             #expect(journey.capture.startCount == 1)
+        }
+    }
+
+    @Test func aSecondRecordWhileTheStartIsUnderWayStartsNothing() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let journey = Journey()
+            defer { journey.teardown() }
+            journey.ingest(slots: [slot(startsIn: 120)])
+            let offer = journey.panel.drawnCard
+            guard case .offer(let meeting, _) = offer else {
+                Issue.record("the heads-up did not draw an offer: \(offer)")
+                return
+            }
+
+            try await journey.click("scribe.meetingCard.primary")
+            try await journey.waitUntil("a session") { journey.scribe.phase.sessionID != nil }
+            let session = try #require(journey.scribe.phase.sessionID)
+            #expect(journey.panel.drawnCard == .starting(meeting, cancellable: false))
+
+            // While Starting the card draws no Record: its primary is nil and the slot stays empty. So the second
+            // Record is only the stale tap on the offer the person saw before the card changed.
+            let window = try #require(journey.panel.window)
+            // Settle the window first: the model is Starting before the hosted view has laid out again, and the old
+            // Record probe is still there until it does. Never click a control that is not ready.
+            try await journey.waitUntil("the Starting layout") {
+                window.contentView?.layoutSubtreeIfNeeded()
+                window.displayIfNeeded()
+                return journey.registry.probes(for: "scribe.meetingCard.primary", in: window).allSatisfy { !$0.controlEnabled }
+            }
+            #expect(journey.registry.probes(for: "scribe.meetingCard.primary", in: window).isEmpty,
+                    "Starting draws no Record, so there is nothing to click a second time")
+            journey.controller.primary(offer)
+            #expect(journey.capture.startCount == 1)
+            #expect(journey.scribe.phase.sessionID == session)
+            #expect(journey.panel.drawnCard == .starting(meeting, cancellable: false))
+
+            journey.capture.send(.captureAcknowledged(session))
+            try await journey.waitUntil("recording") { journey.scribe.isRecording }
+            #expect(journey.capture.startCount == 1)
+            #expect(journey.scribe.phase.sessionID == session)
         }
     }
 
@@ -412,6 +461,8 @@ struct ScribeMeetingCardJourneyTests {
             journey.ingest(slots: [slot(startsIn: 75)])
             let card = journey.panel.drawnCard
             #expect(journey.shownStatus == "in 2 min")
+            // The drawn view says it too, not only the model behind it.
+            try await journey.waitUntil("the drawn words say 2 min") { journey.drawnTime == ["In 2 min"] }
             // The next wake is the minute change, 15 seconds on, not the card's own 20 seconds.
             #expect(journey.scheduler.delay == 15)
 
@@ -420,6 +471,8 @@ struct ScribeMeetingCardJourneyTests {
             #expect(journey.panel.drawnCard == card, "the same card, drawn again with the new time")
             #expect(journey.panel.isOnScreen)
             #expect(journey.shownStatus == "in 1 min")
+            try await journey.waitUntil("the drawn words say 1 min") { journey.drawnTime == ["In 1 min"] }
+            #expect(journey.drawnTime == ["In 1 min"], "the old minute is not left on the card")
         }
     }
 }
