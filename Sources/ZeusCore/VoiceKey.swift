@@ -42,4 +42,22 @@ public enum VoiceKey {
               !(voiceOverOn && pointing == .controlOption) else { return nil }
         return .pointing
     }
+
+    /// Control-Option-Space: Space joins the held talk key without spoiling it (docs/ULTRON-CHORD-PLAN.md).
+    public static let talkChord = Shortcut(keyCode: 49, modifiers: [.control, .option])
+
+    public struct ChatClash: Equatable, Sendable {
+        public let sentence: String
+        public let fix: ChatHotkey
+    }
+
+    public static func talkChord(heard: Shortcut, shared: Bool, voiceOverOn: Bool,
+                                 holders: [(name: String, shortcut: Shortcut?)]) -> (chord: Shortcut?, heldBy: String?) {
+        (nil, nil)
+    }
+
+    public static func chatClash(talk: Shortcut, heard: Shortcut, chat: ChatHotkey, shared: Bool, voiceOverOn: Bool,
+                                 holders: [(name: String, shortcut: Shortcut?)]) -> ChatClash? {
+        nil
+    }
 }

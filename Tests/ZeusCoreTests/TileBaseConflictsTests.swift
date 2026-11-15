@@ -9,10 +9,11 @@ import Testing
     private func notes(_ base: TileModifierBase = .controlOption, talk: Shortcut = .controlOption,
                        dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, polyglot: Shortcut? = nil,
                        chat: ChatHotkey = .off, voiceOverOn: Bool = false, keymap: TileKeymap? = nil,
-                       dictationToggles: Bool = false, others: [TileBaseConflicts.NamedShortcut] = []) -> [String] {
+                       dictationToggles: Bool = false, others: [TileBaseConflicts.NamedShortcut] = [],
+                       talkChord: Shortcut? = nil) -> [String] {
         TileBaseConflicts.notes(base: base, keymap: keymap ?? TileKeymap.defaults(base: base), talk: talk,
                                 dictation: dictation, pointing: pointing, polyglot: polyglot, chat: chat,
-                                voiceOverOn: voiceOverOn, dictationToggles: dictationToggles, others: others)
+                                voiceOverOn: voiceOverOn, dictationToggles: dictationToggles, others: others, talkChord: talkChord)
     }
 
     /// A keyed chord on `modifiers`: left arrow, J and Space.
@@ -92,6 +93,16 @@ import Testing
     @Test func keysThatAreOffAreIgnored() {
         #expect(notes(.optionCommand, talk: .rightOption, dictation: nil, pointing: nil).isEmpty)
         #expect(notes(.controlOption, talk: .rightOption, dictation: nil, pointing: nil).isEmpty)
+    }
+
+    @Test func aTilingBindingOnTheTalkChordIsNamed() throws {
+        let chord = VoiceKey.talkChord
+        #expect(notes(.controlOption, talk: .rightOption, talkChord: chord).isEmpty, "the default table never binds Space")
+        var keymap = TileKeymap.defaults(base: .controlOption)
+        try keymap.bind(chord, to: .retile)
+        let found = notes(.controlOption, talk: .rightOption, keymap: keymap, talkChord: chord)
+        #expect(found == ["Control-Option-Space is both your Talk to Zeus chord and a tiling key."], "\(found)")
+        #expect(notes(.controlOption, talk: .rightOption, keymap: keymap, talkChord: nil).isEmpty, "no chord, no note")
     }
 
     @Test func theChatShortcutClashesOnlyWhenTheKeymapBindsItsChord() throws {

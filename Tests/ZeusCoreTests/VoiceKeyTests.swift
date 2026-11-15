@@ -163,4 +163,64 @@ struct VoiceKeyTests {
         let corner = ScreenAwareness.cursorPixel(CGPoint(x: 1440, y: -100), frame: second, width: 1000, height: 1000)
         #expect(corner == CGPoint(x: 0, y: 1000))
     }
+
+    // MARK: The Control-Option-Space chord (docs/ULTRON-CHORD-PLAN.md)
+
+    private typealias Holder = (name: String, shortcut: Shortcut?)
+    private let chordSpace = Shortcut(keyCode: 49, modifiers: [.control, .option])
+
+    @Test func theChordIsOnlyOnTheBareControlOptionTalkKey() {
+        let free = VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: [])
+        #expect(free.chord == chordSpace && free.chord == VoiceKey.talkChord && free.heldBy == nil)
+        // Only the bare Control-Option pair, as heard.
+        for heard in [Shortcut.function, .rightOption, .optionCommand, .rightCommand, chordSpace,
+                      Shortcut(keyCode: 8, modifiers: [.control, .option])] {
+            let result = VoiceKey.talkChord(heard: heard, shared: false, voiceOverOn: false, holders: [])
+            #expect(result.chord == nil && result.heldBy == nil, "\(heard.symbol) has no chord")
+        }
+        // Not shared with dictation, and not with VoiceOver on (Control-Option-Space is VoiceOver's own key).
+        #expect(VoiceKey.talkChord(heard: .controlOption, shared: true, voiceOverOn: false, holders: []).chord == nil)
+        #expect(VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: true, holders: []).chord == nil)
+        // A Carbon shortcut that holds Control-Option-Space keeps it, and is named.
+        for name in ["Chat", "Agent picker", "Quick to-do"] {
+            let held: [Holder] = [("Another", Shortcut(keyCode: 8, modifiers: [.control, .option])), (name, chordSpace)]
+            let result = VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: held)
+            #expect(result.chord == nil && result.heldBy == name, "\(name) holds the chord")
+        }
+        let off: [Holder] = [("Chat", nil), ("Agent picker", Shortcut(keyCode: 8, modifiers: [.control, .option]))]
+        #expect(VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: off).chord == chordSpace)
+    }
+
+    @Test func theChordYieldsToAnExplicitChatChoice() {
+        func chat(_ raw: String?) -> [Holder] { [("Chat", ChatHotkey.stored(raw).shortcut)] }
+        let fresh = VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: chat(nil))
+        #expect(fresh.chord == chordSpace, "a fresh install puts Chat on Control-Option-C, so the chord is free")
+        let kept = VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: chat("controlOptionSpace"))
+        #expect(kept.chord == nil && kept.heldBy == "Chat", "an explicit stored Control-Option-Space is kept, and Chat wins")
+        let other = VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: chat("optionSpace"))
+        #expect(other.chord == chordSpace)
+        #expect(VoiceKey.talkChord(heard: .controlOption, shared: false, voiceOverOn: false, holders: chat("off")).chord == chordSpace)
+    }
+
+    @Test func theChatClashIsNamedWithItsFix() {
+        let cOption = Shortcut(keyCode: 8, modifiers: [.control, .option])
+        func clash(talk: Shortcut = .controlOption, heard: Shortcut? = nil, chat: ChatHotkey, shared: Bool = false,
+                   voiceOverOn: Bool = false) -> VoiceKey.ChatClash? {
+            VoiceKey.chatClash(talk: talk, heard: heard ?? talk, chat: chat, shared: shared, voiceOverOn: voiceOverOn, holders: [])
+        }
+        let both = clash(chat: .controlOptionSpace)
+        #expect(both?.sentence == "Control-Option-Space also talks to Zeus. While Chat uses it, it opens Chat instead.")
+        #expect(both?.fix == .controlOptionC)
+        #expect(clash(chat: .controlOptionC) == nil, "the default clashes with nothing")
+        #expect(clash(chat: .off) == nil && clash(chat: .optionSpace) == nil)
+        #expect(clash(chat: .controlOptionSpace, shared: true) == nil, "no chord in shared mode, so nothing to clash")
+        #expect(clash(heard: .optionCommand, chat: .controlOptionSpace, voiceOverOn: true) == nil, "VoiceOver has the key")
+        let keyed = clash(talk: chordSpace, chat: .controlOptionSpace)
+        #expect(keyed?.sentence == "This is also your Talk to Zeus key. Chat takes it.")
+        #expect(keyed?.fix == .controlOptionC)
+        let keyedC = clash(talk: cOption, chat: .controlOptionC)
+        #expect(keyedC?.sentence == "This is also your Talk to Zeus key. Chat takes it.")
+        #expect(keyedC?.fix == .off, "moving Chat to C would clash again, so the fix is to turn it off")
+        #expect(clash(talk: cOption, chat: .controlOptionSpace) == nil, "a keyed talk key on C leaves Space to Chat")
+    }
 }
