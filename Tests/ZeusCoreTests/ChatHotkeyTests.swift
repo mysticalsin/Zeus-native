@@ -20,6 +20,26 @@ struct ChatHotkeyTests {
         #expect(ChatHotkey.stored("off") == .off)
     }
 
+    @Test func aFreshInstallOpensChatOnControlOptionCAndAChoiceIsKept() {
+        #expect(ChatHotkey.stored(nil) == .controlOptionC)
+        #expect(ChatHotkey.standard.symbols == "⌃⌥C")
+        #expect(ChatHotkey.stored("controlOptionSpace") == .controlOptionSpace)
+        #expect(ChatHotkey.stored("optionSpace") == .optionSpace)
+        #expect(ChatHotkey.stored("off") == .off)
+    }
+
+    @Test func eachCarbonHotkeyAnswersOnlyItsOwnSignature() {
+        let chat = CarbonHotkeySignature.chat.rawValue
+        let chord = CarbonHotkeySignature.talkChord.rawValue
+        let center = CarbonHotkeySignature.center.rawValue
+        #expect(Set([chat, chord, center]).count == 3)
+        #expect(CarbonHotkeySignature.owner(signature: chat) == .chat)
+        #expect(CarbonHotkeySignature.owner(signature: chord) == .talkChord)
+        #expect(CarbonHotkeySignature.owner(signature: center) == .center)
+        #expect(CarbonHotkeySignature.owner(signature: 0) == nil)
+        #expect(CarbonHotkeySignature.center.rawValue == 0x5A455553) // "ZEUS", unchanged for HotKeyCenter
+    }
+
     @Test func noChoiceUsesARightSideModifierAlone() {
         // Dictation and push-to-talk are single right-hand modifier keys; every chat
         // shortcut needs a real key, so they can never collide.

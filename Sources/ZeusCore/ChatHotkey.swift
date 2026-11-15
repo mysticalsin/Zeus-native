@@ -69,3 +69,15 @@ public enum ChatHotkey: String, CaseIterable, Codable, Identifiable, Sendable {
         raw.flatMap(ChatHotkey.init(rawValue:)) ?? standard
     }
 }
+
+/// Which Carbon hot key fired. Every registration owns one signature, and a handler answers
+/// only its own, so one Zeus hot key can never open another one's action.
+public enum CarbonHotkeySignature: UInt32, CaseIterable, Sendable {
+    case chat = 0x5A434854 // "ZCHT"
+    case talkChord = 0x5A544C4B // "ZTLK"
+    case center = 0x5A455553 // "ZEUS"
+
+    public static func owner(signature: UInt32) -> CarbonHotkeySignature? {
+        nil
+    }
+}
