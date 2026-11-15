@@ -262,7 +262,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WelcomeBackCoordinator.shared.speak = { [weak self] text in self?.voice.say(text) }
         }
         if on(.shortcuts) { ExtraPreferences.shared.onShortcutsChange = { [weak self] in self?.registerShortcuts() } }
-        if on(.settingsCatalog) { wireSettingsCatalog() }
+        if on(.settingsCatalog) {
+            wireSettingsCatalog()
+            // The meeting-start detector starts here, at launch, unless "When a meeting starts" is Off. It reads
+            // which app holds the microphone, never audio, and then only waits until a meeting is near.
+            ScribeCallWatcher.shared.follow()
+        }
         if on(.updates) {
             UpdateCoordinator.shared.onBadgeDidChange = { [weak self] in self?.syncMenuBarUpdateBadge() }
             UpdateCoordinator.shared.startPolling()
@@ -889,6 +894,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "shortcut.answerKeys": self?.registerShortcuts()
             case "notch.displays": self?.notch.refreshDisplays(force: true)
             case MusicAwakeHold.settingID: MusicAwakeHold.shared.setEnabled(store.bool(id))
+            case ScribeAutoStartMode.settingID: ScribeCallWatcher.shared.follow()
             case ZeusScreenSharePolicy.showInSharingKey:
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: self?.teleprompterPrivate ?? false)
             case "about.autoUpdate", "about.updateFeedURL":

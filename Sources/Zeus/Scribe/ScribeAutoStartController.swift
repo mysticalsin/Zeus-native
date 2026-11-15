@@ -69,6 +69,9 @@ final class ScribeAutoStartController {
     }()
 
     private(set) var machine = ScribeAutoStartMachine()
+    /// The machine has nothing in hand: no card up, no start under way, no recording to follow. The call watcher
+    /// stops for good only when this is true and the choice is Off.
+    var isIdle: Bool { machine.state == .idle }
     /// The card last handed to the panel.
     private(set) var drawn: ScribeMeetingCard = .hidden
 

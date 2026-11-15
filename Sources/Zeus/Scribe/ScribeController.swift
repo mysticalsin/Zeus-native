@@ -445,7 +445,6 @@ final class ScribeController {
             showsEndWindow: true
         )
         controller.speakerMonitor = MeetingSpeakerMonitor()
-        ScribeCallWatcher.shared.start()
         return controller
     }
 
