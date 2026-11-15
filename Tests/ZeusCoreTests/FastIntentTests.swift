@@ -340,21 +340,26 @@ import Testing
     }
 
     /// The per-buffer work the always-on tap does when nobody talks: RMS and the gate. A minute of
-    /// 48 kHz audio in 4096-frame buffers should cost well under a millisecond per buffer.
+    /// 48 kHz audio in 4096-frame buffers should cost well under a millisecond per buffer. The cost is
+    /// read from this thread's CPU clock, so a busy machine that preempts the test does not count as
+    /// work the tap would do.
     @Test func voiceActivityIsCheapPerBuffer() {
         var vad = VoiceActivity()
         let samples = (0..<4096).map { Float(sin(Double($0) * 0.01)) * 0.002 }
-        let clock = ContinuousClock()
         let buffers = 60 * 48_000 / 4096
-        let elapsed = clock.measure {
-            for _ in 0..<buffers {
-                var sum: Float = 0
-                for s in samples { sum += s * s }
-                vad.feed(rms: (sum / Float(samples.count)).squareRoot(), seconds: 4096 / 48_000)
-            }
+        func threadCPUSeconds() -> Double {
+            var ts = timespec()
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts)
+            return Double(ts.tv_sec) + Double(ts.tv_nsec) / 1e9
         }
-        let perBuffer = (Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15) / Double(buffers)
-        print("[fast] wake gate: \(String(format: "%.4f", perBuffer)) ms per 85 ms buffer (debug build, scalar RMS)")
+        let start = threadCPUSeconds()
+        for _ in 0..<buffers {
+            var sum: Float = 0
+            for s in samples { sum += s * s }
+            vad.feed(rms: (sum / Float(samples.count)).squareRoot(), seconds: 4096 / 48_000)
+        }
+        let perBuffer = (threadCPUSeconds() - start) * 1000 / Double(buffers)
+        print("[fast] wake gate: \(String(format: "%.4f", perBuffer)) ms per 85 ms buffer (debug build, scalar RMS, thread CPU time)")
         #expect(perBuffer < 1.0)
     }
 }
