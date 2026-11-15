@@ -4522,6 +4522,30 @@
         "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "switchStartsTheNextMeetingOnceWithoutAskingAgain"
       }
+    },
+    {
+      "id": "REG-423",
+      "failure": "A heads-up before a calendar meeting could be lost for good: it was marked as shown before the card could appear, and it never showed in automatic mode.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "theHeadsUpIsShownOncePerMeeting"
+      }
+    },
+    {
+      "id": "REG-424",
+      "failure": "Dismissing the heads-up two minutes before a meeting was forgotten, so the card asked again at the start time.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "dismissAtTwoMinutesStaysQuietAtStartTime"
+      }
     }
   ]
 }

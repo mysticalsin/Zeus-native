@@ -150,8 +150,7 @@ class MeetingCardLint(unittest.TestCase):
         panel = self.read(PANEL)
         self.assertIn("final class ScribeCardHostingView<Content: View>: NSHostingView<Content>", panel)
         self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", panel)
-        driver = ROOT / "Sources/Zeus/Scribe/ScribePopupDriver.swift"
-        self.assertNotIn("class ScribeCardHostingView", self.read(driver))
+        self.assertFalse((ROOT / "Sources/Zeus/Scribe/ScribePopupDriver.swift").exists())
 
     def test_the_lint_detects_its_failure_shapes(self):
         self.assertTrue(clocks("TimelineView(.animation) { _ in }"))

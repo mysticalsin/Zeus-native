@@ -98,9 +98,6 @@ final class ScribeAutoStartController {
         ScribeAutoStartOptIn.migrate(mode: ScribeAutoStartMode.current(), hasSavedMeetings: saved)
     }
 
-    /// Whether a card is on screen. The heads-up card keeps out of its way.
-    var isCardVisible: Bool { drawn != .hidden }
-
     // MARK: Input
 
     /// One reading from the call watcher, every poll and every microphone wake-up.
@@ -214,7 +211,7 @@ final class ScribeAutoStartController {
         Self.log("start", "meeting \(meeting.key)")
         // Only a live call has a process to follow; a calendar start has no call binding.
         let identity = meeting.isLive
-            ? meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: .callDetected($0)) }
+            ? meeting.callApp.flatMap { ScribeCallWatcher.shared.recordingIdentity(for: $0) }
             : nil
         scribe.start(context: meeting.context(callIdentity: identity))
     }

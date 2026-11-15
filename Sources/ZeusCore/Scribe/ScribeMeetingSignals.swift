@@ -65,12 +65,6 @@ public struct ScribeMeeting: Equatable, Sendable {
         self.slot = slot
         self.isLive = isLive
     }
-
-    /// The decision the heads-up popup still reads, until it takes the meeting context.
-    public var promptDecision: ScribePromptDecision {
-        if let slot { return .upcoming(slot) }
-        return callApp.map { .callDetected($0) } ?? .none
-    }
 }
 
 /// Everything the detector knows at one moment. The microphone signal is "which call app holds the input",
@@ -136,9 +130,9 @@ public struct ScribeMeetingEvidence: Equatable, Sendable {
 
 public enum ScribeMeetingStartPolicy {
     /// A calendar event counts from this long before it starts...
-    public static let leadWindow: TimeInterval = ScribeCallPrompt.leadWindow
+    public static let leadWindow: TimeInterval = 120
     /// ...until this long after.
-    public static let lateWindow: TimeInterval = ScribeCallPrompt.lateWindow
+    public static let lateWindow: TimeInterval = 300
 
     /// The app of a call app holding the microphone that belongs to this slot. A slot whose link is one of the known
     /// call apps pairs only with that app; any other slot pairs with the first app that holds the microphone.
@@ -245,5 +239,29 @@ public enum ScribeCallWindow {
     public static func state(app: ScribeCallApp, titles: [String], complete: Bool) -> ScribeCallWindowState {
         guard complete, isCallWindow(app, title: "") != nil else { return .unknown }
         return titles.contains { isCallWindow(app, title: $0) == true } ? .present : .gone
+    }
+}
+
+/// Names of the people on a calendar invite, as display names only.
+public enum ScribeAttendeeNames {
+    /// Trimmed, deduplicated, in order. An entry that is an email address (or holds an `@`) is dropped: an
+    /// address never reaches a transcript, a suggestion or a saved file.
+    public static func clean(_ names: [String], limit: Int = 50) -> [String] {
+        var seen: Set<String> = []
+        var kept: [String] = []
+        for raw in names {
+            let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, !name.contains("@"), !name.contains("://"), name.count <= 80 else { continue }
+            guard seen.insert(key(name)).inserted else { continue }
+            kept.append(name)
+            if kept.count >= limit { break }
+        }
+        return kept
+    }
+
+    /// Case, accent and spacing differences do not make two names two people.
+    public static func key(_ name: String) -> String {
+        name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }

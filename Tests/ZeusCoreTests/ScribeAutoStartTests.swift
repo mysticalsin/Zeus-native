@@ -131,7 +131,6 @@ struct ScribeAutoStartTests {
         let event = asSlot(start: -30, app: .zoom)
         let meeting = ScribeMeetingEvidence(date: asBase, slots: [event]).candidate
         #expect(meeting == ScribeMeeting(key: "s1", title: "Design review", callApp: .zoom, slot: event, isLive: false))
-        #expect(meeting?.promptDecision == .upcoming(event))
         let noApp = ScribeMeetingEvidence(date: asBase, slots: [asSlot(start: -30)], presentApps: [.teams]).candidate
         #expect(noApp?.callApp == nil)
         #expect(noApp?.isLive == false)

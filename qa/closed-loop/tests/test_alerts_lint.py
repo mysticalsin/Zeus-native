@@ -56,7 +56,7 @@ class AlertsStyleLint(unittest.TestCase):
     def test_alert_sources_have_no_em_dash_and_use_the_shared_material(self):
         for path in sorted(ALERTS.glob("*.swift")):
             self.assertNotIn("—", "\n".join(line for _, line in code_lines(path.read_text())), path.name)
-        for relative in ("Sources/Zeus/Proactive/BriefCard.swift", "Sources/Zeus/Scribe/ScribeCallPopup.swift"):
+        for relative in ("Sources/Zeus/Proactive/BriefCard.swift", "Sources/Zeus/Scribe/ScribeMeetingCardView.swift"):
             self.assertIn(".alertGlass(", (ROOT / relative).read_text(), relative)
 
 

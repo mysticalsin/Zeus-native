@@ -812,19 +812,13 @@ class ScribeMeetingCardTests(unittest.TestCase):
         host = mic_body(panel, "final class ScribeCardHostingView", "private final class ScribeMeetingCardWindow")
         self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", host)
         self.assertIn(".activeAlways", host)
-        for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingCardPanel.swift"):
-            text = mic_read(card)
-            self.assertIn("ScribeCardHostingView(rootView:", text, card)
-            self.assertNotIn("NSHostingView(rootView:", text, card)
+        self.assertIn("ScribeCardHostingView(rootView:", panel)
+        self.assertNotIn("NSHostingView(rootView:", panel)
+        self.assertFalse((ROOT / "Sources/Zeus/Scribe/ScribeCallPopup.swift").exists())
 
     def test_scribe_meeting_card_taps_go_through_the_lifecycle(self):
-        popup = mic_read("Scribe/ScribeCallPopup.swift")
-        self.assertIn("model.onRecord = { [weak self] in self?.driver.click() }", popup)
-        self.assertNotIn("autoHide", popup)
-        hide = mic_body(popup, "    func hide() {", "    func refresh(")
-        self.assertIn("guard !driver.isBusy else { return }", hide)
-        # The meeting card: the panel leaves only through `render`, the controller draws the machine's card after
-        # every event, and the late tap is decided in the core.
+        # The meeting card, heads-up included: the panel leaves only through `render`, the controller draws the
+        # machine's card after every event, and the late tap is decided in the core.
         panel = mic_read("Scribe/ScribeMeetingCardPanel.swift")
         self.assertEqual(panel.count("orderOut("), 1)
         render = mic_body(panel, "    func render(_ card: ScribeMeetingCard) {", "    private func view(")
@@ -846,11 +840,6 @@ class ScribeMeetingCardTests(unittest.TestCase):
         self.assertIn("The offer ended in the same instant", late)
 
     def test_scribe_meeting_card_taps_are_logged(self):
-        driver = mic_read("Scribe/ScribePopupDriver.swift")
-        for stage in ('"click"', '"start requested"', '"start ok"', '"start failed"'):
-            self.assertIn(stage, driver)
-        self.assertIn('NSLog("[ZEUS] scribe popup: %@ %@"', driver)
-        self.assertIn("FlightRecorder.shared.record(", driver)
         # The meeting card's own machine logs each state change once, and the taps that were ignored.
         controller = mic_read("Scribe/ScribeAutoStartController.swift")
         self.assertIn('NSLog("[ZEUS] scribe meeting: %@", line)', controller)

@@ -1178,19 +1178,19 @@
       "obligations": [
         {
           "check": "portable-scribe",
-          "acceptance": "Upcoming windows, dismissal dedupe and active recording suppress prompts.",
+          "acceptance": "The heads-up window, a dismissal that holds at the start time and a recording started by hand suppress prompts.",
           "cases": [
             {
-              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "upcomingWindowEdges"
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "headsUpWindowEdges"
             },
             {
-              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "dismissedSlotIsSkipped"
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "dismissAtTwoMinutesStaysQuietAtStartTime"
             },
             {
-              "file": "Tests/ZeusCoreTests/ScribeCoreTests.swift",
-              "function": "recordingSuppressesEveryPrompt"
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "aRecordingStartedByHandIsNeverPromptedOver"
             }
           ],
           "id": "F04.1"

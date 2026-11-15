@@ -203,22 +203,18 @@ enum ScribeCallProbe {
     }
 }
 
-/// Watches for a call in progress or a meeting about to start, and shows the one-tap popup.
+/// Watches for a call in progress or a meeting about to start and hands each reading to the meeting-start
+/// machine, which decides what the card says.
 /// Started lazily by the first access to `ScribeController.shared`, never at app launch. It never asks for any
 /// permission: calendar events are read only when full access was already granted elsewhere.
 @MainActor
 final class ScribeCallWatcher {
     static let shared = ScribeCallWatcher()
 
-    private(set) var decision: ScribePromptDecision = .none
-
     private static let interval: TimeInterval = 5
 
     private var timer: Timer?
     private var scanning = false
-    private var dismissedIDs: Set<String> = []
-    private var dismissedApps: Set<ScribeCallApp> = []
-    private var dismissedInstances: [ScribeCallApp: ScribeCallProcessIdentity] = [:]
     private var latestCalls: [ScribeDetectedCall] = []
     private var terminationObserver: NSObjectProtocol?
     private var micObserver: ScribeMicActivityObserver?
@@ -262,39 +258,13 @@ final class ScribeCallWatcher {
         micObserver = nil
         timer?.invalidate()
         timer = nil
-        decision = .none
-        ScribeCallPopup.shared.hide()
         ScribeAutoStartController.shared.stop()
-    }
-
-    /// Dismisses this prompt: a calendar slot by id, a detected call until that call ends.
-    func dismiss(_ dismissed: ScribePromptDecision) {
-        switch dismissed {
-        case .upcoming(let slot): dismissedIDs.insert(slot.id)
-        case .callDetected(let app):
-            dismissedApps.insert(app)
-            if let call = latestCalls.first(where: { $0.app == app }), let pid = call.pid,
-               let running = NSRunningApplication(processIdentifier: pid), !running.isTerminated {
-                dismissedInstances[app] = Self.identity(of: running)
-            }
-        case .none: break
-        }
-        if decision == dismissed { decision = .none }
-        ScribeCallPopup.shared.hide()
-    }
-
-    /// Recording began: the prompt has done its job.
-    func recordingDidStart() {
-        guard isRunning else { return }
-        decision = .none
-        ScribeCallPopup.shared.hide()
     }
 
     /// Bind only a positively detected native app instance. A browser process owns many tabs and is not
     /// a call identity; calendar/manual starts likewise have no automatic end adapter.
-    func recordingIdentity(for decision: ScribePromptDecision) -> ScribeCallProcessIdentity? {
-        guard case .callDetected(let kind) = decision,
-              let call = latestCalls.first(where: { $0.app == kind }), let pid = call.pid,
+    func recordingIdentity(for kind: ScribeCallApp) -> ScribeCallProcessIdentity? {
+        guard let call = latestCalls.first(where: { $0.app == kind }), let pid = call.pid,
               let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated,
               let bundle = app.bundleIdentifier, !ScribeCallDetection.isBrowser(bundle),
               ScribeCallDetection.identify(bundleID: bundle) == kind else { return nil }
@@ -308,10 +278,6 @@ final class ScribeCallWatcher {
     }
 
     private func applicationTerminated(_ identity: ScribeCallProcessIdentity) {
-        for (kind, dismissed) in dismissedInstances where dismissed == identity {
-            dismissedApps.remove(kind)
-            dismissedInstances.removeValue(forKey: kind)
-        }
         ScribeController.shared.boundCallApplicationDidTerminate(identity)
     }
 
@@ -333,38 +299,17 @@ final class ScribeCallWatcher {
         scanning = false
         guard isRunning else { return }
         latestCalls = scan.calls
-        // A meeting that has started, or a call in progress, is the meeting-start detector's job: it asks, starts
-        // by itself or stays quiet by the "When a meeting starts" setting. This card is only the heads-up
-        // before a calendar meeting, and only for "Ask me".
+        // The meeting-start machine owns every card: the heads-up before a calendar meeting, a meeting that has
+        // started and a call in progress. It asks, starts by itself or stays quiet by the "When a meeting
+        // starts" setting.
         ScribeAutoStartController.shared.ingest(scan: scan, slots: slots, date: now)
-        let headsUp = ScribeAutoStartMode.current() == .ask ? slots.filter { $0.start > now } : []
-        // Mic disappearance can mean mute. Keep Not now suppressed until a positive app-instance exit;
-        // neither an empty/incomplete scan nor a changed browser title proves a new call.
-        let next = ScribeCallPrompt.decide(
-            now: now,
-            upcoming: headsUp,
-            activeCallApp: nil,
-            isRecording: ScribeController.shared.phase.isActive,
-            dismissedIDs: dismissedIDs,
-            dismissedCallApps: dismissedApps
-        )
-        guard next != decision else {
-            ScribeCallPopup.shared.refresh(now: now)
-            return
-        }
-        decision = next
-        if case .none = next {
-            ScribeCallPopup.shared.hide()
-        } else {
-            ScribeCallPopup.shared.present(next, now: now)
-        }
     }
 
     /// Meetings that start within the prompt window. Empty unless calendar access was already granted.
     private func upcomingSlots(now: Date) -> [ScribeCalendarSlot] {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
-        let from = now.addingTimeInterval(-ScribeCallPrompt.lateWindow)
-        let to = now.addingTimeInterval(ScribeCallPrompt.leadWindow + 60)
+        let from = now.addingTimeInterval(-ScribeMeetingStartPolicy.lateWindow)
+        let to = now.addingTimeInterval(ScribeMeetingStartPolicy.leadWindow + 60)
         let predicate = eventStore.predicateForEvents(withStart: from, end: to, calendars: nil)
         return eventStore.events(matching: predicate).compactMap { event in
             guard !event.isAllDay, event.status != .canceled, let start = event.startDate else { return nil }
