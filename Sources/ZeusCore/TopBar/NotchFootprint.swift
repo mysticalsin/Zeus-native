@@ -57,6 +57,22 @@ public enum NotchFootprint: Sendable, Equatable {
     }
 }
 
+/// Where the closed notch is centred. Every zone rule centres on the frame it is given, so a controller passes
+/// the anchor frame to them and keeps the real frame for picking a display and placing the window.
+public enum NotchAnchor {
+    /// How far the notch sits right of the display's centre: the fitted offset of a drawn shape, else 0. An
+    /// offset that is not a number moves nothing.
+    public static func offset(_ footprint: NotchFootprint) -> CGFloat {
+        guard case .drawn(let shape) = footprint, shape.offset.isFinite else { return 0 }
+        return CGFloat(shape.offset)
+    }
+
+    /// The screen frame moved sideways by the offset. The hardware notch and the pill stay centred.
+    public static func frame(screenFrame: CGRect, footprint: NotchFootprint) -> CGRect {
+        screenFrame.offsetBy(dx: offset(footprint), dy: 0)
+    }
+}
+
 /// The three inputs of the closed-body layout, kept apart, with the extra width a cue adds.
 public struct ClosedWingsFacts: Hashable, Sendable {
     public var kindIsNone: Bool

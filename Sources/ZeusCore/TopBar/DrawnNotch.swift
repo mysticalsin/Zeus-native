@@ -65,6 +65,14 @@ public enum DrawnNotchLimits {
         DrawnNotchShape(width: width(shape.width), height: height(shape.height), offset: offset(shape.offset))
     }
 
+    /// The position as the owner reads it: "Centre", or a distance and a side. `unit` is "pt" on screen and
+    /// "points" for VoiceOver. A value off the step or the range reads as the one it snaps to.
+    public static func positionText(_ value: Double, unit: String = "pt") -> String {
+        let snapped = offset(value)
+        guard snapped != 0 else { return "Centre" }
+        return "\(Int(abs(snapped))) \(unit) \(snapped < 0 ? "left" : "right")"
+    }
+
     /// The shape on one display: never wider than a quarter of it (snapped down), and shifted no further than
     /// the open panel with its ears leaves room for (snapped toward zero). Nil when the display is not finite
     /// or cannot hold the narrowest shape: that display keeps the pill.
