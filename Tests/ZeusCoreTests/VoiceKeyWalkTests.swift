@@ -100,6 +100,8 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let processingTime: Bool
     /// The checker applies the chord rules and the search has the `swallowed` move: Space is the chord key.
     let chord: Bool
+    /// Carbon takes every Space: its key-down and key-up are always swallowed, and only the live key state shows it.
+    let carbon: Bool
 
     let ownMask: UInt16
     let shiftMask: UInt16
@@ -113,9 +115,10 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 
     init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false,
          late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false,
-         processingTime: Bool = false, chord: Bool = false) {
+         processingTime: Bool = false, chord: Bool = false, carbon: Bool = false) {
         self.name = name
         self.chord = chord
+        self.carbon = carbon && chord
         self.processingTime = processingTime
         self.pointing = pointing
         self.late = late && !pointing
@@ -194,6 +197,12 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         // the late search keeps B's keys and only its hold config.
         WalkRun("B2 dictation Right Command hold, late", keys: rightCommandKeysOnPair + [.leftCommand], own: [54],
                 configs: [hold(.dictation, .rightCommand, confirm: 0.15)], late: true),
+        // A1: shipped talk with no chord (VoiceOver is on, or Chat holds Control-Option-Space): Space is a plain foreign key.
+        WalkRun("A1 talk hold Control-Option confirm 0.15, no chord", keys: basic, own: controlOption,
+                configs: [hold(.talk, .controlOption, confirm: 0.15)], late: true),
+        // A-carbon: the shipped chord where Carbon swallows every Space down and up, so no monitor ever hears it.
+        WalkRun("A-carbon talk hold Control-Option confirm 0.15, every Space swallowed", keys: basic, own: controlOption,
+                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true, carbon: true),
     ]
 }
 
@@ -321,6 +330,9 @@ private struct Checker: Hashable {
     /// go with Space still down (a clean release). A new press of the own set beside it is another matter: only a clean
     /// Space is left out of I3 and I6.
     var chordForgiven = false
+    /// By the physical keys, whatever any monitor heard: Space is down and went down while exactly the own set was down, and
+    /// no other key has moved since. A start with a Space down that is not this one is a start the keyboard did not earn.
+    var spaceClean = false
 }
 
 private struct Edge {
@@ -477,6 +489,10 @@ private struct Sim {
             if let only = run.keys[index].onlyWith, down & (UInt16(1) << UInt16(index)) == 0, !liveModifiers(run).isSuperset(of: only) {
                 continue
             }
+            if run.carbon, run.chordMask == UInt16(1) << UInt16(index) {
+                out.append(.swallowed(index))
+                continue
+            }
             out.append(.toggle(index))
             if held == nil { out.append(.toggleHeld(index)) }
             if run.chord, run.chordMask == UInt16(1) << UInt16(index) { out.append(.swallowed(index)) }
@@ -581,6 +597,7 @@ private struct Sim {
     private mutating func swallow(_ index: Int, _ run: WalkRun) {
         let bit = UInt16(1) << UInt16(index)
         let pressing = down & bit == 0
+        notePhysical(index, pressing: pressing, run)
         down ^= bit
         if !pressing {
             let tile = TileKeyEvent(phase: .up, keyCode: run.keys[index].code, modifiers: liveModifiers(run))
@@ -592,6 +609,7 @@ private struct Sim {
         let bit = UInt16(1) << UInt16(index)
         let key = run.keys[index]
         let pressing = down & bit == 0
+        notePhysical(index, pressing: pressing, run)
         down ^= bit
         let live = liveModifiers(run)
         if key.flag != nil {
@@ -624,9 +642,21 @@ private struct Sim {
     /// An ordinary key comes up and no monitor hears it. The tiling matcher, which watches every event, does.
     private mutating func missUp(_ index: Int, _ run: WalkRun) {
         let bit = UInt16(1) << UInt16(index)
+        notePhysical(index, pressing: false, run)
         down &= ~bit
         let tile = TileKeyEvent(phase: .up, keyCode: run.keys[index].code, modifiers: liveModifiers(run))
         _ = matcher.decide(tile, keymap: Self.keymap, gate: Self.gate)
+    }
+
+    /// A physical key moves, before `down` changes: Space comes down clean only beside exactly the own set, and any other
+    /// key moving while it is down ends that.
+    private mutating func notePhysical(_ index: Int, pressing: Bool, _ run: WalkRun) {
+        guard run.chord else { return }
+        if run.chordMask == UInt16(1) << UInt16(index) {
+            checker.spaceClean = pressing && down == run.ownMask
+        } else {
+            checker.spaceClean = false
+        }
     }
 
     /// Delivers every tick that is due, as the adapter would: each with the modifiers that are really down.
@@ -666,7 +696,7 @@ private struct Sim {
         if key != nil, !configChange, case .key(let shortcut, let time) = event { due = overdue(config, at: time, event: shortcut) }
         let owed = due?.effects ?? []
         let effects = handle(event, config: config)
-        forgetDroppedSpace(run)
+        forgetDroppedSpace(after: event, run)
         log += effects
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
         // phase that forgets to ask for its own wake is caught, not covered by a stale one.
@@ -700,10 +730,15 @@ private struct Sim {
         if drain, held == nil, kind != .tick, kind != .sweep, kind != .echo { drainWakes(run) }
     }
 
-    /// A Space the machine has dropped by itself is forgotten by the rules too: a tick that found a modifier gone resyncs the
-    /// picture, which forgets every ordinary key whether or not it is still down, the limit the header names for an arrow
-    /// key. A Space whose release was swallowed is the same once the machine has dropped it. Only for the chord runs.
-    private mutating func forgetDroppedSpace(_ run: WalkRun) {
+    /// A Space the machine has dropped by itself is forgotten by the rules too, but only where the machine may drop a key it
+    /// was told about: a tick that found a modifier gone resyncs the picture, which forgets every ordinary key whether or not
+    /// it is still down (the limit the header names for an arrow key), and an interrupt does the same. A Space dropped by any
+    /// other event is the machine losing a key, which the rules must still see. Only for the chord runs.
+    private mutating func forgetDroppedSpace(after event: VoiceKeyMachine.Event, _ run: WalkRun) {
+        switch event {
+        case .tick, .interrupt: break
+        default: return
+        }
         guard run.chord, pointing == nil, seen & run.chordMask != 0, !machine.keys.keysDown.contains(WalkKey.space.code) else { return }
         seen &= ~run.chordMask
         seenChanged(run)
@@ -943,6 +978,9 @@ private struct Sim {
                 }
                 if checker.cancelled { found.append("I2: start after a cancel, before every key was up") }
                 if checker.bigger { found.append("I6: start after the own set was down with something foreign, before every key was up") }
+                if run.chord, down & run.chordMask != 0, !checker.spaceClean {
+                    found.append("I6s: start with a Space physically down that did not join the own set alone, whether or not any monitor heard it")
+                }
                 if phys.ownAll, phys.foreignAny { found.append("I3: start on a larger chord") }
                 if config.mode == .toggle {
                     checker.presses += 1
@@ -1242,6 +1280,32 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
                     problems.append("\(name): the machine returned \(result.effects), expected \(expected)")
                 }
             }
+        }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    /// The orders of the Eighth pass (finding 1): Carbon swallows Space, and only the live key state shows it.
+    @Test func theSwallowedSpaceOrdersKeepTheRules() {
+        let carbon = WalkRun.all.first { $0.name.hasPrefix("A-carbon") }!
+        let release = ["Option", "Control", "wait 0.5"]
+        typealias E = VoiceKeyMachine.Effect
+        let cases: [(String, [String], [E])] = [
+            ("Space first, then the pair: not a chord, nothing starts",
+             ["Space swallowed", "Control", "Option", "wait 0.5", "Space swallowed"] + release, []),
+            ("the pair sends, Space stays, the pair again: nothing starts (I6)",
+             ["Control", "Option", "wait 0.5", "Space swallowed", "Option", "Control", "wait 0.5", "Control", "Option", "wait 0.5",
+              "Space swallowed"] + release, [.start, .send]),
+            ("Control, Space, Option: Space came before the set",
+             ["Control", "Space swallowed", "Option", "wait 0.5", "Space swallowed"] + release, []),
+            ("the pair, Space clean, released, Space let go, the pair again starts",
+             ["Control", "Option", "wait 0.5", "Space swallowed"] + release + ["Space swallowed", "Control", "Option", "wait 0.5"] + release,
+             [.start, .send, .start, .send]),
+        ]
+        var problems: [String] = []
+        for (name, moves, expected) in cases {
+            let result = replayWithLog(carbon, moves)
+            if !result.found.isEmpty { problems.append("\(name): \(result.found[0])") }
+            if result.effects != expected { problems.append("\(name): the machine returned \(result.effects), expected \(expected)") }
         }
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
