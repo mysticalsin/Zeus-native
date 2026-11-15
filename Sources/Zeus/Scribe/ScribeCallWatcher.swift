@@ -397,7 +397,7 @@ final class ScribeCallWatcher {
             // The detector may have stopped since the wake: then nothing is read.
             guard let self, running, started == generation else { return }
             let now = ports.now()
-            let slots = ports.slots(now, ScribeDetectorPlan.lookAhead)
+            let slots = ports.slots(now, ScribeMeetingStartPolicy.leadWindow)
             // The one scheduler slot is free while a scan runs; `applyPlan` takes it back when the scan ends. If the
             // probe never answers, this fires and the scan ends as an empty reading.
             scheduler.schedule(after: Self.scanTimeout) { [weak self] in
@@ -428,8 +428,15 @@ final class ScribeCallWatcher {
     /// Sets the one wake-up the plan asks for, after the machine has seen the scan.
     private func applyPlan() {
         let now = ports.now()
-        plan = ScribeDetectorPlan.plan(mode: ports.mode(), machineIdle: ports.machineIdle(),
-                                       micActive: lastMicActive, slots: lastSlots, now: now)
+        let mode = ports.mode()
+        let idle = ports.machineIdle()
+        plan = ScribeDetectorPlan.plan(mode: mode, machineIdle: idle, micActive: lastMicActive, slots: lastSlots, now: now)
+        // Scans read only the short window around now. Nothing near means the wake is chosen from the full
+        // look-ahead, read once here rather than on every poll.
+        if case .listening = plan {
+            lastSlots = ports.slots(now, ScribeDetectorPlan.lookAhead)
+            plan = ScribeDetectorPlan.plan(mode: mode, machineIdle: idle, micActive: lastMicActive, slots: lastSlots, now: now)
+        }
         switch plan {
         case .stopped:
             halt()
