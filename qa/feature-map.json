@@ -699,6 +699,14 @@
       "scope": "Actual ScreenLock event-free call with an injected lock function: a missing function fails, a zero result succeeds, any other result fails. The real login framework is never called, so nothing locks and no event is posted."
     },
     {
+      "id": "native-FaceVaultStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FaceVaultStoreTests",
+      "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+      "scope": "Actual face vault file and key handling in a temp folder with an in-memory Keychain: a damaged vault or a missing key is unreadable and never overwritten, and deleting the last face removes the file and the key. The real Keychain, the support folder and the camera are never touched."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -5357,6 +5365,45 @@
           "check": "missing-F14-contract",
           "acceptance": "Presence rules (selection, spoof cues, match, vault, machine) hold with injected inputs and no camera, run through a portable group once the Core files exist.",
           "cases": []
+        },
+        {
+          "id": "F14.4",
+          "check": "native-FaceVaultStoreTests",
+          "acceptance": "The face vault file is private, holds sealed embeddings only, and is never overwritten when it cannot be read; deleting the last face removes the file and its key.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aNewStoreIsEmptyAndTouchesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "savedFacesComeBackAndTheFileIsPrivate"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "anUnreadableVaultIsNeverOverwritten"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aMissingKeyWithAFileIsUnreadableNotEmpty"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aKeyThatIsNotThirtyTwoBytesIsUnreadable"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "deletingTheLastFaceRemovesFileAndKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "aKeychainThatRefusesTheKeyWritesNoFile"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+              "function": "eraseRemovesAnUnreadableVaultOnlyWhenAsked"
+            }
+          ]
         }
       ]
     },

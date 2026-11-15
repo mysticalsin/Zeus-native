@@ -4438,6 +4438,30 @@
         "file": "Tests/ZeusCoreTests/FaceMatchTests.swift",
         "function": "samplesFromAnotherRevisionNeverMatch"
       }
+    },
+    {
+      "id": "REG-613",
+      "failure": "An embedding was readable in the face vault file, so a copy of the file would hand over the owner's face print.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceVaultTests.swift",
+        "function": "sealedFileHoldsNoPlaintextEmbedding"
+      }
+    },
+    {
+      "id": "REG-614",
+      "failure": "A damaged or unreadable face vault was treated as empty and overwritten by the next save, losing every enrolled face.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-FaceVaultStoreTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FaceVaultStoreTests.swift",
+        "function": "anUnreadableVaultIsNeverOverwritten"
+      }
     }
   ]
 }
