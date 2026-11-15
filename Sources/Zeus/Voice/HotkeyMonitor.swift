@@ -177,6 +177,13 @@ final class HotkeyMonitor {
         let held = machine.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
+        // The talk chord's Space may be held by Carbon, which hides its key-down from the monitors. On a flags event the
+        // system is asked about it, and the machine hears the key-down it missed, on the flags it had before this event,
+        // so a Space that came before the set spoils the hold and a Space that joined the set does not.
+        if case .flags = event, let chord = chordProvider(), !machine.keys.keysDown.contains(chord),
+           keysStillDown?([chord]).contains(chord) == true {
+            send(.key(.keyDown(keyCode: chord, modifiers: machine.keys.flagModifiers), at: arrived))
+        }
         send(.key(event, at: time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived))
     }
 
