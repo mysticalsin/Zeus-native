@@ -169,6 +169,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
         case tick(at: TimeInterval, live: ShortcutModifiers?)  // a wake the machine asked for, with the modifiers the system reports now
         case abandon(turn: Int)                                // the owner refused the press or ended that turn itself
         case interrupt(live: ShortcutModifiers?)               // sleep or wake
+        case sweep(live: Set<UInt16>)                          // the ordinary keys the system reports down now; the picture drops the rest
     }
     public enum Effect: Sendable, Equatable { case start, send, cancel, refused, wake(after: TimeInterval) }
     public enum Press: Sendable, Equatable { case first, second, ending } // ending: this press will end a hands-free turn
@@ -252,6 +253,7 @@ not `barred`. Every `cancel` also sets `barred` unless `allUp`. Quick means with
 | 22 | spent | R, F or S | any | idle | none |
 | 23 | holding, tapped open, latched, armed ending | `abandon(turn)`, `turn` the machine's `generation` | any | idle, `barred` unless `allUp` | none. In any other phase, or for any other `turn`, an `abandon` is row 25: a toggle has no turn to abandon, and the echo of a turn the machine ended or replaced is not the turn now open |
 | 24 | any | `interrupt` | any | idle, `barred` unless `allUp` | `cancel` when a turn was open |
+| 24b | any | `sweep(live)` | any | unchanged; the picture keeps only the ordinary keys in `live`, and step (3) runs on it, so `barred` clears when that leaves every key up | none |
 | 25 | any | anything else | any | unchanged | none |
 
 Rows 5 and 14 first compare the key with the tick's live modifiers: when they no longer hold the key's modifiers a
@@ -275,7 +277,11 @@ pressed slowly. The swap chord on a dictation key: Shift is row 8 or 12, Command
 (`:114-149`). Everything else goes. What is left is one stored `machine`, injectable `now` and `liveModifiers` (as
 `PointingHotkeyMonitor.swift:41-44`), a `confirmProvider` that defaults to 0, and four entries: `feed(_:)` sends
 `.key(event, at: now())`, `tick()` sends `.tick(at: now(), live: liveModifiers())`, `turnEnded()` sends `.abandon`, and
-the sleep and wake notices (as `PointingController.swift:297-300`) send `.interrupt`. The effects map `start` to
+the sleep and wake notices (as `PointingController.swift:297-300`) send `.interrupt`. Before a key event, while the picture holds an ordinary key,
+`feed(_:)` asks the system which of those keys are down (`keysStillDown`, the hardware state, installed by `start()`) and
+sends `.sweep`: an ordinary key whose key-up no monitor saw (Tab out of a username field into a password field turns
+secure input on before Tab comes up) would otherwise read as a foreign key for ever. Pointing does the same through
+`PointingKeyGesture.sweep`. The effects map `start` to
 `onPress`, `send` to `onRelease`, `cancel` to `onCancel`, `refused` to `onBlocked` with today's sentence (`:241`), and
 `wake(after:)` to one `asyncAfter` that calls `tick()`. It stores no timer and no flag; besides `machine` it keeps one number, the `generation` the machine gave the last turn
 `onPress` was asked to start, which `turnEnded()` sends as the turn it ends (the k-th `start` of a `handle` is turn
