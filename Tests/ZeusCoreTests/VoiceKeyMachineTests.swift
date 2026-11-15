@@ -611,6 +611,24 @@ import Testing
         #expect(rig.machine.config?.confirm == 0.15)
     }
 
+    /// While the key is nil the machine reads nothing, but the picture is kept and a bar that every key up lifts is lifted.
+    @Test func aKeyThatTurnsNilAndComesBackFindsTheBarLiftedOnceEveryKeyWasUp() {
+        var rig = Rig(Self.dictation())
+        rig.press(Self.cmdR, at: 0)
+        rig.config.key = nil
+        #expect(rig.release(Self.cmdR, at: 1) == [.cancel])
+        #expect(rig.machine.barred == false, "everything is up")
+        rig.config.key = .rightCommand
+        #expect(rig.press(Self.cmdR, at: 2) == [.start, .wake(after: 0.25)], "the key is back and its first press acts")
+
+        var held = Rig(Self.dictation())
+        held.press(Self.cmdR, at: 0)
+        held.config.key = nil
+        held.press(Self.shift, at: 1)
+        held.config.key = .rightCommand
+        #expect(held.release(Self.shift, at: 2) == [] && held.machine.barred, "Right Command is still down: nothing begins")
+    }
+
     @Test func aKeyThatTurnsNilStopsTheMachineAndCancelsTheTurn() {
         var rig = Rig(Self.talk())
         rig.press(Self.ctrl, Self.opt, at: 0)

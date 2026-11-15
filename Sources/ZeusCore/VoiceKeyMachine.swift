@@ -168,7 +168,11 @@ public struct VoiceKeyMachine: Sendable, Equatable {
             // is a new press: the adapter hands the config over with an event, so that event is often the press itself.
             if case .key = event { if !wasAllUp { barred = true } } else if !allUp { barred = true }
         }
-        guard let key = config.key else { return out }
+        guard let key = config.key else {
+            // Nothing is read while the key is off, but the picture is kept and the bar still lifts when every key is up.
+            if allUp { barred = false }
+            return out
+        }
 
         let facts = KeyFacts(of: keys, key: key)
         updateBarred(facts)
