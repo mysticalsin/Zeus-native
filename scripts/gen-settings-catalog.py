@@ -156,6 +156,9 @@ S='privacy'
 o(S,'Notification details','Show project and command details','toggle','on','Off hides commands and project names outside the notch.','missing','privacy.details','toggle',[],'true','live','Off, or Meeting mode active: approval cards hide the command.')
 o(S,'Usage data','Help improve (anonymous usage counts)','toggle','on','Daily anonymous counts.','has','privacy.analytics','status',[],'','live','ZEUS sends nothing; shown as a fact, not a switch.')
 o(S,'Music metadata','Synced lyrics (LRCLIB)','toggle','off','Sends title and artist to lrclib.net.','missing','privacy.lyrics','toggle',[],'false','live','Fetches time-synced lyrics from lrclib.net (title, artist, album, duration; no key), cached on disk. Lyrics button on the Music page and a Lyrics Home music style. Off by default as it sends data.')
+o(S,'Face presence','Face presence','toggle','-','Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on.','missing','face.presence','toggle',[],'false','live','Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on.')
+o(S,'Face presence','Lock after absent for','menu','-','How long no enrolled face may be missing before the Mac locks.','missing','face.lockAfter','choice',['30 seconds','1 minute','2 minutes','5 minutes','10 minutes'],'2 minutes','live','Zeus addition. Counted from the last time an enrolled face was seen.')
+o(S,'Face presence','Status','status','-','','missing','face.status','status',[],'','custom','Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away.')
 o(S,'Access','Open Accessibility settings','button','-','Jumps to System Settings.','has','privacy.openAccessibility','action',[],'','live','')
 
 S='interview'
@@ -243,7 +246,8 @@ def validate_table():
     opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
               'lights.liveSpectrum', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
-              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl')
+              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl',
+              'face.presence')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':

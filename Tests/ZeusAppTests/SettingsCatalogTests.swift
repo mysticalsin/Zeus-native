@@ -152,4 +152,83 @@ struct SettingsCatalogTests {
         #expect(options["assistant.model"] == "claude-sonnet-4")
         #expect(options["halo.style"] == "Crystal prism")
     }
+
+    // MARK: Face presence
+
+    @MainActor static func isolatedStore() throws -> (SettingsStore, UserDefaults, String) {
+        let suiteName = "zeus.settings.face.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        return (SettingsStore(defaults: defaults), defaults, suiteName)
+    }
+
+    @MainActor @Test func faceSwitchIsNeverTurnedOnByImport() throws {
+        let (store, defaults, suiteName) = try Self.isolatedStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        #expect(SettingsStore.neverEnabledByImport.contains("face.presence"))
+        #expect(!store.bool("face.presence"))
+
+        func file(_ options: [String: String]) throws -> Data {
+            try JSONSerialization.data(withJSONObject: ["format": "zeus.settings", "version": 1, "options": options, "app": [String: String]()])
+        }
+        // A file that says on leaves the switch off; the same file's other value still applies.
+        let applied = try store.importJSON(file(["face.presence": "true", "face.lockAfter": "5 minutes"]))
+        #expect(!store.bool("face.presence"))
+        #expect(defaults.string(forKey: SettingsStore.key("face.presence")) == nil)
+        #expect(store.string("face.lockAfter") == "5 minutes")
+        #expect(applied == 1)
+
+        // A person who turned it on here can have an import turn it off, never on.
+        store.set("face.presence", "true")
+        try store.importJSON(file(["face.presence": "false"]))
+        #expect(!store.bool("face.presence"))
+        try store.importJSON(file(["face.presence": "true"]))
+        #expect(!store.bool("face.presence"))
+    }
+
+    @MainActor @Test func exportHoldsNoFaceData() throws {
+        let (store, defaults, suiteName) = try Self.isolatedStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        store.set("face.presence", "true")
+        store.set("face.lockAfter", "1 minute")
+
+        // A vault with a face in it, so there is something that could leak.
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-export-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let keychain = KeychainStore(backend: MemoryKeychain(), defaults: defaults)
+        let vault = FaceVaultStore(directory: directory, keychain: keychain)
+        let face = FaceRecord(id: "face-secret-id", name: "Face 1", isEnabled: true, revision: 2,
+                              samples: [[0.123456, 0.654321, 0.111111], [0.222222, 0.333333, 0.444444]], threshold: 0.3)
+        #expect(vault.save([face]) == .saved)
+
+        let data = try store.exportJSON()
+        let text = String(decoding: data, as: UTF8.self)
+        for word in ["samples", "embedding", "threshold", "Face 1", "face-secret-id", "0.123456", "face-presence", "vaultKey", "isEnabled"] {
+            #expect(!text.contains(word), "export holds \(word)")
+        }
+        // What it does hold about faces is the two stored settings.
+        let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let options = try #require(root["options"] as? [String: String])
+        #expect(options.keys.filter { $0.hasPrefix("face.") }.sorted() == ["face.lockAfter", "face.presence"])
+        #expect(options["face.lockAfter"] == "1 minute")
+        let app = try #require(root["app"] as? [String: Any])
+        #expect(app.keys.allSatisfy { !$0.hasPrefix("face.") })
+    }
+
+    @MainActor @Test func unknownLockAfterFallsBackToTwoMinutes() throws {
+        let option = try #require(SettingsCatalog.option("face.lockAfter"))
+        #expect(option.choices == FaceLockAfter.choices.map(\.label))
+        #expect(option.defaultValue == FaceLockAfter.defaultLabel)
+        #expect(FaceLockAfter.seconds(forLabel: option.defaultValue) == 120)
+        #expect(FaceLockAfter.seconds(forLabel: "45 minutes") == 120)
+        // An import of a label that is not offered is refused, so the stored value is always one of the five.
+        #expect(!SettingsStore.accepts("45 minutes", for: option))
+        #expect(option.choices.allSatisfy { SettingsStore.accepts($0, for: option) })
+        let (store, defaults, suiteName) = try Self.isolatedStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let data = try JSONSerialization.data(withJSONObject: ["format": "zeus.settings", "version": 1,
+                                                               "options": ["face.lockAfter": "45 minutes"], "app": [String: String]()])
+        #expect(try store.importJSON(data) == 0)
+        #expect(store.string("face.lockAfter") == "2 minutes")
+    }
 }

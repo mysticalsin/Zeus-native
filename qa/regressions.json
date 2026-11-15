@@ -4582,6 +4582,30 @@
         "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
         "function": "anUnlockNoticeWhileTheSessionIsLockedStartsNothing"
       }
+    },
+    {
+      "id": "REG-604",
+      "failure": "A settings file that said face presence was on switched the camera feature on without the owner.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "faceSwitchIsNeverTurnedOnByImport"
+      }
+    },
+    {
+      "id": "REG-617",
+      "failure": "An exported settings file held a face name, id or embedding.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "exportHoldsNoFaceData"
+      }
     }
   ]
 }

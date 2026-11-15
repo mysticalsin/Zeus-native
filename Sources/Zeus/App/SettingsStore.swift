@@ -255,6 +255,7 @@ final class SettingsStore {
     static let neverEnabledByImport: Set<String> = [
         "voice.answers", "privacy.lyrics", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
+        "face.presence",
     ]
     private static var neverEnabledAppKeys: Set<String> {
         [WakeWordController.defaultsKey, "dictation.engineForVoice"]

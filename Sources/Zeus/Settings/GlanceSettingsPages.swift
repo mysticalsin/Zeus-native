@@ -1144,6 +1144,7 @@ private struct PrivacyPage: View {
                         text: "Sends the song title, artist, album and length to lrclib.net to fetch time-synced lyrics, which are kept on this Mac. Off until you turn it on.",
                         isOn: bool("privacy.lyrics"))
         }
+        GSFacePresenceCardHost()
         GSCard("Control from the notch") {
             GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())

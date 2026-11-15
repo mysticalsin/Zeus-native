@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 178 of 178 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 178 in scope). 167 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 181 of 181 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 181 in scope). 170 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 127.
+**Before this round:** has 19, partial 27, missing 130.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -186,6 +186,9 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Notification details | Show project and command details | toggle | on | Off hides commands and project names outside the notch. | missing | live | `privacy.details` | Off, or Meeting mode active: approval cards hide the command. |
 | Usage data | Help improve (anonymous usage counts) | toggle | on | Daily anonymous counts. | has | live | `privacy.analytics` | ZEUS sends nothing; shown as a fact, not a switch. |
 | Music metadata | Synced lyrics (LRCLIB) | toggle | off | Sends title and artist to lrclib.net. | missing | live | `privacy.lyrics` | Fetches time-synced lyrics from lrclib.net (title, artist, album, duration; no key), cached on disk. Lyrics button on the Music page and a Lyrics Home music style. Off by default as it sends data. |
+| Face presence | Face presence | toggle | - | Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on. | missing | live | `face.presence` | Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on. |
+| Face presence | Lock after absent for | menu | - | How long no enrolled face may be missing before the Mac locks. | missing | live | `face.lockAfter` | Zeus addition. Counted from the last time an enrolled face was seen. |
+| Face presence | Status | status | - |  | missing | custom | `face.status` | Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away. |
 | Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
 
 ## Interview

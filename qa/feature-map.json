@@ -723,11 +723,27 @@
       "scope": "Actual FacePresenceController with a fake camera, lock, clock, session reader, permissions and vault in a temp folder. No camera opens, no permission prompt is raised, the real Keychain is never read and nothing locks the Mac."
     },
     {
+      "id": "native-FacePresenceCardTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FacePresenceCardTests",
+      "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+      "scope": "Actual Face presence card model and fixtures from fixed machine values and face names. The card is never drawn from the controller, the camera, the vault or the Keychain."
+    },
+    {
+      "id": "native-SettingsCatalogTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SettingsCatalogTests",
+      "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+      "scope": "Actual settings store, import and export on an isolated defaults suite, with the face vault in a temp folder and an in-memory Keychain. The real defaults, Keychain and support folder are never touched."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
       "scope": "Face presence rules in ZeusCore (landmark math, face selection, spoof cues, face match, vault records, presence machine) run through a portable group with injected inputs and no camera.",
-      "reason": "The Core rules arrive in tickets FP-2 to FP-6 of docs/FACE-PRESENCE-PLAN.md; the lint guards REG-600 to REG-602 run as closed-loop selftests meanwhile."
+      "reason": "The Core rules are built and run in native-ZeusCoreTests and in the darwin-only face-presence group of qa/portable-core/prepare.py. They use CoreGraphics transforms and CryptoKit, so no Linux portable group can run them."
     },
     {
       "id": "missing-F14-device",
@@ -5596,6 +5612,60 @@
             {
               "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
               "function": "theCameraUsageStringNamesBothFeaturesAndSaysNoImageIsSaved"
+            }
+          ]
+        },
+        {
+          "id": "F14.7",
+          "check": "native-FacePresenceCardTests",
+          "acceptance": "Enroll is enabled only while watching, present or away; the status row names the countdown for VoiceOver; the lock choice falls back to two minutes; one row per face with its switch; no face data reaches the view; the catalog rows come from the generator; the rendered fixtures show every status word.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "enrollIsDisabledOutsideWatchingPresentAndAway"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "statusRowNamesTheCountdownForVoiceOver"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theLockChoiceFollowsTheMachinesLimitAndFallsBackToTwoMinutes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "oneRowPerEnrolledFaceInOrderWithItsSwitchState"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theModelHoldsNoFaceDataButNamesAndSwitches"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theCatalogRowsComeFromTheGenerator"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FacePresenceCardTests.swift",
+              "function": "theRenderedFixturesShowEveryStatusWordAndTheFaceRows"
+            }
+          ]
+        },
+        {
+          "id": "F14.8",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "A settings import never switches face presence on, an export holds no face data, and an unknown lock time reads as two minutes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "faceSwitchIsNeverTurnedOnByImport"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "exportHoldsNoFaceData"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "unknownLockAfterFallsBackToTwoMinutes"
             }
           ]
         }
