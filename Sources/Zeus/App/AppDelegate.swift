@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let notch = NotchController()
     private let permissions = PermissionsModel()
     private let hotkey = HotkeyMonitor()
+    private var talkChordDefaultsObserver: NSObjectProtocol?
+    private var cancelTalkChordVoiceOverWatch: (() -> Void)?
     private var demo: DemoDirector!
     private var voice: VoiceTurnController!
     private var agentServer: AgentEventServer!
@@ -269,7 +271,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakBrief = { [weak self] text in self?.voice.say(text) }
             WelcomeBackCoordinator.shared.speak = { [weak self] text in self?.voice.say(text) }
         }
-        if on(.shortcuts) { ExtraPreferences.shared.onShortcutsChange = { [weak self] in self?.registerShortcuts() } }
+        if on(.shortcuts) {
+            ExtraPreferences.shared.onShortcutsChange = { [weak self] in
+                self?.registerShortcuts()
+                self?.syncTalkChord()
+            }
+        }
         if on(.settingsCatalog) {
             wireSettingsCatalog()
             // The meeting-start detector starts here, at launch, unless "When a meeting starts" is Off. It reads
@@ -303,10 +310,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
             // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one.
-            hotkey.chordProvider = { [weak self] in
-                guard let self else { return nil }
-                return TalkChordRouting.current(heard: self.hotkey.keyProvider(), shared: self.hotkey.sharedProvider()).chord?.keyCode
-            }
+            // Every event reads it, so it also keeps the Carbon registration that takes the press in step (a backstop to the
+            // sync points: start, a Chat or shortcut change, VoiceOver, any setting).
+            hotkey.chordProvider = { [weak self] in self?.syncTalkChord()?.keyCode }
             // A turn that stops listening for its own reason (a failed start, the owner ending it) is told to the key
             // machine, so the next press starts a turn instead of being spent on one that is gone.
             voice?.onListeningEnded = { [weak self] in
@@ -319,6 +325,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice?.cancelListening()
             }
             hotkey.start()
+            syncTalkChord()
+            ChatHotkeyMonitor.shared.onChange = { [weak self] in self?.syncTalkChord() }
+            talkChordDefaultsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncTalkChord() }
+            }
+            cancelTalkChordVoiceOverWatch = TilingKeyClash.watchVoiceOver { [weak self] in self?.syncTalkChord() }
         }
         if on(.pointingHotkey) {
             syncPointing()
@@ -1063,6 +1076,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastHidden = policyHidden
         }
         ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: teleprompterPrivate)
+    }
+
+    /// Puts the Carbon registration that takes Control-Option-Space in step with the chord the clash rule allows right now,
+    /// and returns that chord.
+    @discardableResult
+    private func syncTalkChord() -> Shortcut? {
+        let chord = TalkChordRouting.current(heard: hotkey.keyProvider(), shared: hotkey.sharedProvider()).chord
+        TalkChordHotkey.shared.sync(chord)
+        return chord
     }
 
     private func registerShortcuts() {

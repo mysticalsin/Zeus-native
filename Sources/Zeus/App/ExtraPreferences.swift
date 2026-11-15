@@ -242,7 +242,7 @@ final class HotKeyCenter {
         for (index, (code, modifiers, action)) in bindings.enumerated() {
             let id = UInt32(index + 1)
             var ref: EventHotKeyRef?
-            let hotKeyID = EventHotKeyID(signature: OSType(0x5A455553), id: id) // "ZEUS"
+            let hotKeyID = EventHotKeyID(signature: CarbonHotkeySignature.center.rawValue, id: id)
             if RegisterEventHotKey(code, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref) == noErr, let ref {
                 refs.append(ref); actions[id] = action
             }
@@ -259,6 +259,8 @@ final class HotKeyCenter {
             var hotKeyID = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
                               MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            // Answer only this center's own hot keys; Chat and the talk chord have their own handlers.
+            guard CarbonHotkeySignature.owner(signature: hotKeyID.signature) == .center else { return OSStatus(eventNotHandledErr) }
             let id = hotKeyID.id
             DispatchQueue.main.async { MainActor.assumeIsolated { HotKeyCenter.shared.fire(id) } }
             return noErr

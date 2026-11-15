@@ -13,7 +13,10 @@ final class ChatHotkeyMonitor {
     private(set) var problem: String?
     private var reference: EventHotKeyRef?
     private var handler: EventHandlerRef?
+    private var paused = false
     var onPress: () -> Void = {}
+    /// Called after the choice changes, so the talk chord can yield to it or take Control-Option-Space back.
+    var onChange: () -> Void = {}
 
     private init() {
         hotkey = ChatHotkey.stored(UserDefaults.standard.string(forKey: "chat.hotkey"))
@@ -29,23 +32,35 @@ final class ChatHotkeyMonitor {
         hotkey = new
         UserDefaults.standard.set(new.rawValue, forKey: "chat.hotkey")
         register(new)
+        onChange()
     }
 
     private func installHandler() {
         guard handler == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            // Answer only Chat's own hot key; any other Zeus hot key belongs to another handler.
+            var hotKeyID = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                              MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            guard CarbonHotkeySignature.owner(signature: hotKeyID.signature) == .chat else { return OSStatus(eventNotHandledErr) }
             DispatchQueue.main.async { MainActor.assumeIsolated { ChatHotkeyMonitor.shared.onPress() } }
             return noErr
         }, 1, &spec, nil, &handler)
+    }
+
+    /// Lets go of the hot key while a recorder is listening, so the key reaches the window, and takes it back after.
+    func setPaused(_ paused: Bool) {
+        self.paused = paused
+        register(hotkey)
     }
 
     private func register(_ hotkey: ChatHotkey) {
         if let reference { UnregisterEventHotKey(reference) }
         reference = nil
         problem = nil
-        guard let code = hotkey.keyCode else { return }
-        let id = EventHotKeyID(signature: OSType(0x5A455553), id: 1) // "ZEUS"
+        guard !paused, let code = hotkey.keyCode else { return }
+        let id = EventHotKeyID(signature: CarbonHotkeySignature.chat.rawValue, id: 1)
         let status = RegisterEventHotKey(code, hotkey.modifiers.rawValue, id, GetApplicationEventTarget(), 0, &reference)
         if status != noErr {
             problem = "\(hotkey.symbols) is already used by another app. Pick another shortcut."
