@@ -247,7 +247,9 @@ final class TilingKeyTap: @unchecked Sendable {
         case .passThrough:
             return Unmanaged.passUnretained(event)
         case .consume(let action):
-            deliver(action, joined: decision.monitorEvent(for: key), at: TimeInterval(event.timestamp) / 1_000_000_000)
+            // Stamped here, on the tap's own thread, from the clock HotkeyMonitor's now() reads (seconds since boot).
+            // CGEvent.timestamp is not used: its unit (nanoseconds or host ticks) differs between Macs.
+            deliver(action, joined: decision.monitorEvent(for: key), at: ProcessInfo.processInfo.systemUptime)
             return nil
         }
     }
