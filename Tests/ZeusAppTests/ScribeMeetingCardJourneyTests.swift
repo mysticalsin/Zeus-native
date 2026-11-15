@@ -160,6 +160,19 @@ private final class Journey {
         panel.hostedView.map { ScribeMeetingCardText.status($0.card, now: $0.now) }
     }
 
+    /// The accessibility labels of what the card window drew, read from the hosted view's own tree. Unlike
+    /// `shownStatus` this is not the model: it is what the view produced for the words.
+    var drawnLabels: [String] {
+        var labels: [String] = []
+        func walk(_ element: Any, depth: Int) {
+            guard depth < 16, let object = element as? NSAccessibilityProtocol else { return }
+            if let label = object.accessibilityLabel(), !label.isEmpty { labels.append(label) }
+            for child in (object.accessibilityChildren() as? [Any]) ?? [] { walk(child, depth: depth + 1) }
+        }
+        if let content = panel.window?.contentView { walk(content, depth: 0) }
+        return labels
+    }
+
     /// Everything the test made, taken down. Not an asserted action.
     func teardown() {
         scribe.cancel()
@@ -210,6 +223,42 @@ struct ScribeMeetingCardJourneyTests {
                 journey.registry.probes(for: "scribe.meetingCard.primary", in: window).isEmpty
             }
             #expect(journey.capture.startCount == 1)
+        }
+    }
+
+    @Test func aSecondRecordWhileTheStartIsUnderWayStartsNothing() async throws {
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let journey = Journey()
+            defer { journey.teardown() }
+            journey.ingest(slots: [slot(startsIn: 120)])
+            let offer = journey.panel.drawnCard
+            guard case .offer(let meeting, _) = offer else {
+                Issue.record("the heads-up did not draw an offer: \(offer)")
+                return
+            }
+
+            try await journey.click("scribe.meetingCard.primary")
+            try await journey.waitUntil("a session") { journey.scribe.phase.sessionID != nil }
+            let session = try #require(journey.scribe.phase.sessionID)
+            #expect(journey.panel.drawnCard == .starting(meeting, cancellable: false))
+
+            // Before the provider acknowledges: a second click on the control if the card still draws one, and a
+            // second tap on the offer the person saw. Neither starts anything.
+            let window = try #require(journey.panel.window)
+            if !journey.registry.probes(for: "scribe.meetingCard.primary", in: window).isEmpty {
+                try await journey.click("scribe.meetingCard.primary")
+            }
+            journey.controller.primary(offer)
+            #expect(journey.capture.startCount == 1)
+            #expect(journey.scribe.phase.sessionID == session)
+            #expect(journey.panel.drawnCard == .starting(meeting, cancellable: false))
+
+            journey.capture.send(.captureAcknowledged(session))
+            try await journey.waitUntil("recording") { journey.scribe.isRecording }
+            #expect(journey.capture.startCount == 1)
+            #expect(journey.scribe.phase.sessionID == session)
         }
     }
 
@@ -412,6 +461,8 @@ struct ScribeMeetingCardJourneyTests {
             journey.ingest(slots: [slot(startsIn: 75)])
             let card = journey.panel.drawnCard
             #expect(journey.shownStatus == "in 2 min")
+            // The drawn view says it too, not only the model behind it.
+            try await journey.waitUntil("the drawn words say 2 min") { journey.drawnLabels.contains { $0.contains("in 2 min") } }
             // The next wake is the minute change, 15 seconds on, not the card's own 20 seconds.
             #expect(journey.scheduler.delay == 15)
 
@@ -420,6 +471,8 @@ struct ScribeMeetingCardJourneyTests {
             #expect(journey.panel.drawnCard == card, "the same card, drawn again with the new time")
             #expect(journey.panel.isOnScreen)
             #expect(journey.shownStatus == "in 1 min")
+            try await journey.waitUntil("the drawn words say 1 min") { journey.drawnLabels.contains { $0.contains("in 1 min") } }
+            #expect(!journey.drawnLabels.contains { $0.contains("in 2 min") }, "the old minute is not left on the card")
         }
     }
 }
