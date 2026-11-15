@@ -131,6 +131,30 @@ def opens_a_window(text):
     return [name for name in ("NSPanel(", "NSWindow(") if name in "\n".join(code_lines(text))]
 
 
+def screen_mid_x_lines(text):
+    """Code lines that centre on the real screen frame. The controller centres every zone on the anchor frame."""
+    return [f"{number}: {line.strip()}" for number, line in enumerate(code_lines(text), 1) if "screen.frame.midX" in line]
+
+
+def anchor_has_one_source(text):
+    """The anchor frame is built in exactly one place, and the real frame stays for the display pick and the window."""
+    return (len(re.findall(r"NotchAnchor\.frame\(screenFrame: screen\.frame", "\n".join(code_lines(text)))) == 1
+            and "GlanceTopBar.windowFrame(screen: target.frame)" in text
+            and "$0.screen.frame.contains(NSEvent.mouseLocation)" in text)
+
+
+def view_offset_comes_last(text):
+    """In NotchView.body the one sideways offset is the outermost modifier, after the alert overlay's animation, so
+    the alerts move with the body. `offset` moves drawing and not layout."""
+    view = text[text.index("struct NotchView: View"):]
+    body = function_body(view, "var body: some View")
+    marker = "value: model.alerts.isEmpty)"
+    if body.count(".offset(x:") != 1 or marker not in body:
+        return False
+    after = body[body.index(marker) + len(marker):]
+    return ".offset(x: NotchAnchor.offset(footprint))" in after and after.strip() == ".offset(x: NotchAnchor.offset(footprint))"
+
+
 def has_dash(text):
     return any(dash in text for dash in DASHES)
 
@@ -173,6 +197,15 @@ class DrawnNotchWiring(unittest.TestCase):
         # Only the Settings card starts or changes calibration; the notch and its controller send losses only.
         self.assertEqual(sends_calibration_control(self.CONTROLLER_TEXT), [])
         self.assertEqual(sends_calibration_control(self.VIEW_TEXT), [])
+
+    def test_no_zone_is_centred_on_the_real_screen_frame(self):
+        self.assertEqual(screen_mid_x_lines(self.CONTROLLER_TEXT), [])
+
+    def test_the_anchor_frame_has_one_source_and_the_real_frame_stays_for_the_pick_and_the_window(self):
+        self.assertTrue(anchor_has_one_source(self.CONTROLLER_TEXT))
+
+    def test_the_view_offset_is_the_last_modifier_of_the_body(self):
+        self.assertTrue(view_offset_comes_last(self.VIEW_TEXT))
 
     def test_new_app_files_have_no_en_or_em_dash(self):
         for path in (MODEL, MODEL_TESTS, Path(__file__)):
@@ -231,6 +264,31 @@ class DrawnNotchLintFailsOnItsFailureShapes(unittest.TestCase):
     def test_a_window_in_the_model_is_caught(self):
         self.assertEqual(opens_a_window("let w = NSPanel(contentRect: .zero)"), ["NSPanel("])
         self.assertEqual(opens_a_window("// NSWindow( is not allowed"), [])
+
+    def test_a_zone_centred_on_the_real_frame_is_caught(self):
+        self.assertTrue(screen_mid_x_lines(self.REAL.replace("zone.minX", "screen.frame.midX", 1)))
+        self.assertTrue(screen_mid_x_lines("let x = screen.frame.midX - width / 2"))
+        self.assertEqual(screen_mid_x_lines("// screen.frame.midX is the real centre"), [])
+        self.assertEqual(screen_mid_x_lines("let x = anchor.midX - width / 2"), [])
+
+    def test_a_second_anchor_source_or_a_moved_window_frame_is_caught(self):
+        two = "let a = NotchAnchor.frame(screenFrame: screen.frame, footprint: footprint)\nlet b = NotchAnchor.frame(screenFrame: screen.frame, footprint: x)\n"
+        self.assertFalse(anchor_has_one_source(two + "GlanceTopBar.windowFrame(screen: target.frame)\n$0.screen.frame.contains(NSEvent.mouseLocation)"))
+        one = "let a = NotchAnchor.frame(screenFrame: screen.frame, footprint: footprint)\n"
+        self.assertFalse(anchor_has_one_source(one + "GlanceTopBar.windowFrame(screen: anchor)\n$0.screen.frame.contains(NSEvent.mouseLocation)"))
+        self.assertFalse(anchor_has_one_source(one + "GlanceTopBar.windowFrame(screen: target.frame)\n$0.screen.frame.contains(anchorPoint)"))
+
+    def test_an_offset_before_the_alert_animation_or_a_second_offset_is_caught(self):
+        offset = ".offset(x: NotchAnchor.offset(footprint))"
+        sample = ("struct NotchView: View {\n    var body: some View {\n        Text(\"a\")\n            " + offset
+                  + "\n            .animation(nil, value: model.alerts.isEmpty)\n    }\n}\n")
+        self.assertFalse(view_offset_comes_last(sample))
+        late = sample.replace("            " + offset + "\n", "").replace("value: model.alerts.isEmpty)", "value: model.alerts.isEmpty)\n            " + offset)
+        self.assertTrue(view_offset_comes_last(late))
+        twice = late.replace(offset, offset + "\n            " + offset)
+        self.assertFalse(view_offset_comes_last(twice))
+        self.assertFalse(view_offset_comes_last(late.replace(offset, ".offset(x: 0)")))
+        self.assertFalse(view_offset_comes_last(late.replace(offset, offset + "\n            .opacity(1)")))
 
     def test_a_dash_is_caught(self):
         self.assertTrue(has_dash("a " + DASHES[0] + " b"))
