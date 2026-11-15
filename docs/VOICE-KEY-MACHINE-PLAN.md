@@ -552,3 +552,13 @@ in parallel, up from 110 s, and B2 alone 325 s (A 56,979 states and 741,357 move
 2,861,423; C 83,855; D 33,974; E 7,014; E2 10,488; F 1,764; G 8,613; H 12,090; I 5,088; J 53,688). Run B with its three configs and
 lateness together had 542,081 states and took 450 s, so B2 keeps B's keys and only its hold config and B stays as it was.
 `WALK_ONLY=A,B2` runs a subset.
+
+### Sixth pass
+
+Review of 15 November 2026 of `f25c167..772c87d`.
+
+| # | Finding | Verdict | Change |
+| --- | --- | --- | --- |
+| 31 | A consumed tiling key was stamped `CGEvent.timestamp / 1e9`. That unit is documented as nanoseconds but is host ticks on some Macs, which would stamp every consumed key far in the past: a quick dictation tap followed by a tiling chord inside the gap would be cancelled instead of sent | Not reproduced; the unit is unverified on this Mac, so the conversion was removed rather than trusted | The tap stamps a consumed key with `ProcessInfo.systemUptime` read in its own callback, on its own thread, the clock `now()` reads |
+| 32 | `readLive(joinedOnly:)` writes a key-down's modifiers into `flagModifiers`; Zeus's own synthesized Command-V reaching the global monitor inside a confirm window could leave Command there until the next flags event | Open. Narrow window; the effect drops a press, it never starts or sends one | Follow-up: skip own-input key-downs in `HotkeyMonitor.feed` before they reach the machine |
+| 33 | A wake handled before an ordinary key that happened before it still starts the turn, which the key then cancels | Open, unchanged from before finding 30; finding 30 covers the late key, not the early wake | Follow-up: let a due tick consult `keysStillDown` |
