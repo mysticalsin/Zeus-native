@@ -131,6 +131,53 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log.isEmpty, "\(calls.log)")
     }
 
+    // MARK: A Space no monitor heard (Carbon holds the talk chord, so its key-down never reaches the monitors)
+
+    private final class LiveSpace { var down = false }
+
+    private func swallowing(_ live: LiveSpace) -> (HotkeyMonitor, Calls) {
+        let (monitor, calls) = make(chord: space)
+        monitor.keysStillDown = { $0.filter { $0 == 49 && live.down } }
+        return (monitor, calls)
+    }
+
+    @Test func aSwallowedSpaceHeldBeforeTheSetKeepsTheSetFromStarting() async throws {
+        let live = LiveSpace()
+        let (monitor, calls) = swallowing(live)
+        live.down = true // Space went down first and no event said so
+        controlOption(monitor)
+        try await wait(0.1)
+        #expect(calls.presses == 0, "Space came before the set: not the chord: \(calls.log)")
+        allUp(monitor)
+        live.down = false
+        try await wait(0.1)
+        controlOption(monitor)
+        #expect(calls.presses == 1, "everything was up in between: \(calls.log)")
+        allUp(monitor)
+        try await wait(0.6)
+    }
+
+    @Test func aSwallowedSpaceHeldPastTheSendDoesNotLetTheSetStartAgain() async throws {
+        let live = LiveSpace()
+        let (monitor, calls) = swallowing(live)
+        controlOption(monitor)
+        try await wait(0.1)
+        live.down = true // the chord Space, swallowed
+        allUp(monitor)
+        try await wait(0.6)
+        #expect(calls.log == ["press", "release"], "the clean chord sends: \(calls.log)")
+        controlOption(monitor)
+        try await wait(0.1)
+        #expect(calls.presses == 1, "Space is still down: the set is not alone, nothing starts (I6): \(calls.log)")
+        allUp(monitor)
+        live.down = false
+        try await wait(0.1)
+        controlOption(monitor)
+        #expect(calls.presses == 2, "Space is up and so is everything else: \(calls.log)")
+        allUp(monitor)
+        try await wait(0.6)
+    }
+
     // MARK: Cancel and release
 
     @Test func aKeyJoiningADedicatedDictationHoldCancelsIt() async throws {
