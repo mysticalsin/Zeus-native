@@ -7,6 +7,10 @@ import ZeusCore
 /// modifiers (⌥Space, ⌃⌥Z) is recorded the moment you press it. Escape cancels.
 @MainActor
 final class ShortcutRecorderModel: ObservableObject {
+    /// Called with true when a recorder starts listening and false when it stops: the app lets go of its Carbon hot keys
+    /// (Chat, the talk chord) meanwhile, so a chord such as Control-Option-Space reaches the window and can be recorded.
+    static var pauseGlobalHotkeys: (Bool) -> Void = { _ in }
+
     @Published var recording = false
     @Published var preview = ""
     private var monitor: Any?
@@ -19,6 +23,7 @@ final class ShortcutRecorderModel: ObservableObject {
         state = ShortcutRecorderState()
         recording = true
         preview = ""
+        Self.pauseGlobalHotkeys(true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp]) { [weak self] event in
             guard let self, let converted = Self.convert(event) else { return event }
             let swallow = MainActor.assumeIsolated { self.handle(converted) }
@@ -29,6 +34,7 @@ final class ShortcutRecorderModel: ObservableObject {
     func end() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if recording { Self.pauseGlobalHotkeys(false) }
         recording = false
         preview = ""
     }
@@ -107,6 +113,8 @@ struct ShortcutRecorderRow: View {
     var other: Shortcut?
     /// The key that stands in for Control+Option while VoiceOver is on (the talk key has one).
     var voiceOverFallback: Shortcut?
+    /// Plain sentences under the row, such as a clash with another shortcut, shown like the warnings.
+    var notes: [String] = []
     let set: (Shortcut?) -> Void
 
     var body: some View {
@@ -121,6 +129,14 @@ struct ShortcutRecorderRow: View {
                                         off: { set(nil) }, reset: { set(defaultValue) })
                 }
             }
+        }
+        ForEach(notes, id: \.self) { note in
+            HStack(alignment: .firstTextBaseline, spacing: 9) {
+                Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
+                Text(note).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(Theme.ember)
+            .padding(.vertical, 6)
         }
         if let shortcut {
             ForEach(ShortcutConflicts.warnings(for: shortcut, other: other, otherName: otherName,

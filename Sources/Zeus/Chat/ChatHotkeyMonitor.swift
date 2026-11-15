@@ -51,6 +51,7 @@ final class ChatHotkeyMonitor {
 
     /// Lets go of the hot key while a recorder is listening, so the key reaches the window, and takes it back after.
     func setPaused(_ paused: Bool) {
+        guard self.paused != paused else { return }
         self.paused = paused
         register(hotkey)
     }

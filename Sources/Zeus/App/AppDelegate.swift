@@ -327,6 +327,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey.start()
             syncTalkChord()
             ChatHotkeyMonitor.shared.onChange = { [weak self] in self?.syncTalkChord() }
+            // A recorder in Settings listens for any chord, so the Carbon hot keys let go while it does.
+            ShortcutRecorderModel.pauseGlobalHotkeys = { paused in
+                ChatHotkeyMonitor.shared.setPaused(paused)
+                TalkChordHotkey.shared.setPaused(paused)
+            }
             talkChordDefaultsObserver = NotificationCenter.default.addObserver(
                 forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.syncTalkChord() }

@@ -722,18 +722,99 @@ private struct GSNotificationsPage: View {
 // MARK: Shortcuts
 
 private struct ShortcutsPage: View {
+    /// Mirrors the Chat choice for SwiftUI: the monitor itself is not observable.
+    @State private var chat = ChatHotkeyMonitor.shared.hotkey
+    @State private var chatProblem = ChatHotkeyMonitor.shared.problem
+
+    /// The Chat choices as the catalog names them.
+    private static func title(_ key: ChatHotkey) -> String {
+        switch key {
+        case .off: "Off"
+        case .controlOptionSpace: "Control-Option-Space"
+        case .optionSpace: "Option-Space"
+        case .optionShiftSpace: "Option-Shift-Space"
+        case .commandShiftSpace: "Command-Shift-Space"
+        case .controlOptionC: "Control-Option-C"
+        }
+    }
+
+    /// What the page reads from the keys right now: the chord, the Chat clash and the sentences for the Talk row.
+    private struct Routing {
+        let chord: Shortcut?
+        let clash: VoiceKey.ChatClash?
+        let talkNotes: [String]
+    }
+
+    private func routing() -> Routing {
+        let talk = Preferences.shared.pushToTalk
+        let dictation = DictationSettings.shared
+        let voiceOverOn = NSWorkspace.shared.isVoiceOverEnabled
+        let heard = VoiceKey.effectiveTalkKey(chosen: talk, dictation: dictation.enabled ? dictation.key : nil,
+                                              pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
+                                              voiceOverOn: voiceOverOn)
+        let shared = dictation.enabled && talk == dictation.key
+        let routing = TalkChordRouting.current(heard: heard, shared: shared)
+        let clash = VoiceKey.chatClash(talk: talk, heard: heard, chat: chat, shared: shared, voiceOverOn: voiceOverOn, holders: [])
+        var notes: [String] = []
+        if let clash { notes.append(clash.sentence) }
+        if let holder = routing.heldBy, holder != "Chat" {
+            notes.append("\(holder) uses Control-Option-Space, so it does not talk. Hold Control + Option alone to talk.")
+        }
+        if let problem = TalkChordHotkey.shared.problem { notes.append(problem) }
+        return Routing(chord: routing.chord, clash: clash, talkNotes: notes)
+    }
+
     var body: some View {
+        let state = routing()
+        let clash = state.clash
         GSPageHeading(section: .shortcuts, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
             ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus",
-                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean.",
+                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean."
+                                    + (state.chord != nil ? " Control + Option + Space does the same." : ""),
                                 shortcut: Preferences.shared.pushToTalk, defaultValue: ShortcutStore.talkDefault,
                                 otherName: "Dictation", other: DictationSettings.shared.key,
                                 voiceOverFallback: VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk,
                                                                              dictation: DictationSettings.shared.key,
-                                                                             pointing: nil, voiceOverOn: true)) {
+                                                                             pointing: nil, voiceOverOn: true),
+                                notes: state.talkNotes) {
                 if let new = $0 { Preferences.shared.chooseTalkKey(new) }
+            }
+            GSDivider()
+            GSRow(symbol: "bubble.left.and.bubble.right", title: "Open the chat window",
+                  text: "Opens the chat window from any app.") {
+                GSPopup(selection: Binding(get: { Self.title(chat) },
+                                           set: { value in
+                                               guard let new = ChatHotkey.allCases.first(where: { Self.title($0) == value }) else { return }
+                                               ChatHotkeyMonitor.shared.set(new)
+                                               chat = new
+                                               chatProblem = ChatHotkeyMonitor.shared.problem
+                                           }),
+                        options: ChatHotkey.allCases.map { Self.title($0) }, label: "Open the chat window shortcut")
+            }
+            if let clash {
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
+                    Text(clash.sentence).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button(clash.fix == .off ? "Turn Chat off" : "Move Chat to \(Self.title(clash.fix))") {
+                        ChatHotkeyMonitor.shared.set(clash.fix)
+                        chat = clash.fix
+                        chatProblem = ChatHotkeyMonitor.shared.problem
+                    }
+                    .buttonStyle(GSButtonStyle())
+                }
+                .foregroundStyle(Theme.ember)
+                .padding(.vertical, 6)
+            }
+            if let chatProblem {
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
+                    Text(chatProblem).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Theme.ember)
+                .padding(.vertical, 6)
             }
             GSDivider()
             ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "Hold to speak, let go to write it where your cursor is.",
