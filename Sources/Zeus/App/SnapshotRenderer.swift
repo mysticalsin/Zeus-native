@@ -385,10 +385,10 @@ enum SnapshotRenderer {
             saveSurface(DrawnNotchCard(model: model).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).background(GS.panel),
                         size: CGSize(width: 760, height: height), name: "settings-drawn-card-\(name)")
         }
-        let drawnDraft = DrawnNotchShape(width: 215, height: 36, offset: 0)
+        let drawnDraft = DrawnNotchShape(width: 215, height: 36, offset: -60)
         drawnCard("pill", height: 150, SnapshotDrawnNotch(style: .pill))
         drawnCard("ready", height: 230, SnapshotDrawnNotch())
-        drawnCard("calibrating", height: 340, SnapshotDrawnNotch(state: .adjusting(draft: drawnDraft, saved: SnapshotDrawnNotch.savedShape)))
+        drawnCard("calibrating", height: 400, SnapshotDrawnNotch(state: .adjusting(draft: drawnDraft, saved: SnapshotDrawnNotch.savedShape)))
         drawnCard("not-shown", height: 230, SnapshotDrawnNotch(availability: .notShown))
         drawnCard("no-display", height: 230, SnapshotDrawnNotch(availability: .noDisplay))
 

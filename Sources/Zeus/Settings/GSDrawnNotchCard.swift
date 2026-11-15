@@ -11,6 +11,7 @@ struct DrawnNotchCardModel {
         case size(String)
         case width(Double)
         case height(Double)
+        case offset(Double)
         case actions
         case notShown
         case noDisplay
@@ -49,7 +50,7 @@ struct DrawnNotchCardModel {
             rows.append(.noDisplay)
         case .ready:
             if case .adjusting(let draft, _) = controller.state {
-                rows += [.width(draft.width), .height(draft.height), .actions]
+                rows += [.width(draft.width), .height(draft.height), .offset(draft.offset), .actions]
             } else {
                 let saved = controller.saved
                 rows.append(.size("\(Int(saved.width)) by \(Int(saved.height)) pt"))
@@ -67,6 +68,10 @@ struct DrawnNotchCardModel {
 
     func setHeight(_ value: Double) {
         controller.send(.setHeight(DrawnNotchLimits.sanitized(DrawnNotchShape(width: 0, height: value, offset: 0)).height))
+    }
+
+    func setOffset(_ value: Double) {
+        controller.send(.setOffset(DrawnNotchLimits.sanitized(DrawnNotchShape(width: 0, height: 0, offset: value)).offset))
     }
 
     func step(_ field: DrawnNotchCalibration.Field, _ direction: DrawnNotchCalibration.Direction) {
@@ -125,6 +130,11 @@ struct DrawnNotchCard: View {
             sliderRow(symbol: "arrow.up.and.down", label: "Height", value: value,
                       range: DrawnNotchLimits.heightRange, step: DrawnNotchLimits.heightStep,
                       onSet: model.setHeight, onStep: { model.step(.height, $0) })
+        case .offset(let value):
+            sliderRow(symbol: "arrow.left.arrow.right", label: "Position", value: value,
+                      range: DrawnNotchLimits.offsetRange, step: DrawnNotchLimits.offsetStep,
+                      shown: DrawnNotchLimits.positionText(value), spoken: DrawnNotchLimits.positionText(value, unit: "points"),
+                      valueWidth: 88, onSet: model.setOffset, onStep: { model.step(.offset, $0) })
         case .actions:
             HStack(spacing: 10) {
                 Spacer(minLength: 0)
@@ -144,15 +154,18 @@ struct DrawnNotchCard: View {
         }
     }
 
+    /// `shown` and `spoken` default to the value in points; Position reads "Centre" or a side instead.
     private func sliderRow(symbol: String, label: String, value: Double, range: ClosedRange<Double>, step: Double,
+                           shown: String? = nil, spoken: String? = nil, valueWidth: CGFloat = 52,
                            onSet: @escaping (Double) -> Void,
                            onStep: @escaping (DrawnNotchCalibration.Direction) -> Void) -> some View {
         GSRow(symbol: symbol, title: label) {
             HStack(spacing: 12) {
-                GSPointSlider(label: label, value: value, range: range, step: step, onSet: onSet, onStep: onStep)
+                GSPointSlider(label: label, value: value, range: range, step: step, spokenValue: spoken,
+                              onSet: onSet, onStep: onStep)
                     .frame(width: 200)
-                Text("\(Int(value)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
-                    .frame(width: 52, alignment: .trailing)
+                Text(shown ?? "\(Int(value)) pt").font(GS.rowText).foregroundStyle(GS.secondary).monospacedDigit()
+                    .frame(width: valueWidth, alignment: .trailing)
                     .accessibilityHidden(true)
             }
         }
@@ -160,13 +173,15 @@ struct DrawnNotchCard: View {
 }
 
 /// A slider in points that takes the keyboard: focus it, then each arrow key is one step. VoiceOver speaks its
-/// label and the value, such as "Width, 185 points", and adjusts by one step. `OBTickSlider` speaks percent and
+/// label and the value, such as "Width, 185 points" or "Position, 40 points left", and adjusts by one step. `OBTickSlider` speaks percent and
 /// takes no focus, so it is left as it is.
 struct GSPointSlider: View {
     let label: String
     let value: Double
     let range: ClosedRange<Double>
     let step: Double
+    /// What VoiceOver says for the value; nil is the number and "points".
+    var spokenValue: String? = nil
     let onSet: (Double) -> Void
     let onStep: (DrawnNotchCalibration.Direction) -> Void
     @FocusState private var focused: Bool
@@ -202,7 +217,7 @@ struct GSPointSlider: View {
         .onKeyPress(.upArrow) { onStep(.up); return .handled }
         .accessibilityElement()
         .accessibilityLabel(label)
-        .accessibilityValue("\(Int(value)) points")
+        .accessibilityValue(spokenValue ?? "\(Int(value)) points")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: onStep(.up)
