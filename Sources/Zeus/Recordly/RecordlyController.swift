@@ -463,6 +463,8 @@ final class RecordlyController {
     /// The Record page went away (another page, the notch closed): a countdown must not start a capture the owner can
     /// no longer see or cancel with Escape.
     func pageDisappeared() {
+        // A seeded snapshot fixture is drawn more than once (1x, 2x, flat); each render ending must not cancel it.
+        guard !holdsSeededStateForSnapshot else { return }
         perform(countdown.send(.cancel))
         thumbnailTask?.cancel()
     }
@@ -504,6 +506,8 @@ final class RecordlyController {
 
     // MARK: Snapshot harness
 
+    @ObservationIgnored private var holdsSeededStateForSnapshot = false
+
     enum SnapshotState {
         case idle
         case countdown(Int)
@@ -514,6 +518,7 @@ final class RecordlyController {
     /// Offscreen QA only: puts a controller built with a fake display lister into one visible state, with no
     /// timers, no capture and no permission request.
     func seedForSnapshot(granted: Bool, thumbnail: CGImage?, state: SnapshotState) {
+        holdsSeededStateForSnapshot = true
         screenRecordingGranted = granted
         refreshDisplays()
         self.thumbnail = granted ? thumbnail : nil
