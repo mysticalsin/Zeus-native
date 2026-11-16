@@ -39,7 +39,7 @@ struct VoiceRestoreTests {
         #expect(ElevenLabsVoice.isKeyRejection(429))
         #expect(!ElevenLabsVoice.isKeyRejection(500))
         #expect(ElevenLabsVoice.detailStatus(from: body) == "invalid_api_key")
-        #expect(ElevenLabsVoice.settingsMessage(status: 401, body: body) == "ElevenLabs key rejected, using the offline voice")
+        #expect(ElevenLabsVoice.settingsMessage(status: 401, body: body).contains("Paste a new key"))
         let limited = Data(#"{"detail":{"status":"too_many_concurrent_requests"}}"#.utf8)
         #expect(ElevenLabsVoice.settingsMessage(status: 429, body: limited).contains("rate limit"))
         #expect(ElevenLabsVoice.settingsMessage(status: 429, body: limited).contains("offline voice"))
@@ -48,7 +48,7 @@ struct VoiceRestoreTests {
     @Test @MainActor func settingsStoresRejectionLine() {
         let body = Data(#"{"detail":{"status":"invalid_api_key"}}"#.utf8)
         VoiceSettings.shared.noteElevenLabsKeyRejected(status: 401, body: body)
-        #expect(VoiceSettings.shared.elevenLabsStatusMessage == "ElevenLabs key rejected, using the offline voice")
+        #expect(VoiceSettings.shared.elevenLabsStatusMessage?.contains("Paste a new key") == true)
         VoiceSettings.shared.clearElevenLabsPause()
     }
 

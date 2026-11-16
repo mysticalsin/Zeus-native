@@ -7439,6 +7439,30 @@
         "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
         "function": "underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog"
       }
+    },
+    {
+      "id": "REG-814",
+      "failure": "Every ElevenLabs 401 said quota exceeded, so a bad key and used-up credits gave the same notice and the owner could not tell whether to paste a new key or wait.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
+        "function": "aBadKeyAsksForANewKeyAndDoesNotBlameCredits"
+      }
+    },
+    {
+      "id": "REG-815",
+      "failure": "Used-up ElevenLabs credits were reported as a rejected key, so the notice told the owner to check a key that was fine.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
+        "function": "usedUpCreditsSayTheCreditsAreUsedUpAndTheNextVoiceSpeaksUntilThePauseEnds"
+      }
     }
   ]
 }
