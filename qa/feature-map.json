@@ -6882,6 +6882,29 @@
             }
           ],
           "id": "F13.page-switch-layout"
+        },
+        {
+          "id": "F13.ui-polish",
+          "check": "native-UIPolishSourceTests",
+          "acceptance": "Polish rules hold in the sources: hints wrap instead of cutting mid-word, pop-ups fit their longest option, the onboarding column stays top-left, initials fit the visible disc, the Take notes button stays on one line, the countdown scrim hides the script, and the open panel ignores the pointer leaving while VoiceOver drives. Source and pure helper checks; no window shown.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "thePermissionCueWrapsInsteadOfTruncatingMidWord"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "aSettingsPopupIsWideEnoughForItsLongestOption"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
         }
       ]
     },
