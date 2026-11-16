@@ -237,7 +237,6 @@ struct DrawnNotchCardTests {
     private func importing(_ options: [String: String], over start: [String: String] = [:]) throws -> SettingsStore {
         let suite = NSTemporaryDirectory() + "zeus.drawn.card.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
         let store = SettingsStore(defaults: defaults)
         for (id, value) in start { store.set(id, value) }
         let file: [String: Any] = ["format": "zeus.settings", "version": 1, "options": options, "app": [String: String]()]

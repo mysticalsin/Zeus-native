@@ -103,10 +103,16 @@ struct OnboardingTests {
         #expect(band.progress == 0.7)
     }
 
+    /// A flow that never reads or writes the user's defaults and draws as a snapshot would.
+    @MainActor private static func inertFlow() -> OnboardingFlow {
+        OnboardingFlow(persistence: OnboardingPersistence(readStep: { 0 }, writeStep: { _ in }, readCompleted: { false }, markCompleted: {}),
+                       feedback: OnboardingFeedback(reduceMotion: { false }, isSnapshot: { true }, playSound: { _ in }))
+    }
+
     @Test func goingForwardPlaysTheAdvanceCueOnceAndBackPlaysNone() async throws {
-        TopBarStyle.isSnapshot = true // keep the saved step out of the user's defaults
-        defer { TopBarStyle.isSnapshot = false }
-        let flow = OnboardingFlow()
+        // Its own inert persistence, not the process-wide snapshot flag: this test sleeps, and a global left on
+        // while it sleeps made every settings test that ran meanwhile skip its writes.
+        let flow = Self.inertFlow()
         flow.step = .welcome
         var cues: [OnboardingSound] = []
         flow.playSound = { cues.append($0) }
@@ -127,9 +133,7 @@ struct OnboardingTests {
     }
 
     @Test func theLastStepHasNothingToAdvanceTo() {
-        TopBarStyle.isSnapshot = true
-        defer { TopBarStyle.isSnapshot = false }
-        let flow = OnboardingFlow()
+        let flow = Self.inertFlow()
         flow.step = .sounds
         var cues: [OnboardingSound] = []
         flow.playSound = { cues.append($0) }

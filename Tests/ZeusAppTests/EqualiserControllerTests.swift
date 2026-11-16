@@ -224,7 +224,6 @@ private final class Rig {
     init(book: [AppSoundSettings] = [bassMusic], playing: Bool = true, preload: ((UserDefaults) -> Void)? = nil) {
         let suite = NSTemporaryDirectory() + "zeus.equaliser.tests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
         var saved = AppSoundBook()
         for entry in book { saved.add(entry) }
         if !book.isEmpty { defaults.set(try! saved.encode(), forKey: AppSoundBook.storageKey) }

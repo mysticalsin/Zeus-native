@@ -100,7 +100,6 @@ struct SettingsCatalogTests {
     @MainActor @Test func dictationLanguagePersistsInIsolatedDefaults() throws {
         let suiteName = NSTemporaryDirectory() + "zeus.dictation.language.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
         defaults.set("off", forKey: ShortcutStore.dictationKey)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
@@ -114,7 +113,6 @@ struct SettingsCatalogTests {
     @MainActor @Test func shortcutBehaviorPersistsAndSharedKeyStaysHoldToSpeak() throws {
         let suiteName = NSTemporaryDirectory() + "zeus.dictation.behavior.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let talkKey = Preferences.shared.pushToTalk
@@ -138,7 +136,6 @@ struct SettingsCatalogTests {
     @MainActor @Test func exportIncludesHandBuiltSettings() throws {
         let suiteName = NSTemporaryDirectory() + "zeus.settings.catalog.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults)
@@ -164,7 +161,6 @@ struct SettingsCatalogTests {
 
         init(access: ScribeMicrophoneAccess = .allowed, stored: String? = nil) {
             defaults = UserDefaults(suiteName: suiteName)!
-            defaults.removePersistentDomain(forName: suiteName)
             if let stored { defaults.set(stored, forKey: SettingsStore.key(ScribeAutoStartMode.settingID)) }
             store = SettingsStore(defaults: defaults)
             store.microphoneAccess = { access }
@@ -306,7 +302,6 @@ struct SettingsCatalogTests {
     @MainActor static func isolatedStore() throws -> (SettingsStore, UserDefaults, String) {
         let suiteName = NSTemporaryDirectory() + "zeus.settings.face.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
         return (SettingsStore(defaults: defaults), defaults, suiteName)
     }
 

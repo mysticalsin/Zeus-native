@@ -8,7 +8,6 @@ struct TilingSettingsReaderTests {
     private func isolated() throws -> (UserDefaults, cleanup: () -> Void) {
         let name = NSTemporaryDirectory() + "zeus.tiling.settings.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
-        defaults.removePersistentDomain(forName: name)
         return (defaults, { defaults.removePersistentDomain(forName: name) })
     }
 

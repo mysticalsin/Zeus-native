@@ -9,7 +9,6 @@ struct VoiceKeyTests {
     private func defaults() -> UserDefaults {
         let suite = NSTemporaryDirectory() + "zeus.voicekey.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suite)!
-        d.removePersistentDomain(forName: suite)
         return d
     }
 

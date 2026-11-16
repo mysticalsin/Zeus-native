@@ -46,7 +46,6 @@ struct QA21ShortcutTests {
     private func defaults() -> UserDefaults {
         let suite = NSTemporaryDirectory() + "zeus.qa21.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suite)!
-        d.removePersistentDomain(forName: suite)
         return d
     }
 

@@ -89,7 +89,6 @@ private final class Journey {
     /// Microphone access. Otherwise the choice is the default, Ask me.
     init(automatic: Bool = false) {
         let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
         if automatic {
             defaults.set(ScribeAutoStartMode.automatic.title, forKey: FeatureSettings.key(ScribeAutoStartMode.settingID))
             ScribeAutoStartOptIn.record(mode: .automatic, now: journeyBase, defaults: defaults)

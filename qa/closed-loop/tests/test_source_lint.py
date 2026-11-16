@@ -1520,5 +1520,34 @@ class TestPreferencesStayInTemporaryFolderLint(unittest.TestCase):
         self.assertFalse(preferences_leaks('let d = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.x")'))
 
 
+# A test that turns the process-wide snapshot flag on and then suspends leaves it on for every main-actor test that
+# runs meanwhile; settings tests then skipped their writes and failed at random. Async tests inject their own fixture.
+def snapshot_flag_across_await(text):
+    problems = []
+    for match in re.finditer(r"func (\w+)\([^)]*\)[^{]*\{", text):
+        start = match.end()
+        depth, index = 1, start
+        while depth and index < len(text):
+            depth += {"{": 1, "}": -1}.get(text[index], 0)
+            index += 1
+        body = "\n".join(line.split("//")[0] for line in text[start:index].splitlines())
+        if "TopBarStyle.isSnapshot = true" in body and re.search(r"\bawait\b", body):
+            problems.append(f"{match.group(1)} sets TopBarStyle.isSnapshot and awaits")
+    return problems
+
+
+class SnapshotFlagAcrossAwaitLint(unittest.TestCase):
+    def test_no_async_test_holds_the_snapshot_flag_across_a_suspension(self):
+        for root in TEST_ROOTS:
+            for path in sorted(root.rglob("*.swift")):
+                with self.subTest(path=path.name):
+                    self.assertEqual(snapshot_flag_across_await(path.read_text(encoding="utf-8")), [])
+
+    def test_snapshot_flag_samples_that_must_fail(self):
+        bad = "func t() async {\n    TopBarStyle.isSnapshot = true\n    defer { TopBarStyle.isSnapshot = false }\n    await x()\n}\n"
+        self.assertTrue(snapshot_flag_across_await(bad))
+        self.assertFalse(snapshot_flag_across_await(bad.replace("await x()", "x()")))
+
+
 if __name__ == "__main__":
     unittest.main()
