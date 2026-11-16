@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 
 /// What a listening turn does when the audio hardware changes under it. A Bluetooth headset that
@@ -75,31 +74,4 @@ enum CaptureRecovery {
         }
         return action
     }
-}
-
-/// The few engine calls a capture turn makes, so the stop-race and retry path can be tested without audio hardware.
-protocol CaptureEngine: AnyObject {
-    var isRunning: Bool { get }
-    /// The input's current format, or nil when it has none.
-    func inputFormat() -> AVAudioFormat?
-    func installInputTap(format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock)
-    func removeInputTap()
-    func prepare()
-    func start() throws
-    func stop()
-}
-
-/// The real engine.
-final class AVCaptureEngine: CaptureEngine {
-    private let engine: AVAudioEngine
-    init(_ engine: AVAudioEngine) { self.engine = engine }
-    var isRunning: Bool { engine.isRunning }
-    func inputFormat() -> AVAudioFormat? { engine.inputNode.outputFormat(forBus: 0) }
-    func installInputTap(format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock) {
-        engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: format, block: block)
-    }
-    func removeInputTap() { engine.inputNode.removeTap(onBus: 0) }
-    func prepare() { engine.prepare() }
-    func start() throws { try engine.start() }
-    func stop() { engine.stop() }
 }

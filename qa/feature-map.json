@@ -1061,6 +1061,14 @@
       "suite": "TalkTurnVoiceTests",
       "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
       "scope": "The talk-turn capture recovery sequence, output engine start timing, microphone choice and per-turn diagnostics with spies and pure helpers. No audio hardware, Bluetooth link or speech recognition is exercised."
+    },
+    {
+      "id": "native-SpeechInputRecoveryTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SpeechInputRecoveryTests",
+      "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+      "scope": "SpeechInput configuration-change recovery with a fake capture engine: the stop race around the engine restart, the retry limit for an input with no format, and a format with no converter. No audio hardware or speech recognition is exercised."
     }
   ],
   "features": [
@@ -5326,6 +5334,33 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theSecondKeyOrdersKeepTheRules"
+            }
+          ]
+        },
+        {
+          "id": "F11.speech-input-recovery",
+          "check": "native-SpeechInputRecoveryTests",
+          "acceptance": "A stop that lands during capture recovery never reopens the microphone, an input with no format is retried a bounded number of times and ends the turn, a turn that is already over schedules no retry, and a changed format with no converter ends the turn. A fake capture engine: no audio hardware or speech recognition.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aStopBetweenTheTapAndTheRestartNeverStartsTheEngine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aStopWhileTheEngineIsStartingLeavesItStoppedWithTheTapRemoved"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "anInputWithoutAFormatRetriesAndEndsTheTurnAfterTheLimit"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
             }
           ]
         },
