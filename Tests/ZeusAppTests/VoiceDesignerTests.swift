@@ -28,7 +28,7 @@ struct VoiceDesignerTests {
     @Test func sampleTextAndDescriptionFitTheLimits() {
         #expect(VoiceDesigner.textRange.contains(VoiceDesigner.sampleText.count))
         let description = VoiceDesigner.voiceDescription.lowercased()
-        for quality in ["deep", "smooth", "measured", "american", "unhurried", "quietly amused", "synthetic sheen", "theatrical but calm"] {
+        for quality in ["smooth", "american", "unhurried", "synthetic", "metallic sheen", "theatrical"] {
             #expect(description.contains(quality), "\(quality)")
         }
         #expect(!description.contains("ultron"))
@@ -106,5 +106,18 @@ struct VoiceDesignerTests {
         let body = ElevenLabsVoice.speechBody(text: "Done.", personality: .ultron)
         #expect(body["model_id"] as? String == "eleven_flash_v2_5")
         #expect(body["text"] as? String == "Done.")
+    }
+
+    @Test func theDesignedVoiceIsAnOriginalFiftiesBaritoneWithADrySyntheticSheen() {
+        let description = VoiceDesigner.voiceDescription.lowercased()
+        for quality in ["american english", "in his fifties", "resonant", "slightly nasal baritone", "relaxed", "theatrical",
+                        "precise diction", "dry", "amused", "faintly condescending", "unhurried", "quiet intensity",
+                        "synthetic", "metallic sheen", "studio-quality"] {
+            #expect(description.contains(quality), "\(quality)")
+        }
+        #expect(!description.contains("forties"))
+        #expect(!description.contains("ultron"))
+        #expect(!description.contains("\u{2014}") && !description.contains("\u{2013}"))
+        #expect(VoiceDesigner.voiceDescription.count <= 1000)
     }
 }
