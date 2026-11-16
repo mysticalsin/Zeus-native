@@ -316,6 +316,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Every event reads it, so it also keeps the Carbon registration that takes the press in step (a backstop to the
             // sync points: start, a Chat or shortcut change, VoiceOver, any setting).
             hotkey.chordProvider = { [weak self] in self?.syncTalkChord()?.keyCode }
+            // Right Option, the second talk key (docs/RIGHT-OPTION-TALK-PLAN.md).
+            hotkey.secondKeyProvider = { SecondTalkRouting.current().key }
             // A turn that stops listening for its own reason (a failed start, the owner ending it) is told to the key
             // machine, so the next press starts a turn instead of being spent on one that is gone.
             voice?.onListeningEnded = { [weak self] in

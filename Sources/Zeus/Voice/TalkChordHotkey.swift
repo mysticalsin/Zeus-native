@@ -22,10 +22,24 @@ enum TalkChordRouting {
     }
 }
 
-/// STUB of the second talk key's live routing (docs/RIGHT-OPTION-TALK-PLAN.md).
+/// The second talk key as the talk monitor listens on it right now (docs/RIGHT-OPTION-TALK-PLAN.md): the stored key, or Right
+/// Option when the owner chose nothing, unless a key chosen elsewhere has it (`VoiceKey.secondTalkKey`). Reads the settings and
+/// the Carbon holders, writes nothing.
 @MainActor
 enum SecondTalkRouting {
-    static func current() -> (key: Shortcut?, yieldsTo: String?) { (.rightOption, nil) }
+    static func current() -> (key: Shortcut?, yieldsTo: String?) {
+        let dictation = DictationSettings.shared
+        let dictationKey = dictation.enabled ? dictation.key : nil
+        let pointing = PointingSettings.enabled ? PointingSettings.shortcut : nil
+        let polyglot = PolyglotSettings.shared
+        let voiceOverOn = NSWorkspace.shared.isVoiceOverEnabled
+        let heard = VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk, dictation: dictationKey, pointing: pointing,
+                                              voiceOverOn: voiceOverOn)
+        let stored = ShortcutStore.loadSecondTalk(.standard)
+        return VoiceKey.secondTalkKey(chosen: stored.key, explicit: stored.explicit, heard: heard, dictation: dictationKey,
+                                      pointing: pointing, polyglot: polyglot.enabled ? polyglot.hotkey : nil,
+                                      voiceOverOn: voiceOverOn, carbonHolders: TalkChordRouting.holders())
+    }
 }
 
 /// The Carbon hot key that takes Control-Option-Space away from other apps and from the input-source shortcut while the

@@ -31,10 +31,11 @@ final class PointingHotkeyMonitor {
 
     var onSignal: ((Signal) -> Void)?
     var shortcutProvider: () -> Shortcut = { PointingSettings.shortcut }
-    /// False when the pointing key is the talk key: the Zeus talk turn owns that hold (docs/VOICE-KEY.md),
+    /// False when the pointing key is the talk key or the second talk key: the Zeus talk turn owns that hold (docs/VOICE-KEY.md),
     /// so this monitor starts no turn and shows no VoiceOver notice for it. Esc and double Control still pass.
     var startsTurnsProvider: () -> Bool = {
-        VoiceKey.pointingStartsTurns(talk: Preferences.shared.pushToTalk, pointing: PointingSettings.shortcut, pointingEnabled: true)
+        VoiceKey.pointingStartsTurns(talk: Preferences.shared.pushToTalk, pointing: PointingSettings.shortcut, pointingEnabled: true,
+                                     secondTalk: SecondTalkRouting.current().key)
     }
     var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
     /// The modifiers the system reports right now, for the stuck-key watchdog.

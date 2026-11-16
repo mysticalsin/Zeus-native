@@ -67,7 +67,8 @@ enum KeyAccessNotice {
 
 /// The adapter of the voice key machine (`VoiceKeyMachine`, docs/VOICE-KEY-MACHINE-PLAN.md): it turns keyboard events,
 /// keys the tiling tap consumed and timer firings into machine events and runs the effects that come back. It keeps no
-/// state of its own: after `start()` only `machine` changes. Modifier chords, single modifiers (Right Command, Fn) and
+/// state of its own: after `start()` only `pair` changes, the machine of the talk key and of the second talk key behind one
+/// arbiter (`TalkKeyPair`; with no second key it is the machine). Modifier chords, single modifiers (Right Command, Fn) and
 /// keys with modifiers (Option-Space) are read from the event stream by the machine. Global monitoring needs
 /// Accessibility or Input Monitoring; the local monitor covers Zeus's own windows.
 @MainActor
@@ -105,7 +106,7 @@ final class HotkeyMonitor {
     /// none. Only the talk role reads it, and only in hold mode.
     var chordProvider: () -> UInt16? = { nil }
     /// The second talk key (Right Option unless the owner chose another key or turned it off), nil for none. Only the talk role
-    /// reads it. STUB: not read yet.
+    /// reads it, and it is read on every event, so the owner hands back a value its sync points stored (docs/RIGHT-OPTION-TALK-PLAN.md).
     var secondKeyProvider: () -> Shortcut? = { nil }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
     var liveModifiers: () -> ShortcutModifiers? = {
@@ -119,7 +120,7 @@ final class HotkeyMonitor {
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
-    private var machine = VoiceKeyMachine()
+    private var pair = TalkKeyPair()
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
     private var ownerTurn = 0
 
@@ -177,7 +178,7 @@ final class HotkeyMonitor {
     /// picture as a foreign key, so while the picture holds any ordinary key the system is asked first which of them
     /// are still down.
     func feed(_ event: ShortcutEvent, at time: TimeInterval? = nil) {
-        let held = machine.keys.keysDown
+        let held = pair.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
         let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
@@ -186,9 +187,9 @@ final class HotkeyMonitor {
         // a Space that came before the set spoils the hold and a Space that joined the set does not. It is read at the time
         // of the flags event, not the time that event is heard: a busy main thread must not make a short tap stand for the
         // confirm.
-        if case .flags = event, let chord = chordProvider(), !machine.keys.keysDown.contains(chord),
+        if case .flags = event, let chord = chordProvider(), !pair.keys.keysDown.contains(chord),
            keysStillDown?([chord]).contains(chord) == true {
-            send(.key(.keyDown(keyCode: chord, modifiers: machine.keys.flagModifiers), at: at))
+            send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         send(.key(event, at: at))
     }
@@ -227,13 +228,22 @@ final class HotkeyMonitor {
                                       chord: role == .talk ? chordProvider() : nil)
     }
 
+    /// The second talk key's config: a hold key with the typing confirm (or tiling's, when longer) and no chord. Only the talk
+    /// role has one.
+    private var secondConfig: VoiceKeyMachine.Config {
+        let key = role == .talk ? secondKeyProvider() : nil
+        return VoiceKeyMachine.Config(key: key, role: .talk, mode: .hold,
+                                      voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
+                                      confirm: key.map { VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm($0)) } ?? 0, chord: nil)
+    }
+
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
     /// inside a callback meets the machine in its new state. The k-th `start` of a call is turn `generation before + k`.
     private func send(_ event: VoiceKeyMachine.Event) {
         let config = config
-        let before = machine.generation
+        let before = pair.generation
         var started = 0
-        for effect in machine.handle(event, config: config) {
+        for effect in pair.handle(event, primary: config, second: secondConfig) {
             switch effect {
             case .start:
                 started += 1
