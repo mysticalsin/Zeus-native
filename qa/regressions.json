@@ -6203,6 +6203,18 @@
         "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
         "function": "theFadeUsesTheTimingFunctionAndTheLinkUsesTheWindowScreen"
       }
+    },
+    {
+      "id": "REG-746",
+      "failure": "The mascot's 60 fps stroll ran on a run-loop timer, which is not locked to the display.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MascotMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+        "function": "theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer"
+      }
     }
   ]
 }

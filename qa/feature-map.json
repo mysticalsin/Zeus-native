@@ -6605,6 +6605,10 @@
             {
               "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
               "function": "tickRatesStayWithinTheBudget"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+              "function": "theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer"
             }
           ],
           "id": "F13.mascot-clip-rate"

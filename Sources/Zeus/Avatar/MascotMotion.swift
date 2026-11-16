@@ -117,24 +117,29 @@ struct MascotMotion: Equatable {
     }
 }
 
-/// Reference point for a waking clip, so it starts at its first frame (a class, not @State: the
-/// toolchain lacks StateMacro; it never publishes, so reading it in `body` is free).
+/// Reference point for a waking clip, so it starts at its first frame, and what the frame clock should do next (a
+/// class, not @State: the toolchain lacks StateMacro; it only publishes when the wanted clock changes).
 @MainActor
 final class MascotClipClock: ObservableObject {
     var wakeStart: Double?
-    /// Seconds between ticks: the clip's own rate, 60 fps while travelling. It follows the pose on screen, one tick behind.
+    /// Seconds between timer ticks: the on-screen clip's own frame rate. It follows the pose, one tick behind.
     @Published private(set) var interval: Double = 1 / 12
+    /// Code is moving the sprite (the stroll, the shake, the jump): the view runs on the display link at 60 fps.
+    @Published private(set) var travelling = false
 
-    func follow(_ wanted: Double) {
-        guard abs(wanted - interval) > 1e-9 else { return }
+    func follow(interval wanted: Double, travelling wantsTravel: Bool) {
+        guard abs(wanted - interval) > 1e-9 || wantsTravel != travelling else { return }
         // Not inside the view update that asked: publishing from there is undefined.
-        DispatchQueue.main.async { [weak self] in self?.interval = wanted }
+        DispatchQueue.main.async { [weak self] in
+            self?.interval = wanted
+            self?.travelling = wantsTravel
+        }
     }
 }
 
 /// The v2 mascot, alive: plays the state's sprite animation frame by frame (timed from the atlas
 /// metadata; the 128 px atlas for the notch, 320 px for chat and onboarding) and adds code motion only
-/// for travel. Ticks at each clip's own frame rate (12, 20 or 24 fps) and at 60 fps while it travels; gone from the view tree (the notch
+/// for travel. Ticks at each clip's own frame rate (12, 20 or 24 fps) on a run-loop timer, and at 60 fps on the display link while it travels; gone from the view tree (the notch
 /// hidden) means no timeline and no work. Reduce Motion shows the state's first (rest) frame, and
 /// snapshots pin `frameTime`. A missing atlas falls back to the still pose PNG.
 struct LivingAvatar: View {
@@ -171,9 +176,14 @@ struct LivingAvatar: View {
         1 / MotionRules.fps(clipFPS: clipFPS, travelling: travelling)
     }
 
+    /// The clip's own interval, whether or not code is moving the sprite: this is the run-loop timer's.
+    static func clipInterval(for motion: MascotMotion, atlas: MascotAtlasStore) -> Double {
+        tickInterval(clipFPS: atlas.clip(motion.pose.clipID).map { Double($0.fps) } ?? fallbackFPS, travelling: false)
+    }
+
+    /// The rate the mascot is drawn at: the clip's, or 60 fps while travelling (on the display link).
     static func tickInterval(for motion: MascotMotion, atlas: MascotAtlasStore) -> Double {
-        let clipFPS = atlas.clip(motion.pose.clipID).map { Double($0.fps) } ?? fallbackFPS
-        return tickInterval(clipFPS: clipFPS, travelling: motion.travelling)
+        motion.travelling ? tickInterval(clipFPS: fallbackFPS, travelling: true) : clipInterval(for: motion, atlas: atlas)
     }
 
     var body: some View {
@@ -187,17 +197,27 @@ struct LivingAvatar: View {
             } else if Motion.reduced || TopBarStyle.isSnapshot {
                 frame(MascotMotion(pose: asleep ? .sleepingClean : MascotMotion.cycle(for: state).poses[0]))
             } else {
-                TickingView(interval: clock.interval, paused: paused) { context in
-                    let t = context.date.timeIntervalSinceReferenceDate
-                    let motion = MascotMotion.at(clipTime(t), mood: mood, size: size)
-                    let _ = clock.follow(Self.tickInterval(for: motion, atlas: atlas))
-                    frame(motion)
+                if clock.travelling {
+                    // Code is moving the sprite: the display link at 60 fps (it honours Reduce Motion and hidden windows).
+                    DisplaySynchronizedView(paused: paused, preferredFramesPerSecond: Motion.ambientFPS) { context in
+                        step(at: context.date)
+                    }
+                } else {
+                    TickingView(interval: clock.interval, paused: paused) { context in
+                        step(at: context.date)
+                    }
                 }
             }
         }
         .frame(width: size, height: size)
         .accessibilityElement()
         .accessibilityLabel(asleep ? "Zeus: sleeping" : "Zeus: \(state.title)")
+    }
+
+    private func step(at date: Date) -> some View {
+        let motion = MascotMotion.at(clipTime(date.timeIntervalSinceReferenceDate), mood: mood, size: size)
+        let _ = clock.follow(interval: Self.clipInterval(for: motion, atlas: atlas), travelling: motion.travelling)
+        return frame(motion)
     }
 
     /// Waking starts from its first frame; everything else runs on the shared clock.

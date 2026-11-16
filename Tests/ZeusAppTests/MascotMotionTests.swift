@@ -188,6 +188,19 @@ struct MascotMotionTests {
         #expect(!MascotMotion.at(1, mood: .awake(.idle), size: 22).travelling)
     }
 
+    @MainActor @Test func theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer() throws {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let walking = MascotMotion.at(walkStart + 0.8, mood: .awake(.idle), size: 22)
+        let clip = try #require(atlas.clip(walking.pose.clipID))
+        // The timer interval is always the clip's: 60 fps comes from the display link, not a run-loop timer.
+        #expect(abs(LivingAvatar.clipInterval(for: walking, atlas: atlas) - 1.0 / Double(clip.fps)) < 1e-9)
+        let source = try String(contentsOf: Self.animDirectory.deletingLastPathComponent().appendingPathComponent("MascotMotion.swift"), encoding: .utf8)
+        #expect(source.contains("DisplaySynchronizedView(paused: paused, preferredFramesPerSecond: Motion.ambientFPS)"))
+        #expect(source.contains("if clock.travelling"))
+        #expect(!source.contains("interval: 1 / 60"))
+    }
+
     // MARK: QA7 round 11 -- `zeus debug animate <pose>` for the v2 poses no `AvatarState` reaches directly
 
     // Each test below uses its own `AvatarStatus` instance (not `.shared`) so these can't race
