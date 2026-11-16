@@ -35,7 +35,7 @@ final class PointingHotkeyMonitor {
     /// so this monitor starts no turn and shows no VoiceOver notice for it. Esc and double Control still pass.
     var startsTurnsProvider: () -> Bool = {
         VoiceKey.pointingStartsTurns(talk: Preferences.shared.pushToTalk, pointing: PointingSettings.shortcut, pointingEnabled: true,
-                                     secondTalk: SecondTalkRouting.current().key)
+                                     secondTalk: SecondTalkRouting.lastSynced)
     }
     var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
     /// The modifiers the system reports right now, for the stuck-key watchdog.

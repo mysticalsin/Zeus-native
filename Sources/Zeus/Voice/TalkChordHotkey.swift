@@ -27,6 +27,9 @@ enum TalkChordRouting {
 /// the Carbon holders, writes nothing.
 @MainActor
 enum SecondTalkRouting {
+    /// The key at the last sync point, for the readers that run on every event (pointing). Nil until the app has synced.
+    static var lastSynced: Shortcut?
+
     static func current() -> (key: Shortcut?, yieldsTo: String?) {
         let dictation = DictationSettings.shared
         let dictationKey = dictation.enabled ? dictation.key : nil
