@@ -41,6 +41,8 @@ enum TilingKeyClash {
         var others: [TileBaseConflicts.NamedShortcut] = []
         /// Control-Option-Space while the talk chord is active (it is not when Chat or another hot key holds it), else nil.
         var talkChord: Shortcut?
+        /// The second talk key (Right Option) while it is active, else nil. STUB: not read yet.
+        var secondTalk: Shortcut?
 
         /// The prompter's pause key (`PrompterHub.hotkeys`). It is registered only while the prompter shows, but it is
         /// fixed, so the tiling keys must never bind it.

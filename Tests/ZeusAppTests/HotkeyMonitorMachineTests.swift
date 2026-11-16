@@ -23,8 +23,9 @@ struct HotkeyMonitorMachineTests {
 
     private func make(key: Shortcut = .controlOption, role: HotkeyMonitor.Role = .talk, shared: Bool = false,
                       toggle: Bool = false, voiceOver: Bool = false, confirm: TimeInterval = 0,
-                      live: ShortcutModifiers? = nil, chord: UInt16? = nil) -> (HotkeyMonitor, Calls) {
+                      live: ShortcutModifiers? = nil, chord: UInt16? = nil, second: Shortcut? = nil) -> (HotkeyMonitor, Calls) {
         let monitor = HotkeyMonitor()
+        monitor.secondKeyProvider = { second }
         let calls = Calls()
         monitor.role = role
         monitor.keyProvider = { key }
@@ -92,6 +93,69 @@ struct HotkeyMonitorMachineTests {
         swapChord(direct, consumed: false)
         try await wait(0.6)
         #expect(tapCalls.log == directCalls.log, "\(tapCalls.log) against \(directCalls.log)")
+    }
+
+    // MARK: The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md)
+
+    /// Right Option goes down or up, with `held` modifiers already down.
+    private func rightOptionDown(_ monitor: HotkeyMonitor, beside held: ShortcutModifiers = []) {
+        monitor.feed(.flags(keyCode: 61, modifiers: held.union(.option)))
+    }
+
+    private func rightOptionUp(_ monitor: HotkeyMonitor, beside held: ShortcutModifiers = []) {
+        monitor.feed(.flags(keyCode: 61, modifiers: held))
+    }
+
+    @Test func theSecondKeyCallsPressOnceAndReleaseOnce() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        rightOptionDown(monitor)
+        try await wait(0.1)
+        #expect(calls.presses == 0, "Right Option waits a quarter second: \(calls.log)")
+        try await wait(0.4)
+        #expect(calls.presses == 1, "\(calls.log)")
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "release"], "\(calls.log)")
+    }
+
+    @Test func aSecondKeyPressDuringAPrimaryTurnCallsNothing() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        controlOption(monitor)
+        #expect(calls.presses == 1, "the primary key starts at once with no confirm: \(calls.log)")
+        rightOptionDown(monitor, beside: [.control])
+        try await wait(0.6)
+        #expect(calls.log == ["press"], "the second key's start never reaches the owner: \(calls.log)")
+        rightOptionUp(monitor, beside: [.control, .option])
+        try await wait(0.1)
+        allUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "release"], "one turn, ended by its own key: \(calls.log)")
+    }
+
+    @Test func aRefusedSecondKeyPressIsAbandonedAndTheNextPressStarts() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        calls.takes = false
+        rightOptionDown(monitor)
+        try await wait(0.5)
+        #expect(calls.log == ["press"], "\(calls.log)")
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press"], "a turn the owner refused is never sent: \(calls.log)")
+        calls.takes = true
+        rightOptionDown(monitor)
+        try await wait(0.5)
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "press", "release"], "\(calls.log)")
+    }
+
+    @Test func theDictationMonitorNeverHearsTheSecondKey() async throws {
+        let (monitor, calls) = make(key: .rightCommand, role: .dictation, second: .rightOption)
+        rightOptionDown(monitor)
+        try await wait(0.6)
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log.isEmpty, "only the talk monitor has a second key: \(calls.log)")
     }
 
     // MARK: The talk chord (docs/ULTRON-CHORD-PLAN.md)

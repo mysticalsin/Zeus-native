@@ -140,6 +140,23 @@ struct TilingKeyClashTests {
         #expect(note(.controlOption, talk: .rightOption, voiceOverOn: false, polyglot: nil) == nil)
     }
 
+    @Test func theLiveKeysCarryTheSecondTalkKeyOnlyWhileItIsActive() {
+        let live = TilingKeyClash.Keys.live()
+        #expect(live.secondTalk == SecondTalkRouting.current().key, "the key the talk monitor's second slot listens on")
+        if let key = live.secondTalk { #expect(key.isModifierOnly || key.keyCode != nil) }
+    }
+
+    @Test func aSecondTalkKeyTheTilingKeysBindIsNamedByTheReader() throws {
+        var keymap = TileKeymap()
+        try keymap.bind(Shortcut(keyCode: 123, modifiers: .option), to: .retile)
+        let keys = TilingKeyClash.Keys(talk: .controlOption, dictation: nil, pointing: nil, polyglot: nil, chat: .off,
+                                       voiceOverOn: false, secondTalk: .rightOption)
+        #expect(TilingKeyClash.note(base: .controlOptionCommand, keymap: keymap, keys: keys) == "Option is also your Second talk key.")
+        var off = keys
+        off.secondTalk = nil
+        #expect(TilingKeyClash.note(base: .controlOptionCommand, keymap: keymap, keys: off) == nil)
+    }
+
     @Test func theLiveKeysCarryThePolyglotKeyAsItsMonitorReadsIt() {
         let settings = PolyglotSettings.shared
         #expect(TilingKeyClash.Keys.live().polyglot == (settings.enabled ? settings.hotkey : nil))

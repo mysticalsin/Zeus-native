@@ -22,6 +22,12 @@ enum TalkChordRouting {
     }
 }
 
+/// STUB of the second talk key's live routing (docs/RIGHT-OPTION-TALK-PLAN.md).
+@MainActor
+enum SecondTalkRouting {
+    static func current() -> (key: Shortcut?, yieldsTo: String?) { (.rightOption, nil) }
+}
+
 /// The Carbon hot key that takes Control-Option-Space away from other apps and from the input-source shortcut while the
 /// talk chord is active. Its handler does nothing: the press only has to be taken. The talk turn itself is read from the
 /// key monitors, so a failed registration costs only a typed space (Settings says so).
