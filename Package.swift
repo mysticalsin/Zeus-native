@@ -35,7 +35,7 @@ let package = Package(
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
         ], resources: [
             .copy("Avatar/Poses"), .copy("Avatar/Anim"), .copy("Fonts"),
-            .copy("Onboarding/Media"), .copy("Integrations/Brands"), .copy("Sounds"),
+            .copy("Onboarding/Media"), .copy("Integrations/Brands"), .copy("Sounds"), .copy("Personality"),
         ]),
         .executableTarget(name: "zeus-hook", dependencies: ["ZeusCore"]),
         .executableTarget(name: "zeus-bridge", dependencies: ["ZeusCore"]),

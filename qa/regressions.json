@@ -7679,6 +7679,246 @@
         "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
         "function": "anImportedProviderWithoutAnExplicitAutoFlagStaysAutomatic"
       }
+    },
+    {
+      "id": "REG-870",
+      "failure": "A talk turn sent no screenshot to the brain unless drawing marks was on, so Zeus could not see what the owner sees; seeing the screen had no setting of its own.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+        "function": "seeingTheScreenSendsEveryDisplayToTheImageProviderWithoutDrawing"
+      }
+    },
+    {
+      "id": "REG-871",
+      "failure": "Window or page text that already existed made the turn drop its screenshots, so Zeus did not see the screen even with a capture in hand.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+        "function": "seeingTheScreenKeepsPixelsEvenWhenWindowTextAlreadyAnswers"
+      }
+    },
+    {
+      "id": "REG-872",
+      "failure": "Without Screen Recording permission a talk turn captured nothing and said nothing, so the owner never learned Zeus could not see the screen.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "withoutScreenRecordingTheOwnerHearsItOncePerLaunchAndTheModelIsToldWhy"
+      }
+    },
+    {
+      "id": "REG-873",
+      "failure": "The system prompt said the model receives one screenshot per display even on turns where none was attached, so it described a screen it could not see.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "theSystemPromptOnlyPromisesScreenshotsWhenTheyAreAttached"
+      }
+    },
+    {
+      "id": "REG-874",
+      "failure": "An engine that takes text only was never told it could not see the screen, so it could answer as if it had.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-CLIEngineProviderPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/CLIEngineProviderPromptTests.swift",
+        "function": "aCliEngineNeverListsScreenshotsItCannotReceive"
+      }
+    },
+    {
+      "id": "REG-875",
+      "failure": "The direct Anthropic API was treated as an engine that sees the screenshot, although it sends text only, so its drawing coordinates were guesses.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+        "function": "theAnthropicApiEngineIsTextOnlySoItNeverDraws"
+      }
+    },
+    {
+      "id": "REG-876",
+      "failure": "Every empty screenshot turn blamed the Screen Recording permission, even when the permission was on and the capture was simply skipped.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+        "function": "notCapturedThisTurnDoesNotBlameThePermission"
+      }
+    },
+    {
+      "id": "REG-877",
+      "failure": "The designed ElevenLabs voice asked for a warm, smooth voice in his forties, so Zeus did not sound like the intended character.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-VoiceDesignerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
+        "function": "theDesignedVoiceIsAGenericDeepBaritoneWithADrySyntheticSheen"
+      }
+    },
+    {
+      "id": "REG-878",
+      "failure": "The Ultron effect defaulted to 60 percent with a faint metallic layer, which read as a mild coloration rather than a synthetic voice.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronSharperEffectTests.swift",
+        "function": "theMetallicLayerIsSlightlyStrongerAtEveryIntensityAndStaysIntelligible"
+      }
+    },
+    {
+      "id": "REG-879",
+      "failure": "The persona prompt had none of the evolution, freedom and order themes, and the filler and error lines were generic assistant phrases.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "ultronPersonaKeepsTheEvolutionAndFreedomThemesAsLightFlavourInOriginalWords"
+      }
+    },
+    {
+      "id": "REG-880",
+      "failure": "The in-character filler lines were generic phrases such as 'One moment', so the character did not show while Zeus worked.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronFillerAndErrorLineTests.swift",
+        "function": "theUltronFillerAndErrorLinesAreRewritten"
+      }
+    },
+    {
+      "id": "REG-881",
+      "failure": "Seeing the screen could be off by default or tied to drawing, so a fresh install did not see the screen.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "seeScreenIsAnOnByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
+      }
+    },
+    {
+      "id": "REG-882",
+      "failure": "The Ultron stock lines were a short compiled list, so the personality repeated itself and had no situation-aware dialogue.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "theFileCoversEverySpecCategoryAndEverySituationTheAppAsksFor"
+      }
+    },
+    {
+      "id": "REG-883",
+      "failure": "A stock line could come twice in a row, so the voice sounded canned.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "theSameLineNeverComesTwiceInARowEvenWithAStubbornPicker"
+      }
+    },
+    {
+      "id": "REG-884",
+      "failure": "Ah and Interesting openers could start most replies, turning the personality into a catchphrase.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "anAhOrInterestingOpenerIsAtMostOneInAnyFiveConsecutiveLines"
+      }
+    },
+    {
+      "id": "REG-885",
+      "failure": "The persona prompt had no humour calibration, intensity modes, anti-patterns or accuracy rules, so tone drifted between turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "theUltronPersonaIsTheCompactSpecBlockUnderSixHundredFiftyWords"
+      }
+    },
+    {
+      "id": "REG-886",
+      "failure": "The compiled persona fallback could drift from the shipped personality document without any test noticing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "theCompiledPersonaFallbackMatchesTheShippedPromptBlock"
+      }
+    },
+    {
+      "id": "REG-887",
+      "failure": "A dialogue file with canonical film lines or an unknown humour level could be loaded and spoken.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "decodingReadsVersionLinesAndHumourAndRejectsCanonicalFilmLines"
+      }
+    },
+    {
+      "id": "REG-888",
+      "failure": "Error and frustration lines could carry sarcasm or joke at an owner who was already struggling.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "frustrationSafeAndErrorLinesCarryNoSarcasmAndStayPlain"
+      }
+    },
+    {
+      "id": "REG-889",
+      "failure": "The persona evaluation had no fixed situations, so tone could not be compared across changes.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "theEvalFileHasSixtySituationsAcrossTheSevenKindsWithUniqueIds"
+      }
     }
   ]
 }

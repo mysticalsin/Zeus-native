@@ -116,6 +116,8 @@ public struct BrainRequest: Sendable {
     /// The screenshot is attached because talk drawing is on. A persistent Claude process that took it is replaced
     /// before the next turn; with drawing off nothing is flagged and the process is reused as before.
     public let carriesDrawImage: Bool
+    /// Why `screenshots` is empty, when it is. Nil reads as "not captured this turn".
+    public let screenReason: ScreenSightReason?
 
     public init(
         turn: UUID = UUID(),
@@ -127,9 +129,11 @@ public struct BrainRequest: Sendable {
         systemPrompt: String,
         deep: Bool = false,
         firstTextBudget: TimeInterval? = nil,
-        carriesDrawImage: Bool = false
+        carriesDrawImage: Bool = false,
+        screenReason: ScreenSightReason? = nil
     ) {
         self.carriesDrawImage = carriesDrawImage
+        self.screenReason = screenReason
         self.turn = turn
         self.transcript = transcript
         self.screenshots = screenshots
@@ -144,11 +148,14 @@ public struct BrainRequest: Sendable {
     /// A copy with one field changed. Used when a turn retries deeper, or a racer needs its own id so cancelling the loser leaves the winner running.
     public func with(turn: UUID? = nil, transcript: String? = nil, screenshots: [ScreenShot]? = nil,
                      systemPrompt: String? = nil, deep: Bool? = nil,
-                     firstTextBudget: TimeInterval? = nil) -> BrainRequest {
+                     firstTextBudget: TimeInterval? = nil, screenReason: ScreenSightReason? = nil,
+                     carriesDrawImage: Bool? = nil) -> BrainRequest {
         BrainRequest(turn: turn ?? self.turn, transcript: transcript ?? self.transcript,
                      screenshots: screenshots ?? self.screenshots, axSummary: axSummary, activeTab: activeTab,
                      history: history, systemPrompt: systemPrompt ?? self.systemPrompt, deep: deep ?? self.deep,
-                     firstTextBudget: firstTextBudget ?? self.firstTextBudget, carriesDrawImage: carriesDrawImage)
+                     firstTextBudget: firstTextBudget ?? self.firstTextBudget,
+                     carriesDrawImage: carriesDrawImage ?? self.carriesDrawImage,
+                     screenReason: screenReason ?? self.screenReason)
     }
 }
 

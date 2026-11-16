@@ -11,7 +11,7 @@ enum UltronVoiceEffect {
         defaults.object(forKey: enabledKey) as? Bool ?? true
     }
 
-    /// 0 to 1. Untouched installs get the designed 60 %.
+    /// 0 to 1. Untouched installs get the designed 75 %.
     static func intensity(_ defaults: UserDefaults = .standard) -> Float {
         defaults.object(forKey: intensityKey) as? Float ?? Float(UltronEffectParameters.defaultPercent) / 100
     }

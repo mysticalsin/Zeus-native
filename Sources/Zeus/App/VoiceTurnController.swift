@@ -24,6 +24,11 @@ final class VoiceTurnController {
     private let presenter: any TalkVisualPresenting
     /// Whether the owner turned on drawing marks on the screen while Zeus answers (off by default).
     private let drawConsent: () -> Bool
+    /// Whether the brain gets the screenshots (on by default), and whether Screen Recording is granted.
+    private let seeScreenConsent: () -> Bool
+    private let screenPermission: () -> Bool
+    /// The "I can't see your screen" notice, given once per launch.
+    private var sightNotice = ScreenSightNotice()
     /// A drawing from this controller's last answer may still be on screen.
     private var drawActive = false
 
@@ -72,8 +77,12 @@ final class VoiceTurnController {
 
     init(buddy: BuddyController, notch: NotchController, brain: BrainProvider,
          speaker: (any LineSpeaking)? = nil, presenter: (any TalkVisualPresenting)? = nil,
-         drawConsent: @escaping () -> Bool = { FeatureSettings.talkDrawOnScreen() }) {
+         drawConsent: @escaping () -> Bool = { FeatureSettings.talkDrawOnScreen() },
+         seeScreen: @escaping () -> Bool = { FeatureSettings.talkSeeScreen() },
+         screenPermission: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
         self.drawConsent = drawConsent
+        seeScreenConsent = seeScreen
+        self.screenPermission = screenPermission
         self.buddy = buddy
         self.notch = notch
         self.brain = brain
@@ -749,16 +758,30 @@ final class VoiceTurnController {
         if !restricted, !pageText, awareness.needsCapture, shots.isEmpty {
             shots = await ScreenCapture.captureAll()
         }
-        if pageText || restricted || (awareness.preferPixels == false && !awareness.promptPrefix.isEmpty) {
-            shots = []
-        }
-        // Drawing on: one screenshot (the cursor display), only from a winner that saw it.
-        let drawing = TalkDrawPolicy.wantsImages(consent: drawConsent(), shots: shots.count)
+        // Seeing the screen sends one image per display to the image-capable provider and keeps pixels even when window
+        // text exists. Drawing marks is a separate consent: it cuts the request to the cursor display.
+        let seeScreen = seeScreenConsent(), drawConsented = drawConsent()
+        let sight = TalkSightPolicy.plan(
+            seeScreen: seeScreen, drawConsent: drawConsented, restricted: restricted, pageRoute: pageText,
+            textAnswersIt: awareness.preferPixels == false && !awareness.promptPrefix.isEmpty, captured: shots)
+        shots = sight.kept
+        let drawing = sight.drawing
         if drawing {
             system += "\n\n" + ZeusPrompt.drawInstructions()
         }
         // Only the brain request is cut to one display; POINT screenN tags and the drive and walkthrough actions keep every capture.
-        let requestShots = TalkDrawPolicy.requestShots(consent: drawing, shots: shots)
+        let requestShots = sight.request
+        var screenReason: ScreenSightReason?
+        var owesSightNotice = false
+        if requestShots.isEmpty {
+            if shots.isEmpty {
+                let granted = screenPermission()
+                screenReason = granted ? .notCaptured : .permissionOff
+                owesSightNotice = !granted && !restricted && !pageText && (seeScreen || drawConsented)
+            } else {
+                screenReason = .turnedOff // captured for POINT and drive, but seeing and drawing are both off
+            }
+        }
         let drawToken = UUID()
         if let route {
             system += "\n\n" + AgentRouter.preamble(route.agent, memory: agentStore.memory(for: route.agent))
@@ -774,9 +797,10 @@ final class VoiceTurnController {
             history: history,
             systemPrompt: system,
             deep: deep,
-            carriesDrawImage: drawing
+            carriesDrawImage: sight.sendsImages,
+            screenReason: screenReason
         )
-        turnObserver?(TurnObservation(request: request, preferAppClaude: drawing, shots: shots))
+        turnObserver?(TurnObservation(request: request, preferAppClaude: sight.sendsImages, shots: shots))
 
         var parser = ZeusTagStreamParser()
         var splitter = SentenceSplitter()
@@ -952,7 +976,7 @@ final class VoiceTurnController {
                 let taskKind = RouterTask.classify(transcript)
                 let ordered = BrainLatencyBook.shared.ordered(
                     RouterSettings.shared.brainEngineCandidates(task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain,
-                                                    preferAppClaude: drawing),
+                                                    preferAppClaude: sight.sendsImages),
                     id: \.id)
                 guard !ordered.isEmpty else {
                     VoiceLog.log("route", "brain (none)")
@@ -971,9 +995,17 @@ final class VoiceTurnController {
                     ordered.first { $0.engine == engine }.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) }
                 }
                 VoiceLog.log("route", "brain race \(raced.map(\.id).joined(separator: " + "))\(deepReason != nil && deepTier != nil ? ", deep behind: \(deepTier?.id ?? "")" : "")")
-                let race = FastRaceRun(
-                    tiers: raced.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
-                    request: request.with(deep: deep, firstTextBudget: budget),
+                // A turn that carries screenshots races only the engine that can see them; text-only engines wait and
+                // answer (without the screen, and saying so) only if the image engine fails or times out.
+                let groups = TalkSightPolicy.raceGroups(ids: raced.map(\.id), carriesImages: request.carriesDrawImage)
+                let primary = raced.filter { groups.primary.contains($0.id) }
+                let fallback = raced.filter { groups.fallback.contains($0.id) }
+                let keepsDeep = TalkSightPolicy.keepsDeepTier(deepID: deepTier?.id, carriesImages: request.carriesDrawImage)
+                func makeRace(_ tiers: [(engine: BrainEngineID, id: String, provider: BrainProvider)], _ turnRequest: BrainRequest,
+                              deepTier: FastRaceRun.Tier?, deepReason: DeepTrigger.Reason?) -> FastRaceRun {
+                    FastRaceRun(
+                    tiers: tiers.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
+                    request: turnRequest.with(deep: deep, firstTextBudget: budget),
                     deepTier: deepTier, deepReason: deepReason,
                     callbacks: FastRaceRun.Callbacks(
                         filler: { [weak self] in
@@ -1003,9 +1035,20 @@ final class VoiceTurnController {
                         deliverDeep: { [weak self] text in
                             self?.deliverDeepAnswer(text, transcript: transcript, speak: speak)
                         }))
+                }
+                var race = makeRace(primary, request, deepTier: keepsDeep ? deepTier : nil, deepReason: keepsDeep ? deepReason : nil)
                 fastRace = race
                 VoiceLatency.shared.mark(.requestSent)
-                try await race.run { delta in parser.feed(delta).forEach(handle) }
+                do {
+                    try await race.run { delta in parser.feed(delta).forEach(handle) }
+                } catch where spoken.isEmpty && !fallback.isEmpty && !Task.isCancelled {
+                    // The image engine failed before saying anything: the text engines answer, and say they cannot see.
+                    VoiceLog.log("route", "image engine failed; racing text engines \(fallback.map(\.id).joined(separator: " + "))")
+                    let blind = request.with(screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
+                    race = makeRace(fallback, blind, deepTier: nil, deepReason: nil)
+                    fastRace = race
+                    try await race.run { delta in parser.feed(delta).forEach(handle) }
+                }
                 VoiceLog.log("brain", "engine=\(race.winnerID ?? "?") done_ms=\(max(0, Int(Date().timeIntervalSince(started) * 1000)))")
             }
             parser.finish().forEach(handle)
@@ -1017,6 +1060,12 @@ final class VoiceTurnController {
             }
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()
+            // No Screen Recording: one log line and one plain notice per launch, never a permission prompt mid-turn.
+            if owesSightNotice, let notice = sightNotice.take(permissionGranted: false) {
+                VoiceLog.log("screen", "Screen Recording is off, so Zeus cannot see the screen; owner told once this launch")
+                NSLog("[ZEUS] screen sight: Screen Recording permission is off (told the owner once this launch)")
+                if speak { speaker.speak(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }
+            }
             if !pointed { buddy.idle() }
             if !result.actions.isEmpty { AvatarStatus.shared.flash(.done, for: 2) }
             // Defense in depth: a tag or control code split oddly across streamed chunks could

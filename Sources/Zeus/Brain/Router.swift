@@ -49,7 +49,7 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
     /// not" list, removes that cue; `ResponseSanitizer` stays as the floor underneath this, for
     /// whatever still slips through.
     static func prompt(for request: BrainRequest) -> String {
-        var parts = [request.systemPrompt]
+        var parts = [ScreenSightNote.textOnlySystemPrompt(for: request)]
         let history = request.history.suffix(6)
         if !history.isEmpty {
             var lines = ["Earlier in this same conversation, for context only -- do not repeat or continue any of it:"]

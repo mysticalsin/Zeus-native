@@ -6,7 +6,7 @@ those ship as a ticked, visible choice in onboarding instead.
 
 | Area | Default on a fresh install | Why / constraint |
 |---|---|---|
-| Voice | Ultron persona and Ultron voice effect on, intensity 60 % | Owner request. Best engine available automatically, never Samantha |
+| Voice | Ultron persona and Ultron voice effect on, intensity 75 % | Owner request. Best engine available automatically, never Samantha |
 | Talk to Zeus | Fast tier race (Haiku, fast OpenAI model) with Sonnet deep follow-up | Owner request, first word target under 1.5 s |
 | Instant commands | Rules then Jev; Jev active once a key exists | Money: the Jev monthly limit defaults to US$10 (also the ceiling) until the owner saves a different number; a saved limit is never overwritten, and Remove keeps it off |
 | Talk key | Control+Option: hold, speak (point if you want), let go; Zeus answers aloud in the Zeus voice and marks the screen when the answer is about it. Earlier auto-written Option+Command or Right Command keys move to Control+Option once; a key you record is kept. While VoiceOver is on, talk moves to Option+Command | Owner request 2026-11-11, docs/VOICE-KEY.md |
@@ -20,7 +20,7 @@ those ship as a ticked, visible choice in onboarding instead.
 | Dictation speed | Speech model loads on key down and stays loaded 10 minutes after last use; audio is transcribed in chunks while the key is held | Owner request, target under 300 ms from release to text |
 
 Tests: `Tests/ZeusCoreTests/FirstRunDefaultsTests.swift` proves each row above (except Jev, owned by another branch) against a
-fresh `UserDefaults` suite. The Ultron effect default (on, 60 %) is also proved on the app side in `UltronVoiceEffectTests`.
+fresh `UserDefaults` suite. The Ultron effect default (on, 75 %) is also proved on the app side in `UltronVoiceEffectTests`.
 Pointing now has a separate "Draw while held" setting (`pointing.drawWhileHeld`, on); the screenshot upload
 (`pointing.sendScreenshot`) stays off and needs Screen Recording already granted. Call-window names
 (`scribe.callWindowNames`) is a policy only so far: `ScribeCallWindowNamesPolicy` says on-by-default and never without

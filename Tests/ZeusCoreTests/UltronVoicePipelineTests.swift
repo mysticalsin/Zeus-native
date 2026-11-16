@@ -9,10 +9,10 @@ struct UltronEffectParametersTests {
         #expect(UltronEffectParameters.make(percent: .nan).isNeutral)
     }
 
-    @Test func defaultIsSixtyPercentAtAboutThreeAndAHalfSemitonesDown() {
+    @Test func defaultIsSeventyFivePercentAtAboutThreeAndThreeQuarterSemitonesDown() {
         let p = UltronEffectParameters.make(percent: Double(UltronEffectParameters.defaultPercent))
-        #expect(UltronEffectParameters.defaultPercent == 60)
-        #expect(p.pitchCents == -350)
+        #expect(UltronEffectParameters.defaultPercent == 75)
+        #expect(abs(p.pitchCents - -387.5) < 0.01)
         #expect(!p.isNeutral)
     }
 
@@ -27,7 +27,7 @@ struct UltronEffectParametersTests {
             #expect(p.reverbWetPercent >= previous.reverbWetPercent)
             // Intelligibility first: the wet effects stay small, the comb stays near 10 ms.
             #expect(p.distortionWetPercent <= 10)
-            #expect(p.combWetPercent <= 15)
+            #expect(p.combWetPercent <= 18)
             #expect(p.reverbWetPercent <= 12)
             #expect(p.pitchCents >= -500)
             #expect((0.008...0.012).contains(p.combDelaySeconds))
@@ -233,8 +233,8 @@ struct UltronPersonaTests {
                 }
             }
         }
-        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("A moment.") == true)
-        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("Let me look.") == true)
+        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("Evolution takes a moment.") == true)
+        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("Already ahead of you; hold on.") == true)
         #expect(!AckLines.filler(personality: .ultron).isEmpty)
     }
 

@@ -19,8 +19,7 @@ import Testing
 
     @Test func onlyAWinnerThatSawPixelsMayDraw() {
         #expect(TalkDrawPolicy.accepts(winner: "claude"))
-        #expect(TalkDrawPolicy.accepts(winner: "anthropic-api"))
-        for blind in ["codex", "gemini", "ollama", "openai", "grok", "cursor-agent", "", nil] as [String?] {
+        for blind in ["anthropic-api", "codex", "gemini", "ollama", "openai", "grok", "cursor-agent", "", nil] as [String?] {
             #expect(!TalkDrawPolicy.accepts(winner: blind), "\(blind ?? "nil")")
         }
     }

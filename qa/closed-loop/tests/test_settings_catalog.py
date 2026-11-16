@@ -42,6 +42,13 @@ class SettingsGenerationTests(unittest.TestCase):
                         writer(output)
                     self.assertFalse(output.exists())
 
+    def test_see_screen_row_is_live_on_by_default_and_drawing_stays_an_opt_in(self):
+        module = generator()
+        rows = {row[7]: row for row in module.R}
+        see, draw = rows['talk.seeScreen'], rows['talk.drawOnScreen']
+        self.assertEqual((see[0], see[8], see[10], see[11]), ('voice', 'toggle', 'true', 'live'))
+        self.assertEqual((draw[8], draw[10]), ('toggle', 'false'))
+
     def test_tiling_rows_are_live_and_use_our_own_wording(self):
         module = generator()
         rows = [row for row in module.R if row[0] == 'tiling']

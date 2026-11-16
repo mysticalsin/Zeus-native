@@ -22,7 +22,7 @@ the rest of that reply and the next few go straight to Kokoro. ElevenLabs is nev
 cloud engine whose recent first-audio time is over 2.5 s drops behind a faster one.
 Chatterbox clones from a reference clip, so it is used only when chosen.
 Picking one engine in Settings makes it lead; the rest remain as fallbacks. The Mac voice is always last.
-Every spoken line logs `engine=... voice=... effect=60% reason=... first_audio_ms=...` (keys are never logged).
+Every spoken line logs `engine=... voice=... effect=75% reason=... first_audio_ms=...` (keys are never logged).
 
 ## Voices per engine
 
@@ -39,11 +39,11 @@ Every spoken line logs `engine=... voice=... effect=60% reason=... first_audio_m
 ## Effect chain (`Sources/Zeus/Voice/UltronAudioChain.swift`)
 
 Every engine's audio is converted to 24 kHz mono and played through one `AVAudioEngine` graph:
-time pitch (-350 cents at 60 %, -450 at 100 %), EQ (low shelf 140 Hz up to +7.5 dB, high shelf 4.5 kHz up to
-+5 dB), radio-tower distortion at a very low mix (up to 8 %), a 10 ms comb delay (feedback up to 35 %, wet up to
-14 %) for the metallic sheen, and a small room (wet up to 10 %), with an output trim. The numbers by intensity
+time pitch (-350 cents at 60 %, about -388 at the 75 % default, -450 at 100 %), EQ (low shelf 140 Hz up to +7.5 dB, high shelf 4.5 kHz up to
++5 dB), radio-tower distortion at a very low mix (up to 10 %), a 10 ms comb delay (feedback up to 35 %, wet up to
+17 %) for the metallic sheen, and a small room (wet up to 10 %), with an output trim. The numbers by intensity
 are `UltronEffectParameters.make(percent:)`. Settings > Voice has the toggle and an intensity slider (0 to 100 %,
-default 60 %). Intensity 0 or the toggle off is neutral. The same graph runs offline for silent previews and tests.
+default 75 %). Intensity 0 or the toggle off is neutral. The same graph runs offline for silent previews and tests.
 
 ## Latency and the sentence API
 
