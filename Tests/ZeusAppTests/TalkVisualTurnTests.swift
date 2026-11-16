@@ -61,9 +61,8 @@ struct TalkVisualTurnTests {
             continuation.yield(.done(nil))
             continuation.finish()
         }
-        return await controller.runTurn(transcript: "where do I export this as a PDF", screenshots: Self.shots, activeTab: nil,
-                                        turn: UUID(), deep: false, speak: true, awaitActions: false,
-                                        replay: (id: winner, events: events))
+        return await controller.runScriptedTurn(transcript: "where do I export this as a PDF", screenshots: Self.shots,
+                                                replay: (id: winner, events: events))
     }
 
     @Test func aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins() async {

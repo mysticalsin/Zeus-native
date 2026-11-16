@@ -122,6 +122,12 @@ final class VoiceTurnController {
     var hasPendingApproval: Bool { notch.model.approval != nil }
     var voiceDescription: String { speaker.engineDescription }
 
+    /// One answered turn driven by a scripted reply, for the tests that watch what the turn asks of the voice and the drawing.
+    func runScriptedTurn(transcript: String, screenshots: [ScreenShot], replay: (id: String, events: AsyncThrowingStream<BrainEvent, Error>)) async -> TurnResult {
+        await runTurn(transcript: transcript, screenshots: screenshots, activeTab: nil, turn: UUID(), deep: false,
+                      speak: true, awaitActions: false, replay: replay)
+    }
+
     /// Hides the marks of the last answer. A turn that never drew makes no presenter call.
     func clearDrawingForNewTurn() {
         guard drawActive else { return }
@@ -679,7 +685,7 @@ final class VoiceTurnController {
         return TurnResult(spoken: reply)
     }
 
-    func runTurn(transcript: String, screenshots: [ScreenShot], activeTab: TabContext?, turn: UUID,
+    private func runTurn(transcript: String, screenshots: [ScreenShot], activeTab: TabContext?, turn: UUID,
                          deep: Bool, speak: Bool, awaitActions: Bool,
                          replay: (id: String, events: AsyncThrowingStream<BrainEvent, Error>)? = nil,
                          pageText: Bool = false) async -> TurnResult {
