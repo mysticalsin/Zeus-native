@@ -1083,7 +1083,8 @@ private struct ClipboardRow: View {
 
 struct ShelfPage: View {
     let topBar: TopBarModel
-    
+    /// The stack whose files are laid out in a ribbon, if one is open.
+    @State private var openStack: UUID?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1105,8 +1106,17 @@ struct ShelfPage: View {
                 if let fling = topBar.fling { FlingNearbyStrip(fling: fling, topBar: topBar) }
                 PageScroll(.horizontal) {
                     HStack(spacing: 8) {
-                        ForEach(topBar.shelf) { item in
-                            ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item, fling: topBar.fling) }
+                        if let openStack, case let files = topBar.shelf.filter({ $0.stackID == openStack }), files.count > 1 {
+                            FlingStackRibbon(items: files, topBar: topBar) { self.openStack = nil }
+                        } else {
+                            ForEach(ShelfStacks.cells(topBar.shelf)) { cell in
+                                switch cell {
+                                case .item(let item):
+                                    ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item, fling: topBar.fling) }
+                                case .stack(let id, let items):
+                                    FlingStackCell(stack: id, items: items, topBar: topBar) { openStack = id }
+                                }
+                            }
                         }
                     }
                 }
@@ -1125,7 +1135,7 @@ struct ShelfPage: View {
     }
 }
 
-private struct ShelfCell: View {
+struct ShelfCell: View {
     let item: TopBarModel.ShelfItem
     let topBar: TopBarModel
 
