@@ -157,7 +157,7 @@ struct FlingStackCell: View {
         }
         .padding(6)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay { FlingStackDragSource(urls: items.map(\.url), onClick: open) }
+        .live { $0.overlay { FlingStackDragSource(urls: items.map(\.url), onClick: open) } }
         .contextMenu {
             Button("Open stack") { open() }
             if let fling = topBar.fling, fling.isEnabled {

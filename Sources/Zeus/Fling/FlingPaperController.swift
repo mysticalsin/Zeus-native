@@ -42,7 +42,7 @@ struct FlingPaperView: View {
         .frame(width: FlingPaperController.paperSize.width, height: FlingPaperController.paperSize.height)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.storm.opacity(0.96)))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
-        .overlay { FlingStackDragSource(urls: [url], onClick: { NSWorkspace.shared.open(url) }) }
+        .live { $0.overlay { FlingStackDragSource(urls: [url], onClick: { NSWorkspace.shared.open(url) }) } }
         .overlay(alignment: .topTrailing) {
             Button(action: close) {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.cloudSecondary)

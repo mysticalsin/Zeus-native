@@ -56,19 +56,23 @@ struct FlingNearbyStrip: View {
         .padding(.horizontal, 6).frame(height: 30)
     }
 
+    @ViewBuilder
     private var peersRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 10) {
-                if fling.nearby.isEmpty {
-                    Text("Looking for Macs running Zeus").font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet)
-                        .frame(height: 50)
-                }
-                ForEach(fling.nearby) { peer in FlingAvatar(peer: peer, fling: fling, topBar: topBar) }
-                FlingAirDropTile(fling: fling, topBar: topBar)
+        let row = HStack(alignment: .top, spacing: 10) {
+            if fling.nearby.isEmpty {
+                Text("Looking for Macs running Zeus").font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet)
+                    .frame(height: 50)
             }
-            .padding(.horizontal, 4)
+            ForEach(fling.nearby) { peer in FlingAvatar(peer: peer, fling: fling, topBar: topBar) }
+            FlingAirDropTile(fling: fling, topBar: topBar)
         }
-        .frame(height: 56)
+        .padding(.horizontal, 4)
+        // A snapshot cannot draw a scroll view, so it draws the row itself.
+        if TopBarStyle.isSnapshot {
+            row.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) { row }.frame(height: 56)
+        }
     }
 }
 

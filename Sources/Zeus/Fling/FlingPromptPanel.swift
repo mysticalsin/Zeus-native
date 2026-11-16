@@ -71,10 +71,10 @@ struct FlingPromptCard: View {
                 Text("\(peer) wants to send \(count) \(count == 1 ? "item" : "items")").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
                 Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
             }
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text("Declines by itself in \(model.secondsLeft(now: context.date)) s").font(TopBarStyle.label(9.5)).foregroundStyle(Theme.cloudQuiet)
+            }
             HStack(spacing: 8) {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("Declines in \(model.secondsLeft(now: context.date)) s").font(TopBarStyle.label(9.5)).foregroundStyle(Theme.cloudQuiet)
-                }
                 Spacer(minLength: 8)
                 button(canDecline: true)
                 if canAccept {
@@ -88,7 +88,7 @@ struct FlingPromptCard: View {
             }
         }
         .padding(14)
-        .frame(width: 300, alignment: .leading)
+        .frame(width: 320, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.storm.opacity(0.96)))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
     }
@@ -101,6 +101,7 @@ struct FlingPromptCard: View {
     private func choice(_ title: String, _ mode: FlingSaveMode, id: String) -> some View {
         Button { model.choose(mode) } label: {
             Text(title).font(TopBarStyle.label(11, .bold)).foregroundStyle(Color.black)
+                .lineLimit(1).fixedSize()
                 .padding(.horizontal, 14).padding(.vertical, 5).background(Capsule().fill(Theme.bolt))
         }
         .buttonStyle(.plain)
@@ -114,6 +115,7 @@ struct FlingPromptCard: View {
         let title = canDecline ? (isPairingStarter ? "Cancel" : "Decline") : "Accept"
         Button { model.answer(!canDecline) } label: {
             Text(title).font(TopBarStyle.label(11, .bold)).foregroundStyle(canDecline ? Theme.cloudPrimary : Color.black)
+                .lineLimit(1).fixedSize()
                 .padding(.horizontal, 14).padding(.vertical, 5)
                 .background(Capsule().fill(canDecline ? Color.white.opacity(0.12) : Theme.bolt))
         }
