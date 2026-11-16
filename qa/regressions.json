@@ -5699,6 +5699,18 @@
         "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
         "function": "marksLandWherePointDoesOnASecondaryDisplayAtNegativeX"
       }
+    },
+    {
+      "id": "REG-702",
+      "failure": "Marks could be drawn from an answer by an engine that never saw the screenshot, or screenshots could be sent for drawing with the setting off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+        "function": "onlyAWinnerThatSawPixelsMayDraw"
+      }
     }
   ]
 }
