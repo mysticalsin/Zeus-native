@@ -1029,6 +1029,22 @@
       "scope": "Offscreen SwiftUI layout of the page container and the page switch source; no window, animation run or device acceptance.",
       "suite": "PageSwitchLayoutTests",
       "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift"
+    },
+    {
+      "id": "native-FlingSecurityTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingSecurityTests",
+      "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+      "scope": "Real endpoints in this process over loopback TLS with memory Keychains and temp folders: eight silent pairing connections, space reserved by a running stack, stop() events, a debounced name change, an already paired id, and an answer for the wrong Mac. No Bonjour, no real Keychain, no Downloads."
+    },
+    {
+      "id": "native-FlingSecurityAppTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingSecurityAppTests",
+      "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+      "scope": "Actual FlingService and prompt model with a recording stand-in transport, plus the file sink in a temp folder: the one second input delay, private links not opening, Pair again, the named pairing answer, quarantine and case-only name clashes. No browser, no network."
     }
   ],
   "features": [
@@ -7452,7 +7468,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
-              "function": "theKeyIsStoredOnlyAfterBothConfirm"
+              "function": "theKeyIsStoredOnlyAfterBothPeopleAccept"
             },
             {
               "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
@@ -7537,6 +7553,58 @@
             {
               "file": "Tests/ZeusCoreTests/FlingGeometryTests.swift",
               "function": "aPinchFansPapersIntoOneStack"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "theStartingMacStoresNothingUntilItsOwnPersonAccepts"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "everyFailedAttemptCountsAndAnAddressIsMutedWhateverIdsItUses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "aHelloProofNeedsTheClaimedIdsKeyAndTheNonce"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "hugeDeclaredSizesAreDeclinedWithoutTrapping"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "formatAndBidiCharactersAreRejectedAndCleanedAway"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "numberedNamesStayShortAndCaseIsFolded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "onlyTheConfiguredFlingFoldersAreRecognised"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "onlyPublicWebAddressesOpenWithoutAClick"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+              "function": "manyFramesInOneReadAreDecodedQuickly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+              "function": "aChunkWithNoDataIsMalformed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "theKeyIsStoredOnlyAfterBothPeopleAccept"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "theStartingMacDecliningAfterThePeerConfirmedStoresNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "aHugePeerNameCannotMakeAFolderNameOver255Bytes"
             }
           ]
         },
@@ -7625,6 +7693,68 @@
           ]
         },
         {
+          "id": "F15.14",
+          "check": "native-FlingSecurityTests",
+          "acceptance": "Findings of the independent security review that need real endpoints: silent pairing connections, space reservation, stop events, a debounced name, an already paired id and an answer for the wrong Mac.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "eightSilentPairingConnectionsBlockNeitherTransfersNorLaterPairing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "bytesReservedByARunningStackCountAgainstTheNextOffer"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "stoppingAnEndpointCancelsItsTransfersWithEvents"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "aDeviceNameTypedQuicklyRebuildsTheListenersOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "anAlreadyPairedMacIsRefusedAndKeepsItsKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "anAnswerForAnotherMacDoesNotAnswerThePairing"
+            }
+          ]
+        },
+        {
+          "id": "F15.15",
+          "check": "native-FlingSecurityAppTests",
+          "acceptance": "Review findings on the app side: the input delay, private links, Pair again, the named answer, quarantine and case-only clashes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "aNewCardIgnoresAnswersForItsFirstSecond"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "aRejectedStoredKeySaysPairAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "thePairingAnswerNamesItsMac"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "receivedFilesAreQuarantinedAsFromZeus"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "privateLinksNeverOpenWithoutAClick"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "aCaseOnlyClashGetsANumberInTheStackFolder"
+            }
+          ]
+        },
+        {
           "id": "F15.2",
           "check": "native-FlingTwoProcessTests",
           "acceptance": "Real separate processes: pair with a code, send four items including 50 MB with verified hashes and a Shelf record, reject an unpaired Mac, decline a traversal name, cancel cleanly, catch a corrupted byte.",
@@ -7648,6 +7778,14 @@
             {
               "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
               "function": "aCorruptedByteIsCaughtByTheHash"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "theStartingMacCanDeclineAndNeitherSideStoresAKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "aPairedMacClaimingAnotherPairedMacsIdIsRejected"
             }
           ]
         },
@@ -7717,7 +7855,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
-              "function": "thePairingCardOnTheStartingMacOffersCancelOnly"
+              "function": "thePairingCardOnTheStartingMacAsksForCodesMatchOrCancel"
             }
           ]
         },
@@ -7760,6 +7898,14 @@
             {
               "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
               "function": "removeDeletesTheKeyAndAFailureKeepsTheRecord"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
+              "function": "anAlreadyPairedIdKeepsItsKeyUnlessReplacementIsAskedFor"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
+              "function": "aPeerNameIsCappedWhenStored"
             }
           ]
         },

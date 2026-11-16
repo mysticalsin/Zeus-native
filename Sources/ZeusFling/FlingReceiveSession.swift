@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Security
 import ZeusCore
 
 /// One inbound transfer connection. The TLS handshake already proved the peer holds a paired key; this drives the
@@ -13,6 +14,7 @@ final class FlingReceiveSession {
     private var offer: FlingOffer?
     private var peer: FlingHello?
     private var peerID: String?
+    private var nonce = ""
     private var committed: [Int: URL] = [:]
     private var totalBytes: Int64 = 0
     private var doneBytes: Int64 = 0
@@ -33,9 +35,11 @@ final class FlingReceiveSession {
 
     func start() {
         channel.onReady = { [self] in
-            peerID = channel.tlsIdentity
-            endpoint.log("receive: tls identity \(peerID ?? "none")")
-            channel.send(.hello(FlingHello(id: endpoint.identity.id, name: endpoint.identity.name, model: endpoint.identity.model)))
+            // The hello carries a fresh nonce; the sender must answer with a proof made with the key of the id it claims.
+            var bytes = [UInt8](repeating: 0, count: 16)
+            _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+            nonce = Data(bytes).base64EncodedString()
+            channel.send(.hello(FlingHello(id: endpoint.identity.id, name: endpoint.identity.name, model: endpoint.identity.model, nonce: nonce)))
         }
         channel.onFrame = { [self] frame in handle(frame) }
         channel.onClose = { [self] reason in closed(reason) }
@@ -64,10 +68,14 @@ final class FlingReceiveSession {
         guard let message = try? FlingWire.decode(frame) else { return fail() }
         guard let peer else {
             guard case .hello(let hello) = message else { return fail() }
-            // The key the peer proved is the identity it must claim.
-            if let identity = channel.tlsIdentity, identity != hello.id { return fail() }
-            guard endpoint.store.psk(for: hello.id) != nil else {
-                endpoint.emit(.rejected(reason: "notPaired", via: "tls"))
+            // The claimed id must be proved with that id's own key, bound to this connection's nonce. Which key the TLS
+            // handshake used does not decide who the peer is, so a paired Mac cannot pose as another paired Mac.
+            guard let key = endpoint.store.psk(for: hello.id) else {
+                endpoint.emit(.rejected(reason: "notPaired", via: "hello"))
+                return fail()
+            }
+            guard let proof = hello.proof, FlingCrypto.isValidHelloProof(proof, psk: key, nonce: nonce, id: hello.id) else {
+                endpoint.emit(.rejected(reason: "idMismatch", via: "hello"))
                 return fail()
             }
             self.peer = hello
@@ -97,10 +105,12 @@ final class FlingReceiveSession {
         }
         holdsTransfer = true
         offer = incoming
-        totalBytes = incoming.items.filter { $0.kind == .file }.reduce(0) { $0 + $1.size }
+        totalBytes = FlingOfferRules.totalFileBytes(incoming)
         let name = endpoint.store.pairedNames()[peer.id] ?? peer.name
+        let place = FlingSaveRules.destination(mode: endpoint.settings.saveMode, root: endpoint.saveRoot, inbox: endpoint.inbox, peer: name, date: Date(),
+                                               downloadsGranted: endpoint.settings.downloadsGranted).deletingLastPathComponent()
         let context = FlingReceiveContext(peerID: peer.id, peerName: name, paired: true, autoAccept: endpoint.settings.autoAcceptPaired && endpoint.settings.saveMode != .ask,
-                                          freeBytes: endpoint.freeBytes(), isReplay: endpoint.replay.isReplay(incoming.stackID, now: Date()))
+                                          freeBytes: endpoint.freeBytes(at: place), isReplay: endpoint.replay.isReplay(incoming.stackID, now: Date()))
         machine = FlingReceiveMachine(context: context)
         apply(step(.received(.offer(incoming), now: Date())))
     }
@@ -121,6 +131,7 @@ final class FlingReceiveSession {
             switch effect {
             case .send(let message): channel.send(message)
             case .makeTemp(let id):
+                endpoint.reserved[id] = totalBytes
                 let destination = FlingSaveRules.destination(mode: chosenMode ?? endpoint.settings.saveMode, root: endpoint.saveRoot, inbox: endpoint.inbox,
                                                               peer: peerName, date: Date(), downloadsGranted: endpoint.settings.downloadsGranted)
                 let sink = FlingFileSink(stackID: id, partialParent: destination.deletingLastPathComponent(), destination: destination)
@@ -210,6 +221,12 @@ final class FlingReceiveSession {
     }
 
     func abort() {
+        if var m = machine, !m.state.isFinal {
+            let out = m.handle(.userCancel)
+            machine = m
+            for effect in out { if case .deleteTemp = effect { sink?.deleteTemp() } }
+            announceIfFinal()
+        }
         sink?.deleteTemp()
         channel.cancel()
         finish()
@@ -224,6 +241,7 @@ final class FlingReceiveSession {
     private func finish() {
         guard !finished else { return }
         finished = true
+        if let id = offer?.stackID { endpoint.reserved[id] = nil }
         if holdsTransfer, let peerID = peer?.id { endpoint.gate.endTransfer(peerID: peerID) }
         endpoint.gate.release(connection: number)
         endpoint.forget(self)

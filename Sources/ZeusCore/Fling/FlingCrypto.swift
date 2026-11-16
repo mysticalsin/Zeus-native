@@ -69,6 +69,16 @@ public enum FlingCrypto {
         return FlingPairSecrets(code: formatCode(from: value), psk: psk, transcript: transcript)
     }
 
+    /// Proves that a hello's sender holds the key it paired under for `id`, bound to the receiver's fresh nonce.
+    public static func helloProof(psk: Data, nonce: String, id: String) -> String {
+        Data(HMAC<SHA256>.authenticationCode(for: Data("zeus-fling-hello-v1".utf8) + lengthPrefixed(id) + Data(nonce.utf8), using: SymmetricKey(data: psk))).base64EncodedString()
+    }
+
+    public static func isValidHelloProof(_ proof: String, psk: Data, nonce: String, id: String) -> Bool {
+        guard let mac = Data(base64Encoded: proof) else { return false }
+        return HMAC<SHA256>.isValidAuthenticationCode(mac, authenticating: Data("zeus-fling-hello-v1".utf8) + lengthPrefixed(id) + Data(nonce.utf8), using: SymmetricKey(data: psk))
+    }
+
     /// Each side confirms with its own label, so one side's confirmation cannot be echoed back as the other's.
     public static func confirmMAC(psk: Data, transcript: Data, label: String) -> Data {
         Data(HMAC<SHA256>.authenticationCode(for: Data("confirm-\(label)".utf8) + transcript, using: SymmetricKey(data: psk)))

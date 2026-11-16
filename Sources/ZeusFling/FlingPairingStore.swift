@@ -65,12 +65,25 @@ public final class FlingPairingStore: @unchecked Sendable {
         return Dictionary(uniqueKeysWithValues: peers.filter { table[$0.id] != nil }.map { ($0.id, $0.name) })
     }
 
-    @discardableResult
-    public func add(id: String, name: String, model: String, psk: Data, now: Date) -> Bool {
+    public func isPaired(_ id: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
+        return records.contains { $0.id == id } && keychain.get(Self.account(for: id)) != nil
+    }
+
+    private static func capped(_ name: String) -> String {
+        var text = name
+        while text.utf8.count > FlingSaveRules.maxPeerNameBytes { text.removeLast() }
+        return text
+    }
+
+    /// Stores a new key. An id that is already paired keeps its key unless `replace` is asked for explicitly.
+    @discardableResult
+    public func add(id: String, name: String, model: String, psk: Data, now: Date, replace: Bool = false) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if !replace, records.contains(where: { $0.id == id }), keychain.get(Self.account(for: id)) != nil { return false }
         guard keychain.set(psk.base64EncodedString(), for: Self.account(for: id)) else { return false }
         records.removeAll { $0.id == id }
-        records.append(FlingPairedPeer(id: id, name: name, model: model, pairedAt: now, lastSeen: now))
+        records.append(FlingPairedPeer(id: id, name: Self.capped(name), model: model, pairedAt: now, lastSeen: now))
         saveLocked()
         return true
     }

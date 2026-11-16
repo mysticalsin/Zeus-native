@@ -31,7 +31,11 @@ public enum FlingItemKind: String, Codable, Equatable, Sendable { case file, lin
 
 public struct FlingHello: Codable, Equatable, Sendable {
     public var v: Int, id: String, name: String, model: String
-    public init(v: Int = FlingLimits.protocolVersion, id: String, name: String, model: String) { self.v = v; self.id = id; self.name = name; self.model = model }
+    /// A receiver's hello carries a fresh nonce; the sender answers with a `proof` over it (see `FlingCrypto.helloProof`).
+    public var nonce: String?, proof: String?
+    public init(v: Int = FlingLimits.protocolVersion, id: String, name: String, model: String, nonce: String? = nil, proof: String? = nil) {
+        self.v = v; self.id = id; self.name = name; self.model = model; self.nonce = nonce; self.proof = proof
+    }
 }
 public struct FlingPairCommit: Codable, Equatable, Sendable { public var h: String; public init(h: String) { self.h = h } }
 public struct FlingPairKey: Codable, Equatable, Sendable { public var pub: String; public init(pub: String) { self.pub = pub } }
@@ -146,7 +150,8 @@ public enum FlingWire {
         case .accept: return .accept(try parse(FlingStackRef.self, frame))
         case .decline: return .decline(try parse(FlingDecline.self, frame))
         case .chunk:
-            guard frame.payload.count >= 4 else { throw .malformed }
+            // A chunk with an index and no data carries nothing.
+            guard frame.payload.count > 4 else { throw .malformed }
             let index = frame.payload.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
             return .chunk(FlingChunk(index: index, bytes: frame.payload.dropFirst(4)))
         case .fileDone: return .fileDone(try parse(FlingFileDone.self, frame))
@@ -170,15 +175,20 @@ public struct FlingFrameDecoder: Sendable {
         if failed { throw .alreadyFailed }
         buffer.append(data)
         var frames: [FlingFrame] = []
-        while buffer.count >= 5 {
-            let bytes = Array(buffer.prefix(5))
-            let length = Int(bytes[0]) << 24 | Int(bytes[1]) << 16 | Int(bytes[2]) << 8 | Int(bytes[3])
-            guard let type = FlingMessageType(rawValue: bytes[4]) else { failed = true; buffer.removeAll(); throw .unknownType(bytes[4]) }
+        // Frames are read at a moving offset and the buffer is compacted once at the end, so a long run of small
+        // frames costs one pass instead of a copy of the rest of the buffer per frame.
+        var offset = buffer.startIndex
+        let end = buffer.endIndex
+        while end - offset >= 5 {
+            let length = Int(buffer[offset]) << 24 | Int(buffer[offset + 1]) << 16 | Int(buffer[offset + 2]) << 8 | Int(buffer[offset + 3])
+            let rawType = buffer[offset + 4]
+            guard let type = FlingMessageType(rawValue: rawType) else { failed = true; buffer.removeAll(); throw .unknownType(rawType) }
             guard length <= type.payloadCap else { failed = true; buffer.removeAll(); throw .frameTooLarge }
-            guard buffer.count >= 5 + length else { break }
-            frames.append(FlingFrame(type: type, payload: Data(buffer.dropFirst(5).prefix(length))))
-            buffer = Data(buffer.dropFirst(5 + length))
+            guard end - offset >= 5 + length else { break }
+            frames.append(FlingFrame(type: type, payload: Data(buffer[(offset + 5)..<(offset + 5 + length)])))
+            offset += 5 + length
         }
+        if offset > buffer.startIndex { buffer = Data(buffer[offset...]) }
         return frames
     }
 }
@@ -189,19 +199,32 @@ public enum FlingOfferRules {
         let items = offer.items
         guard !items.isEmpty, items.count <= FlingLimits.maxItems else { return .tooMany }
         guard Set(items.map(\.index)) == Set(0..<items.count) else { return .malformed }
-        var total: Int64 = 0
         for item in items {
             if case .failure = FlingNames.validate(item.name) { return .badName }
-            guard item.size >= 0, isSHA256Hex(item.sha256) else { return .malformed }
+            guard item.size >= 0, item.size <= FlingLimits.maxItemBytes, isSHA256Hex(item.sha256) else { return .malformed }
             if item.kind == .link {
                 guard item.size == 0 else { return .malformed }
                 guard let text = item.url, isWebLink(text) else { return .badLink }
-            } else {
-                total += item.size
             }
         }
-        if total > freeBytes - FlingLimits.freeSpaceReserveBytes { return .diskFull }
+        // Only now, with every size known to be sane, are they added up, and an overflow is "no room".
+        var total: Int64 = 0
+        for item in items where item.kind == .file {
+            let (sum, overflow) = total.addingReportingOverflow(item.size)
+            if overflow { return .diskFull }
+            total = sum
+        }
+        let (room, overflow) = freeBytes.subtractingReportingOverflow(FlingLimits.freeSpaceReserveBytes)
+        if overflow || total > room { return .diskFull }
         return nil
+    }
+
+    /// The bytes of all files, saturating at Int64.max instead of overflowing; for a prompt, never for a decision.
+    public static func totalFileBytes(_ offer: FlingOffer) -> Int64 {
+        offer.items.filter { $0.kind == .file }.reduce(Int64(0)) {
+            let (sum, overflow) = $0.addingReportingOverflow($1.size)
+            return overflow ? Int64.max : sum
+        }
     }
 
     static func isSHA256Hex(_ text: String) -> Bool {

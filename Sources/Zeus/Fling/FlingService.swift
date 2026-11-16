@@ -161,6 +161,7 @@ final class FlingService: FlingSending {
             isEnabled = true
         } else {
             if started { transport.stop(); started = false }
+            activity = []
             isEnabled = false
             nearby = []
             pairingPrompt = nil
@@ -240,7 +241,7 @@ final class FlingService: FlingSending {
     }
 
     func answerPairing(accept: Bool) {
-        transport.answerPairing(accept: accept)
+        transport.answerPairing(accept: accept, peerID: pairingPrompt?.peerID)
         if !accept { pairingPrompt = nil }
     }
 
@@ -299,7 +300,9 @@ final class FlingService: FlingSending {
         guard finished else { return }
         if mode == .clipboard { writeClipboard(pending.urls) }
         if opensLinks {
-            for text in pending.links where FlingOfferRules.isWebLink(text) {
+            // Only public web addresses open by themselves; a link to a local or private address stays on the Shelf
+            // until a click on it.
+            for text in pending.links where FlingLinkPolicy.opensWithoutAClick(text) {
                 if let url = URL(string: text) { openLink(url) }
             }
         }
@@ -355,7 +358,11 @@ final class FlingService: FlingSending {
             if let stack { finish(stack); flush(stack); if pendingOffer?.stackID == stack { pendingOffer = nil } }
             if direction == .send {
                 if let stack { sends[stack] = nil }
-                problem(reason == "notPaired" ? "Pair with that Mac first." : "Could not send. Tap to try again.")
+                switch reason {
+                case "notPaired": problem("Pair with that Mac first.")
+                case "tlsRejected": problem("That Mac does not recognise this one. Pair again.")
+                default: problem("Could not send. Tap to try again.")
+                }
             } else if reason == "hashMismatch" {
                 problem("Could not verify a file from the other Mac. It was not kept.")
             }
@@ -383,7 +390,7 @@ final class FlingService: FlingSending {
 
 extension FlingService {
     /// Where Fling keeps its non-secret files: paired Mac names, the private inbox and the Shelf record.
-    static var supportDirectory: URL {
+    nonisolated static var supportDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("Zeus", isDirectory: true)
     }

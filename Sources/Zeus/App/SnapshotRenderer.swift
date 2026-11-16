@@ -180,7 +180,7 @@ enum SnapshotRenderer {
             }.environment(\.colorScheme, .dark)
         }
         saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: true)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-asked")
-        saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: false)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-starter")
+        saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: true, starter: true)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-starter")
         saveSurface(flingCard(.offer(peerName: "Alpha Mac", itemCount: 3, totalBytes: 12_400_000)), size: CGSize(width: 340, height: 130), name: "fling-prompt-offer")
         saveSurface(flingCard(.offer(peerName: "Alpha Mac", itemCount: 1, totalBytes: 4_100_000_000), askWhere: true), size: CGSize(width: 340, height: 130), name: "fling-prompt-ask")
         saveSurface(ZStack { Theme.storm; FlingPaperView(url: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff"), peer: "Alpha Mac", close: {}) }

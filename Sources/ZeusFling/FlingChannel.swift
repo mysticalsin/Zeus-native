@@ -83,9 +83,9 @@ final class FlingChannel {
         connection.send(content: data, completion: .contentProcessed { error in completion?(error) })
     }
 
-    func send(_ message: FlingMessage) {
+    func send(_ message: FlingMessage, completion: ((NWError?) -> Void)? = nil) {
         guard let data = try? FlingWire.encode(message) else { return }
-        send(data)
+        send(data, completion: completion)
     }
 
     /// Lets queued frames go out, then closes.

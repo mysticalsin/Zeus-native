@@ -1,3 +1,4 @@
+import CoreServices
 import Foundation
 import ZeusCore
 
@@ -88,10 +89,23 @@ public final class FlingFileSink {
         return url
     }
 
+    /// Marks a received file as downloaded by Zeus, so Gatekeeper still checks what a peer sent before it runs.
+    private static func quarantine(_ url: URL) {
+        var file = url
+        var values = URLResourceValues()
+        values.quarantineProperties = [
+            kLSQuarantineAgentNameKey as String: "Zeus",
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+        ]
+        try? file.setResourceValues(values)
+    }
+
     @discardableResult
     public func commit(index: Int, name: String) throws -> URL {
         let url = try target(for: name)
-        try FileManager.default.moveItem(at: partial.appendingPathComponent(String(index)), to: url)
+        let source = partial.appendingPathComponent(String(index))
+        Self.quarantine(source) // the mark travels with the file when it moves
+        try FileManager.default.moveItem(at: source, to: url)
         return url
     }
 
@@ -99,6 +113,7 @@ public final class FlingFileSink {
     public func commitLink(name: String, link: String) throws -> URL {
         let url = try target(for: FlingSaveRules.linkFileName(name))
         try FlingSaveRules.weblocData(for: link).write(to: url, options: .atomic)
+        Self.quarantine(url)
         return url
     }
 

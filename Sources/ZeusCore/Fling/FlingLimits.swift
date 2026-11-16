@@ -11,6 +11,12 @@ public enum FlingLimits {
     /// The data size a sender puts in one chunk.
     public static let sendChunkBytes = 256 * 1024
     public static let maxLinkLength = 2048
+    /// One item may declare at most this many bytes (1 TiB); with 100 items the total still fits an Int64.
+    public static let maxItemBytes: Int64 = 1 << 40
+    /// A new card ignores clicks for this long, so a stray or scripted click cannot answer it.
+    public static let promptInputDelay: TimeInterval = 1
+    /// After the hello, each pairing step must arrive within this time.
+    public static let pairingStageTimeout: TimeInterval = 10
     public static let maxNameBytes = 255
     /// Free space that must remain after an arrival.
     public static let freeSpaceReserveBytes: Int64 = 1024 * 1024 * 1024

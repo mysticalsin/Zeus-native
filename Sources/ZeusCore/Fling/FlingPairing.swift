@@ -5,6 +5,8 @@ public enum FlingPairRole: Equatable, Sendable { case initiator, responder }
 
 public enum FlingPairFailure: Equatable, Sendable {
     case commitmentMismatch, badKey, badConfirm, unexpectedMessage, connectionLost, peerRefused
+    /// The other Mac's id already has a key here. Remove it in Settings before pairing again.
+    case alreadyPaired, timedOut
 }
 
 public enum FlingPairingState: Equatable, Sendable {
@@ -51,6 +53,9 @@ public struct FlingPairingMachine: Sendable {
     private var peerCommitment: Data?
     private var peerPublic: Data?
     private var secrets: FlingPairSecrets?
+    /// The initiator completes only when the peer confirmed and its own person accepted, in either order.
+    private var peerConfirmed = false
+    private var userAccepted = false
 
     public init(role: FlingPairRole, localID: String, remoteID: String, entropy: FlingPairingEntropy) {
         self.role = role; self.localID = localID; self.remoteID = remoteID; self.entropy = entropy
@@ -67,6 +72,14 @@ public struct FlingPairingMachine: Sendable {
         if let message { effects.append(.send(message)) }
         effects += [.hidePrompt, .close]
         return effects
+    }
+
+    /// The starting Mac's end: its own confirmation goes out first, then the key is stored.
+    private mutating func completeIfBothAgree() -> [FlingPairingEffect] {
+        guard peerConfirmed, userAccepted, let secrets else { return [] }
+        state = .confirmed
+        let own = FlingCrypto.confirmMAC(psk: secrets.psk, transcript: secrets.transcript, label: ownLabel)
+        return [.send(.pairConfirm(FlingPairConfirm(mac: b64(own)))), .storePSK(peerID: remoteID, psk: secrets.psk), .hidePrompt, .close]
     }
 
     private mutating func derive() -> Bool {
@@ -101,6 +114,11 @@ public struct FlingPairingMachine: Sendable {
             return end(.declined, send: .pairDecline(FlingPairDecline(reason: "declined")))
 
         case .userAccept:
+            if role == .initiator {
+                guard case .showingCode = state else { return [] }
+                userAccepted = true
+                return completeIfBothAgree()
+            }
             guard role == .responder, case .showingCode(_, let deadline) = state, let secrets else { return [] }
             state = .awaitingConfirm(deadline: deadline)
             let mac = FlingCrypto.confirmMAC(psk: secrets.psk, transcript: secrets.transcript, label: ownLabel)
@@ -152,9 +170,8 @@ public struct FlingPairingMachine: Sendable {
                   FlingCrypto.isValidConfirm(mac, psk: secrets.psk, transcript: secrets.transcript, label: peerLabel) else {
                 return end(.failed(.badConfirm), send: .pairDecline(FlingPairDecline(reason: "confirm")))
             }
-            state = .confirmed
-            let own = FlingCrypto.confirmMAC(psk: secrets.psk, transcript: secrets.transcript, label: ownLabel)
-            return [.storePSK(peerID: remoteID, psk: secrets.psk), .send(.pairConfirm(FlingPairConfirm(mac: b64(own)))), .hidePrompt, .close]
+            peerConfirmed = true
+            return completeIfBothAgree()
 
         case (.responder, .awaitingConfirm, .pairConfirm(let confirm)):
             guard let secrets, let mac = Data(base64Encoded: confirm.mac),
@@ -170,28 +187,40 @@ public struct FlingPairingMachine: Sendable {
     }
 }
 
-/// Three declines from one id inside ten minutes mute that id for ten minutes.
+/// Three failed attempts from one id, or from one address under any ids, inside ten minutes mute it for ten minutes.
+/// A failure is a decline, an expiry, a dropped connection or a step that never arrived.
 public struct FlingMuteLedger: Sendable {
-    private var declines: [String: [Date]] = [:]
+    private var failures: [String: [Date]] = [:]
     private var mutedUntil: [String: Date] = [:]
     public static let window: TimeInterval = 10 * 60
     public static let threshold = 3
     public init() {}
 
-    public mutating func recordDecline(_ id: String, now: Date) {
-        var recent = (declines[id] ?? []).filter { now.timeIntervalSince($0) <= Self.window }
+    private mutating func record(_ key: String, now: Date) {
+        var recent = (failures[key] ?? []).filter { now.timeIntervalSince($0) <= Self.window }
         recent.append(now)
         if recent.count >= Self.threshold {
-            mutedUntil[id] = now.addingTimeInterval(Self.window)
-            declines[id] = nil
+            mutedUntil[key] = now.addingTimeInterval(Self.window)
+            failures[key] = nil
         } else {
-            declines[id] = recent
+            failures[key] = recent
         }
     }
 
+    public mutating func recordDecline(_ id: String, now: Date) { record("id:" + id, now: now) }
+
+    public mutating func recordFailure(_ id: String, address: String, now: Date) {
+        record("id:" + id, now: now)
+        record("addr:" + address, now: now)
+    }
+
     public func isMuted(_ id: String, now: Date) -> Bool {
-        guard let until = mutedUntil[id] else { return false }
+        guard let until = mutedUntil["id:" + id] else { return false }
         return now < until
+    }
+
+    public func isMuted(_ id: String, address: String, now: Date) -> Bool {
+        isMuted(id, now: now) || (mutedUntil["addr:" + address].map { now < $0 } ?? false)
     }
 }
 

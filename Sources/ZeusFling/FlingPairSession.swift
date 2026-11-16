@@ -15,6 +15,8 @@ final class FlingPairSession {
     private var helloReceived = false
     private var holdsGate = false
     private var finished = false
+    private var helloAt: Date?
+    private let address: String
 
     /// Outbound: we start the pairing.
     init(endpoint: FlingEndpoint, initiatorTo address: NWEndpoint, expectedID: String?) {
@@ -22,6 +24,7 @@ final class FlingPairSession {
         self.role = .initiator
         self.number = nil
         self.expectedID = expectedID
+        self.address = "out"
         self.channel = FlingChannel(connection: NWConnection(to: address, using: endpoint.pairingClientParameters()), queue: endpoint.queue)
     }
 
@@ -31,10 +34,20 @@ final class FlingPairSession {
         self.role = .responder
         self.number = number
         self.expectedID = nil
+        self.address = Self.hostText(connection.endpoint)
         self.channel = FlingChannel(connection: connection, queue: endpoint.queue)
     }
 
+    /// The remote host without an interface suffix, for rate limiting.
+    private static func hostText(_ endpoint: NWEndpoint) -> String {
+        if case .hostPort(let host, _) = endpoint {
+            return "\(host)".split(separator: "%").first.map(String.init) ?? "\(host)"
+        }
+        return "unknown"
+    }
+
     func start() {
+        if role == .responder && endpoint.mute.isMuted("", address: address, now: Date()) { return abort() }
         channel.onReady = { [self] in sendHello() }
         channel.onFrame = { [self] frame in handle(frame) }
         channel.onClose = { [self] _ in closed() }
@@ -52,10 +65,18 @@ final class FlingPairSession {
             guard case .hello(let hello) = message else { return rejectStranger(message) }
             helloReceived = true
             remote = hello
+            helloAt = Date()
             channel.handshaken = true
             if let expectedID, expectedID != hello.id { return end(.failed(.unexpectedMessage)) }
+            // A Mac that already has a key here is never paired over: remove it in Settings first.
+            if endpoint.store.isPaired(hello.id) {
+                channel.send(.pairDecline(FlingPairDecline(reason: "alreadyPaired")))
+                endpoint.emit(.pairEnded(.failed(.alreadyPaired)))
+                channel.closeAfterFlush()
+                return finish()
+            }
             if role == .responder {
-                if endpoint.mute.isMuted(hello.id, now: Date()) { return abort() }
+                if endpoint.mute.isMuted(hello.id, address: address, now: Date()) { return abort() }
                 guard endpoint.promptGate.tryBegin(hello.id) else {
                     channel.send(.pairDecline(FlingPairDecline(reason: "busy")))
                     return channel.closeAfterFlush()
@@ -94,18 +115,25 @@ final class FlingPairSession {
 
     private func apply(_ effects: [FlingPairingEffect]) {
         guard let remote else { return }
-        for effect in effects {
+        // The key is stored after the confirmation has been handed to the connection, so a send that fails never
+        // leaves this Mac paired with a Mac that was not told.
+        let lastSend = effects.lastIndex { if case .send = $0 { true } else { false } }
+        let storeAt = effects.firstIndex { if case .storePSK = $0 { true } else { false } }
+        for (index, effect) in effects.enumerated() {
             switch effect {
-            case .send(let message): channel.send(message)
+            case .send(let message):
+                if let storeAt, index == lastSend, index < storeAt, case .storePSK(let peerID, let psk) = effects[storeAt] {
+                    channel.send(message) { [self] error in
+                        if error == nil { store(peerID: peerID, psk: psk, remote: remote) } else { end(.failed(.connectionLost)) }
+                    }
+                } else {
+                    channel.send(message)
+                }
             case .showCode(let code, let role):
                 endpoint.emit(.pairCode(code: code, role: role, peerID: remote.id, peerName: remote.name))
             case .storePSK(let peerID, let psk):
-                if endpoint.store.add(id: peerID, name: remote.name, model: remote.model, psk: psk, now: Date()) {
-                    endpoint.peerPaired()
-                    endpoint.emit(.paired(peerID: peerID, name: remote.name))
-                } else {
-                    endpoint.emit(.pairEnded(.failed(.badConfirm)))
-                }
+                // With a confirmation ahead of it, the send's completion stores the key instead.
+                if !(lastSend.map { $0 < index } ?? false) { store(peerID: peerID, psk: psk, remote: remote) }
             case .hidePrompt: break
             case .close: channel.closeAfterFlush()
             }
@@ -113,32 +141,61 @@ final class FlingPairSession {
         if let state = machine?.state, state.isFinal { end(state) }
     }
 
+    private func store(peerID: String, psk: Data, remote: FlingHello) {
+        if endpoint.store.add(id: peerID, name: remote.name, model: remote.model, psk: psk, now: Date()) {
+            endpoint.peerPaired()
+            endpoint.emit(.paired(peerID: peerID, name: remote.name))
+        } else {
+            endpoint.emit(.pairEnded(.failed(endpoint.store.isPaired(peerID) ? .alreadyPaired : .badConfirm)))
+        }
+    }
+
     private func end(_ state: FlingPairingState) {
         guard !finished else { return }
-        if state != .confirmed { endpoint.emit(.pairEnded(state)) }
-        if state == .declined, role == .responder, let remote { endpoint.mute.recordDecline(remote.id, now: Date()) }
+        if state != .confirmed {
+            endpoint.emit(.pairEnded(state))
+            // Every attempt that did not end in a pairing counts, whatever id it came with.
+            if role == .responder, let remote { endpoint.mute.recordFailure(remote.id, address: address, now: Date()) }
+        }
         channel.closeAfterFlush()
         finish()
     }
 
     private func closed() {
         guard !finished else { return }
+        if role == .responder, let remote, machine?.state.isFinal == false { endpoint.mute.recordFailure(remote.id, address: address, now: Date()) }
         if var m = machine { let out = m.handle(.connectionLost); machine = m; apply(out) } else { finish() }
     }
 
-    func answer(accept: Bool) {
+    func answer(accept: Bool, peerID: String?) {
         guard !finished, var m = machine else { return }
-        let event: FlingPairingEvent = role == .responder ? (accept ? .userAccept : .userDecline) : .userCancel
+        if let peerID, remote?.id != peerID { return }
+        let event: FlingPairingEvent = accept ? .userAccept : (role == .responder ? .userDecline : .userCancel)
         let out = m.handle(event)
         machine = m
         apply(out)
     }
 
     func tick(_ now: Date) {
-        guard !finished, var m = machine else { return }
+        guard !finished else { return }
+        // A connection that never says hello is closed after the handshake time, whatever else is going on.
+        if !channel.handshaken, FlingTimeoutPolicy(connectedAt: channel.connectedAt, lastActivity: channel.lastActivity).shouldClose(now: now, handshaken: false) {
+            return abort()
+        }
+        guard var m = machine else { return }
         let out = m.handle(.tick(now: now))
         machine = m
         if !out.isEmpty { apply(out) }
+        // After the hello each step before the code must arrive in time, so a silent peer cannot hold a slot or the card.
+        if let helloAt, let state = machine?.state, now.timeIntervalSince(helloAt) > FlingLimits.pairingStageTimeout {
+            switch state {
+            case .idle, .committing, .awaitingKey, .awaitingReveal:
+                if role == .responder, let remote { endpoint.mute.recordFailure(remote.id, address: address, now: now) }
+                endpoint.emit(.pairEnded(.failed(.timedOut)))
+                return abort()
+            default: break
+            }
+        }
         // The code has its own 60 s deadline in the machine; only the handshake needs a cap here.
         if !channel.handshaken, FlingTimeoutPolicy(connectedAt: channel.connectedAt, lastActivity: channel.lastActivity).shouldClose(now: now, handshaken: false) {
             abort()
@@ -154,7 +211,7 @@ final class FlingPairSession {
         guard !finished else { return }
         finished = true
         if holdsGate { endpoint.promptGate.end(); holdsGate = false }
-        if let number { endpoint.gate.release(connection: number) }
+        if let number { endpoint.pairGate.release(connection: number) }
         endpoint.forget(self)
     }
 }

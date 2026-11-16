@@ -8,7 +8,7 @@ import ZeusCore
 final class FlingPromptModel {
     enum Kind: Equatable {
         /// `canAccept` is false on the Mac that started the pairing: it shows the same code with Cancel only.
-        case pairing(code: String, peerName: String, canAccept: Bool)
+        case pairing(code: String, peerName: String, canAccept: Bool, starter: Bool = false)
         case offer(peerName: String, itemCount: Int, totalBytes: Int64)
     }
 
@@ -17,39 +17,46 @@ final class FlingPromptModel {
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let onAnswer: (Bool) -> Void
     private(set) var answered = false
+    @ObservationIgnored private let shownAt: Date
+    @ObservationIgnored private let inputDelay: TimeInterval
     /// Ask each time: Accept becomes "Save" and "Copy", and the choice goes with the answer.
     let askWhere: Bool
     @ObservationIgnored private let onChoose: ((FlingSaveMode) -> Void)?
 
     init(kind: Kind, deadline: Date, clock: @escaping () -> Date, onAnswer: @escaping (Bool) -> Void,
-         askWhere: Bool = false, onChoose: ((FlingSaveMode) -> Void)? = nil) {
+         askWhere: Bool = false, onChoose: ((FlingSaveMode) -> Void)? = nil, inputDelay: TimeInterval = FlingLimits.promptInputDelay) {
         self.kind = kind; self.deadline = deadline; self.clock = clock; self.onAnswer = onAnswer
         self.askWhere = askWhere; self.onChoose = onChoose
+        self.inputDelay = inputDelay; self.shownAt = clock()
     }
+
+    /// A click in the first moments after the card appears is ignored: it was meant for something else.
+    private var acceptsInput: Bool { clock() >= shownAt.addingTimeInterval(inputDelay) }
 
     /// Accepts and says where the files go. Only the first answer counts.
     func choose(_ mode: FlingSaveMode) {
-        guard !answered else { return }
+        guard !answered, acceptsInput else { return }
         answered = true
         onChoose?(mode)
     }
 
     /// Only the first answer counts.
     func answer(_ accept: Bool) {
-        guard !answered else { return }
+        guard !answered, acceptsInput else { return }
         answered = true
         onAnswer(accept)
     }
 
     /// Called about once a second. At the deadline the answer is no.
     func tick() {
-        if !answered && clock() >= deadline { answer(false) }
+        // The timeout is not a click: it declines whatever the input delay says.
+        if !answered && clock() >= deadline { answered = true; onAnswer(false) }
     }
 
     func secondsLeft(now: Date? = nil) -> Int { max(0, Int(deadline.timeIntervalSince(now ?? clock()).rounded(.up))) }
 
     var codeText: String? {
-        guard case .pairing(let code, _, _) = kind, code.count == 6 else { return nil }
+        guard case .pairing(let code, _, _, _) = kind, code.count == 6 else { return nil }
         return "\(code.prefix(3)) \(code.suffix(3))"
     }
 }
@@ -60,12 +67,12 @@ struct FlingPromptCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             switch model.kind {
-            case .pairing(_, let peer, let canAccept):
-                Text(canAccept ? "\(peer) wants to pair" : "Pairing with \(peer)").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+            case .pairing(_, let peer, _, let starter):
+                Text(starter ? "Pairing with \(peer)" : "\(peer) wants to pair").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
                 Text(model.codeText ?? "").font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit()).foregroundStyle(Theme.bolt)
                     .accessibilityLabel("Code \(model.codeText ?? "")")
-                Text(canAccept ? "Check that \(peer) shows the same six digits, then accept."
-                               : "Check that \(peer) shows the same six digits. They accept on that Mac.")
+                Text(starter ? "Check that \(peer) shows the same six digits, then press Codes match. They accept on that Mac too."
+                             : "Check that \(peer) shows the same six digits, then accept.")
                     .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary).fixedSize(horizontal: false, vertical: true)
             case .offer(let peer, let count, let bytes):
                 Text("\(peer) wants to send \(count) \(count == 1 ? "item" : "items")").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
@@ -94,7 +101,7 @@ struct FlingPromptCard: View {
     }
 
     private var canAccept: Bool {
-        if case .pairing(_, _, let can) = model.kind { return can }
+        if case .pairing(_, _, let can, _) = model.kind { return can }
         return true
     }
 
@@ -111,8 +118,8 @@ struct FlingPromptCard: View {
 
     @ViewBuilder
     private func button(canDecline: Bool) -> some View {
-        let isPairingStarter: Bool = { if case .pairing(_, _, false) = model.kind { return true } else { return false } }()
-        let title = canDecline ? (isPairingStarter ? "Cancel" : "Decline") : "Accept"
+        let isPairingStarter: Bool = { if case .pairing(_, _, _, true) = model.kind { return true } else { return false } }()
+        let title = canDecline ? (isPairingStarter ? "Cancel" : "Decline") : (isPairingStarter ? "Codes match" : "Accept")
         Button { model.answer(!canDecline) } label: {
             Text(title).font(TopBarStyle.label(11, .bold)).foregroundStyle(canDecline ? Theme.cloudPrimary : Color.black)
                 .lineLimit(1).fixedSize()
@@ -168,7 +175,7 @@ final class FlingPromptPanelController {
         let next: FlingPromptModel
         if let pairing {
             let service = fling
-            next = FlingPromptModel(kind: .pairing(code: pairing.code, peerName: pairing.peerName, canAccept: pairing.role == .responder),
+            next = FlingPromptModel(kind: .pairing(code: pairing.code, peerName: pairing.peerName, canAccept: true, starter: pairing.role == .initiator),
                                     deadline: deadline, clock: Date.init, onAnswer: { accept in service.answerPairing(accept: accept) })
         } else if let offer {
             let service = fling

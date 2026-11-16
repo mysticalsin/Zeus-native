@@ -73,6 +73,10 @@ public final class FlingTestHooks: @unchecked Sendable {
     public var corruptByte = false
     /// Connect with a made-up key instead of the stored one.
     public var forceUnknownKey = false
+    /// The hello claims this id instead of the sender's own (the proof is still made with the sender's key).
+    public var spoofHelloID: String?
+    /// Pretend the destination volume has this much room.
+    public var freeBytes: Int64?
     public var diagnostics: (@Sendable (String) -> Void)?
     public init() {}
 }
@@ -92,7 +96,7 @@ public protocol FlingTransporting: AnyObject, Sendable {
     func stop()
     func updateSettings(_ settings: FlingEndpointSettings)
     func pair(with address: FlingPeerAddress)
-    func answerPairing(accept: Bool)
+    func answerPairing(accept: Bool, peerID: String?)
     func send(_ items: [FlingOutgoingItem], to address: FlingPeerAddress) -> UUID
     func cancel(_ stackID: UUID)
     func answerOffer(_ stackID: UUID, accept: Bool, saveMode: FlingSaveMode?)
@@ -119,7 +123,12 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
     var replay = FlingReplayLedger()
     var mute = FlingMuteLedger()
     var promptGate = FlingPairPromptGate()
+    /// Transfers and pairing have their own connection caps, so a flood of one cannot starve the other.
     var gate = FlingConnectionGate()
+    var pairGate = FlingConnectionGate()
+    var reserved: [UUID: Int64] = [:]
+    private var rebuildGeneration = 0
+    private var listenerFailures = 0
     var peers = FlingPeerList()
     var pairSessions: [ObjectIdentifier: FlingPairSession] = [:]
     var receiveSessions: [ObjectIdentifier: FlingReceiveSession] = [:]
@@ -184,10 +193,11 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
             transferListener?.cancel(); transferListener = nil
             pairingListener?.cancel(); pairingListener = nil
             browser?.cancel(); browser = nil
+            // Every transfer ends with an event, so nothing is left hanging on a progress ring.
             for s in pairSessions.values { s.abort() }
             for s in receiveSessions.values { s.abort() }
             for s in sendSessions.values { s.abort() }
-            pairSessions.removeAll(); receiveSessions.removeAll(); sendSessions.removeAll()
+            pairSessions.removeAll(); receiveSessions.removeAll(); sendSessions.removeAll(); reserved.removeAll()
             transferPort = nil; pairingPort = nil
         }
     }
@@ -198,10 +208,23 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
         queue.async { [self] in
             let trimmed = new.deviceName.trimmingCharacters(in: .whitespacesAndNewlines)
             let name = trimmed.isEmpty ? defaultName : String(trimmed.prefix(60))
-            let listenersChanged = new.visibility != settings.visibility || name != identity.name
+            let visibilityChanged = new.visibility != settings.visibility
+            let nameChanged = name != identity.name
             identity.name = name
             settings = new
-            if started && listenersChanged { applyListeners() }
+            guard started else { return }
+            if visibilityChanged {
+                rebuildGeneration += 1
+                applyListeners()
+            } else if nameChanged {
+                // A name typed key by key rebuilds the listeners once, when the typing stops.
+                rebuildGeneration += 1
+                let generation = rebuildGeneration
+                queue.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                    guard let self, self.started, generation == self.rebuildGeneration else { return }
+                    self.applyListeners()
+                }
+            }
         }
     }
 
@@ -215,9 +238,10 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
     }
 
     /// The person's answer to a pairing prompt (accept or decline) or, on the initiating Mac, Cancel.
-    public func answerPairing(accept: Bool) {
+    /// The answer is for the pairing with `peerID`; with no id it goes to whichever pairing is waiting.
+    public func answerPairing(accept: Bool, peerID: String? = nil) {
         queue.async { [self] in
-            for session in pairSessions.values { session.answer(accept: accept) }
+            for session in pairSessions.values { session.answer(accept: accept, peerID: peerID) }
         }
     }
 
@@ -311,6 +335,7 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
 
     /// (Re)builds both listeners from the visibility setting and the paired Macs.
     private func applyListeners() {
+        log("listeners rebuilt")
         applyPairingListener()
         applyTransferListener()
     }
@@ -326,7 +351,10 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
             }
             listener.newConnectionHandler = { [weak self] connection in self?.acceptPairing(connection) }
             listener.stateUpdateHandler = { [weak self, weak listener] state in
-                guard let self, let listener, case .ready = state else { return }
+                guard let self, let listener else { return }
+                if case .failed = state { return self.listenerFailed() }
+                guard case .ready = state else { return }
+                self.listenerFailures = 0
                 self.pairingPort = listener.port?.rawValue
                 self.announceListening()
             }
@@ -349,7 +377,10 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
             }
             listener.newConnectionHandler = { [weak self] connection in self?.acceptTransfer(connection) }
             listener.stateUpdateHandler = { [weak self, weak listener] state in
-                guard let self, let listener, case .ready = state else { return }
+                guard let self, let listener else { return }
+                if case .failed = state { return self.listenerFailed() }
+                guard case .ready = state else { return }
+                self.listenerFailures = 0
                 self.transferPort = listener.port?.rawValue
                 self.announceListening()
             }
@@ -357,6 +388,19 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
             listener.start(queue: queue)
         } else {
             announceListening()
+        }
+    }
+
+    /// A listener that died is reported and rebuilt a few times, a little later each time.
+    private func listenerFailed() {
+        emit(.failed(stackID: nil, direction: .receive, reason: "listenerFailed"))
+        listenerFailures += 1
+        guard listenerFailures <= 3, started else { return }
+        rebuildGeneration += 1
+        let generation = rebuildGeneration
+        queue.asyncAfter(deadline: .now() + 2 * Double(listenerFailures)) { [weak self] in
+            guard let self, self.started, generation == self.rebuildGeneration else { return }
+            self.applyListeners()
         }
     }
 
@@ -381,7 +425,7 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
     private func acceptPairing(_ connection: NWConnection) {
         inboundCount += 1
         let number = inboundCount
-        guard gate.admit(connection: number) else { connection.cancel(); return }
+        guard pairGate.admit(connection: number) else { connection.cancel(); return }
         let session = FlingPairSession(endpoint: self, inbound: connection, number: number)
         pairSessions[ObjectIdentifier(session)] = session
         session.start()
@@ -440,8 +484,19 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
     func forget(_ session: FlingReceiveSession) { receiveSessions[ObjectIdentifier(session)] = nil }
     func forget(sendStack id: UUID) { sendSessions[id] = nil }
 
-    func freeBytes() -> Int64 {
-        let attrs = try? FileManager.default.attributesOfFileSystem(forPath: FileManager.default.fileExists(atPath: saveRoot.path) ? saveRoot.path : saveRoot.deletingLastPathComponent().path)
-        return (attrs?[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
+    /// Room on the volume that holds `folder`, less what stacks already arriving have promised.
+    func freeBytes(at folder: URL) -> Int64 {
+        var base: Int64 = 0
+        if let forced = hooks.freeBytes {
+            base = forced
+        } else {
+            var probe = folder
+            while !FileManager.default.fileExists(atPath: probe.path), probe.path != "/" { probe.deleteLastPathComponent() }
+            let attrs = try? FileManager.default.attributesOfFileSystem(forPath: probe.path)
+            base = (attrs?[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
+        }
+        let promised = reserved.values.reduce(Int64(0)) { $0.addingReportingOverflow($1).overflow ? Int64.max : $0 + $1 }
+        let (room, overflow) = base.subtractingReportingOverflow(promised)
+        return overflow ? 0 : max(0, room)
     }
 }

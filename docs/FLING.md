@@ -42,7 +42,7 @@ Frames are `UInt32 length | UInt8 type | payload`. Header payloads are JSON (at 
 
 There are two listeners, each advertised as its own Bonjour service of type `_zeus-fling._tcp` (a `r` key in the TXT record says which, a deviation from the plan's single service with a `pp` port; the TXT also carries `v`, `id`, and for Everyone `name` and `model`):
 
-- the **transfer listener** speaks TLS with a pre-shared key. The key identity is the sender's install id and the receiver also checks that the id in the hello is the one the TLS handshake proved. It exists only while at least one Mac is paired and is rebuilt whenever the set changes;
+- the **transfer listener** speaks TLS with a pre-shared key. The key identity is the sender's install id. Who the peer is comes from the hello: the receiver speaks first with a nonce and the sender answers with an HMAC proof of the key of the id it claims. It exists only while at least one Mac is paired and is rebuilt whenever the set changes;
 - the **pairing listener** is plain TCP and takes only pairing frames. Anything else gets `decline(notPaired)` and a closed connection. It is closed when visibility is Paired only or Off.
 
 ## Threat model and caps
@@ -50,14 +50,17 @@ There are two listeners, each advertised as its own Bonjour service of type `_ze
 | Threat | Defence |
 |---|---|
 | Unpaired Mac sends files | The transfer listener is TLS-PSK only; an unknown identity fails the handshake (`-9864`). The pairing port answers an offer with `notPaired`. |
-| Spoofed name or id | A paired Mac is shown by the name stored at pairing. The id in a hello must match the key the handshake proved. The six digits and the commitment defeat a man in the middle; one prompt at a time; three declines mute an id for ten minutes. |
-| Path traversal | `FlingNames.validate` rejects separators, colon, control characters, a leading dot, `.`, `..`, empty names and more than 255 UTF-8 bytes after NFC. The final path is checked to stay inside the stack folder. Senders clean their own names. |
-| Oversized or zip-bomb payload | At most 100 items; header 64 KiB, chunk 1 MiB; bytes beyond the declared size abort; the total must fit in free space minus 1 GiB; archives are never unpacked; links http or https only. |
-| Partial or corrupt files | Hidden partial folder (mode 0600, created exclusively), deleted on every end except done and by a launch sweep (older than an hour); a file is visible only after its hash matched. |
+| A Mac that answers a pairing request at once and is stored without anyone looking | Both people accept. The responder presses Accept; the starting Mac keeps its key out of storage until its own person presses "Codes match", and only then sends its confirmation and stores. A card ignores clicks for its first second. |
+| Spoofed name or id | A paired Mac is shown by the name stored at pairing (capped at 60 bytes). The receiver sends a fresh nonce in its hello; the sender's hello must carry an HMAC over that nonce and the id it claims, made with the key paired under that id, so a paired Mac cannot pose as another paired Mac whichever key the TLS handshake used. A Mac that is already paired cannot be paired over (`alreadyPaired`); remove it in Settings first. |
+| Pairing floods and prompt spam | Pairing and transfers have separate connection caps (8 each). A connection that does not say hello within 10 s, or a pairing step that is late by 10 s, is dropped. Every failed attempt counts toward a 10 minute mute by id and by address. One card at a time. |
+| Path traversal and look-alike names | `FlingNames.validate` rejects separators, colon, control and format characters (bidi overrides, zero width, byte order marks; the two emoji joiners stay), a leading dot, `.`, `..`, empty names and more than 255 UTF-8 bytes after NFC. Numbered and case-folded names (APFS is usually case-insensitive) never pass 255 bytes or overwrite. The final path is checked to stay inside the stack folder. |
+| Oversized, overflowing or zip-bomb payloads | At most 100 items, 1 TiB each; sizes are summed with overflow checks after every item was validated; header 64 KiB, chunk 1 MiB and never empty; bytes beyond the declared size abort; the total must fit in the destination volume's free space minus 1 GiB minus what running stacks have already promised; archives are never unpacked. The frame decoder reads at an offset, not by copying per frame. |
+| Partial or corrupt files | Hidden partial folder (mode 0600, created exclusively), deleted on every end except done and by a launch sweep; a file is visible only after its hash matched. Stopping Fling ends every transfer with an event. |
+| Running what a peer sent | Every received file and `.webloc` carries a quarantine mark with the agent name Zeus, so Gatekeeper checks it as a download. |
+| A link that makes this Mac request something on its own network | A received link opens by itself only for public http or https addresses. Loopback, private, link-local, `.local` and single-label hosts, and numbers written in disguise, stay on the Shelf as a `.webloc` and open only when clicked. |
 | Replay | Stack ids are remembered for ten minutes. |
-| Flooding | At most 8 connections, one transfer per peer, 10 s to handshake, 30 s idle. |
-| Secrets | Keys live only in the Keychain (service `com.zeus.app`, account `fling.peer.<id>`). Logs carry id prefixes and byte counts, never keys, codes or contents. |
-| Sending without a gesture | `FlingService.send(_:to:gesture:)` is the only way in. |
+| Secrets | Keys live only in the Keychain (service `com.zeus.app`, account `fling.peer.<id>`), and replacing one needs an explicit call. Logs carry id prefixes and byte counts, never keys, codes or contents. |
+| Sending without a gesture | `FlingService.send(_:to:gesture:)` is the only way in. A Mac that refuses a stored key tells the person to pair again. |
 
 ## Limits and warnings
 
@@ -85,3 +88,7 @@ There are two listeners, each advertised as its own Bonjour service of type `_ze
 7. Papers on: no focus is stolen and closing a paper leaves the Shelf unchanged.
 8. The flick: hold the paper plane on a cell and flick toward a Mac; it flies off and arrives; Reduce Motion fades instead.
 9. Dragging a stack out into a Finder window copies every file.
+
+## Security review round
+
+An independent review of the first build (1 blocker, 5 majors, 11 minors) was fixed with tests first, REG-730 to REG-748. Verdicts are in the report that went with the commits; the main changes are the two-sided pairing confirmation, the proven hello, the pairing timeouts and separate gate, quarantine, overflow-safe sizes, bidi-safe names, private links that never open themselves, reserved free space, a debounced listener rebuild and events on stop.

@@ -132,9 +132,8 @@ final class FlingSendSession {
         let connection = NWConnection(to: target, using: endpoint.clientParameters(psk: connectionKey))
         let channel = FlingChannel(connection: connection, queue: endpoint.queue)
         self.channel = channel
-        channel.onReady = { [self] in
-            channel.send(.hello(FlingHello(id: endpoint.identity.id, name: endpoint.identity.name, model: endpoint.identity.model)))
-        }
+        // The receiver speaks first with a nonce; the sender's hello answers it with a proof of its key.
+        channel.onReady = {}
         channel.onFrame = { [self] frame in receive(frame) }
         channel.onClose = { [self] reason in closed(reason) }
         channel.start()
@@ -145,7 +144,10 @@ final class FlingSendSession {
         guard let message = try? FlingWire.decode(frame) else { return abortConnection() }
         guard let channel else { return }
         if !channel.handshaken {
-            guard case .hello(let hello) = message, address.id.isEmpty || hello.id == address.id else { return abortConnection() }
+            guard case .hello(let hello) = message, address.id.isEmpty || hello.id == address.id, let nonce = hello.nonce else { return abortConnection() }
+            let claimed = endpoint.hooks.spoofHelloID ?? endpoint.identity.id
+            channel.send(.hello(FlingHello(id: claimed, name: endpoint.identity.name, model: endpoint.identity.model,
+                                           nonce: nil, proof: FlingCrypto.helloProof(psk: connectionKey, nonce: nonce, id: claimed))))
             channel.handshaken = true
             let queued = pending
             pending = []
@@ -239,6 +241,7 @@ final class FlingSendSession {
     }
 
     func abort() {
+        if !machine.state.isFinal { apply(step(.userCancel)) }
         finished = true
         channel?.cancel()
     }

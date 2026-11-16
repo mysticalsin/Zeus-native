@@ -5841,7 +5841,7 @@
       "check": "native-ZeusCoreTests",
       "guard": {
         "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
-        "function": "theKeyIsStoredOnlyAfterBothConfirm"
+        "function": "theKeyIsStoredOnlyAfterBothPeopleAccept"
       }
     },
     {

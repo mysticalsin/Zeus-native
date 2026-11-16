@@ -128,13 +128,14 @@ while let line = readLine() {
     case "pair":
         endpoint.pair(with: .direct(port: nil, pairPort: UInt16(command["pairPort"] as? Int ?? 0), host: host))
     case "answerPairing":
-        endpoint.answerPairing(accept: command["accept"] as? Bool ?? false)
+        endpoint.answerPairing(accept: command["accept"] as? Bool ?? false, peerID: command["peerID"] as? String)
     case "send":
         let peerID = command["peerID"] as? String ?? endpoint.pairedPeers.first?.id ?? ""
         hooks.rawName = command["rawName"] as? String
         hooks.chunkDelayMs = command["chunkDelayMs"] as? Int ?? 0
         hooks.corruptByte = command["corruptByte"] as? Bool ?? false
         hooks.forceUnknownKey = command["forceUnknownKey"] as? Bool ?? false
+        hooks.spoofHelloID = command["spoofID"] as? String
         let address = FlingPeerAddress.direct(id: peerID, port: UInt16(command["port"] as? Int ?? 0), pairPort: nil, host: host)
         let stackID = endpoint.send(items(from: command["items"] as? [[String: Any]] ?? []), to: address)
         emit(["event": "sending", "stackID": stackID.uuidString])

@@ -308,7 +308,7 @@ public struct FlingReceiveMachine: Sendable {
                 return [.makeTemp(stackID: incoming.stackID), .send(.accept(FlingStackRef(stackID: incoming.stackID)))] + advance()
             }
             state = .prompting(deadline: now.addingTimeInterval(FlingLimits.promptTimeout))
-            let total = incoming.items.filter { $0.kind == .file }.reduce(Int64(0)) { $0 + $1.size }
+            let total = FlingOfferRules.totalFileBytes(incoming)
             return [.prompt(peerName: context.peerName, itemCount: incoming.items.count, totalBytes: total, stackID: incoming.stackID)]
 
         case (.receiving(let index, let got), .chunk(let chunk)):
