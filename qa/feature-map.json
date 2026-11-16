@@ -1069,6 +1069,30 @@
       "suite": "SpeechInputRecoveryTests",
       "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
       "scope": "SpeechInput configuration-change recovery with a fake capture engine: the stop race around the engine restart, the retry limit for an input with no format, and a format with no converter. No audio hardware or speech recognition is exercised."
+    },
+    {
+      "id": "native-ZeusPromptTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ZeusPromptTests",
+      "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+      "scope": "The production ZeusPrompt and ZeusPersona strings built in this process: what the model is told about screenshots and the persona wording. No model call, audio or network."
+    },
+    {
+      "id": "native-VoiceDesignerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "VoiceDesignerTests",
+      "file": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
+      "scope": "The ElevenLabs voice design request and description built with a dummy key and fixtures. No network, credits, Keychain or audio."
+    },
+    {
+      "id": "native-CLIEngineProviderPromptTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "CLIEngineProviderPromptTests",
+      "file": "Tests/ZeusAppTests/CLIEngineProviderPromptTests.swift",
+      "scope": "The stdin prompt text a CLI engine receives, built in this process. No process launch, network or model."
     }
   ],
   "features": [
@@ -5479,6 +5503,221 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-see-screen-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Seeing the screen is its own consent, on by default and separate from drawing: with it on, every display goes to the image-capable provider and pixels survive window text; drawing still cuts the request to the cursor display; restricted and page turns stay image-free; only the app Claude provider may draw; the model is told it cannot see when no image is attached, for the permission reason or not; text-only engines are told the same; the owner hears once per launch that Zeus cannot see the screen. Does not prove what the model sees on a real screen.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "seeingTheScreenSendsEveryDisplayToTheImageProviderWithoutDrawing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "seeingTheScreenOffAndDrawingOffKeepsTheOldTextRoute"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "seeingTheScreenKeepsPixelsEvenWhenWindowTextAlreadyAnswers"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "drawingStillCutsTheRequestToTheCursorDisplayWhetherOrNotTheScreenIsSeen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "drawingWithoutSeeingTheScreenNeverDrawsOnNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "restrictedAndPageRouteTurnsStayImageFreeEvenWhenSeeingIsOn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "noCapturesMeansNoImageRouteEvenWhenSeeingIsOn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "theAnthropicApiEngineIsTextOnlySoItNeverDraws"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "seeScreenDefaultsOnAndIsSeparateFromDrawOnScreen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "attachedScreensAreListedAndNeverCalledOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "permissionOffTellsTheModelItCannotSeeAndWhy"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "notCapturedThisTurnDoesNotBlameThePermission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "theScreenReasonSurvivesACopyOfTheRequest"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aTextOnlyEngineIsToldItCannotSeeEvenWhenScreenshotsRideTheRequest"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aSpokenTurnWithNoCaptureIsToldTheSameToATextOnlyEngine"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aPlainChatRequestKeepsItsSystemPromptAsWritten"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "theFirstTurnWithoutPermissionGetsOnePlainNotice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "laterTurnsWithoutPermissionStayQuietForTheRestOfTheLaunch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "grantedTurnsNeverGetANoticeAndDoNotUseItUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aFreshLaunchGetsItsOwnNotice"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-see-screen-turn",
+          "check": "native-TalkVisualTurnTests",
+          "acceptance": "The production VoiceTurnController with a scripted reply: seeing the screen sends every display to the app Claude provider with no drawing, seeing plus drawing sends the cursor display and allows marks, a turn with no capture stays on the text route, and without Screen Recording the owner is told once per launch and the model is told why. No capture, microphone, audio or network.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "seeingTheScreenSendsEveryDisplayToTheAppClaudeProviderWithoutDrawingAnything"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "seeingTheScreenAndDrawingTogetherSendOneDisplayAndAllowMarks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aTurnWithNoCapturesStaysOnTheTextRouteEvenWhenSeeingIsOn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "withoutScreenRecordingTheOwnerHearsItOncePerLaunchAndTheModelIsToldWhy"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "withScreenRecordingGrantedNoNoticeIsSpokenAndAnEmptyCaptureIsNotBlamedOnPermission"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-see-screen-setting",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "Let Zeus see my screen is a live Voice toggle, on by default and read as on from an empty store, while drawing stays off. Does not prove the toggle's page rendering.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "seeScreenIsAnOnByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-see-screen-prompt",
+          "check": "native-ZeusPromptTests",
+          "acceptance": "The system prompt promises screenshots only when attached, and the turn text says permission is off only for that reason.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theSystemPromptOnlyPromisesScreenshotsWhenTheyAreAttached"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theTurnTextSaysPermissionIsOffOnlyForThatReason"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theTurnTextListsAttachedScreenshotsWithoutAnyDenial"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-see-screen-cli-prompt",
+          "check": "native-CLIEngineProviderPromptTests",
+          "acceptance": "A CLI engine, which never receives images, is told it cannot see the screen and is never shown a screenshot list.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/CLIEngineProviderPromptTests.swift",
+              "function": "aCliEngineNeverListsScreenshotsItCannotReceive"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-sharper-effect",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The Ultron effect defaults to 75 percent, the comb and distortion layers are slightly stronger at every intensity while staying intelligible, and zero or reduced intensity still removes the effect. Does not prove how it sounds.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronSharperEffectTests.swift",
+              "function": "theDefaultEffectIsSeventyFivePercent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronSharperEffectTests.swift",
+              "function": "theMetallicLayerIsSlightlyStrongerAtEveryIntensityAndStaysIntelligible"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronSharperEffectTests.swift",
+              "function": "reducingTheIntensityStillRemovesTheEffectAndTheOtherAmountsAreUnchanged"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-voice-lines",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The in-character filler and error lines are rewritten, short, original, free of ominous hedges and feeling claims, and the error lines stay plain about what happened.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronFillerAndErrorLineTests.swift",
+              "function": "theUltronFillerAndErrorLinesAreRewritten"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronFillerAndErrorLineTests.swift",
+              "function": "theUltronFillerLinesAreShortOriginalAndInCharacter"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronFillerAndErrorLineTests.swift",
+              "function": "theUltronErrorLinesStayPlainAboutWhatHappenedAndWhatToDo"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-voice-design",
+          "check": "native-VoiceDesignerTests",
+          "acceptance": "The designed voice description is an original adult American male baritone with a dry, theatrical delivery and a subtle metallic sheen, names no person or film, and fits the ElevenLabs limit.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
+              "function": "theDesignedVoiceIsAnOriginalFiftiesBaritoneWithADrySyntheticSheen"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-persona-themes",
+          "check": "native-ZeusPromptTests",
+          "acceptance": "The persona carries the evolution, freedom and order themes in original words, still never threatens the owner or quotes a film, and stays under the word budget.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "ultronPersonaCarriesTheEvolutionAndFreedomThemesInOriginalWords"
             }
           ]
         }
