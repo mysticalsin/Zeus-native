@@ -1023,6 +1023,14 @@
       "file": "Tests/ZeusAppTests/BuddyMotionTests.swift"
     },
     {
+      "id": "native-UIPolishSourceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Layout and copy rules read from the view sources and pure sizing helpers (pop-up widths, initials box, panel close rule); no window shown.",
+      "suite": "UIPolishSourceTests",
+      "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift"
+    },
+    {
       "id": "native-PageSwitchLayoutTests",
       "kind": "native-fixture",
       "tier": "native-integration",

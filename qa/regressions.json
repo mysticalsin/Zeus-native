@@ -7338,7 +7338,7 @@
       "features": [
         "F13"
       ],
-      "check": "native-ZeusAppTests",
+      "check": "native-UIPolishSourceTests",
       "guard": {
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "thePermissionCueWrapsInsteadOfTruncatingMidWord"
@@ -7350,7 +7350,7 @@
       "features": [
         "F13"
       ],
-      "check": "native-ZeusAppTests",
+      "check": "native-UIPolishSourceTests",
       "guard": {
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "aSettingsPopupIsWideEnoughForItsLongestOption"
@@ -7362,7 +7362,7 @@
       "features": [
         "F13"
       ],
-      "check": "native-ZeusAppTests",
+      "check": "native-UIPolishSourceTests",
       "guard": {
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual"
@@ -7386,7 +7386,7 @@
       "features": [
         "F13"
       ],
-      "check": "native-ZeusAppTests",
+      "check": "native-UIPolishSourceTests",
       "guard": {
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
