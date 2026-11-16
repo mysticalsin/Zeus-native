@@ -284,7 +284,11 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         let model = answerPin.resolve(quality: VoiceSettings.shared.elevenQuality, studioUnsupported: studioUnsupported)
         lastElevenStatus = nil
         var result = await speakElevenLabs(text, began: began, model: model)
-        if result == nil, model == ElevenLabsQuality.studioModel, !answerHadAudio, !Task.isCancelled {
+        // No second try when ElevenLabs is paused (bad key, no credits) or the first-audio deadline passed.
+        if result == nil, model == ElevenLabsQuality.studioModel, !Task.isCancelled,
+           ElevenLabsFailsafe.shouldRetryOnFastModel(
+               paused: VoiceSettings.shared.isProviderPaused(.elevenLabs),
+               remaining: ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()), answerHadAudio: answerHadAudio) {
             if let status = lastElevenStatus, AnswerModelPin.isModelRejection(status: status) { studioUnsupported = true }
             answerPin.fallBackToFast()
             VoiceLog.log("voice", "studio model not available; this answer uses \(ElevenLabsQuality.fastModel)")
@@ -297,46 +301,66 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         return result
     }
 
+    /// Headers and first audio together must arrive before `began + firstAudioTimeout`. A timer cancels the
+    /// route's task at that moment, which also cancels its URLSession request, so nothing keeps streaming
+    /// (or billing) after the same sentence moves on to Kokoro. Past the deadline no other route is tried.
     private func speakElevenLabs(_ text: String, began: Date, model: String) async -> String? {
         for route in ElevenLabsVoice.loadRoutes() {
+            guard let remaining = ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()),
+                  ElevenLabsFailsafe.shouldTryNextRoute(remaining: remaining) else { return nil }
             let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
-            let deadline = began.addingTimeInterval(VoiceTTSChain.firstAudioTimeout)
-            do {
-                let (bytes, response) = try await Self.elevenLabsSession.bytes(for: route.request(for: text, model: model))
-                if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                    lastElevenStatus = http.statusCode
-                    var body = Data()
-                    for try await byte in bytes { body.append(byte); if body.count > 8_192 { break } }
-                    if ElevenLabsVoice.isKeyRejection(http.statusCode) {
-                        VoiceSettings.shared.noteElevenLabsKeyRejected(status: http.statusCode, body: body)
-                    }
-                    continue
-                }
-                var chunk = Data()
-                chunk.reserveCapacity(Self.pcmChunkBytes)
-                for try await byte in bytes {
-                    if Task.isCancelled { feeder.discard(); return feeder.scheduledAny ? Self.routeVoice(route) : nil }
-                    if !feeder.receivedAny, Date() > deadline { break }
-                    chunk.append(byte)
-                    if chunk.count >= Self.pcmChunkBytes {
-                        feeder.push(chunk)
-                        chunk.removeAll(keepingCapacity: true)
-                    }
-                }
-                if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
-                    feeder.push(chunk)
-                    feeder.finish()
-                } else {
-                    feeder.discard()
-                }
-            } catch {
-                if Task.isCancelled { feeder.discard() } else { feeder.finish() }
-                if feeder.scheduledAny { return Self.routeVoice(route) }
-                continue
+            let attempt = Task { await self.streamElevenLabs(route, text: text, began: began, model: model, feeder: feeder) }
+            let timer = Task {
+                try? await Task.sleep(for: .seconds(remaining))
+                if !Task.isCancelled, !feeder.receivedAny { attempt.cancel() }
             }
-            if feeder.scheduledAny { return Self.routeVoice(route) }
+            let voice = await withTaskCancellationHandler { await attempt.value } onCancel: { attempt.cancel() }
+            timer.cancel()
+            if let voice { return voice }
+            if Task.isCancelled { return nil }
         }
         return nil
+    }
+
+    /// One ElevenLabs route. Nil when it produced no audio: refused, unreachable, cancelled or past the deadline.
+    private func streamElevenLabs(_ route: ElevenLabsVoice, text: String, began: Date, model: String, feeder: PCMStreamFeeder) async -> String? {
+        do {
+            let (bytes, response) = try await Self.elevenLabsSession.bytes(for: route.request(for: text, model: model))
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                lastElevenStatus = http.statusCode
+                var body = Data()
+                for try await byte in bytes { body.append(byte); if body.count > 8_192 { break } }
+                if ElevenLabsVoice.isKeyRejection(http.statusCode) {
+                    VoiceSettings.shared.noteElevenLabsKeyRejected(status: http.statusCode, body: body)
+                }
+                return nil
+            }
+            var chunk = Data()
+            chunk.reserveCapacity(Self.pcmChunkBytes)
+            for try await byte in bytes {
+                if Task.isCancelled { feeder.discard(); return feeder.scheduledAny ? Self.routeVoice(route) : nil }
+                if !feeder.receivedAny,
+                   !ElevenLabsFailsafe.shouldPushPartialChunk(remaining: ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date())) {
+                    // Too late: a fragment is not a reply. Drop it so Kokoro speaks the whole sentence.
+                    feeder.discard()
+                    return nil
+                }
+                chunk.append(byte)
+                if chunk.count >= Self.pcmChunkBytes {
+                    feeder.push(chunk)
+                    chunk.removeAll(keepingCapacity: true)
+                }
+            }
+            if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
+                feeder.push(chunk)
+                feeder.finish()
+            } else {
+                feeder.discard()
+            }
+        } catch {
+            if Task.isCancelled { feeder.discard() } else { feeder.finish() }
+        }
+        return feeder.scheduledAny ? Self.routeVoice(route) : nil
     }
 
     /// 50 ms of 24 kHz 16-bit mono PCM: small enough to start fast, with a one-buffer look-ahead for the tail fade.
