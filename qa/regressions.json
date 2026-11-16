@@ -7919,6 +7919,114 @@
         "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
         "function": "theEvalFileHasSixtySituationsAcrossTheSevenKindsWithUniqueIds"
       }
+    },
+    {
+      "id": "REG-890",
+      "failure": "Ultron speech used the first take's slow, breathy delivery settings.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "takeCSettingsAreFasterAndSteadier"
+      }
+    },
+    {
+      "id": "REG-891",
+      "failure": "The Studio voice choice pointed at an unverified model id.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "theStudioChoiceIsAKnownModelAndTheFastDefaultStays"
+      }
+    },
+    {
+      "id": "REG-892",
+      "failure": "Spoken Ultron replies could carry ellipses that the voice reads as long gaps.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "noEllipsisSurvivesAndPlainTextIsUntouched"
+      }
+    },
+    {
+      "id": "REG-893",
+      "failure": "A dialogue line could ship with an ellipsis.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "noDialogueLineContainsAnEllipsis"
+      }
+    },
+    {
+      "id": "REG-894",
+      "failure": "The Ultron prompt had no wording rules for short clauses, no filler and one dry aside.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "theUltronPromptCarriesTheTakeCReplyWordingRules"
+      }
+    },
+    {
+      "id": "REG-895",
+      "failure": "The text fallback after an image engine failure spoke a second filler line.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "anImageEngineThatFailsAfterTheFillerLetsTheTextEngineAnswerOnceWithOneFillerAndNoRepeatedAction"
+      }
+    },
+    {
+      "id": "REG-896",
+      "failure": "The text fallback could start after an action tag had already begun on the image race.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "theTextFallbackNeedsNoWordsAndNoActionOnTheImageRace"
+      }
+    },
+    {
+      "id": "REG-897",
+      "failure": "An older claude stripped the screenshots but marks were still allowed and the prompt still held the draw rules.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "marksAreRefusedWhenAnOlderClaudeStrippedTheImages"
+      }
+    },
+    {
+      "id": "REG-898",
+      "failure": "The fallback reused the blocked-images wording instead of saying the image engine failed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "theImageEngineFailureHasItsOwnDistinctWording"
+      }
     }
   ]
 }
