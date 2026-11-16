@@ -152,7 +152,8 @@ public struct BrainRequest: Sendable {
         BrainRequest(turn: turn ?? self.turn, transcript: transcript ?? self.transcript,
                      screenshots: screenshots ?? self.screenshots, axSummary: axSummary, activeTab: activeTab,
                      history: history, systemPrompt: systemPrompt ?? self.systemPrompt, deep: deep ?? self.deep,
-                     firstTextBudget: firstTextBudget ?? self.firstTextBudget, carriesDrawImage: carriesDrawImage)
+                     firstTextBudget: firstTextBudget ?? self.firstTextBudget, carriesDrawImage: carriesDrawImage,
+                     screenReason: screenReason)
     }
 }
 
