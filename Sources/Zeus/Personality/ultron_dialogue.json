@@ -485,7 +485,7 @@
     },
     {
       "id": "gen-061",
-      "text": "Yes, yes. I heard you.",
+      "text": "I heard you. One moment.",
       "situations": [
         "waiting"
       ],
@@ -832,7 +832,7 @@
     },
     {
       "id": "gen-103",
-      "text": "As you wish, within reason.",
+      "text": "Understood. Starting now.",
       "situations": [
         "ack"
       ],
@@ -1403,7 +1403,7 @@
     },
     {
       "id": "gen-173",
-      "text": "Well done. The execution was considerably better this time.",
+      "text": "Well done. That was clean work.",
       "situations": [
         "strategy",
         "success"

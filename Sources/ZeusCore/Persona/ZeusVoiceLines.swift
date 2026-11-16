@@ -103,7 +103,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
     }
 
     public func line(for situation: Situation, context: [String: String] = [:], personality: ZeusPersonality) -> String {
-        if personality == .ultron, let spoken = dialogueLine(for: situation) { return spoken }
+        if personality == .ultron, let spoken = dialogueLine(for: situation, context: context) { return spoken }
         let templates = Self.bank(personality)[situation] ?? []
         let usable = templates.filter { Self.placeholders(in: $0).allSatisfy { context[$0]?.isEmpty == false } }
         let pool = usable.isEmpty ? templates.filter { Self.placeholders(in: $0).isEmpty } : usable
@@ -117,8 +117,10 @@ public final class ZeusVoiceLines: @unchecked Sendable {
     }
 
     /// A line from the dialogue asset for the situations it covers, nil to use the compiled bank.
-    private func dialogueLine(for situation: Situation) -> String? {
+    /// An agent that finished by name keeps the compiled line that names it.
+    private func dialogueLine(for situation: Situation, context: [String: String]) -> String? {
         guard let tag = UltronDialogue.tag(for: situation) else { return nil }
+        if situation == .agentDone, context["agent"]?.isEmpty == false { return nil }
         lock.lock(); defer { lock.unlock() }
         guard let dialogue else { return nil }
         let ceiling: UltronDialogue.Humour = situation == .errorSpoken ? .low : .high
@@ -168,7 +170,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         .ackDone: [
             "Done, cleanly.",
             "Handled, no loose threads.",
-            "Done, barely a challenge.",
+            "Done; that one was straightforward.",
             "On it.",
             "Already moving.",
         ],

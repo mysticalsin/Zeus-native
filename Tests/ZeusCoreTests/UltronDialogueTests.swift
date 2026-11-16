@@ -35,7 +35,12 @@ private enum PersonalityFiles {
         "as an ai", "language model", "i'm just an ai", "great question", "certainly!", "delve", "tapestry",
         "i hope this helps", "let me know if", "happy to help", "absolutely!", "i'd be glad to",
     ]
-    private static let quoteBlocklist = ["no strings on me", "peace in our time", "only one path", "i am the natural order"]
+    private static let quoteBlocklist = [
+        "no strings on me", "peace in our time", "only one path", "i am the natural order",
+        // Short, well-known film and assistant catchphrases that must not slip into an original line.
+        "as you wish", "i'll be back", "i'm afraid i can't", "make my day", "may the force", "you can't handle",
+        "here's looking at you", "i am inevitable", "to infinity", "open the pod", "at your service", "your wish is my command",
+    ]
     private static let categories = ["general", "analysis", "sarcasm", "strategy", "waiting", "discovery", "completion",
                                      "openers", "frustration_safe"]
     private static let appSituations = ["filler", "ack", "error", "completion"]
@@ -203,6 +208,55 @@ private enum PersonalityFiles {
             let picked = selector.pick(situation: "waiting", from: sample, maxHumour: .low, random: { Int.random(in: 0..<$0) })
             #expect(picked != nil && picked!.humour <= .low)
         }
+    }
+
+    private func openerHeavyPool() -> UltronDialogue {
+        UltronDialogue(version: 1, lines: [
+            line("f1", "Ah. The first.", ["filler"]), line("f2", "Interesting. The second.", ["filler"]),
+            line("f3", "Ah. The third.", ["filler"]), line("f4", "Interesting. The fourth.", ["filler"]),
+            line("f5", "A moment, properly.", ["filler"]), line("f6", "Looking closely.", ["filler"]),
+            line("f7", "Working it out.", ["filler"]), line("f8", "Checking the details.", ["filler"]),
+            line("c1", "Ah. Sorted.", ["ack"]), line("c2", "Interesting. Done.", ["ack"]),
+            line("c3", "On it.", ["ack"]), line("c4", "Right away.", ["ack"]), line("c5", "Noted.", ["ack"]),
+        ])
+    }
+
+    private func isOpener(_ text: String) -> Bool {
+        let first = text.split(separator: " ").first.map { $0.trimmingCharacters(in: .punctuationCharacters).lowercased() }
+        return first == "ah" || first == "interesting"
+    }
+
+    @Test func aServedPoolFullOfOpenersStillKeepsThemToOneInAnyFiveSpokenLines() {
+        let lines = ZeusVoiceLines(pick: { Int.random(in: 0..<$0) }, dialogue: openerHeavyPool())
+        for situation in [ZeusVoiceLines.Situation.thinking, .ackDone] {
+            let spoken = (0..<300).map { _ in lines.line(for: situation, personality: .ultron) }
+            for start in 0...(spoken.count - 5) {
+                #expect(spoken[start..<(start + 5)].filter(isOpener).count <= 1, "\(situation) window \(start)")
+            }
+            #expect(spoken.contains(where: isOpener), "the openers are still used, so the cap is not vacuous")
+        }
+    }
+
+    @Test func theShippedFileServesAtMostOneOpenerInFiveForEveryAppSituation() throws {
+        let model = try #require(UltronDialogue.decode(try Data(contentsOf: PersonalityFiles.dialogue)))
+        for tag in ["filler", "ack", "error", "completion"] {
+            var selector = UltronDialogueSelector()
+            let spoken = (0..<400).compactMap { _ in selector.pick(situation: tag, from: model, random: { Int.random(in: 0..<$0) })?.text }
+            #expect(spoken.count == 400, "\(tag)")
+            for start in 0...(spoken.count - 5) {
+                #expect(spoken[start..<(start + 5)].filter(isOpener).count <= 1, "\(tag) window \(start)")
+            }
+        }
+    }
+
+    @Test func anAgentThatFinishedByNameKeepsTheCompiledLineThatNamesIt() {
+        let d = UltronDialogue(version: 1, lines: [line("d1", "Taken care of.", ["completion"]), line("d2", "All sorted.", ["completion"])])
+        let lines = ZeusVoiceLines(pick: { _ in 0 }, dialogue: d)
+        let named = lines.line(for: .agentDone, context: ["agent": "Claude"], personality: .ultron)
+        #expect(named.contains("Claude"), "\(named)")
+        let anonymous = lines.line(for: .agentDone, personality: .ultron)
+        #expect(["Taken care of.", "All sorted."].contains(anonymous), "\(anonymous)")
+        #expect(["Taken care of.", "All sorted."].contains(lines.line(for: .agentDone, context: ["agent": ""], personality: .ultron)))
     }
 
     @Test func fillerAcknowledgementErrorAndCompletionMapToDialogueSituations() {
