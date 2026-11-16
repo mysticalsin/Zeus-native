@@ -28,7 +28,7 @@ Every spoken line logs `engine=... voice=... effect=75% reason=... first_audio_m
 
 - ElevenLabs: Voice Design from a text description (`VoiceDesigner`). The owner designs the voice in Settings > Voice
   and stores only the voice id (Keychain account `elevenlabs.voice-id`); it is used whenever one is saved. Nothing
-  designs a voice automatically (it spends credits). With none saved the stock voice speaks. Delivery settings (take C: faster, fewer breaths): stability 0.6, similarity boost 0.85, style 0.3, speaker boost on, speed 1.0. The default model stays `eleven_flash_v2_5` for latency. Take C was auditioned on `eleven_multilingual_v2`, which is the Studio quality choice (Settings > Voice > Voice quality); pick Studio if the fast model sounds off. Nothing switches models on its own.
+  designs a voice automatically (it spends credits). With none saved the stock voice speaks. Delivery settings (take C: faster, fewer breaths): stability 0.6, similarity boost 0.85, style 0.3, speaker boost on, speed 1.0. The default model stays `eleven_flash_v2_5` for latency. Take C was auditioned on `eleven_multilingual_v2`, which is the Studio quality choice (Settings > Voice > Voice quality); pick Studio if the fast model sounds off. Nothing switches models on its own. Delivery settings depend on the personality only, so plain on Studio uses plain's own settings and Ultron on Studio uses take C.
 - OpenAI: model `gpt-4o-mini-tts`, voice `onyx`, with tone instructions (sent only to gpt-4o models), raw 24 kHz
   PCM streamed while it downloads.
 - Kokoro: `am_michael` at speed 0.88, rendered per sentence.

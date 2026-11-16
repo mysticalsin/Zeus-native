@@ -26,7 +26,10 @@ struct VoiceRestoreTests {
         #expect(plain["stability"] as? Double == 0.45)
         #expect(plain["similarity_boost"] as? Double == 0.8)
         #expect(plain["style"] as? Double == 0.0)
-        let studio = ElevenLabsVoice.voiceSettings(for: .ultron, model: ElevenLabsQuality.studioModel)
+        // Delivery depends on the personality only, so Studio (`speechBody` with the Studio model) keeps it too.
+        let studioBody = ElevenLabsVoice.speechBody(text: "Ready.", personality: .ultron, model: ElevenLabsQuality.studioModel)
+        #expect(studioBody["model_id"] as? String == "eleven_multilingual_v2")
+        let studio = studioBody["voice_settings"] as? [String: Any] ?? [:]
         #expect(studio["stability"] as? Double == 0.6)
         #expect(studio["speed"] as? Double == 1.0)
         #expect(studio["use_speaker_boost"] as? Bool == true)
