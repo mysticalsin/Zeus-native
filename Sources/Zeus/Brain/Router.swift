@@ -119,7 +119,8 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
             process.arguments = Self.stdinArguments(engine: engine,
                                                     localModel: UserDefaults.standard.string(forKey: "router.ollamaModel") ?? "llama3.2",
                                                     tier: request.deep ? .deep : .fast,
-                                                    lean: request.firstTextBudget != nil)
+                                                    lean: request.firstTextBudget != nil,
+                                                    claudeLean: engine == .claude ? Self.claudeLeanArguments(voice: true) : [])
             var environment = ProcessInfo.processInfo.environment
             environment["PATH"] = CLILocator.searchDirectories.joined(separator: ":")
             environment["ZEUS_INTERNAL"] = "1"
@@ -205,7 +206,12 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
     ///
     /// `lean` is a spoken turn. Codex then runs ephemeral (no session files) on the small voice model:
     /// without `-m` it used the account default, a large model on priority tier, at "low" effort only.
-    static func stdinArguments(engine: RouterEngine, localModel: String, tier: ModelTier, lean: Bool = false) -> [String] {
+    /// A spoken Claude turn runs as lean as the dedicated Claude path (`--safe-mode`, no MCP servers, hooks, plugins
+    /// or tools). Without it the race launched the owner's whole setup and never met the first-text budget.
+    static func claudeLeanArguments(voice: Bool) -> [String] { ClaudeCLIProvider.leanArguments(voice: voice) }
+
+    static func stdinArguments(engine: RouterEngine, localModel: String, tier: ModelTier, lean: Bool = false,
+                               claudeLean: [String] = []) -> [String] {
         let cap = ModelCap.arguments(for: engine, tier: tier)
         let stub = "Answer the message provided on standard input."
         var codexLean: [String] = []
@@ -214,7 +220,7 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
             if !cap.contains("-m") { codexLean += ["-m", ModelCap.codexVoiceModel] }
         }
         return switch engine {
-        case .claude: cap + ["-p"]
+        case .claude: cap + ["-p"] + (lean ? claudeLean : [])
         case .codex: ["exec", "--skip-git-repo-check"] + codexLean + cap + ["-"]
         case .gemini: cap + ["-p", stub]
         case .cursorAgent: cap + ["--trust", "-p", stub, "--output-format", "text"]
