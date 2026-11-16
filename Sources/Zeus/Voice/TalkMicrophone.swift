@@ -28,6 +28,11 @@ enum TalkMicrophoneChoice: Equatable {
         }
     }
 
+    var isSpecificDevice: Bool {
+        if case .device = self { return true }
+        return false
+    }
+
     var stored: String {
         switch self {
         case .automatic: Self.automaticTitle

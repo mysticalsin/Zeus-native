@@ -247,7 +247,7 @@ final class SpeechInput: @unchecked Sendable {
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
         ) { [weak self, weak engine] _ in
             guard let self, let engine else { return }
-            self.handleConfigurationChange(engine: engine, session: current, origin: controllerGeneration,
+            self.handleConfigurationChange(engine: AVCaptureEngine(engine), session: current, origin: controllerGeneration,
                                            policy: capturePolicy, startedAt: startedAt)
         }
         lock.withLock { configurationObserver = observer }
@@ -257,7 +257,7 @@ final class SpeechInput: @unchecked Sendable {
                              turn: RecognitionTurn(sessionID: current, origin: controllerGeneration))
         }
 
-        installTap(on: input, format: format, session: current, origin: controllerGeneration,
+        installTap(on: AVCaptureEngine(engine), format: format, session: current, origin: controllerGeneration,
                    policy: capturePolicy, startedAt: startedAt, resampler: turnResampler)
         engine.prepare()
         do { try engine.start() } catch { cancel(); throw error }
@@ -266,11 +266,11 @@ final class SpeechInput: @unchecked Sendable {
 
     /// Installs the microphone tap for one session. Called at the start of a turn and again after a
     /// configuration change, always on the same recognition request (read through `request` per buffer).
-    private func installTap(on input: AVAudioInputNode, format: AVAudioFormat, session current: Int, origin: UInt64,
+    private func installTap(on input: any CaptureEngine, format: AVAudioFormat, session current: Int, origin: UInt64,
                             policy: CapturePolicy, startedAt: TimeInterval, resampler: AudioSamples.Resampler?,
                             requestConverter: AVAudioConverter? = nil) {
-        input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        input.removeInputTap()
+        input.installInputTap(format: format) { [weak self] buffer, _ in
             guard let self else { return }
             self.lock.withLock { if self.generation == current { self.captureDiagnostics.frames += Int(buffer.frameLength) } }
             if policy.maximumSeconds != nil {
@@ -325,8 +325,12 @@ final class SpeechInput: @unchecked Sendable {
     /// The audio hardware changed under a running capture (a headset switching profile, a device
     /// leaving). Cancels the turn when the policy says so; otherwise rebuilds the input format,
     /// reinstalls the tap and restarts the engine, keeping the same recognition request.
-    private func handleConfigurationChange(engine: AVAudioEngine, session: Int, origin: UInt64,
-                                           policy: CapturePolicy, startedAt: TimeInterval) {
+    func handleConfigurationChange(engine: any CaptureEngine, session: Int, origin: UInt64,
+                                   policy: CapturePolicy, startedAt: TimeInterval,
+                                   makeConverter: @escaping (AVAudioFormat, AVAudioFormat) -> AVAudioConverter? =
+                                       { AVAudioConverter(from: $0, to: $1) },
+                                   scheduleRetry: @escaping (TimeInterval, @escaping () -> Void) -> Void =
+                                       { delay, work in DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work) }) {
         let (owns, changes) = lock.withLock { () -> (Bool, Int) in
             let owns = generation == session && !stopRequested
             if owns { captureDiagnostics.configChanges += 1 }
@@ -348,12 +352,19 @@ final class SpeechInput: @unchecked Sendable {
             cancelTurn: endTurn,
             reinstallTap: { [self] in
                 // `stop()` runs off the main actor: re-check ownership before touching the engine.
-                guard ownsCapture(session) else { return false }
-                let input = engine.inputNode
-                let format = input.outputFormat(forBus: 0)
-                guard Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else { return false }
+                guard ownsCapture(session) else { return .turnOver }
+                guard let format = engine.inputFormat(),
+                      Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else {
+                    // A stop that landed while the format was read is not a missing format.
+                    return ownsCapture(session) ? .inputUnavailable : .turnOver
+                }
                 let original = lock.withLock { requestFormat }
-                let converter = original.flatMap { $0 == format ? nil : AVAudioConverter(from: format, to: $0) }
+                var converter: AVAudioConverter?
+                if let original, original != format {
+                    // Appending buffers in the wrong format to the request would corrupt it: end the turn instead.
+                    guard let made = makeConverter(format, original) else { return .formatUnconvertible }
+                    converter = made
+                }
                 let name = Self.inputDeviceName(uid: deviceUID)
                 let next = lock.withLock { () -> AudioSamples.Resampler? in
                     captureDiagnostics.deviceName = name
@@ -362,9 +373,9 @@ final class SpeechInput: @unchecked Sendable {
                     if resampler != nil { resampler = AudioSamples.Resampler(from: format) }
                     return resampler
                 }
-                installTap(on: input, format: format, session: session, origin: origin,
+                installTap(on: engine, format: format, session: session, origin: origin,
                            policy: policy, startedAt: startedAt, resampler: next, requestConverter: converter)
-                return true
+                return nil
             },
             restartEngine: { [self] in
                 guard ownsCapture(session) else { return }
@@ -373,17 +384,19 @@ final class SpeechInput: @unchecked Sendable {
                 // A stop that landed while the engine was starting must still close the mic.
                 if !ownsCapture(session) {
                     engine.stop()
-                    engine.inputNode.removeTap(onBus: 0)
+                    engine.removeInputTap()
                 }
             },
-            recoveryFailed: { [weak self, weak engine] outcome in
+            recoveryFailed: { [weak self] outcome in
                 VoiceLog.log("listen", "input recovery failed (\(outcome))")
                 if outcome.endsTurn { endTurn(); return }
+                guard outcome.retries else { return }
                 // No usable format yet and maybe no further notification: retry shortly (bounded by the limit).
-                DispatchQueue.main.asyncAfter(deadline: .now() + CaptureRecovery.retryDelay) {
-                    guard let self, let engine, self.ownsCapture(session), !engine.isRunning else { return }
+                scheduleRetry(CaptureRecovery.retryDelay) {
+                    guard let self, self.ownsCapture(session), !engine.isRunning else { return }
                     self.handleConfigurationChange(engine: engine, session: session, origin: origin,
-                                                   policy: policy, startedAt: startedAt)
+                                                   policy: policy, startedAt: startedAt,
+                                                   makeConverter: makeConverter, scheduleRetry: scheduleRetry)
                 }
             })
     }
@@ -687,6 +700,16 @@ final class SpeechInput: @unchecked Sendable {
         finish()
     }
 
+    /// Test seam: opens a session the way `start` does, without touching audio hardware.
+    func beginSessionForTesting(requestFormat format: AVAudioFormat?) -> Int {
+        lock.withLock {
+            generation += 1
+            recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
+            requestFormat = format
+            return generation
+        }
+    }
+
     private func ownsCapture(_ session: Int) -> Bool {
         lock.withLock { generation == session && !stopRequested }
     }
@@ -755,4 +778,31 @@ final class SpeechInput: @unchecked Sendable {
         lock.unlock()
         pending.forEach { $0.resume(returning: text) }
     }
+}
+
+/// The few engine calls a capture turn makes, so the stop-race and retry path can be tested without audio hardware.
+protocol CaptureEngine: AnyObject {
+    var isRunning: Bool { get }
+    /// The input's current format, or nil when it has none.
+    func inputFormat() -> AVAudioFormat?
+    func installInputTap(format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock)
+    func removeInputTap()
+    func prepare()
+    func start() throws
+    func stop()
+}
+
+/// The real engine.
+final class AVCaptureEngine: CaptureEngine {
+    private let engine: AVAudioEngine
+    init(_ engine: AVAudioEngine) { self.engine = engine }
+    var isRunning: Bool { engine.isRunning }
+    func inputFormat() -> AVAudioFormat? { engine.inputNode.outputFormat(forBus: 0) }
+    func installInputTap(format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock) {
+        engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: format, block: block)
+    }
+    func removeInputTap() { engine.inputNode.removeTap(onBus: 0) }
+    func prepare() { engine.prepare() }
+    func start() throws { try engine.start() }
+    func stop() { engine.stop() }
 }

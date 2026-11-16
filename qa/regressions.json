@@ -7511,6 +7511,54 @@
         "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
         "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
       }
+    },
+    {
+      "id": "REG-830",
+      "failure": "A settings export carried the talk microphone as device:<Core Audio UID>, a device id from this Mac that the catalog and docs say is never exported.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "aChosenTalkMicrophoneDeviceIsNeverExported"
+      }
+    },
+    {
+      "id": "REG-831",
+      "failure": "The capture recovery path (stop landing during the engine restart, an input with no usable format) had no test, so a stop race could reopen the microphone or a flapping input could retry for ever unnoticed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aStopWhileTheEngineIsStartingLeavesItStoppedWithTheTapRemoved"
+      }
+    },
+    {
+      "id": "REG-832",
+      "failure": "When the headset format changed and no converter could be built, capture recovery treated it like no conversion needed and fed the recognition request buffers in the wrong format.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
+      }
+    },
+    {
+      "id": "REG-833",
+      "failure": "When a stop won the race during capture recovery, the log said input recovery failed because the input had no usable format, and a retry was queued for a turn that was already over.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry"
+      }
     }
   ]
 }

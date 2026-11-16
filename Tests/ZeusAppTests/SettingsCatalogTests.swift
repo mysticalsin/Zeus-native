@@ -265,6 +265,23 @@ struct SettingsCatalogTests {
         #expect(SettingsStore.appKeys.contains(ShortcutStore.secondTalkKey), "the key the recorder writes is exported and imported like the talk key")
     }
 
+    @MainActor @Test func aChosenTalkMicrophoneDeviceIsNeverExported() throws {
+        let suiteName = NSTemporaryDirectory() + "zeus.settings.catalog.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults)
+        store.set(TalkMicrophoneChoice.settingID, TalkMicrophoneChoice.device("AppleUSBAudioEngine:ACME:1234").stored)
+        let text = String(decoding: try store.exportJSON(), as: UTF8.self)
+        #expect(!text.contains("device:"), "a CoreAudio UID is from this Mac and stays here")
+        #expect(!text.contains("AppleUSBAudioEngine"))
+
+        store.set(TalkMicrophoneChoice.settingID, TalkMicrophoneChoice.builtIn.stored)
+        let root = try #require(JSONSerialization.jsonObject(with: store.exportJSON()) as? [String: Any])
+        let options = try #require(root["options"] as? [String: String])
+        #expect(options[TalkMicrophoneChoice.settingID] == TalkMicrophoneChoice.builtInTitle, "a named choice still travels")
+    }
+
     @MainActor @Test func theStampKeysAreNeverExportedOrImported() throws {
         let keys = Set(SettingsStore.appKeys)
         for key in [ScribeAutoStartOptIn.key, ScribeAutoStartOptIn.legacyKey, ScribeAutoStartOptIn.firstRecordingKey] {

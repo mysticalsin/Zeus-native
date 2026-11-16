@@ -22,7 +22,7 @@ struct TalkTurnVoiceTests {
         CaptureRecovery.handle(
             cancelsTurn: cancelsTurn, ownsSession: ownsSession,
             cancelTurn: { spy.calls.append("cancel") },
-            reinstallTap: { spy.calls.append("tap"); return spy.tapAccepted },
+            reinstallTap: { spy.calls.append("tap"); return spy.tapAccepted ? nil : .inputUnavailable },
             restartEngine: { spy.calls.append("restart"); if spy.restartThrows { throw Boom() } },
             recoveryFailed: { spy.failures.append($0) })
     }
@@ -63,6 +63,14 @@ struct TalkTurnVoiceTests {
         #expect(spy.calls == ["tap", "restart"])
         #expect(spy.failures == [.restartFailed])
         #expect(CaptureRecovery.Outcome.restartFailed.endsTurn)
+    }
+
+    @Test func aTurnThatIsAlreadyOverIsNeitherRetriedNorEnded() {
+        let outcome = CaptureRecovery.Outcome.turnOver
+        #expect(!outcome.endsTurn)
+        #expect(!outcome.retries)
+        #expect(outcome.description == "turn already over")
+        #expect(CaptureRecovery.Outcome.inputUnavailable.retries)
     }
 
     @Test func twoChangesInARowEachRebuild() {
