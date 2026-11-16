@@ -90,21 +90,22 @@ public final class FlingFileSink {
     }
 
     /// Marks a received file as downloaded by Zeus, so Gatekeeper still checks what a peer sent before it runs.
-    private static func quarantine(_ url: URL) {
+    /// Replaceable by a test. Failing to set the mark is an error: the file must not come into view unmarked.
+    public var quarantine: (URL) throws -> Void = { url in
         var file = url
         var values = URLResourceValues()
         values.quarantineProperties = [
             kLSQuarantineAgentNameKey as String: "Zeus",
             kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
         ]
-        try? file.setResourceValues(values)
+        try file.setResourceValues(values)
     }
 
     @discardableResult
     public func commit(index: Int, name: String) throws -> URL {
         let url = try target(for: name)
         let source = partial.appendingPathComponent(String(index))
-        Self.quarantine(source) // the mark travels with the file when it moves
+        try quarantine(source) // the mark travels with the file when it moves
         try FileManager.default.moveItem(at: source, to: url)
         return url
     }
@@ -112,8 +113,16 @@ public final class FlingFileSink {
     @discardableResult
     public func commitLink(name: String, link: String) throws -> URL {
         let url = try target(for: FlingSaveRules.linkFileName(name))
-        try FlingSaveRules.weblocData(for: link).write(to: url, options: .atomic)
-        Self.quarantine(url)
+        // Written and marked in the private partial folder first, then moved into view.
+        let staged = partial.appendingPathComponent("link-" + UUID().uuidString)
+        try FlingSaveRules.weblocData(for: link).write(to: staged, options: .atomic)
+        do {
+            try quarantine(staged)
+            try FileManager.default.moveItem(at: staged, to: url)
+        } catch {
+            try? FileManager.default.removeItem(at: staged)
+            throw error
+        }
         return url
     }
 

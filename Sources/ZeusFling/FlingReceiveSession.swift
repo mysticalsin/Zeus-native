@@ -37,7 +37,7 @@ final class FlingReceiveSession {
         channel.onReady = { [self] in
             // The hello carries a fresh nonce; the sender must answer with a proof made with the key of the id it claims.
             var bytes = [UInt8](repeating: 0, count: 16)
-            _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+            guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return fail() }
             nonce = Data(bytes).base64EncodedString()
             channel.send(.hello(FlingHello(id: endpoint.identity.id, name: endpoint.identity.name, model: endpoint.identity.model, nonce: nonce)))
         }

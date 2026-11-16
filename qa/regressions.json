@@ -7091,6 +7091,90 @@
         "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
         "function": "receivedFilesAreQuarantinedAsFromZeus"
       }
+    },
+    {
+      "id": "REG-789",
+      "failure": "A link host written with leading zeros, octal, hex, decimal or full width digits was judged public.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "numbersInDisguiseAreNeverPublic"
+      }
+    },
+    {
+      "id": "REG-790",
+      "failure": "A wildcard-IP DNS name, or a name spelling a private address, was judged public.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "wildcardAndEmbeddedAddressHostsAreNotPublic"
+      }
+    },
+    {
+      "id": "REG-791",
+      "failure": "The address that was checked was not the address handed to the browser.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "theCheckedAddressIsTheOpenedAddress"
+      }
+    },
+    {
+      "id": "REG-792",
+      "failure": "A failed attempt that never showed a code could mute the id it claimed.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "anAddressOnlyFailureDoesNotMuteTheClaimedId"
+      }
+    },
+    {
+      "id": "REG-793",
+      "failure": "An inbound pairing attempt from a paired Mac showed a banner or revealed which ids are paired.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "anInboundAttemptFromAPairedMacShowsNothingAndRevealsNothing"
+      }
+    },
+    {
+      "id": "REG-794",
+      "failure": "A dropped pairing was counted twice toward the mute.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "aDroppedPairingIsCountedOnceNotTwice"
+      }
+    },
+    {
+      "id": "REG-795",
+      "failure": "A file whose quarantine mark could not be set still came into view.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "aFailedQuarantineKeepsTheFileOutOfView"
+      }
     }
   ]
 }

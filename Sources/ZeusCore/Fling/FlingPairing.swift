@@ -209,6 +209,9 @@ public struct FlingMuteLedger: Sendable {
 
     public mutating func recordDecline(_ id: String, now: Date) { record("id:" + id, now: now) }
 
+    /// An attempt that never showed a code: it counts against its address only, so an attacker cannot mute a real Mac's id.
+    public mutating func recordAddressFailure(_ address: String, now: Date) { record("addr:" + address, now: now) }
+
     public mutating func recordFailure(_ id: String, address: String, now: Date) {
         record("id:" + id, now: now)
         record("addr:" + address, now: now)

@@ -302,8 +302,9 @@ final class FlingService: FlingSending {
         if opensLinks {
             // Only public web addresses open by themselves; a link to a local or private address stays on the Shelf
             // until a click on it.
-            for text in pending.links where FlingLinkPolicy.opensWithoutAClick(text) {
-                if let url = URL(string: text) { openLink(url) }
+            for text in pending.links {
+                // The URL that was checked is the URL that is opened.
+                if let url = FlingLinkPolicy.urlToOpen(text) { openLink(url) }
             }
         }
     }
@@ -360,7 +361,7 @@ final class FlingService: FlingSending {
                 if let stack { sends[stack] = nil }
                 switch reason {
                 case "notPaired": problem("Pair with that Mac first.")
-                case "tlsRejected": problem("That Mac does not recognise this one. Pair again.")
+                case "tlsRejected": problem("That Mac does not recognise this one. Remove it in Settings, then pair again.")
                 default: problem("Could not send. Tap to try again.")
                 }
             } else if reason == "hashMismatch" {

@@ -7605,6 +7605,22 @@
             {
               "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
               "function": "aHugePeerNameCannotMakeAFolderNameOver255Bytes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "numbersInDisguiseAreNeverPublic"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "wildcardAndEmbeddedAddressHostsAreNotPublic"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "theCheckedAddressIsTheOpenedAddress"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+              "function": "anAddressOnlyFailureDoesNotMuteTheClaimedId"
             }
           ]
         },
@@ -7720,6 +7736,14 @@
             {
               "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
               "function": "anAnswerForAnotherMacDoesNotAnswerThePairing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "anInboundAttemptFromAPairedMacShowsNothingAndRevealsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "aDroppedPairingIsCountedOnceNotTwice"
             }
           ]
         },
@@ -7751,6 +7775,10 @@
             {
               "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
               "function": "aCaseOnlyClashGetsANumberInTheStackFolder"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+              "function": "aFailedQuarantineKeepsTheFileOutOfView"
             }
           ]
         },
