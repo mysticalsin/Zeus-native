@@ -226,9 +226,12 @@ struct ScribeInitialStack: View {
     var limit = 4
     var size: CGFloat = 18
 
+    /// How far the next disc covers this one. Small enough that two capital initials stay fully visible.
+    static func overlap(size: CGFloat) -> CGFloat { size * 0.1 }
+
     var body: some View {
         let shown = Array(names.prefix(limit))
-        HStack(spacing: -5) {
+        HStack(spacing: -Self.overlap(size: size)) {
             ForEach(Array(shown.enumerated()), id: \.offset) { _, name in
                 ScribeInitialDisc(name: name, size: size)
             }
@@ -247,10 +250,13 @@ struct ScribeInitialDisc: View {
     let name: String
     var size: CGFloat = 18
 
+    static func fontSize(size: CGFloat) -> CGFloat { size * 0.45 }
+
     var body: some View {
         let tint = scribeColor(ScribeSpeakerPalette.color(for: .participant(name)))
         Text(ScribeInitials.of(name))
-            .font(TopBarStyle.label(size * 0.45, .bold)).foregroundStyle(tint)
+            .font(TopBarStyle.label(Self.fontSize(size: size), .bold)).foregroundStyle(tint)
+            .lineLimit(1).fixedSize()
             .frame(width: size, height: size)
             .background(Circle().fill(Theme.storm))
             .overlay(Circle().fill(tint.opacity(0.22)))

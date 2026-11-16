@@ -1426,6 +1426,7 @@ struct NotchActionButton: View {
             Text(title)
                 .font(TopBarStyle.label(12, .semibold))
                 .foregroundStyle(filled ? Theme.storm : tint)
+                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 28)
                 .background(Capsule().fill(filled ? tint : Color.white.opacity(0.12)))

@@ -44,4 +44,19 @@ struct UIPolishSourceTests {
         let style = try Self.source("Sources/Zeus/Settings/GlanceSettingsStyle.swift")
         #expect(style.contains("frame(width: GS.rowIconColumn, alignment: .leading)"))
     }
+
+    @Test func theNotchActionButtonTitleNeverWraps() throws {
+        let text = try Self.source("Sources/Zeus/TopBar/TopBarViews.swift")
+        let start = try #require(text.range(of: "struct NotchActionButton: View"))
+        let block = String(text[start.upperBound...].prefix(700))
+        #expect(block.contains(".lineLimit(1).fixedSize(horizontal: true, vertical: false)"))
+    }
+
+    @Test @MainActor func overlappedInitialDiscsKeepTwoCapitalsVisible() {
+        for size: CGFloat in [16, 18] {
+            let font = NSFont.systemFont(ofSize: ScribeInitialDisc.fontSize(size: size), weight: .bold)
+            let width = ("MM" as NSString).size(withAttributes: [.font: font]).width
+            #expect(size / 2 + width / 2 <= size - ScribeInitialStack.overlap(size: size))
+        }
+    }
 }
