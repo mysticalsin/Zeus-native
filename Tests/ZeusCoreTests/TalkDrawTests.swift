@@ -99,7 +99,8 @@ import Testing
         let captureID = UUID()
         let geometry = try TalkDrawScene.geometry(shot: shot, displayID: UInt32(screen), backingScale: scale, captureID: captureID)
         let w = Double(shot.pixelWidth), h = Double(shot.pixelHeight)
-        let pixels = [(0.0, 0.0), (w / 2, h / 2), (w - 1, h - 1), (w * 0.31, h * 0.77), (412, 88)]
+        // Whole pixels: `[POINT]` is an integer tag, so both paths are fed the same values.
+        let pixels = [(0.0, 0.0), ((w / 2).rounded(.down), (h / 2).rounded(.down)), (w - 1, h - 1), ((w * 0.31).rounded(.down), (h * 0.77).rounded(.down)), (412, 88)]
         for (x, y) in pixels {
             let draw = TalkDraw(screen: screen, marks: [.init(shape: .ring(center: .init(x: x, y: y), radius: 10), at: 0)])
             let ring = try #require(TalkDrawScene.objects(draw, shot: shot, captureID: captureID)[0]?.first)
