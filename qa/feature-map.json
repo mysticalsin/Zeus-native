@@ -5341,6 +5341,14 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "aTalkTurnListensOnTheMicrophoneChosenForDictation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "thisTestRunIsDetectedAndItsLogIsNotTheOwnersLog"
             }
           ]
         }

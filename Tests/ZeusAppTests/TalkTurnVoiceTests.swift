@@ -119,4 +119,33 @@ struct TalkTurnVoiceTests {
         VoiceTurnController.applyChosenMicrophone(to: speech, from: settings)
         #expect(speech.deviceUID == nil, "dropping the choice follows the system input again")
     }
+
+    // MARK: Voice log location
+
+    @Test func theVoiceLogStaysInTheOwnersFolderOutsideTests() {
+        let home = URL(fileURLWithPath: "/Users/fixture", isDirectory: true)
+        let dir = VoiceLog.logDirectory(environment: [:], runningTests: false, home: home,
+                                        temporary: URL(fileURLWithPath: "/tmp/fixture", isDirectory: true))
+        #expect(dir.path == "/Users/fixture/Library/Logs/Zeus")
+    }
+
+    @Test func underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog() {
+        let home = URL(fileURLWithPath: "/Users/fixture", isDirectory: true)
+        let temp = URL(fileURLWithPath: "/tmp/fixture", isDirectory: true)
+        let dir = VoiceLog.logDirectory(environment: [:], runningTests: true, home: home, temporary: temp)
+        #expect(dir.path.hasPrefix("/tmp/fixture/"))
+        #expect(!dir.path.contains("/Users/fixture"))
+    }
+
+    @Test func anExplicitLogFolderWinsEvenUnderTests() {
+        let dir = VoiceLog.logDirectory(environment: ["ZEUS_LOG_DIR": "/tmp/chosen"], runningTests: true)
+        #expect(dir.path == "/tmp/chosen")
+    }
+
+    @Test func thisTestRunIsDetectedAndItsLogIsNotTheOwnersLog() {
+        #expect(VoiceLog.isRunningTests)
+        if ProcessInfo.processInfo.environment["ZEUS_LOG_DIR"] == nil {
+            #expect(!VoiceLog.url.path.contains("Library/Logs/Zeus"))
+        }
+    }
 }

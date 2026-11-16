@@ -7427,6 +7427,18 @@
         "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
         "function": "aTalkTurnListensOnTheMicrophoneChosenForDictation"
       }
+    },
+    {
+      "id": "REG-813",
+      "failure": "Test runs wrote lines into the owner's real ~/Library/Logs/Zeus/voice.log, mixing test output into the evidence used to debug live voice turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog"
+      }
     }
   ]
 }
