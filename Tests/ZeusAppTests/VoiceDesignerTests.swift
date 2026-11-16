@@ -108,15 +108,15 @@ struct VoiceDesignerTests {
         #expect(body["text"] as? String == "Done.")
     }
 
-    @Test func theDesignedVoiceIsAnOriginalFiftiesBaritoneWithADrySyntheticSheen() {
+    @Test func theDesignedVoiceIsAGenericDeepBaritoneWithADrySyntheticSheen() {
         let description = VoiceDesigner.voiceDescription.lowercased()
-        for quality in ["american english", "in his fifties", "resonant", "slightly nasal baritone", "relaxed", "theatrical",
-                        "precise diction", "dry", "amused", "faintly condescending", "unhurried", "quiet intensity",
-                        "synthetic", "metallic sheen", "studio-quality"] {
+        for quality in ["american english", "deep", "smooth", "resonant", "baritone", "measured", "theatrical", "precise diction",
+                        "dry amusement", "unhurried", "synthetic", "metallic sheen", "studio-quality"] {
             #expect(description.contains(quality), "\(quality)")
         }
-        #expect(!description.contains("forties"))
-        #expect(!description.contains("ultron"))
+        for narrow in ["fifties", "forties", "nasal", "condescending", "ultron"] {
+            #expect(!description.contains(narrow), "\(narrow)")
+        }
         #expect(!description.contains("\u{2014}") && !description.contains("\u{2013}"))
         #expect(VoiceDesigner.voiceDescription.count <= 1000)
     }

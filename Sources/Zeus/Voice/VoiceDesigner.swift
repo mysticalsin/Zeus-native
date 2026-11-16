@@ -24,9 +24,9 @@ enum VoiceDesigner {
     /// Generic qualities only, following the ElevenLabs prompt guide: language first, then age,
     /// timbre, attitude, pacing and recording quality.
     static let voiceDescription = """
-    American English, adult male in his fifties. A smooth, resonant, slightly nasal baritone, relaxed and \
-    conversational yet theatrical. Precise diction with a dry, amused, faintly condescending lilt. Unhurried \
-    pacing, with sudden quiet intensity on key words. A subtle synthetic, metallic sheen. Studio-quality recording.
+    American English, adult male. A deep, smooth, resonant baritone, measured and theatrical, with precise diction \
+    and dry amusement. Unhurried pacing, with quiet emphasis on key words. A subtle synthetic, metallic sheen. \
+    Studio-quality recording.
     """
 
     /// An original line in the persona's manner, long enough for a stable preview.
