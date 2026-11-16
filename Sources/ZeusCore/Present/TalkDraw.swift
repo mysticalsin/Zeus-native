@@ -28,6 +28,8 @@ public struct TalkDraw: Equatable, Sendable {
     public static let maxInkPoints = 24
     public static let maxTextCharacters = 60
     public static let maxSentenceIndex = 7
+    public static let maxRingRadius = 200.0
+    public static let minRingRadius = 4.0
 
     /// 1-based screen number, as the screenshot labels.
     public var screen: Int
@@ -83,7 +85,7 @@ public enum TalkDrawParser {
         case "ring":
             guard let x = number(object["x"]), let y = number(object["y"]),
                   let r = number(object["r"]), r > 0 else { return nil }
-            return .init(shape: .ring(center: .init(x: x, y: y), radius: r), at: at)
+            return .init(shape: .ring(center: .init(x: x, y: y), radius: min(TalkDraw.maxRingRadius, max(TalkDraw.minRingRadius, r))), at: at)
         case "arrow":
             guard let from = point(object["from"]), let to = point(object["to"]) else { return nil }
             return .init(shape: .arrow(from: from, to: to), at: at)

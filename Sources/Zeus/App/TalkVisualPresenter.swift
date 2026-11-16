@@ -7,11 +7,12 @@ import ZeusCore
 @MainActor
 protocol TalkVisualPresenting: AnyObject {
     /// A draw tag arrived for this capture. Nothing is shown yet.
-    func begin(_ draw: TalkDraw, shot: ScreenShot)
+    /// `token` names the turn; later calls with another token (a late callback of an earlier turn) are ignored.
+    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID)
     /// The line for this sentence index has started to play: show its marks.
-    func reveal(sentence: Int)
+    func reveal(sentence: Int, token: UUID)
     /// The last sentence has finished playing: hide the marks soon.
-    func answerFinished()
+    func answerFinished(token: UUID)
     /// Hide everything now.
     func clear()
 }
@@ -32,9 +33,14 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     private var pending: [Int: [ExplanationObject]] = [:]
     private var shown: [ExplanationObject] = []
     private var hideTask: Task<Void, Never>?
+    private var token: UUID?
+    private var identity: (session: UUID, scene: UUID, revision: Int)?
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 
     var isShowing: Bool { overlay.isVisible }
+    var hideIsArmed: Bool { hideTask != nil }
+    /// One scene per turn: its marks keep their identity while later sentences add to it.
+    var sceneIdentity: (session: UUID, scene: UUID, revision: Int)? { identity }
 
     init(screens: @escaping @MainActor () -> [Screen] = TalkVisualPresenter.currentScreens,
          reduceMotion: @escaping @MainActor () -> Bool = { Motion.reduced }) {
@@ -50,7 +56,7 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         }
     }
 
-    func begin(_ draw: TalkDraw, shot: ScreenShot) {
+    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) {
         clear()
         // The shot carries no display id: the screen whose frame it was taken from is the one to draw on.
         guard let screen = screens().first(where: { Self.sameFrame($0.frame, shot.displayFrame) }),
@@ -60,15 +66,21 @@ final class TalkVisualPresenter: TalkVisualPresenting {
             return
         }
         capture = ExplanationCaptureContext(geometry: geometry, currentDisplay: geometry.display)
+        self.token = token
+        identity = (UUID(), UUID(), 0)
         pending = TalkDrawScene.objects(draw, shot: shot, captureID: geometry.captureID)
         watchForStaleScreen()
     }
 
-    func reveal(sentence: Int) {
-        guard let capture, let marks = pending.removeValue(forKey: sentence) else { return }
+    func reveal(sentence: Int, token: UUID) {
+        guard token == self.token, let capture, var identity, let marks = pending.removeValue(forKey: sentence) else { return }
         hideTask?.cancel()
+        hideTask = nil
         shown += marks
-        let scene = ExplanationScene(sessionID: UUID(), sceneID: UUID(), canvasSize: capture.geometry.imageSize,
+        identity.revision += 1
+        self.identity = identity
+        let scene = ExplanationScene(sessionID: identity.session, sceneID: identity.scene, revision: identity.revision,
+                                     canvasSize: capture.geometry.imageSize,
                                      captureID: capture.geometry.captureID,
                                      objects: Dictionary(shown.map { ($0.id, $0) }, uniquingKeysWith: { $1 }))
         if !overlay.present(scene: scene, capture: capture, reduceMotion: reduceMotion()) {
@@ -76,8 +88,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         }
     }
 
-    func answerFinished() {
-        guard capture != nil else { return }
+    func answerFinished(token: UUID) {
+        guard capture != nil, token == self.token else { return }
         hideTask?.cancel()
         hideTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(Self.autoHideSeconds))
@@ -93,6 +105,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         observers = []
         overlay.hide()
         capture = nil
+        token = nil
+        identity = nil
         pending = [:]
         shown = []
     }
