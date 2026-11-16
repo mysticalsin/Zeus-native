@@ -827,6 +827,14 @@
       "scope": "Actual Face presence card model and fixtures from fixed machine values and face names. The card is never drawn from the controller, the camera, the vault or the Keychain."
     },
     {
+      "id": "native-RouterRaceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "RouterRaceTests",
+      "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+      "scope": "Router candidate choice and the persistent Claude retirement rule with no process, capture or network: the app Claude provider is handed to the Claude entry when preferred, and a slot that carried an image is replaced."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -4821,6 +4829,25 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theChordOrdersKeepTheRules"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-route",
+          "check": "native-RouterRaceTests",
+          "acceptance": "With talk drawing on, the Claude race entry is the app provider that carries the screenshot, and a persistent Claude process that carried an image is replaced before the next turn. Does not prove a real image reaches the model.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+              "function": "preferAppClaudeGivesTheAppProviderForClaudeEvenWhenTheCLIIsInstalled"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+              "function": "theCandidateListHandsTheAppProviderToTheClaudeEntryWhenPreferred"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+              "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
             }
           ]
         }

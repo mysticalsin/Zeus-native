@@ -5711,6 +5711,18 @@
         "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
         "function": "onlyAWinnerThatSawPixelsMayDraw"
       }
+    },
+    {
+      "id": "REG-703",
+      "failure": "A talk turn with a screenshot never reached the app Claude provider when the claude command line tool was installed, and a persistent Claude process kept screenshots in its context across turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-RouterRaceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+        "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
+      }
     }
   ]
 }
