@@ -8,13 +8,14 @@ import ZeusCore
 @MainActor
 struct MotionAppTokensTests {
     @Test func theCloseIsTheCriticallyDampedPanelSpring() {
-        #expect(TopBarStyle.closeMotion == .spring(response: 0.175, dampingFraction: 1.0))
-        #expect(Motion.panelClose == TopBarStyle.closeMotion)
+        // The live value follows this Mac's Reduce Motion setting; the token itself never does.
+        #expect(Motion.panelClose == .spring(response: 0.175, dampingFraction: 1.0))
+        #expect(TopBarStyle.closeMotion == (Motion.reduced ? nil : Motion.panelClose))
     }
 
     @Test func theCueWingsUseTheCueGrowToken() {
-        #expect(NotchView.wingsSpring == .spring(response: 0.12, dampingFraction: 0.90))
-        #expect(Motion.cueGrow == NotchView.wingsSpring)
+        #expect(Motion.cueGrow == .spring(response: 0.12, dampingFraction: 0.90))
+        #expect(NotchView.wingsSpring == (Motion.reduced ? nil : Motion.cueGrow))
     }
 
     @Test func aTokenSpringIsInstantUnderReduceMotion() {

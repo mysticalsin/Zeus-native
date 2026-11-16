@@ -502,7 +502,7 @@ struct TopBarPage: View {
 /// by the old one above it.
 struct PageStack<Content: View>: View {
     @ViewBuilder let content: () -> Content
-    var body: some View { ZStack(alignment: .top, content: content) }
+    var body: some View { ZStack(alignment: .topLeading, content: content) }
 }
 
 /// Glance's section switch: the new page crossfades in with a small rise and scale, and the old one fades out fast
