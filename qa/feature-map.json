@@ -935,6 +935,14 @@
       "scope": "Static fade timing and screen choice plus the controller source; no window shown, display link run or device acceptance.",
       "suite": "BuddyMotionTests",
       "file": "Tests/ZeusAppTests/BuddyMotionTests.swift"
+    },
+    {
+      "id": "native-PageSwitchLayoutTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Offscreen SwiftUI layout of the page container and the page switch source; no window, animation run or device acceptance.",
+      "suite": "PageSwitchLayoutTests",
+      "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift"
     }
   ],
   "features": [
@@ -6643,6 +6651,21 @@
             }
           ],
           "id": "F13.buddy-motion"
+        },
+        {
+          "check": "native-PageSwitchLayoutTests",
+          "acceptance": "Native page switch layout: the leaving page overlaps and the new page does not move.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
+              "function": "theNewPageStaysPutWhileTheOldOneLeavesOverIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
+              "function": "thePageSwitchUsesTheOverlapAndALeavingPageTakesNoHits"
+            }
+          ],
+          "id": "F13.page-switch-layout"
         }
       ]
     },

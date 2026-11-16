@@ -455,6 +455,10 @@ struct TopBarPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        PageSwitcher(key: topBar.selectedTab, reduceMotion: reduceMotion) { page }
+    }
+
+    private var page: some View {
         Group {
             switch topBar.selectedTab {
             case .home:
@@ -491,13 +495,44 @@ struct TopBarPage: View {
             }
         }
         .frame(height: GlanceTopBar.pageHeight(home: topBar.selectedTab == .home) + (topBar.selectedTab == .home ? topBar.homeExtraHeight : 0), alignment: .top)
-        // Glance's section switch: the new page crossfades in with a small rise and scale.
-        .transition(.asymmetric(insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
-                                // The old page fades out fast (0.08 s). A slower fade drew its title (e.g. Music's
-                                // "Nothing playing") on top of the Calendar's add-event field.
-                                removal: reduceMotion ? .identity : .opacity.animation(Motion.pageOut)))
-        .id(topBar.selectedTab)
-        .animation(Motion.page(reduceMotion: reduceMotion), value: topBar.selectedTab)
+    }
+}
+
+/// The pages overlap from the top: while one leaves, the new one is laid out where it will stay, not pushed down
+/// by the old one above it.
+struct PageStack<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    var body: some View { ZStack(alignment: .top, content: content) }
+}
+
+/// Glance's section switch: the new page crossfades in with a small rise and scale, and the old one fades out fast
+/// (0.08 s) over it. A slower fade drew its title (e.g. Music's "Nothing playing") on top of the Calendar's
+/// add-event field. The leaving page takes no clicks.
+struct PageSwitcher<Key: Hashable, Page: View>: View {
+    let key: Key
+    let reduceMotion: Bool
+    @ViewBuilder let page: () -> Page
+
+    /// A page that is on its way out: faded and not hittable.
+    private struct Leaving: ViewModifier {
+        let leaving: Bool
+        func body(content: Content) -> some View {
+            content.opacity(leaving ? 0 : 1).allowsHitTesting(!leaving)
+        }
+    }
+
+    private var transition: AnyTransition {
+        .asymmetric(
+            insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
+            removal: reduceMotion ? .identity : AnyTransition.modifier(active: Leaving(leaving: true), identity: Leaving(leaving: false))
+                .animation(Motion.pageOut))
+    }
+
+    var body: some View {
+        PageStack {
+            page().id(key).transition(transition)
+        }
+        .animation(Motion.page(reduceMotion: reduceMotion), value: key)
     }
 }
 

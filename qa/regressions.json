@@ -6263,6 +6263,30 @@
         "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
         "function": "aSpringWrittenWithNumbersOrAPresetIsFlagged"
       }
+    },
+    {
+      "id": "REG-751",
+      "failure": "During the 80 ms page fade the old and new pages stacked in one column, so the new page was pushed down and then jumped up.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageSwitchLayoutTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
+        "function": "theNewPageStaysPutWhileTheOldOneLeavesOverIt"
+      }
+    },
+    {
+      "id": "REG-752",
+      "failure": "A page that was fading out could still take clicks over the new page.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageSwitchLayoutTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
+        "function": "thePageSwitchUsesTheOverlapAndALeavingPageTakesNoHits"
+      }
     }
   ]
 }

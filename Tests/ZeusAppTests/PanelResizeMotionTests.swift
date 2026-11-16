@@ -36,7 +36,7 @@ struct PanelResizeMotionTests {
 
     @Test func theOldPageFadesOutInsteadOfCutting() throws {
         let source = try Self.text("TopBar/TopBarViews.swift")
-        #expect(source.contains("removal: reduceMotion ? .identity : .opacity.animation(Motion.pageOut)"))
+        #expect(source.contains("Motion.pageOut"))
         #expect(!source.contains("removal: .identity))\n        .id(topBar.selectedTab)"))
     }
 }
