@@ -6095,6 +6095,54 @@
         "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
         "function": "theOldPageFadesOutInsteadOfCutting"
       }
+    },
+    {
+      "id": "REG-737",
+      "failure": "Visible motion ran on a 30 Hz run-loop timer that is not locked to the display, so it judders on a 120 Hz screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "noVisibleMotionRunsOnAFastRunLoopClockOutsideTheAllowlist"
+      }
+    },
+    {
+      "id": "REG-738",
+      "failure": "An animation without a value could fire for every state change and animate things it was never meant to.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "noAnimationFiresForEveryChange"
+      }
+    },
+    {
+      "id": "REG-739",
+      "failure": "Spring numbers were repeated as literals across the notch and top bar views and drifted apart.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "noSpringNumbersLiveInTheNotchOrTopBarViews"
+      }
+    },
+    {
+      "id": "REG-740",
+      "failure": "A fast-clock allowlist entry could outlive its file.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "everyAllowlistedFileStillExists"
+      }
     }
   ]
 }

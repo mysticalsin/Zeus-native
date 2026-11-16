@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import ZeusCore
 
 /// Glance cards rise slightly under the pointer: 1 % larger with a deeper shadow, and a light
 /// trackpad tick the first time. A press sinks to 0.985. Off with Reduce Motion.
@@ -24,7 +25,7 @@ private struct CardHoverLift: ViewModifier {
             .shadow(color: .black.opacity(active && hover.on && !hover.pressed ? 0.35 : 0),
                     radius: active && hover.on && !hover.pressed ? 14 : 0,
                     y: active && hover.on && !hover.pressed ? 6 : 0)
-            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: scale)
+            .animation(Motion.spring(MotionTokens.peekContent), value: scale)
             .onHover { inside in
                 guard inside != hover.on else { return }
                 hover.on = inside

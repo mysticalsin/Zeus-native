@@ -1098,7 +1098,7 @@ struct ShelfPage: View {
             .frame(maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous)
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topBar.shelfTargeted)
+            .animation(Motion.spring(MotionTokens.panelResize), value: topBar.shelfTargeted)
 
             PageScroll(.horizontal) {
                 HStack(spacing: 8) {
