@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Testing
+import ZeusCore
 @testable import Zeus
 
 /// The talk-turn voice path with an AirPods-style headset: capture survives a profile change, and
@@ -104,20 +105,64 @@ struct TalkTurnVoiceTests {
 
     // MARK: Chosen microphone
 
-    @Test @MainActor func aTalkTurnListensOnTheMicrophoneChosenForDictation() {
+    private let usb = MicrophoneDevice(uid: "usb-1", name: "Desk USB")
+    private let builtIn = MicrophoneDevice(uid: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
+    private let headset = MicrophoneDevice(uid: "bt-1", name: "AirPods", isDefault: true)
+
+    @Test func automaticIsTheDefaultAndMeansNoDevice() {
+        #expect(TalkMicrophoneChoice(stored: nil) == .automatic)
+        #expect(TalkMicrophoneChoice(stored: "garbage") == .automatic)
+        #expect(TalkMicrophoneChoice.automatic.resolvedUID(devices: [builtIn, headset], builtInUID: builtIn.uid) == nil,
+                "Automatic follows the system input, where a connected headset wins")
+    }
+
+    @Test func theBuiltInChoiceResolvesToTheBuiltInDeviceAtTurnStart() {
+        #expect(TalkMicrophoneChoice.builtIn.resolvedUID(devices: [builtIn, headset], builtInUID: builtIn.uid) == builtIn.uid)
+        #expect(TalkMicrophoneChoice.builtIn.resolvedUID(devices: [headset], builtInUID: nil) == nil,
+                "a Mac with no built-in input falls back to Automatic")
+        #expect(TalkMicrophoneChoice.builtIn.resolvedUID(devices: [headset], builtInUID: builtIn.uid) == nil,
+                "a built-in device that is not in the list is not used")
+    }
+
+    @Test func aSpecificDeviceResolvesToItsUIDAndFallsBackToAutomaticWhenGone() {
+        #expect(TalkMicrophoneChoice.device("usb-1").resolvedUID(devices: [usb, builtIn], builtInUID: builtIn.uid) == "usb-1")
+        #expect(TalkMicrophoneChoice.device("usb-1").resolvedUID(devices: [builtIn], builtInUID: builtIn.uid) == nil)
+    }
+
+    @Test func theChoiceRoundTripsThroughItsStoredText() {
+        for choice in [TalkMicrophoneChoice.automatic, .builtIn, .device("usb-1")] {
+            #expect(TalkMicrophoneChoice(stored: choice.stored) == choice)
+        }
+        #expect(TalkMicrophoneChoice(stored: "device:") == .automatic, "an empty device is no choice")
+    }
+
+    @Test @MainActor func aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn() {
         let suite = NSTemporaryDirectory() + "zeus.talkturn.mic.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        let settings = DictationSettings(defaults: defaults)
+        let dictation = DictationSettings(defaults: defaults)
+        dictation.microphoneUID = "usb-1"
         let speech = SpeechInput()
+        func apply() {
+            VoiceTurnController.applyChosenMicrophone(to: speech, defaults: defaults, devices: { return [self.usb, self.builtIn, self.headset] },
+                                                      builtInUID: { self.builtIn.uid })
+        }
 
-        settings.microphoneUID = "BuiltInMicrophoneDevice"
-        VoiceTurnController.applyChosenMicrophone(to: speech, from: settings)
-        #expect(speech.deviceUID == "BuiltInMicrophoneDevice")
+        apply()
+        #expect(speech.deviceUID == nil, "dictation's microphone does not move talk turns")
 
-        settings.microphoneUID = nil
-        VoiceTurnController.applyChosenMicrophone(to: speech, from: settings)
-        #expect(speech.deviceUID == nil, "dropping the choice follows the system input again")
+        defaults.set(TalkMicrophoneChoice.builtIn.stored, forKey: TalkMicrophoneChoice.defaultsKey)
+        apply()
+        #expect(speech.deviceUID == builtIn.uid)
+
+        defaults.set(TalkMicrophoneChoice.device("usb-1").stored, forKey: TalkMicrophoneChoice.defaultsKey)
+        apply()
+        #expect(speech.deviceUID == "usb-1")
+        #expect(dictation.microphoneUID == "usb-1", "talk turns never write dictation's choice")
+
+        defaults.set(TalkMicrophoneChoice.automatic.stored, forKey: TalkMicrophoneChoice.defaultsKey)
+        apply()
+        #expect(speech.deviceUID == nil)
     }
 
     // MARK: Voice log location

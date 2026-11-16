@@ -7425,7 +7425,7 @@
       "check": "native-TalkTurnVoiceTests",
       "guard": {
         "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
-        "function": "aTalkTurnListensOnTheMicrophoneChosenForDictation"
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
       }
     },
     {
@@ -7462,6 +7462,30 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
         "function": "usedUpCreditsSayTheCreditsAreUsedUpAndTheNextVoiceSpeaksUntilThePauseEnds"
+      }
+    },
+    {
+      "id": "REG-816",
+      "failure": "Talk turns could not be told to use the Mac's own microphone, so a connected Bluetooth headset always switched profile for every talk turn, and a chosen input that was unplugged was not handled.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "theBuiltInChoiceResolvesToTheBuiltInDeviceAtTurnStart"
+      }
+    },
+    {
+      "id": "REG-817",
+      "failure": "Talk turns reused the Dictation microphone, so choosing a microphone for dictation silently moved talk turns, and talk had no choice of its own.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
       }
     }
   ]

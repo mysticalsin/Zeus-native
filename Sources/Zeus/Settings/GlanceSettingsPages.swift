@@ -1000,6 +1000,8 @@ private struct VoicePage: View {
         GSCard("Talk to Zeus") {
             ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
             GSDivider()
+            TalkMicrophoneRow()
+            GSDivider()
             KeyAccessLinkRow(navigation: navigation)
         }
         WakeWordCard()
@@ -1032,6 +1034,26 @@ private struct VoicePage: View {
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                 .accessibilityLabel("\(title) keywords")
         }
+    }
+}
+
+/// Which microphone talk turns use. Automatic follows the system input; This Mac's microphone keeps a Bluetooth headset out of
+/// the talk turn. The inputs are listed off the main thread when the page shows, like the Dictation page.
+private struct TalkMicrophoneRow: View {
+    private var devices: [MicrophoneDevice] { MicrophoneTester.shared.devices }
+    private var choice: TalkMicrophoneChoice { TalkMicrophoneChoice(stored: store.string(TalkMicrophoneChoice.settingID)) }
+
+    var body: some View {
+        GSRow(symbol: "mic.circle", title: "Microphone",
+              text: "What Zeus listens on when you talk. Automatic uses the system input, so a connected headset wins. This Mac\u{2019}s microphone keeps a Bluetooth headset from switching mode. Dictation has its own.") {
+            GSPopup(selection: Binding(get: { choice.title(devices: devices) },
+                                       set: { title in
+                                           guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
+                                           store.set(TalkMicrophoneChoice.settingID, new.stored)
+                                       }),
+                    options: choice.options(devices: devices), label: "Talk microphone")
+        }
+        .onAppear { Task { MicrophoneTester.shared.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } }
     }
 }
 

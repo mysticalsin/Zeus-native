@@ -5324,7 +5324,7 @@
         {
           "id": "F11.talk-turn-voice",
           "check": "native-TalkTurnVoiceTests",
-          "acceptance": "Talk turns keep listening through a headset profile change, start the output engine only when audio is scheduled, use the chosen microphone and report what the input saw when nothing was heard. Spies and pure helpers: no Bluetooth link, capture hardware or speech recognition.",
+          "acceptance": "Talk turns keep listening through a headset profile change, start the output engine only when audio is scheduled, use the microphone chosen for talk (Automatic, this Mac's microphone or one input) and report what the input saw when nothing was heard. Spies and pure helpers: no Bluetooth link, capture hardware or speech recognition.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
@@ -5340,7 +5340,23 @@
             },
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
-              "function": "aTalkTurnListensOnTheMicrophoneChosenForDictation"
+              "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "automaticIsTheDefaultAndMeansNoDevice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "theBuiltInChoiceResolvesToTheBuiltInDeviceAtTurnStart"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aSpecificDeviceResolvesToItsUIDAndFallsBackToAutomaticWhenGone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "theChoiceRoundTripsThroughItsStoredText"
             },
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",

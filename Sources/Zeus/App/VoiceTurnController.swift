@@ -161,9 +161,14 @@ final class VoiceTurnController {
         buddy.idle()
     }
 
-    /// Talk turns listen on the microphone chosen in Dictation settings, like dictation does; nil follows the system input.
-    static func applyChosenMicrophone(to speech: SpeechInput, from settings: DictationSettings = .shared) {
-        speech.deviceUID = settings.microphoneUID
+    /// Talk turns listen on the microphone chosen for talk (Settings > Voice), resolved now: Automatic is no device, This Mac's
+    /// microphone is the built-in device, a specific input is itself or Automatic when it is gone. Dictation's choice is separate.
+    /// The device list is read only when a device is chosen.
+    static func applyChosenMicrophone(to speech: SpeechInput, defaults: UserDefaults = .standard,
+                                      devices: () -> [MicrophoneDevice] = { Microphones.all() },
+                                      builtInUID: () -> String? = { Microphones.builtInUID() }) {
+        let choice = TalkMicrophoneChoice.load(defaults)
+        speech.deviceUID = choice == .automatic ? nil : choice.resolvedUID(devices: devices(), builtInUID: builtInUID())
     }
 
     @discardableResult
