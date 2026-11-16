@@ -927,6 +927,14 @@
       "scope": "Actual mascot motion rules against the shipped atlas clip files; no rendering, display refresh or device acceptance.",
       "suite": "MascotMotionTests",
       "file": "Tests/ZeusAppTests/MascotMotionTests.swift"
+    },
+    {
+      "id": "native-BuddyMotionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Static fade timing and screen choice plus the controller source; no window shown, display link run or device acceptance.",
+      "suite": "BuddyMotionTests",
+      "file": "Tests/ZeusAppTests/BuddyMotionTests.swift"
     }
   ],
   "features": [
@@ -6600,6 +6608,25 @@
             }
           ],
           "id": "F13.mascot-clip-rate"
+        },
+        {
+          "check": "native-BuddyMotionTests",
+          "acceptance": "Native buddy motion fixtures: explicit fade timing and the display link screen choice.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+              "function": "theWindowFadeInEasesOutAndTheFadeOutEasesIn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+              "function": "theDisplayLinkFollowsTheBuddyWindowsScreenNotJustTheMainOne"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+              "function": "theFadeUsesTheTimingFunctionAndTheLinkUsesTheWindowScreen"
+            }
+          ],
+          "id": "F13.buddy-motion"
         }
       ]
     },

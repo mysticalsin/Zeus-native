@@ -72,9 +72,12 @@ final class BuddyController: NSObject {
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil
         )
-        let link = (NSScreen.main ?? NSScreen.screens[0]).displayLink(target: self, selector: #selector(tick(_:)))
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        // The link follows the screen the buddy's own window is on, so it runs at that display's rate.
+        if let screen = Self.linkScreen(window: windows.first?.screen, main: NSScreen.main, all: NSScreen.screens) {
+            let link = screen.displayLink(target: self, selector: #selector(tick(_:)))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
         // The frame loop sleeps once the spark has settled and wakes on the next mouse move,
         // so an idle Mac costs nothing (it used to redraw the overlay at display rate forever).
         let wake: (NSEvent) -> Void = { [weak self] _ in MainActor.assumeIsolated { self?.wake() } }
@@ -97,6 +100,16 @@ final class BuddyController: NSObject {
         }
         DispatchQueue.main.async { self.model.hasAppeared = true }
         applyVisibility(animated: false)
+    }
+
+    /// The window fade, with explicit timing from the motion table: in eases out, out eases in.
+    static func fadeTiming(showing: Bool) -> (duration: TimeInterval, curve: CAMediaTimingFunctionName) {
+        showing ? (MotionTokens.windowFadeInDuration, .easeOut) : (MotionTokens.windowFadeOutDuration, .easeIn)
+    }
+
+    /// The screen the display link runs on: the buddy window's own, else the main one, else any.
+    static func linkScreen<Screen>(window: Screen?, main: Screen?, all: [Screen]) -> Screen? {
+        window ?? main ?? all.first
     }
 
     // MARK: Visibility
@@ -142,7 +155,12 @@ final class BuddyController: NSObject {
             if target == 1 { windows.forEach { $0.orderFrontRegardless() } }
             for window in windows where window.alphaValue != target {
                 if animated, !Motion.reduced {
-                    NSAnimationContext.runAnimationGroup({ $0.duration = target == 1 ? 0.2 : 0.35; window.animator().alphaValue = target },
+                    let timing = Self.fadeTiming(showing: target == 1)
+                    NSAnimationContext.runAnimationGroup({
+                        $0.duration = timing.duration
+                        $0.timingFunction = CAMediaTimingFunction(name: timing.curve)
+                        window.animator().alphaValue = target
+                    },
                                                          completionHandler: { [weak self, weak window] in
                         MainActor.assumeIsolated { if self?.shownAlpha == 0 { window?.orderOut(nil) } }
                     })

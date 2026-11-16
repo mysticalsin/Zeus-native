@@ -6167,6 +6167,42 @@
         "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
         "function": "theMascotTicksAtEachClipsOwnFPSAndSixtyOnItsStroll"
       }
+    },
+    {
+      "id": "REG-743",
+      "failure": "The buddy's window fades used the AppKit default curve and a 0.35 s fade out, so the fades did not match the other motion.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theWindowFadeInEasesOutAndTheFadeOutEasesIn"
+      }
+    },
+    {
+      "id": "REG-744",
+      "failure": "The buddy's display link was bound to the main screen, not the screen its own window is on.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theDisplayLinkFollowsTheBuddyWindowsScreenNotJustTheMainOne"
+      }
+    },
+    {
+      "id": "REG-745",
+      "failure": "The buddy controller could stop passing the explicit fade timing or go back to the main-screen link.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theFadeUsesTheTimingFunctionAndTheLinkUsesTheWindowScreen"
+      }
     }
   ]
 }
