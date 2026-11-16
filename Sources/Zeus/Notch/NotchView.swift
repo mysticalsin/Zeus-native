@@ -85,6 +85,14 @@ struct NotchView: View {
     var drawnNotch: DrawnNotchModel? = nil
     /// Snapshots and previews pin the drop; nil reads Settings > Appearance > Top bar position.
     var topOffsetOverride: Double? = nil
+    /// Snapshots and previews pin the island background; nil reads Settings > Appearance > Island background.
+    var backgroundOverride: NotchBackground? = nil
+
+    /// The layers the body draws now: Transparent drops fill, outline and glow of the closed island only.
+    private var layers: NotchBodyLayers {
+        let background = backgroundOverride ?? NotchBackground.resolve(SettingsStore.shared.string(NotchBackground.settingID))
+        return background.layers(closed: model.presentation == .closed)
+    }
 
     /// The closed shape on this display.
     var footprint: NotchFootprint {
@@ -111,6 +119,9 @@ struct NotchView: View {
     private var notch: CGSize { footprint.layoutSize }
     private var slimPill: Bool { footprint.isPill }
     private var barHeight: CGFloat { max(notch.height, 30) }
+    /// The closed body is taller than the bar on a hardware notch (it hangs below the notch). The peek, the open
+    /// panel and the tab row keep `barHeight`.
+    private var closedBodyHeight: CGFloat { NotchFootprintRules.closedHeight(footprint, wings: closedWings) }
     private var hasNotch: Bool { notch.width > 0 }
 
     /// Idle and closed, the top bar is exactly the hardware notch (square top, no ears); open it
@@ -162,9 +173,9 @@ struct NotchView: View {
                     width: NotchClosedBodyLayout.bodyWidth(
                         notchWidth: footprint.wingBase, shoulder: shoulder, showWings: true,
                         extraWidth: wings.extraWidth, hasNotch: hasNotch, slimPill: slimPill),
-                    height: barHeight)
+                    height: closedBodyHeight)
             }
-            if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: notch.height) }
+            if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: closedBodyHeight) }
             return footprint.idleSize
         case .peek:
             if let approval = model.approval {
@@ -200,7 +211,7 @@ struct NotchView: View {
     /// The closed outline the lights follow: the black shape with wings, or the bare notch.
     private var closedLightBody: CGSize {
         let closed = size
-        return closed.width > 0 ? closed : CGSize(width: notch.width + 2 * shoulder, height: notch.height)
+        return closed.width > 0 ? closed : CGSize(width: notch.width + 2 * shoulder, height: closedBodyHeight)
     }
 
     private var bottomRadius: CGFloat {
@@ -232,7 +243,7 @@ struct NotchView: View {
                 if !model.alerts.isEmpty, model.presentation == .closed {
                     AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
                                    onHover: { NotchControllerBridge.alertHover($0) })
-                        .padding(.top, barHeight + 6 + topOffset)
+                        .padding(.top, closedBodyHeight + 6 + topOffset)
                         .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
                 }
             }
@@ -253,7 +264,8 @@ struct NotchView: View {
     private func canvas(size: CGSize) -> some View {
         let status = model.status
         let halo = topBar?.haloStyle ?? .classic
-        let glowing = glowsOutline(status: status)
+        let drawn = layers
+        let glowing = glowsOutline(status: status) && drawn.glow
         // Only tick while the halo is drawn and breathing, and only the outline layers (never the
         // content): an idle notch, or a closed one whose arms carry the glow, costs nothing.
         let breathing = !Motion.reduced && glowing
@@ -275,6 +287,8 @@ struct NotchView: View {
                         // only Zeus's own marks show on it. One fill type, so opening grows the body instead of
                         // cross-fading a new layer in.
                         .fill(Color.black)
+                        // Transparent: the closed island has no body, only its marks (the hardware notch is black).
+                        .opacity(drawn.fill ? 1 : 0)
                         // Glance's soft drop shadow under the open body (parity/N4: alpha 0.19 at 2 pt
                         // below, 0.10 at 15 pt, gone by 50 pt; weaker at the sides).
                         .shadow(color: .black.opacity(glanceOpen ? Glass.notchShadow.opacity : 0),
@@ -282,7 +296,7 @@ struct NotchView: View {
                         .shadow(color: glow.opacity(glowing ? 0.28 * breath : 0), radius: 9)
                         .shadow(color: glow.opacity(glowing ? 0.2 * breath : 0), radius: 3)
                         .shadow(color: Theme.bolt.opacity(glowing && halo == .storm ? 0.3 * breath : 0), radius: 26)
-                    shape.stroke(glow.opacity(glowing ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
+                    shape.stroke(glow.opacity(glowing && drawn.outline ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
                 }
             }
 
@@ -304,6 +318,7 @@ struct NotchView: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .ownedJourneyControl("notch.body")
         // Glance (parity/N7, frames 139 to 143): the glass rim sits on the final open outline from
         // the first frame while the body grows inside it, then fades. Behind the body, not animated.
         .background(alignment: .top) {
@@ -314,7 +329,7 @@ struct NotchView: View {
                 .transaction { $0.animation = nil }
         }
         .overlay(alignment: .top) {
-            if let topBar, model.presentation == .closed, hasNotch || slimPill || !topBar.lights.isEmpty {
+            if let topBar, model.presentation == .closed, layers.glow, hasNotch || slimPill || !topBar.lights.isEmpty {
                 NotchLights(topBar: topBar, status: status, body_: closedLightBody, shoulder: shoulder)
             }
         }
@@ -338,6 +353,8 @@ struct NotchView: View {
                 // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
                 ClosedWings(topBar: topBar, notchGap: footprint.wingBase).frame(height: barHeight)
                     .allowsHitTesting(false)
+                    // Transparent: no body behind the white wing text, so a soft shadow keeps it readable.
+                    .shadow(color: .black.opacity(layers.fill ? 0 : 0.7), radius: 2, y: 0.5)
             }
         case .peek:
             VStack(spacing: 10) {

@@ -495,6 +495,30 @@ enum SnapshotRenderer {
         let drawnGuide = NotchModel()
         saveSurface(NotchStage(model: drawnGuide, topBar: TopBarModel(), footprint: drawn, guide: true), size: CGSize(width: 960, height: 120), name: "notch-drawn-guide")
 
+        // The closed island at the owner's 220 x 38 notch, Black and Transparent: the body hangs 6 pt below the
+        // hardware notch so its whole bottom outline shows; Transparent draws only the mascot and the words.
+        let islandAvatar = AvatarStatus.shared
+        let islandPinned = islandAvatar.pinned
+        defer { islandAvatar.pinned = islandPinned }
+        for background in NotchBackground.allCases {
+            let tag = background.rawValue.lowercased()
+            islandAvatar.pinned = .thinking
+            let agent = NotchModel()
+            saveSurface(NotchStage(model: agent, topBar: TopBarModel(), footprint: .hardware(ownerNotch), background: background, wallpaper: true),
+                        size: CGSize(width: 700, height: 90), name: "island-\(tag)-agent")
+            islandAvatar.pinned = .idle
+            let cueModel = NotchModel()
+            let cueBar = TopBarModel()
+            cueBar.setCueForSnapshot(.hint("Allow Zeus to look"))
+            saveSurface(NotchStage(model: cueModel, topBar: cueBar, footprint: .hardware(ownerNotch), background: background, wallpaper: true),
+                        size: CGSize(width: 700, height: 90), name: "island-\(tag)-cue")
+        }
+        islandAvatar.pinned = islandPinned
+        let ownerPanel = NotchModel()
+        ownerPanel.presentation = .panel
+        saveSurface(NotchStage(model: ownerPanel, topBar: TopBarModel(), footprint: .hardware(ownerNotch), background: .transparent, wallpaper: true),
+                    size: CGSize(width: 960, height: 300), name: "island-transparent-panel")
+
         // D4: the shape placed 200 pt right with an alert under it. The capsule is centred under the shape, not the screen.
         let placedAlertTime = Date()
         let placedAlert = NotchModel()
@@ -1240,12 +1264,22 @@ private struct NotchStage: View {
     var guide = false
     /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
     var topOffset: Double = 0
+    /// Pins the island background; nil reads the setting.
+    var background: NotchBackground? = nil
+    /// A bright wallpaper with a black hardware notch of the footprint's size, so Transparent is judged on a real look.
+    var wallpaper = false
 
     var body: some View {
         ZStack(alignment: .top) {
-            LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
-            Rectangle().fill(Color.black.opacity(0.35)).frame(height: footprint.layoutSize.height)
-            NotchView(model: model, topBar: topBar, footprintOverride: footprint, guideOverride: guide, topOffsetOverride: topOffset)
+            if wallpaper {
+                LinearGradient(colors: [Color(hex: 0x7C98C8), Color(hex: 0xC9B7A2)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                Rectangle().fill(Color.black).frame(width: footprint.layoutSize.width, height: footprint.layoutSize.height)
+            } else {
+                LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
+                Rectangle().fill(Color.black.opacity(0.35)).frame(height: footprint.layoutSize.height)
+            }
+            NotchView(model: model, topBar: topBar, footprintOverride: footprint, guideOverride: guide, topOffsetOverride: topOffset,
+                      backgroundOverride: background)
         }
     }
 }

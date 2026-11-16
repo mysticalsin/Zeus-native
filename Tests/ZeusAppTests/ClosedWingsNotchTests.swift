@@ -175,4 +175,57 @@ struct ClosedWingsNotchTests {
             }
         }
     }
+
+    // MARK: The whole closed island at the owner's notch
+
+    /// The real `NotchView` in a 700 x 120 window at the 220 x 38 notch, read back: the body must hang from the top
+    /// of the screen and end `belowNotch` under the hardware notch, so the bottom outline is not covered by it.
+    private func bodyFrame(presentation: NotchModel.Presentation, background: NotchBackground, cue: NotchCue?) async throws -> (CGRect, CGFloat) {
+        var result: (CGRect, CGFloat)?
+        try await OwnedWindowJourneyLease.perform {
+            let original = try OwnedWindowFixtureApplication.prepare()
+            defer { OwnedWindowFixtureApplication.restore(original) }
+            let model = NotchModel()
+            model.presentation = presentation
+            let bar = topBar { if let cue { $0.setCueForSnapshot(cue) } }
+            let registry = OwnedWindowControlRegistry()
+            let root = NotchView(model: model, topBar: bar, footprintOverride: .hardware(Self.notch),
+                                 topOffsetOverride: 0, backgroundOverride: background)
+                .environment(\.ownedWindowControlRegistry, registry)
+                .frame(width: 960, height: 400)
+            let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 960, height: 400),
+                                  styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: root)
+            window.makeKeyAndOrderFront(nil)
+            defer { OwnedWindowFixtureApplication.close(window) }
+            if let rect = await frame("notch.body", registry, window) {
+                let height = window.contentView?.bounds.height ?? 0
+                result = (rect, height)
+            }
+        }
+        return try #require(result, "no notch body frame was laid out")
+    }
+
+    @Test(arguments: [NotchBackground.black, .transparent])
+    func theClosedBodyHangsFromTheTopAndEndsBelowTheHardwareNotch(background: NotchBackground) async throws {
+        let cue = NotchCue.hint("Allow")
+        for (name, shown) in [("idle", nil), ("wings", cue)] as [(String, NotchCue?)] {
+            let (rect, height) = try await bodyFrame(presentation: .closed, background: background, cue: shown)
+            #expect(abs(height - rect.maxY) < 0.5, "\(name) \(background): the body leaves a gap at the top of the screen")
+            let bottom = height - rect.minY
+            #expect(bottom >= Self.notch.height + NotchClosedBodyLayout.belowNotch - 0.5,
+                    "\(name) \(background): the body ends at \(bottom), not below the notch")
+            #expect(abs(rect.height - (Self.notch.height + NotchClosedBodyLayout.belowNotch)) < 0.5)
+        }
+    }
+
+    @Test func theOpenPanelStaysFlushWithTheTopAndItsTabRowIsBelowTheBar() async throws {
+        let (rect, height) = try await bodyFrame(presentation: .panel, background: .transparent, cue: nil)
+        #expect(abs(height - rect.maxY) < 0.5)
+        let expected = NotchView.topBarPanelSize(barHeight: Self.notch.height, hasApproval: false, home: true,
+                                                 homeStrip: TopBarModel(defaults: UserDefaults(suiteName: "closed-wings-\(UUID().uuidString)")!).homeExtraHeight)
+        #expect(abs(rect.height - expected.height) < 0.5, "the open panel kept its own height")
+        #expect(GlanceTopBar.tabRowTop >= Self.notch.height, "the tab row starts below the 38 pt bar")
+    }
 }

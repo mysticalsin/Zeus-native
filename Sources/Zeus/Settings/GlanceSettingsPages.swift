@@ -335,6 +335,11 @@ private struct AppearancePage: View {
                 GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
             }
             GSDivider()
+            GSRow(symbol: "rectangle.dashed", title: "Island background",
+                  text: "Transparent draws only the mascot and the text beside the notch, with no body, outline or glow. The notch itself stays black. The open panel is always black.") {
+                GSPopup(selection: SettingsStore.binding(NotchBackground.settingID), options: NotchBackground.allCases.map(\.rawValue)).popupLabel("Island background")
+            }
+            GSDivider()
             GSRow(symbol: "line.3.horizontal", title: "Light thickness") {
                 OBTickSlider(value: Binding(get: { max(100, store.double("halo.thickness")) }, set: { store.set("halo.thickness", String(Int($0))) }), range: 100...200, step: 5)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Light thickness")

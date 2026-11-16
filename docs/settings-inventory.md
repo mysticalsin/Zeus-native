@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 197 of 197 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 197 in scope). 186 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 198 of 198 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 198 in scope). 187 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 146.
+**Before this round:** has 19, partial 27, missing 147.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -67,6 +67,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Halo | Match the halo colour to the wallpaper | toggle | on | Blends with white on light wallpapers. | partial | live | `halo.wallpaper` | Samples the wallpaper under the notch and blends the halo toward white as it gets lighter. |
 | Halo | Halo arm width (Narrow, Medium, Wide, Extra wide) | segmented | Medium | 76, 130, 220 or 440 pt each side. | missing | live | `halo.armWidth` | Controls the closed-notch halo reach and live preview. |
 | Halo | Light thickness | slider | 100 % | 100 to 200 %. | missing | live | `halo.thickness` | Controls the closed-notch halo and live preview. |
+| Halo | Island background (Black, Transparent) | segmented | - | Black keeps the closed island pitch black with its outline and glow. Transparent draws only the mascot and the wing text: no body, outline or glow, and the hardware notch stays black by itself. The open panel is always black. | missing | live | `notch.background` | Zeus addition. Closed island only. |
 | Halo | Light wave to the screen edges | toggle | on | A wave of light crosses the screen on agent events. | partial | live | `halo.edgeWave` | A click-through overlay on every Space, left out of captures; fronts run round the screen edge. |
 | Everyday lights | Light wave while music plays | toggle | on | Artwork-tinted wave on the closed notch. | has | custom | `topBar.musicWings` |  |
 | Everyday lights | Progress outline on the music preview | toggle | on | Outline empties as the track plays. | missing | live | `lights.musicProgress` | Tracks media progress around the music wings. |

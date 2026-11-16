@@ -1,5 +1,8 @@
 """The notch body is pitch black, closed and open, so it reads as part of the hardware notch.
 
+Black is the default and the only opaque fill. The Transparent island background draws no fill, outline or glow: it
+does so by gating that one black fill, the outline stroke and the glow on the pure `NotchBackground` layers.
+
 Each check is a function over source text, so every one has a sample that must fail it.
 """
 from pathlib import Path
@@ -24,6 +27,12 @@ def body_fill_problems(view_text):
         problems.append(f"the body fills are {fills}, not one Color.black")
     if re.search(r"\.overlay\s*\{\s*shape\.fill", region):
         problems.append("a second fill is laid over the black body")
+    if not re.search(r"\.fill\(Color\.black\)\s*\.opacity\(drawn\.fill \? 1 : 0\)", region):
+        problems.append("the black fill is not gated on the background layers (Transparent would still be black)")
+    if not re.search(r"shape\.stroke\([^\n]*drawn\.outline", region):
+        problems.append("the outline stroke is not gated on the background layers")
+    if not re.search(r"glowsOutline\(status: status\) && drawn\.glow", view_text):
+        problems.append("the glow is not gated on the background layers")
     return problems
 
 
@@ -42,11 +51,30 @@ class NotchBlackLint(unittest.TestCase):
     def test_a_gradient_over_the_black_fails(self):
         sample = ANCHOR + """
                     shape
-                        .fill(Color.black)
+                        .fill(Color.black).opacity(drawn.fill ? 1 : 0)
                         .overlay { shape.fill(Glass.notchPanelFill).opacity(glanceOpen ? 1 : 0) }
             content
 """
         self.assertTrue(body_fill_problems(sample))
+
+    def test_an_ungated_black_fill_fails(self):
+        sample = ANCHOR + """
+                    shape.fill(Color.black)
+                    shape.stroke(glow.opacity(0.5), lineWidth: 1.2)
+            content
+"""
+        self.assertTrue(any("not gated" in p for p in body_fill_problems(sample)))
+
+    def test_the_gated_fill_outline_and_glow_pass(self):
+        sample = ANCHOR + """
+                    shape
+                        .fill(Color.black)
+                        .opacity(drawn.fill ? 1 : 0)
+                    shape.stroke(glow.opacity(glowing && drawn.outline ? 0.5 : 0), lineWidth: 1.2)
+            content
+        let glowing = glowsOutline(status: status) && drawn.glow
+"""
+        self.assertEqual(body_fill_problems(sample), [])
 
     def test_a_grey_fill_fails(self):
         sample = ANCHOR + """

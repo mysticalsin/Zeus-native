@@ -6029,6 +6029,63 @@
           ]
         },
         {
+          "id": "F13.closed-island-below-notch",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "On a hardware notch the closed body (idle and with wings) is the notch height plus NotchClosedBodyLayout.belowNotch (6 pt), the hover and click zones follow it, and a drawn notch and the pill keep their heights.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "theClosedBodyHangsSixPointsBelowTheHardwareNotch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+              "function": "aHardwareIslandHangsBelowTheNotchByTheNamedConstant"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+              "function": "theDrawnNotchAndThePillKeepTheirHeights"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+              "function": "theZonesOfAHardwareNotchFollowTheNewHeight"
+            }
+          ]
+        },
+        {
+          "id": "F13.closed-island-background",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The island background is Black by default; Transparent draws no body fill, outline or glow while the notch is closed, and the open panel keeps all three.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "blackIsTheDefaultBackgroundAndAnythingUnknownIsBlack"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "blackDrawsFillOutlineAndGlowInEveryPresentation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "transparentDrawsNoFillOutlineOrGlowWhileClosedAndKeepsThemOpen"
+            }
+          ]
+        },
+        {
+          "id": "F13.closed-island-hosted",
+          "check": "native-ClosedWingsNotchTests",
+          "acceptance": "At a 220 x 38 notch the real closed NotchView body hangs from the top of the screen and ends 6 pt below the hardware notch in Black and Transparent, and the open panel stays flush with the top at its own height. Layout evidence in an owned window; not device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "theClosedBodyHangsFromTheTopAndEndsBelowTheHardwareNotch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ClosedWingsNotchTests.swift",
+              "function": "theOpenPanelStaysFlushWithTheTopAndItsTabRowIsBelowTheBar"
+            }
+          ]
+        },
+        {
           "id": "F13.drawn-notch-model",
           "check": "native-DrawnNotchModelTests",
           "acceptance": "The drawn notch model saves only on Done, follows the draft on a display without a notch, leaves a notched display alone, ends calibration when no display is left, and a pinned view never reads the store.",

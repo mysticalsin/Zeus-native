@@ -5556,6 +5556,30 @@
       }
     },
     {
+      "id": "REG-655",
+      "failure": "The closed island on a hardware notch ended exactly at the notch's bottom edge, so the hardware notch covered the bottom of its outline and glow.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchFootprintTests.swift",
+        "function": "aHardwareIslandHangsBelowTheNotchByTheNamedConstant"
+      }
+    },
+    {
+      "id": "REG-656",
+      "failure": "The closed island could only be drawn as a black body with an outline and glow, with no choice of a transparent island that shows only the mascot and the wing text.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+        "function": "transparentDrawsNoFillOutlineOrGlowWhileClosedAndKeepsThemOpen"
+      }
+    },
+    {
       "id": "REG-628",
       "failure": "Space joining a held Control-Option talk turn cancelled it: the Space press made the hold foreign, so Control-Option-Space could not continue a turn.",
       "features": [
