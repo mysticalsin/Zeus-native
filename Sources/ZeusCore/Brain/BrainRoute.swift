@@ -40,7 +40,8 @@ public enum BrainRoute {
 public enum ModelBudget {
     public static let medianCostCeiling = 0.002
     public static let medianLatencyCeilingMs = 6_000
-    public static let promptCharacterLimit = 10_000
+    /// Raised from 10,000 for the Ultron personality block (about 4,200 characters); the whole spoken system prompt is about 11,400.
+    public static let promptCharacterLimit = 12_000
 
     public struct Sample: Equatable, Sendable {
         public var latencyMs: Int
