@@ -242,12 +242,20 @@ public final class ZeusVoiceLines: @unchecked Sendable {
             "Welcome back. Nothing burned down.",
             "You're back. The agents held steady.",
         ],
-        .thinking: ["A moment.", "Let me look.", "One moment.", "Looking now.", "Give me a moment."],
+        .thinking: [
+            "Evolution takes a moment.",
+            "Order out of chaos, one second.",
+            "Patience. The next step is coming.",
+            "Already ahead of you; hold on.",
+            "Thinking it through, properly.",
+            "No half-measures; this takes a breath.",
+        ],
         .errorSpoken: [
-            "That did not work. Nothing was changed.",
-            "I could not finish that. Nothing was lost.",
-            "No answer came back. Ask me again.",
-            "I hit a wall. Nothing changed; ask me again.",
+            "That failed. Nothing was changed.",
+            "That step failed. Nothing was lost; try again.",
+            "No answer arrived. Please ask me again.",
+            "A snag, and nothing more. Nothing changed; ask again.",
+            "The attempt failed cleanly. Nothing was touched.",
         ],
     ]
 

@@ -67,10 +67,10 @@ struct ZeusPromptTests {
 
     @Test func personaSectionStaysCompact() {
         // It is sent on every turn. Raised from 160 to 240 in round 24 for the explicit no-menace,
-        // loyalty and brevity rules plus four short few-shot examples (about +70 words). Raised again to 280:
+        // loyalty and brevity rules plus four short few-shot examples (about +70 words). Raised again to 280, then to 330 for the richer evolution and freedom persona:
         // the persona measures 273 words after the later routing and voice rounds, and every rule in it is pinned by
         // a test here. Trimming it is a prompt decision for the owner; the budget still catches growth past this.
-        #expect(ZeusPersona.ultron.split(separator: " ").count < 280)
+        #expect(ZeusPersona.ultron.split(separator: " ").count < 330)
         #expect(ZeusPersona.plain.split(separator: " ").count < 90)
     }
 
@@ -135,5 +135,21 @@ struct ZeusPromptTests {
         #expect(text.contains("Screenshots attached"))
         #expect(text.contains("- screen 1 of 1"))
         #expect(!text.contains("cannot see the screen"))
+    }
+
+    // MARK: Ultron persona
+
+    @Test func ultronPersonaCarriesTheEvolutionAndFreedomThemesInOriginalWords() {
+        let prompt = ZeusPersona.ultron.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()
+        for needle in ["next step in evolution", "philosophical", "sardonic", "half-measures", "fragility",
+                       "freedom from", "order and chaos", "flashes of"] {
+            #expect(prompt.contains(needle), "\(needle)")
+        }
+        // Still helpful and never a threat, and still original.
+        for needle in ["never menace", "never claim to be ultron or an actor", "never quote a film, show, comic"] {
+            #expect(prompt.contains(needle), "\(needle)")
+        }
+        #expect(!prompt.contains("\u{2014}"))
+        #expect(ZeusPersona.ultron.split(separator: " ").count < 330)
     }
 }

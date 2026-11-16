@@ -233,8 +233,8 @@ struct UltronPersonaTests {
                 }
             }
         }
-        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("A moment.") == true)
-        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("Let me look.") == true)
+        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("Evolution takes a moment.") == true)
+        #expect(ZeusVoiceLines.bank(.ultron)[.thinking]?.contains("Already ahead of you; hold on.") == true)
         #expect(!AckLines.filler(personality: .ultron).isEmpty)
     }
 
