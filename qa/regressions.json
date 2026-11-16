@@ -7773,7 +7773,7 @@
       "check": "native-VoiceDesignerTests",
       "guard": {
         "file": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
-        "function": "theDesignedVoiceIsAnOriginalFiftiesBaritoneWithADrySyntheticSheen"
+        "function": "theDesignedVoiceIsAGenericDeepBaritoneWithADrySyntheticSheen"
       }
     },
     {

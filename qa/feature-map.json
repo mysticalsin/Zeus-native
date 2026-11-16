@@ -5509,7 +5509,7 @@
         {
           "id": "F11.talk-see-screen-core",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Seeing the screen is its own consent, on by default and separate from drawing: with it on, every display goes to the image-capable provider and pixels survive window text; drawing still cuts the request to the cursor display; restricted and page turns stay image-free; only the app Claude provider may draw; the model is told it cannot see when no image is attached, for the permission reason or not; text-only engines are told the same; the owner hears once per launch that Zeus cannot see the screen. Does not prove what the model sees on a real screen.",
+          "acceptance": "Seeing the screen is its own consent, on by default and separate from drawing: with it on, every display goes to the image-capable provider and pixels survive window text; drawing still cuts the request to the cursor display; restricted and page turns stay image-free; only the app Claude provider may draw; the model is told it cannot see when no image is attached, for the permission reason or not; text-only engines are told the same; the owner hears once per launch that Zeus cannot see the screen. Does not prove what the model sees on a real screen. With seeing and drawing both off no image is attached at all; a turn with screenshots races only the engine that sees them with text engines as the fallback; a launch that cannot keep screenshots out of the saved session sends none and says so.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
@@ -5590,6 +5590,42 @@
             {
               "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
               "function": "aFreshLaunchGetsItsOwnNotice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aTurnWithScreenshotsRacesOnlyTheEngineThatSeesThemAndHoldsTextEnginesBack"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aTurnWithoutScreenshotsRacesEveryEngineTogether"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "ifNoRacerCanSeeEveryoneRacesEvenWithScreenshots"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "theDeepFollowUpIsDroppedOnAScreenshotTurnUnlessItSeesTheScreen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aLaunchWithoutNoSessionPersistenceSendsNoScreenshotsAndSaysSo"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aSpokenLaunchThatKeepsNoSessionKeepsItsScreenshots"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aNonSpokenLaunchNeverGetsScreenshotsEvenOnANewClaude"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "turnedOffAndBlockedImagesSayWhyWithoutBlamingThePermission"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
+              "function": "aCopyCanChangeTheReasonAndDropTheImageFlag"
             }
           ]
         },
@@ -5617,6 +5653,10 @@
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "withScreenRecordingGrantedNoNoticeIsSpokenAndAnEmptyCaptureIsNotBlamedOnPermission"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "noImageReachesAnyProviderWhenSeeingAndDrawingAreOffEvenOnTheAppClaudePath"
             }
           ]
         },
@@ -5706,7 +5746,7 @@
           "cases": [
             {
               "file": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
-              "function": "theDesignedVoiceIsAnOriginalFiftiesBaritoneWithADrySyntheticSheen"
+              "function": "theDesignedVoiceIsAGenericDeepBaritoneWithADrySyntheticSheen"
             }
           ]
         },
@@ -5800,6 +5840,18 @@
             {
               "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
               "function": "theUltronVoiceLinesDrawFromTheDialogueAndNeverRepeatOrTouchPlain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "aServedPoolFullOfOpenersStillKeepsThemToOneInAnyFiveSpokenLines"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theShippedFileServesAtMostOneOpenerInFiveForEveryAppSituation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "anAgentThatFinishedByNameKeepsTheCompiledLineThatNamesIt"
             }
           ]
         },
