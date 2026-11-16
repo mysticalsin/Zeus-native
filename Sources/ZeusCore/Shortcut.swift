@@ -185,15 +185,24 @@ public enum ShortcutStore {
         defaults.set(true, forKey: talkMigrationKey)
     }
 
-    /// The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md). STUB: always the default.
+    /// The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md): Right Option alone unless the owner chose another key or turned it off.
     public static let secondTalkKey = "talk.secondShortcut"
     public static let secondTalkDefault = Shortcut.rightOption
 
+    /// The second talk key, and whether the owner chose it. Absent, or a stored value that does not parse, is the default and no
+    /// choice; `off` is a choice. It never writes: the default is written nowhere until the owner records a key.
     public static func loadSecondTalk(_ defaults: UserDefaults) -> (key: Shortcut?, explicit: Bool) {
-        (secondTalkDefault, false)
+        guard let text = defaults.string(forKey: secondTalkKey) else { return (secondTalkDefault, false) }
+        if text == "off" { return (nil, true) }
+        if let saved = Shortcut.parse(text) { return (saved, true) }
+        return (secondTalkDefault, false)
     }
 
-    public static func recordSecondTalkChoice(_ shortcut: Shortcut?, in defaults: UserDefaults) {}
+    /// The owner recorded `shortcut` for the second talk key, or nil to turn it off. The default key (also what Reset records)
+    /// removes the stored value, so the default rules apply again.
+    public static func recordSecondTalkChoice(_ shortcut: Shortcut?, in defaults: UserDefaults) {
+        if shortcut == secondTalkDefault { defaults.removeObject(forKey: secondTalkKey) } else { defaults.set(Shortcut.stored(shortcut), forKey: secondTalkKey) }
+    }
 
     /// nil means dictation has no key.
     public static func loadDictation(_ defaults: UserDefaults) -> Shortcut? {
