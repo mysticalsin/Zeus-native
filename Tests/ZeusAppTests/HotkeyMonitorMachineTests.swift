@@ -211,6 +211,37 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log == ["press", "cancel"], "\(calls.log)")
     }
 
+    @Test func aMouseClickHeardLateIsReadAtTheTimeItHappened() async throws {
+        // Right Option down at 0, the click at 0.2, the main thread busy until 0.3: the 0.25 confirm has not passed at the click, so
+        // the press is dropped, and onPress is never called.
+        let (monitor, calls) = make(second: .rightOption)
+        let clock = FakeClock()
+        monitor.now = { clock.seconds }
+        rightOptionDown(monitor)
+        clock.seconds = 0.3
+        monitor.mouseDown(at: 0.2)
+        #expect(calls.log == [], "the click came inside the confirm: \(calls.log)")
+        try await wait(0.4)
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == [], "nothing started, nothing sent: \(calls.log)")
+    }
+
+    @Test func aLauncherSpaceTappedDuringTheHoldCancelsItAtTheRelease() async throws {
+        // Option-Space tapped and let go inside the hold, between two looks at the keyboard, is never in the picture at the release.
+        let (monitor, calls) = make(second: .rightOption)
+        var spaceDown = false
+        monitor.keysStillDown = { spaceDown ? $0.intersection([49]) : [] }
+        rightOptionDown(monitor)
+        try await wait(0.4)
+        spaceDown = true
+        monitor.feed(.flags(keyCode: 61, modifiers: [.option]))
+        spaceDown = false
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "cancel"], "a Space seen during the hold means the person was not talking: \(calls.log)")
+    }
+
     @Test func aMouseDownDuringTheControlOptionKeyChangesNothing() async throws {
         let (monitor, calls) = make(second: .rightOption)
         controlOption(monitor)

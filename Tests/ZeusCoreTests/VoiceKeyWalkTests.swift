@@ -1532,7 +1532,8 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
         var acted: Bool = wasLatched ? sim.log.contains(.send) || (changing && sim.log.contains(.cancel)) : sim.log.contains(.start)
         if wasLatched, let owner, owner != slot {
             // The other key of the pair: nothing happens, no start, no send, no cancel.
-            acted = !sim.log.contains { $0 == .start || $0 == .send || ($0 == .cancel && !changing) }
+            // Only the key whose setting changed may be cancelled by the change (the second key, slot 1).
+            acted = !sim.log.contains { $0 == .start || $0 == .send || ($0 == .cancel && !(changing && owner == 1)) }
         }
         if !acted {
             let names = order.map { run.keys[$0].name }.joined(separator: ", ")
@@ -1874,9 +1875,26 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         let blind = WalkRun.talkPair("K-late with the timers after the key", primaryConfirm: 0, late: true, space: false,
                                      leftOption: false, inOrder: false)
         let report = search(blind, stopAtFirst: true)
-        #expect(!report.violations.isEmpty,
+        #expect(report.violations.contains { $0.hasPrefix("I12") || $0.hasPrefix("I13") },
                 "\(report.violations)")
         print("voice key walk K-late, timers after the key: \(report.violations.first ?? "no violation")")
+    }
+
+    /// The first order of the review of the pair: Control-Option held 0.1 s and let go (no confirm, so a turn waits out the 0.4 s gap, due
+    /// at 0.5), Right Option down at 0.2 (its start is due at 0.45), both timers late, then a key at 0.5. On time the second key's start
+    /// comes first (swallowed, the gap is open) and the gap's send second. A pair that settles each machine's timer inside its own call
+    /// lets the send out first and the start after it: effects out of due order (I14).
+    @Test func theSearchSeesTimersThatActOutOfDueOrder() {
+        let moves = ["Control", "Option", "wait", "wait", "Option", "Control", "wait", "wait", "RightOption", "wait", "wait", "wait", "wait",
+                     "wait 0.05 (timers late)", "wait 0.05 (timers late)", "RightOption"]
+        let blind = WalkRun.talkPair("K-late with the timers after the key, Left Option", primaryConfirm: 0, late: true, space: false,
+                                     inOrder: false)
+        let found = replay(blind, moves)
+        #expect(found.contains { $0.hasPrefix("I14") }, "\(found)")
+        let kept = WalkRun.talkPair("K-late with the timers in due order, Left Option", primaryConfirm: 0, late: true, space: false)
+        let result = replayWithLog(kept, moves)
+        #expect(result.found.isEmpty, "\(result.found)")
+        #expect(result.effects == [.start, .send], "the second key's start is swallowed while the gap is open: \(result.effects)")
     }
 
     /// With no second key the pair is the machine: run A walked plainly to length 5 (66,429 sequences), the machine against the

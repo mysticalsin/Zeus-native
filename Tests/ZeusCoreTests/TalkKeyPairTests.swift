@@ -571,6 +571,27 @@ import Testing
         #expect(rig.effects == [.start, .send], "once every key is up the key acts again")
     }
 
+    @Test func afterAMouseCancelNothingStartsUntilEveryKeyIsUp() {
+        // The cancel ends the second key's turn with a key still down, so the other key waits too (I11): the safe reading, pinned.
+        let rig = Rig()
+        rig.press(Self.optR, at: 0)
+        rig.wait(until: 0.5)
+        rig.mouse(at: 0.6)
+        rig.press(Self.ctrl, at: 0.7)
+        rig.wait(until: 1.5)
+        rig.release(Self.ctrl, at: 1.6)
+        rig.press(Self.ctrl, at: 1.7)
+        rig.wait(until: 2.5)
+        #expect(rig.effects == [.start, .cancel], "neither key starts while Right Option is still down: \(rig.effects)")
+        rig.release(Self.ctrl, at: 2.6)
+        rig.release(Self.optR, at: 2.7)
+        rig.wait(until: 3.5)
+        rig.press(Self.ctrl, Self.optL, at: 4)
+        rig.wait(until: 4.5)
+        rig.release(Self.optL, Self.ctrl, at: 4.6)
+        #expect(rig.effects == [.start, .cancel, .start, .send], "after every key is up the primary key acts: \(rig.effects)")
+    }
+
     @Test func aMouseDownLeavesThePrimaryKeyAndAHandsFreeSecondTurnAlone() {
         let primary = Rig()
         primary.press(Self.ctrl, Self.optL, at: 0)

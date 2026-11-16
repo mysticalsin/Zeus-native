@@ -149,7 +149,7 @@ final class HotkeyMonitor {
             return event
         }) { keyMonitors.append(local) }
         if let localMouse = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.mouseDown() }
+            MainActor.assumeIsolated { self?.mouseDown(at: event.timestamp) }
             return event
         }) { keyMonitors.append(localMouse) }
     }
@@ -163,8 +163,8 @@ final class HotkeyMonitor {
             let time = event.timestamp
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
         }) { keyMonitors.append(global) }
-        if let globalMouse = NSEvent.addGlobalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.mouseDown() }
+        if let globalMouse = NSEvent.addGlobalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.mouseDown(at: event.timestamp) }
         }) { keyMonitors.append(globalMouse) }
     }
 
@@ -217,7 +217,7 @@ final class HotkeyMonitor {
 
     /// A mouse button went down (left, right, other, a drag starts with one): an Option-click or Option-drag is not a talk turn.
     /// The second talk key's turn, armed or held, is over and never sent; the primary key is not told (`TalkKeyPair.mouseDown`).
-    func mouseDown() {
+    func mouseDown(at time: TimeInterval? = nil) {
         guard role == .talk else { return }
         let config = config, second = secondConfig
         let before = pair.generation
