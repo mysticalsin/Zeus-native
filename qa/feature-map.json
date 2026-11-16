@@ -5951,6 +5951,26 @@
             {
               "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
               "function": "noDialogueLineContainsAnEllipsis"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisBeforeAnythingButAWordLeavesNoMark"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "numberRangesCodeLikeTokensAndBracketedElisionsAreLeftAlone"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisBeforeALowercaseWordStaysInOneStreamedSentence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisBeforeACapitalStillEndsTheSentence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisAtTheChunkEdgeWaitsForTheNextWord"
             }
           ]
         },
@@ -5997,6 +6017,10 @@
             {
               "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
               "function": "theImageEngineFailureHasItsOwnDistinctWording"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theDrawRulesAreCutOutOfAPromptWithTheirBlankLine"
             }
           ]
         },
@@ -6012,6 +6036,18 @@
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "anOlderClaudeThatStripsTheImagesNeverDrawsMarks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "voicedTextHasNoEllipsisForUltronAndKeepsItForPlain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aStreamedEllipsisReplyIsOneSpokenLineForUltron"
             }
           ]
         }

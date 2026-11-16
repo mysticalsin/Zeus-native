@@ -8027,6 +8027,18 @@
         "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
         "function": "theImageEngineFailureHasItsOwnDistinctWording"
       }
+    },
+    {
+      "id": "REG-899",
+      "failure": "Marks or a pointer begun by a failed image engine stayed on screen while the text fallback answered.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers"
+      }
     }
   ]
 }
