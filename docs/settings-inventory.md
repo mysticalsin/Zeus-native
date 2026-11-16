@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 198 of 198 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 198 in scope). 187 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 199 of 199 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 199 in scope). 188 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 147.
+**Before this round:** has 19, partial 27, missing 148.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -267,6 +267,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Fast path | Fast path (instant commands) | toggle | - | Simple commands run the moment you finish speaking; off sends everything to the AI. | missing | live | `fastPath.enabled` | Zeus addition. Jev is on the Engine page. |
 | Hey Zeus | Listen for "Hey Zeus" | toggle | - | Say it, then your request. Off until you turn it on. | missing | custom | `voice.heyZeus` | Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off). |
 | Talk to Zeus | Talk shortcut | recorder | - | Hold Control + Option, or Control + Option + Space, to talk, let go to send. Point at something while you hold and Zeus sees what you mean. | missing | custom | `voice.talkKey` | Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept. |
+| Talk to Zeus | Draw on the screen while Zeus answers | toggle | off | Off: nothing is drawn and talk turns work as before. On: one screenshot of the display under your pointer goes to Claude with each question, and Zeus can ring, arrow or label what it talks about as it says it. Marks go a few seconds after the answer and the screenshot is never saved. | missing | live | `talk.drawOnScreen` | Separate consent from the macOS Screen Recording permission. Needs your Claude login. |
 | Voice | Personality (Ultron or Plain) and Design voice | menu | - | How Zeus sounds and what it calls itself. | missing | custom | `voice.personality` | Zeus addition. Voice page. |
 | Dictation | Murmure speech engines | menu | - | Which speech recognition writes your words. | missing | custom | `dictation.engine` | Zeus addition. Murmure page. |
 

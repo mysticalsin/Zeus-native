@@ -724,7 +724,10 @@ final class VoiceTurnController {
         }
         // Drawing on: one screenshot (the cursor display), only from a winner that saw it.
         let drawing = TalkDrawPolicy.wantsImages(consent: drawConsent(), shots: shots.count)
-        if drawing { shots = TalkDrawPolicy.requestShots(consent: true, shots: shots) }
+        if drawing {
+            system += "\n\n" + ZeusPrompt.drawInstructions()
+            shots = TalkDrawPolicy.requestShots(consent: true, shots: shots)
+        }
         if let route {
             system += "\n\n" + AgentRouter.preamble(route.agent, memory: agentStore.memory(for: route.agent))
             NSLog("[ZEUS] agent %@: routed turn", route.agent.name)
