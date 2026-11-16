@@ -5675,6 +5675,18 @@
         "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
         "function": "aTilingBindingOnTheTalkChordIsNamed"
       }
+    },
+    {
+      "id": "REG-700",
+      "failure": "A model-written screen drawing tag that was malformed, or split across stream chunks, could be read aloud as bracket text or dropped without the rest of the reply surviving.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+        "function": "aMalformedDrawTagIsStrippedAndNeverSpoken"
+      }
     }
   ]
 }
