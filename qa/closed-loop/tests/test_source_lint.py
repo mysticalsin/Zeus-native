@@ -1609,7 +1609,7 @@ class ButtonDefaultActionLint(unittest.TestCase):
         # A line number is reported once per chain, so a chain with two matching modifiers is not double counted.
         self.assertEqual(problems, [])
 
-    def test_samples_that_must_fail(self):
+    def test_button_default_action_samples_that_must_fail(self):
         bad = "return Button {\n    go()\n} label: {\n    Text(\"x\")\n}\n.buttonStyle(.plain)\n.accessibilityElement(children: .ignore)\n.accessibilityLabel(\"x\")\n"
         self.assertTrue(button_without_default_action(bad))
         self.assertFalse(button_without_default_action(bad + ".accessibilityAction { go() }\n"))
