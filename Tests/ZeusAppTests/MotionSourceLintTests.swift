@@ -12,12 +12,34 @@ struct MotionSourceLintTests {
 
     // MARK: Rules
 
-    /// Source with `//` comments blanked, so rules do not read prose.
+    /// Source with comments blanked (`//` and `/* */`, newlines kept), so rules do not read prose. A `//` inside a
+    /// string literal (a URL, say) is not a comment.
     static func code(_ source: String) -> String {
-        source.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
-            guard let range = line.range(of: "//") else { return String(line) }
-            return String(line[line.startIndex..<range.lowerBound])
-        }.joined(separator: "\n")
+        var out = ""
+        var inString = false, inLine = false, inBlock = false
+        let chars = Array(source)
+        var index = 0
+        while index < chars.count {
+            let c = chars[index]
+            let next = index + 1 < chars.count ? chars[index + 1] : "\0"
+            if inLine {
+                if c == "\n" { inLine = false; out.append(c) } else { out.append(" ") }
+            } else if inBlock {
+                if c == "*" && next == "/" { inBlock = false; out.append("  "); index += 1 } else { out.append(c == "\n" ? "\n" : " ") }
+            } else if inString {
+                out.append(c)
+                if c == "\\" && index + 1 < chars.count { out.append(next); index += 1 } else if c == "\"" { inString = false }
+            } else if c == "/" && next == "/" {
+                inLine = true; out.append("  "); index += 1
+            } else if c == "/" && next == "*" {
+                inBlock = true; out.append("  "); index += 1
+            } else {
+                if c == "\"" { inString = true }
+                out.append(c)
+            }
+            index += 1
+        }
+        return out
     }
 
     /// The text of the parenthesised group that opens at `open` (exclusive of the parentheses).
@@ -47,23 +69,80 @@ struct MotionSourceLintTests {
         }
     }
 
+    /// The interval expression of a clock call: what follows `label` up to the next top-level comma or the end.
+    static func intervalExpressions(in source: String) -> [(call: String, expression: String?)] {
+        let text = code(source)
+        var found: [(String, String?)] = []
+        var from = text.startIndex
+        while let range = text.range(of: #"(TickingView|TimelineView)\("#, options: .regularExpression, range: from..<text.endIndex) {
+            from = range.upperBound
+            let open = text.index(before: range.upperBound)
+            let args = group(in: text, opening: open)
+            let isTicking = text[range].hasPrefix("TickingView")
+            let label: String?
+            if isTicking { label = "interval:" }
+            else if args.contains(".periodic(") { label = "by:" }
+            else if args.contains(".animation") { label = "minimumInterval:" }
+            else { continue } // another schedule (every minute, explicit): not a frame clock
+            guard let labelRange = args.range(of: label!) else {
+                found.append((isTicking ? "TickingView" : "TimelineView", nil)); continue
+            }
+            var expression = ""
+            var depth = 0
+            for ch in args[labelRange.upperBound...] {
+                if ch == "(" { depth += 1 }
+                if ch == ")" { if depth == 0 { break }; depth -= 1 }
+                if ch == "," && depth == 0 { break }
+                expression.append(ch)
+            }
+            found.append((isTicking ? "TickingView" : "TimelineView", expression.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        return found
+    }
+
+    /// A plain number or quotient: `0.5`, `1 / 30`, `1.0 / 24.0`.
+    static func literal(_ expression: String) -> Double? {
+        let parts = expression.trimmingCharacters(in: .whitespaces).split(separator: "/", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        let values = parts.compactMap { Double($0) }
+        guard values.count == parts.count, (1...2).contains(values.count) else { return nil }
+        return values.count == 2 ? (values[1] == 0 ? nil : values[0] / values[1]) : values[0]
+    }
+
+    /// A ternary's branches (the condition is not an interval), or the whole expression.
+    static func branches(of expression: String) -> [String] {
+        guard let question = expression.firstIndex(of: "?") else { return [expression] }
+        let rest = expression[expression.index(after: question)...]
+        guard let colon = rest.firstIndex(of: ":") else { return [String(rest)] }
+        return [String(rest[..<colon]), String(rest[rest.index(after: colon)...])].map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// Named intervals that may stand in for a literal, with the reason. A match is by prefix.
+    static let namedIntervals: [(name: String, reason: String)] = [
+        ("NotchLights.frameInterval", "the halo lights' frame interval: the mascot's top clip rate (24 fps), a CPU-capped grid"),
+        ("reducedInterval", "the edge wave's fixed 0.1 s step for Reduce Motion"),
+        ("clock.interval", "the mascot's clip rate (12, 20 or 24 fps), set by `MascotClipClock`"),
+        ("Self.clipInterval(", "the mascot's clip rate for a pinned pose preview"),
+    ]
+
     /// Visible motion must not run on a run-loop clock faster than 0.1 s: `TickingView(interval:)`, and
     /// `TimelineView(.animation(minimumInterval:))` or `.periodic(by:)`.
     static func fastClocks(in source: String) -> [String] {
-        let text = code(source)
+        intervalExpressions(in: source).compactMap { call, expression in
+            guard let expression, branches(of: expression).contains(where: { (literal($0) ?? 1) < 0.1 }) else { return nil }
+            return "\(call)(interval:\(expression))"
+        }
+    }
+
+    /// Intervals that are not a literal of 0.1 s or more and not a named constant on `namedIntervals`, or missing:
+    /// a clock whose rate cannot be read from the source is not allowed.
+    static func unreadableClocks(in source: String) -> [String] {
         var found: [String] = []
-        for (opener, label) in [("TickingView(", "interval:"), ("TimelineView(", "minimumInterval:"), ("TimelineView(", "by:")] {
-            var from = text.startIndex
-            while let range = text.range(of: opener, range: from..<text.endIndex) {
-                from = range.upperBound
-                let open = text.index(before: range.upperBound)
-                let args = group(in: text, opening: open)
-                guard let labelRange = args.range(of: label) else { continue }
-                var expression = String(args[labelRange.upperBound...])
-                if let end = expression.firstIndex(where: { $0 == "," || $0 == "{" }) { expression = String(expression[..<end]) }
-                if let small = numbers(in: expression).min(), small < 0.1 {
-                    found.append("\(opener)\(label)\(expression.trimmingCharacters(in: .whitespaces))")
-                }
+        for (call, expression) in intervalExpressions(in: source) {
+            guard let expression else { found.append("\(call) with no interval"); continue }
+            for branch in branches(of: expression) where literal(branch) == nil {
+                if namedIntervals.contains(where: { branch.hasPrefix($0.name) }) { continue }
+                found.append("\(call)(interval:\(branch))")
             }
         }
         return found
@@ -93,6 +172,9 @@ struct MotionSourceLintTests {
         return found
     }
 
+    /// Only when the call belongs to a transition expression: inside `.transition(...)`, or in the same statement
+    /// as `AnyTransition`, `.asymmetric(` or `.combined(with:`. A statement runs back over lines that continue it
+    /// (they start with `.` or `)`), to the line that opens it.
     private static func isInsideTransition(_ text: String, before index: String.Index) -> Bool {
         var depth = 0
         var cursor = index
@@ -103,20 +185,27 @@ struct MotionSourceLintTests {
             case "(":
                 if depth == 0 {
                     let head = text[..<cursor]
-                    if head.hasSuffix(".transition") || head.hasSuffix("AnyTransition") { return true }
+                    if head.hasSuffix(".transition") { return true }
                 } else { depth -= 1 }
             default: break
             }
         }
-        // A transition built in a function or property that returns `AnyTransition`, within the few lines above.
-        let lines = text[..<index].split(separator: "\n", omittingEmptySubsequences: false).suffix(5)
-        return lines.contains { $0.contains("AnyTransition") }
+        var lines = text[..<index].split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var statement: [String] = []
+        while let line = lines.popLast() {
+            statement.append(line)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if !(trimmed.hasPrefix(".") || trimmed.hasPrefix(")") || trimmed.isEmpty) { break }
+        }
+        let joined = statement.joined(separator: "\n")
+        return ["AnyTransition", ".asymmetric(", ".combined(with:"].contains { joined.contains($0) }
     }
 
-    /// A spring written with numbers instead of a `MotionTokens` entry.
+    /// A spring written with numbers or a stock preset instead of a `MotionTokens` entry.
     static func springLiterals(in source: String) -> [String] {
         let text = code(source)
-        let regex = try! NSRegularExpression(pattern: #"spring\(\s*response:\s*[0-9.]+"#)
+        let pattern = #"spring\(\s*(?:response|duration|bounce):\s*[0-9.]+|interpolatingSpring\(|\.(?:snappy|bouncy|smooth)\b(?!\s*\()|\.(?:snappy|bouncy|smooth)\("#
+        let regex = try! NSRegularExpression(pattern: pattern)
         let ns = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range) }
     }
@@ -151,6 +240,7 @@ struct MotionSourceLintTests {
         #expect(Self.fastClocks(in: "TickingView(interval: 1) { c in }").isEmpty)
         #expect(Self.fastClocks(in: "TickingView(interval: 0.5) { c in }").isEmpty)
         #expect(Self.fastClocks(in: "// TickingView(interval: 1 / 30)").isEmpty)
+        #expect(Self.fastClocks(in: "/* TickingView(interval: 1 / 30) */").isEmpty)
     }
 
     @Test func anAnimationWithoutAValueIsFlaggedOutsideATransition() {
@@ -160,13 +250,43 @@ struct MotionSourceLintTests {
         #expect(Self.animationsWithoutValue(in: "view.animation(entrance.animation) {\n $0.opacity(1)\n }").isEmpty)
         #expect(Self.animationsWithoutValue(in: "TimelineView(.animation(minimumInterval: 1 / 24)) { c in }").isEmpty)
         #expect(Self.animationsWithoutValue(in: "func removal() -> AnyTransition {\n .opacity\n .animation(.easeIn)\n }").isEmpty)
+        #expect(Self.animationsWithoutValue(in: "return .scale(scale: 0.9).combined(with: .opacity)\n .animation(.easeIn)").isEmpty)
         #expect(Self.animationsWithoutValue(in: ".transition(.asymmetric(\n insertion: .opacity.animation(.easeIn),\n removal: .scale.animation(.easeOut)))").isEmpty)
+        // A transition elsewhere in the file does not excuse an unkeyed animation in a different statement.
+        #expect(!Self.animationsWithoutValue(in: "func removal() -> AnyTransition {\n .opacity\n }\n let x = Text(\"a\")\n .animation(.easeIn)").isEmpty)
+        #expect(!Self.animationsWithoutValue(in: ".transition(.opacity)\n Text(\"b\")\n .animation(.easeIn)").isEmpty)
     }
 
-    @Test func aSpringWrittenWithNumbersIsFlagged() {
+    @Test func aSpringWrittenWithNumbersOrAPresetIsFlagged() {
         #expect(!Self.springLiterals(in: ".animation(.spring(response: 0.34, dampingFraction: 0.82), value: x)").isEmpty)
+        #expect(!Self.springLiterals(in: ".animation(.spring(duration: 0.4, bounce: 0.1), value: x)").isEmpty)
+        #expect(!Self.springLiterals(in: ".animation(.interpolatingSpring(stiffness: 100, damping: 10), value: x)").isEmpty)
+        #expect(!Self.springLiterals(in: ".animation(.snappy, value: x)").isEmpty)
+        #expect(!Self.springLiterals(in: ".animation(.bouncy(duration: 0.3), value: x)").isEmpty)
+        #expect(!Self.springLiterals(in: ".animation(.smooth, value: x)").isEmpty)
         #expect(Self.springLiterals(in: ".spring(response: token.response, dampingFraction: token.damping)").isEmpty)
         #expect(Self.springLiterals(in: "// spring(response: 0.3, dampingFraction: 0.7)").isEmpty)
+        #expect(Self.springLiterals(in: "/* .animation(.snappy) */ let x = 1").isEmpty)
+        #expect(Self.springLiterals(in: "/* start\n .spring(response: 0.3) \n end */").isEmpty)
+    }
+
+    @Test func commentsAreBlankedButStringsKeepTheirSlashes() {
+        #expect(!Self.code("let url = \"https://example.com\" // note").contains("note"))
+        #expect(Self.code("let url = \"https://example.com\" // note").contains("https://example.com"))
+        // A comment-looking string must not hide the code after it.
+        #expect(Self.fastClocks(in: "let s = \"//\"; TickingView(interval: 1 / 30) { c in }").count == 1)
+        #expect(Self.code("a /* x\ny */ b").filter { $0 == "\n" }.count == 1)
+    }
+
+    @Test func aClockWhoseRateCannotBeReadIsFlagged() {
+        #expect(!Self.unreadableClocks(in: "TickingView(interval: someRate) { c in }").isEmpty)
+        #expect(!Self.unreadableClocks(in: "TickingView(interval: Motion.reduced ? 1 : rate) { c in }").isEmpty)
+        #expect(!Self.unreadableClocks(in: "TimelineView(.animation) { c in }").isEmpty)
+        #expect(!Self.unreadableClocks(in: "TimelineView(.periodic(from: .now, by: step)) { c in }").isEmpty)
+        #expect(Self.unreadableClocks(in: "TickingView(interval: 1) { c in }").isEmpty)
+        #expect(Self.unreadableClocks(in: "TickingView(interval: Motion.reduced ? 0.5 : NotchLights.frameInterval) { c in }").isEmpty)
+        #expect(Self.unreadableClocks(in: "TimelineView(.periodic(from: .now, by: 0.25)) { c in }").isEmpty)
+        #expect(Self.unreadableClocks(in: "TimelineView(.everyMinute) { c in }").isEmpty)
     }
 
     // MARK: Tests on the real tree
@@ -187,6 +307,16 @@ struct MotionSourceLintTests {
         }
         #expect(problems.isEmpty, "use DisplaySynchronizedView at Motion.ambientFPS, or allowlist with a reason: \(problems)")
         for entry in Self.fastClockAllowlist { #expect(!entry.reason.isEmpty, "\(entry.file) needs a reason") }
+    }
+
+    @Test func everyClockRateCanBeReadFromTheSource() throws {
+        var problems: [String] = []
+        for file in Self.swiftFiles() {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            for hit in Self.unreadableClocks(in: source) { problems.append("\(file.lastPathComponent): \(hit)") }
+        }
+        #expect(problems.isEmpty, "use a literal of 0.1 s or more, or add the named constant to namedIntervals with a reason: \(problems)")
+        for entry in Self.namedIntervals { #expect(!entry.reason.isEmpty, "\(entry.name) needs a reason") }
     }
 
     @Test func everyAllowlistedFileStillExists() throws {

@@ -6569,7 +6569,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
-              "function": "aSpringWrittenWithNumbersIsFlagged"
+              "function": "aSpringWrittenWithNumbersOrAPresetIsFlagged"
             },
             {
               "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
@@ -6590,6 +6590,18 @@
             {
               "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
               "function": "theAmbientLoopsRunOnTheDisplayLink"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+              "function": "commentsAreBlankedButStringsKeepTheirSlashes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+              "function": "aClockWhoseRateCannotBeReadIsFlagged"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+              "function": "everyClockRateCanBeReadFromTheSource"
             }
           ],
           "id": "F13.motion-source-lint"

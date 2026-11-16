@@ -6215,6 +6215,54 @@
         "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
         "function": "theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer"
       }
+    },
+    {
+      "id": "REG-747",
+      "failure": "A frame clock whose interval was a variable could run fast and pass the lint, which only read literals.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "everyClockRateCanBeReadFromTheSource"
+      }
+    },
+    {
+      "id": "REG-748",
+      "failure": "The lint accepted any non-literal timer interval and any timeline without an interval.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "aClockWhoseRateCannotBeReadIsFlagged"
+      }
+    },
+    {
+      "id": "REG-749",
+      "failure": "The lint cut a line at a // inside a string and ignored block comments, so code could hide or be misread.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "commentsAreBlankedButStringsKeepTheirSlashes"
+      }
+    },
+    {
+      "id": "REG-750",
+      "failure": "Stock presets and duration-based springs sidestepped the rule against spring numbers outside the token table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "aSpringWrittenWithNumbersOrAPresetIsFlagged"
+      }
     }
   ]
 }

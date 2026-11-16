@@ -189,7 +189,7 @@ struct LivingAvatar: View {
     var body: some View {
         Group {
             if let pinnedPose {
-                TickingView(interval: Self.tickInterval(for: MascotMotion(pose: pinnedPose), atlas: atlas), paused: paused) { context in
+                TickingView(interval: Self.clipInterval(for: MascotMotion(pose: pinnedPose), atlas: atlas), paused: paused) { context in
                     frame(MascotMotion(pose: pinnedPose, elapsed: context.date.timeIntervalSinceReferenceDate))
                 }
             } else if let frameTime {
