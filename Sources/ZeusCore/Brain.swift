@@ -116,6 +116,8 @@ public struct BrainRequest: Sendable {
     /// The screenshot is attached because talk drawing is on. A persistent Claude process that took it is replaced
     /// before the next turn; with drawing off nothing is flagged and the process is reused as before.
     public let carriesDrawImage: Bool
+    /// Why `screenshots` is empty, when it is. Nil reads as "not captured this turn".
+    public let screenReason: ScreenSightReason?
 
     public init(
         turn: UUID = UUID(),
@@ -127,9 +129,11 @@ public struct BrainRequest: Sendable {
         systemPrompt: String,
         deep: Bool = false,
         firstTextBudget: TimeInterval? = nil,
-        carriesDrawImage: Bool = false
+        carriesDrawImage: Bool = false,
+        screenReason: ScreenSightReason? = nil
     ) {
         self.carriesDrawImage = carriesDrawImage
+        self.screenReason = screenReason
         self.turn = turn
         self.transcript = transcript
         self.screenshots = screenshots

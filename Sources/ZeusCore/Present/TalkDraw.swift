@@ -192,9 +192,9 @@ public enum TalkDrawScene {
 
 /// When a talk turn may carry a screenshot for drawing, and whose answer may draw on it.
 public enum TalkDrawPolicy {
-    /// Engines whose request carries the image: the app's own Claude provider and the direct
-    /// Anthropic API. A CLI engine fed on stdin never sees pixels, so its coordinates mean nothing.
-    private static let sighted: Set<String> = ["claude", "anthropic-api"]
+    /// Engines whose request carries the image: the app's own Claude provider. The direct Anthropic API
+    /// and every CLI engine fed on stdin are text only and never see pixels, so their coordinates mean nothing.
+    private static let sighted: Set<String> = ["claude"]
 
     public static func accepts(winner: String?) -> Bool {
         winner.map(sighted.contains) ?? false

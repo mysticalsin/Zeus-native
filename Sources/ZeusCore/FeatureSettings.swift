@@ -43,6 +43,10 @@ public enum FeatureSettings {
     /// screenshot of the cursor display to Claude with the question.
     public static func talkDrawOnScreen(defaults: UserDefaults = .standard) -> Bool { bool("talk.drawOnScreen", default: false, defaults: defaults) }
 
+    /// Whether the brain gets a screenshot of each display with a talk question, so Zeus can see what the owner sees.
+    /// On unless the owner turns it off. Separate from drawing marks, which stays off until chosen.
+    public static func talkSeeScreen(defaults: UserDefaults = .standard) -> Bool { bool("talk.seeScreen", default: true, defaults: defaults) }
+
     // MARK: Tiling
 
     /// Arranging windows from the keyboard. Off until the owner turns it on, and a settings import cannot turn it on.

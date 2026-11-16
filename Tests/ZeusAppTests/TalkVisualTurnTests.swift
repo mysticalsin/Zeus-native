@@ -46,12 +46,14 @@ struct TalkVisualTurnTests {
     private static let reply = #"[DRAW:{"s":1,"m":[{"k":"ring","x":412,"y":88,"r":24,"at":0},{"k":"card","x":440,"y":120,"t":"Export","at":1}]}]"#
         + " Open the File menu. Choose Export as PDF. Then save it."
 
-    private func controller(consent: Bool, log: TurnLog) -> VoiceTurnController {
+    private func controller(consent: Bool, log: TurnLog, sees: Bool = false, permission: Bool = true) -> VoiceTurnController {
         VoiceTurnController(buddy: BuddyController(), notch: NotchController(), brain: ClaudeCLIProvider(),
-                            speaker: FakeSpeaker(log), presenter: FakePresenter(log), drawConsent: { consent })
+                            speaker: FakeSpeaker(log), presenter: FakePresenter(log), drawConsent: { consent },
+                            seeScreen: { sees }, screenPermission: { permission })
     }
 
-    private func run(_ controller: VoiceTurnController, winner: String, sighted: Bool = true) async -> TurnResult {
+    private func run(_ controller: VoiceTurnController, winner: String, sighted: Bool = true,
+                      screenshots: [ScreenShot] = TalkVisualTurnTests.shots) async -> TurnResult {
         let events = AsyncThrowingStream<BrainEvent, Error> { continuation in
             for chunk in stride(from: 0, to: Self.reply.count, by: 11) {
                 let from = Self.reply.index(Self.reply.startIndex, offsetBy: chunk)
@@ -61,7 +63,7 @@ struct TalkVisualTurnTests {
             continuation.yield(.done(nil))
             continuation.finish()
         }
-        return await controller.runScriptedTurn(transcript: "where do I export this as a PDF", screenshots: Self.shots,
+        return await controller.runScriptedTurn(transcript: "where do I export this as a PDF", screenshots: screenshots,
                                                 replay: (id: winner, events: events), replaySawScreen: sighted)
     }
 
@@ -160,6 +162,72 @@ struct TalkVisualTurnTests {
         _ = await run(controller(consent: true, log: log), winner: "claude", sighted: false)
         #expect(!log.events.contains { $0.hasPrefix("begin") || $0.hasPrefix("reveal") })
         #expect(log.events.filter { $0.hasPrefix("line ") }.count == 3)
+    }
+
+    // MARK: Seeing the screen is separate from drawing on it
+
+    @Test func seeingTheScreenSendsEveryDisplayToTheAppClaudeProviderWithoutDrawingAnything() async throws {
+        let log = TurnLog()
+        let sees = controller(consent: false, log: log, sees: true)
+        let box = observe(sees)
+        _ = await run(sees, winner: "claude")
+        let seen = try #require(box.observation)
+        #expect(seen.request.screenshots.map(\.label) == ["screen 1", "screen 2"])
+        #expect(seen.preferAppClaude, "the image-capable provider serves the turn")
+        #expect(seen.request.carriesDrawImage)
+        #expect(!seen.request.systemPrompt.contains("[DRAW:"))
+        #expect(seen.shots.count == 2)
+        #expect(!log.events.contains { $0.hasPrefix("begin") || $0.hasPrefix("reveal") })
+    }
+
+    @Test func seeingTheScreenAndDrawingTogetherSendOneDisplayAndAllowMarks() async throws {
+        let log = TurnLog()
+        let both = controller(consent: true, log: log, sees: true)
+        let box = observe(both)
+        _ = await run(both, winner: "claude")
+        let seen = try #require(box.observation)
+        #expect(seen.request.screenshots.map(\.label) == ["screen 1"])
+        #expect(seen.preferAppClaude)
+        #expect(seen.request.systemPrompt.contains("[DRAW:"))
+        #expect(log.events.contains("begin marks=2 w=1280"))
+    }
+
+    @Test func aTurnWithNoCapturesStaysOnTheTextRouteEvenWhenSeeingIsOn() async throws {
+        let log = TurnLog()
+        let sees = controller(consent: false, log: log, sees: true)
+        let box = observe(sees)
+        _ = await run(sees, winner: "claude", screenshots: [])
+        let seen = try #require(box.observation)
+        #expect(seen.request.screenshots.isEmpty)
+        #expect(!seen.preferAppClaude)
+        #expect(!seen.request.carriesDrawImage)
+    }
+
+    // MARK: Without Screen Recording the owner is told once per launch
+
+    @Test func withoutScreenRecordingTheOwnerHearsItOncePerLaunchAndTheModelIsToldWhy() async throws {
+        let log = TurnLog()
+        let blind = controller(consent: false, log: log, sees: true, permission: false)
+        let box = observe(blind)
+        _ = await run(blind, winner: "claude", screenshots: [])
+        let first = try #require(box.observation)
+        #expect(first.request.screenReason == .permissionOff)
+        #expect(!first.preferAppClaude)
+        let notices = log.events.filter { $0.contains("Screen Recording") }
+        #expect(notices == ["line " + ScreenSightNotice.message])
+        log.events.removeAll()
+        _ = await run(blind, winner: "claude", screenshots: [])
+        #expect(!log.events.contains { $0.contains("Screen Recording") }, "the second turn stays quiet")
+        #expect(try #require(box.observation).request.screenReason == .permissionOff)
+    }
+
+    @Test func withScreenRecordingGrantedNoNoticeIsSpokenAndAnEmptyCaptureIsNotBlamedOnPermission() async throws {
+        let log = TurnLog()
+        let sighted = controller(consent: false, log: log, sees: true, permission: true)
+        let box = observe(sighted)
+        _ = await run(sighted, winner: "claude", screenshots: [])
+        #expect(!log.events.contains { $0.contains("Screen Recording") })
+        #expect(try #require(box.observation).request.screenReason == .notCaptured)
     }
 
     // MARK: One turn's drawing cannot be changed by another turn

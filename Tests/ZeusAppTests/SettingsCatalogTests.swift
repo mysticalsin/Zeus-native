@@ -431,4 +431,20 @@ struct SettingsCatalogTests {
         empty.set("true", forKey: FeatureSettings.key("talk.drawOnScreen"))
         #expect(FeatureSettings.talkDrawOnScreen(defaults: empty))
     }
+
+    @Test func seeScreenIsAnOnByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing() throws {
+        let option = try #require(SettingsCatalog.option("talk.seeScreen"))
+        #expect(option.section == .voice)
+        #expect(option.kind == .toggle)
+        #expect(option.defaultValue == "true")
+        #expect(option.state == .live)
+        #expect(option.note.lowercased().contains("screen"))
+        let draw = try #require(SettingsCatalog.option("talk.drawOnScreen"))
+        #expect(draw.defaultValue == "false")
+        let empty = UserDefaults(suiteName: NSTemporaryDirectory() + "talk.seeScreen.\(UUID().uuidString)")!
+        #expect(FeatureSettings.talkSeeScreen(defaults: empty))
+        #expect(!FeatureSettings.talkDrawOnScreen(defaults: empty))
+        empty.set("false", forKey: FeatureSettings.key("talk.seeScreen"))
+        #expect(!FeatureSettings.talkSeeScreen(defaults: empty))
+    }
 }

@@ -24,6 +24,11 @@ final class VoiceTurnController {
     private let presenter: any TalkVisualPresenting
     /// Whether the owner turned on drawing marks on the screen while Zeus answers (off by default).
     private let drawConsent: () -> Bool
+    /// Whether the brain gets the screenshots (on by default), and whether Screen Recording is granted.
+    private let seeScreenConsent: () -> Bool
+    private let screenPermission: () -> Bool
+    /// The "I can't see your screen" notice, given once per launch.
+    private var sightNotice = ScreenSightNotice()
     /// A drawing from this controller's last answer may still be on screen.
     private var drawActive = false
 
@@ -72,8 +77,12 @@ final class VoiceTurnController {
 
     init(buddy: BuddyController, notch: NotchController, brain: BrainProvider,
          speaker: (any LineSpeaking)? = nil, presenter: (any TalkVisualPresenting)? = nil,
-         drawConsent: @escaping () -> Bool = { FeatureSettings.talkDrawOnScreen() }) {
+         drawConsent: @escaping () -> Bool = { FeatureSettings.talkDrawOnScreen() },
+         seeScreen: @escaping () -> Bool = { FeatureSettings.talkSeeScreen() },
+         screenPermission: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
         self.drawConsent = drawConsent
+        seeScreenConsent = seeScreen
+        self.screenPermission = screenPermission
         self.buddy = buddy
         self.notch = notch
         self.brain = brain
@@ -749,16 +758,26 @@ final class VoiceTurnController {
         if !restricted, !pageText, awareness.needsCapture, shots.isEmpty {
             shots = await ScreenCapture.captureAll()
         }
-        if pageText || restricted || (awareness.preferPixels == false && !awareness.promptPrefix.isEmpty) {
-            shots = []
-        }
-        // Drawing on: one screenshot (the cursor display), only from a winner that saw it.
-        let drawing = TalkDrawPolicy.wantsImages(consent: drawConsent(), shots: shots.count)
+        // Seeing the screen sends one image per display to the image-capable provider and keeps pixels even when window
+        // text exists. Drawing marks is a separate consent: it cuts the request to the cursor display.
+        let seeScreen = seeScreenConsent(), drawConsented = drawConsent()
+        let sight = TalkSightPolicy.plan(
+            seeScreen: seeScreen, drawConsent: drawConsented, restricted: restricted, pageRoute: pageText,
+            textAnswersIt: awareness.preferPixels == false && !awareness.promptPrefix.isEmpty, captured: shots)
+        shots = sight.kept
+        let drawing = sight.drawing
         if drawing {
             system += "\n\n" + ZeusPrompt.drawInstructions()
         }
         // Only the brain request is cut to one display; POINT screenN tags and the drive and walkthrough actions keep every capture.
-        let requestShots = TalkDrawPolicy.requestShots(consent: drawing, shots: shots)
+        let requestShots = sight.request
+        var screenReason: ScreenSightReason?
+        var owesSightNotice = false
+        if shots.isEmpty {
+            let granted = screenPermission()
+            screenReason = granted ? .notCaptured : .permissionOff
+            owesSightNotice = !granted && !restricted && !pageText && (seeScreen || drawConsented)
+        }
         let drawToken = UUID()
         if let route {
             system += "\n\n" + AgentRouter.preamble(route.agent, memory: agentStore.memory(for: route.agent))
@@ -774,9 +793,10 @@ final class VoiceTurnController {
             history: history,
             systemPrompt: system,
             deep: deep,
-            carriesDrawImage: drawing
+            carriesDrawImage: sight.sendsImages,
+            screenReason: screenReason
         )
-        turnObserver?(TurnObservation(request: request, preferAppClaude: drawing, shots: shots))
+        turnObserver?(TurnObservation(request: request, preferAppClaude: sight.sendsImages, shots: shots))
 
         var parser = ZeusTagStreamParser()
         var splitter = SentenceSplitter()
@@ -952,7 +972,7 @@ final class VoiceTurnController {
                 let taskKind = RouterTask.classify(transcript)
                 let ordered = BrainLatencyBook.shared.ordered(
                     RouterSettings.shared.brainEngineCandidates(task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain,
-                                                    preferAppClaude: drawing),
+                                                    preferAppClaude: sight.sendsImages),
                     id: \.id)
                 guard !ordered.isEmpty else {
                     VoiceLog.log("route", "brain (none)")
@@ -1017,6 +1037,12 @@ final class VoiceTurnController {
             }
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()
+            // No Screen Recording: one log line and one plain notice per launch, never a permission prompt mid-turn.
+            if owesSightNotice, let notice = sightNotice.take(permissionGranted: false) {
+                VoiceLog.log("screen", "Screen Recording is off, so Zeus cannot see the screen; owner told once this launch")
+                NSLog("[ZEUS] screen sight: Screen Recording permission is off (told the owner once this launch)")
+                if speak { speaker.speak(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }
+            }
             if !pointed { buddy.idle() }
             if !result.actions.isEmpty { AvatarStatus.shared.flash(.done, for: 2) }
             // Defense in depth: a tag or control code split oddly across streamed chunks could
