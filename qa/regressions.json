@@ -7655,6 +7655,30 @@
         "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
         "function": "aNetworkErrorOrTimeoutPausesElevenLabsBrieflySoTheNextSentencesGoToKokoro"
       }
+    },
+    {
+      "id": "REG-838",
+      "failure": "A hung ElevenLabs request waited for response headers up to 15 seconds per route (doubled by the Studio retry) before Kokoro spoke, because the 4 second first-audio deadline was only checked while bytes arrived; a late fragment also counted as success.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+        "function": "theDeadlineBoundsHeadersAndFirstAudioTogether"
+      }
+    },
+    {
+      "id": "REG-839",
+      "failure": "An imported voice.ttsProvider without voice.engine.auto turned automatic routing off and pinned that engine, so ElevenLabs first with Kokoro as failsafe no longer applied.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+        "function": "anImportedProviderWithoutAnExplicitAutoFlagStaysAutomatic"
+      }
     }
   ]
 }
