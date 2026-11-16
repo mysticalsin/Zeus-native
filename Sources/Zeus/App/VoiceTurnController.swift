@@ -773,10 +773,14 @@ final class VoiceTurnController {
         let requestShots = sight.request
         var screenReason: ScreenSightReason?
         var owesSightNotice = false
-        if shots.isEmpty {
-            let granted = screenPermission()
-            screenReason = granted ? .notCaptured : .permissionOff
-            owesSightNotice = !granted && !restricted && !pageText && (seeScreen || drawConsented)
+        if requestShots.isEmpty {
+            if shots.isEmpty {
+                let granted = screenPermission()
+                screenReason = granted ? .notCaptured : .permissionOff
+                owesSightNotice = !granted && !restricted && !pageText && (seeScreen || drawConsented)
+            } else {
+                screenReason = .turnedOff // captured for POINT and drive, but seeing and drawing are both off
+            }
         }
         let drawToken = UUID()
         if let route {
@@ -991,9 +995,17 @@ final class VoiceTurnController {
                     ordered.first { $0.engine == engine }.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) }
                 }
                 VoiceLog.log("route", "brain race \(raced.map(\.id).joined(separator: " + "))\(deepReason != nil && deepTier != nil ? ", deep behind: \(deepTier?.id ?? "")" : "")")
-                let race = FastRaceRun(
-                    tiers: raced.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
-                    request: request.with(deep: deep, firstTextBudget: budget),
+                // A turn that carries screenshots races only the engine that can see them; text-only engines wait and
+                // answer (without the screen, and saying so) only if the image engine fails or times out.
+                let groups = TalkSightPolicy.raceGroups(ids: raced.map(\.id), carriesImages: request.carriesDrawImage)
+                let primary = raced.filter { groups.primary.contains($0.id) }
+                let fallback = raced.filter { groups.fallback.contains($0.id) }
+                let keepsDeep = TalkSightPolicy.keepsDeepTier(deepID: deepTier?.id, carriesImages: request.carriesDrawImage)
+                func makeRace(_ tiers: [(engine: BrainEngineID, id: String, provider: BrainProvider)], _ turnRequest: BrainRequest,
+                              deepTier: FastRaceRun.Tier?, deepReason: DeepTrigger.Reason?) -> FastRaceRun {
+                    FastRaceRun(
+                    tiers: tiers.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
+                    request: turnRequest.with(deep: deep, firstTextBudget: budget),
                     deepTier: deepTier, deepReason: deepReason,
                     callbacks: FastRaceRun.Callbacks(
                         filler: { [weak self] in
@@ -1023,9 +1035,20 @@ final class VoiceTurnController {
                         deliverDeep: { [weak self] text in
                             self?.deliverDeepAnswer(text, transcript: transcript, speak: speak)
                         }))
+                }
+                var race = makeRace(primary, request, deepTier: keepsDeep ? deepTier : nil, deepReason: keepsDeep ? deepReason : nil)
                 fastRace = race
                 VoiceLatency.shared.mark(.requestSent)
-                try await race.run { delta in parser.feed(delta).forEach(handle) }
+                do {
+                    try await race.run { delta in parser.feed(delta).forEach(handle) }
+                } catch where spoken.isEmpty && !fallback.isEmpty && !Task.isCancelled {
+                    // The image engine failed before saying anything: the text engines answer, and say they cannot see.
+                    VoiceLog.log("route", "image engine failed; racing text engines \(fallback.map(\.id).joined(separator: " + "))")
+                    let blind = request.with(screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
+                    race = makeRace(fallback, blind, deepTier: nil, deepReason: nil)
+                    fastRace = race
+                    try await race.run { delta in parser.feed(delta).forEach(handle) }
+                }
                 VoiceLog.log("brain", "engine=\(race.winnerID ?? "?") done_ms=\(max(0, Int(Date().timeIntervalSince(started) * 1000)))")
             }
             parser.finish().forEach(handle)

@@ -148,12 +148,14 @@ public struct BrainRequest: Sendable {
     /// A copy with one field changed. Used when a turn retries deeper, or a racer needs its own id so cancelling the loser leaves the winner running.
     public func with(turn: UUID? = nil, transcript: String? = nil, screenshots: [ScreenShot]? = nil,
                      systemPrompt: String? = nil, deep: Bool? = nil,
-                     firstTextBudget: TimeInterval? = nil) -> BrainRequest {
+                     firstTextBudget: TimeInterval? = nil, screenReason: ScreenSightReason? = nil,
+                     carriesDrawImage: Bool? = nil) -> BrainRequest {
         BrainRequest(turn: turn ?? self.turn, transcript: transcript ?? self.transcript,
                      screenshots: screenshots ?? self.screenshots, axSummary: axSummary, activeTab: activeTab,
                      history: history, systemPrompt: systemPrompt ?? self.systemPrompt, deep: deep ?? self.deep,
-                     firstTextBudget: firstTextBudget ?? self.firstTextBudget, carriesDrawImage: carriesDrawImage,
-                     screenReason: screenReason)
+                     firstTextBudget: firstTextBudget ?? self.firstTextBudget,
+                     carriesDrawImage: carriesDrawImage ?? self.carriesDrawImage,
+                     screenReason: screenReason ?? self.screenReason)
     }
 }
 

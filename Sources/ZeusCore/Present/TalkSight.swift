@@ -4,6 +4,10 @@ import Foundation
 public enum ScreenSightReason: String, Sendable, Equatable {
     case permissionOff
     case notCaptured
+    /// Seeing the screen is switched off in Settings (and drawing is off), so nothing is sent.
+    case turnedOff
+    /// The launch cannot keep screenshots out of the saved session, so none are sent.
+    case imagesBlocked
 }
 
 /// What the model is told about the screen. It is told it can see only when pixels are really attached.
@@ -20,6 +24,12 @@ public enum ScreenSightNote {
         case .notCaptured, nil:
             return "No screenshots this turn: none were captured, so you cannot see the screen right now. "
                 + "Do not guess what is on it. Use [POINT:none]."
+        case .turnedOff:
+            return "No screenshots this turn: Tony turned off seeing his screen, so you cannot see the screen. "
+                + "Say so plainly if he asks about it. Use [POINT:none]."
+        case .imagesBlocked:
+            return "No screenshots this turn: this setup cannot send them privately, so you cannot see the screen. "
+                + "Say so plainly if Tony asks about it. Use [POINT:none]."
         }
     }
 
@@ -58,9 +68,37 @@ public enum TalkSightPolicy {
                             captured: [ScreenShot]) -> Plan {
         let kept = (restricted || pageRoute || (textAnswersIt && !seeScreen)) ? [] : captured
         let drawing = TalkDrawPolicy.wantsImages(consent: drawConsent, shots: kept.count)
-        let request = TalkDrawPolicy.requestShots(consent: drawing, shots: kept)
+        // With seeing and drawing both off no image is attached at all, whatever provider ends up serving the turn.
+        // `kept` stays whole for POINT tags and the drive and walkthrough actions.
+        let request = (seeScreen || drawing) ? TalkDrawPolicy.requestShots(consent: drawing, shots: kept) : []
         return Plan(kept: kept, request: request, drawing: drawing,
                     sendsImages: !request.isEmpty && (seeScreen || drawing))
+    }
+}
+
+extension TalkSightPolicy {
+    /// Which racers start together. A turn carrying screenshots races only the engines that can see them; the text-only
+    /// engines are held back as a fallback for when the image engine fails or times out. Nothing sighted: everyone races.
+    public static func raceGroups(ids: [String], carriesImages: Bool) -> (primary: [String], fallback: [String]) {
+        guard carriesImages else { return (ids, []) }
+        let sighted = ids.filter { TalkDrawPolicy.accepts(winner: $0) }
+        guard !sighted.isEmpty else { return (ids, []) }
+        return (sighted, ids.filter { !sighted.contains($0) })
+    }
+
+    /// The deeper follow-up engine answers later in text, so it is dropped on a turn that carries screenshots
+    /// unless it is itself an engine that sees them.
+    public static func keepsDeepTier(deepID: String?, carriesImages: Bool) -> Bool {
+        guard let deepID else { return false }
+        return !carriesImages || TalkDrawPolicy.accepts(winner: deepID)
+    }
+
+    /// Screenshots are attached only to a launch that keeps them out of the saved session: a spoken turn on a `claude`
+    /// that supports `--safe-mode` (which comes with `--no-session-persistence`). Any other launch goes out text only,
+    /// and the model is told it cannot see.
+    public static func launchRequest(_ request: BrainRequest, voice: Bool, supportsNoSessionPersistence: Bool) -> BrainRequest {
+        guard !request.screenshots.isEmpty, !(voice && supportsNoSessionPersistence) else { return request }
+        return request.with(screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
     }
 }
 

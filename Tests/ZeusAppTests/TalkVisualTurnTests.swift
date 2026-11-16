@@ -136,12 +136,25 @@ struct TalkVisualTurnTests {
         let box = observe(off)
         _ = await run(off, winner: "claude")
         let seen = try #require(box.observation)
-        #expect(seen.request.screenshots.count == 2)
-        #expect(seen.request.screenshots.map(\.label) == ["screen 1", "screen 2"])
+        #expect(seen.request.screenshots.isEmpty, "seeing and drawing off: no image rides the request")
+        #expect(seen.request.screenReason == .turnedOff)
         #expect(!seen.preferAppClaude)
         #expect(!seen.request.carriesDrawImage)
         #expect(!seen.request.systemPrompt.contains("[DRAW:"))
         #expect(seen.shots.count == 2)
+    }
+
+    @Test func noImageReachesAnyProviderWhenSeeingAndDrawingAreOffEvenOnTheAppClaudePath() async throws {
+        let log = TurnLog()
+        let off = controller(consent: false, log: log, sees: false)
+        let box = observe(off)
+        _ = await run(off, winner: "claude")
+        let seen = try #require(box.observation)
+        let message = String(decoding: ClaudeCLIProvider.userMessage(for: seen.request), as: UTF8.self)
+        #expect(!message.contains("\"type\":\"image\""), "the app Claude provider serves a CLI-less install with the same request")
+        #expect(!message.contains("Screenshots attached"))
+        #expect(message.contains("cannot see the screen"))
+        #expect(seen.shots.count == 2, "POINT and drive keep the captures")
     }
 
     @Test func consentOnSendsOneShotToTheBrainButKeepsEveryCaptureForPointAndDrive() async throws {

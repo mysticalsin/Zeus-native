@@ -27,7 +27,8 @@ import Testing
 
     @Test func seeingTheScreenOffAndDrawingOffKeepsTheOldTextRoute() {
         let p = plan(see: false, draw: false)
-        #expect(p.requestLabels.count == 2)
+        #expect(p.requestLabels.isEmpty, "no image is attached when seeing and drawing are both off")
+        #expect(p.keptCount == 2, "POINT screenN and drive still keep every capture")
         #expect(!p.sendsImages)
         #expect(!p.drawing)
     }
@@ -116,6 +117,70 @@ import Testing
         #expect(request.screenReason == .permissionOff)
         #expect(request.with(deep: true, firstTextBudget: 8).screenReason == .permissionOff)
         #expect(BrainRequest(transcript: "x", systemPrompt: "s").screenReason == nil)
+    }
+}
+
+@Suite struct TalkSightRoutingPolicyTests {
+    private let shot = ScreenShot(jpegData: Data([1]), label: "screen 1 of 1", pixelWidth: 10, pixelHeight: 10, displayFrame: .zero)
+
+    @Test func aTurnWithScreenshotsRacesOnlyTheEngineThatSeesThemAndHoldsTextEnginesBack() {
+        let groups = TalkSightPolicy.raceGroups(ids: ["anthropic-api", "claude", "codex"], carriesImages: true)
+        #expect(groups.primary == ["claude"])
+        #expect(groups.fallback == ["anthropic-api", "codex"])
+    }
+
+    @Test func aTurnWithoutScreenshotsRacesEveryEngineTogether() {
+        let groups = TalkSightPolicy.raceGroups(ids: ["anthropic-api", "claude", "codex"], carriesImages: false)
+        #expect(groups.primary == ["anthropic-api", "claude", "codex"] && groups.fallback.isEmpty)
+    }
+
+    @Test func ifNoRacerCanSeeEveryoneRacesEvenWithScreenshots() {
+        let groups = TalkSightPolicy.raceGroups(ids: ["anthropic-api", "codex"], carriesImages: true)
+        #expect(groups.primary == ["anthropic-api", "codex"] && groups.fallback.isEmpty)
+    }
+
+    @Test func theDeepFollowUpIsDroppedOnAScreenshotTurnUnlessItSeesTheScreen() {
+        #expect(TalkSightPolicy.keepsDeepTier(deepID: "anthropic-api", carriesImages: false))
+        #expect(!TalkSightPolicy.keepsDeepTier(deepID: "anthropic-api", carriesImages: true))
+        #expect(TalkSightPolicy.keepsDeepTier(deepID: "claude", carriesImages: true))
+        #expect(!TalkSightPolicy.keepsDeepTier(deepID: nil, carriesImages: false))
+    }
+
+    @Test func aLaunchWithoutNoSessionPersistenceSendsNoScreenshotsAndSaysSo() {
+        let request = BrainRequest(transcript: "x", screenshots: [shot], systemPrompt: "s", firstTextBudget: 8, carriesDrawImage: true)
+        let sent = TalkSightPolicy.launchRequest(request, voice: true, supportsNoSessionPersistence: false)
+        #expect(sent.screenshots.isEmpty && !sent.carriesDrawImage)
+        #expect(sent.screenReason == .imagesBlocked)
+        #expect(ScreenSightNote.line(labels: [], reason: sent.screenReason).contains("cannot see the screen"))
+    }
+
+    @Test func aSpokenLaunchThatKeepsNoSessionKeepsItsScreenshots() {
+        let request = BrainRequest(transcript: "x", screenshots: [shot], systemPrompt: "s", firstTextBudget: 8, carriesDrawImage: true)
+        let sent = TalkSightPolicy.launchRequest(request, voice: true, supportsNoSessionPersistence: true)
+        #expect(sent.screenshots.count == 1 && sent.carriesDrawImage && sent.screenReason == nil)
+    }
+
+    @Test func aNonSpokenLaunchNeverGetsScreenshotsEvenOnANewClaude() {
+        let request = BrainRequest(transcript: "x", screenshots: [shot], systemPrompt: "s")
+        let sent = TalkSightPolicy.launchRequest(request, voice: false, supportsNoSessionPersistence: true)
+        #expect(sent.screenshots.isEmpty && sent.screenReason == .imagesBlocked)
+        let none = BrainRequest(transcript: "x", systemPrompt: "s")
+        #expect(TalkSightPolicy.launchRequest(none, voice: false, supportsNoSessionPersistence: false).screenReason == nil)
+    }
+
+    @Test func turnedOffAndBlockedImagesSayWhyWithoutBlamingThePermission() {
+        for reason in [ScreenSightReason.turnedOff, .imagesBlocked] {
+            let text = ScreenSightNote.line(labels: [], reason: reason)
+            #expect(text.contains("No screenshots") && text.contains("cannot see the screen"), "\(reason)")
+            #expect(!text.lowercased().contains("permission"), "\(reason)")
+        }
+    }
+
+    @Test func aCopyCanChangeTheReasonAndDropTheImageFlag() {
+        let request = BrainRequest(transcript: "x", systemPrompt: "s", carriesDrawImage: true, screenReason: .permissionOff)
+        let copy = request.with(screenReason: .turnedOff, carriesDrawImage: false)
+        #expect(copy.screenReason == .turnedOff && !copy.carriesDrawImage)
+        #expect(request.with(deep: true).carriesDrawImage && request.with(deep: true).screenReason == .permissionOff)
     }
 }
 
