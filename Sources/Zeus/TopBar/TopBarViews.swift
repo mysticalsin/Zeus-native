@@ -294,6 +294,7 @@ struct TopBarHeader: View {
             .accessibilityHint("Opens a menu with settings and the Zeus pointer toggle.")
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("notch.more")
+            .accessibilityAction { MoreMenu.show(topBar: topBar) }
         }
         .frame(height: GlanceTopBar.tabRowHeight)
         // N9 (parity/N9-glance-switch): new label appears at once; pill slides about 3 frames later
@@ -366,6 +367,9 @@ struct TopBarHeader: View {
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .accessibilityHint(selected ? "" : "Shows \(tab.title).")
         .accessibilityIdentifier("notch.tab.\(tab.rawValue)")
+        // `.ignore` replaces the Button with a new element that has no default action of its own, so AXPress
+        // from outside (VoiceOver, Switch Control) did nothing. Say what pressing it does.
+        .accessibilityAction { topBar.selectedTab = tab }
     }
 
     /// Counts shown as numbers (Glance): alerts from the last day, files in the Inbox, clipboard items.
@@ -1055,6 +1059,12 @@ private struct ClipboardRow: View {
         }
     }
 
+    /// A click, and the default accessibility action: copy this entry again.
+    private func copyBack() {
+        if entry.kind == .text || entry.kind == .link { topBar.copyText(entry.text) } else { ClipboardMedia.copyBack(entry) }
+        topBar.show(.copied(entry.preview))
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if hasThumb, let thumb = ClipboardMedia.thumbnail(for: entry) {
@@ -1092,14 +1102,12 @@ private struct ClipboardRow: View {
         .background(Color.white.opacity((topBar.hovered == "c\(entry.id)") ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .contentShape(Rectangle())
         .onHover { topBar.hovered = $0 ? "c\(entry.id)" : (topBar.hovered == "c\(entry.id)" ? nil : topBar.hovered) }
-        .onTapGesture {
-            if entry.kind == .text || entry.kind == .link { topBar.copyText(entry.text) } else { ClipboardMedia.copyBack(entry) }
-            topBar.show(.copied(entry.preview))
-        }
+        .onTapGesture { copyBack() }
         .live { $0.onDrag { ClipboardMedia.dragProvider(for: entry) } }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Copies this again. Drag it out to drop it elsewhere.")
+        .accessibilityAction { copyBack() }
         // Pin and Remove only draw while hovered; VoiceOver and the keyboard get them here.
         .accessibilityAction(named: entry.pinned ? "Unpin" : "Pin") { topBar.clipboard.togglePin(entry.id) }
         .accessibilityAction(named: "Remove") { removeEntry() }
@@ -1754,6 +1762,7 @@ enum ScribeWings {
             .accessibilityLabel("Scribe recording")
             .accessibilityValue(RecordingMotion.spokenElapsed(scribe.elapsed) ?? "Elapsed time unavailable")
             .accessibilityHint("Opens Scribe, where you can end the meeting.")
+            .accessibilityAction { topBar.onOpenTab(.scribe) }
         }
 
         /// The clock for the words' pacing runs only while this wing is on screen (that is, while recording).

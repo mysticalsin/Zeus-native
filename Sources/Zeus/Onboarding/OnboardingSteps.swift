@@ -313,6 +313,7 @@ private struct AgentSegmented: View {
                 .accessibilityLabel(title)
                 .accessibilityAddTraits(selection == choice ? [.isSelected] : [])
                 .accessibilityIdentifier("onboarding.agent.\(choice == .claude ? "claude" : "codex")")
+                .accessibilityAction { selection = choice }
             }
         }
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(ob.track))

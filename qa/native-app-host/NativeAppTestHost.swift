@@ -88,6 +88,8 @@ private enum NativeAppTestHost {
                 "^ZeusAppTests\\.ExplanationChatLifecycleTests/",
                 // Local trusted-Mac journey only (scripts/trusted-ax-journey.sh); CI never selects it.
                 "^ZeusAppTests\\.ScribeTrustedAccessibilityJourneyTests/",
+                // Local trusted-Mac AXPress on the notch tabs and body; CI never selects it either.
+                "^ZeusAppTests\\.NotchTrustedAccessibilityTests/",
                 "^ZeusAppTests\\.ClosedWingsNotchTests/",
                 "^ZeusAppTests\\.FlingShelfJourneyTests/",
                 "^ZeusAppTests\\.FlingTwoProcessTests/"

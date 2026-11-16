@@ -174,6 +174,7 @@ struct FlingStackCell: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Stack of \(items.count) files from \(from)")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction { open() }
     }
 }
 

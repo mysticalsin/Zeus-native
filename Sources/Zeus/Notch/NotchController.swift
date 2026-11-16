@@ -457,6 +457,17 @@ final class NotchController {
         return true
     }
 
+    /// The accessibility "Open Zeus panel" action on the notch: the same result as a completed hover or click.
+    /// Same guards as `openOnClick`: something to show, and never while the drawn notch is being calibrated.
+    func openFromAccessibility() {
+        guard model.presentation != .panel else { return }
+        guard screen != nil, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
+        guard !drawnNotch.isCalibrating else { return }
+        hoverTask?.cancel()
+        hoverTask = nil
+        show(.panel)
+    }
+
     /// With auto-hide off the panel stays open until a click elsewhere (global monitors only see other apps).
     private func clickedOutside() {
         guard model.presentation == .panel, !SettingsStore.shared.bool("notch.autoHide"), topBar?.prompterActive != true, model.picker == nil else { return }
@@ -615,7 +626,8 @@ final class NotchController {
             panel.ignoresMouseEvents = true
             panel.acceptsMouseMovedEvents = true
             ZeusWindowSharing.apply(to: panel, visibleInShare: !hiddenFromCapture, surface: .zeusStandard)
-            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, facts: Self.facts(of: target)))
+            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, facts: Self.facts(of: target),
+                                                                   openPanel: { [weak self] in self?.openFromAccessibility() }))
             // The panel's frame is set here, never from the content: without this the hosting view
             // re-measures the whole notch tree on every animation frame (≈30% of the main thread in QA).
             hosting.sizingOptions = []

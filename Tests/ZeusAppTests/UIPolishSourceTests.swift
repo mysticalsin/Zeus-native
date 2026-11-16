@@ -78,4 +78,30 @@ struct UIPolishSourceTests {
         let pin = try #require(text.range(of: "PolyglotPinPolicy.decide(.pointerExited", range: exit.upperBound..<text.endIndex))
         #expect(text[exit.upperBound..<pin.lowerBound].contains("Self.pointerExitKeepsPanelOpen(voiceOverOn: voiceOverProvider())"))
     }
+
+    @Test func theClosedNotchIsNamedZeusAndOpensThePanelThroughAccessibility() throws {
+        let view = try Self.source("Sources/Zeus/Notch/NotchView.swift")
+        let body = try #require(view.range(of: ".ownedJourneyControl(\"notch.body\")"))
+        let chain = String(view[..<body.lowerBound].suffix(700))
+        #expect(chain.contains(".accessibilityElement(children: .contain)"))
+        #expect(chain.contains(".accessibilityLabel(\"Zeus\")"))
+        #expect(chain.contains(".accessibilityAction { openPanel?() }"))
+        #expect(chain.contains("if model.presentation != .panel {"))
+        #expect(chain.contains("Button(\"Open Zeus panel\") { openPanel?() }"))
+        let controller = try Self.source("Sources/Zeus/Notch/NotchController.swift")
+        #expect(controller.contains("openPanel: { [weak self] in self?.openFromAccessibility() }"))
+        let open = try #require(controller.range(of: "func openFromAccessibility() {"))
+        let opener = controller[open.upperBound...].prefix(420)
+        #expect(opener.contains("guard !drawnNotch.isCalibrating else { return }"))
+        #expect(opener.contains("show(.panel)"))
+    }
+
+    @Test func theSettingsDeepLinkOnlyOpensTheSettingsWindow() throws {
+        let links = try Self.source("Sources/Zeus/App/DeepLinks.swift")
+        let perform = try #require(links.range(of: "case .settings(let section):"))
+        #expect(links[perform.upperBound...].prefix(80).contains("openSettings?(section)"))
+        let delegate = try Self.source("Sources/Zeus/App/AppDelegate.swift")
+        let wired = try #require(delegate.range(of: "DeepLinks.openSettings = { [weak self] section in"))
+        #expect(delegate[wired.upperBound...].prefix(240).contains("self?.showSettings(GSSection.allCases.first"))
+    }
 }

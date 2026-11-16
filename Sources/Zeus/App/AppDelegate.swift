@@ -623,6 +623,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.notch.show(.panel)
             self.topBar.show(.hint("A link asked Zeus to start dictation. Press the dictation key or mic here to begin."))
         }
+        DeepLinks.openSettings = { [weak self] section in
+            self?.showSettings(GSSection.allCases.first { $0.rawValue.lowercased() == section && $0.isShown })
+        }
         DeepLinks.handle(urls)
     }
 
@@ -918,10 +921,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return GlanceSettingsWindowController(context: context)
     }()
 
-    private func showSettings() {
+    private func showSettings(_ section: GSSection? = nil) {
         guard on(.settingsWindow) else { return }
         panel.close()
-        glanceSettings.show()
+        glanceSettings.show(section)
     }
 
     /// What ships with Zeus that other people made, and where each project's license text lives.

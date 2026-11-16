@@ -7391,6 +7391,54 @@
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
       }
+    },
+    {
+      "id": "REG-801",
+      "failure": "Notch tab buttons (and the More, Scribe ticker, recording, agent choice, Fling stack and Clipboard row controls) did nothing on AXPress from outside: .accessibilityElement(children: .ignore) replaced each Button with an element that had no default action.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_every_button_under_an_ignored_element_has_a_default_action"
+      }
+    },
+    {
+      "id": "REG-802",
+      "failure": "The collapsed notch exposed only an unlabelled body, so a VoiceOver user could not open the panel: the notch is click-through and opens on the pointer.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-UIPolishSourceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "theClosedNotchIsNamedZeusAndOpensThePanelThroughAccessibility"
+      }
+    },
+    {
+      "id": "REG-803",
+      "failure": "Zeus has no Dock icon and its menu bar item can be hidden, and no zeus:// link opened Settings, so Settings could be unreachable.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationExtrasTests.swift",
+        "function": "settingsDeepLinkParses"
+      }
+    },
+    {
+      "id": "REG-804",
+      "failure": "A zeus://settings link parsed but did nothing, or changed more than the Settings window.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-UIPolishSourceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "theSettingsDeepLinkOnlyOpensTheSettingsWindow"
+      }
     }
   ]
 }
