@@ -24,4 +24,11 @@ import Testing
             #expect(!TalkDrawPolicy.accepts(winner: blind), "\(blind ?? "nil")")
         }
     }
+
+    @Test func aRequestKeepsItsDrawImageFlagThroughWith() {
+        let request = BrainRequest(transcript: "x", systemPrompt: "s", carriesDrawImage: true)
+        #expect(request.carriesDrawImage)
+        #expect(request.with(deep: true, firstTextBudget: 8).carriesDrawImage)
+        #expect(!BrainRequest(transcript: "x", systemPrompt: "s").carriesDrawImage)
+    }
 }

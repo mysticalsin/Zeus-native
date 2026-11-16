@@ -31,6 +31,15 @@ import Testing
         #expect(card.marks[0].at == TalkDraw.maxSentenceIndex)
     }
 
+    @Test func aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen() {
+        let huge = Self.draw(#"{"k":"ring","x":10,"y":10,"r":5000}"#)
+        guard case .ring(_, let radius) = huge.marks[0].shape else { Issue.record("not a ring"); return }
+        #expect(radius == TalkDraw.maxRingRadius)
+        let tiny = Self.draw(#"{"k":"ring","x":10,"y":10,"r":0.5}"#)
+        guard case .ring(_, let small) = tiny.marks[0].shape else { Issue.record("not a ring"); return }
+        #expect(small == TalkDraw.minRingRadius)
+    }
+
     @Test func unknownIncompleteAndEmptyMarksAreDropped() {
         #expect(TalkDrawParser.parse(#"{"m":[{"k":"star","x":1,"y":2}]}"#) == nil)
         #expect(TalkDrawParser.parse(#"{"m":[{"k":"ring","x":1,"y":2}]}"#) == nil)

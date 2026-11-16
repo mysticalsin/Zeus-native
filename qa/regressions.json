@@ -5795,6 +5795,42 @@
         "file": "Tests/ZeusAppTests/SpeakerTests.swift",
         "function": "aPipelinedLineStartsOnlyAfterTheEarlierLinesAudioHasPlayed"
       }
+    },
+    {
+      "id": "REG-710",
+      "failure": "A late callback from an earlier talk answer could reveal marks, or arm the four second hide, against the next answer's screenshot.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture"
+      }
+    },
+    {
+      "id": "REG-711",
+      "failure": "Turning on drawing cut the screenshots for POINT screen tags and the drive and walkthrough actions down to one display, and flagged a persistent Claude runner as image-carrying even with drawing off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "consentOnSendsOneShotToTheBrainButKeepsEveryCaptureForPointAndDrive"
+      }
+    },
+    {
+      "id": "REG-712",
+      "failure": "One ring mark could be given a radius large enough to cover the screen, and every reveal of a sentence rebuilt the scene under new identities so the marks already shown animated in again.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+        "function": "aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen"
+      }
     }
   ]
 }

@@ -4922,6 +4922,26 @@
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "theNextKeyPressClearsADrawingAndANeverDrawnTurnClearsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOffSendsTheBaseRequestWithEveryShotAndNoDrawPrompt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOnSendsOneShotToTheBrainButKeepsEveryCaptureForPointAndDrive"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aReplayedSpeculativeTurnNeverDraws"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "revealsOfOneTurnShareOneSceneAndOnlyAdvanceItsRevision"
             }
           ]
         },
@@ -5007,6 +5027,14 @@
             {
               "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
               "function": "onlyAWinnerThatSawPixelsMayDraw"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+              "function": "aRequestKeepsItsDrawImageFlagThroughWith"
             }
           ]
         },
