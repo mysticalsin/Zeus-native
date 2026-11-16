@@ -218,6 +218,7 @@ S='voice'
 o(S,'Fast path','Fast path (instant commands)','toggle','-','Simple commands run the moment you finish speaking; off sends everything to the AI.','missing','fastPath.enabled','toggle',[],'true','live','Zeus addition. Jev is on the Engine page.')
 o(S,'Hey Zeus','Listen for "Hey Zeus"','toggle','-','Say it, then your request. Off until you turn it on.','missing','voice.heyZeus','toggle',[],'false','custom','Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off).')
 o(S,'Talk to Zeus','Talk shortcut','recorder','-','Hold Control + Option, or Control + Option + Space, to talk, let go to send. Point at something while you hold and Zeus sees what you mean.','missing','voice.talkKey','choice',[],'','custom','Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept.')
+o(S,'Talk to Zeus','Draw on the screen while Zeus answers','toggle','off','Off: nothing is drawn and talk turns work as before. On: one screenshot of the display under your pointer goes to Claude with each question, and Zeus can ring, arrow or label what it talks about as it says it. Marks go a few seconds after the answer and the screenshot is never saved.','missing','talk.drawOnScreen','toggle',[],'false','live','Separate consent from the macOS Screen Recording permission. Needs your Claude login.')
 o(S,'Voice','Personality (Ultron or Plain) and Design voice','menu','-','How Zeus sounds and what it calls itself.','missing','voice.personality','choice',['Ultron','Plain'],'Ultron','custom','Zeus addition. Voice page.')
 o(S,'Dictation','Murmure speech engines','menu','-','Which speech recognition writes your words.','missing','dictation.engine','choice',[],'','custom','Zeus addition. Murmure page.')
 
@@ -278,7 +279,7 @@ def validate_table():
     opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
-              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl',
+              'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
               'face.presence', 'tiling.enabled', 'fling.enabled')
     for key in opt_in:
         row = by_id.get(key)

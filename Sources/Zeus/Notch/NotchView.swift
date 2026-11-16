@@ -152,9 +152,7 @@ struct NotchView: View {
     }
 
     /// How the closed notch grows into (and out of) its wings.
-    static let wingsSpring = Animation.spring(
-        response: NotchClosedBodyLayout.wingsSpringResponse,
-        dampingFraction: NotchClosedBodyLayout.wingsSpringDamping)
+    @MainActor static var wingsSpring: Animation? { Motion.reducible(Motion.cueGrow) }
 
     private var closedWings: ClosedWingsFacts { topBar.map(ClosedWingsFacts.init(of:)) ?? .noWings }
 
@@ -162,6 +160,16 @@ struct NotchView: View {
     /// `wingsSpring`. It never reads the footprint, so a footprint change moves the body without the spring.
     var closedWidthKey: ClosedWingsFacts.MotionKey? {
         model.presentation == .closed ? closedWings.motionKey : nil
+    }
+
+    /// The open panel's height, or nil while it is not open. A tab change (Home is 122 pt shorter than the other
+    /// pages) or an approval changes it, so the height eases with the page spring instead of jumping.
+    static func panelHeightKey(presentation: NotchModel.Presentation, panelHeight: CGFloat) -> CGFloat? {
+        presentation == .panel ? panelHeight : nil
+    }
+
+    private var panelHeightKey: CGFloat? {
+        Self.panelHeightKey(presentation: model.presentation, panelHeight: size(for: .panel).height)
     }
 
     private func size(for presentation: NotchModel.Presentation) -> CGSize {
@@ -230,6 +238,9 @@ struct NotchView: View {
         NotchSizeReader { animated in canvas(size: animated) }
             .modifier(AnimatedNotchHeight(height: size(for: model.shownHeight).height))
             .animation(open ? TopBarStyle.openHeightSpring : TopBarStyle.closeMotion, value: model.shownHeight)
+            // Outside the open-height animation, which wins on open: this one only runs when the page or an approval
+            // changes the open panel's height.
+            .animation(TopBarStyle.pageSpring, value: panelHeightKey)
             .modifier(AnimatedNotchWidth(width: size(for: model.presentation).width))
             .animation(Self.wingsSpring, value: closedWidthKey)
             .animation(open ? TopBarStyle.openSpring : TopBarStyle.closeMotion, value: model.presentation)
@@ -272,7 +283,7 @@ struct NotchView: View {
         let shape = NotchShape(shoulder: shoulder, earHeight: earHeight, bottomRadius: bottomRadius)
         let glanceOpen = topBar != nil && model.presentation == .panel
         return ZStack(alignment: .top) {
-            TickingView(interval: 1 / 30, paused: !breathing) { context in
+            DisplaySynchronizedView(paused: !breathing, preferredFramesPerSecond: Motion.ambientFPS) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 let period = status == .needsYou ? 1.8 : 2.6
                 // Reduce Motion: a steady glow instead of breathing.
@@ -340,8 +351,8 @@ struct NotchView: View {
             topBar.flash(.entrance(style, tint))
             topBar.flash(.edgeWave(tint))
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.approval?.id)
-        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: model.sessions.count)
+        .animation(Motion.live(MotionTokens.peekContent), value: model.approval?.id)
+        .animation(Motion.live(MotionTokens.panelResize), value: model.sessions.count)
         .animation(Self.wingsSpring, value: topBar.map { ClosedWings.kind(of: $0) })
     }
 
@@ -364,19 +375,19 @@ struct NotchView: View {
                         .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
                 } else if let completion = model.completion {
                     CompletionCardView(completion: completion) { model.completion = nil }
-                        .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                        .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let failure = model.failure {
                     AgentTroubleCard(kind: .failed, sessionID: failure.sessionID, agent: failure.agent, project: failure.project, reason: failure.reason) {
                         NotchControllerBridge.dismissFailure()
                     }
-                    .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                    .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let session = stalledPeek {
                     AgentTroubleCard(kind: .stalled, sessionID: session.id, agent: session.agent, project: session.project,
                                      reason: session.reason ?? "No activity for a while") {
                         model.peekSessionID = nil
                         NotchControllerBridge.closePeek()
                     }
-                    .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                    .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let edit = model.selectionEdit {
                     SelectionEditBody(edit: edit)
                         .padding(.horizontal, 16)
@@ -386,7 +397,7 @@ struct NotchView: View {
                 } else if let recap = model.recap {
                     WelcomeRecapCardView(recap: recap) { model.recap = nil; NotchControllerBridge.closePeek() }
                         .padding(.horizontal, 16)
-                        .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                        .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 }
             }
             .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.1)))
@@ -709,12 +720,7 @@ private struct TopBarPanelBody: View {
     /// glow is content-driven (music hue when playing, otherwise copper behind Calendar).
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // Glance (parity/N4): brightest under the fourth card's left edge, about 77 % across,
-            // and it never reaches the tab row (y 37 stays black edge to edge).
-            RadialGradient(colors: [contentGlow.opacity(0.35), .clear], center: UnitPoint(x: 0.77, y: 1.0),
-                           startRadius: 10, endRadius: 170)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            // Absolute black behind the content: no ambient glow (the owner's choice over the reference look).
             VStack(alignment: .leading, spacing: 0) {
                 Color.clear.frame(height: GlanceTopBar.tabRowTop)
                 TopBarHeader(topBar: topBar, agentCount: model.sessions.count, needsYou: model.status == .needsYou,
@@ -734,15 +740,6 @@ private struct TopBarPanelBody: View {
                 .padding(.horizontal, GlanceTopBar.cardInset)
             }
         }
-    }
-
-    /// Content tint: playing music paints a violet/album glow (Codex review 1 live pair); idle Home
-    /// keeps the copper behind Calendar from TOPBAR-SPEC §2.
-    private var contentGlow: Color {
-        if let playing = topBar.nowPlaying {
-            return ArtworkStore.shared.tint(for: playing, saturation: 0.45, brightness: 0.55, scale: 0.8)
-        }
-        return GlanceTint.glow
     }
 
     private var summary: String {

@@ -72,9 +72,7 @@ final class BuddyController: NSObject {
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil
         )
-        let link = (NSScreen.main ?? NSScreen.screens[0]).displayLink(target: self, selector: #selector(tick(_:)))
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        startDisplayLink()
         // The frame loop sleeps once the spark has settled and wakes on the next mouse move,
         // so an idle Mac costs nothing (it used to redraw the overlay at display rate forever).
         let wake: (NSEvent) -> Void = { [weak self] _ in MainActor.assumeIsolated { self?.wake() } }
@@ -97,6 +95,39 @@ final class BuddyController: NSObject {
         }
         DispatchQueue.main.async { self.model.hasAppeared = true }
         applyVisibility(animated: false)
+    }
+
+    /// The window fade, with explicit timing from the motion table: in eases out, out eases in.
+    static func fadeTiming(showing: Bool) -> (duration: TimeInterval, curve: CAMediaTimingFunctionName) {
+        showing ? (MotionTokens.windowFadeInDuration, .easeOut) : (MotionTokens.windowFadeOutDuration, .easeIn)
+    }
+
+    /// The index of the window whose frame holds `point` (where the buddy is shown), if any.
+    static func windowIndex(containing point: CGPoint, in frames: [CGRect]) -> Int? {
+        frames.firstIndex { $0.contains(point) }
+    }
+
+    private func shownWindowScreen() -> NSScreen? {
+        Self.windowIndex(containing: model.position, in: windows.map(\.frame)).flatMap { windows[$0].screen }
+    }
+
+    /// Binds the display link to the screen where the buddy is shown, so it runs at that display's rate. Called at
+    /// start and again whenever the screens change (the old link may belong to a display that is gone).
+    private func startDisplayLink() {
+        let wasPaused = displayLink?.isPaused ?? false
+        displayLink?.invalidate()
+        displayLink = nil
+        guard let screen = Self.linkScreen(window: shownWindowScreen(), main: NSScreen.main, all: NSScreen.screens) else { return }
+        let link = screen.displayLink(target: self, selector: #selector(tick(_:)))
+        link.isPaused = wasPaused
+        lastTimestamp = 0
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    /// The screen the display link runs on: the one where the buddy is shown, else the main one, else any.
+    static func linkScreen<Screen>(window: Screen?, main: Screen?, all: [Screen]) -> Screen? {
+        window ?? main ?? all.first
     }
 
     // MARK: Visibility
@@ -137,11 +168,23 @@ final class BuddyController: NSObject {
         let target: CGFloat = (hiddenForPanel || !visibility.isVisible(at: now)) ? 0 : 1
         if target != shownAlpha {
             shownAlpha = target
+            // A hidden buddy leaves the screen: an invisible full-screen window at the screen-saver level made the
+            // windows under it, other apps' too, report themselves occluded.
+            if target == 1 { windows.forEach { $0.orderFrontRegardless() } }
             for window in windows where window.alphaValue != target {
                 if animated, !Motion.reduced {
-                    NSAnimationContext.runAnimationGroup({ $0.duration = target == 1 ? 0.2 : 0.35; window.animator().alphaValue = target }, completionHandler: nil)
+                    let timing = Self.fadeTiming(showing: target == 1)
+                    NSAnimationContext.runAnimationGroup({
+                        $0.duration = timing.duration
+                        $0.timingFunction = CAMediaTimingFunction(name: timing.curve)
+                        window.animator().alphaValue = target
+                    },
+                                                         completionHandler: { [weak self, weak window] in
+                        MainActor.assumeIsolated { if self?.shownAlpha == 0 { window?.orderOut(nil) } }
+                    })
                 } else {
                     window.alphaValue = target
+                    if target == 0 { window.orderOut(nil) }
                 }
             }
         }
@@ -462,6 +505,7 @@ final class BuddyController: NSObject {
         }
         lastDisplays = next
         rebuildWindows()
+        startDisplayLink()
     }
 
     private func rebuildWindows() {
@@ -480,7 +524,7 @@ final class BuddyController: NSObject {
             window.setFrame(screen.frame, display: false)
             window.alphaValue = shownAlpha == 0 ? 0 : 1
             ZeusWindowSharing.apply(to: window, visibleInShare: visible, surface: .zeusStandard)
-            window.orderFrontRegardless()
+            if shownAlpha != 0 { window.orderFrontRegardless() }
             return window
         }
     }

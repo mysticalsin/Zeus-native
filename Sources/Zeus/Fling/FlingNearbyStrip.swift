@@ -284,10 +284,11 @@ struct FlingFlickHandle: View {
                     if case .send = outcome {
                         // Fly off along the flick, never further than 240 points; Reduce Motion only fades.
                         let motion = FlingGeometry.flyOff(translation: value.predictedEndTranslation, reduceMotion: Motion.reduced)
-                        withAnimation(.easeOut(duration: 0.35)) { offset = motion.offset; gone = true }
+                        // Reduce Motion fades; otherwise it travels on the peek spring.
+                        withAnimation(motion.fadeOnly ? .easeOut(duration: MotionTokens.crossfadeDuration) : Motion.live(MotionTokens.peekContent)) { offset = motion.offset; gone = true }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { gone = false; offset = .zero }
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = .zero }
+                        withAnimation(Motion.live(MotionTokens.panelResize)) { offset = .zero }
                     }
                 })
             .popover(isPresented: $picker) {

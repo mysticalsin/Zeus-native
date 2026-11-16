@@ -402,4 +402,17 @@ struct SettingsCatalogTests {
         #expect(try store.importJSON(data) == 0)
         #expect(store.string("face.lockAfter") == "2 minutes")
     }
+
+    @Test func drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage() throws {
+        let option = try #require(SettingsCatalog.option("talk.drawOnScreen"))
+        #expect(option.section == .voice)
+        #expect(option.kind == .toggle)
+        #expect(option.defaultValue == "false")
+        #expect(option.state == .live)
+        #expect(option.note.contains("screenshot"))
+        let empty = UserDefaults(suiteName: "talk.drawOnScreen.\(UUID().uuidString)")!
+        #expect(!FeatureSettings.talkDrawOnScreen(defaults: empty))
+        empty.set("true", forKey: FeatureSettings.key("talk.drawOnScreen"))
+        #expect(FeatureSettings.talkDrawOnScreen(defaults: empty))
+    }
 }

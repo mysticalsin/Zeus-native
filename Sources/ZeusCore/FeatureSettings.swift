@@ -37,6 +37,12 @@ public enum FeatureSettings {
 
     public static func pointingShortcutName(defaults: UserDefaults = .standard) -> String { string("pointing.shortcut", default: pointingShortcutDefault, defaults: defaults) }
 
+    // MARK: Talk drawing
+
+    /// Marks drawn on the screen while a talk answer is spoken. Off until the owner turns it on: it sends one
+    /// screenshot of the cursor display to Claude with the question.
+    public static func talkDrawOnScreen(defaults: UserDefaults = .standard) -> Bool { bool("talk.drawOnScreen", default: false, defaults: defaults) }
+
     // MARK: Tiling
 
     /// Arranging windows from the keyboard. Off until the owner turns it on, and a settings import cannot turn it on.

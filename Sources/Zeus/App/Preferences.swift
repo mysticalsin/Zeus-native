@@ -67,12 +67,43 @@ enum Motion {
     /// System Settings › Accessibility › Display › Reduce motion.
     @MainActor static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
-    /// Shared interaction timings. Capture/completion choreography keeps its own longer sequence.
-    static let feedbackDuration = 0.12
-    static let crossfadeDuration = 0.12
-    static let pageResponse = 0.34
-    static let pageDamping = 0.84
-    static let pressedScale: CGFloat = 0.98
+    /// Shared interaction timings, all read from the one table in `MotionTokens`. Capture/completion
+    /// choreography keeps its own longer sequence.
+    static let feedbackDuration = MotionTokens.pressDuration
+    static let crossfadeDuration = MotionTokens.crossfadeDuration
+    static let pageResponse = MotionTokens.panelResize.response
+    static let pageDamping = MotionTokens.panelResize.damping
+    static let pressedScale = CGFloat(MotionTokens.pressScale)
+    static let windowFadeIn = MotionTokens.windowFadeInDuration
+    static let windowFadeOut = MotionTokens.windowFadeOutDuration
+    /// Frame rates of clock-driven loops.
+    static let ambientFPS = MotionRules.ambientFPS
+    static let spinnerFPS = MotionRules.spinnerFPS
+
+    private static func raw(_ token: SpringToken) -> Animation {
+        .spring(response: token.response, dampingFraction: token.damping)
+    }
+
+    /// A token spring. Under Reduce Motion nothing animates.
+    static func spring(_ token: SpringToken, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : raw(token)
+    }
+
+    /// A token spring that follows the system's Reduce Motion setting right now.
+    @MainActor static func live(_ token: SpringToken) -> Animation? { spring(token, reduceMotion: reduced) }
+
+    /// Any animation, made instant under Reduce Motion.
+    static func reducible(_ animation: Animation, reduceMotion: Bool) -> Animation? { reduceMotion ? nil : animation }
+    @MainActor static func reducible(_ animation: Animation) -> Animation? { reducible(animation, reduceMotion: reduced) }
+
+    /// The panel closing: no overshoot.
+    static let panelClose = raw(MotionTokens.panelClose)
+    /// HUD cue wings growing and shrinking.
+    static let cueGrow = raw(MotionTokens.cueGrow)
+    /// Peek cards arriving beside the closed notch.
+    static let peekContent = raw(MotionTokens.peekContent).delay(MotionTokens.peekContentDelay)
+    /// A page leaving the panel.
+    static let pageOut = Animation.easeOut(duration: MotionTokens.pageOutDuration)
 
     static func feedback(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .easeOut(duration: feedbackDuration)
@@ -80,6 +111,6 @@ enum Motion {
 
     /// Layout changes settle promptly. Reduced motion changes geometry immediately.
     static func page(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .spring(response: pageResponse, dampingFraction: pageDamping)
+        spring(MotionTokens.panelResize, reduceMotion: reduceMotion)
     }
 }

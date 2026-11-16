@@ -119,10 +119,16 @@ struct GlanceTopBarTests {
         #expect(-lowest * (body - closed) < 3)
     }
 
-    @Test func closeIsFourFramesAfterHalfASecond() {
-        // Glance (parity/N8): down to a strip about 6 frames at 60 fps after it starts, about 0.53 s
-        // after the pointer leaves.
-        #expect(abs(GlanceTopBar.closeDuration * 60 - 6) <= 1)
+    @Test func closeFitsGlancesMeasuredHeightsWithoutOvershoot() {
+        // Glance (parity/N8): the recorded body heights while it shrinks. The honest model is the start height to the
+        // real closed height with no offset; the numbers are stated in MotionTokensTests.
+        let spring = GlanceTopBar.closeSpring
+        let rms = MotionTokensTests.closeRMS(response: spring.response, damping: spring.damping)
+        #expect(rms < 0.75 * MotionTokensTests.linearCloseRMS(), "rms \(rms) pt from Glance")
+        #expect(spring.damping >= 1)
+    }
+
+    @Test func closeWaitsHalfASecondAndTheOpenHeightLeadsTheWidth() {
         #expect(abs(GlanceTopBar.closeDelay - 0.53) <= 0.05)
         // The open height leads the width: further along at every early moment.
         for ms in stride(from: 17.0, through: 100, by: 17) {

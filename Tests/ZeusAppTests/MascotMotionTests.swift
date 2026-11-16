@@ -150,13 +150,55 @@ struct MascotMotionTests {
         #expect(AvatarState.thinking.pulses)
     }
 
-    @Test func tickRatesStayWithinTheBudget() {
+    private static let animDirectory = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/Zeus/Avatar/Anim")
+
+    @MainActor @Test func tickRatesStayWithinTheBudget() {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
         for state in AvatarState.allCases {
-            let busy = LivingAvatar.tickInterval(asleep: false, waking: false, state: state)
-            #expect(busy >= 1.0 / 24 - 1e-9)
-            #expect(state != .idle || busy >= 1.0 / 12 - 1e-9)
+            for t in stride(from: 0.0, to: 80, by: 0.05) {
+                let motion = MascotMotion.at(t, mood: .awake(state), size: 22)
+                let interval = LivingAvatar.tickInterval(for: motion, atlas: atlas)
+                #expect(interval >= 1.0 / 60 - 1e-9)
+                // Only the stroll and the short shake and jump ride faster than the slowest clip rate that is 24 fps.
+                #expect(motion.travelling || interval >= 1.0 / 24 - 1e-9, "\(state) at \(t): \(interval)")
+            }
         }
-        #expect(LivingAvatar.tickInterval(asleep: true, waking: false, state: .idle) >= 1.0 / 12 - 1e-9)
+        // At rest the idle mascot ticks at its clip's 12 fps, not faster.
+        let resting = MascotMotion.at(1, mood: .awake(.idle), size: 22)
+        #expect(abs(LivingAvatar.tickInterval(for: resting, atlas: atlas) - 1.0 / 12) < 1e-9)
+        #expect(LivingAvatar.tickInterval(for: MascotMotion.at(5, mood: .asleep, size: 22), atlas: atlas) >= 1.0 / 12 - 1e-9)
+    }
+
+    @MainActor @Test func theMascotTicksAtEachClipsOwnFPSAndSixtyOnItsStroll() throws {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
+        var seen = Set<Int>()
+        for pose in LivingPose.allCases where pose != .walking {
+            let clip = try #require(atlas.clip(pose.clipID), "\(pose) has no clip")
+            seen.insert(clip.fps)
+            let motion = MascotMotion(pose: pose)
+            #expect(abs(LivingAvatar.tickInterval(for: motion, atlas: atlas) - 1.0 / Double(clip.fps)) < 1e-9, "\(pose)")
+        }
+        #expect(seen.isSubset(of: [12, 20, 24]), "\(seen)")
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let walking = MascotMotion.at(walkStart + 0.8, mood: .awake(.idle), size: 22)
+        #expect(walking.travelling)
+        #expect(LivingAvatar.tickInterval(for: walking, atlas: atlas) == 1.0 / 60)
+        #expect(!MascotMotion.at(1, mood: .awake(.idle), size: 22).travelling)
+    }
+
+    @MainActor @Test func theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer() throws {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let walking = MascotMotion.at(walkStart + 0.8, mood: .awake(.idle), size: 22)
+        let clip = try #require(atlas.clip(walking.pose.clipID))
+        // The timer interval is always the clip's: 60 fps comes from the display link, not a run-loop timer.
+        #expect(abs(LivingAvatar.clipInterval(for: walking, atlas: atlas) - 1.0 / Double(clip.fps)) < 1e-9)
+        let source = try String(contentsOf: Self.animDirectory.deletingLastPathComponent().appendingPathComponent("MascotMotion.swift"), encoding: .utf8)
+        #expect(source.contains("DisplaySynchronizedView(paused: paused, preferredFramesPerSecond: Motion.ambientFPS)"))
+        #expect(source.contains("if clock.travelling"))
+        #expect(!source.contains("interval: 1 / 60"))
     }
 
     // MARK: QA7 round 11 -- `zeus debug animate <pose>` for the v2 poses no `AvatarState` reaches directly

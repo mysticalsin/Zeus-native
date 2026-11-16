@@ -358,13 +358,18 @@ final class RouterSettings {
     /// Fastest healthy brains for one voice turn, restricted by the task's privacy and provider
     /// choice before any provider (and so any request) exists. The first two are raced.
     /// `claude` is the app's own Claude provider, offered when the `claude` CLI isn't otherwise listed.
-    func brainCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil) -> [(id: String, provider: BrainProvider)] {
-        brainEngineCandidates(task: task, hasAnthropicKey: hasAnthropicKey, claude: claude).map { ($0.id, $0.provider) }
+    func brainCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil,
+                         preferAppClaude: Bool = false) -> [(id: String, provider: BrainProvider)] {
+        brainEngineCandidates(task: task, hasAnthropicKey: hasAnthropicKey, claude: claude,
+                              preferAppClaude: preferAppClaude).map { ($0.id, $0.provider) }
     }
 
     /// Same list with each entry's engine, so a spoken turn can pick its fast tier by engine and not by display id
     /// (`"ollama"` names both the local HTTP server and the CLI).
-    func brainEngineCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil)
+    /// `preferAppClaude` hands the `claude` entry to the app's own provider even when the CLI is installed:
+    /// the app provider sends screenshots, the plain CLI engine feeds text on stdin only.
+    func brainEngineCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil,
+                               preferAppClaude: Bool = false)
         -> [(engine: BrainEngineID, id: String, provider: BrainProvider)] {
         let openAI = Keychain.get("assistant.key.openai").map { !$0.isEmpty } ?? false
         var ordered = BrainRoute.order(hasAnthropicKey: hasAnthropicKey, hasOpenAIKey: openAI,
@@ -372,9 +377,14 @@ final class RouterSettings {
         if claude != nil, !exhaustedEngines().contains(.claude), !ordered.contains(.claude) { ordered.append(.claude) }
         let ids = Self.allowedEngines(ordered, task: task, choice: choices[task] ?? .auto)
         return ids.compactMap { id -> (engine: BrainEngineID, id: String, provider: BrainProvider)? in
-            if id == .claude, installed[.claude] == nil, let claude { return (id, "claude", claude) }
+            if id == .claude, Self.appClaudeServes(cliInstalled: installed[.claude] != nil, preferAppClaude: preferAppClaude),
+               let claude { return (id, "claude", claude) }
             return candidate(for: id).map { (id, $0.id, $0.provider) }
         }
+    }
+
+    nonisolated static func appClaudeServes(cliInstalled: Bool, preferAppClaude: Bool) -> Bool {
+        !cliInstalled || preferAppClaude
     }
 
     /// Auto routing for callers with no prompt yet (nothing is sent). Prefer the task-aware form.
