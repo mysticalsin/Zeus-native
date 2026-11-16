@@ -167,6 +167,22 @@ Right Option is a typing key, so its second key waits `VoiceKey.secondKeyConfirm
 is longer) before it starts. A letter inside that time reads as typing and starts nothing (accents). Left Option never
 starts it, and joining a Right Option turn cancels it. A tap shorter than the confirm does nothing; a double tap latches.
 
+**The mouse cancels it** (owner decision). While the second key's turn is armed or held, any mouse button going down (left, right,
+other; a drag starts with one) is a foreign key for the second key only: a press still inside its confirm is dropped, a held turn is
+cancelled and never sent, and nothing starts until every key is up. An Option-click or Option-drag therefore does not talk.
+`TalkKeyPair.mouseDown` is the pure event (the machine hears a foreign key that is down and up at once, and only the second
+slot is told); `HotkeyMonitor.mouseDown` is fed by global and local monitors of the three mouse-down types. The primary key and a
+hands-free second turn (no key held) are not affected.
+
+**Timers run in order.** Each machine asks for its own timers (the confirm, the 0.4 s gap, the 0.25 s check). The pair keeps their
+times and, before it hands a key to the machines, runs every timer that fell due by that key's own time, earliest first across
+both machines, as the tick the adapter would have delivered. A busy main thread therefore gives the effects of timers that ran
+on time (`timersThatRunLateGiveTheEffectsOfTimersThatRunOnTime`, and the three orders of the review). With no second key the
+pair does none of this and is the machine.
+
+**A Space the system says is down** at the release of a second-key turn means a launcher on Option-Space that Carbon cannot see
+took the press: the turn is cancelled, not sent.
+
 **The default is written nowhere.** `ShortcutStore.loadSecondTalk` returns Right Option when `talk.secondShortcut` is
 absent or does not parse, and never writes. Only the recorder writes (`off`, or a key); Reset removes the key.
 

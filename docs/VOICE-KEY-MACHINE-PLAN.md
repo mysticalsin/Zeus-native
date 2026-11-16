@@ -636,7 +636,25 @@ Walk budget, and the fallbacks used. The planned K (five keys with Space, late t
 
 | Run | Keys | States | Moves | Time |
 | --- | --- | --- | --- | --- |
-| K, Control-Option confirm 0.15, Right Option confirm 0.25 | Control, Option, Right Option, Left arrow | 254,954 | 2,229,028 | 96.7 s |
-| K0, primary confirm 0 | the same | 108,266 | 945,100 | 49.0 s |
+| K, Control-Option confirm 0.15, Right Option confirm 0.25 | Control, Option, Right Option, Left arrow | 254,890 | 2,228,516 | 225 s |
+| K0, primary confirm 0 | the same | 108,202 | 944,588 | 114 s |
+| K-late15, late timers, primary confirm 0.15 (fix round) | Control, Right Option, Left arrow | 484,984 | 5,633,520 | 464 s |
+| K-late0, late timers, primary confirm 0 (fix round) | the same | 292,648 | 3,395,848 | 347 s |
+| K-flip, the second key turned off and on, the mouse (fix round) | the same | 387,418 | 3,335,970 | 266 s |
 
 Both are well under run A (1,883,647 states, 28,473,473 moves, 2,104 s in the same full run, which took 2,225 s in all with the pair runs taking 321 s and 142 s inside it; the table is from a quieter run). Every other run kept its states and moves: A1 253,450 and 3,581,849, A0 406,896 and 6,524,802, A-carbon 1,302,124 and 18,199,394, B 734,915, B2 871,099, C 357,149, D 156,302, G 108,306, H 81,932, J 222,639. `WALK_PROGRESS=path` and `WALK_LIMIT=n` are off by default: the first appends the size of each search to a file while it runs, the second stops a search past n states, for measuring a run before it is listed. Minors folded in from the chord lane review: I6s now also judges a `send` from a new press on a latched or armed(ending) press beside a Space the keyboard did not earn (`theSearchSeesAHandsFreeTurnEndedBesideASwallowedSpace`).
+
+#### Ninth pass, fix round after an independent review
+
+Two majors and five minors, each with a failing test first. `VoiceKeyMachine.swift` still has a zero diff.
+
+| # | Finding | Change |
+| --- | --- | --- |
+| Major 1 | Overdue timers were not run in time order across the two machines. Each machine settled its own late timer inside its own call, after the pair had ruled on the key: a gap send due before a Right Option press barred a press that came after it in real time, a second key start due before Control lost to a primary start of that Control, and a busy main thread gave a send, a start and a send in one burst | `TalkKeyPair` keeps the due time of every wake it passes through (`wakes`) and, before it hands a key to the machines, runs the wakes due by that key's own time as ticks, earliest first across both machines, with the live modifiers `settle` reads (the key-down's own). Only with a second key on: with it off the pair is the machine. Tests: the three orders as `TalkKeyPairTests`, a property test over 20,736 short orders at two primary confirms (late and on time give the same effects), and an adapter case on a fake clock |
+| Major 2 | K and K0 had no late timers, no config flips, so they could not see the cross-machine orders | Runs K-late15 and K-late0 (three keys: Control, Right Option, Left arrow; late timers; refusal) and K-flip (the second key turned off and on, riding on key events; the mouse). New pair rules: I12 (a start that a timer owed ahead of a key is never swallowed for a turn that very key opened) and I13 (a turn a timer ended with every key up before the key never bars the other key). `theSearchSeesAPairThatDeliversTimersAfterTheKey` turns the in-order delivery off and the search reports I12. Two harness fixes the new runs needed: a tick reads the live modifiers for a slot only when something is due for that slot, and a timer's end is judged against the keys down before the key |
+| Minor a | A launcher on Option-Space is not known to Carbon | A Space the system reports down at the release of a second-key turn cancels the turn instead of sending it |
+| Minor b | Option-click and Option-drag (owner decision) | A mouse down cancels the second key's turn while it is armed or held: `TalkKeyPair.mouseDown`, a foreign key for the second slot only; `HotkeyMonitor` global and local monitors; walked in K-flip |
+| Minor c | A cached key that changes in the middle of a hands-free turn | `syncTalkChord` sends the monitor one tick when it stores a changed value, so the turn ends at once (`HotkeyMonitor.configChanged`) |
+| Minor d | `talk.secondShortcut` was not exported | Added to the export and import rules |
+| Minor e | The log named the primary key for second-key starts | The slot's own key title is logged (not tested) |
+

@@ -373,7 +373,7 @@ Feature map: new obligation **`F11.second-talk-key`**, check `native-ZeusCoreTes
 3. Type accented letters with Right Option (for example Right Option+E, then E) at normal speed for a minute: no listen sound. Note any false start, and how long Option was held.
 4. Left Option held, and Left Option plus letters: never a listen sound.
 5. Control then Right Option, and Right Option then Control quickly: one Control+Option turn. Right Option held about 0.5 s, then Control: one cancel and no second sound until everything is up.
-6. Option-drag a file in Finder with Right Option: report whether the mic opens (risk above).
+6. Option-drag a file in Finder with Right Option, and Option-click: the turn is cancelled by the mouse-down, never sent (owner decision). Right Option held past 0.25 s, then a click: one cancel, nothing sent.
 7. Hands-free:
    - Double-tap Control+Option, then press Right Option: nothing; Control+Option ends it.
    - Double-tap Right Option, then press Control+Option: nothing; Right Option ends it.
