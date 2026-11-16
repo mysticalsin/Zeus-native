@@ -171,4 +171,22 @@ struct TalkTurnVoiceTests {
         #expect(!diagnostics.nothingHeardSummary.contains("\u{2014}"))
         #expect(diagnostics.nothingHeardSummary.contains("0 Hz 2 ch"))
     }
+
+    @Test func aFlappingLinkEndsTheTurnAfterTheLimitButAHeadsetSettlingDoesNot() {
+        #expect(!CaptureRecovery.exceedsLimit(changes: 3))
+        #expect(!CaptureRecovery.exceedsLimit(changes: CaptureRecovery.maximumChanges))
+        #expect(CaptureRecovery.exceedsLimit(changes: CaptureRecovery.maximumChanges + 1))
+    }
+
+    @Test func aBufferInTheHeadsetFormatIsConvertedToTheRequestFormat() throws {
+        let headset = try #require(AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 24_000, channels: 1, interleaved: false))
+        let original = try #require(AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 2, interleaved: false))
+        let converter = try #require(AVAudioConverter(from: headset, to: original))
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: headset, frameCapacity: 2_400))
+        buffer.frameLength = 2_400
+        for index in 0..<2_400 { buffer.floatChannelData![0][index] = sin(Float(index) * 0.05) * 0.3 }
+        let converted = try #require(SpeechInput.convert(buffer, with: converter))
+        #expect(converted.format == original)
+        #expect(converted.frameLength > 2_000)
+    }
 }

@@ -26,6 +26,13 @@ enum CaptureRecovery {
         }
     }
 
+    /// A headset settles in two or three changes; more than this is a flapping link, and the turn ends.
+    static let maximumChanges = 6
+    /// How long to wait before retrying an input that had no usable format.
+    static let retryDelay: TimeInterval = 0.4
+
+    static func exceedsLimit(changes: Int) -> Bool { changes > maximumChanges }
+
     /// A change that belongs to a turn already over (stopped, replaced) is ignored.
     static func action(cancelsTurn: Bool, ownsSession: Bool) -> Action {
         guard ownsSession else { return .ignore }
