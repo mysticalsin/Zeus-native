@@ -20,7 +20,7 @@ struct FlingSecurityTests {
         return url
     }
 
-    /// REG-739: eight connections that never speak lock out neither transfers nor, once they time out, pairing.
+    /// REG-779: eight connections that never speak lock out neither transfers nor, once they time out, pairing.
     @Test func eightSilentPairingConnectionsBlockNeitherTransfersNorLaterPairing() async throws {
         let dir = parent(); defer { try? FileManager.default.removeItem(at: dir) }
         let a = Node("Alpha", parent: dir), b = Node("Beta", parent: dir)
@@ -43,7 +43,7 @@ struct FlingSecurityTests {
         #expect(await pair(c, b) != nil)
     }
 
-    /// REG-740: bytes promised to a stack that is still arriving count against the free space of the next offer.
+    /// REG-780: bytes promised to a stack that is still arriving count against the free space of the next offer.
     @Test func bytesReservedByARunningStackCountAgainstTheNextOffer() async throws {
         let dir = parent(); defer { try? FileManager.default.removeItem(at: dir) }
         let slow = FlingTestHooks(); slow.chunkDelayMs = 700
@@ -68,7 +68,7 @@ struct FlingSecurityTests {
         _ = try #require(await b.wait("the second stack") { if case .itemArrived(_, _, let n, _, _, _, _) = $0, n == "two.bin" { return true } else { return nil } })
     }
 
-    /// REG-741: stopping an endpoint ends every transfer with an event, so nothing hangs on a progress ring.
+    /// REG-781: stopping an endpoint ends every transfer with an event, so nothing hangs on a progress ring.
     @Test func stoppingAnEndpointCancelsItsTransfersWithEvents() async throws {
         for stopTheReceiver in [true, false] {
             let dir = parent(); defer { try? FileManager.default.removeItem(at: dir) }
@@ -88,7 +88,7 @@ struct FlingSecurityTests {
         }
     }
 
-    /// REG-742: typing a device name rebuilds the listeners once, not on every keystroke.
+    /// REG-782: typing a device name rebuilds the listeners once, not on every keystroke.
     @Test func aDeviceNameTypedQuicklyRebuildsTheListenersOnce() async throws {
         let dir = parent(); defer { try? FileManager.default.removeItem(at: dir) }
         let count = Counter()
@@ -107,7 +107,7 @@ struct FlingSecurityTests {
         #expect(count.value - before == 1, "and the last name is applied")
     }
 
-    /// REG-743: an id that is already paired is refused at the hello on both sides and its key is untouched.
+    /// REG-783: an id that is already paired is refused at the hello on both sides and its key is untouched.
     @Test func anAlreadyPairedMacIsRefusedAndKeepsItsKey() async throws {
         let dir = parent(); defer { try? FileManager.default.removeItem(at: dir) }
         let a = Node("Alpha", parent: dir), b = Node("Beta", parent: dir)
@@ -124,7 +124,7 @@ struct FlingSecurityTests {
         #expect(b.endpoint.pairedPeers.first?.pairedAt == stamp)
     }
 
-    /// REG-744: an answer for another Mac's pairing does nothing; the right one does.
+    /// REG-784: an answer for another Mac's pairing does nothing; the right one does.
     @Test func anAnswerForAnotherMacDoesNotAnswerThePairing() async throws {
         let dir = parent(); defer { try? FileManager.default.removeItem(at: dir) }
         let a = Node("Alpha", parent: dir), b = Node("Beta", parent: dir)
@@ -157,7 +157,7 @@ struct FlingSecurityAppTests {
         for _ in 0..<400 where !condition() { try? await Task.sleep(nanoseconds: 5_000_000) }
     }
 
-    /// REG-745: a card ignores clicks for its first second, so a stray click or a scripted one cannot answer it, but the timeout still declines.
+    /// REG-785: a card ignores clicks for its first second, so a stray click or a scripted one cannot answer it, but the timeout still declines.
     @Test func aNewCardIgnoresAnswersForItsFirstSecond() {
         var now = Date(timeIntervalSince1970: 1000)
         var answers: [Bool] = []
@@ -175,7 +175,7 @@ struct FlingSecurityAppTests {
         #expect(late == [false], "the timeout is not an answer a click can block")
     }
 
-    /// REG-737: private, loopback and local links are kept on the Shelf but never opened by themselves.
+    /// REG-777: private, loopback and local links are kept on the Shelf but never opened by themselves.
     @Test func privateLinksNeverOpenWithoutAClick() async {
         for (address, expected) in [("https://example.com", 1), ("http://192.168.1.1/admin", 0), ("http://localhost:3000", 0), ("http://printer.local", 0), ("https://[::1]/", 0)] {
             let transport = FakeTransport()
@@ -192,7 +192,7 @@ struct FlingSecurityAppTests {
         }
     }
 
-    /// REG-746: when a Mac that was paired refuses our key, the person is told to pair again.
+    /// REG-786: when a Mac that was paired refuses our key, the person is told to pair again.
     @Test func aRejectedStoredKeySaysPairAgain() async {
         let transport = FakeTransport()
         let s = FlingService(model: model(), transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
@@ -202,7 +202,7 @@ struct FlingSecurityAppTests {
         #expect(s.lastProblem?.contains("Pair again") == true)
     }
 
-    /// REG-747: the answer to a pairing names the Mac it is for.
+    /// REG-787: the answer to a pairing names the Mac it is for.
     @Test func thePairingAnswerNamesItsMac() async {
         let transport = FakeTransport()
         let s = FlingService(model: model(), transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
@@ -213,7 +213,7 @@ struct FlingSecurityAppTests {
         #expect(transport.pairingPeers == ["idB"])
     }
 
-    /// REG-748: a received file carries Zeus's quarantine mark, so Gatekeeper still looks at what a peer sent.
+    /// REG-788: a received file carries Zeus's quarantine mark, so Gatekeeper still looks at what a peer sent.
     @Test func receivedFilesAreQuarantinedAsFromZeus() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-q-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -232,7 +232,7 @@ struct FlingSecurityAppTests {
         }
     }
 
-    /// REG-735: a name that differs only in case lands beside the existing file, never over it.
+    /// REG-775: a name that differs only in case lands beside the existing file, never over it.
     @Test func aCaseOnlyClashGetsANumberInTheStackFolder() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-c-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

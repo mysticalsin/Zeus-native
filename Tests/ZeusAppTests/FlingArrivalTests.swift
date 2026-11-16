@@ -103,7 +103,7 @@ struct FlingArrivalTests {
         #expect(AirDropScreenshotWatcher.isIgnored(inbox.appendingPathComponent("Stack/a.png")))
         #expect(AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent(".hidden")))
         #expect(!AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("photo.png")))
-        #expect(!AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("Other/Fling/a.png")), "REG-736: only Zeus's own folders")
+        #expect(!AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("Other/Fling/a.png")), "REG-776: only Zeus's own folders")
     }
 
     /// REG-683: the service type the app browses for is the one the plist declares.

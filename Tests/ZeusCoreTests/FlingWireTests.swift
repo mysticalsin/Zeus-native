@@ -120,7 +120,7 @@ struct FlingWireTests {
         }
     }
 
-    /// REG-738: thousands of frames in one read are decoded in one pass, not by copying the rest of the buffer per frame.
+    /// REG-778: thousands of frames in one read are decoded in one pass, not by copying the rest of the buffer per frame.
     @Test func manyFramesInOneReadAreDecodedQuickly() throws {
         var bytes = Data()
         for i in 0..<60_000 { bytes.append(try FlingWire.encode(.fileDone(FlingFileDone(index: i)))) }
@@ -136,7 +136,7 @@ struct FlingWireTests {
         #expect(got == 1)
     }
 
-    /// REG-738: a chunk with an index and no data carries nothing and is refused.
+    /// REG-778: a chunk with an index and no data carries nothing and is refused.
     @Test func aChunkWithNoDataIsMalformed() {
         #expect(throws: FlingWireError.malformed) { try FlingWire.decode(FlingFrame(type: .chunk, payload: Data([0, 0, 0, 1]))) }
     }

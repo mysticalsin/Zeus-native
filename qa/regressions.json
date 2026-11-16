@@ -6863,6 +6863,234 @@
         "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
         "function": "theDisplayLinkStartsOneTickBeforeTheStrollSoItsFirstFramesAreNotLate"
       }
+    },
+    {
+      "id": "REG-770",
+      "failure": "A pairing was stored on the starting Mac as soon as the peer confirmed, with no confirmation from its own person.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "theStartingMacStoresNothingUntilItsOwnPersonAccepts"
+      }
+    },
+    {
+      "id": "REG-771",
+      "failure": "Expired or dropped pairing attempts, and ids rotated from one address, were never counted toward the mute.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "everyFailedAttemptCountsAndAnAddressIsMutedWhateverIdsItUses"
+      }
+    },
+    {
+      "id": "REG-772",
+      "failure": "A paired Mac could claim another paired Mac's id in its hello.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "aHelloProofNeedsTheClaimedIdsKeyAndTheNonce"
+      }
+    },
+    {
+      "id": "REG-773",
+      "failure": "Huge declared sizes overflowed a sum and trapped the receiver.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "hugeDeclaredSizesAreDeclinedWithoutTrapping"
+      }
+    },
+    {
+      "id": "REG-774",
+      "failure": "A bidi or format character in a received name passed validation.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "formatAndBidiCharactersAreRejectedAndCleanedAway"
+      }
+    },
+    {
+      "id": "REG-775",
+      "failure": "A numbered or folder name could pass 255 bytes, or a case-only clash overwrote a file.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "numberedNamesStayShortAndCaseIsFolded"
+      }
+    },
+    {
+      "id": "REG-776",
+      "failure": "The intake watcher skipped any folder named Fling, not only Zeus's own receiving folders.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "onlyTheConfiguredFlingFoldersAreRecognised"
+      }
+    },
+    {
+      "id": "REG-777",
+      "failure": "A received link to a loopback, private or local address opened by itself.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSecurityCoreTests.swift",
+        "function": "onlyPublicWebAddressesOpenWithoutAClick"
+      }
+    },
+    {
+      "id": "REG-778",
+      "failure": "The frame decoder copied the rest of its buffer per frame, and accepted a chunk with no data.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+        "function": "manyFramesInOneReadAreDecodedQuickly"
+      }
+    },
+    {
+      "id": "REG-779",
+      "failure": "Silent pairing connections could lock out transfers or later pairing.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "eightSilentPairingConnectionsBlockNeitherTransfersNorLaterPairing"
+      }
+    },
+    {
+      "id": "REG-780",
+      "failure": "Bytes promised to a running stack were not counted against the next offer.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "bytesReservedByARunningStackCountAgainstTheNextOffer"
+      }
+    },
+    {
+      "id": "REG-781",
+      "failure": "Stopping an endpoint left transfers without an end event.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "stoppingAnEndpointCancelsItsTransfersWithEvents"
+      }
+    },
+    {
+      "id": "REG-782",
+      "failure": "Every keystroke in the device name rebuilt both listeners.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "aDeviceNameTypedQuicklyRebuildsTheListenersOnce"
+      }
+    },
+    {
+      "id": "REG-783",
+      "failure": "Pairing an already paired id silently replaced its key.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "anAlreadyPairedMacIsRefusedAndKeepsItsKey"
+      }
+    },
+    {
+      "id": "REG-784",
+      "failure": "An answer to a pairing prompt went to every pairing session.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "anAnswerForAnotherMacDoesNotAnswerThePairing"
+      }
+    },
+    {
+      "id": "REG-785",
+      "failure": "A new card could be answered by a click in its first second.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "aNewCardIgnoresAnswersForItsFirstSecond"
+      }
+    },
+    {
+      "id": "REG-786",
+      "failure": "A Mac that refused a stored key was not told to pair again.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "aRejectedStoredKeySaysPairAgain"
+      }
+    },
+    {
+      "id": "REG-787",
+      "failure": "The pairing answer did not name the Mac it was for.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "thePairingAnswerNamesItsMac"
+      }
+    },
+    {
+      "id": "REG-788",
+      "failure": "Received files carried no quarantine mark.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingSecurityAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
+        "function": "receivedFilesAreQuarantinedAsFromZeus"
+      }
     }
   ]
 }

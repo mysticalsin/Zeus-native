@@ -70,7 +70,7 @@ struct FlingPairingStoreTests {
         #expect(lonely.pskTable().isEmpty && lonely.pairedNames().isEmpty)
     }
 
-    /// REG-743: pairing an id that is already paired never silently swaps its key.
+    /// REG-783: pairing an id that is already paired never silently swaps its key.
     @Test func anAlreadyPairedIdKeepsItsKeyUnlessReplacementIsAskedFor() {
         let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
         let (store, _) = make(dir: dir)
@@ -83,7 +83,7 @@ struct FlingPairingStoreTests {
         #expect(store.psk(for: "idB") == other)
     }
 
-    /// REG-735: a peer's name is capped at 60 bytes when it is stored, so no folder name built from it can grow.
+    /// REG-775: a peer's name is capped at 60 bytes when it is stored, so no folder name built from it can grow.
     @Test func aPeerNameIsCappedWhenStored() {
         let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
         let (store, _) = make(dir: dir)

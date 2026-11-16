@@ -295,7 +295,7 @@ struct FlingTwoProcessTests {
         #expect(rig.b.events(named: "itemVerified", from: markB).isEmpty)
     }
 
-    /// REG-730: the Mac that started the pairing can decline too, and then neither side keeps a key.
+    /// REG-770: the Mac that started the pairing can decline too, and then neither side keeps a key.
     @Test func theStartingMacCanDeclineAndNeitherSideStoresAKey() throws {
         let parent = FileManager.default.temporaryDirectory.appendingPathComponent("fling-e2e-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
@@ -320,7 +320,7 @@ struct FlingTwoProcessTests {
         #expect(try a.wait(for: "failed", from: markA2)["reason"] as? String == "notPaired")
     }
 
-    /// REG-732: a paired Mac that claims another paired Mac's id in its hello is turned away, and that other Mac still works.
+    /// REG-772: a paired Mac that claims another paired Mac's id in its hello is turned away, and that other Mac still works.
     @Test func aPairedMacClaimingAnotherPairedMacsIdIsRejected() throws {
         var rig = try Rig.make(); defer { rig.stop() }
         try rig.pair()

@@ -107,7 +107,7 @@ struct FlingPairingTests {
         #expect(try #require(sendAt) < #require(storeAt))
     }
 
-    /// REG-730: a peer that answers at once is not paired until the person on the starting Mac says the codes match.
+    /// REG-770: a peer that answers at once is not paired until the person on the starting Mac says the codes match.
     @Test func theStartingMacStoresNothingUntilItsOwnPersonAccepts() throws {
         var (i, r) = pair()
         _ = pump(&i, &r, first: i.handle(.start(now: t0)), now: t0)
@@ -209,7 +209,7 @@ struct FlingPairingTests {
         #expect(out5)
     }
 
-    /// REG-731: failed attempts of every kind count, by id and by address, so a rotating id cannot dodge the mute.
+    /// REG-771: failed attempts of every kind count, by id and by address, so a rotating id cannot dodge the mute.
     @Test func everyFailedAttemptCountsAndAnAddressIsMutedWhateverIdsItUses() {
         var ledger = FlingMuteLedger()
         ledger.recordFailure("id1", address: "10.0.0.7", now: t0)
@@ -224,7 +224,7 @@ struct FlingPairingTests {
         #expect(byID.isMuted("same", address: "10.9.9.9", now: t0.addingTimeInterval(4)))
     }
 
-    /// REG-732: the hello proves the claimed id with its key, bound to the receiver's fresh nonce.
+    /// REG-772: the hello proves the claimed id with its key, bound to the receiver's fresh nonce.
     @Test func aHelloProofNeedsTheClaimedIdsKeyAndTheNonce() {
         let key = Data(repeating: 7, count: 32), other = Data(repeating: 8, count: 32)
         let proof = FlingCrypto.helloProof(psk: key, nonce: "n1", id: "idA")

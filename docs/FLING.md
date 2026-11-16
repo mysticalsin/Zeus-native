@@ -91,4 +91,4 @@ There are two listeners, each advertised as its own Bonjour service of type `_ze
 
 ## Security review round
 
-An independent review of the first build (1 blocker, 5 majors, 11 minors) was fixed with tests first, REG-730 to REG-748. Verdicts are in the report that went with the commits; the main changes are the two-sided pairing confirmation, the proven hello, the pairing timeouts and separate gate, quarantine, overflow-safe sizes, bidi-safe names, private links that never open themselves, reserved free space, a debounced listener rebuild and events on stop.
+An independent review of the first build (1 blocker, 5 majors, 11 minors) was fixed with tests first, REG-770 to REG-788. Verdicts are in the report that went with the commits; the main changes are the two-sided pairing confirmation, the proven hello, the pairing timeouts and separate gate, quarantine, overflow-safe sizes, bidi-safe names, private links that never open themselves, reserved free space, a debounced listener rebuild and events on stop.

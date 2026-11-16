@@ -241,7 +241,7 @@ struct FlingShelfJourneyTests {
         }
     }
 
-    /// REG-730: the starting Mac's card also needs its person: "Codes match" or Cancel, and both answer.
+    /// REG-770: the starting Mac's card also needs its person: "Codes match" or Cancel, and both answer.
     @Test func thePairingCardOnTheStartingMacAsksForCodesMatchOrCancel() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()

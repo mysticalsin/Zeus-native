@@ -8,7 +8,7 @@ struct FlingSecurityCoreTests {
         FlingOfferItem(index: i, name: "\(name)\(i)", size: size, kind: .file, uti: nil, sha256: String(repeating: "0", count: 64), url: nil)
     }
 
-    /// REG-733: sizes that would overflow a sum are declined, never trapped on, and one item has a cap.
+    /// REG-773: sizes that would overflow a sum are declined, never trapped on, and one item has a cap.
     @Test func hugeDeclaredSizesAreDeclinedWithoutTrapping() {
         let max = Int64.max
         let free: Int64 = 100 << 30
@@ -22,7 +22,7 @@ struct FlingSecurityCoreTests {
         #expect(FlingOfferRules.totalFileBytes(FlingOffer(stackID: UUID(), items: [item(0, size: 5), item(1, size: 7)])) == 12)
     }
 
-    /// REG-734: bidi and other format characters cannot dress a name up as another extension.
+    /// REG-774: bidi and other format characters cannot dress a name up as another extension.
     @Test func formatAndBidiCharactersAreRejectedAndCleanedAway() {
         for bad in ["evil\u{202E}gpj.exe", "a\u{200F}b", "a\u{2066}b\u{2069}", "a\u{061C}b", "a\u{FEFF}b", "a\u{200B}b"] {
             #expect(FlingNames.validate(bad) == .failure(.unsafe), "\(bad.unicodeScalars.map(\.value))")
@@ -34,7 +34,7 @@ struct FlingSecurityCoreTests {
         #expect(FlingNames.validate("family \u{1F468}\u{200D}\u{1F469}.png") != .failure(.unsafe))
     }
 
-    /// REG-735: a name stays within 255 bytes even with a number added, and case alone is a clash.
+    /// REG-775: a name stays within 255 bytes even with a number added, and case alone is a clash.
     @Test func numberedNamesStayShortAndCaseIsFolded() {
         let long = String(repeating: "a", count: 251) + ".txt"
         #expect(long.utf8.count == 255)
@@ -55,7 +55,7 @@ struct FlingSecurityCoreTests {
         #expect(FlingNames.clean(String(repeating: "é", count: 200), maxBytes: FlingSaveRules.maxPeerNameBytes).utf8.count <= FlingSaveRules.maxPeerNameBytes)
     }
 
-    /// REG-736: only Zeus's own receiving folders are skipped by the intake watcher, not any folder called Fling.
+    /// REG-776: only Zeus's own receiving folders are skipped by the intake watcher, not any folder called Fling.
     @Test func onlyTheConfiguredFlingFoldersAreRecognised() {
         let roots = [URL(fileURLWithPath: "/Users/a/Downloads/Fling"), URL(fileURLWithPath: "/Users/a/Library/Application Support/Zeus/Fling/Inbox")]
         func inside(_ p: String) -> Bool { FlingSaveRules.isInsideFlingFolder(URL(fileURLWithPath: p), roots: roots) }
@@ -68,7 +68,7 @@ struct FlingSecurityCoreTests {
         #expect(!inside("/Users/a/Downloads/Fling/../a.png"))
     }
 
-    /// REG-737: a received link opens by itself only when it is a public web address.
+    /// REG-777: a received link opens by itself only when it is a public web address.
     @Test func onlyPublicWebAddressesOpenWithoutAClick() {
         for ok in ["https://example.com/a?b=1", "http://example.org", "https://sub.example.co.uk:8443/x", "https://8.8.8.8/", "https://[2001:4860:4860::8888]/"] {
             #expect(FlingLinkPolicy.opensWithoutAClick(ok), "\(ok)")
