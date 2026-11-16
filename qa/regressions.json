@@ -6167,6 +6167,30 @@
         "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
         "function": "theAcceptCardAnswersTheReceiveMachineAndTheTimeoutDeclines"
       }
+    },
+    {
+      "id": "REG-696",
+      "failure": "Files that arrived together did not collapse into one stack cell, a saved stack lost files, or a drag out moved them instead of copying.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingStackTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingStackTests.swift",
+        "function": "filesFromOneStackCollapseIntoOneCellAndSingleFilesStayAlone"
+      }
+    },
+    {
+      "id": "REG-697",
+      "failure": "Ask each time did not prompt a paired Mac, Clipboard or a missing Downloads grant wrote into Downloads/Fling, or a link opened without the switch.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingModesTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+        "function": "askEachTimePromptsEvenForAPairedMacAndTheAnswerPicksTheFolder"
+      }
     }
   ]
 }

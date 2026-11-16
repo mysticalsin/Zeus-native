@@ -917,6 +917,30 @@
       "suite": "FlingShelfJourneyTests",
       "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
       "scope": "Actual ShelfPage, strip, flick tracker and prompt card in owned windows with layout-resolved events and a recording stand-in for Fling; the drop lands through the same handler the avatar calls. No network, no pairing, no file leaves the Mac, no global input injection."
+    },
+    {
+      "id": "native-FlingStackTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingStackTests",
+      "file": "Tests/ZeusAppTests/FlingStackTests.swift",
+      "scope": "Actual TopBarModel Shelf grouping, saving a stack into a temp folder with a rollback, and the multi-file drag writers. No Finder, no drag session, no real folders outside temp."
+    },
+    {
+      "id": "native-FlingModesTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingModesTests",
+      "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+      "scope": "Two real endpoints in this process over loopback TLS with their own memory Keychains and temp folders: Ask each time, Clipboard, no Downloads access, and a received link. No Bonjour, no real Keychain, no Downloads."
+    },
+    {
+      "id": "native-FlingServiceModesTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingServiceModesTests",
+      "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+      "scope": "Actual FlingService with a recording stand-in transport and injected link opener and clipboard writer: links open only when allowed and only for web addresses, Clipboard copies, the Ask answer carries the place. No browser, no pasteboard."
     }
   ],
   "features": [
@@ -7022,6 +7046,67 @@
             {
               "file": "Tests/ZeusCoreTests/FlingGeometryTests.swift",
               "function": "aFlickFliesOffAlongItsDirectionAndReduceMotionOnlyFades"
+            }
+          ]
+        },
+        {
+          "id": "F15.10",
+          "check": "native-FlingStackTests",
+          "acceptance": "A stack is one cell with a ribbon, can be grouped, ungrouped and saved to a folder (with a rollback), and is dragged out as copies.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingStackTests.swift",
+              "function": "filesFromOneStackCollapseIntoOneCellAndSingleFilesStayAlone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingStackTests.swift",
+              "function": "savingAStackMovesItsFilesAndUpdatesTheShelf"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingStackTests.swift",
+              "function": "aFailedSaveLeavesTheFilesAndTheShelfAlone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingStackTests.swift",
+              "function": "draggingAStackOutOffersCopiesOfEveryFile"
+            }
+          ]
+        },
+        {
+          "id": "F15.11",
+          "check": "native-FlingModesTests",
+          "acceptance": "Ask each time prompts even a paired Mac and the answer picks the folder; Clipboard and a missing Downloads grant use the private inbox; a link arrives as a .webloc.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+              "function": "askEachTimePromptsEvenForAPairedMacAndTheAnswerPicksTheFolder"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+              "function": "clipboardModeAndNoDownloadsAccessLandInTheInbox"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+              "function": "aLinkArrivesAsAWeblocWithItsAddress"
+            }
+          ]
+        },
+        {
+          "id": "F15.12",
+          "check": "native-FlingServiceModesTests",
+          "acceptance": "A received link opens only with the switch on and only for http or https; Clipboard copies the verified files; the Ask answer carries the chosen place.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+              "function": "aReceivedLinkOpensOnlyWhenAllowedAndOnlyForWebAddresses"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+              "function": "clipboardModeCopiesTheArrivedFiles"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingModesTests.swift",
+              "function": "theAskAnswerCarriesTheChosenPlace"
             }
           ]
         },

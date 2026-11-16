@@ -95,7 +95,7 @@ public protocol FlingTransporting: AnyObject, Sendable {
     func answerPairing(accept: Bool)
     func send(_ items: [FlingOutgoingItem], to address: FlingPeerAddress) -> UUID
     func cancel(_ stackID: UUID)
-    func answerOffer(_ stackID: UUID, accept: Bool)
+    func answerOffer(_ stackID: UUID, accept: Bool, saveMode: FlingSaveMode?)
     func removePeer(id: String) -> Bool
     func address(of id: String) -> FlingPeerAddress?
 }
@@ -240,9 +240,10 @@ public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
         }
     }
 
-    public func answerOffer(_ stackID: UUID, accept: Bool) {
+    /// The person's answer to an offer. In Ask each time mode `saveMode` is where they chose to put the files.
+    public func answerOffer(_ stackID: UUID, accept: Bool, saveMode: FlingSaveMode? = nil) {
         queue.async { [self] in
-            for s in receiveSessions.values where s.stackID == stackID { s.answer(accept: accept) }
+            for s in receiveSessions.values where s.stackID == stackID { s.answer(accept: accept, mode: saveMode) }
         }
     }
 

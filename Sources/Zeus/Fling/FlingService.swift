@@ -89,12 +89,21 @@ final class FlingService: FlingSending {
     @ObservationIgnored private let model: TopBarModel
     @ObservationIgnored private let setting: @MainActor (String) -> String
     @ObservationIgnored private let downloadsGranted: @MainActor () -> Bool
+    /// Opens a received link. A test replaces it; the app opens it in the browser.
+    @ObservationIgnored var openLink: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// Puts arrived files on the pasteboard in Clipboard mode.
+    @ObservationIgnored var writeClipboard: ([URL]) -> Void = { urls in
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(urls.map { $0 as NSURL })
+    }
     /// Whether the notch is open; only read when "Receive while the notch is closed" is off.
     @ObservationIgnored var notchIsOpen: @MainActor () -> Bool = { true }
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var applied: Applied?
     @ObservationIgnored private var started = false
-    @ObservationIgnored private var arrivals: [UUID: (peer: String, urls: [URL])] = [:]
+    @ObservationIgnored private var arrivals: [UUID: (peer: String, urls: [URL], links: [String])] = [:]
+    @ObservationIgnored private var chosenModes: [UUID: FlingSaveMode] = [:]
     @ObservationIgnored private var sends: [UUID: (count: Int, peer: String, peerID: String)] = [:]
     @ObservationIgnored private var observing = false
 
@@ -222,10 +231,24 @@ final class FlingService: FlingSending {
         if !accept { pairingPrompt = nil }
     }
 
-    func answerOffer(accept: Bool) {
+    func answerOffer(accept: Bool) { answerOffer(accept: accept, saveMode: nil) }
+
+    /// In Ask each time mode the person picks where the files go along with the answer.
+    func answerOffer(accept: Bool, saveMode: FlingSaveMode?) {
         guard let offer = pendingOffer else { return }
-        transport.answerOffer(offer.stackID, accept: accept)
+        if accept, let saveMode { chosenModes[offer.stackID] = saveMode }
+        transport.answerOffer(offer.stackID, accept: accept, saveMode: saveMode)
         pendingOffer = nil
+    }
+
+    /// True when every offer asks where to put the files.
+    var asksWhere: Bool { setting("fling.saveMode") == "Ask each time" }
+    private var settingSaveMode: FlingSaveMode {
+        switch setting("fling.saveMode") {
+        case "Clipboard": .clipboard
+        case "Ask each time": .ask
+        default: .downloads
+        }
     }
 
     func cancelAll() {
@@ -253,9 +276,19 @@ final class FlingService: FlingSending {
         }
     }
 
-    private func flush(_ stack: UUID) {
+    /// Puts the verified files on the Shelf. When the whole stack finished it also copies them (Clipboard mode) and
+    /// opens received web links; a stack that stopped halfway only keeps what already matched.
+    private func flush(_ stack: UUID, finished: Bool = false) {
+        let mode = chosenModes.removeValue(forKey: stack) ?? settingSaveMode
         guard let pending = arrivals.removeValue(forKey: stack), !pending.urls.isEmpty else { return }
         model.addToShelf(pending.urls, origin: .fling(peer: pending.peer), stack: stack)
+        guard finished else { return }
+        if mode == .clipboard { writeClipboard(pending.urls) }
+        if opensLinks {
+            for text in pending.links where FlingOfferRules.isWebLink(text) {
+                if let url = URL(string: text) { openLink(url) }
+            }
+        }
     }
 
     private func finish(_ stack: UUID) { activity.removeAll { $0.stackID == stack } }
@@ -283,12 +316,13 @@ final class FlingService: FlingSending {
             let peerID = sends[stack]?.peerID ?? ""
             if let i = activity.firstIndex(where: { $0.stackID == stack }) { activity[i].fraction = fraction }
             else { activity.append(FlingActivity(stackID: stack, direction: direction, peerID: peerID, peerName: name, fraction: fraction)) }
-        case .itemArrived(let stack, _, _, let url, _, let peer, _):
-            arrivals[stack, default: (peer, [])].urls.append(url)
+        case .itemArrived(let stack, _, _, let url, _, let peer, let link):
+            arrivals[stack, default: (peer, [], [])].urls.append(url)
+            if let link { arrivals[stack]?.links.append(link) }
         case .stackFinished(let stack, let direction):
             finish(stack)
             switch direction {
-            case .receive: flush(stack)
+            case .receive: flush(stack, finished: true)
             case .send:
                 if let sent = sends.removeValue(forKey: stack) {
                     model.show(.flingSent(count: sent.count, to: sent.peer))

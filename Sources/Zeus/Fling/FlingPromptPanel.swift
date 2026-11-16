@@ -17,9 +17,21 @@ final class FlingPromptModel {
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let onAnswer: (Bool) -> Void
     private(set) var answered = false
+    /// Ask each time: Accept becomes "Save" and "Copy", and the choice goes with the answer.
+    let askWhere: Bool
+    @ObservationIgnored private let onChoose: ((FlingSaveMode) -> Void)?
 
-    init(kind: Kind, deadline: Date, clock: @escaping () -> Date, onAnswer: @escaping (Bool) -> Void) {
+    init(kind: Kind, deadline: Date, clock: @escaping () -> Date, onAnswer: @escaping (Bool) -> Void,
+         askWhere: Bool = false, onChoose: ((FlingSaveMode) -> Void)? = nil) {
         self.kind = kind; self.deadline = deadline; self.clock = clock; self.onAnswer = onAnswer
+        self.askWhere = askWhere; self.onChoose = onChoose
+    }
+
+    /// Accepts and says where the files go. Only the first answer counts.
+    func choose(_ mode: FlingSaveMode) {
+        guard !answered else { return }
+        answered = true
+        onChoose?(mode)
     }
 
     /// Only the first answer counts.
@@ -65,7 +77,14 @@ struct FlingPromptCard: View {
                 }
                 Spacer(minLength: 8)
                 button(canDecline: true)
-                if canAccept { button(canDecline: false) }
+                if canAccept {
+                    if model.askWhere, case .offer = model.kind {
+                        choice("Save", .downloads, id: "fling.prompt.save")
+                        choice("Copy", .clipboard, id: "fling.prompt.copy")
+                    } else {
+                        button(canDecline: false)
+                    }
+                }
             }
         }
         .padding(14)
@@ -77,6 +96,16 @@ struct FlingPromptCard: View {
     private var canAccept: Bool {
         if case .pairing(_, _, let can) = model.kind { return can }
         return true
+    }
+
+    private func choice(_ title: String, _ mode: FlingSaveMode, id: String) -> some View {
+        Button { model.choose(mode) } label: {
+            Text(title).font(TopBarStyle.label(11, .bold)).foregroundStyle(Color.black)
+                .padding(.horizontal, 14).padding(.vertical, 5).background(Capsule().fill(Theme.bolt))
+        }
+        .buttonStyle(.plain)
+        .ownedJourneyControl(id)
+        .accessibilityLabel(mode == .downloads ? "Save to Downloads" : "Copy to the clipboard")
     }
 
     @ViewBuilder
@@ -142,7 +171,8 @@ final class FlingPromptPanelController {
         } else if let offer {
             let service = fling
             next = FlingPromptModel(kind: .offer(peerName: offer.peerName, itemCount: offer.itemCount, totalBytes: offer.totalBytes),
-                                    deadline: deadline, clock: Date.init, onAnswer: { accept in service.answerOffer(accept: accept) })
+                                    deadline: deadline, clock: Date.init, onAnswer: { accept in service.answerOffer(accept: accept) },
+                                    askWhere: service.asksWhere, onChoose: { mode in service.answerOffer(accept: true, saveMode: mode) })
         } else { _ = key; return }
         model = next
         show(next)

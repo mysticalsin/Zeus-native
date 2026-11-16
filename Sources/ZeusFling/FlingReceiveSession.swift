@@ -20,6 +20,8 @@ final class FlingReceiveSession {
     private var finished = false
     private var holdsTransfer = false
     private var announcedEnd = false
+    /// Where the person chose to put these files when the mode is Ask each time.
+    private var chosenMode: FlingSaveMode?
 
     var stackID: UUID? { offer?.stackID }
 
@@ -97,7 +99,7 @@ final class FlingReceiveSession {
         offer = incoming
         totalBytes = incoming.items.filter { $0.kind == .file }.reduce(0) { $0 + $1.size }
         let name = endpoint.store.pairedNames()[peer.id] ?? peer.name
-        let context = FlingReceiveContext(peerID: peer.id, peerName: name, paired: true, autoAccept: endpoint.settings.autoAcceptPaired,
+        let context = FlingReceiveContext(peerID: peer.id, peerName: name, paired: true, autoAccept: endpoint.settings.autoAcceptPaired && endpoint.settings.saveMode != .ask,
                                           freeBytes: endpoint.freeBytes(), isReplay: endpoint.replay.isReplay(incoming.stackID, now: Date()))
         machine = FlingReceiveMachine(context: context)
         apply(step(.received(.offer(incoming), now: Date())))
@@ -119,7 +121,7 @@ final class FlingReceiveSession {
             switch effect {
             case .send(let message): channel.send(message)
             case .makeTemp(let id):
-                let destination = FlingSaveRules.destination(mode: endpoint.settings.saveMode, root: endpoint.saveRoot, inbox: endpoint.inbox,
+                let destination = FlingSaveRules.destination(mode: chosenMode ?? endpoint.settings.saveMode, root: endpoint.saveRoot, inbox: endpoint.inbox,
                                                               peer: peerName, date: Date(), downloadsGranted: endpoint.settings.downloadsGranted)
                 let sink = FlingFileSink(stackID: id, partialParent: destination.deletingLastPathComponent(), destination: destination)
                 self.sink = sink
@@ -190,7 +192,10 @@ final class FlingReceiveSession {
         }
     }
 
-    func answer(accept: Bool) { apply(step(accept ? .userAccept : .userDecline)) }
+    func answer(accept: Bool, mode: FlingSaveMode? = nil) {
+        if accept { chosenMode = mode }
+        apply(step(accept ? .userAccept : .userDecline))
+    }
     func cancel() { apply(step(.userCancel)) }
 
     func tick(_ now: Date) {
