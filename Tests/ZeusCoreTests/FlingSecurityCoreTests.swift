@@ -81,4 +81,44 @@ struct FlingSecurityCoreTests {
         }
         #expect(FlingLinkPolicy.opensWithoutAClick("http://172.32.0.1/"), "172.32 is public")
     }
+
+    /// REG-789: numbers in disguise (leading zeros, octal, hex, decimal, full width) are never public.
+    @Test func numbersInDisguiseAreNeverPublic() {
+        for no in ["http://012.0.0.1/", "http://0177.0.0.1/", "http://1.2.3.04/", "http://08.8.8.8/", "http://0x7f000001/", "http://017700000001/",
+                   "http://2130706433", "http://\u{FF11}\u{FF12}\u{FF17}.\u{FF10}.\u{FF10}.\u{FF11}/", "http://\u{FF45}xample.com/", "http://exa%6Dple.com/", "http://exämple.com/"] {
+            #expect(!FlingLinkPolicy.opensWithoutAClick(no), "\(no)")
+        }
+        #expect(FlingLinkPolicy.opensWithoutAClick("http://8.8.4.4/"))
+        #expect(FlingLinkPolicy.opensWithoutAClick("http://100.1.1.1/"), "100.1 is public; only 100.64/10 is carrier NAT")
+    }
+
+    /// REG-790: wildcard-IP DNS names and hosts that embed a private address are not public.
+    @Test func wildcardAndEmbeddedAddressHostsAreNotPublic() {
+        for no in ["http://127.0.0.1.nip.io/", "http://10-0-0-1.sslip.io/", "http://a.xip.io", "http://localtest.me", "http://app.lvh.me/", "http://NIP.IO/",
+                   "http://192-168-1-1.example.com/", "http://x.10.0.0.5.example.org/", "http://169-254-169-254.attacker.example/"] {
+            #expect(!FlingLinkPolicy.opensWithoutAClick(no), "\(no)")
+        }
+        #expect(FlingLinkPolicy.opensWithoutAClick("http://8.8.8.8.example.com/"), "a public address embedded in a name is fine")
+        #expect(FlingLinkPolicy.opensWithoutAClick("https://snip.io.example.com/"), "only the real suffix counts")
+    }
+
+    /// REG-791: the address that was checked is the address that gets opened.
+    @Test func theCheckedAddressIsTheOpenedAddress() {
+        let text = "https://Example.com/A?b=1#c"
+        let url = FlingLinkPolicy.urlToOpen(text)
+        #expect(url?.absoluteString == URL(string: text)?.absoluteString)
+        #expect(url?.host?.unicodeScalars.allSatisfy { $0.isASCII } == true)
+        #expect(FlingLinkPolicy.urlToOpen("http://localhost") == nil)
+        #expect(FlingLinkPolicy.urlToOpen("not a url") == nil)
+    }
+
+    /// REG-792: an attempt that never showed a code counts against its address only, not the id it claimed.
+    @Test func anAddressOnlyFailureDoesNotMuteTheClaimedId() {
+        var ledger = FlingMuteLedger()
+        let t = Date(timeIntervalSince1970: 5)
+        for k in 0..<3 { ledger.recordAddressFailure("10.0.0.9", now: t.addingTimeInterval(Double(k))) }
+        #expect(ledger.isMuted("anyone", address: "10.0.0.9", now: t.addingTimeInterval(4)))
+        #expect(!ledger.isMuted("victim", now: t.addingTimeInterval(4)), "an attacker's attempts never mute the real Mac's id")
+    }
 }
+

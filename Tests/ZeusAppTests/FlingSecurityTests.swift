@@ -143,6 +143,50 @@ struct FlingSecurityTests {
     }
 }
 
+extension FlingSecurityTests {
+    /// REG-793: an inbound attempt from a Mac that is already paired shows no banner, and a Mac that was removed on the
+    /// other side is not told which ids are paired.
+    @Test func anInboundAttemptFromAPairedMacShowsNothingAndRevealsNothing() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-sec-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let a = Node("Alpha", parent: dir), b = Node("Beta", parent: dir)
+        defer { a.endpoint.stop(); b.endpoint.stop() }
+        _ = try #require(await pair(a, b))
+        let pairPort = try #require(await b.pairPort())
+        let markB = b.events.count
+        // Alpha forgets Beta; Beta still holds Alpha's key.
+        #expect(a.endpoint.removePeer(id: b.id))
+        a.endpoint.pair(with: .direct(port: nil, pairPort: pairPort))
+        let ended = await a.wait("the refusal") { e -> FlingPairingState? in if case .pairEnded(let s) = e { return s } else { return nil } }
+        #expect(ended == .declined, "the starting Mac is told only that it was declined: \(String(describing: ended))")
+        try await Task.sleep(nanoseconds: 500_000_000)
+        #expect(!b.events.dropFirst(markB).contains { if case .pairEnded = $0 { true } else { false } }, "no banner for an attempt that never showed a code")
+        #expect(!b.events.dropFirst(markB).contains { if case .pairCode = $0 { true } else { false } })
+    }
+
+    /// REG-794: a pairing dropped after its code was shown is counted once, so two drops do not mute and a third attempt still shows its code.
+    @Test func aDroppedPairingIsCountedOnceNotTwice() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-sec-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let b = Node("Beta", parent: dir)
+        defer { b.endpoint.stop() }
+        let pairPort = try #require(await b.pairPort())
+        for round in 0..<3 {
+            let a = Node("Alpha\(round)", parent: dir)
+            a.endpoint.pair(with: .direct(port: nil, pairPort: pairPort))
+            let code = await b.wait("a code in round \(round)") { e -> Bool? in
+                guard case .pairCode(_, _, let peer, _) = e, peer == a.id else { return nil }
+                return true }
+            #expect(code == true, "round \(round) should still show its code")
+            a.endpoint.stop()
+            _ = await b.wait("the drop in round \(round)") { e -> Bool? in if case .pairEnded(.failed(.connectionLost)) = e { return true } else { return nil } }
+            try await Task.sleep(nanoseconds: 300_000_000)
+        }
+    }
+}
+
 final class Counter: @unchecked Sendable {
     private let lock = NSLock(); private var n = 0
     func bump() { lock.withLock { n += 1 } }
@@ -199,7 +243,7 @@ struct FlingSecurityAppTests {
         s.reconfigure(); await settle { s.eventsAreFlowing }
         transport.emit(.failed(stackID: UUID(), direction: .send, reason: "tlsRejected"))
         await settle { s.lastProblem != nil }
-        #expect(s.lastProblem?.contains("Pair again") == true)
+        #expect(s.lastProblem?.contains("pair again") == true && s.lastProblem?.contains("Settings") == true)
     }
 
     /// REG-787: the answer to a pairing names the Mac it is for.
@@ -245,4 +289,21 @@ struct FlingSecurityAppTests {
         #expect(first.lastPathComponent == "Report.PDF" && second.lastPathComponent == "report 2.pdf")
         #expect(try String(contentsOf: first) == "one" && (try String(contentsOf: second)) == "two")
     }
+
+    /// REG-795: if the quarantine mark cannot be set the file never comes into view.
+    @Test func aFailedQuarantineKeepsTheFileOutOfView() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-qf-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sink = FlingFileSink(stackID: UUID(), partialParent: dir, destination: dir.appendingPathComponent("Stack"))
+        struct Refused: Error {}
+        sink.quarantine = { _ in throw Refused() }
+        try sink.makeTemp()
+        try sink.write(index: 0, data: Data("x".utf8)); _ = try sink.verify(index: 0)
+        #expect(throws: (any Error).self) { try sink.commit(index: 0, name: "a.bin") }
+        #expect(throws: (any Error).self) { try sink.commitLink(name: "site", link: "https://example.com") }
+        let visible = (try? FileManager.default.contentsOfDirectory(atPath: dir.appendingPathComponent("Stack").path)) ?? []
+        #expect(visible.isEmpty, "nothing was moved or written into the stack folder: \(visible)")
+    }
 }
+
