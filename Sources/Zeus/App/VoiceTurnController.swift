@@ -1054,7 +1054,13 @@ final class VoiceTurnController {
                     && TalkSightPolicy.fallbackAllowed(spokeAnything: !spoken.isEmpty, actionStarted: actionStarted) {
                     // The image engine failed before saying anything: the text engines answer, and say they cannot see.
                     VoiceLog.log("route", "image engine failed; racing text engines \(fallback.map(\.id).joined(separator: " + "))")
-                    let blind = request.with(screenshots: [], screenReason: .imageEngineFailed, carriesDrawImage: false)
+                    let blindPrompt = TalkSightPolicy.withoutDrawInstructions(request.systemPrompt,
+                                                                              drawInstructions: ZeusPrompt.drawInstructions())
+                    let blind = request.with(screenshots: [], systemPrompt: blindPrompt, screenReason: .imageEngineFailed,
+                                             carriesDrawImage: false)
+                    // Marks or a pointer the image engine began are taken back before the text engine answers.
+                    if drawBegun { presenter.clear(); drawBegun = false; drawActive = false }
+                    if pointed { buddy.idle(); pointed = false }
                     // Nothing from the image race reached the parser's output, so its half-read tag is dropped.
                     parser = ZeusTagStreamParser()
                     race = makeRace(fallback, blind, deepTier: nil, deepReason: nil)

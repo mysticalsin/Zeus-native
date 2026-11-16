@@ -39,16 +39,18 @@ private final class ScriptedProvider: BrainProvider, @unchecked Sendable {
     let capabilities: ProviderCapabilities
     private let delayMs: Int
     private let reply: String?
+    private let opening: String?
     private let lock = NSLock()
     private var seen: [BrainRequest] = []
 
     struct Failure: LocalizedError { var errorDescription: String? { "scripted image engine failure" } }
 
-    init(id: ProviderID, capabilities: ProviderCapabilities, delayMs: Int, reply: String?) {
+    init(id: ProviderID, capabilities: ProviderCapabilities, delayMs: Int, reply: String?, opening: String? = nil) {
         self.id = id
         self.capabilities = capabilities
         self.delayMs = delayMs
         self.reply = reply
+        self.opening = opening
     }
 
     var requests: [BrainRequest] { lock.withLock { seen } }
@@ -58,9 +60,10 @@ private final class ScriptedProvider: BrainProvider, @unchecked Sendable {
 
     func send(_ request: BrainRequest) -> AsyncThrowingStream<BrainEvent, Error> {
         lock.withLock { seen.append(request) }
-        let delayMs = delayMs, reply = reply
+        let delayMs = delayMs, reply = reply, opening = opening
         return AsyncThrowingStream { continuation in
             let task = Task {
+                if let opening { continuation.yield(.textDelta(opening)) }
                 try? await Task.sleep(for: .milliseconds(delayMs))
                 if let reply {
                     continuation.yield(.textDelta(reply))
@@ -360,5 +363,57 @@ struct TalkVisualTurnTests {
         #expect(text.requests.count == 1)
         #expect(fallback.screenshots.isEmpty && !fallback.carriesDrawImage)
         #expect(fallback.screenReason == .imageEngineFailed)
+    }
+
+    @Test func marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers() async throws {
+        let tagEnd = try #require(Self.reply.range(of: "}]}]")).upperBound
+        let drawOnly = String(Self.reply[..<tagEnd])
+        let image = ScriptedProvider(id: .claudeCLI, capabilities: [.images, .streaming], delayMs: 300, reply: nil, opening: drawOnly)
+        let text = ScriptedProvider(id: .codexCLI, capabilities: [.streaming], delayMs: 100, reply: "Fallback answer here.")
+        let log = TurnLog()
+        let both = controller(consent: true, log: log, sees: true)
+        both.engineCandidatesOverride = { [(.claude, "claude", image), (.codex, "codex", text)] }
+        _ = await both.runScriptedTurn(transcript: "where do I export this as a PDF", screenshots: Self.shots)
+
+        let begin = try #require(log.events.firstIndex { $0.hasPrefix("begin") })
+        let clear = try #require(log.events.firstIndex(of: "clear"))
+        let answer = try #require(log.events.firstIndex(of: "line Fallback answer here."))
+        #expect(begin < clear && clear < answer, "the half-begun marks are cleared before the blind answer: \(log.events)")
+        let fallback = try #require(text.requests.first)
+        #expect(!fallback.systemPrompt.contains("[DRAW:"), "the blind prompt carries no draw rules")
+    }
+
+    // MARK: Ultron speech text
+
+    private func asUltron<T>(_ body: () async -> T) async -> T {
+        let defaults = UserDefaults.standard
+        let old = defaults.object(forKey: ZeusPersonality.defaultsKey)
+        defaults.set(ZeusPersonality.ultron.rawValue, forKey: ZeusPersonality.defaultsKey)
+        defer {
+            if let old { defaults.set(old, forKey: ZeusPersonality.defaultsKey) } else { defaults.removeObject(forKey: ZeusPersonality.defaultsKey) }
+        }
+        return await body()
+    }
+
+    @Test func voicedTextHasNoEllipsisForUltronAndKeepsItForPlain() async {
+        await asUltron { #expect(VoiceTurnController.voiced("Fine... that works.") == "Fine, that works.") }
+        UserDefaults.standard.set(ZeusPersonality.plain.rawValue, forKey: ZeusPersonality.defaultsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ZeusPersonality.defaultsKey) }
+        #expect(VoiceTurnController.voiced("Fine... that works.") == "Fine... that works.")
+    }
+
+    @Test func aStreamedEllipsisReplyIsOneSpokenLineForUltron() async {
+        await asUltron {
+            let log = TurnLog()
+            let ultron = controller(consent: false, log: log)
+            let events = AsyncThrowingStream<BrainEvent, Error> { continuation in
+                continuation.yield(.textDelta("Fine..."))
+                continuation.yield(.textDelta(" that works."))
+                continuation.yield(.done(nil))
+                continuation.finish()
+            }
+            _ = await ultron.runScriptedTurn(transcript: "does it work", screenshots: [], replay: (id: "claude", events: events))
+            #expect(log.events.filter { $0.hasPrefix("line ") } == ["line Fine, that works."])
+        }
     }
 }
