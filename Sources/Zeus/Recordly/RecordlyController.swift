@@ -463,9 +463,9 @@ final class RecordlyController {
     /// The Record page went away (another page, the notch closed): a countdown must not start a capture the owner can
     /// no longer see or cancel with Escape.
     func pageDisappeared() {
-        // A seeded snapshot fixture is drawn more than once (1x, 2x, flat); each render ending must not cancel it.
-        guard !holdsSeededStateForSnapshot else { return }
-        perform(countdown.send(.cancel))
+        // A seeded snapshot fixture is drawn more than once (1x, 2x, flat); each render ending must not cancel its
+        // countdown. The thumbnail request still stops, so a snapshot never keeps a real screen capture.
+        if !holdsSeededStateForSnapshot { perform(countdown.send(.cancel)) }
         thumbnailTask?.cancel()
     }
 
