@@ -35,14 +35,8 @@ struct ElevenLabsVoice: Sendable {
     }
 
     /// Delivery for each personality (docs/PERSONA.md, section 6). Plain is a natural, steady read.
-    /// Ultron is more expressive: lower stability for range, some style exaggeration (supported by
-    /// the flash model, at a small latency cost), speaker boost on, and a touch unhurried.
-    static func voiceSettings(for personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
-        // Studio (UNVERIFIED model, see `ElevenLabsQuality.studioModel`): only the settings every model takes.
-        if model == ElevenLabsQuality.studioModel {
-            let studio: [String: Any] = ["stability": 0.5, "similarity_boost": 0.8, "use_speaker_boost": true]
-            return studio
-        }
+    /// Ultron (take C) is steadier and brisker: stability 0.6, some style, speaker boost on, normal speed.
+    static func voiceSettings(for personality: ZeusPersonality) -> [String: Any] {
         switch personality {
         case .plain:
             let plain: [String: Any] = ["stability": 0.45, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": true]
@@ -54,7 +48,7 @@ struct ElevenLabsVoice: Sendable {
 
     /// The JSON body of a direct text to speech request.
     static func speechBody(text: String, personality: ZeusPersonality, model: String = ElevenLabsVoice.model) -> [String: Any] {
-        ["text": text, "model_id": model, "voice_settings": voiceSettings(for: personality, model: model)]
+        ["text": text, "model_id": model, "voice_settings": voiceSettings(for: personality)]
     }
 
     /// 24 kHz 16-bit mono PCM, played without decoding. `pcm_44100` needs the Pro tier (ElevenLabs docs);

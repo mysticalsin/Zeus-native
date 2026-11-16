@@ -5896,6 +5896,160 @@
               "function": "theUltronPromptStillNeverThreatensAndStaysHonestAboutEmotions"
             }
           ]
+        },
+        {
+          "id": "F11.ultron-take-c-voice",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Ultron ElevenLabs delivery is take C (stability 0.6, similarity 0.85, style 0.3, speed 1.0), the fast model stays the default and Studio is the known eleven_multilingual_v2. Does not prove how it sounds.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "takeCSettingsAreFasterAndSteadier"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theStudioChoiceIsAKnownModelAndTheFastDefaultStays"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-take-c-voice-app",
+          "check": "native-VoiceDesignerTests",
+          "acceptance": "The Ultron request body carries the take C settings with speaker boost on. No network or audio.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/VoiceDesignerTests.swift",
+              "function": "ultronDeliveryIsMoreExpressive"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-speech-sanitizer",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Spoken Ultron text never carries an ellipsis: it becomes a comma or a period, plain text is untouched, and no dialogue line contains one.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anAsciiEllipsisBeforeALowercaseWordBecomesAComma"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisAtASentenceEndBecomesAPeriod"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theUnicodeEllipsisAndLongerRunsAreHandledTheSame"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "noEllipsisSurvivesAndPlainTextIsUntouched"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "onlyTheUltronPersonalityIsSanitizedForTheVoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "noDialogueLineContainsAnEllipsis"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisBeforeAnythingButAWordLeavesNoMark"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "numberRangesCodeLikeTokensAndBracketedElisionsAreLeftAlone"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisBeforeALowercaseWordStaysInOneStreamedSentence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisBeforeACapitalStillEndsTheSentence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "anEllipsisAtTheChunkEdgeWaitsForTheNextWord"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-take-c-wording",
+          "check": "native-ZeusPromptTests",
+          "acceptance": "The Ultron prompt asks for short clauses, no ellipses, no filler, one dry aside at the end and calm delivery, stays inside the word budget and the plain persona is unchanged.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theUltronPromptCarriesTheTakeCReplyWordingRules"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "thePlainPersonaIsUnchangedByTakeC"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theUltronPersonaStaysUnderTheSevenHundredWordBudget"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-sight-fallback-rules",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The text fallback runs only when the image engine said and did nothing, one filler per turn, marks need pixels that really reached the engine and draw rules leave a stripped prompt, and the fallback is told with its own wording.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theTextFallbackNeedsNoWordsAndNoActionOnTheImageRace"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theFillerGateLetsExactlyOneLineThroughPerTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "marksAreRefusedWhenAnOlderClaudeStrippedTheImages"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "aStrippedLaunchDropsTheDrawInstructionsFromThePrompt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theImageEngineFailureHasItsOwnDistinctWording"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+              "function": "theDrawRulesAreCutOutOfAPromptWithTheirBlankLine"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-sight-fallback-turn",
+          "check": "native-TalkVisualTurnTests",
+          "acceptance": "With scripted providers, an image engine that fails lets the text engine answer once with one filler and no marks, and an older claude never draws.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "anImageEngineThatFailsAfterTheFillerLetsTheTextEngineAnswerOnceWithOneFillerAndNoRepeatedAction"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "anOlderClaudeThatStripsTheImagesNeverDrawsMarks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "voicedTextHasNoEllipsisForUltronAndKeepsItForPlain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aStreamedEllipsisReplyIsOneSpokenLineForUltron"
+            }
+          ]
         }
       ]
     },
