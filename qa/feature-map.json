@@ -5027,6 +5027,45 @@
           ]
         },
         {
+          "id": "F11.ultron-eleven-kokoro",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The Ultron voice defaults to ElevenLabs, then Kokoro (am_michael, same effect chain), then the Mac voice; only an explicit owner pick overrides it. Any ElevenLabs failure leaves Kokoro next: a bad key or empty credits pause it 15 minutes, a network error, timeout or rate limit 60 seconds, and the pause expires so ElevenLabs is retried.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "aKokoroStoredWithoutAnOwnerPickDoesNotBeatElevenLabs"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "elevenLabsIsTheDefaultProviderEvenWhenKokoroIsSetUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "aSlowElevenLabsStillLeadsAndTheTimeoutIsTheFailsafe"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "aNetworkErrorOrTimeoutPausesElevenLabsBrieflySoTheNextSentencesGoToKokoro"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "everyWayElevenLabsCanFailLeavesKokoroNextThenTheMacVoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "thePersistedPauseExpiresSoElevenLabsIsTriedAgainAfterCreditsReset"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "anExplicitOwnerPickStillWins"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+              "function": "kokoroSpeaksAsTheSameUltronCharacter"
+            }
+          ]
+        },
+        {
           "id": "F11.talk-chord",
           "check": "native-ZeusCoreTests",
           "acceptance": "Control-Option-Space joins a held talk turn without a second start or a typed key, only on the bare Control-Option key in hold mode with VoiceOver off, never ends a hands-free turn when Space comes first, yields to an explicit Chat choice, and every Carbon hot key answers only its own signature.",
