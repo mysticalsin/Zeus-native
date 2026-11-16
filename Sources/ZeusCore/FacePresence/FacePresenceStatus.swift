@@ -15,7 +15,7 @@ public struct FacePresenceStatus: Equatable, Sendable {
 
     public static func hint(for state: FacePresenceMachine.State) -> String? {
         switch state {
-        case .needsCameraConsent: "Allow the camera for Zeus in System Settings, Privacy and Security, Camera."
+        case .needsCameraConsent: "Allow the camera for Zeus in System Settings, Privacy & Security, Camera."
         case .enrolling: "Look at the camera until Zeus has learned your face."
         case .unavailable(.camera): "Zeus can't use the camera right now. Close other apps that use it, then switch Face presence off and on."
         case .unavailable(.lock): "This Mac can't be locked by Zeus right now. Switch Face presence off and on to try again."

@@ -7367,6 +7367,18 @@
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual"
       }
+    },
+    {
+      "id": "REG-769",
+      "failure": "The Face presence hint sat left of the row titles and said Privacy and Security where macOS says Privacy & Security.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceStatusTests.swift",
+        "function": "statesThatNeedAnActionSayWhyAndWhatToDo"
+      }
     }
   ]
 }

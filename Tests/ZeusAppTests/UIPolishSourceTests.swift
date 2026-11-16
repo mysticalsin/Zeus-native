@@ -37,4 +37,11 @@ struct UIPolishSourceTests {
         let offset = try #require(block.range(of: ".offset(x: OB.contentX, y: OB.headingTopY)"))
         #expect(pin.lowerBound < offset.lowerBound)
     }
+
+    @Test func theFacePresenceHintIndentsToTheRowTitles() throws {
+        let card = try Self.source("Sources/Zeus/Settings/GSFacePresenceCard.swift")
+        #expect(card.contains(".padding(.leading, GS.rowIconColumn)"))
+        let style = try Self.source("Sources/Zeus/Settings/GlanceSettingsStyle.swift")
+        #expect(style.contains("frame(width: GS.rowIconColumn, alignment: .leading)"))
+    }
 }

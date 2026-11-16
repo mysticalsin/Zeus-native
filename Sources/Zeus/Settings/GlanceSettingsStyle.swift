@@ -43,6 +43,8 @@ enum GS {
     static let pageSubtitle = OB.font(14)
     static let cardTitle = OB.font(16.5, .semibold)
     static let rowTitle = OB.font(14, .semibold)
+    /// Width of a row's icon column: row titles start this far in, so loose text under a row indents by it too.
+    static let rowIconColumn: CGFloat = 42
     static let rowText = OB.font(13.5)
     static let sidebarItem = OB.font(15, .medium)
     static let sidebarHead = OB.font(12.5, .medium)
@@ -88,7 +90,7 @@ struct GSRow<Trailing: View>: View {
         HStack(alignment: .center, spacing: 0) {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 18, weight: .regular)).foregroundStyle(GS.text)
-                    .frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                    .frame(width: GS.rowIconColumn, alignment: .leading).accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(GS.rowTitle).foregroundStyle(GS.text)
