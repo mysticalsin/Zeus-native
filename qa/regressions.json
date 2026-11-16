@@ -6371,6 +6371,18 @@
         "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
         "function": "theFrameLoopChecksTheBuddysDisplayEveryTick"
       }
+    },
+    {
+      "id": "REG-760",
+      "failure": "The mascot's idle stroll switched to the 60 fps display link one clip frame (up to 83 ms) after it had started moving, so its first steps jumped.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MascotMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+        "function": "theDisplayLinkStartsOneTickBeforeTheStrollSoItsFirstFramesAreNotLate"
+      }
     }
   ]
 }
