@@ -40,7 +40,11 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     private var queue: [(text: String, onStart: (@MainActor () -> Void)?)] = []
     /// Fires when the line now being spoken starts to play; cleared after it fires, so it runs once per line.
     private var lineOnStart: (@MainActor () -> Void)?
+    /// How many buffers the chain had been given when the line now being spoken began: its own audio plays after them.
+    private var lineBase = 0
     /// Test seam: stands in for every voice engine, so no audio is made. Nil in the app.
+    /// Where the chain counts queued and played buffers (the tests stand in for an engine through it).
+    var playbackLedger: PlaybackLedger { chain.ledger }
     var attemptOverride: (@MainActor (String) async -> String?)?
     private var pump: Task<Void, Never>?
     private var pumpToken: UUID?
@@ -178,12 +182,13 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     private func speakLine(_ text: String, began: Date = Date(), onStart: (@MainActor () -> Void)? = nil) async -> Played? {
         let settings = VoiceSettings.shared
         lineOnStart = onStart
+        lineBase = chain.ledger.scheduled
         defer { lineOnStart = nil }
         for decision in settings.routeDecisions() {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
             guard let voiceName = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
-            fireLineStart() // Engines that never reported a first buffer have still played by now.
+            armLineStart() // Engines that never reported a first buffer have still queued their audio by now.
             let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
             if let ms { settings.recordFirstAudio(decision.engine, ms: ms) }
             logSpoken(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
@@ -235,14 +240,16 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         SpeechAttemptPolicy.shouldRecordFailure(producedAudio: false, cancelled: Task.isCancelled)
     }
 
-    private func fireLineStart() {
+    /// The line's start callback runs when its audio plays. Engines queue a line behind the earlier one (the
+    /// next sentence is requested while this one plays), so that is when everything queued before it has played.
+    private func armLineStart() {
         guard let start = lineOnStart else { return }
         lineOnStart = nil
-        start()
+        chain.ledger.whenPlayed(upTo: lineBase, run: start)
     }
 
-    private func markAudioReady() {
-        fireLineStart()
+    func markAudioReady() {
+        armLineStart()
         if audioReadyAt == nil { audioReadyAt = Date() }
         VoiceLatency.shared.mark(.firstAudio)
     }
