@@ -394,6 +394,9 @@ final class NotchController {
             // beside or below it reach the app underneath.
             setIgnoresMouse(!over)
             guard outside else { closeTask?.cancel(); closeTask = nil; return }
+            // VoiceOver moves its own cursor, not the pointer: a pointer outside the panel says nothing about where
+            // the person is, so the panel stays until a click outside or the notch closes it.
+            if Self.pointerExitKeepsPanelOpen(voiceOverOn: voiceOverProvider()) { closeTask?.cancel(); closeTask = nil; return }
             switch PolyglotPinPolicy.decide(.pointerExited, pinContext()) {
             case .keepOpen:
                 closeTask?.cancel(); closeTask = nil
@@ -413,6 +416,12 @@ final class NotchController {
     }
 
     private var closeTask: Task<Void, Never>?
+
+    /// Whether VoiceOver is running; tests replace it.
+    var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
+
+    /// The pointer leaving the open panel closes it, except while VoiceOver drives: its cursor is not the pointer.
+    static func pointerExitKeepsPanelOpen(voiceOverOn: Bool) -> Bool { voiceOverOn }
 
     /// Re-evaluate a pending close immediately when the pin is changed, including unpinning.
     func polyglotPinChanged() {

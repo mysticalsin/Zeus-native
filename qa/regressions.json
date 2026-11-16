@@ -7379,6 +7379,18 @@
         "file": "Tests/ZeusCoreTests/FacePresenceStatusTests.swift",
         "function": "statesThatNeedAnActionSayWhyAndWhatToDo"
       }
+    },
+    {
+      "id": "REG-800",
+      "failure": "With VoiceOver on, the open notch panel closed 0.2 s after the pointer left it, so a VoiceOver user could not switch tabs: VoiceOver's cursor is not the pointer.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+      }
     }
   ]
 }
