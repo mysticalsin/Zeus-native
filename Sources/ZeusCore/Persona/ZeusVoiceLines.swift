@@ -80,10 +80,21 @@ public final class ZeusVoiceLines: @unchecked Sendable {
     private let lock = NSLock()
     private var last: [String: String] = [:]
     private let pick: @Sendable (Int) -> Int
+    /// The dialogue asset the Ultron personality draws filler, acknowledgement, error and completion lines from.
+    private var dialogue: UltronDialogue?
+    private var selector = UltronDialogueSelector()
 
     /// `pick` returns an index below its argument; tests pass a fixed one.
-    public init(pick: @escaping @Sendable (Int) -> Int = { Int.random(in: 0..<$0) }) {
+    public init(pick: @escaping @Sendable (Int) -> Int = { Int.random(in: 0..<$0) }, dialogue: UltronDialogue? = nil) {
         self.pick = pick
+        self.dialogue = dialogue
+    }
+
+    /// Installs (or clears) the dialogue asset, for the app after it loads the bundled file.
+    public func setDialogue(_ dialogue: UltronDialogue?) {
+        lock.lock(); defer { lock.unlock() }
+        self.dialogue = dialogue
+        selector = UltronDialogueSelector()
     }
 
     /// A line for `situation` in the saved personality, spoken as is.
@@ -92,6 +103,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
     }
 
     public func line(for situation: Situation, context: [String: String] = [:], personality: ZeusPersonality) -> String {
+        if personality == .ultron, let spoken = dialogueLine(for: situation) { return spoken }
         let templates = Self.bank(personality)[situation] ?? []
         let usable = templates.filter { Self.placeholders(in: $0).allSatisfy { context[$0]?.isEmpty == false } }
         let pool = usable.isEmpty ? templates.filter { Self.placeholders(in: $0).isEmpty } : usable
@@ -102,6 +114,15 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         let chosen = fresh[min(max(pick(fresh.count), 0), fresh.count - 1)]
         last[key] = chosen
         return Self.fill(chosen, context: context)
+    }
+
+    /// A line from the dialogue asset for the situations it covers, nil to use the compiled bank.
+    private func dialogueLine(for situation: Situation) -> String? {
+        guard let tag = UltronDialogue.tag(for: situation) else { return nil }
+        lock.lock(); defer { lock.unlock() }
+        guard let dialogue else { return nil }
+        let ceiling: UltronDialogue.Humour = situation == .errorSpoken ? .low : .high
+        return selector.pick(situation: tag, from: dialogue, maxHumour: ceiling, random: pick)?.text
     }
 
     /// Replaces each `{key}` with its value from `context`. Unknown keys stay as written.
