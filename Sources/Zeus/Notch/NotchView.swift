@@ -87,6 +87,9 @@ struct NotchView: View {
     var topOffsetOverride: Double? = nil
     /// Snapshots and previews pin the island background; nil reads Settings > Appearance > Island background.
     var backgroundOverride: NotchBackground? = nil
+    /// What the notch's accessibility action does: open the panel. The closed notch is click-through and opens on
+    /// the pointer, which a VoiceOver or Switch Control user does not have. Nil (previews, snapshots) does nothing.
+    var openPanel: (() -> Void)? = nil
 
     /// The layers the body draws now: Transparent drops fill, outline and glow of the closed island only.
     private var layers: NotchBodyLayers {
@@ -329,6 +332,17 @@ struct NotchView: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        // One labelled element for the whole notch (its children stay reachable), so a closed notch that draws only
+        // marks still has a name and something to press.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Zeus")
+        .accessibilityAction { openPanel?() }
+        // Offered only while there is a panel to open, so VoiceOver does not list a dead action on the open panel.
+        .accessibilityActions {
+            if model.presentation != .panel {
+                Button("Open Zeus panel") { openPanel?() }
+            }
+        }
         .ownedJourneyControl("notch.body")
         // Glance (parity/N7, frames 139 to 143): the glass rim sits on the final open outline from
         // the first frame while the body grows inside it, then fades. Behind the body, not animated.

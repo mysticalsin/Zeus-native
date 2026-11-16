@@ -126,6 +126,7 @@ struct RecordingFeedbackFrameView: View {
             .accessibilityLabel(snapshot.label)
             .accessibilityHint("Opens \(snapshot.producer == .meetings ? "Meetings" : "Record").")
             .accessibilityIdentifier("recording.feedback.\(snapshot.producer.rawValue)")
+            .accessibilityAction { open() }
             .help(snapshot.label)
         }
     }

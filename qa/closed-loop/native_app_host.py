@@ -12,9 +12,9 @@ SUITES = {"OwnedWindowEventDriverTests", "ScribeComponentJourneyTests", "ScribeA
           "ScribeMeetingCardJourneyTests", "OnboardingComponentJourneyTests", "OnboardingFilmLifecycleTests",
           "ExplanationRendererTests", "ExplanationTalkButtonTests", "ExplanationScreenContextTests",
           "ExplanationChatLifecycleTests", "ScribeTrustedAccessibilityJourneyTests", "ClosedWingsNotchTests",
-          "FlingShelfJourneyTests", "FlingTwoProcessTests"}
+          "FlingShelfJourneyTests", "FlingTwoProcessTests", "NotchTrustedAccessibilityTests"}
 # Launchable by the host, but only by the local trusted runner. `selected` never picks these for CI.
-TRUSTED_SUITES = {"ScribeTrustedAccessibilityJourneyTests"}
+TRUSTED_SUITES = {"ScribeTrustedAccessibilityJourneyTests", "NotchTrustedAccessibilityTests"}
 INFO = {
     "CFBundleExecutable": "zeus-native-test-host",
     "CFBundleIdentifier": "org.zeus.native-test-host",

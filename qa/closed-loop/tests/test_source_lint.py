@@ -1549,5 +1549,82 @@ class SnapshotFlagAcrossAwaitLint(unittest.TestCase):
         self.assertFalse(snapshot_flag_across_await(bad.replace("await x()", "x()")))
 
 
+# A SwiftUI Button wrapped in `.accessibilityElement(children: .ignore)` is replaced by a new accessibility element that
+# can lose the Button's default action, so an outside AXPress (VoiceOver, Switch Control, a QA driver) did nothing. Every
+# modifier chain that is a Button under `children: .ignore`, or that adds the button trait, must carry an explicit default
+# `.accessibilityAction { ... }` (a named action does not count: it is not the one AXPress performs).
+def _indent(line):
+    return len(line) - len(line.lstrip())
+
+
+def _chain(lines, index):
+    """The modifier chain around lines[index]: its head line (or None) and the chain text."""
+    n = _indent(lines[index])
+    start = index
+    while start > 0:
+        previous = lines[start - 1]
+        if previous.strip() and _indent(previous) <= n and not previous.lstrip().startswith((".", "//")):
+            break
+        start -= 1
+    end = index + 1
+    while end < len(lines):
+        line = lines[end]
+        if line.strip() and (_indent(line) < n or (_indent(line) == n and not line.lstrip().startswith((".", "//")))):
+            break
+        end += 1
+    head = lines[start - 1] if start > 0 else ""
+    if head.strip().startswith("}"):
+        opener = start - 1
+        while opener > 0 and not (_indent(lines[opener]) == _indent(head) and not lines[opener].lstrip().startswith(("}", "."))):
+            opener -= 1
+        head = lines[opener]
+    return head, "\n".join(lines[start:end])
+
+
+DEFAULT_ACTION = re.compile(r"\.accessibilityAction\s*(?:\{|\(\.default\))")
+
+
+def button_without_default_action(text, label="sample"):
+    lines = text.splitlines()
+    problems = []
+    for index, line in enumerate(lines):
+        ignored = "children: .ignore" in line
+        tapped = ".accessibilityAddTraits(" in line and "isButton" in line
+        if line.strip().startswith("//") or not (ignored or tapped):
+            continue
+        head, chain = _chain(lines, index)
+        is_button = re.search(r"\bButton\b", head) or "isButton" in chain
+        # Only the chain's own modifiers count: an action nested inside a trailing `.overlay { ... }` belongs to a child.
+        own = "\n".join(l for l in chain.splitlines() if _indent(l) == _indent(line) and l.lstrip().startswith("."))
+        if is_button and not DEFAULT_ACTION.search(own):
+            problems.append(f"{label}:{index + 1}")
+    return sorted(set(problems))
+
+
+class ButtonDefaultActionLint(unittest.TestCase):
+    def test_every_button_under_an_ignored_element_has_a_default_action(self):
+        problems = []
+        for path in sorted(APP.rglob("*.swift")):
+            problems += button_without_default_action(path.read_text(encoding="utf-8"), str(path.relative_to(APP)))
+        # A line number is reported once per chain, so a chain with two matching modifiers is not double counted.
+        self.assertEqual(problems, [])
+
+    def test_samples_that_must_fail(self):
+        bad = "return Button {\n    go()\n} label: {\n    Text(\"x\")\n}\n.buttonStyle(.plain)\n.accessibilityElement(children: .ignore)\n.accessibilityLabel(\"x\")\n"
+        self.assertTrue(button_without_default_action(bad))
+        self.assertFalse(button_without_default_action(bad + ".accessibilityAction { go() }\n"))
+        # A named action is not the default one.
+        self.assertTrue(button_without_default_action(bad + ".accessibilityAction(named: \"Go\") { go() }\n"))
+        tapped = "Text(\"x\")\n    .onTapGesture { go() }\n    .accessibilityAddTraits(.isButton)\n"
+        self.assertTrue(button_without_default_action(tapped))
+        self.assertFalse(button_without_default_action(tapped + "    .accessibilityAction { go() }\n"))
+        # An action inside a child's closure is not the button's own default action.
+        nested = bad + ".overlay {\n    Text(\"y\")\n        .accessibilityAction { go() }\n}\n"
+        self.assertTrue(button_without_default_action(nested))
+        # A plain read-only element is not a button.
+        label = "VStack {\n    Text(\"x\")\n}\n.accessibilityElement(children: .ignore)\n.accessibilityLabel(\"x\")\n"
+        self.assertFalse(button_without_default_action(label))
+
+
 if __name__ == "__main__":
     unittest.main()
