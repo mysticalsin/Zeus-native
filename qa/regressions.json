@@ -5687,6 +5687,18 @@
         "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
         "function": "aMalformedDrawTagIsStrippedAndNeverSpoken"
       }
+    },
+    {
+      "id": "REG-701",
+      "failure": "Screen marks drawn from a talk reply could land away from where the same pixel pointed with a POINT tag, or run past the 6 mark, 24 ink point and 60 character limits, or fall outside the screenshot.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+        "function": "marksLandWherePointDoesOnASecondaryDisplayAtNegativeX"
+      }
     }
   ]
 }
