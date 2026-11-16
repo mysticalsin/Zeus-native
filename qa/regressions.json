@@ -5999,6 +5999,78 @@
         "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
         "function": "visibilityDecidesWhatIsAdvertisedAndWhichListenersRun"
       }
+    },
+    {
+      "id": "REG-673",
+      "failure": "A Mac that was never paired got past the Fling TLS handshake.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingTwoProcessTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+        "function": "anUnpairedMacIsRejectedAtTheHandshakeAndAtThePairingPort"
+      }
+    },
+    {
+      "id": "REG-685",
+      "failure": "Pairing two Macs did not give the same code, or a stack of four items including 50 MB did not arrive with matching hashes and a Shelf record.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingTwoProcessTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+        "function": "pairsWithACodeAndSendsFourItemsIncludingFiftyMegabytes"
+      }
+    },
+    {
+      "id": "REG-686",
+      "failure": "The open Fling pairing port accepted an offer from a stranger.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingTwoProcessTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+        "function": "anUnpairedMacIsRejectedAtTheHandshakeAndAtThePairingPort"
+      }
+    },
+    {
+      "id": "REG-687",
+      "failure": "A Fling name with a path climb was accepted or wrote a file outside the stack folder.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingTwoProcessTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+        "function": "aTraversalNameIsDeclinedAndWritesNothing"
+      }
+    },
+    {
+      "id": "REG-688",
+      "failure": "A cancelled or corrupted Fling transfer left a partial or final file, or blocked the next send.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingTwoProcessTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+        "function": "cancellingMidwayLeavesNothingAndTheNextSendSucceeds"
+      }
+    },
+    {
+      "id": "REG-691",
+      "failure": "The Fling key was stored outside the Keychain, or Remove left a key behind.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingPairingStoreTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
+        "function": "theKeyIsOnlyInTheKeychainAndTheFileIsOwnerOnly"
+      }
     }
   ]
 }

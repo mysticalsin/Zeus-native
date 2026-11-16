@@ -877,6 +877,22 @@
       "tier": "device-proof",
       "scope": "On two owner-run Macs on one network: the peer shows in Nearby, pairing codes match, a decline stores nothing, files arrive in Downloads/Fling and on the Shelf, a large video verifies, the Local Network prompt shows once, AirDrop to an iPhone opens its sheet, removing a paired Mac forgets its key, Clipboard mode pastes in Finder, floating papers steal no focus.",
       "reason": "No CI runner has two Macs, a real Wi-Fi network, the Local Network prompt or an iPhone; only a person can check it."
+    },
+    {
+      "id": "native-FlingTwoProcessTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingTwoProcessTests",
+      "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+      "scope": "Two or three real zeus-fling-peer processes over loopback TLS with a pre-shared key, each with its own temp save root and in-memory Keychain: pairing code, four items including 50 MB with hashes and Shelf record, an unpaired Mac rejected, a traversal name declined, a cancel and a corrupted byte. No Bonjour, no Local Network prompt, no real Keychain or Downloads."
+    },
+    {
+      "id": "native-FlingPairingStoreTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingPairingStoreTests",
+      "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
+      "scope": "Actual pairing store with an in-memory Keychain and a temp folder: the key only in the Keychain, an owner-only names file, Remove, and a Keychain failure. No real Keychain."
     }
   ],
   "features": [
@@ -6974,6 +6990,33 @@
           ]
         },
         {
+          "id": "F15.2",
+          "check": "native-FlingTwoProcessTests",
+          "acceptance": "Real separate processes: pair with a code, send four items including 50 MB with verified hashes and a Shelf record, reject an unpaired Mac, decline a traversal name, cancel cleanly, catch a corrupted byte.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "pairsWithACodeAndSendsFourItemsIncludingFiftyMegabytes"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "anUnpairedMacIsRejectedAtTheHandshakeAndAtThePairingPort"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "aTraversalNameIsDeclinedAndWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "cancellingMidwayLeavesNothingAndTheNextSendSucceeds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
+              "function": "aCorruptedByteIsCaughtByTheHash"
+            }
+          ]
+        },
+        {
           "id": "F15.6",
           "check": "missing-F15-device",
           "acceptance": "Owner-run proof on two real Macs, as listed in docs/FLING.md.",
@@ -6984,6 +7027,21 @@
           "check": "missing-F15-contract",
           "acceptance": "Fling rules hold with injected inputs and no network, run through a portable group once one can run CryptoKit.",
           "cases": []
+        },
+        {
+          "id": "F15.8",
+          "check": "native-FlingPairingStoreTests",
+          "acceptance": "The Fling key lives only in the Keychain, the names file is owner-only, Remove deletes both, and a Keychain failure keeps the record.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
+              "function": "theKeyIsOnlyInTheKeychainAndTheFileIsOwnerOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
+              "function": "removeDeletesTheKeyAndAFailureKeepsTheRecord"
+            }
+          ]
         }
       ]
     }
