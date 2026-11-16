@@ -157,7 +157,7 @@ struct CredentialOriginTests {
     private func storeWithKeyBoundToX() -> (FlakyKeychain, KeychainStore) {
         let backend = FlakyKeychain(["com.zeus.app|\(AnyLLMConfig.keyAccount)": "key-A",
                                      "com.zeus.app|\(AnyLLMConfig.originAccount)": "https://x.example.com:443"])
-        return (backend, KeychainStore(backend: backend, defaults: UserDefaults(suiteName: "zeus.origin.\(UUID().uuidString)")!))
+        return (backend, KeychainStore(backend: backend, defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.origin.\(UUID().uuidString)")!))
     }
 
     @Test func aFailedOriginWriteLeavesTheNewKeyUnboundNotBoundToTheOldAddress() {

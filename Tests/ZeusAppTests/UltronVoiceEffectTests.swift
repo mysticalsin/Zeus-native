@@ -118,7 +118,7 @@ import ZeusCore
 
 
     private func fresh() -> UserDefaults {
-        let name = "zeus.ultron.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.ultron.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
         return defaults

@@ -350,7 +350,7 @@ struct ScribeDetectorTests {
     }
 
     @Test func offThenAskInsideTheMeetingWindowShowsNoCardForAMeetingAlreadyDismissed() async throws {
-        let suite = "scribe-detector-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "scribe-detector-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let key = FeatureSettings.key(ScribeAutoStartMode.settingID)

@@ -30,7 +30,7 @@ import Testing
     }
 
     private func defaults() -> UserDefaults {
-        let suite = "zeus.shortcuts.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.shortcuts.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suite)!
         d.removePersistentDomain(forName: suite)
         return d

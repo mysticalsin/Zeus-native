@@ -1484,5 +1484,41 @@ class TalkKeyPathLint(unittest.TestCase):
         self.assertNotIn("other()", text)
 
 
+# Tests keep their settings out of the owner's ~/Library/Preferences. A throwaway suite named "zeus.x.<UUID>" leaves
+# an empty plist there for ever (cfprefsd writes it back even after removePersistentDomain), and the test runs had
+# left more than 10,000 of them. A suite named by a path in the temporary folder keeps its plist there instead.
+TEST_ROOTS = [ROOT / "Tests/ZeusAppTests", ROOT / "Tests/ZeusCoreTests"]
+TEST_SUITE_LITERAL = re.compile(r'UserDefaults\(suiteName: *"')
+TEST_SUITE_NAME = re.compile(r'(?:let|var) (?:suite|name|suiteName) *= *"[^"\n]*\\\(UUID\(')
+TEST_SUITE_FUNC = re.compile(r'-> String \{ *"[^"\n]*\\\(UUID\(')
+
+
+def preferences_leaks(text):
+    """Lines of a test file that name a settings suite outside the temporary folder."""
+    if "UserDefaults(suiteName" not in text and "JevBudgetStore(suite" not in text:
+        return []
+    problems = []
+    for number, line in enumerate(text.splitlines(), 1):
+        code = line.split("//")[0]
+        if TEST_SUITE_LITERAL.search(code) or TEST_SUITE_NAME.search(code) or TEST_SUITE_FUNC.search(code):
+            problems.append(f"line {number}: settings suite outside NSTemporaryDirectory(): {code.strip()}")
+    return problems
+
+
+class TestPreferencesStayInTemporaryFolderLint(unittest.TestCase):
+    def test_no_test_names_a_settings_suite_in_the_owner_preferences(self):
+        for root in TEST_ROOTS:
+            for path in sorted(root.rglob("*.swift")):
+                with self.subTest(path=path.name):
+                    self.assertEqual(preferences_leaks(path.read_text(encoding="utf-8")), [])
+
+    def test_preferences_leak_samples_that_must_fail(self):
+        self.assertTrue(preferences_leaks('let d = UserDefaults(suiteName: "zeus.x.\\(UUID().uuidString)")!'))
+        self.assertTrue(preferences_leaks('let suite = "zeus.x.\\(UUID().uuidString)"\nUserDefaults(suiteName: suite)'))
+        self.assertTrue(preferences_leaks('func f() -> String { "zeus.x.\\(UUID())" }\nJevBudgetStore(suite: f())'))
+        self.assertFalse(preferences_leaks('let suite = NSTemporaryDirectory() + "zeus.x.\\(UUID().uuidString)"\nUserDefaults(suiteName: suite)'))
+        self.assertFalse(preferences_leaks('let d = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.x")'))
+
+
 if __name__ == "__main__":
     unittest.main()

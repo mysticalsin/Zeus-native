@@ -335,7 +335,7 @@ struct MCPStdioClientTests {
 struct BrowserBackendSelectionTests {
     @MainActor
     @Test func theRunnerFollowsTheSettingAndTheFlag() {
-        let suite = "zeus.test.backend.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.backend.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         #expect(BrowserAgentRunner.backendKind(forceSeparate: false, defaults: defaults) == .chrome)

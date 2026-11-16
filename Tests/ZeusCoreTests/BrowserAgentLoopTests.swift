@@ -351,7 +351,7 @@ struct BrowserAgentLoopTests {
     // MARK: Brain launch
 
     @Test func brainLaunchUsesOnlyInjectedModelPreferences() {
-        let suite = "zeus.browserAgent.model-fixture.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.browserAgent.model-fixture.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("gemini-fixture-flash", forKey: "modelCap.gemini.fast")
@@ -360,7 +360,7 @@ struct BrowserAgentLoopTests {
     }
 
     @Test func everyStepIsPinnedToTheFastTier() {
-        let defaults = UserDefaults(suiteName: "zeus.browserAgent.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.browserAgent.\(UUID().uuidString)")!
         let claude = BrowserAgentBrainLaunch.arguments(engine: .claude, prompt: "p", defaults: defaults)
         #expect(claude.starts(with: ["--model", "haiku", "-p", "p"]))
         #expect(claude.contains("--strict-mcp-config"))

@@ -10,7 +10,7 @@ struct FlingPairingStoreTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("fling-store-\(UUID().uuidString)", isDirectory: true)
     }
     private func make(_ keychain: MemoryKeychain = MemoryKeychain(), dir: URL) -> (FlingPairingStore, MemoryKeychain) {
-        (FlingPairingStore(keychain: KeychainStore(backend: keychain, defaults: UserDefaults(suiteName: "zeus.fling-store.\(UUID().uuidString)")!), directory: dir), keychain)
+        (FlingPairingStore(keychain: KeychainStore(backend: keychain, defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-store.\(UUID().uuidString)")!), directory: dir), keychain)
     }
 
     /// REG-691: the key lives only in the Keychain; the file holds names and dates, owner-only.
@@ -55,7 +55,7 @@ struct FlingPairingStoreTests {
 
     @Test func aKeychainThatRefusesTheKeyStoresNoRecord() {
         let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
-        let store = FlingPairingStore(keychain: KeychainStore(backend: RefusingBackend(), defaults: UserDefaults(suiteName: "zeus.fling-store.\(UUID().uuidString)")!), directory: dir)
+        let store = FlingPairingStore(keychain: KeychainStore(backend: RefusingBackend(), defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-store.\(UUID().uuidString)")!), directory: dir)
         #expect(!store.add(id: "idB", name: "Beta", model: "m", psk: psk, now: Date()))
         #expect(store.peers.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("peers.json").path))

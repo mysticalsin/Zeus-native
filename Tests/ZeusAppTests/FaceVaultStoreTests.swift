@@ -15,7 +15,7 @@ struct FaceVaultStoreTests {
         init() {
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-vault-\(UUID().uuidString)", isDirectory: true)
             backend = MemoryKeychain()
-            keychain = KeychainStore(backend: backend, defaults: UserDefaults(suiteName: "zeus.facevault.tests.\(UUID().uuidString)")!)
+            keychain = KeychainStore(backend: backend, defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.facevault.tests.\(UUID().uuidString)")!)
             store = FaceVaultStore(directory: directory, keychain: keychain)
         }
 
@@ -115,7 +115,7 @@ struct FaceVaultStoreTests {
         let fixture = Fixture(); defer { fixture.cleanUp() }
         // A store whose Keychain cannot save the new key must not leave a file nobody can open.
         let refusing = FaceVaultStore(directory: fixture.directory, keychain: KeychainStore(backend: RefusingKeychain(),
-            defaults: UserDefaults(suiteName: "zeus.facevault.tests.\(UUID().uuidString)")!))
+            defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.facevault.tests.\(UUID().uuidString)")!))
         #expect(refusing.save([Self.record("1")]) == .failed)
         #expect(!FileManager.default.fileExists(atPath: refusing.url.path))
     }

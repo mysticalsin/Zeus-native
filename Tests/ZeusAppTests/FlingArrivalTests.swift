@@ -7,7 +7,7 @@ import ZeusFling
 @MainActor
 @Suite("Fling arrivals and the Shelf", .serialized)
 struct FlingArrivalTests {
-    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-arrival.\(UUID().uuidString)")!) }
+    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-arrival.\(UUID().uuidString)")!) }
     private func temp() -> URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-arrival-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

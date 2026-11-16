@@ -196,7 +196,7 @@ final class Counter: @unchecked Sendable {
 @MainActor
 @Suite("Fling security round, app side")
 struct FlingSecurityAppTests {
-    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-secapp.\(UUID().uuidString)")!) }
+    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-secapp.\(UUID().uuidString)")!) }
     private func settle(_ condition: @MainActor () -> Bool) async {
         for _ in 0..<400 where !condition() { try? await Task.sleep(nanoseconds: 5_000_000) }
     }

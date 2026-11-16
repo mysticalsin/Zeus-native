@@ -98,7 +98,7 @@ struct SettingsCatalogTests {
     }
 
     @MainActor @Test func dictationLanguagePersistsInIsolatedDefaults() throws {
-        let suiteName = "zeus.dictation.language.\(UUID().uuidString)"
+        let suiteName = NSTemporaryDirectory() + "zeus.dictation.language.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defaults.set("off", forKey: ShortcutStore.dictationKey)
@@ -112,7 +112,7 @@ struct SettingsCatalogTests {
     }
 
     @MainActor @Test func shortcutBehaviorPersistsAndSharedKeyStaysHoldToSpeak() throws {
-        let suiteName = "zeus.dictation.behavior.\(UUID().uuidString)"
+        let suiteName = NSTemporaryDirectory() + "zeus.dictation.behavior.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -136,7 +136,7 @@ struct SettingsCatalogTests {
     }
 
     @MainActor @Test func exportIncludesHandBuiltSettings() throws {
-        let suiteName = "zeus.settings.catalog.\(UUID().uuidString)"
+        let suiteName = NSTemporaryDirectory() + "zeus.settings.catalog.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -159,7 +159,7 @@ struct SettingsCatalogTests {
     @MainActor private final class AutoStartRig {
         let defaults: UserDefaults
         let store: SettingsStore
-        private let suiteName = "zeus.autostart.\(UUID().uuidString)"
+        private let suiteName = NSTemporaryDirectory() + "zeus.autostart.\(UUID().uuidString)"
         private(set) var prompts = 0
 
         init(access: ScribeMicrophoneAccess = .allowed, stored: String? = nil) {
@@ -304,7 +304,7 @@ struct SettingsCatalogTests {
     // MARK: Face presence
 
     @MainActor static func isolatedStore() throws -> (SettingsStore, UserDefaults, String) {
-        let suiteName = "zeus.settings.face.\(UUID().uuidString)"
+        let suiteName = NSTemporaryDirectory() + "zeus.settings.face.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         return (SettingsStore(defaults: defaults), defaults, suiteName)
@@ -414,7 +414,7 @@ struct SettingsCatalogTests {
         #expect(option.defaultValue == "false")
         #expect(option.state == .live)
         #expect(option.note.contains("screenshot"))
-        let empty = UserDefaults(suiteName: "talk.drawOnScreen.\(UUID().uuidString)")!
+        let empty = UserDefaults(suiteName: NSTemporaryDirectory() + "talk.drawOnScreen.\(UUID().uuidString)")!
         #expect(!FeatureSettings.talkDrawOnScreen(defaults: empty))
         empty.set("true", forKey: FeatureSettings.key("talk.drawOnScreen"))
         #expect(FeatureSettings.talkDrawOnScreen(defaults: empty))

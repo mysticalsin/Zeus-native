@@ -54,7 +54,7 @@ struct FlingShelfJourneyTests {
         return url
     }
     private func model(_ fling: RecordingFling, items: [URL] = []) -> TopBarModel {
-        let m = TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-journey.\(UUID().uuidString)")!)
+        let m = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-journey.\(UUID().uuidString)")!)
         m.shelf = items.map { TopBarModel.ShelfItem(url: $0) }
         m.fling = fling
         return m

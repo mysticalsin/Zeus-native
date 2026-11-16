@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct KeychainStoreTests {
     func defaults() -> UserDefaults {
-        let name = "zeus.keychain.tests.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.keychain.tests.\(UUID().uuidString)"
         return UserDefaults(suiteName: name)!
     }
 

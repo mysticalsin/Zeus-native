@@ -427,7 +427,7 @@ struct BrowserUseSettingsTests {
         #expect(BrowserAgentBackendKind.resolve(setting: "") == .chrome)
         #expect(BrowserAgentBackendKind.resolve(setting: "Separate browser (browser-use)") == .separate)
         #expect(BrowserAgentBackendKind.resolve(setting: "Your Chrome", forceSeparate: true) == .separate)
-        let suite = "zeus.test.browseruse.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.browseruse.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         #expect(FeatureSettings.browserAgentBackend(defaults: defaults) == .chrome)

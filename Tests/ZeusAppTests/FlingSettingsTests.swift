@@ -7,7 +7,7 @@ import ZeusFling
 @MainActor
 @Suite("Fling settings page")
 struct FlingSettingsTests {
-    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-settings.\(UUID().uuidString)")!) }
+    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-settings.\(UUID().uuidString)")!) }
     private func service(_ transport: FakeTransport, _ values: [String: String] = [:]) -> FlingService {
         FlingService(model: model(), transport: transport,
                      setting: { id in values[id] ?? (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })

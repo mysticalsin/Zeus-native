@@ -83,7 +83,7 @@ private final class Journey {
     let scribe: ScribeController
     let panel: ScribeMeetingCardPanel
     let controller: ScribeAutoStartController
-    private let suite = "scribe-card-journey-\(UUID().uuidString)"
+    private let suite = NSTemporaryDirectory() + "scribe-card-journey-\(UUID().uuidString)"
 
     /// `automatic` sets what an automatic start needs: the choice, the owner's click, one earlier recording and
     /// Microphone access. Otherwise the choice is the default, Ask me.

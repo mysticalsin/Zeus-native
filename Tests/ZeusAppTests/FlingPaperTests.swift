@@ -41,7 +41,7 @@ struct FlingPaperTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let a = dir.appendingPathComponent("a.png"), b = dir.appendingPathComponent("b.png")
         try Data("a".utf8).write(to: a); try Data("b".utf8).write(to: b)
-        let topBar = TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-papers.\(UUID().uuidString)")!)
+        let topBar = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-papers.\(UUID().uuidString)")!)
         topBar.addToShelf([a, b], origin: .fling(peer: "Mac B"), stack: UUID())
         let before = topBar.shelf
         let controller = FlingPaperController(area: { area }, present: false)
@@ -75,7 +75,7 @@ struct FlingPaperTests {
     @Test func arrivalsBecomePapersOnlyWhenTheSwitchIsOn() async {
         for (setting, expected) in [("true", 1), ("false", 0)] {
             let transport = FakeTransport()
-            let service = FlingService(model: TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-papers.\(UUID().uuidString)")!), transport: transport,
+            let service = FlingService(model: TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-papers.\(UUID().uuidString)")!), transport: transport,
                                        setting: { id in id == "fling.enabled" ? "true" : (id == "fling.papers" ? setting : (SettingsCatalog.option(id)?.defaultValue ?? "")) },
                                        downloadsGranted: { true })
             var shown: [([URL], String)] = []

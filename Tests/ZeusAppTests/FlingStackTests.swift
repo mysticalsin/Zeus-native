@@ -7,7 +7,7 @@ import ZeusCore
 @MainActor
 @Suite("Fling stacks on the Shelf")
 struct FlingStackTests {
-    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-stacks.\(UUID().uuidString)")!) }
+    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-stacks.\(UUID().uuidString)")!) }
     private func temp() -> URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-stacks-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

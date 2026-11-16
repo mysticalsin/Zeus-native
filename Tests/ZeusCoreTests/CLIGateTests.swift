@@ -74,7 +74,7 @@ struct CLIGateTests {
     // MARK: Where the switch lives
 
     private func fixture() throws -> (MemoryKeychain, KeychainStore, UserDefaults, () -> Void) {
-        let name = "zeus.cli-gate.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.cli-gate.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         let backend = MemoryKeychain()
         return (backend, KeychainStore(backend: backend, defaults: defaults), defaults, { defaults.removePersistentDomain(forName: name) })
@@ -107,7 +107,7 @@ struct CLIGateTests {
             func write(_ value: String, service: String, account: String) -> Bool { false }
             func delete(service: String, account: String) -> Bool { true }
         }
-        let name = "zeus.cli-gate.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.cli-gate.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let store = KeychainStore(backend: Refusing(), defaults: defaults)

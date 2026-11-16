@@ -47,7 +47,7 @@ struct FacePresenceControllerTests {
         let source = FakeSource()
         let script = Script()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-controller-\(UUID().uuidString)", isDirectory: true)
-        let keychain = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: "zeus.facecontroller.\(UUID().uuidString)")!)
+        let keychain = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.facecontroller.\(UUID().uuidString)")!)
         var vault: FaceVaultStore { FaceVaultStore(directory: directory, keychain: keychain) }
         var clock: Double = 1000
         var lockCalls = 0

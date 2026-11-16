@@ -44,7 +44,7 @@ struct QA21LatencyTests {
 @Suite("QA21 default shortcuts")
 struct QA21ShortcutTests {
     private func defaults() -> UserDefaults {
-        let suite = "zeus.qa21.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.qa21.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suite)!
         d.removePersistentDomain(forName: suite)
         return d

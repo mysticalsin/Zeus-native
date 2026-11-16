@@ -509,7 +509,7 @@ extension TilingSectionTests {
 extension TilingSectionTests {
     @Suite struct SettingsConfigTests {
         private func isolated() throws -> (UserDefaults, cleanup: () -> Void) {
-            let name = "zeus.tiling.section.\(UUID().uuidString)"
+            let name = NSTemporaryDirectory() + "zeus.tiling.section.\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: name))
             defaults.removePersistentDomain(forName: name)
             return (defaults, { defaults.removePersistentDomain(forName: name) })

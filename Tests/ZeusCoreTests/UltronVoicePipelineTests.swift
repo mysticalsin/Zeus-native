@@ -205,7 +205,7 @@ struct UltronCloudVoiceTests {
 @Suite("Ultron persona")
 struct UltronPersonaTests {
     @Test func freshDefaultsAreUltron() {
-        let name = "zeus.persona.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.persona.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         #expect(ZeusPersonality.current(defaults) == .ultron)

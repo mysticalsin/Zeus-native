@@ -25,7 +25,7 @@ import ZeusCore
     var browser: [(kind: MusicCommandKind, seconds: Double?, key: BrowserMediaKey)] = []
 
     init() {
-        model = TopBarModel(defaults: UserDefaults(suiteName: "NowPlayingHubTests.\(UUID().uuidString)") ?? .standard)
+        model = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "NowPlayingHubTests.\(UUID().uuidString)") ?? .standard)
         hub = NowPlayingHub(model: model)
         hub.ports.follow = { [unowned self] in label }
         hub.ports.now = { [unowned self] in clock }

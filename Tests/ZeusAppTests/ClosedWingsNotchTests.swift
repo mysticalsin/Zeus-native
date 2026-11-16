@@ -91,7 +91,7 @@ struct ClosedWingsNotchTests {
     }
 
     private func topBar(_ configure: (TopBarModel) -> Void = { _ in }) -> TopBarModel {
-        let model = TopBarModel(defaults: UserDefaults(suiteName: "closed-wings-\(UUID().uuidString)")!)
+        let model = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "closed-wings-\(UUID().uuidString)")!)
         configure(model)
         return model
     }
@@ -151,7 +151,7 @@ struct ClosedWingsNotchTests {
     }
 
     @Test func theScribeTickerStaysClearOfTheNotch() async throws {
-        let suite = "closed-wings-scribe-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "closed-wings-scribe-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let capture = Capture()
@@ -224,7 +224,7 @@ struct ClosedWingsNotchTests {
         let (rect, height) = try await bodyFrame(presentation: .panel, background: .transparent, cue: nil)
         #expect(abs(height - rect.maxY) < 0.5)
         let expected = NotchView.topBarPanelSize(barHeight: Self.notch.height, hasApproval: false, home: true,
-                                                 homeStrip: TopBarModel(defaults: UserDefaults(suiteName: "closed-wings-\(UUID().uuidString)")!).homeExtraHeight)
+                                                 homeStrip: TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "closed-wings-\(UUID().uuidString)")!).homeExtraHeight)
         #expect(abs(rect.height - expected.height) < 0.5, "the open panel kept its own height")
         #expect(GlanceTopBar.tabRowTop >= Self.notch.height, "the tab row starts below the 38 pt bar")
     }

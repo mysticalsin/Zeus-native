@@ -15,7 +15,7 @@ final class Node: @unchecked Sendable {
         self.id = "id-\(name)-\(UUID().uuidString.prefix(6))"
         self.root = parent.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let keys = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: "zeus.fling-modes.\(UUID().uuidString)")!)
+        let keys = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-modes.\(UUID().uuidString)")!)
         endpoint = FlingEndpoint(identity: FlingIdentity(id: id, name: name, model: "Mac-test"), keys: keys,
                                  supportDirectory: root.appendingPathComponent("Support"), saveRoot: root,
                                  inbox: root.appendingPathComponent("Inbox"), discovery: .direct, hooks: hooks)

@@ -6,7 +6,7 @@ import Testing
 /// `UserDefaults` suite yields the value the table promises.
 @Suite struct FirstRunDefaultsTests {
     private func fresh() -> (UserDefaults, () -> Void) {
-        let name = "zeus.firstrun.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.firstrun.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         return (defaults, { defaults.removePersistentDomain(forName: name) })
     }

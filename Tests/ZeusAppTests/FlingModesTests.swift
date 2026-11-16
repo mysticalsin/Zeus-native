@@ -69,7 +69,7 @@ struct FlingModesTests {
 @MainActor
 @Suite("Fling service: links, clipboard and the Ask card")
 struct FlingServiceModesTests {
-    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: "zeus.fling-svc.\(UUID().uuidString)")!) }
+    private func model() -> TopBarModel { TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fling-svc.\(UUID().uuidString)")!) }
     private func settle(_ condition: @MainActor () -> Bool) async {
         for _ in 0..<400 where !condition() { try? await Task.sleep(nanoseconds: 5_000_000) }
     }

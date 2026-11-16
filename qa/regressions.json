@@ -7295,6 +7295,18 @@
         "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
         "function": "aSecondTalkKeyIsComparedWithTheBoundSets"
       }
+    },
+    {
+      "id": "REG-763",
+      "failure": "Test runs left more than 10,000 empty settings files in the owner's ~/Library/Preferences: throwaway suites named zeus.x.<UUID> outlive removePersistentDomain.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_no_test_names_a_settings_suite_in_the_owner_preferences"
+      }
     }
   ]
 }

@@ -29,7 +29,7 @@ struct LicenseServerBindingTests {
     }
 
     private func fixture(defaultsServer: String?, boundOrigin: String?) throws -> Fixture {
-        let name = "zeus.license-binding.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.license-binding.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         if let defaultsServer { defaults.set(defaultsServer, forKey: "license.server") } else { defaults.set("", forKey: "license.server") }
         let signer = Curve25519.Signing.PrivateKey()

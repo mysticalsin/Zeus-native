@@ -92,7 +92,7 @@ struct SettingsConsumerTests {
     }
 
     @Test func coreDefaultsMatchTheCatalog() throws {
-        let empty = try #require(UserDefaults(suiteName: "zeus.features.\(UUID().uuidString)"))
+        let empty = try #require(UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.features.\(UUID().uuidString)"))
         #expect(SettingsCatalog.option("fastPath.enabled")?.defaultValue == String(FeatureSettings.fastPathEnabled(defaults: empty)))
         #expect(SettingsCatalog.option("browserAgent.enabled")?.defaultValue == String(FeatureSettings.browserAgentEnabled(defaults: empty)))
         #expect(SettingsCatalog.option("browserAgent.maxSteps")?.defaultValue == String(FeatureSettings.browserAgentMaxSteps(defaults: empty)))
@@ -102,7 +102,7 @@ struct SettingsConsumerTests {
     }
 
     @Test func settingsReachTheirConsumers() throws {
-        let defaults = try #require(UserDefaults(suiteName: "zeus.features.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.features.\(UUID().uuidString)"))
         defaults.set("false", forKey: "opt.fastPath.enabled")
         defaults.set("40", forKey: "opt.browserAgent.maxSteps")
         defaults.set("Apply, Invite ,", forKey: "opt.browserAgent.alwaysAsk")

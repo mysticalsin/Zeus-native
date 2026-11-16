@@ -8,7 +8,7 @@ private let optIn2 = Date(timeIntervalSince1970: 2_000)
 @Suite("Scribe automatic start opt-in")
 struct ScribeAutoStartOptInTests {
     private func fresh() throws -> (UserDefaults, () -> Void) {
-        let name = "ScribeAutoStartOptIn.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "ScribeAutoStartOptIn.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         return (defaults, { defaults.removePersistentDomain(forName: name) })
     }

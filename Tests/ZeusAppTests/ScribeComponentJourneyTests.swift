@@ -407,7 +407,7 @@ private struct ScribeComponentFixture {
     ]
 
     private func preferences() throws -> (String, UserDefaults) {
-        let suite = "scribe-component-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "scribe-component-\(UUID().uuidString)"
         return (suite, try #require(UserDefaults(suiteName: suite)))
     }
 

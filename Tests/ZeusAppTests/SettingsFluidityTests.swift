@@ -27,7 +27,7 @@ import ZeusCore
     }
 
     @Test func launchAtLoginSwitchDrawsFromTheCacheNotTheService() {
-        let defaults = UserDefaults(suiteName: "zeus.fluidity.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.fluidity.\(UUID().uuidString)")!
         let store = SettingsStore(defaults: defaults)
         let binding = store.boolBinding(SettingsStore.launchAtLoginID)
         let time = elapsed { for _ in 0..<5_000 { _ = binding.wrappedValue } }

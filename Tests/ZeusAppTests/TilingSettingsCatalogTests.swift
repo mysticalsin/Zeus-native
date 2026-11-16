@@ -13,7 +13,7 @@ struct TilingSettingsCatalogTests {
     ]
 
     private func isolated() throws -> (UserDefaults, cleanup: () -> Void) {
-        let name = "zeus.tiling.catalog.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.tiling.catalog.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defaults.removePersistentDomain(forName: name)
         return (defaults, { defaults.removePersistentDomain(forName: name) })

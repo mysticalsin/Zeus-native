@@ -15,7 +15,7 @@ struct ChatHotkeyMonitorTests {
     }
 
     private func make(_ log: Log, _ hotkey: ChatHotkey) -> ChatHotkeyMonitor {
-        let defaults = UserDefaults(suiteName: "ChatHotkeyMonitorTests.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "ChatHotkeyMonitorTests.\(UUID().uuidString)")!
         return ChatHotkeyMonitor(hotkey: hotkey, defaults: defaults, ops: .init(
             register: { _, _ in log.events.append("register"); return !log.held },
             unregister: { log.events.append("unregister") }))

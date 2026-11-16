@@ -26,7 +26,7 @@ struct ScribeLifecycleScenarioTests {
 
     private enum Failure: Error { case eventTimedOut }
     private func preferences() throws -> (String, UserDefaults) {
-        let name = "scribe-lifecycle-\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "scribe-lifecycle-\(UUID().uuidString)"
         return (name, try #require(UserDefaults(suiteName: name)))
     }
     private func waitUntil(_ condition: () -> Bool) async throws {
