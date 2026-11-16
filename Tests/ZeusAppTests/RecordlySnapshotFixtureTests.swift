@@ -27,6 +27,16 @@ struct RecordlySnapshotFixtureTests {
         #expect(counting.isCountingDown, "later renders of the same fixture must still show the countdown")
     }
 
+    /// The page opening runs a thumbnail refresh; on a fixture it must keep the drawn still and take no capture.
+    @Test func aFixtureKeepsItsDrawnThumbnailWhenThePageOpens() async throws {
+        let fixture = controller(.countdown(2))
+        let before = try #require(fixture.thumbnail)
+        fixture.pageAppeared()
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(fixture.thumbnail === before, "a capture replaced the drawn still")
+        fixture.pageDisappeared()
+    }
+
     @Test func everyFixtureStateShowsItsOwnState() {
         #expect(!controller(.idle).isCountingDown)
         #expect(controller(.recording(elapsed: 74)).elapsed == 74)

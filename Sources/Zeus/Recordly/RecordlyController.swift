@@ -412,6 +412,8 @@ final class RecordlyController {
 
     /// One still of the selected display. Skipped without Screen Recording already granted; never requests it.
     private func refreshThumbnail(force: Bool) {
+        // A seeded snapshot fixture keeps the still it was given: a render must never take a real capture.
+        guard !holdsSeededStateForSnapshot else { return }
         guard screenRecordingGranted, case .display(let id)? = sourcePicker.selectionIntent else {
             thumbnailTask?.cancel()
             thumbnail = nil
