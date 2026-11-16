@@ -6392,7 +6392,7 @@
       ],
       "check": "closed-loop-selftests",
       "guard": {
-        "file": "qa/closed-loop/tests/test_overlay_pinned_lint.py",
+        "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_every_overlay_window_turns_the_system_animation_off"
       }
     },
@@ -6404,7 +6404,7 @@
       ],
       "check": "closed-loop-selftests",
       "guard": {
-        "file": "qa/closed-loop/tests/test_overlay_pinned_lint.py",
+        "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_rebuilds_close_the_windows_they_drop"
       }
     }
