@@ -59,4 +59,11 @@ struct UIPolishSourceTests {
             #expect(size / 2 + width / 2 <= size - ScribeInitialStack.overlap(size: size))
         }
     }
+
+    @Test func theCountdownScrimHidesTheScriptBehindTheDigit() throws {
+        let text = try Self.source("Sources/Zeus/TopBar/TeleprompterPage.swift")
+        #expect(text.contains("static let countdownScrimOpacity: Double = 0.92"))
+        #expect(text.contains("Color.black.opacity(Self.countdownScrimOpacity)"))
+        #expect(!text.contains("Color.black.opacity(0.55)"))
+    }
 }
