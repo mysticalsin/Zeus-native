@@ -198,6 +198,12 @@ public enum TalkDrawPolicy {
         winner.map(sighted.contains) ?? false
     }
 
+    /// The screenshots a talk turn sends. Drawing off: every capture, as before. Drawing on: only the
+    /// first (the cursor display), which is the one the marks are placed on and costs the fewest image tokens.
+    public static func requestShots(consent: Bool, shots: [ScreenShot]) -> [ScreenShot] {
+        consent ? Array(shots.prefix(1)) : shots
+    }
+
     /// Images are sent for drawing only with the setting on and a capture in hand.
     public static func wantsImages(consent: Bool, shots: Int) -> Bool {
         consent && shots > 0

@@ -2,12 +2,25 @@ import AVFoundation
 import Foundation
 import ZeusCore
 
+/// What a talk turn needs from the voice: speak a line, tell the turn when its audio starts, stop.
+@MainActor
+protocol LineSpeaking: AnyObject {
+    var isSpeaking: Bool { get }
+    var engineDescription: String { get }
+    func speak(_ text: String, onStart: (@MainActor () -> Void)?)
+    func stop()
+}
+
+extension LineSpeaking {
+    func speak(_ text: String) { speak(text, onStart: nil) }
+}
+
 /// Speaks reply sentences. `UltronEngineRouter` picks the engine (ElevenLabs, OpenAI, Kokoro, then the
 /// deepest Mac voice) with a logged reason, and every engine's audio, the Mac voice included, runs
 /// through the Ultron effect chain (`UltronAudioChain`). Each sentence is scheduled for playback as soon
 /// as its first audio arrives, so the next sentence is requested while the previous one plays.
 @MainActor
-final class Speaker: SentenceSpeaking {
+final class Speaker: SentenceSpeaking, LineSpeaking {
     nonisolated(unsafe) static var urlSession: URLSession = .shared
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
