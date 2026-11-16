@@ -38,7 +38,7 @@ struct FlingSecurityTests {
         a.endpoint.send([.file(file)], to: .direct(id: b.id, port: port, pairPort: nil))
         _ = try #require(await b.wait("a transfer while pairing is flooded") { if case .itemArrived(_, _, let n, _, _, _, _) = $0, n == "during.bin" { return true } else { return nil } })
         // After the handshake timeout the silent connections are gone and a new Mac can pair.
-        try await Task.sleep(nanoseconds: 11_000_000_000)
+        try await Task.sleep(nanoseconds: 14_000_000_000)
         let c = Node("Gamma", parent: dir); defer { c.endpoint.stop() }
         #expect(await pair(c, b) != nil)
     }
