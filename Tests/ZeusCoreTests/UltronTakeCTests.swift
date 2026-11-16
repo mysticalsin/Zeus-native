@@ -62,6 +62,42 @@ struct UltronTakeCCoreTests {
         #expect(fresh, "a new turn gets a new gate")
     }
 
+    @Test func anEllipsisBeforeAnythingButAWordLeavesNoMark() {
+        #expect(UltronSpeechText.sanitize("Hmm...?") == "Hmm?")
+        #expect(UltronSpeechText.sanitize("He said \"wait...\" and left.") == "He said \"wait\" and left.")
+        #expect(UltronSpeechText.sanitize("Really...! Fine.") == "Really! Fine.")
+    }
+
+    @Test func numberRangesCodeLikeTokensAndBracketedElisionsAreLeftAlone() {
+        #expect(UltronSpeechText.sanitize("Pages 1...5 now.") == "Pages 1...5 now.")
+        #expect(UltronSpeechText.sanitize("Use a...b here.") == "Use a...b here.")
+        #expect(UltronSpeechText.sanitize("The [...] part.") == "The [...] part.")
+    }
+
+    @Test func anEllipsisBeforeALowercaseWordStaysInOneStreamedSentence() {
+        var splitter = SentenceSplitter()
+        #expect(splitter.feed("Fine... that works. ") == ["Fine... that works."])
+        var unicode = SentenceSplitter()
+        #expect(unicode.feed("Fine\u{2026} that works. ") == ["Fine\u{2026} that works."])
+    }
+
+    @Test func anEllipsisBeforeACapitalStillEndsTheSentence() {
+        var splitter = SentenceSplitter()
+        #expect(splitter.feed("Done... Next up. ") == ["Done...", "Next up."])
+    }
+
+    @Test func anEllipsisAtTheChunkEdgeWaitsForTheNextWord() {
+        var splitter = SentenceSplitter()
+        #expect(splitter.feed("Fine... ").isEmpty)
+        #expect(splitter.feed("that works. ") == ["Fine... that works."])
+    }
+
+    @Test func theDrawRulesAreCutOutOfAPromptWithTheirBlankLine() {
+        #expect(TalkSightPolicy.withoutDrawInstructions("base\n\nRULES", drawInstructions: "RULES") == "base")
+        #expect(TalkSightPolicy.withoutDrawInstructions("base", drawInstructions: "RULES") == "base")
+        #expect(TalkSightPolicy.withoutDrawInstructions("base\n\nRULES", drawInstructions: "") == "base\n\nRULES")
+    }
+
     private static let shot = ScreenShot(jpegData: Data([1]), label: "screen 1", pixelWidth: 10, pixelHeight: 10,
                                          displayFrame: .init(x: 0, y: 0, width: 10, height: 10))
     private static let drawText = "DRAW-RULES-BLOCK"

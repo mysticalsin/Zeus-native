@@ -105,16 +105,19 @@ extension TalkSightPolicy {
                                      drawInstructions: String = "") -> BrainRequest {
         guard !request.screenshots.isEmpty, !(voice && supportsNoSessionPersistence) else { return request }
         // The draw rules go too: with no pixels attached, marks would mean nothing.
-        var text = request.systemPrompt
-        if !drawInstructions.isEmpty {
-            text = text.replacingOccurrences(of: "\n\n" + drawInstructions, with: "")
-                .replacingOccurrences(of: drawInstructions, with: "")
-        }
+        let text = withoutDrawInstructions(request.systemPrompt, drawInstructions: drawInstructions)
         return request.with(screenshots: [], systemPrompt: text, screenReason: .imagesBlocked, carriesDrawImage: false)
     }
 }
 
 extension TalkSightPolicy {
+    /// The prompt without the draw rules (and the blank line that joined them).
+    public static func withoutDrawInstructions(_ prompt: String, drawInstructions: String) -> String {
+        guard !drawInstructions.isEmpty else { return prompt }
+        return prompt.replacingOccurrences(of: "\n\n" + drawInstructions, with: "")
+            .replacingOccurrences(of: drawInstructions, with: "")
+    }
+
     /// The text engines answer a screenshot turn only when the image engine failed before saying or doing anything.
     public static func fallbackAllowed(spokeAnything: Bool, actionStarted: Bool) -> Bool { !spokeAnything && !actionStarted }
 
