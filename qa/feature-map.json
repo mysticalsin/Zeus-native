@@ -843,6 +843,14 @@
       "scope": "The production Speaker with a fake voice engine in this process: per-line start callbacks fire once, in order. No audio, capture or network."
     },
     {
+      "id": "native-TalkVisualTurnTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "TalkVisualTurnTests",
+      "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+      "scope": "The production VoiceTurnController runTurn with a scripted reply, a fake voice and a fake presenter: marks reveal with their sentence, nothing draws with the setting off or from a blind engine, and a new turn clears. No capture, microphone, audio or network."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -4871,6 +4879,33 @@
             {
               "file": "Tests/ZeusAppTests/SpeakerTests.swift",
               "function": "aLineWithNoCallbackStillSpeaks"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-turn",
+          "check": "native-TalkVisualTurnTests",
+          "acceptance": "A DRAW tag reveals each mark with its sentence before the next line begins; setting off makes no presenter call and sends every shot; a winner that never saw the screen draws nothing; the next turn clears once. Does not prove real audio timing or on-screen drawing.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOffMakesNoPresenterCallAndStillSpeaksEverySentence"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aWinnerThatNeverSawPixelsDrawsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOffSendsEveryShotAndConsentOnSendsTheCursorDisplayOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "theNextKeyPressClearsADrawingAndANeverDrawnTurnClearsNothing"
             }
           ]
         }

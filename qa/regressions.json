@@ -5735,6 +5735,18 @@
         "file": "Tests/ZeusAppTests/SpeakerTests.swift",
         "function": "onStartFiresOncePerLineInOrderBeforeTheNextLineBegins"
       }
+    },
+    {
+      "id": "REG-705",
+      "failure": "A drawing from a talk reply could appear before or long after its sentence, draw with the setting off, draw from an engine that never saw the screen, or stay on screen into the next turn.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins"
+      }
     }
   ]
 }
