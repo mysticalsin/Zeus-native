@@ -147,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Top bar live data (music, clipboard, system cues, weather, calendar on request).
         if on(.topBarServices) {
             topBarServices = TopBarServices(model: topBar)
+            topBarServices.notchIsOpen = { [weak self] in self?.notch.model.presentation != .closed }
             topBarServices.start()
         }
         // Continuity: a cue from Zeus when Beamer moves your keyboard to another machine.

@@ -1117,7 +1117,8 @@ private struct ClipboardRow: View {
 
 struct ShelfPage: View {
     let topBar: TopBarModel
-    
+    /// The stack whose files are laid out in a ribbon, if one is open.
+    @State private var openStack: UUID?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1135,9 +1136,23 @@ struct ShelfPage: View {
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
             .animation(Motion.live(MotionTokens.panelResize), value: topBar.shelfTargeted)
 
-            PageScroll(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(topBar.shelf) { item in ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url) } }
+            VStack(alignment: .leading, spacing: 4) {
+                if let fling = topBar.fling { FlingNearbyStrip(fling: fling, topBar: topBar) }
+                PageScroll(.horizontal) {
+                    HStack(spacing: 8) {
+                        if let openStack, case let files = topBar.shelf.filter({ $0.stackID == openStack }), files.count > 1 {
+                            FlingStackRibbon(items: files, topBar: topBar) { self.openStack = nil }
+                        } else {
+                            ForEach(ShelfStacks.cells(topBar.shelf)) { cell in
+                                switch cell {
+                                case .item(let item):
+                                    ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item, fling: topBar.fling) }
+                                case .stack(let id, let items):
+                                    FlingStackCell(stack: id, items: items, topBar: topBar) { openStack = id }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -1154,7 +1169,7 @@ struct ShelfPage: View {
     }
 }
 
-private struct ShelfCell: View {
+struct ShelfCell: View {
     let item: TopBarModel.ShelfItem
     let topBar: TopBarModel
 
@@ -1163,10 +1178,21 @@ private struct ShelfCell: View {
         VStack(spacing: 5) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                 .resizable().frame(width: 52, height: 52)
+                .overlay(alignment: .bottomTrailing) {
+                    if item.verified {
+                        Image(systemName: "checkmark.seal.fill").font(.system(size: 11)).foregroundStyle(Theme.leaf)
+                            .accessibilityLabel("Verified")
+                    }
+                }
             Text(item.name).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 84)
             HStack(spacing: 0) {
-                GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
-                    NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
+                if let fling = topBar.fling, fling.isEnabled {
+                    FlingPickerMenu(items: [item], fling: fling)
+                    FlingFlickHandle(items: [item], fling: fling, sensitivity: fling.flickSensitivity)
+                } else {
+                    GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
+                        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
+                    }
                 }
                 if item.isMedia {
                     GlyphButton(symbol: "text.bubble", size: 9, tint: Theme.cloudSecondary, label: "Transcribe") { topBar.transcribeFile(item.url) }
@@ -1583,6 +1609,8 @@ struct ClosedWings: View {
         case .rain: ("cloud.rain.fill", Theme.sky)
         case .decided: ("checkmark.circle.fill", Theme.bolt)
         case .screenshot: ("camera.fill", Theme.bolt)
+        case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
+        case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1617,6 +1645,12 @@ struct ClosedWings: View {
             Text("+\(count)").font(TopBarStyle.label(11, .bold)).foregroundStyle(Theme.bolt)
         case .screenshot(let title):
             Text(title).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingArrived(let count, let from):
+            Text("\(count) from \(from)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingSent(let count, let to):
+            Text("Sent \(count) to \(to)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingProblem(let text):
+            Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .permission(let text, let pane):

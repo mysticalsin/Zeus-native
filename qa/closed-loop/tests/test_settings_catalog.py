@@ -31,7 +31,7 @@ class SettingsGenerationTests(unittest.TestCase):
     def test_capture_and_input_default_regressions_fail_before_any_output(self):
         for key in ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts', 'lights.liveSpectrum',
                     'general.showInScreenSharing', 'present.physicalPointer', 'explanation.enabled',
-                    'tiling.enabled'):
+                    'tiling.enabled', 'fling.enabled'):
             with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
                 module = generator()
                 index = next(i for i, row in enumerate(module.R) if row[7] == key)
@@ -55,6 +55,28 @@ class SettingsGenerationTests(unittest.TestCase):
                 self.assertEqual(row[4], '-')
                 self.assertEqual(row[6], 'missing')
                 self.assertTrue(row[12].startswith('Zeus addition.'))
+
+    def test_fling_rows_exist_in_the_shelf_section_and_start_off(self):
+        module = generator()
+        rows = {row[7]: row for row in module.R if row[0] == 'shelf'}
+        self.assertEqual(list(rows), ['fling.enabled', 'fling.receiveInBackground', 'fling.deviceName', 'fling.visibility',
+                                      'fling.autoAcceptPaired', 'fling.saveMode', 'fling.papers', 'fling.flickSensitivity',
+                                      'fling.openLinks', 'fling.pairedMacs'])
+        self.assertEqual(module.SECTION_TITLES['shelf'], 'Shelf')
+        defaults = {key: row[10] for key, row in rows.items()}
+        self.assertEqual(defaults['fling.enabled'], 'false')
+        self.assertEqual(defaults['fling.papers'], 'false')
+        self.assertEqual(defaults['fling.receiveInBackground'], 'true')
+        self.assertEqual(defaults['fling.openLinks'], 'true')
+        self.assertEqual(defaults['fling.autoAcceptPaired'], 'true')
+        self.assertEqual(defaults['fling.visibility'], 'Everyone nearby')
+        self.assertEqual(rows['fling.visibility'][9], ['Everyone nearby', 'Paired only', 'Off'])
+        self.assertEqual(defaults['fling.saveMode'], 'Downloads/Fling')
+        self.assertEqual(rows['fling.saveMode'][9], ['Downloads/Fling', 'Clipboard', 'Ask each time'])
+        self.assertEqual(defaults['fling.flickSensitivity'], 'Normal')
+        self.assertEqual(rows['fling.flickSensitivity'][9], ['Low', 'Normal', 'High'])
+        light = next(row for row in module.R if row[7] == 'lights.fling')
+        self.assertEqual((light[0], light[8], light[10]), ('appearance', 'toggle', 'true'))
 
     def test_tiling_enabled_default_cannot_be_removed_or_made_true(self):
         module = generator()

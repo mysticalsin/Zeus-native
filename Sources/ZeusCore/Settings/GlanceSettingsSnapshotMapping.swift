@@ -15,7 +15,7 @@ public enum GlanceSettingsSnapshotMapping {
         let live: Set<String> = [
             "general", "appearance", "sounds", "notifications", "shortcuts", "insomnia",
             "integrations", "murmure", "polyglot", "dictation", "voice", "engine", "iphone",
-            "features", "beamer", "tiling", "license", "permissions", "privacy", "diagnostics", "about",
+            "features", "beamer", "tiling", "shelf", "license", "permissions", "privacy", "diagnostics", "about",
         ]
         if live.contains(key) { return key == "iphone" ? "iPhone" : key }
         switch key {
@@ -44,7 +44,7 @@ public enum GlanceSettingsSnapshotMapping {
             ("notifications", "notifications"), ("shortcuts", "shortcuts"), ("insomnia", "insomnia"),
             ("integrations", "integrations"), ("murmure", "murmure"), ("polyglot", "polyglot"),
             ("dictation", "dictation"), ("voice", "voice"), ("engine", "engine"),
-            ("features", "features"), ("beamer", "beamer"), ("tiling", "tiling"), ("license", "license"),
+            ("features", "features"), ("beamer", "beamer"), ("tiling", "tiling"), ("shelf", "shelf"), ("license", "license"),
             ("permissions", "permissions"), ("privacy", "privacy"), ("diagnostics", "diagnostics"),
             ("about", "about"),
         ]

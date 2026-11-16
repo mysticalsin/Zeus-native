@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
-FEATURE_IDS = {f"F{i:02}" for i in range(1, 15)} | {f"S{i:02}" for i in range(1, 7)}
+FEATURE_IDS = {f"F{i:02}" for i in range(1, 16)} | {f"S{i:02}" for i in range(1, 7)}
 TIERS = {"contract", "native-integration", "device-proof"}
 STATUSES = {"passed", "failed", "blocked", "not-run", "unimplemented"}
 
@@ -216,7 +216,7 @@ def validate_map(data, portable, root=ROOT):
     require(len(groups) == len(set(groups)), "duplicate portable group")
     require(set(groups) == set(portable.GROUPS) - {"wiki"}, "every default portable group must execute")
     unique(data["features"], "id")
-    require({f["id"] for f in data["features"]} == FEATURE_IDS, "all 14 Friday and 6 Sunday items are mandatory")
+    require({f["id"] for f in data["features"]} == FEATURE_IDS, "all 15 Friday and 6 Sunday items are mandatory")
     used_checks, obligation_ids = set(), set()
     for feature in data["features"]:
         fields(feature, {"id", "title", "obligations"})

@@ -49,6 +49,27 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 - Pointing stays its own reducer (`PointingKeyGesture`, item 22) and reads the same key facts.
 - Tests: `VoiceKeyMachineTests` (every transition and the chord), `VoiceKeyWalkTests` (every press order against the rules), `KeyFactsTests`, `HotkeyMonitorMachineTests` (the adapter), `TilingConsumedKeyTests`, `TileBaseConflictsTests` (the tiling clash rule).
 
+### 25. Fling pairing. EXPLICIT from the start (2026-11-15)
+- Where: `ZeusCore/Fling/FlingPairing.swift` (`FlingPairingMachine`, roles initiator and responder), `FlingCrypto.swift` (CryptoKit only), driven by `ZeusFling/FlingPairSession.swift` over the plain pairing port. Plan: `docs/FLING-PLAN.md`.
+- States: idle, committing, awaitingKey, awaitingReveal, showingCode(code, deadline 60 s), awaitingConfirm(deadline) (the responder accepted and waits for the initiator's own confirmation; an addition to the plan), confirmed, declined, expired, failed(reason: commitmentMismatch, badKey, badConfirm, unexpectedMessage, connectionLost, peerRefused, alreadyPaired, timedOut).
+- Events: start, received(message), userAccept, userDecline, userCancel, tick, connectionLost. Effects: send, storePSK, showCode, hidePrompt, close.
+- Rules: the initiator commits to its key and nonce first, the responder answers with its key, the initiator reveals, and a reveal that does not match the commitment fails. Both sides derive the same six digits and the same 32-byte key from the shared secret and a transcript of both ids and keys. Both people must accept: the responder's Accept sends its confirmation, and the initiator completes only when that confirmation arrived and its own person pressed Codes match, in either order (security review 1, REG-770). The initiator's own confirmation goes out first and the key is stored when that send has been handed to the connection; a decline, a timeout, a loss or a bad MAC stores nothing. Every failed attempt (decline, expiry, dropped connection, a step that did not arrive in 10 s after the hello) counts toward a mute by id and by remote address (`FlingMuteLedger`): three in ten minutes mute for ten minutes. An id that already has a key is refused at the hello (`alreadyPaired`). Only one prompt shows at a time (`FlingPairPromptGate`), pairing has its own connection gate, and a card ignores clicks for its first second.
+- Tests: `FlingPairingTests`, `FlingTwoProcessTests` (the real thing between processes).
+
+### 26. Fling send. EXPLICIT from the start (2026-11-15)
+- Where: `ZeusCore/Fling/FlingTransfer.swift` (`FlingSendMachine`), driven by `ZeusFling/FlingSendSession.swift`.
+- States: hashing, awaitingAccept, sending(index, sent), finishing, done, declined(reason), failed(reason), cancelled. The plan's separate `offering` state is folded into the move from hashing to awaitingAccept, because the offer is one effect.
+- Events: start, hashReady, received(message), fileSent, progress, userCancel, connectionLost. Effects: computeHash, send, streamFile, close.
+- Rules: the offer goes out only when every hash is ready; cancel from any state that is not final sends cancel and closes; a lost peer ends in failed(peerLost) with no resume; a failed send never resends by itself, and the only way in is `FlingService.send(_:to:gesture:)`.
+- Tests: `FlingSendMachineTests`, `FlingTwoProcessTests`, `FlingArrivalTests` (no send without a gesture).
+
+### 27. Fling receive. EXPLICIT from the start (2026-11-15)
+- Where: `ZeusCore/Fling/FlingTransfer.swift` (`FlingReceiveMachine`), driven by `ZeusFling/FlingReceiveSession.swift` and `FlingFileSink.swift`.
+- States: validating, prompting(deadline 60 s), receiving(index, got), verifying, committing, done, declined(reason), failed(reason), cancelled.
+- Events: received(message), userAccept, userDecline, userCancel, tick, hashComputed, committed, commitFailed, connectionLost. Effects: makeTemp, write, verify, commit, commitLink, addToShelf, deleteTemp, prompt, hidePrompt, send, close.
+- Rules: an offer that breaks a rule (not paired, a replay, a bad name, too many items, too big, a bad link) is declined with its reason before anyone is asked; a prompt timeout is a decline; bytes beyond the declared size fail the transfer; a file is kept only after its SHA-256 matched and then reaches the Shelf; deleteTemp runs on every end state except done.
+- Tests: `FlingReceiveMachineTests`, `FlingTwoProcessTests`, `FlingModesTests`.
+
 ## Fixed
 
 ### 1. Dictation job phase (live, file, history re-run). FIXED, severity high
