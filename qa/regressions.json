@@ -7355,6 +7355,18 @@
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "aSettingsPopupIsWideEnoughForItsLongestOption"
       }
+    },
+    {
+      "id": "REG-768",
+      "failure": "The Languages onboarding step has no visual, so its column was centred in the window and its note ran into the Set up later button.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual"
+      }
     }
   ]
 }

@@ -28,4 +28,13 @@ struct UIPolishSourceTests {
         #expect(long >= needed + 20)
         #expect(GSPopup.width(for: [String(repeating: "W", count: 80)]) == GSPopup.maxWidth)
     }
+
+    @Test func theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual() throws {
+        let text = try Self.source("Sources/Zeus/Onboarding/OnboardingSteps.swift")
+        let start = try #require(text.range(of: "column\n"))
+        let block = String(text[start.upperBound...].prefix(700))
+        let pin = try #require(block.range(of: ".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"))
+        let offset = try #require(block.range(of: ".offset(x: OB.contentX, y: OB.headingTopY)"))
+        #expect(pin.lowerBound < offset.lowerBound)
+    }
 }
