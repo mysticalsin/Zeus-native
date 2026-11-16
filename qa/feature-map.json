@@ -827,6 +827,38 @@
       "scope": "Actual Face presence card model and fixtures from fixed machine values and face names. The card is never drawn from the controller, the camera, the vault or the Keychain."
     },
     {
+      "id": "native-RouterRaceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "RouterRaceTests",
+      "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+      "scope": "Router candidate choice and the persistent Claude retirement rule with no process, capture or network: the app Claude provider is handed to the Claude entry when preferred, and a slot that carried an image is replaced."
+    },
+    {
+      "id": "native-SpeakerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SpeakerTests",
+      "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+      "scope": "The production Speaker with a fake voice engine in this process: per-line start callbacks fire once, in order. No audio, capture or network."
+    },
+    {
+      "id": "native-TalkVisualTurnTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "TalkVisualTurnTests",
+      "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+      "scope": "The production VoiceTurnController runTurn with a scripted reply, a fake voice and a fake presenter: marks reveal with their sentence, nothing draws with the setting off or from a blind engine, and a new turn clears. No capture, microphone, audio or network."
+    },
+    {
+      "id": "native-TalkVisualOverlayTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "TalkVisualOverlayTests",
+      "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+      "scope": "Own-process drawing panels with a synthetic or main display and capture geometry: ring, arrow and label are laid out in capture space, the panel ignores input, is excluded from capture and is removed on hide. No capture, key tap or permission."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -4860,6 +4892,223 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theChordOrdersKeepTheRules"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-route",
+          "check": "native-RouterRaceTests",
+          "acceptance": "With talk drawing on, the Claude race entry is the app provider that carries the screenshot, and a persistent Claude process that carried an image is replaced before the next turn. Does not prove a real image reaches the model.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+              "function": "preferAppClaudeGivesTheAppProviderForClaudeEvenWhenTheCLIIsInstalled"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+              "function": "theCandidateListHandsTheAppProviderToTheClaudeEntryWhenPreferred"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+              "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-line-start",
+          "check": "native-SpeakerTests",
+          "acceptance": "Each spoken line reports its start once, in order, when its audio plays, which for a line queued behind an earlier one is after the earlier audio has played; a stop drops waiting starts; a line with no callback still speaks. Does not prove real audio timing.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "onStartFiresOncePerLineInOrderBeforeTheNextLineBegins"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "aLineWithNoCallbackStillSpeaks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "aPipelinedLineStartsOnlyAfterTheEarlierLinesAudioHasPlayed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "aStopDropsTheWaitingLineStartsAndIgnoresLateCompletions"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-turn",
+          "check": "native-TalkVisualTurnTests",
+          "acceptance": "A DRAW tag reveals each mark with its sentence before the next line begins; setting off makes no presenter call and sends every shot; a winner that never saw the screen draws nothing; the next turn clears once. Does not prove real audio timing or on-screen drawing.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOffMakesNoPresenterCallAndStillSpeaksEverySentence"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aWinnerThatNeverSawPixelsDrawsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOffSendsEveryShotAndConsentOnSendsTheCursorDisplayOnly"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "theNextKeyPressClearsADrawingAndANeverDrawnTurnClearsNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOffSendsTheBaseRequestWithEveryShotAndNoDrawPrompt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "consentOnSendsOneShotToTheBrainButKeepsEveryCaptureForPointAndDrive"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aReplayedSpeculativeTurnNeverDraws"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "revealsOfOneTurnShareOneSceneAndOnlyAdvanceItsRevision"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-overlay",
+          "check": "native-TalkVisualOverlayTests",
+          "acceptance": "A ring, an arrow and a label lay out in capture space and show on the display panel, which ignores input and is gone after hide; more marks of one capture reuse the panel. Does not prove pixels on a real screen.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+              "function": "aRingAnArrowAndALabelAreLaidOutInCaptureSpaceAndHideLeavesNoPanel"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+              "function": "revealingMoreMarksReusesThePanelOfTheSameCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+              "function": "aSceneWithNoMarkOfThisCaptureShowsNothing"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-setting",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "Draw on screen while Zeus answers is a Voice toggle, off by default, live, and read as off from an empty store. Does not prove the toggle's page rendering.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A leading DRAW tag, also split across chunks, becomes marks and is never spoken; a malformed one is stripped; marks respect the mark, ink point, text and sentence limits, drop when outside the image, and land where a POINT tag lands on 1x, 2x, downscaled and negative-origin displays; drawing needs consent and a winner that saw the screen. Does not prove the model's coordinate accuracy.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+              "function": "aLeadingDrawTagIsEmittedAndNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+              "function": "aDrawTagSplitAcrossChunksStillParses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+              "function": "aMalformedDrawTagIsStrippedAndNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "theMarkCountInkPointsTextAndSentenceIndexAreLimited"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksOutsideTheImageAreDroppedAndGroupedBySentence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "aCardIsClampedInsideTheImage"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnA1xDisplay"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnA2xDisplay"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnADownscaledShot"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnASecondaryDisplayAtNegativeX"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+              "function": "consentOffSendsNoImages"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+              "function": "onlyAWinnerThatSawPixelsMayDraw"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+              "function": "aRequestKeepsItsDrawImageFlagThroughWith"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-leak",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A DRAW tag is never spoken: after spoken words, at the end, with no closing bracket, with unbalanced braces, with brackets inside its strings, or unterminated; the speech around it is kept and an unterminated tag is dropped at a size bound or at the stream end. Does not prove what a model writes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "aTagAfterSpokenWordsIsNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "aTagAtTheEndOfTheReplyIsNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "aTagWithNoClosingBracketIsNeverSpokenAndTheSpeechFollows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "unbalancedBracesEndAtTheLineBreakAndTheSpeechStartsBeforeTheStreamEnds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "anUnterminatedTagIsDroppedAtTheSizeBoundAndAtTheEndOfTheStream"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "bracesAndBracketsInsideStringsDoNotEndTheTag"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "theWholeReplyParserAndTheSanitizerAlsoStripEveryShape"
             }
           ]
         }

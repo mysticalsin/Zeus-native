@@ -5735,6 +5735,162 @@
         "file": "Tests/ZeusCoreTests/FacePresenceStatusTests.swift",
         "function": "statesThatNeedAnActionSayWhyAndWhatToDo"
       }
+    },
+    {
+      "id": "REG-700",
+      "failure": "A model-written screen drawing tag that was malformed, or split across stream chunks, could be read aloud as bracket text or dropped without the rest of the reply surviving.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+        "function": "aMalformedDrawTagIsStrippedAndNeverSpoken"
+      }
+    },
+    {
+      "id": "REG-701",
+      "failure": "Screen marks drawn from a talk reply could land away from where the same pixel pointed with a POINT tag, or run past the 6 mark, 24 ink point and 60 character limits, or fall outside the screenshot.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+        "function": "marksLandWherePointDoesOnASecondaryDisplayAtNegativeX"
+      }
+    },
+    {
+      "id": "REG-702",
+      "failure": "Marks could be drawn from an answer by an engine that never saw the screenshot, or screenshots could be sent for drawing with the setting off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+        "function": "onlyAWinnerThatSawPixelsMayDraw"
+      }
+    },
+    {
+      "id": "REG-703",
+      "failure": "A talk turn with a screenshot never reached the app Claude provider when the claude command line tool was installed, and a persistent Claude process kept screenshots in its context across turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-RouterRaceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+        "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
+      }
+    },
+    {
+      "id": "REG-704",
+      "failure": "A screen mark could not be tied to the moment its sentence began to play, because the speaker gave no per-line start signal.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+        "function": "onStartFiresOncePerLineInOrderBeforeTheNextLineBegins"
+      }
+    },
+    {
+      "id": "REG-705",
+      "failure": "A drawing from a talk reply could appear before or long after its sentence, draw with the setting off, draw from an engine that never saw the screen, or stay on screen into the next turn.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins"
+      }
+    },
+    {
+      "id": "REG-706",
+      "failure": "Marks from a talk answer could fail to render in capture space on the main display, take input, or stay as a window after hiding.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+        "function": "aRingAnArrowAndALabelAreLaidOutInCaptureSpaceAndHideLeavesNoPanel"
+      }
+    },
+    {
+      "id": "REG-707",
+      "failure": "Drawing on the screen during a talk answer, which sends a screenshot, could be on without the owner choosing it, because the setting was missing or defaulted on.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage"
+      }
+    },
+    {
+      "id": "REG-708",
+      "failure": "A screen drawing tag after spoken words, with no closing bracket, or with unbalanced braces could be read aloud as JSON, or held back the rest of the reply until the stream ended.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+        "function": "aTagWithNoClosingBracketIsNeverSpokenAndTheSpeechFollows"
+      }
+    },
+    {
+      "id": "REG-709",
+      "failure": "Screen marks appeared when a line's first audio was queued, not when it played, so with lines queued back to back the marks of the next sentence showed while the earlier one was still being spoken.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+        "function": "aPipelinedLineStartsOnlyAfterTheEarlierLinesAudioHasPlayed"
+      }
+    },
+    {
+      "id": "REG-710",
+      "failure": "A late callback from an earlier talk answer could reveal marks, or arm the four second hide, against the next answer's screenshot.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture"
+      }
+    },
+    {
+      "id": "REG-711",
+      "failure": "Turning on drawing cut the screenshots for POINT screen tags and the drive and walkthrough actions down to one display, and flagged a persistent Claude runner as image-carrying even with drawing off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "consentOnSendsOneShotToTheBrainButKeepsEveryCaptureForPointAndDrive"
+      }
+    },
+    {
+      "id": "REG-712",
+      "failure": "One ring mark could be given a radius large enough to cover the screen, and every reveal of a sentence rebuilt the scene under new identities so the marks already shown animated in again.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+        "function": "aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen"
+      }
     }
   ]
 }

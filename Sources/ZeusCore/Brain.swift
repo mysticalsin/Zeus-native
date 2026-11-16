@@ -113,6 +113,9 @@ public struct BrainRequest: Sendable {
     /// Set for a spoken turn: seconds an engine may stay silent before it is stopped, and the signal to
     /// launch a CLI lean (no hooks, plugins, MCP or tools). Nil for chat, routines and other long jobs.
     public let firstTextBudget: TimeInterval?
+    /// The screenshot is attached because talk drawing is on. A persistent Claude process that took it is replaced
+    /// before the next turn; with drawing off nothing is flagged and the process is reused as before.
+    public let carriesDrawImage: Bool
 
     public init(
         turn: UUID = UUID(),
@@ -123,8 +126,10 @@ public struct BrainRequest: Sendable {
         history: [Exchange] = [],
         systemPrompt: String,
         deep: Bool = false,
-        firstTextBudget: TimeInterval? = nil
+        firstTextBudget: TimeInterval? = nil,
+        carriesDrawImage: Bool = false
     ) {
+        self.carriesDrawImage = carriesDrawImage
         self.turn = turn
         self.transcript = transcript
         self.screenshots = screenshots
@@ -143,7 +148,7 @@ public struct BrainRequest: Sendable {
         BrainRequest(turn: turn ?? self.turn, transcript: transcript ?? self.transcript,
                      screenshots: screenshots ?? self.screenshots, axSummary: axSummary, activeTab: activeTab,
                      history: history, systemPrompt: systemPrompt ?? self.systemPrompt, deep: deep ?? self.deep,
-                     firstTextBudget: firstTextBudget ?? self.firstTextBudget)
+                     firstTextBudget: firstTextBudget ?? self.firstTextBudget, carriesDrawImage: carriesDrawImage)
     }
 }
 
