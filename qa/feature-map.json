@@ -4878,7 +4878,7 @@
         {
           "id": "F11.talk-draw-line-start",
           "check": "native-SpeakerTests",
-          "acceptance": "Each spoken line reports its start once, in order, before the next line begins; a line with no callback still speaks. Does not prove real audio timing.",
+          "acceptance": "Each spoken line reports its start once, in order, when its audio plays, which for a line queued behind an earlier one is after the earlier audio has played; a stop drops waiting starts; a line with no callback still speaks. Does not prove real audio timing.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/SpeakerTests.swift",
@@ -4887,6 +4887,14 @@
             {
               "file": "Tests/ZeusAppTests/SpeakerTests.swift",
               "function": "aLineWithNoCallbackStillSpeaks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "aPipelinedLineStartsOnlyAfterTheEarlierLinesAudioHasPlayed"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "aStopDropsTheWaitingLineStartsAndIgnoresLateCompletions"
             }
           ]
         },

@@ -5783,6 +5783,18 @@
         "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
         "function": "aTagWithNoClosingBracketIsNeverSpokenAndTheSpeechFollows"
       }
+    },
+    {
+      "id": "REG-709",
+      "failure": "Screen marks appeared when a line's first audio was queued, not when it played, so with lines queued back to back the marks of the next sentence showed while the earlier one was still being spoken.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+        "function": "aPipelinedLineStartsOnlyAfterTheEarlierLinesAudioHasPlayed"
+      }
     }
   ]
 }
