@@ -179,6 +179,8 @@ final class UltronAudioChain {
     /// Silent runs (the owner's quiet mode, tests) go through the whole chain with the volume at zero.
     var muted = false { didSet { player.volume = muted ? 0 : 1 } }
     private(set) var firstScheduledAt: Date?
+    /// Times this chain started its output engine: only `prepare()` does, and `schedule` calls it.
+    private(set) var engineStarts = 0
 
     init() {
         engine.attach(player)
@@ -219,6 +221,7 @@ final class UltronAudioChain {
         if !engine.isRunning {
             engine.prepare()
             do { try engine.start() } catch { return false }
+            engineStarts += 1
         }
         return true
     }

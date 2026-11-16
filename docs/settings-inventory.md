@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 211 of 211 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 211 in scope). 200 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 212 of 212 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 212 in scope). 201 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 160.
+**Before this round:** has 19, partial 27, missing 161.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -269,6 +269,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Hey Zeus | Listen for "Hey Zeus" | toggle | - | Say it, then your request. Off until you turn it on. | missing | custom | `voice.heyZeus` | Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off). |
 | Talk to Zeus | Talk shortcut | recorder | - | Hold Control + Option, or Control + Option + Space, to talk, let go to send. Point at something while you hold and Zeus sees what you mean. | missing | custom | `voice.talkKey` | Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept. |
 | Talk to Zeus | Second talk key | recorder | - | Hold Right Option alone to talk, let go to send. Double-tap to keep listening. Turn it off or record another key. | missing | custom | `voice.secondTalkKey` | Zeus addition. Recorder on Shortcuts. Stored under talk.secondShortcut only when you record or turn it off. The default gives way to a key you chose for pointing, dictation or Polyglot, and to Chat on Option-Space. |
+| Talk to Zeus | Microphone | menu | - | What Zeus listens on when you talk. Automatic uses the system input, so a connected headset wins. This Mac’s microphone keeps a Bluetooth headset from switching mode. Dictation has its own. | missing | custom | `talk.microphone` | Zeus addition. Pop-up on Voice, next to the talk key. A specific input is stored as device:<uid> on this Mac and is not exported or imported. |
 | Talk to Zeus | Draw on the screen while Zeus answers | toggle | off | Off: nothing is drawn and talk turns work as before. On: one screenshot of the display under your pointer goes to Claude with each question, and Zeus can ring, arrow or label what it talks about as it says it. Marks go a few seconds after the answer and the screenshot is never saved. | missing | live | `talk.drawOnScreen` | Separate consent from the macOS Screen Recording permission. Needs your Claude login. |
 | Voice | Personality (Ultron or Plain) and Design voice | menu | - | How Zeus sounds and what it calls itself. | missing | custom | `voice.personality` | Zeus addition. Voice page. |
 | Dictation | Murmure speech engines | menu | - | Which speech recognition writes your words. | missing | custom | `dictation.engine` | Zeus addition. Murmure page. |

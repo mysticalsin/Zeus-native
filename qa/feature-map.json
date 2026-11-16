@@ -1053,6 +1053,22 @@
       "suite": "FlingSecurityAppTests",
       "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
       "scope": "Actual FlingService and prompt model with a recording stand-in transport, plus the file sink in a temp folder: the one second input delay, private links not opening, Pair again, the named pairing answer, quarantine and case-only name clashes. No browser, no network."
+    },
+    {
+      "id": "native-TalkTurnVoiceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "TalkTurnVoiceTests",
+      "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+      "scope": "The talk-turn capture recovery sequence, output engine start timing, microphone choice and per-turn diagnostics with spies and pure helpers. No audio hardware, Bluetooth link or speech recognition is exercised."
+    },
+    {
+      "id": "native-SpeechInputRecoveryTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SpeechInputRecoveryTests",
+      "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+      "scope": "SpeechInput configuration-change recovery with a fake capture engine: the stop race around the engine restart, the retry limit for an input with no format, and a format with no converter. No audio hardware or speech recognition is exercised."
     }
   ],
   "features": [
@@ -5301,6 +5317,14 @@
             },
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "theDefaultSecondKeyThatDuplicatesTheTalkKeyIsQuietAndAChosenOneKeepsItsWarning"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
               "function": "theSecondKeyYieldsToAKeyChosenElsewhere"
             },
             {
@@ -5310,6 +5334,84 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theSecondKeyOrdersKeepTheRules"
+            }
+          ]
+        },
+        {
+          "id": "F11.speech-input-recovery",
+          "check": "native-SpeechInputRecoveryTests",
+          "acceptance": "A stop that lands during capture recovery never reopens the microphone, an input with no format is retried a bounded number of times and ends the turn, a turn that is already over schedules no retry, and a changed format with no converter ends the turn. A fake capture engine: no audio hardware or speech recognition.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aStopBetweenTheTapAndTheRestartNeverStartsTheEngine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aStopWhileTheEngineIsStartingLeavesItStoppedWithTheTapRemoved"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "anInputWithoutAFormatRetriesAndEndsTheTurnAfterTheLimit"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+              "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-turn-voice",
+          "check": "native-TalkTurnVoiceTests",
+          "acceptance": "Talk turns keep listening through a headset profile change, start the output engine only when audio is scheduled, use the microphone chosen for talk (Automatic, this Mac's microphone or one input) and report what the input saw when nothing was heard. Spies and pure helpers: no Bluetooth link, capture hardware or speech recognition.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "prewarmOnKeyPressNeverPreparesTheOutputEngine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "theFirstScheduledAudioStartsTheOutputEngineOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "automaticIsTheDefaultAndMeansNoDevice"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "theBuiltInChoiceResolvesToTheBuiltInDeviceAtTurnStart"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aSpecificDeviceResolvesToItsUIDAndFallsBackToAutomaticWhenGone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "theChoiceRoundTripsThroughItsStoredText"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "thisTestRunIsDetectedAndItsLogIsNotTheOwnersLog"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges"
             }
           ]
         }
@@ -6839,6 +6941,29 @@
             }
           ],
           "id": "F13.page-switch-layout"
+        },
+        {
+          "id": "F13.ui-polish",
+          "check": "native-UIPolishSourceTests",
+          "acceptance": "Polish rules hold in the sources: hints wrap instead of cutting mid-word, pop-ups fit their longest option, the onboarding column stays top-left, initials fit the visible disc, the Take notes button stays on one line, the countdown scrim hides the script, and the open panel ignores the pointer leaving while VoiceOver drives. Source and pure helper checks; no window shown.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "thePermissionCueWrapsInsteadOfTruncatingMidWord"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "aSettingsPopupIsWideEnoughForItsLongestOption"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual"
+            },
+            {
+              "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+              "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
         }
       ]
     },

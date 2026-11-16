@@ -76,6 +76,13 @@ public enum VoiceKey {
         return (chosen, nil)
     }
 
+    /// Whether the sentence for a second key that gave way is quiet (a plain "Off") rather than a warning. Only the default key
+    /// that merely repeats the talk key is: the owner never recorded it, so there is nothing for them to fix. A key they recorded
+    /// that clashes, or any other holder (Dictation, Polyglot, Pointing, Chat, VoiceOver), keeps the warning.
+    public static func secondTalkNoteIsQuiet(yieldsTo: String?, explicit: Bool) -> Bool {
+        yieldsTo == "Talk to Zeus" && !explicit
+    }
+
     /// Why `key` cannot be recorded as the second talk key: it is already the talk, dictation or Polyglot key. Nil when it can.
     public static func secondTalkRefusal(_ key: Shortcut, talk: Shortcut, dictation: Shortcut?, polyglot: Shortcut?) -> String? {
         let named: [(String, Shortcut?)] = [("Talk to Zeus", talk), ("Dictation", dictation), ("Polyglot", polyglot)]

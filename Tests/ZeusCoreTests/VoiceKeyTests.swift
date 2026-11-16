@@ -257,6 +257,25 @@ struct VoiceKeyTests {
         #expect(ShortcutStore.loadSecondTalk(e).key == .rightOption && !ShortcutStore.loadSecondTalk(e).explicit)
     }
 
+    @Test func theDefaultSecondKeyThatDuplicatesTheTalkKeyIsQuietAndAChosenOneKeepsItsWarning() {
+        #expect(VoiceKey.secondTalkNoteIsQuiet(yieldsTo: "Talk to Zeus", explicit: false), "Right Option talk key, second key never recorded")
+        #expect(!VoiceKey.secondTalkNoteIsQuiet(yieldsTo: "Talk to Zeus", explicit: true), "the owner recorded a clashing key")
+        for name in ["Dictation", "Polyglot", "Pointing", "Chat", "VoiceOver"] {
+            #expect(!VoiceKey.secondTalkNoteIsQuiet(yieldsTo: name, explicit: false), "\(name) still explains why the key is off")
+        }
+        #expect(!VoiceKey.secondTalkNoteIsQuiet(yieldsTo: nil, explicit: false), "a key that works has nothing to say")
+    }
+
+    @Test func aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne() {
+        func note(explicit: Bool) -> (key: Shortcut?, quiet: Bool) {
+            let result = VoiceKey.secondTalkKey(chosen: .rightOption, explicit: explicit, heard: .rightOption, dictation: nil, pointing: nil,
+                                                polyglot: nil, voiceOverOn: false, carbonHolders: [])
+            return (result.key, VoiceKey.secondTalkNoteIsQuiet(yieldsTo: result.yieldsTo, explicit: explicit))
+        }
+        #expect(note(explicit: false).key == nil && note(explicit: false).quiet, "off, and nothing to warn about")
+        #expect(note(explicit: true).key == nil && !note(explicit: true).quiet, "off, and the owner is told why")
+    }
+
     @Test func theSecondKeyYieldsToAKeyChosenElsewhere() {
         func second(chosen: Shortcut? = .rightOption, explicit: Bool = false, talk: Shortcut = .controlOption,
                     dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, polyglot: Shortcut? = nil,

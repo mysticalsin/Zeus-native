@@ -7439,6 +7439,174 @@
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "theSettingsDeepLinkOnlyOpensTheSettingsWindow"
       }
+    },
+    {
+      "id": "REG-810",
+      "failure": "With AirPods as the microphone, the headset switched profile when the talk key went down, the audio engine stopped and was never restarted, so every talk turn heard nothing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
+      }
+    },
+    {
+      "id": "REG-811",
+      "failure": "Every talk-key press started the Ultron output engine, which pulled AirPods back to the playback profile while the microphone was opening, so the two engines fought over the Bluetooth link.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "prewarmOnKeyPressNeverPreparesTheOutputEngine"
+      }
+    },
+    {
+      "id": "REG-812",
+      "failure": "Talk turns ignored the microphone chosen in Dictation settings and always used the system input, so an AirPods default was used even when another microphone was picked.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
+      }
+    },
+    {
+      "id": "REG-813",
+      "failure": "Test runs wrote lines into the owner's real ~/Library/Logs/Zeus/voice.log, mixing test output into the evidence used to debug live voice turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog"
+      }
+    },
+    {
+      "id": "REG-814",
+      "failure": "Every ElevenLabs 401 said quota exceeded, so a bad key and used-up credits gave the same notice and the owner could not tell whether to paste a new key or wait.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
+        "function": "aBadKeyAsksForANewKeyAndDoesNotBlameCredits"
+      }
+    },
+    {
+      "id": "REG-815",
+      "failure": "Used-up ElevenLabs credits were reported as a rejected key, so the notice told the owner to check a key that was fine.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
+        "function": "usedUpCreditsSayTheCreditsAreUsedUpAndTheNextVoiceSpeaksUntilThePauseEnds"
+      }
+    },
+    {
+      "id": "REG-816",
+      "failure": "Talk turns could not be told to use the Mac's own microphone, so a connected Bluetooth headset always switched profile for every talk turn, and a chosen input that was unplugged was not handled.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "theBuiltInChoiceResolvesToTheBuiltInDeviceAtTurnStart"
+      }
+    },
+    {
+      "id": "REG-817",
+      "failure": "Talk turns reused the Dictation microphone, so choosing a microphone for dictation silently moved talk turns, and talk had no choice of its own.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
+      }
+    },
+    {
+      "id": "REG-818",
+      "failure": "With Right Option as the talk key, Settings warned that the second talk key was off and told the owner to record another key, although the owner never set a second key and wants Right Option only.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theDefaultSecondKeyThatDuplicatesTheTalkKeyIsQuietAndAChosenOneKeepsItsWarning"
+      }
+    },
+    {
+      "id": "REG-819",
+      "failure": "The quiet Off for a default second key must not hide the warning when the owner recorded a clashing key, or the key would be off with no explanation.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
+      }
+    },
+    {
+      "id": "REG-830",
+      "failure": "A settings export carried the talk microphone as device:<Core Audio UID>, a device id from this Mac that the catalog and docs say is never exported.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "aChosenTalkMicrophoneDeviceIsNeverExported"
+      }
+    },
+    {
+      "id": "REG-831",
+      "failure": "The capture recovery path (stop landing during the engine restart, an input with no usable format) had no test, so a stop race could reopen the microphone or a flapping input could retry for ever unnoticed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aStopWhileTheEngineIsStartingLeavesItStoppedWithTheTapRemoved"
+      }
+    },
+    {
+      "id": "REG-832",
+      "failure": "When the headset format changed and no converter could be built, capture recovery treated it like no conversion needed and fed the recognition request buffers in the wrong format.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
+      }
+    },
+    {
+      "id": "REG-833",
+      "failure": "When a stop won the race during capture recovery, the log said input recovery failed because the input had no usable format, and a retry was queued for a turn that was already over.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry"
+      }
     }
   ]
 }

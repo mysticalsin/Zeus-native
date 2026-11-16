@@ -137,6 +137,8 @@ struct ShortcutRecorderRow: View {
     var voiceOverFallback: Shortcut?
     /// Plain sentences under the row, such as a clash with another shortcut, shown like the warnings.
     var notes: [String] = []
+    /// Plain sentences under the row for a state that needs no fixing, such as a default key that is off: no warning style.
+    var quietNotes: [String] = []
     let set: (Shortcut?) -> Void
 
     var body: some View {
@@ -159,6 +161,10 @@ struct ShortcutRecorderRow: View {
             }
             .foregroundStyle(Theme.ember)
             .padding(.vertical, 6)
+        }
+        ForEach(quietNotes, id: \.self) { note in
+            Text(note).font(OB.font(13)).foregroundStyle(GS.secondary).fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 6)
         }
         if let shortcut {
             ForEach(ShortcutConflicts.warnings(for: shortcut, other: other, otherName: otherName,

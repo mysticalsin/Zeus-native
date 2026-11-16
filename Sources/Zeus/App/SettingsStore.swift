@@ -339,6 +339,12 @@ final class SettingsStore {
         }
     }
 
+    /// A specific talk microphone is a Core Audio id from this Mac: it is never exported. Automatic and This Mac's
+    /// microphone are plain names and travel like any other choice.
+    static func isExportable(id: String, value: String) -> Bool {
+        !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
+    }
+
     func exportJSON() throws -> Data {
         var app: [String: Any] = [:]
         for key in Self.appKeys {
@@ -348,6 +354,7 @@ final class SettingsStore {
         for option in SettingsCatalog.all where option.state == .custom {
             if let value = defaults.string(forKey: Self.key(option.id)) { optionValues[option.id] = value }
         }
+        optionValues = optionValues.filter { Self.isExportable(id: $0.key, value: $0.value) }
         let root: [String: Any] = ["format": "zeus.settings", "version": 1, "options": optionValues, "app": app]
         return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
     }
