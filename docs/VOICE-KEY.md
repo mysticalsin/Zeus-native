@@ -171,8 +171,10 @@ starts it, and joining a Right Option turn cancels it. A tap shorter than the co
 other; a drag starts with one) is a foreign key for the second key only: a press still inside its confirm is dropped, a held turn is
 cancelled and never sent, and nothing starts until every key is up. An Option-click or Option-drag therefore does not talk.
 `TalkKeyPair.mouseDown` is the pure event (the machine hears a foreign key that is down and up at once, and only the second
-slot is told); `HotkeyMonitor.mouseDown` is fed by global and local monitors of the three mouse-down types. The primary key and a
-hands-free second turn (no key held) are not affected.
+slot is told); `HotkeyMonitor.mouseDown` is fed by global and local monitors of the three mouse-down types. The click is read at the time it happened
+(`NSEvent.timestamp`, never later than now), as a key is, so a busy main thread cannot let a confirm that came due after the click
+start the turn first. After a mouse cancel nothing starts until every key is up, the other talk key included (I11: the turn ended
+with a key still down). The primary key and a hands-free second turn (no key held) are not affected.
 
 **Timers run in order.** Each machine asks for its own timers (the confirm, the 0.4 s gap, the 0.25 s check). The pair keeps their
 times and, before it hands a key to the machines, runs every timer that fell due by that key's own time, earliest first across
@@ -181,7 +183,8 @@ on time (`timersThatRunLateGiveTheEffectsOfTimersThatRunOnTime`, and the three o
 pair does none of this and is the machine.
 
 **A Space the system says is down** at the release of a second-key turn means a launcher on Option-Space that Carbon cannot see
-took the press: the turn is cancelled, not sent.
+took the press: the turn is cancelled, not sent. A Space tapped and let go between two looks at the keyboard is caught too: the
+monitor asks the system on every key event and tick while the second key's turn is open, and a Space seen once cancels the turn.
 
 **The default is written nowhere.** `ShortcutStore.loadSecondTalk` returns Right Option when `talk.secondShortcut` is
 absent or does not parse, and never writes. Only the recorder writes (`off`, or a key); Reset removes the key.

@@ -658,3 +658,14 @@ Two majors and five minors, each with a failing test first. `VoiceKeyMachine.swi
 | Minor d | `talk.secondShortcut` was not exported | Added to the export and import rules |
 | Minor e | The log named the primary key for second-key starts | The slot's own key title is logged (not tested) |
 
+Second review of the fix round (six minors, all folded in):
+
+| # | Change |
+| --- | --- |
+| 1 | The mouse is stamped with `NSEvent.timestamp` (clamped as key times are): a click at 0.2 heard at 0.3 drops a press whose confirm fell due at 0.25 (`aMouseClickHeardLateIsReadAtTheTimeItHappened`) |
+| 2 | After a mouse cancel nothing starts until every key is up, the other key included. The requirement changes, not the code: documented in VOICE-KEY.md and pinned by `afterAMouseCancelNothingStartsUntilEveryKeyIsUp` |
+| 3 | A Space tapped and let go during the hold is remembered from the looks at the keyboard on key events and ticks, and cancels the turn at its release (`aLauncherSpaceTappedDuringTheHoldCancelsItAtTheRelease`) |
+| 4 | Rule I14: the effects that timers owed ahead of a key come out in the order the timers fell due, across both keys. `theSearchSeesTimersThatActOutOfDueOrder` replays the first order of the review (Control and Left Option held 0.1 s, Right Option down at 0.2, both timers late, a key at 0.5): with the timers after the key it reports I14, in due order it gives start, send |
+| 5 | In the rest check a change of config may cancel only the key whose setting changed (the second key) |
+| 6 | The negative test of the timer order requires its first violation to start with I12 or I13 |
+
