@@ -12,6 +12,8 @@ final class BuddyController: NSObject {
     private var windows: [NSWindow] = []
     private var captionHide: Task<Void, Never>?
     private var displayLink: CADisplayLink?
+    /// The window (one per screen) whose display the link was bound to; the frame loop rebinds when the buddy leaves it.
+    private var linkedWindowIndex: Int?
     private var lastTimestamp: CFTimeInterval = 0
     private var mouseMonitors: [Any] = []
 
@@ -107,17 +109,25 @@ final class BuddyController: NSObject {
         frames.firstIndex { $0.contains(point) }
     }
 
-    private func shownWindowScreen() -> NSScreen? {
-        Self.windowIndex(containing: model.position, in: windows.map(\.frame)).flatMap { windows[$0].screen }
+    private func shownWindowIndex() -> Int? {
+        Self.windowIndex(containing: model.position, in: windows.map(\.frame))
+    }
+
+    /// True when the buddy is shown on a different window's display than the one the link runs on.
+    static func needsRebind(shownIndex: Int?, linkedIndex: Int?) -> Bool {
+        shownIndex != nil && shownIndex != linkedIndex
     }
 
     /// Binds the display link to the screen where the buddy is shown, so it runs at that display's rate. Called at
-    /// start and again whenever the screens change (the old link may belong to a display that is gone).
+    /// start, whenever the screens change (the old link may belong to a display that is gone), and when the buddy
+    /// crosses to another display, so a 60 Hz external screen does not pace a buddy shown on the 120 Hz built-in one.
     private func startDisplayLink() {
         let wasPaused = displayLink?.isPaused ?? false
         displayLink?.invalidate()
         displayLink = nil
-        guard let screen = Self.linkScreen(window: shownWindowScreen(), main: NSScreen.main, all: NSScreen.screens) else { return }
+        let shown = shownWindowIndex()
+        linkedWindowIndex = shown
+        guard let screen = Self.linkScreen(window: shown.flatMap { windows[$0].screen }, main: NSScreen.main, all: NSScreen.screens) else { return }
         let link = screen.displayLink(target: self, selector: #selector(tick(_:)))
         link.isPaused = wasPaused
         lastTimestamp = 0
@@ -340,6 +350,8 @@ final class BuddyController: NSObject {
             model.strikeProgress = min(progress, 1)
             if progress >= 1 { strikeStart = nil }
         }
+
+        if Self.needsRebind(shownIndex: shownWindowIndex(), linkedIndex: linkedWindowIndex) { startDisplayLink() }
     }
 
     private func advanceFlight(now: CFTimeInterval) {
