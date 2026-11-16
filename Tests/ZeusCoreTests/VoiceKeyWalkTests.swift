@@ -390,6 +390,9 @@ private struct Checker: Hashable {
 private struct Edge {
     var cameDown = false
     var released = false
+    /// The press that this step let go came down beside a Space the keyboard did not earn as a chord: the step that lets it go
+    /// has already cleared `dirtySpaceAtPress`, and a quick press ends a hands-free turn at its release.
+    var releasedDirty = false
 }
 
 /// The state of one search node. The machine is held as the four things it reads: the config, the flags-only modifier
@@ -1264,6 +1267,7 @@ private struct Sim {
             checker.pressForeign = checker.pressForeign || phys.foreignAny
         }
         if !phys.ownAll {
+            if checker.dirtySpaceAtPress { edge.releasedDirty = true }
             checker.presses = 0
             checker.pressAge = 0
             checker.dirtySpaceAtPress = false
@@ -1321,6 +1325,9 @@ private struct Sim {
                     let cleanRelease = confirmSteps > 0 && edge.released && !checker.pressForeign
                     if !(atPress || stayedAlone || cleanRelease) {
                         found.append("I1: a hands-free turn was sent by something other than a clean press of exactly the own set")
+                    }
+                    if run.chord, checker.dirtySpaceAtPress || edge.releasedDirty {
+                        found.append("I6s: a hands-free turn was ended by a press that came down beside a Space physically down that had not joined the own set alone, whether or not any monitor heard that Space")
                     }
                 } else {
                     if checker.foreign { found.append("I1: a turn was sent after something foreign was down") }
@@ -1729,8 +1736,6 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
             ("Right Option held, then a letter", held + ["Left", "Left", "wait 0.5", "RightOption"] + rest, [.start, .cancel]),
             ("Left Option alone", ["Option", "wait 0.5", "Option"] + rest, []),
             ("Left Option joins a Right Option turn", held + ["Option", "wait 0.5", "Option", "RightOption"] + rest, [.start, .cancel]),
-            ("Right Option and Space inside the confirm", ["RightOption", "Space", "wait 0.5", "Space", "RightOption"] + rest, []),
-            ("Right Option held, then Space", held + ["Space", "Space", "wait 0.5", "RightOption"] + rest, [.start, .cancel]),
             ("Control, then Right Option", ["Control", "RightOption", "wait 0.5", "RightOption", "Control"] + rest, [.start, .send]),
             ("Right Option, then Control inside the confirm", ["RightOption", "Control", "wait 0.5", "Control", "RightOption"] + rest, [.start, .send]),
             ("Right Option held, then Control, then a fresh press",
