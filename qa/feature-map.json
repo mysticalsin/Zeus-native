@@ -941,6 +941,14 @@
       "suite": "FlingServiceModesTests",
       "file": "Tests/ZeusAppTests/FlingModesTests.swift",
       "scope": "Actual FlingService with a recording stand-in transport and injected link opener and clipboard writer: links open only when allowed and only for web addresses, Clipboard copies, the Ask answer carries the place. No browser, no pasteboard."
+    },
+    {
+      "id": "native-FlingPaperTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingPaperTests",
+      "file": "Tests/ZeusAppTests/FlingPaperTests.swift",
+      "scope": "Actual paper controller with unshown owned panels: the floating, non-activating, every-Space flags, the cascade inside the screen, close leaving the Shelf alone, the pinch, and arrivals becoming papers only with the switch on. Nothing is shown on screen."
     }
   ],
   "features": [
@@ -7046,6 +7054,14 @@
             {
               "file": "Tests/ZeusCoreTests/FlingGeometryTests.swift",
               "function": "aFlickFliesOffAlongItsDirectionAndReduceMotionOnlyFades"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingGeometryTests.swift",
+              "function": "papersCascadeFromTheCornerAndStayOnScreen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingGeometryTests.swift",
+              "function": "aPinchFansPapersIntoOneStack"
             }
           ]
         },
@@ -7111,6 +7127,29 @@
           ]
         },
         {
+          "id": "F15.13",
+          "check": "native-FlingPaperTests",
+          "acceptance": "Papers float on every Space without focus, cascade inside the screen, close without touching the Shelf, group on a pinch and appear only with fling.papers on.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingPaperTests.swift",
+              "function": "papersFloatOnEverySpaceAndNeverTakeFocus"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingPaperTests.swift",
+              "function": "closingAPaperNeverTouchesTheShelfOrTheFiles"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingPaperTests.swift",
+              "function": "aPinchGroupsThePapersIntoOneStack"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingPaperTests.swift",
+              "function": "arrivalsBecomePapersOnlyWhenTheSwitchIsOn"
+            }
+          ]
+        },
+        {
           "id": "F15.2",
           "check": "native-FlingTwoProcessTests",
           "acceptance": "Real separate processes: pair with a code, send four items including 50 MB with verified hashes and a Shelf record, reject an unpaired Mac, decline a traversal name, cancel cleanly, catch a corrupted byte.",
@@ -7165,6 +7204,10 @@
             {
               "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
               "function": "flingStaysOffUntilTheSwitchIsOn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "aSendOverTwoGigabytesWarnsAndStillGoesWithItsGesture"
             }
           ]
         },

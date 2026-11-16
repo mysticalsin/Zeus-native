@@ -34,6 +34,7 @@ final class TopBarServices {
     private var intakeWatcher: AirDropScreenshotWatcher?
     private(set) var flingService: FlingService?
     private var flingPrompts: FlingPromptPanelController?
+    private var flingPapers: FlingPaperController?
     /// Whether the notch is open. Fling reads it only when background receiving is off.
     var notchIsOpen: @MainActor () -> Bool = { true }
 
@@ -447,6 +448,9 @@ final class TopBarServices {
             flingService = service
             FlingService.current = service
             flingPrompts = FlingPromptPanelController(fling: service)
+            let papers = FlingPaperController()
+            flingPapers = papers
+            service.presentPapers = { [weak papers] urls, peer in papers?.show(urls: urls, from: peer) }
             service.observeSettings()
         }
         flingService?.reconfigure()

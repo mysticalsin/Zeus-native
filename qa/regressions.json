@@ -6191,6 +6191,30 @@
         "file": "Tests/ZeusAppTests/FlingModesTests.swift",
         "function": "askEachTimePromptsEvenForAPairedMacAndTheAnswerPicksTheFolder"
       }
+    },
+    {
+      "id": "REG-698",
+      "failure": "A floating paper took focus, left the screen, or closing it removed the file from the Shelf.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingPaperTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingPaperTests.swift",
+        "function": "closingAPaperNeverTouchesTheShelfOrTheFiles"
+      }
+    },
+    {
+      "id": "REG-699",
+      "failure": "A send over 2 GB went out without saying so.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingArrivalTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+        "function": "aSendOverTwoGigabytesWarnsAndStillGoesWithItsGesture"
+      }
     }
   ]
 }

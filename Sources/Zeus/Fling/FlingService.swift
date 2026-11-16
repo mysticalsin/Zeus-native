@@ -92,6 +92,8 @@ final class FlingService: FlingSending {
     /// Opens a received link. A test replaces it; the app opens it in the browser.
     @ObservationIgnored var openLink: (URL) -> Void = { NSWorkspace.shared.open($0) }
     /// Puts arrived files on the pasteboard in Clipboard mode.
+    /// Shows arrivals as floating papers when `fling.papers` is on. The app wires the paper controller in.
+    @ObservationIgnored var presentPapers: ([URL], String) -> Void = { _, _ in }
     @ObservationIgnored var writeClipboard: ([URL]) -> Void = { urls in
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -212,10 +214,20 @@ final class FlingService: FlingSending {
                 return
             }
             let name = nearby.first { $0.id == id }?.name ?? address.name
+            let total = items.reduce(Int64(0)) { $0 + Self.fileSize($1.url) }
             let stack = transport.send(items.map { .file($0.url) }, to: address)
             sends[stack] = (items.count, name, id)
             lastProblem = nil
         }
+    }
+
+    /// Said before a send over 2 GB. The send still goes: the person asked for it.
+    static func largeSendWarning(_ bytes: Int64) -> String {
+        "Large send: \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)). It can take a while."
+    }
+
+    private static func fileSize(_ url: URL) -> Int64 {
+        ((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? NSNumber)?.int64Value ?? 0
     }
 
     func pair(with peerID: String) {
@@ -282,6 +294,7 @@ final class FlingService: FlingSending {
         let mode = chosenModes.removeValue(forKey: stack) ?? settingSaveMode
         guard let pending = arrivals.removeValue(forKey: stack), !pending.urls.isEmpty else { return }
         model.addToShelf(pending.urls, origin: .fling(peer: pending.peer), stack: stack)
+        if showsPapers { presentPapers(pending.urls, pending.peer) }
         guard finished else { return }
         if mode == .clipboard { writeClipboard(pending.urls) }
         if opensLinks {
