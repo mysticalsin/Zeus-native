@@ -441,7 +441,9 @@ struct SettingsCatalogTests {
         #expect(option.note.lowercased().contains("screen"))
         let draw = try #require(SettingsCatalog.option("talk.drawOnScreen"))
         #expect(draw.defaultValue == "false")
-        let empty = UserDefaults(suiteName: NSTemporaryDirectory() + "talk.seeScreen.\(UUID().uuidString)")!
+        let suiteName = NSTemporaryDirectory() + "talk.seeScreen.\(UUID().uuidString)"
+        let empty = UserDefaults(suiteName: suiteName)!
+        defer { empty.removePersistentDomain(forName: suiteName) }
         #expect(FeatureSettings.talkSeeScreen(defaults: empty))
         #expect(!FeatureSettings.talkDrawOnScreen(defaults: empty))
         empty.set("false", forKey: FeatureSettings.key("talk.seeScreen"))
