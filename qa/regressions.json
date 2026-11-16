@@ -6323,6 +6323,30 @@
         "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
         "function": "theTokenAnimationRuleSeesABareToken"
       }
+    },
+    {
+      "id": "REG-756",
+      "failure": "The buddy's display link ran on the first window's screen, not the screen where the buddy is shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theLinkScreenIsTheOneWhereTheBuddyIsShown"
+      }
+    },
+    {
+      "id": "REG-757",
+      "failure": "After a display was plugged or unplugged the buddy's display link stayed bound to the old screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theLinkIsRecreatedWhenTheScreensChange"
+      }
     }
   ]
 }

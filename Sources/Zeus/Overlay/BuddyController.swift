@@ -72,12 +72,7 @@ final class BuddyController: NSObject {
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil
         )
-        // The link follows the screen the buddy's own window is on, so it runs at that display's rate.
-        if let screen = Self.linkScreen(window: windows.first?.screen, main: NSScreen.main, all: NSScreen.screens) {
-            let link = screen.displayLink(target: self, selector: #selector(tick(_:)))
-            link.add(to: .main, forMode: .common)
-            displayLink = link
-        }
+        startDisplayLink()
         // The frame loop sleeps once the spark has settled and wakes on the next mouse move,
         // so an idle Mac costs nothing (it used to redraw the overlay at display rate forever).
         let wake: (NSEvent) -> Void = { [weak self] _ in MainActor.assumeIsolated { self?.wake() } }
@@ -107,7 +102,30 @@ final class BuddyController: NSObject {
         showing ? (MotionTokens.windowFadeInDuration, .easeOut) : (MotionTokens.windowFadeOutDuration, .easeIn)
     }
 
-    /// The screen the display link runs on: the buddy window's own, else the main one, else any.
+    /// The index of the window whose frame holds `point` (where the buddy is shown), if any.
+    static func windowIndex(containing point: CGPoint, in frames: [CGRect]) -> Int? {
+        frames.firstIndex { $0.contains(point) }
+    }
+
+    private func shownWindowScreen() -> NSScreen? {
+        Self.windowIndex(containing: model.position, in: windows.map(\.frame)).flatMap { windows[$0].screen }
+    }
+
+    /// Binds the display link to the screen where the buddy is shown, so it runs at that display's rate. Called at
+    /// start and again whenever the screens change (the old link may belong to a display that is gone).
+    private func startDisplayLink() {
+        let wasPaused = displayLink?.isPaused ?? false
+        displayLink?.invalidate()
+        displayLink = nil
+        guard let screen = Self.linkScreen(window: shownWindowScreen(), main: NSScreen.main, all: NSScreen.screens) else { return }
+        let link = screen.displayLink(target: self, selector: #selector(tick(_:)))
+        link.isPaused = wasPaused
+        lastTimestamp = 0
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    /// The screen the display link runs on: the one where the buddy is shown, else the main one, else any.
     static func linkScreen<Screen>(window: Screen?, main: Screen?, all: [Screen]) -> Screen? {
         window ?? main ?? all.first
     }
@@ -487,6 +505,7 @@ final class BuddyController: NSObject {
         }
         lastDisplays = next
         rebuildWindows()
+        startDisplayLink()
     }
 
     private func rebuildWindows() {

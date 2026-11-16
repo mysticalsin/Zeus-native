@@ -6660,6 +6660,14 @@
             {
               "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
               "function": "theFadeUsesTheTimingFunctionAndTheLinkUsesTheWindowScreen"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+              "function": "theLinkScreenIsTheOneWhereTheBuddyIsShown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+              "function": "theLinkIsRecreatedWhenTheScreensChange"
             }
           ],
           "id": "F13.buddy-motion"
