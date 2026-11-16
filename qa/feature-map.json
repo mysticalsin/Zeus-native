@@ -835,6 +835,14 @@
       "scope": "Router candidate choice and the persistent Claude retirement rule with no process, capture or network: the app Claude provider is handed to the Claude entry when preferred, and a slot that carried an image is replaced."
     },
     {
+      "id": "native-SpeakerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SpeakerTests",
+      "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+      "scope": "The production Speaker with a fake voice engine in this process: per-line start callbacks fire once, in order. No audio, capture or network."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -4848,6 +4856,21 @@
             {
               "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
               "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-line-start",
+          "check": "native-SpeakerTests",
+          "acceptance": "Each spoken line reports its start once, in order, before the next line begins; a line with no callback still speaks. Does not prove real audio timing.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "onStartFiresOncePerLineInOrderBeforeTheNextLineBegins"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+              "function": "aLineWithNoCallbackStillSpeaks"
             }
           ]
         }

@@ -5723,6 +5723,18 @@
         "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
         "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
       }
+    },
+    {
+      "id": "REG-704",
+      "failure": "A screen mark could not be tied to the moment its sentence began to play, because the speaker gave no per-line start signal.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+        "function": "onStartFiresOncePerLineInOrderBeforeTheNextLineBegins"
+      }
     }
   ]
 }
