@@ -7487,6 +7487,30 @@
         "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
         "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
       }
+    },
+    {
+      "id": "REG-818",
+      "failure": "With Right Option as the talk key, Settings warned that the second talk key was off and told the owner to record another key, although the owner never set a second key and wants Right Option only.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theDefaultSecondKeyThatDuplicatesTheTalkKeyIsQuietAndAChosenOneKeepsItsWarning"
+      }
+    },
+    {
+      "id": "REG-819",
+      "failure": "The quiet Off for a default second key must not hide the warning when the owner recorded a clashing key, or the key would be off with no explanation.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
+      }
     }
   ]
 }

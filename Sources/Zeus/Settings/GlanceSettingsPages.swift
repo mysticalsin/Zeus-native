@@ -754,6 +754,8 @@ private struct ShortcutsPage: View {
         let talkNotes: [String]
         let secondTalk: Shortcut?
         let secondTalkNotes: [String]
+        /// Plain sentences for the second key, without the warning style.
+        let secondTalkQuietNotes: [String]
     }
 
     /// The sentence under the second talk key when another key has it (`VoiceKey.secondTalkKey` named the key it gave way to).
@@ -785,11 +787,19 @@ private struct ShortcutsPage: View {
         let second = SecondTalkRouting.current()
         var secondNotes: [String] = []
         if let refusal = secondTalkRefusal { secondNotes.append(refusal) }
-        if let name = second.yieldsTo { secondNotes.append(Self.yieldNote(name)) }
+        var quietNotes: [String] = []
+        if let name = second.yieldsTo {
+            if VoiceKey.secondTalkNoteIsQuiet(yieldsTo: name, explicit: ShortcutStore.loadSecondTalk(.standard).explicit) {
+                quietNotes.append("Off: it is the same as your talk key.")
+            } else {
+                secondNotes.append(Self.yieldNote(name))
+            }
+        }
         secondNotes += TilingKeyClash.notes(base: TileModifierBase(label: SettingsStore.shared.string("tiling.keyBase")))
             .filter { $0.contains("Second talk") }
         if second.key != nil { secondNotes.append("Hold it a quarter second before speaking.") }
-        return Routing(chord: routing.chord, clash: clash, talkNotes: notes, secondTalk: second.key, secondTalkNotes: secondNotes)
+        return Routing(chord: routing.chord, clash: clash, talkNotes: notes, secondTalk: second.key, secondTalkNotes: secondNotes,
+                       secondTalkQuietNotes: quietNotes)
     }
 
     var body: some View {
@@ -815,7 +825,7 @@ private struct ShortcutsPage: View {
                                 text: "Hold to talk, let go to send, double-tap to keep listening, like the talk key. Left Option and Right Option with a letter type as usual.",
                                 shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk,
-                                notes: state.secondTalkNotes) { new in
+                                notes: state.secondTalkNotes, quietNotes: state.secondTalkQuietNotes) { new in
                 let dictation = DictationSettings.shared, polyglot = PolyglotSettings.shared
                 secondTalkRefusal = new.flatMap {
                     VoiceKey.secondTalkRefusal($0, talk: Preferences.shared.pushToTalk, dictation: dictation.enabled ? dictation.key : nil,

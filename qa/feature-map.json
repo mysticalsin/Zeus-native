@@ -5309,6 +5309,14 @@
             },
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "theDefaultSecondKeyThatDuplicatesTheTalkKeyIsQuietAndAChosenOneKeepsItsWarning"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
               "function": "theSecondKeyYieldsToAKeyChosenElsewhere"
             },
             {
