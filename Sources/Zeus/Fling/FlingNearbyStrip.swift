@@ -277,16 +277,14 @@ struct FlingFlickHandle: View {
                     let peers = fling.nearby.filter(\.paired)
                     let outcome = tracker.finish(peerCount: peers.count)
                     FlingFlickAction.perform(outcome, items: items, peers: peers, fling: fling, openPicker: { picker = true })
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        if case .send = outcome {
-                            // Fly off along the flick; Reduce Motion only fades.
-                            if !Motion.reduced { offset = CGSize(width: value.predictedEndTranslation.width, height: value.predictedEndTranslation.height) }
-                            gone = true
-                        } else {
-                            offset = .zero
-                        }
+                    if case .send = outcome {
+                        // Fly off along the flick, never further than 240 points; Reduce Motion only fades.
+                        let motion = FlingGeometry.flyOff(translation: value.predictedEndTranslation, reduceMotion: Motion.reduced)
+                        withAnimation(.easeOut(duration: 0.35)) { offset = motion.offset; gone = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { gone = false; offset = .zero }
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = .zero }
                     }
-                    if gone { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { gone = false; offset = .zero } }
                 })
             .popover(isPresented: $picker) {
                 VStack(alignment: .leading, spacing: 6) {

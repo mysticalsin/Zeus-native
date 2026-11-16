@@ -7018,6 +7018,10 @@
             {
               "file": "Tests/ZeusCoreTests/FlingSettingsMappingTests.swift",
               "function": "theShelfSectionResolvesByNameInAnyCase"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingGeometryTests.swift",
+              "function": "aFlickFliesOffAlongItsDirectionAndReduceMotionOnlyFades"
             }
           ]
         },
