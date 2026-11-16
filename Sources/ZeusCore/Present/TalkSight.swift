@@ -8,6 +8,8 @@ public enum ScreenSightReason: String, Sendable, Equatable {
     case turnedOff
     /// The launch cannot keep screenshots out of the saved session, so none are sent.
     case imagesBlocked
+    /// The image engine failed or timed out, so a text engine answers without the screen.
+    case imageEngineFailed
 }
 
 /// What the model is told about the screen. It is told it can see only when pixels are really attached.
@@ -27,6 +29,9 @@ public enum ScreenSightNote {
         case .turnedOff:
             return "No screenshots this turn: Tony turned off seeing his screen, so you cannot see the screen. "
                 + "Say so plainly if he asks about it. Use [POINT:none]."
+        case .imageEngineFailed:
+            return "No screenshots this turn: the image engine did not answer, so you cannot see the screen. "
+                + "Say so plainly if Tony asks about it. Use [POINT:none]."
         case .imagesBlocked:
             return "No screenshots this turn: this setup cannot send them privately, so you cannot see the screen. "
                 + "Say so plainly if Tony asks about it. Use [POINT:none]."
@@ -96,9 +101,45 @@ extension TalkSightPolicy {
     /// Screenshots are attached only to a launch that keeps them out of the saved session: a spoken turn on a `claude`
     /// that supports `--safe-mode` (which comes with `--no-session-persistence`). Any other launch goes out text only,
     /// and the model is told it cannot see.
-    public static func launchRequest(_ request: BrainRequest, voice: Bool, supportsNoSessionPersistence: Bool) -> BrainRequest {
+    public static func launchRequest(_ request: BrainRequest, voice: Bool, supportsNoSessionPersistence: Bool,
+                                     drawInstructions: String = "") -> BrainRequest {
         guard !request.screenshots.isEmpty, !(voice && supportsNoSessionPersistence) else { return request }
-        return request.with(screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
+        // The draw rules go too: with no pixels attached, marks would mean nothing.
+        var text = request.systemPrompt
+        if !drawInstructions.isEmpty {
+            text = text.replacingOccurrences(of: "\n\n" + drawInstructions, with: "")
+                .replacingOccurrences(of: drawInstructions, with: "")
+        }
+        return request.with(systemPrompt: text, screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
+    }
+}
+
+extension TalkSightPolicy {
+    /// The text engines answer a screenshot turn only when the image engine failed before saying or doing anything.
+    public static func fallbackAllowed(spokeAnything: Bool, actionStarted: Bool) -> Bool { !spokeAnything && !actionStarted }
+
+    /// DRAW marks are accepted only from an engine that sees pixels and only when the launch really carried them
+    /// (an older `claude` strips the images, so its coordinates would mean nothing).
+    public static func drawAllowed(winner: String?, request: BrainRequest, supportsNoSessionPersistence: Bool,
+                                   drawInstructions: String = "") -> Bool {
+        guard TalkDrawPolicy.accepts(winner: winner), request.carriesDrawImage else { return false }
+        let sent = launchRequest(request, voice: true, supportsNoSessionPersistence: supportsNoSessionPersistence,
+                                 drawInstructions: drawInstructions)
+        return !sent.screenshots.isEmpty
+    }
+}
+
+/// Lets one filler line through per turn, however many races the turn runs.
+public struct TurnFillerGate: Sendable {
+    private var taken = false
+
+    public init() {}
+
+    /// True the first time only.
+    public mutating func take() -> Bool {
+        guard !taken else { return false }
+        taken = true
+        return true
     }
 }
 

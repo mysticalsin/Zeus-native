@@ -33,6 +33,48 @@ private final class FakePresenter: TalkVisualPresenting {
     func clear() { log.events.append("clear") }
 }
 
+/// A provider that follows a script: wait, then stream a reply or fail. Records every request it was sent.
+private final class ScriptedProvider: BrainProvider, @unchecked Sendable {
+    let id: ProviderID
+    let capabilities: ProviderCapabilities
+    private let delayMs: Int
+    private let reply: String?
+    private let lock = NSLock()
+    private var seen: [BrainRequest] = []
+
+    struct Failure: LocalizedError { var errorDescription: String? { "scripted image engine failure" } }
+
+    init(id: ProviderID, capabilities: ProviderCapabilities, delayMs: Int, reply: String?) {
+        self.id = id
+        self.capabilities = capabilities
+        self.delayMs = delayMs
+        self.reply = reply
+    }
+
+    var requests: [BrainRequest] { lock.withLock { seen } }
+
+    func healthCheck() async -> ProviderHealth { .ready(version: "scripted") }
+    func cancel(turn: UUID) async {}
+
+    func send(_ request: BrainRequest) -> AsyncThrowingStream<BrainEvent, Error> {
+        lock.withLock { seen.append(request) }
+        let delayMs = delayMs, reply = reply
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                try? await Task.sleep(for: .milliseconds(delayMs))
+                if let reply {
+                    continuation.yield(.textDelta(reply))
+                    continuation.yield(.done(nil))
+                    continuation.finish()
+                } else {
+                    continuation.finish(throwing: Failure())
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
 @MainActor
 @Suite("Talk turn drawing", .serialized)
 struct TalkVisualTurnTests {
@@ -47,9 +89,11 @@ struct TalkVisualTurnTests {
         + " Open the File menu. Choose Export as PDF. Then save it."
 
     private func controller(consent: Bool, log: TurnLog, sees: Bool = false, permission: Bool = true) -> VoiceTurnController {
-        VoiceTurnController(buddy: BuddyController(), notch: NotchController(), brain: ClaudeCLIProvider(),
-                            speaker: FakeSpeaker(log), presenter: FakePresenter(log), drawConsent: { consent },
-                            seeScreen: { sees }, screenPermission: { permission })
+        let made = VoiceTurnController(buddy: BuddyController(), notch: NotchController(), brain: ClaudeCLIProvider(),
+                                       speaker: FakeSpeaker(log), presenter: FakePresenter(log), drawConsent: { consent },
+                                       seeScreen: { sees }, screenPermission: { permission })
+        made.supportsNoSessionPersistence = { true }
+        return made
     }
 
     private func run(_ controller: VoiceTurnController, winner: String, sighted: Bool = true,
@@ -170,6 +214,15 @@ struct TalkVisualTurnTests {
         #expect(seen.shots.count == 2, "POINT screenN and the drive and walkthrough actions still see every display")
     }
 
+    @Test func anOlderClaudeThatStripsTheImagesNeverDrawsMarks() async {
+        let log = TurnLog()
+        let older = controller(consent: true, log: log)
+        older.supportsNoSessionPersistence = { false }
+        _ = await run(older, winner: "claude")
+        #expect(!log.events.contains { $0.hasPrefix("begin") || $0.hasPrefix("reveal") })
+        #expect(log.events.filter { $0.hasPrefix("line ") }.count == 3)
+    }
+
     @Test func aReplayedSpeculativeTurnNeverDraws() async {
         let log = TurnLog()
         _ = await run(controller(consent: true, log: log), winner: "claude", sighted: false)
@@ -284,5 +337,28 @@ struct TalkVisualTurnTests {
         let second = drawing.sceneIdentity
         #expect(first != nil && first?.session == second?.session && first?.scene == second?.scene)
         #expect((second?.revision ?? 0) > (first?.revision ?? 0))
+    }
+
+    // MARK: The image engine fails, the text engine answers once
+
+    @Test func anImageEngineThatFailsAfterTheFillerLetsTheTextEngineAnswerOnceWithOneFillerAndNoRepeatedAction() async throws {
+        // Both engines stay silent past the 900 ms filler mark, so a second race would speak a second filler.
+        let image = ScriptedProvider(id: .claudeCLI, capabilities: [.images, .streaming], delayMs: 1_100, reply: nil)
+        let text = ScriptedProvider(id: .codexCLI, capabilities: [.streaming], delayMs: 1_200, reply: "Fallback answer here.")
+        let log = TurnLog()
+        let sees = controller(consent: false, log: log, sees: true)
+        sees.engineCandidatesOverride = { [(.claude, "claude", image), (.codex, "codex", text)] }
+        let result = await sees.runScriptedTurn(transcript: "where do I export this as a PDF", screenshots: Self.shots)
+
+        #expect(result.error == nil)
+        let lines = log.events.filter { $0.hasPrefix("line ") }
+        #expect(lines.filter { $0 == "line Fallback answer here." }.count == 1, "the text engine answers exactly once")
+        #expect(lines.count == 2, "one filler and one answer, got \(lines)")
+        #expect(!log.events.contains { $0.hasPrefix("begin") || $0.hasPrefix("reveal") }, "no marks from a blind answer")
+        #expect(image.requests.count == 1)
+        let fallback = try #require(text.requests.first)
+        #expect(text.requests.count == 1)
+        #expect(fallback.screenshots.isEmpty && !fallback.carriesDrawImage)
+        #expect(fallback.screenReason == .imageEngineFailed)
     }
 }

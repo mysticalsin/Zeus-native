@@ -40,6 +40,10 @@ final class VoiceTurnController {
         var shots: [ScreenShot]
     }
     var turnObserver: ((TurnObservation) -> Void)?
+    /// Tests only: the engines a turn races, in place of the router's choice.
+    /// Whether the launched `claude` keeps screenshots out of the saved session (so it is sent them). Tests set it.
+    var supportsNoSessionPersistence: () -> Bool = { ClaudeFlags.supportsSafeMode }
+    var engineCandidatesOverride: (() -> [(engine: BrainEngineID, id: String, provider: BrainProvider)])?
     let brain: BrainProvider
     let chrome: ChromeActions
 
@@ -141,7 +145,7 @@ final class VoiceTurnController {
     var voiceDescription: String { speaker.engineDescription }
 
     /// One answered turn driven by a scripted reply, for the tests that watch what the turn asks of the voice and the drawing.
-    func runScriptedTurn(transcript: String, screenshots: [ScreenShot], replay: (id: String, events: AsyncThrowingStream<BrainEvent, Error>),
+    func runScriptedTurn(transcript: String, screenshots: [ScreenShot], replay: (id: String, events: AsyncThrowingStream<BrainEvent, Error>)? = nil,
                          replaySawScreen: Bool = true) async -> TurnResult {
         await runTurn(transcript: transcript, screenshots: screenshots, activeTab: nil, turn: UUID(), deep: false,
                       speak: true, awaitActions: false, replay: replay, replaySawScreen: replaySawScreen)
@@ -826,6 +830,8 @@ final class VoiceTurnController {
         var blockedByRestriction = false
         var winnerID: String?
         var drawBegun = false
+        var actionStarted = false
+        var fillerGate = TurnFillerGate()
 
         func handle(_ output: ZeusTagStreamParser.Output) {
             switch output {
@@ -841,6 +847,7 @@ final class VoiceTurnController {
                     pointed = true
                 }
             case .tag(.action(let action)):
+                actionStarted = true
                 if restricted {
                     // Refused at the boundary: nothing is run, and the reply says so.
                     blockedByRestriction = true
@@ -904,7 +911,10 @@ final class VoiceTurnController {
             case .tag(.point(nil)):
                 break
             case .tag(.draw(let draw)):
-                guard drawing, !drawBegun, TalkDrawPolicy.accepts(winner: winnerID), let shot = shots.first else { break }
+                guard drawing, !drawBegun, let shot = shots.first,
+                      TalkSightPolicy.drawAllowed(winner: winnerID, request: request,
+                                                  supportsNoSessionPersistence: supportsNoSessionPersistence(),
+                                                  drawInstructions: ZeusPrompt.drawInstructions()) else { break }
                 presenter.begin(draw, shot: shot, token: drawToken)
                 drawBegun = true
                 drawActive = true
@@ -941,7 +951,7 @@ final class VoiceTurnController {
                     if speak {
                         let index = spokenSentenceCount - 1
                         let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
-                        speaker.speak(PersonaCompliance.stripOminousHedges(sentence), onStart: reveal)
+                        speaker.speak(Self.voiced(sentence), onStart: reveal)
                     }
                     buddy.showCaption(Self.captionTail(spoken))
                 }
@@ -974,10 +984,9 @@ final class VoiceTurnController {
                 // The task's privacy rule and provider choice decide the candidates before any
                 // provider (and so any request) is created; a private task never sees a cloud engine.
                 let taskKind = RouterTask.classify(transcript)
-                let ordered = BrainLatencyBook.shared.ordered(
-                    RouterSettings.shared.brainEngineCandidates(task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain,
-                                                    preferAppClaude: sight.sendsImages),
-                    id: \.id)
+                let candidates = engineCandidatesOverride?() ?? RouterSettings.shared.brainEngineCandidates(
+                    task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain, preferAppClaude: sight.sendsImages)
+                let ordered = BrainLatencyBook.shared.ordered(candidates, id: \.id)
                 guard !ordered.isEmpty else {
                     VoiceLog.log("route", "brain (none)")
                     throw ClaudeCLIProvider.ProviderError.failed(
@@ -1009,7 +1018,7 @@ final class VoiceTurnController {
                     deepTier: deepTier, deepReason: deepReason,
                     callbacks: FastRaceRun.Callbacks(
                         filler: { [weak self] in
-                            guard speak, let self else { return }
+                            guard speak, let self, fillerGate.take() else { return }
                             let line = AckLines.filler(personality: ZeusPersonality.current())
                             VoiceLog.log("timing", "filler at \(msSinceRelease()) ms, nothing streamed yet")
                             self.say(line)
@@ -1041,10 +1050,13 @@ final class VoiceTurnController {
                 VoiceLatency.shared.mark(.requestSent)
                 do {
                     try await race.run { delta in parser.feed(delta).forEach(handle) }
-                } catch where spoken.isEmpty && !fallback.isEmpty && !Task.isCancelled {
+                } catch where !fallback.isEmpty && !Task.isCancelled
+                    && TalkSightPolicy.fallbackAllowed(spokeAnything: !spoken.isEmpty, actionStarted: actionStarted) {
                     // The image engine failed before saying anything: the text engines answer, and say they cannot see.
                     VoiceLog.log("route", "image engine failed; racing text engines \(fallback.map(\.id).joined(separator: " + "))")
-                    let blind = request.with(screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
+                    let blind = request.with(screenshots: [], screenReason: .imageEngineFailed, carriesDrawImage: false)
+                    // Nothing from the image race reached the parser's output, so its half-read tag is dropped.
+                    parser = ZeusTagStreamParser()
                     race = makeRace(fallback, blind, deepTier: nil, deepReason: nil)
                     fastRace = race
                     try await race.run { delta in parser.feed(delta).forEach(handle) }
@@ -1056,7 +1068,7 @@ final class VoiceTurnController {
                 let index = spokenSentenceCount
                 spokenSentenceCount += 1
                 let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
-                speaker.speak(PersonaCompliance.stripOminousHedges(rest), onStart: reveal)
+                speaker.speak(Self.voiced(rest), onStart: reveal)
             }
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()
@@ -1169,7 +1181,7 @@ final class VoiceTurnController {
         buddy.hideCaption()
         if speakIt, SettingsStore.shared.bool("voice.speakReplies") {
             speaker.speak("Here is the fuller answer.")
-            for sentence in sentences.prefix(4) { speaker.speak(PersonaCompliance.stripOminousHedges(sentence)) }
+            for sentence in sentences.prefix(4) { speaker.speak(Self.voiced(sentence)) }
         }
         history.append(Exchange(user: "(fuller answer to: \(transcript.prefix(80)))", assistant: String(clean.prefix(400))))
         if history.count > 10 { history.removeFirst(history.count - 10) }
@@ -1180,7 +1192,7 @@ final class VoiceTurnController {
         VoiceLog.logContent("spoken", text)
         if SettingsStore.shared.bool("voice.speakReplies") {
             SystemAudioDucker.begin()
-            speaker.speak(text)
+            speaker.speak(Self.voiced(text))
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 while self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
@@ -1189,6 +1201,11 @@ final class VoiceTurnController {
         }
         buddy.showCaption(text)
         buddy.hideCaption()
+    }
+
+    /// What the voice is handed: no ominous trailing hedge, and no ellipsis in an Ultron reply.
+    static func voiced(_ text: String) -> String {
+        UltronSpeechText.prepared(PersonaCompliance.stripOminousHedges(text), personality: ZeusPersonality.current())
     }
 
     /// The last ~240 characters of the reply, cut at a word boundary.

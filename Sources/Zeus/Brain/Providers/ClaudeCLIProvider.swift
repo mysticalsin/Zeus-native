@@ -42,7 +42,8 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
         // Screenshots go only to a launch that keeps them out of the saved session (`--no-session-persistence`, which
         // comes with the `--safe-mode` the CLI is feature-detected for). An older claude gets text and an honest note.
         let request = TalkSightPolicy.launchRequest(original, voice: original.firstTextBudget != nil,
-                                                    supportsNoSessionPersistence: ClaudeFlags.supportsSafeMode)
+                                                    supportsNoSessionPersistence: ClaudeFlags.supportsSafeMode,
+                                                    drawInstructions: ZeusPrompt.drawInstructions())
         return AsyncThrowingStream { continuation in
             guard let path = executable else {
                 continuation.finish(throwing: ProviderError.notInstalled)
