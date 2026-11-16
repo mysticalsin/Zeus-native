@@ -251,12 +251,16 @@ struct ScribeInitialDisc: View {
     var size: CGFloat = 18
 
     static func fontSize(size: CGFloat) -> CGFloat { size * 0.45 }
+    /// The centred text box: clear of the next disc's overlap on the right, symmetric on the left.
+    static func textWidth(size: CGFloat) -> CGFloat { size - 2 * ScribeInitialStack.overlap(size: size) }
 
     var body: some View {
         let tint = scribeColor(ScribeSpeakerPalette.color(for: .participant(name)))
         Text(ScribeInitials.of(name))
             .font(TopBarStyle.label(Self.fontSize(size: size), .bold)).foregroundStyle(tint)
-            .lineLimit(1).fixedSize()
+            // Kept inside the part of the disc the next one does not cover; wide pairs ("MM") shrink to fit.
+            .lineLimit(1).minimumScaleFactor(0.6)
+            .frame(width: Self.textWidth(size: size))
             .frame(width: size, height: size)
             .background(Circle().fill(Theme.storm))
             .overlay(Circle().fill(tint.opacity(0.22)))

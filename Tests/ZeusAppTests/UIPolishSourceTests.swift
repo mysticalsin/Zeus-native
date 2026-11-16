@@ -56,7 +56,10 @@ struct UIPolishSourceTests {
         for size: CGFloat in [16, 18] {
             let font = NSFont.systemFont(ofSize: ScribeInitialDisc.fontSize(size: size), weight: .bold)
             let width = ("MM" as NSString).size(withAttributes: [.font: font]).width
-            #expect(size / 2 + width / 2 <= size - ScribeInitialStack.overlap(size: size))
+            let box = ScribeInitialDisc.textWidth(size: size)
+            // The text box ends where the next disc begins, and even "MM" fits it at the 0.6 minimum scale.
+            #expect(size / 2 + box / 2 <= size - ScribeInitialStack.overlap(size: size))
+            #expect(width * 0.6 <= box)
         }
     }
 
@@ -65,5 +68,14 @@ struct UIPolishSourceTests {
         #expect(text.contains("static let countdownScrimOpacity: Double = 0.92"))
         #expect(text.contains("Color.black.opacity(Self.countdownScrimOpacity)"))
         #expect(!text.contains("Color.black.opacity(0.55)"))
+    }
+
+    @Test @MainActor func theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives() throws {
+        #expect(NotchController.pointerExitKeepsPanelOpen(voiceOverOn: true))
+        #expect(!NotchController.pointerExitKeepsPanelOpen(voiceOverOn: false))
+        let text = try Self.source("Sources/Zeus/Notch/NotchController.swift")
+        let exit = try #require(text.range(of: "guard outside else {"))
+        let pin = try #require(text.range(of: "PolyglotPinPolicy.decide(.pointerExited", range: exit.upperBound..<text.endIndex))
+        #expect(text[exit.upperBound..<pin.lowerBound].contains("Self.pointerExitKeepsPanelOpen(voiceOverOn: voiceOverProvider())"))
     }
 }
