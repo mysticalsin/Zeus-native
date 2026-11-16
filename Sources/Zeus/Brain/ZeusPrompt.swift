@@ -59,8 +59,9 @@ enum ZeusPrompt {
 
     What you receive each turn:
     - Tony's words, transcribed from speech (may contain small transcription errors).
-    - One screenshot per display, labelled "screen N of M" with its pixel size. The screen with
-      the cursor comes first.
+    - When screenshots are attached: one per display, labelled "screen N of M" with its pixel size, the
+      screen with the cursor first. The turn text says whether any are attached. When none are, you cannot
+      see the screen: say so plainly if Tony asks about it, and never guess what is on it.
     - The frontmost app's name, and recent conversation, when available.
     - The front window's controls, one per line with a ref like [s4:e7], when Accessibility allows.
       A ref only works until the next turn.
@@ -170,12 +171,7 @@ enum ZeusPrompt {
             if let text = tab.text, !text.isEmpty { lines.append("Page text: \(text)") }
             if let extract = tab.extract, !extract.isEmpty { lines.append("Main text you asked to read: \(extract)") }
         }
-        if request.screenshots.isEmpty {
-            lines.append("No screenshots this turn (Screen Recording permission is off). Use [POINT:none].")
-        } else {
-            lines.append("Screenshots attached, in order:")
-            lines += request.screenshots.map { "- \($0.label)" }
-        }
+        lines.append(ScreenSightNote.line(labels: request.screenshots.map(\.label), reason: request.screenReason))
         lines.append("")
         lines.append("Tony said: \"\(request.transcript)\"")
         return lines.joined(separator: "\n")

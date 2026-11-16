@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import ZeusCore
 @testable import Zeus
@@ -104,5 +105,35 @@ struct ZeusPromptTests {
     @Test func theBasePromptNeverCarriesTheDrawInstructions() {
         #expect(!ZeusPrompt.system.contains("[DRAW:"))
         for personality in ZeusPersonality.allCases { #expect(!ZeusPrompt.system(personality: personality).contains("[DRAW:")) }
+    }
+
+    // MARK: Screen honesty
+
+    @Test func theSystemPromptOnlyPromisesScreenshotsWhenTheyAreAttached() {
+        for personality in ZeusPersonality.allCases {
+            let prompt = ZeusPrompt.system(personality: personality).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            #expect(!prompt.contains("- One screenshot per display"), "\(personality)")
+            #expect(prompt.contains("When screenshots are attached"), "\(personality)")
+            #expect(prompt.contains("cannot see the screen"), "\(personality)")
+        }
+    }
+
+    @Test func theTurnTextSaysPermissionIsOffOnlyForThatReason() {
+        let off = ZeusPrompt.userText(for: BrainRequest(transcript: "what is this", systemPrompt: "s", screenReason: .permissionOff))
+        #expect(off.contains("Screen Recording permission is off"))
+        #expect(off.contains("cannot see the screen"))
+        for reason in [ScreenSightReason.notCaptured, nil] {
+            let text = ZeusPrompt.userText(for: BrainRequest(transcript: "what is this", systemPrompt: "s", screenReason: reason))
+            #expect(!text.lowercased().contains("permission"), "\(String(describing: reason))")
+            #expect(text.contains("cannot see the screen"), "\(String(describing: reason))")
+        }
+    }
+
+    @Test func theTurnTextListsAttachedScreenshotsWithoutAnyDenial() {
+        let shot = ScreenShot(jpegData: Data([1]), label: "screen 1 of 1", pixelWidth: 10, pixelHeight: 10, displayFrame: .zero)
+        let text = ZeusPrompt.userText(for: BrainRequest(transcript: "what is this", screenshots: [shot], systemPrompt: "s"))
+        #expect(text.contains("Screenshots attached"))
+        #expect(text.contains("- screen 1 of 1"))
+        #expect(!text.contains("cannot see the screen"))
     }
 }
