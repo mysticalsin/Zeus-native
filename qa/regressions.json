@@ -5807,6 +5807,54 @@
         "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
         "function": "linksAreHttpOrHttpsAndBounded"
       }
+    },
+    {
+      "id": "REG-663",
+      "failure": "The two Macs could derive different pairing codes or keys from the same exchange.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "bothSidesDeriveTheSameCodeAndKey"
+      }
+    },
+    {
+      "id": "REG-664",
+      "failure": "A pairing reveal that broke the commitment still showed a code or stored a key.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "aRevealThatBreaksTheCommitmentFailsAndStoresNothing"
+      }
+    },
+    {
+      "id": "REG-665",
+      "failure": "A pairing stored its key before both Macs confirmed, or after a decline, expiry or loss.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "theKeyIsStoredOnlyAfterBothConfirm"
+      }
+    },
+    {
+      "id": "REG-666",
+      "failure": "Repeated declined pairing requests from one Mac kept prompting, or two prompts showed at once.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+        "function": "threeDeclinesMuteAnIdAndOnlyOnePromptShows"
+      }
     }
   ]
 }

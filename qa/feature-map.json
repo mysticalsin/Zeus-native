@@ -6894,6 +6894,22 @@
             {
               "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
               "function": "linksAreHttpOrHttpsAndBounded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "bothSidesDeriveTheSameCodeAndKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "aRevealThatBreaksTheCommitmentFailsAndStoresNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "theKeyIsStoredOnlyAfterBothConfirm"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
+              "function": "threeDeclinesMuteAnIdAndOnlyOnePromptShows"
             }
           ]
         },
