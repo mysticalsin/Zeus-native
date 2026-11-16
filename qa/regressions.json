@@ -5675,6 +5675,66 @@
         "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
         "function": "aTilingBindingOnTheTalkChordIsNamed"
       }
+    },
+    {
+      "id": "REG-645",
+      "failure": "A plain swift test run of ZeusAppTests ended with no summary because hosted AppKit suites exited the process on their first real window event, while the wrapper still reported success.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NativeHostGateTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NativeHostGateTests.swift",
+        "function": "aPlainSwiftTestProcessIsNotTheHost"
+      }
+    },
+    {
+      "id": "REG-646",
+      "failure": "The routine card's Copy and Save to Brain actions took the default text colour and were invisible on the dark card.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-CardFooterVisibilityTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/CardFooterVisibilityTests.swift",
+        "function": "theRoutineCardFooterActionsAreDrawnLight"
+      }
+    },
+    {
+      "id": "REG-647",
+      "failure": "The Record page countdown snapshot showed the idle screen because the first render ending cancelled the seeded countdown.",
+      "features": [
+        "F08"
+      ],
+      "check": "native-RecordlySnapshotFixtureTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RecordlySnapshotFixtureTests.swift",
+        "function": "theCountdownFixtureSurvivesTheRenderEndingThePage"
+      }
+    },
+    {
+      "id": "REG-648",
+      "failure": "A meeting that had already started showed a Starting soon pill next to its Now time.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+        "function": "aMeetingThatHasStartedDoesNotSayStartingSoon"
+      }
+    },
+    {
+      "id": "REG-649",
+      "failure": "Face presence needs-camera, enrolling and unavailable states gave no reason or next step.",
+      "features": [
+        "F14"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceStatusTests.swift",
+        "function": "statesThatNeedAnActionSayWhyAndWhatToDo"
+      }
     }
   ]
 }

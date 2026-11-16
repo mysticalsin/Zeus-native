@@ -839,6 +839,30 @@
       "tier": "device-proof",
       "scope": "On an owner-run Mac: the camera opens only after the switch is on, the system camera indicator shows, the camera stops on lock, sleep and switch off, an absent owner locks the Mac after the chosen time, and a present owner never is locked.",
       "reason": "No Mac executor can enrol a face or sit in front of a camera in CI; only a person at the Mac can check it."
+    },
+    {
+      "id": "native-NativeHostGateTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Pure recognition of the native test host from its executable name; no window, no AppKit.",
+      "suite": "NativeHostGateTests",
+      "file": "Tests/ZeusAppTests/NativeHostGateTests.swift"
+    },
+    {
+      "id": "native-CardFooterVisibilityTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Offscreen render of the routine card; reads pixels only, no window shown, no capture.",
+      "suite": "CardFooterVisibilityTests",
+      "file": "Tests/ZeusAppTests/CardFooterVisibilityTests.swift"
+    },
+    {
+      "id": "native-RecordlySnapshotFixtureTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Record page fixture controller with a fake display lister; no capture, no timers, no permission request.",
+      "suite": "RecordlySnapshotFixtureTests",
+      "file": "Tests/ZeusAppTests/RecordlySnapshotFixtureTests.swift"
     }
   ],
   "features": [
@@ -2302,6 +2326,21 @@
             }
           ],
           "id": "F08.7"
+        },
+        {
+          "id": "F08.snapshot-countdown",
+          "check": "native-RecordlySnapshotFixtureTests",
+          "acceptance": "The Record page countdown fixture stays counting after a render ends, so every snapshot copy shows the countdown.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/RecordlySnapshotFixtureTests.swift",
+              "function": "theCountdownFixtureIsActuallyCountingDown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/RecordlySnapshotFixtureTests.swift",
+              "function": "theCountdownFixtureSurvivesTheRenderEndingThePage"
+            }
+          ]
         }
       ]
     },
@@ -6144,6 +6183,32 @@
             {
               "file": "Tests/ZeusAppTests/DrawnNotchCardTests.swift",
               "function": "renderingTheCardNeverTouchesTheController"
+            }
+          ]
+        },
+        {
+          "id": "F13.native-host-gate",
+          "check": "native-NativeHostGateTests",
+          "acceptance": "Hosted AppKit journey suites run only in the native test host, so a plain swift test process reaches its summary instead of exiting on the first real window event.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/NativeHostGateTests.swift",
+              "function": "theNativeHostIsRecognisedByItsExecutableName"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NativeHostGateTests.swift",
+              "function": "aPlainSwiftTestProcessIsNotTheHost"
+            }
+          ]
+        },
+        {
+          "id": "F13.card-footer-visible",
+          "check": "native-CardFooterVisibilityTests",
+          "acceptance": "The routine card's Copy and Save to Brain actions are drawn in a light colour a person can read on the dark card.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/CardFooterVisibilityTests.swift",
+              "function": "theRoutineCardFooterActionsAreDrawnLight"
             }
           ]
         }
