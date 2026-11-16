@@ -265,7 +265,7 @@ final class SettingsStore {
         "notify.calendarLead": .number(0...180),
         "sound.volume": .number(0...100),
         "shortcut.openNotch": .text(40), "shortcut.quickTodo": .text(40),
-        "pushToTalk": .scalar, "talk.shortcut": .scalar, "dictation.shortcut": .scalar, "dictation.key": .scalar,
+        "pushToTalk": .scalar, "talk.shortcut": .scalar, ShortcutStore.secondTalkKey: .scalar, "dictation.shortcut": .scalar, "dictation.key": .scalar,
         "topBar.tabs": .text(2000), "topBar.tabs.known": .text(2000), "topBar.weatherCity": .text(120),
         // 0 is "Forever", so it must survive an export and import.
         "dictation.mode": .text(64), "dictation.keepDays": .whole(0...3650),
