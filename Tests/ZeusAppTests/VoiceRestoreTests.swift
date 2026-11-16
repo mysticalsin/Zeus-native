@@ -10,15 +10,26 @@ struct VoiceRestoreTests {
         #expect(ElevenLabsVoice.model == "eleven_flash_v2_5")
     }
 
-    @Test func ultronDeliveryMatchesSevenEac431() throws {
+    @Test func ultronDeliveryIsTakeCSettings() throws {
         let ultron = ElevenLabsVoice.voiceSettings(for: .ultron)
-        #expect(ultron["stability"] as? Double == 0.35)
-        #expect(ultron["similarity_boost"] as? Double == 0.8)
+        #expect(ultron["stability"] as? Double == 0.6)
+        #expect(ultron["similarity_boost"] as? Double == 0.85)
         #expect(ultron["style"] as? Double == 0.3)
         #expect(ultron["use_speaker_boost"] as? Bool == true)
-        #expect(ultron["speed"] as? Double == 0.95)
+        #expect(ultron["speed"] as? Double == 1.0)
         let body = ElevenLabsVoice.speechBody(text: "Ready.", personality: .ultron)
         #expect(body["model_id"] as? String == "eleven_flash_v2_5")
+    }
+
+    @Test func plainDeliveryIsUnchangedAndStudioDeliversUltronItsOwnSettings() {
+        let plain = ElevenLabsVoice.voiceSettings(for: .plain)
+        #expect(plain["stability"] as? Double == 0.45)
+        #expect(plain["similarity_boost"] as? Double == 0.8)
+        #expect(plain["style"] as? Double == 0.0)
+        let studio = ElevenLabsVoice.voiceSettings(for: .ultron, model: ElevenLabsQuality.studioModel)
+        #expect(studio["stability"] as? Double == 0.6)
+        #expect(studio["speed"] as? Double == 1.0)
+        #expect(studio["use_speaker_boost"] as? Bool == true)
     }
 
     @Test func offlineFallbackIsKokoroMichael() {
