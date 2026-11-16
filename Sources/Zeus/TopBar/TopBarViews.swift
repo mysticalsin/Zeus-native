@@ -1101,9 +1101,14 @@ struct ShelfPage: View {
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topBar.shelfTargeted)
 
-            PageScroll(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(topBar.shelf) { item in ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url) } }
+            VStack(alignment: .leading, spacing: 4) {
+                if let fling = topBar.fling { FlingNearbyStrip(fling: fling, topBar: topBar) }
+                PageScroll(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(topBar.shelf) { item in
+                            ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item, fling: topBar.fling) }
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -1129,10 +1134,21 @@ private struct ShelfCell: View {
         VStack(spacing: 5) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                 .resizable().frame(width: 52, height: 52)
+                .overlay(alignment: .bottomTrailing) {
+                    if item.verified {
+                        Image(systemName: "checkmark.seal.fill").font(.system(size: 11)).foregroundStyle(Theme.leaf)
+                            .accessibilityLabel("Verified")
+                    }
+                }
             Text(item.name).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 84)
             HStack(spacing: 0) {
-                GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
-                    NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
+                if let fling = topBar.fling, fling.isEnabled {
+                    FlingPickerMenu(items: [item], fling: fling)
+                    FlingFlickHandle(items: [item], fling: fling, sensitivity: fling.flickSensitivity)
+                } else {
+                    GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
+                        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
+                    }
                 }
                 if item.isMedia {
                     GlyphButton(symbol: "text.bubble", size: 9, tint: Theme.cloudSecondary, label: "Transcribe") { topBar.transcribeFile(item.url) }

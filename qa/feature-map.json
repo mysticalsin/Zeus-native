@@ -909,6 +909,14 @@
       "suite": "FlingSettingsTests",
       "file": "Tests/ZeusAppTests/FlingSettingsTests.swift",
       "scope": "Actual GSSection and FlingService with a recording stand-in transport: the Shelf section in Your tools, Remove on a paired Mac and a failure that keeps it, and the Settings rows reaching the service. No network, no Keychain."
+    },
+    {
+      "id": "native-FlingShelfJourneyTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingShelfJourneyTests",
+      "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+      "scope": "Actual ShelfPage, strip, flick tracker and prompt card in owned windows with layout-resolved events and a recording stand-in for Fling; the drop lands through the same handler the avatar calls. No network, no pairing, no file leaves the Mac, no global input injection."
     }
   ],
   "features": [
@@ -7068,6 +7076,41 @@
             {
               "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
               "function": "flingStaysOffUntilTheSwitchIsOn"
+            }
+          ]
+        },
+        {
+          "id": "F15.4",
+          "check": "native-FlingShelfJourneyTests",
+          "acceptance": "The real Shelf page and prompt card in owned windows: Turn on, the strip order and pairing click, a drop onto an avatar, flicks by speed and direction, Accept, Decline and the sixty second timeout, and the refused Local Network help.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "theShelfOffersTurnOnAndThatClickTurnsFlingOn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "aRefusedLocalNetworkShowsHelpInsteadOfNearby"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "theStripListsPairedMacsFirstAndAnUnpairedOneStartsPairingOnClick"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "droppingACellOnAnAvatarSendsThatItemThereWithTheDropGesture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "flicksSendPickOrDropByTheirSpeedDirectionAndPeers"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "theAcceptCardAnswersTheReceiveMachineAndTheTimeoutDeclines"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+              "function": "thePairingCardOnTheStartingMacOffersCancelOnly"
             }
           ]
         },

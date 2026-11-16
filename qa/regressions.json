@@ -6143,6 +6143,30 @@
         "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
         "function": "flingStartsOffAndAnImportNeverTurnsItOn"
       }
+    },
+    {
+      "id": "REG-689",
+      "failure": "The Shelf did not offer Turn on while Fling was off, or a drop onto an avatar did not send that item to that Mac with the drop gesture.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingShelfJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+        "function": "droppingACellOnAnAvatarSendsThatItemThereWithTheDropGesture"
+      }
+    },
+    {
+      "id": "REG-690",
+      "failure": "The accept card did not answer the receive machine, or sixty seconds without an answer did not decline.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingShelfJourneyTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingShelfJourneyTests.swift",
+        "function": "theAcceptCardAnswersTheReceiveMachineAndTheTimeoutDeclines"
+      }
     }
   ]
 }

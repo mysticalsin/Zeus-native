@@ -33,6 +33,7 @@ final class TopBarServices {
     private var hudMonitor: SystemHUDMonitor?
     private var intakeWatcher: AirDropScreenshotWatcher?
     private(set) var flingService: FlingService?
+    private var flingPrompts: FlingPromptPanelController?
     /// Whether the notch is open. Fling reads it only when background receiving is off.
     var notchIsOpen: @MainActor () -> Bool = { true }
 
@@ -445,6 +446,7 @@ final class TopBarServices {
             model.fling = service
             flingService = service
             FlingService.current = service
+            flingPrompts = FlingPromptPanelController(fling: service)
             service.observeSettings()
         }
         flingService?.reconfigure()

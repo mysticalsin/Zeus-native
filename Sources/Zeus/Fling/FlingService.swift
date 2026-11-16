@@ -37,6 +37,7 @@ struct FlingOfferPrompt: Equatable, Sendable {
 struct FlingActivity: Equatable, Sendable {
     var stackID: UUID
     var direction: FlingDirection
+    var peerID: String
     var peerName: String
     var fraction: Double
 }
@@ -50,13 +51,20 @@ protocol FlingSending: AnyObject {
     var pairingPrompt: FlingPairingPrompt? { get }
     var pendingOffer: FlingOfferPrompt? { get }
     var activity: [FlingActivity] { get }
+    /// Macs that just received a stack from this one; the avatar shows a check for two seconds.
+    var justSent: Set<String> { get }
     var lastProblem: String? { get }
+    var flickSensitivity: FlickSensitivity { get }
     func turnOn()
     func send(_ items: [TopBarModel.ShelfItem], to target: FlingTarget, gesture: FlingGesture)
     func pair(with peerID: String)
     func answerPairing(accept: Bool)
     func answerOffer(accept: Bool)
     func cancelAll()
+}
+
+extension FlingSending {
+    var flickSensitivity: FlickSensitivity { .normal }
 }
 
 /// The app's side of Fling: it turns the endpoint on and off from Settings, shows what it reports on the Shelf and
@@ -69,6 +77,7 @@ final class FlingService: FlingSending {
     private(set) var pairingPrompt: FlingPairingPrompt?
     private(set) var pendingOffer: FlingOfferPrompt?
     private(set) var activity: [FlingActivity] = []
+    private(set) var justSent: Set<String> = []
     private(set) var lastProblem: String?
     private(set) var eventsAreFlowing = false
     private(set) var pairedMacs: [FlingPairedPeer] = []
@@ -86,7 +95,7 @@ final class FlingService: FlingSending {
     @ObservationIgnored private var applied: Applied?
     @ObservationIgnored private var started = false
     @ObservationIgnored private var arrivals: [UUID: (peer: String, urls: [URL])] = [:]
-    @ObservationIgnored private var sends: [UUID: (count: Int, peer: String)] = [:]
+    @ObservationIgnored private var sends: [UUID: (count: Int, peer: String, peerID: String)] = [:]
     @ObservationIgnored private var observing = false
 
     private struct Applied: Equatable {
@@ -195,7 +204,7 @@ final class FlingService: FlingSending {
             }
             let name = nearby.first { $0.id == id }?.name ?? address.name
             let stack = transport.send(items.map { .file($0.url) }, to: address)
-            sends[stack] = (items.count, name)
+            sends[stack] = (items.count, name, id)
             lastProblem = nil
         }
     }
@@ -271,8 +280,9 @@ final class FlingService: FlingSending {
         case .progress(let stack, let direction, let done, let total):
             let fraction = total > 0 ? min(1, Double(done) / Double(total)) : 1
             let name = sends[stack]?.peer ?? arrivals[stack]?.peer ?? ""
+            let peerID = sends[stack]?.peerID ?? ""
             if let i = activity.firstIndex(where: { $0.stackID == stack }) { activity[i].fraction = fraction }
-            else { activity.append(FlingActivity(stackID: stack, direction: direction, peerName: name, fraction: fraction)) }
+            else { activity.append(FlingActivity(stackID: stack, direction: direction, peerID: peerID, peerName: name, fraction: fraction)) }
         case .itemArrived(let stack, _, _, let url, _, let peer, _):
             arrivals[stack, default: (peer, [])].urls.append(url)
         case .stackFinished(let stack, let direction):
@@ -280,7 +290,15 @@ final class FlingService: FlingSending {
             switch direction {
             case .receive: flush(stack)
             case .send:
-                if let sent = sends.removeValue(forKey: stack) { model.show(.flingSent(count: sent.count, to: sent.peer)) }
+                if let sent = sends.removeValue(forKey: stack) {
+                    model.show(.flingSent(count: sent.count, to: sent.peer))
+                    justSent.insert(sent.peerID)
+                    let id = sent.peerID
+                    Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        self?.justSent.remove(id)
+                    }
+                }
             }
         case .declined(let stack, let direction, let reason):
             finish(stack); flush(stack); pendingOffer = pendingOffer?.stackID == stack ? nil : pendingOffer

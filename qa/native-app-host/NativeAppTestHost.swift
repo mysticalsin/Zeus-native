@@ -88,7 +88,9 @@ private enum NativeAppTestHost {
                 "^ZeusAppTests\\.ExplanationChatLifecycleTests/",
                 // Local trusted-Mac journey only (scripts/trusted-ax-journey.sh); CI never selects it.
                 "^ZeusAppTests\\.ScribeTrustedAccessibilityJourneyTests/",
-                "^ZeusAppTests\\.ClosedWingsNotchTests/"
+                "^ZeusAppTests\\.ClosedWingsNotchTests/",
+                "^ZeusAppTests\\.FlingShelfJourneyTests/",
+                "^ZeusAppTests\\.FlingTwoProcessTests/"
             ]
             guard args.count == 9,
                   args[1] == "--test-bundle-path",
