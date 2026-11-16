@@ -352,11 +352,16 @@ final class SpeechInput: @unchecked Sendable {
             cancelTurn: endTurn,
             reinstallTap: { [self] in
                 // `stop()` runs off the main actor: re-check ownership before touching the engine.
-                guard ownsCapture(session) else { return false }
+                guard ownsCapture(session) else { return .inputUnavailable }
                 guard let format = engine.inputFormat(),
-                      Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else { return false }
+                      Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else { return .inputUnavailable }
                 let original = lock.withLock { requestFormat }
-                let converter = original.flatMap { $0 == format ? nil : makeConverter(format, $0) }
+                var converter: AVAudioConverter?
+                if let original, original != format {
+                    // Appending buffers in the wrong format to the request would corrupt it: end the turn instead.
+                    guard let made = makeConverter(format, original) else { return .formatUnconvertible }
+                    converter = made
+                }
                 let name = Self.inputDeviceName(uid: deviceUID)
                 let next = lock.withLock { () -> AudioSamples.Resampler? in
                     captureDiagnostics.deviceName = name
@@ -367,7 +372,7 @@ final class SpeechInput: @unchecked Sendable {
                 }
                 installTap(on: engine, format: format, session: session, origin: origin,
                            policy: policy, startedAt: startedAt, resampler: next, requestConverter: converter)
-                return true
+                return nil
             },
             restartEngine: { [self] in
                 guard ownsCapture(session) else { return }

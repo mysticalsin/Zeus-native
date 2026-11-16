@@ -7535,6 +7535,18 @@
         "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
         "function": "aStopWhileTheEngineIsStartingLeavesItStoppedWithTheTapRemoved"
       }
+    },
+    {
+      "id": "REG-832",
+      "failure": "When the headset format changed and no converter could be built, capture recovery treated it like no conversion needed and fed the recognition request buffers in the wrong format.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
+      }
     }
   ]
 }

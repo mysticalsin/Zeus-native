@@ -14,15 +14,19 @@ enum CaptureRecovery {
         /// The new input has no usable format yet. The next configuration change retries.
         case inputUnavailable
         case restartFailed
+        /// The new input differs from the format the recognition request opened with, and no converter exists.
+        case formatUnconvertible
 
-        /// Only a failed restart ends the turn: an unusable format may settle on the next notification.
-        var endsTurn: Bool { self == .restartFailed }
+        /// A failed restart or an input that cannot reach the request ends the turn: an unusable format may
+        /// settle on the next notification.
+        var endsTurn: Bool { self == .restartFailed || self == .formatUnconvertible }
 
         var description: String {
             switch self {
             case .recovered: "recovered"
             case .inputUnavailable: "input has no usable format"
             case .restartFailed: "engine would not restart"
+            case .formatUnconvertible: "input format cannot be converted for the request"
             }
         }
     }
@@ -41,8 +45,8 @@ enum CaptureRecovery {
     }
 
     /// Reinstalls the tap on the new format, then restarts the engine the system stopped.
-    static func rebuild(reinstallTap: () -> Bool, restartEngine: () throws -> Void) -> Outcome {
-        guard reinstallTap() else { return .inputUnavailable }
+    static func rebuild(reinstallTap: () -> Outcome?, restartEngine: () throws -> Void) -> Outcome {
+        if let failure = reinstallTap() { return failure }
         do { try restartEngine() } catch { return .restartFailed }
         return .recovered
     }
@@ -51,7 +55,7 @@ enum CaptureRecovery {
     @discardableResult
     static func handle(cancelsTurn: Bool, ownsSession: Bool,
                        cancelTurn: () -> Void,
-                       reinstallTap: () -> Bool,
+                       reinstallTap: () -> Outcome?,
                        restartEngine: () throws -> Void,
                        recoveryFailed: (Outcome) -> Void) -> Action {
         let action = action(cancelsTurn: cancelsTurn, ownsSession: ownsSession)

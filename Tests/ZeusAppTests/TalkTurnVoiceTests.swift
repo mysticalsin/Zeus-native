@@ -22,7 +22,7 @@ struct TalkTurnVoiceTests {
         CaptureRecovery.handle(
             cancelsTurn: cancelsTurn, ownsSession: ownsSession,
             cancelTurn: { spy.calls.append("cancel") },
-            reinstallTap: { spy.calls.append("tap"); return spy.tapAccepted },
+            reinstallTap: { spy.calls.append("tap"); return spy.tapAccepted ? nil : .inputUnavailable },
             restartEngine: { spy.calls.append("restart"); if spy.restartThrows { throw Boom() } },
             recoveryFailed: { spy.failures.append($0) })
     }

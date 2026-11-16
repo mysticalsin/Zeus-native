@@ -100,6 +100,17 @@ struct SpeechInputRecoveryTests {
         #expect(rig.engine.calls.filter { $0 == "format" }.count == CaptureRecovery.maximumChanges)
     }
 
+    // MARK: converter
+
+    @Test func aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat() throws {
+        let rig = Rig(format: try format(24_000), requestFormat: try format(48_000))
+        rig.converterResult = nil
+        rig.change()
+        #expect(rig.converterRequests == 1)
+        #expect(rig.failures == [.configurationChanged])
+        #expect(!rig.engine.calls.contains("start"))
+    }
+
     @Test func noConverterIsAskedForWhenTheFormatIsUnchanged() throws {
         let rig = Rig(format: try format(48_000), requestFormat: try format(48_000))
         rig.change()
