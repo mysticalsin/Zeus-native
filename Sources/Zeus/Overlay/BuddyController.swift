@@ -137,11 +137,18 @@ final class BuddyController: NSObject {
         let target: CGFloat = (hiddenForPanel || !visibility.isVisible(at: now)) ? 0 : 1
         if target != shownAlpha {
             shownAlpha = target
+            // A hidden buddy leaves the screen: an invisible full-screen window at the screen-saver level made the
+            // windows under it, other apps' too, report themselves occluded.
+            if target == 1 { windows.forEach { $0.orderFrontRegardless() } }
             for window in windows where window.alphaValue != target {
                 if animated, !Motion.reduced {
-                    NSAnimationContext.runAnimationGroup({ $0.duration = target == 1 ? 0.2 : 0.35; window.animator().alphaValue = target }, completionHandler: nil)
+                    NSAnimationContext.runAnimationGroup({ $0.duration = target == 1 ? 0.2 : 0.35; window.animator().alphaValue = target },
+                                                         completionHandler: { [weak self, weak window] in
+                        MainActor.assumeIsolated { if self?.shownAlpha == 0 { window?.orderOut(nil) } }
+                    })
                 } else {
                     window.alphaValue = target
+                    if target == 0 { window.orderOut(nil) }
                 }
             }
         }
@@ -480,7 +487,7 @@ final class BuddyController: NSObject {
             window.setFrame(screen.frame, display: false)
             window.alphaValue = shownAlpha == 0 ? 0 : 1
             ZeusWindowSharing.apply(to: window, visibleInShare: visible, surface: .zeusStandard)
-            window.orderFrontRegardless()
+            if shownAlpha != 0 { window.orderFrontRegardless() }
             return window
         }
     }
