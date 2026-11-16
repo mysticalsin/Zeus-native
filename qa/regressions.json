@@ -7403,6 +7403,18 @@
         "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
         "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
       }
+    },
+    {
+      "id": "REG-811",
+      "failure": "Every talk-key press started the Ultron output engine, which pulled AirPods back to the playback profile while the microphone was opening, so the two engines fought over the Bluetooth link.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "prewarmOnKeyPressNeverPreparesTheOutputEngine"
+      }
     }
   ]
 }

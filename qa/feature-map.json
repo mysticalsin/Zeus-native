@@ -5329,6 +5329,14 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "prewarmOnKeyPressNeverPreparesTheOutputEngine"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "theFirstScheduledAudioStartsTheOutputEngineOnce"
             }
           ]
         }

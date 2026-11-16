@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import Zeus
@@ -68,5 +69,36 @@ struct TalkTurnVoiceTests {
         _ = fire(spy)
         _ = fire(spy)
         #expect(spy.calls == ["tap", "restart", "tap", "restart"])
+    }
+
+    // MARK: Output engine timing
+
+    @Test @MainActor func aNewOutputChainHasStartedNoEngine() {
+        #expect(UltronAudioChain().engineStarts == 0)
+    }
+
+    @Test func prewarmOnKeyPressNeverPreparesTheOutputEngine() throws {
+        let text = try UIPolishSourceTests.source("Sources/Zeus/Voice/Speaker.swift")
+        let start = try #require(text.range(of: "func prewarm() {"))
+        let rest = text[start.upperBound...]
+        let end = try #require(rest.range(of: "    func stop() {"))
+        let body = String(rest[..<end.lowerBound])
+        #expect(!body.contains("chain.prepare"), "key-down must not start playback")
+        #expect(!body.contains("chain.schedule"))
+    }
+
+    /// Scheduling the first audio is what starts the output engine, once. A Mac with no output device
+    /// cannot start one, so the count is only checked when the buffer was accepted.
+    @Test @MainActor func theFirstScheduledAudioStartsTheOutputEngineOnce() throws {
+        let chain = UltronAudioChain()
+        chain.muted = true
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: UltronAudioChain.format, frameCapacity: 2_400))
+        buffer.frameLength = 2_400
+        #expect(chain.engineStarts == 0)
+        guard chain.schedule(buffer) else { return }
+        #expect(chain.engineStarts == 1)
+        _ = chain.schedule(buffer)
+        #expect(chain.engineStarts == 1, "a running engine is not started again")
+        chain.stop()
     }
 }

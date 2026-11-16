@@ -45,6 +45,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     /// Test seam: stands in for every voice engine, so no audio is made. Nil in the app.
     /// Where the chain counts queued and played buffers (the tests stand in for an engine through it).
     var playbackLedger: PlaybackLedger { chain.ledger }
+    /// How many times the shared output engine has been started (the tests check a key press starts none).
+    var outputEngineStarts: Int { chain.engineStarts }
     var attemptOverride: (@MainActor (String) async -> String?)?
     private var pump: Task<Void, Never>?
     private var pumpToken: UUID?
@@ -142,7 +144,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     }
 
     /// Warms the engine the next reply will use. Called on every talk-key press, never at launch. Cloud voices
-    /// re-open their connection (throttled in `TTSHTTP`); local engines warm once.
+    /// re-open their connection (throttled in `TTSHTTP`); local engines warm once. Never starts audio output.
     func prewarm() {
         let settings = VoiceSettings.shared
         guard let decision = settings.routeDecisions().first else { return }
@@ -158,7 +160,9 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         default:
             break
         }
-        chain.prepare()
+        // The output engine is not started here: opening playback at key-down pulls a Bluetooth headset
+        // out of its listening profile just as capture opens. `UltronAudioChain.schedule` starts it when
+        // the first audio is ready.
         if prewarmed != decision.engine {
             prewarmed = decision.engine
             VoiceLog.log("prewarm", "engine=\(decision.engine.logName) reason=\(decision.reason)")
