@@ -16,10 +16,14 @@ enum CaptureRecovery {
         case restartFailed
         /// The new input differs from the format the recognition request opened with, and no converter exists.
         case formatUnconvertible
+        /// A stop or a newer turn won the race: nothing to recover and nothing to retry.
+        case turnOver
 
         /// A failed restart or an input that cannot reach the request ends the turn: an unusable format may
-        /// settle on the next notification.
+        /// settle on the next notification, and a turn that is already over needs nothing.
         var endsTurn: Bool { self == .restartFailed || self == .formatUnconvertible }
+        /// Only an input with no format yet is worth another look shortly.
+        var retries: Bool { self == .inputUnavailable }
 
         var description: String {
             switch self {
@@ -27,6 +31,7 @@ enum CaptureRecovery {
             case .inputUnavailable: "input has no usable format"
             case .restartFailed: "engine would not restart"
             case .formatUnconvertible: "input format cannot be converted for the request"
+            case .turnOver: "turn already over"
             }
         }
     }

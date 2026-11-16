@@ -352,9 +352,12 @@ final class SpeechInput: @unchecked Sendable {
             cancelTurn: endTurn,
             reinstallTap: { [self] in
                 // `stop()` runs off the main actor: re-check ownership before touching the engine.
-                guard ownsCapture(session) else { return .inputUnavailable }
+                guard ownsCapture(session) else { return .turnOver }
                 guard let format = engine.inputFormat(),
-                      Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else { return .inputUnavailable }
+                      Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else {
+                    // A stop that landed while the format was read is not a missing format.
+                    return ownsCapture(session) ? .inputUnavailable : .turnOver
+                }
                 let original = lock.withLock { requestFormat }
                 var converter: AVAudioConverter?
                 if let original, original != format {
@@ -387,6 +390,7 @@ final class SpeechInput: @unchecked Sendable {
             recoveryFailed: { [weak self] outcome in
                 VoiceLog.log("listen", "input recovery failed (\(outcome))")
                 if outcome.endsTurn { endTurn(); return }
+                guard outcome.retries else { return }
                 // No usable format yet and maybe no further notification: retry shortly (bounded by the limit).
                 scheduleRetry(CaptureRecovery.retryDelay) {
                     guard let self, self.ownsCapture(session), !engine.isRunning else { return }

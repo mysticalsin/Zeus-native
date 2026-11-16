@@ -7547,6 +7547,18 @@
         "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
         "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
       }
+    },
+    {
+      "id": "REG-833",
+      "failure": "When a stop won the race during capture recovery, the log said input recovery failed because the input had no usable format, and a retry was queued for a turn that was already over.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry"
+      }
     }
   ]
 }

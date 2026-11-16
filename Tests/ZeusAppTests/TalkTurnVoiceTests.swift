@@ -65,6 +65,14 @@ struct TalkTurnVoiceTests {
         #expect(CaptureRecovery.Outcome.restartFailed.endsTurn)
     }
 
+    @Test func aTurnThatIsAlreadyOverIsNeitherRetriedNorEnded() {
+        let outcome = CaptureRecovery.Outcome.turnOver
+        #expect(!outcome.endsTurn)
+        #expect(!outcome.retries)
+        #expect(outcome.description == "turn already over")
+        #expect(CaptureRecovery.Outcome.inputUnavailable.retries)
+    }
+
     @Test func twoChangesInARowEachRebuild() {
         let spy = Spy()
         _ = fire(spy)

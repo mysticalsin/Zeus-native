@@ -100,6 +100,14 @@ struct SpeechInputRecoveryTests {
         #expect(rig.engine.calls.filter { $0 == "format" }.count == CaptureRecovery.maximumChanges)
     }
 
+    @Test func aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry() throws {
+        let rig = Rig(format: nil)
+        rig.engine.onFormatRead = { rig.input.cancel() }
+        rig.change()
+        #expect(rig.scheduled.isEmpty, "the turn is over, so there is nothing to retry")
+        #expect(rig.failures.isEmpty)
+    }
+
     // MARK: converter
 
     @Test func aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat() throws {
