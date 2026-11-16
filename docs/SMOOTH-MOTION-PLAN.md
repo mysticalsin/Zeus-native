@@ -91,3 +91,10 @@ All in one table; under Reduce Motion every token is instant or the 0.12 s cross
 Hover open and close ten times; Home to Calendar to Home; volume keys five times (`zeus debug animate volume`); an
 agent running (halo); mascot stroll; Instruments Animation Hitches before and after; Activity Monitor CPU idle and with
 an agent; Reduce Motion on: everything instant or a crossfade.
+
+## 6. Idle frame budget (decided in the fix round)
+
+The mascot ticks at most 12 fps at rest (its idle clip's own rate), at most its clip fps (24 or less) while listening
+or waiting for approval, and 60 only while it travels (stroll, error shake, done jump), on the display link. Before, rest,
+listening and approval ran at 6 fps, which dropped half the idle clip's frames. The cost is about twice the idle redraw
+of a 22 pt image at rest; `idleMascotTicksSlowly` pins these caps. If the owner sees idle CPU rise, rest returns to 6 fps.
