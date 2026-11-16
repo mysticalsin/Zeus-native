@@ -633,14 +633,19 @@ enum SnapshotRenderer {
     /// no other pane may have produced the same bytes; otherwise the run records a failure and exits 1.
     private static func writeOne<V: View>(_ view: V, size: CGSize, scale: CGFloat, pane: GSSection? = nil, to url: URL) {
         let content = view.environment(\.mascotRasterScale, scale).frame(width: size.width, height: size.height)
-        let renderer = ImageRenderer(content: content)
-        renderer.scale = scale
         // Let pending main-queue work from navigating to the pane land before rendering.
         if pane != nil { RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02)) }
         SnapshotPaneProbe.reset()
-        guard let image = renderer.nsImage,
-              let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+        let renderedPNG: Data?
+        if drawsAppKitControls(url.lastPathComponent) {
+            renderedPNG = hostedPNG(content, size: size, scale: scale)
+        } else {
+            let renderer = ImageRenderer(content: content)
+            renderer.scale = scale
+            renderedPNG = renderer.nsImage?.tiffRepresentation
+                .flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }
+        }
+        guard let png = renderedPNG else {
             if pane != nil { harnessFailures.append("\(url.lastPathComponent): render produced no image") }
             return
         }
@@ -659,6 +664,34 @@ enum SnapshotRenderer {
             paneByDigest[key] = pane.rawValue
         }
         try? png.write(to: url)
+    }
+
+    /// Screens with AppKit-backed controls (text fields, sliders, lists and scroll views). ImageRenderer cannot
+    /// draw those and paints a yellow prohibition box in their place, so these go through a real AppKit view.
+    static func drawsAppKitControls(_ fileName: String) -> Bool {
+        ["agents-chat", "topbar-28-page-scribe", "settings-"].contains { fileName.hasPrefix($0) }
+    }
+
+    /// Draws `content` in an NSHostingView inside a window that is never shown, then reads the pixels back with
+    /// cacheDisplay. Real AppKit drawing, offscreen: no screen capture and no window on screen.
+    private static func hostedPNG<V: View>(_ content: V, size: CGSize, scale: CGFloat) -> Data? {
+        let frame = NSRect(origin: .zero, size: size)
+        let hosting = NSHostingView(rootView: content)
+        hosting.frame = frame
+        let window = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.contentView = nil; window.close() }
+        hosting.layoutSubtreeIfNeeded()
+        // Long enough for entrance fades and list loading to settle, which ImageRenderer skips by drawing the end state.
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.8))
+        hosting.layoutSubtreeIfNeeded()
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        rep.size = size
+        hosting.cacheDisplay(in: frame, to: rep)
+        return rep.representation(using: .png, properties: [:])
     }
 
     private static func notchStates() -> [(String, NotchModel)] {
