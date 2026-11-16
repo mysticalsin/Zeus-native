@@ -580,7 +580,8 @@ final class NotchController {
     }
 
     private func build() {
-        for entry in panels { entry.panel.orderOut(nil) }
+        // Closed, not only ordered out: a dropped panel must never linger on screen as a second island.
+        for entry in panels { entry.panel.orderOut(nil); entry.panel.close() }
         panels = []
         let targets = targetDisplays()
         displays = targets
@@ -594,6 +595,8 @@ final class NotchController {
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.hasShadow = false
+            // No system window animation: a stuck zoom left a ghost island 4 pt below the screen edge.
+            panel.animationBehavior = .none
             panel.isFloatingPanel = true
             // After isFloatingPanel, which resets the level to floating (3).
             panel.level = NSWindow.Level(rawValue: GlanceTopBar.windowLayer)

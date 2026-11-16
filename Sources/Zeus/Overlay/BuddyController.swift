@@ -522,11 +522,13 @@ final class BuddyController: NSObject {
     }
 
     private func rebuildWindows() {
-        windows.forEach { $0.orderOut(nil) }
+        windows.forEach { $0.orderOut(nil); $0.close() }
         let visible = lastVisibleInShare
         windows = NSScreen.screens.map { screen in
             let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
             window.level = .screenSaver
+            // No system window animation: a stuck zoom leaves a ghost overlay on screen.
+            window.animationBehavior = .none
             window.ignoresMouseEvents = true
             window.isOpaque = false
             window.backgroundColor = .clear

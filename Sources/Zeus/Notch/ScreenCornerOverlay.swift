@@ -134,6 +134,8 @@ struct ScreenCornerPanelFlags: Equatable {
         panel.level = level
         panel.hidesOnDeactivate = hidesOnDeactivate
         panel.collectionBehavior = collectionBehavior
+        // No system window animation: a stuck zoom left a ghost island 4 pt below the screen edge.
+        panel.animationBehavior = .none
     }
 }
 

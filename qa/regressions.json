@@ -6383,6 +6383,30 @@
         "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
         "function": "theDisplayLinkStartsOneTickBeforeTheStrollSoItsFirstFramesAreNotLate"
       }
+    },
+    {
+      "id": "REG-761",
+      "failure": "A stuck system zoom animation left a ghost copy of the island at 98 percent scale 4 pt below the screen top, so wallpaper showed between the island and the screen edge.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_overlay_pinned_lint.py",
+        "function": "test_every_overlay_window_turns_the_system_animation_off"
+      }
+    },
+    {
+      "id": "REG-762",
+      "failure": "A top bar or buddy rebuild only ordered old windows out, so a dropped window could linger on screen as a second island.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_overlay_pinned_lint.py",
+        "function": "test_rebuilds_close_the_windows_they_drop"
+      }
     }
   ]
 }
