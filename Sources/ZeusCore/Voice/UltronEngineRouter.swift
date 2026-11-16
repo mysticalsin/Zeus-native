@@ -69,8 +69,10 @@ public struct UltronRouteDecision: Equatable, Sendable {
 
 /// Pure engine choice: no Keychain, no network. `Speaker` walks the chain until one speaks.
 public enum UltronEngineRouter {
-    /// Auto order: lowest-latency designed voice first. A cloud engine whose recent first-audio time
-    /// is over `slowMs` drops behind the others, so a working but slow engine does not lead.
+    /// Auto order: the designed ElevenLabs voice first, Kokoro as the failsafe. Another cloud engine whose
+    /// recent first-audio time is over `slowMs` drops behind the others. ElevenLabs is never demoted: a
+    /// demoted engine is never tried, so its reading could not recover; its first-audio timeout and a short
+    /// pause after a failure send a slow reply to Kokoro instead.
     /// Chatterbox clones from a reference clip the owner supplies, so it is used only when chosen explicitly.
     public static let autoOrder: [UltronEngine] = [.elevenLabs, .openAI, .kokoro, .system]
     public static let slowMs = 2_500
@@ -96,8 +98,9 @@ public enum UltronEngineRouter {
             }
         }
         let usable = autoOrder.filter { availability.skipReason($0) == nil }
-        let fast = usable.filter { (observedFirstAudioMs[$0] ?? 0) <= slowMs }
-        let slow = usable.filter { (observedFirstAudioMs[$0] ?? 0) > slowMs }
+        func isSlow(_ engine: UltronEngine) -> Bool { engine != .elevenLabs && (observedFirstAudioMs[engine] ?? 0) > slowMs }
+        let fast = usable.filter { !isSlow($0) }
+        let slow = usable.filter { isSlow($0) }
         for engine in fast + slow {
             if engine == .system { continue }
             let tail = slow.contains(engine) ? "usable but slow lately" : "best available, lowest latency"

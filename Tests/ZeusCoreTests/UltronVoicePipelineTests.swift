@@ -93,9 +93,9 @@ struct UltronEngineRouterTests {
     }
 
     @Test func aSlowEngineDropsBehindAFasterOne() {
-        let both = A(elevenLabsConfigured: true, kokoroReady: true)
-        #expect(engines(.auto, both, observed: [.elevenLabs: 3_400, .kokoro: 900]) == [.kokoro, .elevenLabs, .system])
-        #expect(engines(.auto, both, observed: [.elevenLabs: 400]) == [.elevenLabs, .kokoro, .system])
+        let both = A(openAIConfigured: true, kokoroReady: true)
+        #expect(engines(.auto, both, observed: [.openAI: 3_400, .kokoro: 900]) == [.kokoro, .openAI, .system])
+        #expect(engines(.auto, both, observed: [.openAI: 400]) == [.openAI, .kokoro, .system])
     }
 
     @Test func everyDecisionHasAReasonAndNoKeyMaterial() {
