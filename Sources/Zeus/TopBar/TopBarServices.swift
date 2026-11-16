@@ -444,6 +444,7 @@ final class TopBarServices {
             model.loadPersistedShelf()
             model.fling = service
             flingService = service
+            FlingService.current = service
             service.observeSettings()
         }
         flingService?.reconfigure()

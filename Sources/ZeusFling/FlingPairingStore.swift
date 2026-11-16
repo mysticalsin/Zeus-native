@@ -7,6 +7,9 @@ public struct FlingPairedPeer: Codable, Equatable, Sendable, Identifiable {
     public var model: String
     public var pairedAt: Date
     public var lastSeen: Date
+    public init(id: String, name: String, model: String, pairedAt: Date, lastSeen: Date) {
+        self.id = id; self.name = name; self.model = model; self.pairedAt = pairedAt; self.lastSeen = lastSeen
+    }
 }
 
 /// Paired Macs. The key lives only in the Keychain under `fling.peer.<id>`; `peers.json` holds names and dates,

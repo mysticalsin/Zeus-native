@@ -6131,6 +6131,18 @@
         "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
         "function": "sendingNeedsAGestureAndNothingResendsOnItsOwn"
       }
+    },
+    {
+      "id": "REG-684",
+      "failure": "Fling could be turned on by a settings import or by default, or its Settings section was missing from the live window.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "flingStartsOffAndAnImportNeverTurnsItOn"
+      }
     }
   ]
 }

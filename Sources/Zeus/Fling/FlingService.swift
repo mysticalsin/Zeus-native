@@ -72,6 +72,9 @@ final class FlingService: FlingSending {
     private(set) var lastProblem: String?
     private(set) var eventsAreFlowing = false
     private(set) var pairedMacs: [FlingPairedPeer] = []
+    /// The service the Settings page reads. Set once the app built it.
+    static weak var current: FlingService?
+    static let localNetworkSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")!
 
     @ObservationIgnored private let transport: FlingTransporting
     @ObservationIgnored private let model: TopBarModel
@@ -165,6 +168,18 @@ final class FlingService: FlingSending {
         SettingsStore.shared.set("fling.enabled", "true")
         reconfigure()
     }
+
+    // MARK: What the Settings rows decide
+
+    var flickSensitivity: FlickSensitivity {
+        switch setting("fling.flickSensitivity") {
+        case "Low": .low
+        case "High": .high
+        default: .normal
+        }
+    }
+    var opensLinks: Bool { flag("fling.openLinks") }
+    var showsPapers: Bool { flag("fling.papers") }
 
     // MARK: Gestures
 

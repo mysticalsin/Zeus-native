@@ -901,6 +901,14 @@
       "suite": "FlingArrivalTests",
       "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
       "scope": "Actual FlingService and TopBarModel with a recording stand-in for the transport, a throwaway defaults suite and temp folders: Shelf origin, stack and verified mark, persistence across a relaunch, the Fling light and cue gated by lights.fling, the intake watcher skip, and sending only through a gesture. No network, no Keychain, no Downloads."
+    },
+    {
+      "id": "native-FlingSettingsTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingSettingsTests",
+      "file": "Tests/ZeusAppTests/FlingSettingsTests.swift",
+      "scope": "Actual GSSection and FlingService with a recording stand-in transport: the Shelf section in Your tools, Remove on a paired Mac and a failure that keeps it, and the Settings rows reaching the service. No network, no Keychain."
     }
   ],
   "features": [
@@ -6998,6 +7006,10 @@
             {
               "file": "Tests/ZeusCoreTests/FlingPlistTests.swift",
               "function": "theLocalNetworkPromptSaysWhyAndTheBonjourTypeIsDeclared"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSettingsMappingTests.swift",
+              "function": "theShelfSectionResolvesByNameInAnyCase"
             }
           ]
         },
@@ -7060,6 +7072,21 @@
           ]
         },
         {
+          "id": "F15.5",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "The Fling rows are on the Shelf section, Fling starts off, and a settings import never turns it on.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "flingStartsOffAndAnImportNeverTurnsItOn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "theFlingRowsLiveOnTheShelfSectionAndTheLightIsEverydayLights"
+            }
+          ]
+        },
+        {
           "id": "F15.6",
           "check": "missing-F15-device",
           "acceptance": "Owner-run proof on two real Macs, as listed in docs/FLING.md.",
@@ -7083,6 +7110,25 @@
             {
               "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
               "function": "removeDeletesTheKeyAndAFailureKeepsTheRecord"
+            }
+          ]
+        },
+        {
+          "id": "F15.9",
+          "check": "native-FlingSettingsTests",
+          "acceptance": "The Shelf section is in Your tools and found by name, Remove forgets a paired Mac and a Keychain failure keeps it, and each Settings row reaches the service.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingSettingsTests.swift",
+              "function": "theShelfSectionIsInYourToolsAndFoundByName"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSettingsTests.swift",
+              "function": "removingAPairedMacForgetsItAndAFailureKeepsIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingSettingsTests.swift",
+              "function": "theRowsReachTheServiceThatActsOnThem"
             }
           ]
         }
