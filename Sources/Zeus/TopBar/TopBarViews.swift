@@ -12,15 +12,14 @@ enum TopBarStyle {
     /// Glance's open panel: about 870 x 340 pt. Pages get the room under the tab row.
     static let panelWidth: CGFloat = 870
     static let pageHeight: CGFloat = 236
-    /// Glance-feel motion: a soft spring with a touch of overshoot for open/close and pages.
-    /// Measured from Glance's hover video: opens with no visible overshoot, closes firmly.
-    static let openSpring = Animation.spring(response: GlanceTopBar.openSpring.response, dampingFraction: GlanceTopBar.openSpring.damping)
-    static let closeMotion = Animation.linear(duration: GlanceTopBar.closeDuration)
+    /// Glance-feel motion, from the token table: open has a touch of overshoot, close has none.
+    @MainActor static var openSpring: Animation? { Motion.live(MotionTokens.panelOpen) }
+    @MainActor static var closeMotion: Animation? { Motion.reducible(Motion.panelClose) }
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
     static var tabLabel: Font {
         GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)
     }
-    static let openHeightSpring = Animation.spring(response: GlanceTopBar.openHeightSpring.response, dampingFraction: GlanceTopBar.openHeightSpring.damping)
+    @MainActor static var openHeightSpring: Animation? { Motion.live(MotionTokens.panelOpenHeight) }
     @MainActor static var pageSpring: Animation? { Motion.page(reduceMotion: Motion.reduced) }
     static let tile = Glass.notchTile
     static let tileStroke = Glass.notchTileStroke
@@ -154,7 +153,7 @@ struct LevelBars: View {
     var height: CGFloat = 14
 
     var body: some View {
-        TickingView(interval: 1 / 30, paused: !active || Motion.reduced) { context in
+        DisplaySynchronizedView(paused: !active || Motion.reduced, preferredFramesPerSecond: Motion.ambientFPS) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<count, id: \.self) { index in
@@ -456,6 +455,10 @@ struct TopBarPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        PageSwitcher(key: topBar.selectedTab, reduceMotion: reduceMotion) { page }
+    }
+
+    private var page: some View {
         Group {
             switch topBar.selectedTab {
             case .home:
@@ -492,13 +495,44 @@ struct TopBarPage: View {
             }
         }
         .frame(height: GlanceTopBar.pageHeight(home: topBar.selectedTab == .home) + (topBar.selectedTab == .home ? topBar.homeExtraHeight : 0), alignment: .top)
-        // Glance's section switch: the new page crossfades in with a small rise and scale.
-        .transition(.asymmetric(insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
-                                // The old page leaves at once: fading it over the new one drew its title
-                                // (e.g. Music's "Nothing playing") on top of the Calendar's add-event field.
-                                removal: .identity))
-        .id(topBar.selectedTab)
-        .animation(Motion.page(reduceMotion: reduceMotion), value: topBar.selectedTab)
+    }
+}
+
+/// The pages overlap from the top: while one leaves, the new one is laid out where it will stay, not pushed down
+/// by the old one above it.
+struct PageStack<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    var body: some View { ZStack(alignment: .topLeading, content: content) }
+}
+
+/// Glance's section switch: the new page crossfades in with a small rise and scale, and the old one fades out fast
+/// (0.08 s) over it. A slower fade drew its title (e.g. Music's "Nothing playing") on top of the Calendar's
+/// add-event field. The leaving page takes no clicks.
+struct PageSwitcher<Key: Hashable, Page: View>: View {
+    let key: Key
+    let reduceMotion: Bool
+    @ViewBuilder let page: () -> Page
+
+    /// A page that is on its way out: faded and not hittable.
+    private struct Leaving: ViewModifier {
+        let leaving: Bool
+        func body(content: Content) -> some View {
+            content.opacity(leaving ? 0 : 1).allowsHitTesting(!leaving)
+        }
+    }
+
+    private var transition: AnyTransition {
+        .asymmetric(
+            insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
+            removal: reduceMotion ? .identity : AnyTransition.modifier(active: Leaving(leaving: true), identity: Leaving(leaving: false))
+                .animation(Motion.pageOut))
+    }
+
+    var body: some View {
+        PageStack {
+            page().id(key).transition(transition)
+        }
+        .animation(Motion.page(reduceMotion: reduceMotion), value: key)
     }
 }
 
@@ -1099,7 +1133,7 @@ struct ShelfPage: View {
             .frame(maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous)
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topBar.shelfTargeted)
+            .animation(Motion.live(MotionTokens.panelResize), value: topBar.shelfTargeted)
 
             PageScroll(.horizontal) {
                 HStack(spacing: 8) {

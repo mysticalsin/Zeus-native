@@ -2,12 +2,25 @@ import AVFoundation
 import Foundation
 import ZeusCore
 
+/// What a talk turn needs from the voice: speak a line, tell the turn when its audio starts, stop.
+@MainActor
+protocol LineSpeaking: AnyObject {
+    var isSpeaking: Bool { get }
+    var engineDescription: String { get }
+    func speak(_ text: String, onStart: (@MainActor () -> Void)?)
+    func stop()
+}
+
+extension LineSpeaking {
+    func speak(_ text: String) { speak(text, onStart: nil) }
+}
+
 /// Speaks reply sentences. `UltronEngineRouter` picks the engine (ElevenLabs, OpenAI, Kokoro, then the
 /// deepest Mac voice) with a logged reason, and every engine's audio, the Mac voice included, runs
 /// through the Ultron effect chain (`UltronAudioChain`). Each sentence is scheduled for playback as soon
 /// as its first audio arrives, so the next sentence is requested while the previous one plays.
 @MainActor
-final class Speaker: SentenceSpeaking {
+final class Speaker: SentenceSpeaking, LineSpeaking {
     nonisolated(unsafe) static var urlSession: URLSession = .shared
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
@@ -24,7 +37,15 @@ final class Speaker: SentenceSpeaking {
     private let synthesizer = AVSpeechSynthesizer()
     private let voice: AVSpeechSynthesisVoice?
     private let chain = UltronAudioChain()
-    private var queue: [String] = []
+    private var queue: [(text: String, onStart: (@MainActor () -> Void)?)] = []
+    /// Fires when the line now being spoken starts to play; cleared after it fires, so it runs once per line.
+    private var lineOnStart: (@MainActor () -> Void)?
+    /// How many buffers the chain had been given when the line now being spoken began: its own audio plays after them.
+    private var lineBase = 0
+    /// Test seam: stands in for every voice engine, so no audio is made. Nil in the app.
+    /// Where the chain counts queued and played buffers (the tests stand in for an engine through it).
+    var playbackLedger: PlaybackLedger { chain.ledger }
+    var attemptOverride: (@MainActor (String) async -> String?)?
     private var pump: Task<Void, Never>?
     private var pumpToken: UUID?
     private var systemRendering = false
@@ -74,16 +95,18 @@ final class Speaker: SentenceSpeaking {
 
     // MARK: Entry points
 
-    func speak(_ text: String) {
+    /// `onStart` runs once, on the main actor, when this line's audio starts, before the next line begins.
+    func speak(_ text: String, onStart: (@MainActor () -> Void)? = nil) {
         ExplanationAudioArbitration.yieldToNewCapture()
-        queue.append(text)
+        queue.append((text, onStart))
         guard pump == nil else { return }
         let token = UUID()
         pumpToken = token
         pump = Task { [weak self] in
             while let self, !Task.isCancelled {
                 if !self.queue.isEmpty {
-                    _ = await self.speakLine(self.queue.removeFirst())
+                    let line = self.queue.removeFirst()
+                    _ = await self.speakLine(line.text, onStart: line.onStart)
                 } else if self.chain.isPlaying || self.systemRendering {
                     try? await Task.sleep(for: .milliseconds(40))
                 } else {
@@ -156,12 +179,16 @@ final class Speaker: SentenceSpeaking {
     // MARK: Choosing and playing
 
     /// Tries each engine in router order until one produces audio. Returns nil only when nothing could speak.
-    private func speakLine(_ text: String, began: Date = Date()) async -> Played? {
+    private func speakLine(_ text: String, began: Date = Date(), onStart: (@MainActor () -> Void)? = nil) async -> Played? {
         let settings = VoiceSettings.shared
+        lineOnStart = onStart
+        lineBase = chain.ledger.scheduled
+        defer { lineOnStart = nil }
         for decision in settings.routeDecisions() {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
             guard let voiceName = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
+            armLineStart() // Engines that never reported a first buffer have still queued their audio by now.
             let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
             if let ms { settings.recordFirstAudio(decision.engine, ms: ms) }
             logSpoken(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
@@ -172,6 +199,7 @@ final class Speaker: SentenceSpeaking {
 
     /// One engine, one sentence. The voice name on success, nil when this engine could not speak it.
     private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> String? {
+        if let attemptOverride { return await attemptOverride(text) }
         VoiceLatency.shared.mark(.ttsRequest)
         switch engine {
         case .elevenLabs:
@@ -212,7 +240,16 @@ final class Speaker: SentenceSpeaking {
         SpeechAttemptPolicy.shouldRecordFailure(producedAudio: false, cancelled: Task.isCancelled)
     }
 
-    private func markAudioReady() {
+    /// The line's start callback runs when its audio plays. Engines queue a line behind the earlier one (the
+    /// next sentence is requested while this one plays), so that is when everything queued before it has played.
+    private func armLineStart() {
+        guard let start = lineOnStart else { return }
+        lineOnStart = nil
+        chain.ledger.whenPlayed(upTo: lineBase, run: start)
+    }
+
+    func markAudioReady() {
+        armLineStart()
         if audioReadyAt == nil { audioReadyAt = Date() }
         VoiceLatency.shared.mark(.firstAudio)
     }

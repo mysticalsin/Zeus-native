@@ -5737,6 +5737,618 @@
       }
     },
     {
+      "id": "REG-700",
+      "failure": "A model-written screen drawing tag that was malformed, or split across stream chunks, could be read aloud as bracket text or dropped without the rest of the reply surviving.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+        "function": "aMalformedDrawTagIsStrippedAndNeverSpoken"
+      }
+    },
+    {
+      "id": "REG-701",
+      "failure": "Screen marks drawn from a talk reply could land away from where the same pixel pointed with a POINT tag, or run past the 6 mark, 24 ink point and 60 character limits, or fall outside the screenshot.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+        "function": "marksLandWherePointDoesOnASecondaryDisplayAtNegativeX"
+      }
+    },
+    {
+      "id": "REG-702",
+      "failure": "Marks could be drawn from an answer by an engine that never saw the screenshot, or screenshots could be sent for drawing with the setting off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+        "function": "onlyAWinnerThatSawPixelsMayDraw"
+      }
+    },
+    {
+      "id": "REG-703",
+      "failure": "A talk turn with a screenshot never reached the app Claude provider when the claude command line tool was installed, and a persistent Claude process kept screenshots in its context across turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-RouterRaceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/RouterRaceTests.swift",
+        "function": "aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn"
+      }
+    },
+    {
+      "id": "REG-704",
+      "failure": "A screen mark could not be tied to the moment its sentence began to play, because the speaker gave no per-line start signal.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+        "function": "onStartFiresOncePerLineInOrderBeforeTheNextLineBegins"
+      }
+    },
+    {
+      "id": "REG-705",
+      "failure": "A drawing from a talk reply could appear before or long after its sentence, draw with the setting off, draw from an engine that never saw the screen, or stay on screen into the next turn.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins"
+      }
+    },
+    {
+      "id": "REG-706",
+      "failure": "Marks from a talk answer could fail to render in capture space on the main display, take input, or stay as a window after hiding.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+        "function": "aRingAnArrowAndALabelAreLaidOutInCaptureSpaceAndHideLeavesNoPanel"
+      }
+    },
+    {
+      "id": "REG-707",
+      "failure": "Drawing on the screen during a talk answer, which sends a screenshot, could be on without the owner choosing it, because the setting was missing or defaulted on.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage"
+      }
+    },
+    {
+      "id": "REG-708",
+      "failure": "A screen drawing tag after spoken words, with no closing bracket, or with unbalanced braces could be read aloud as JSON, or held back the rest of the reply until the stream ended.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+        "function": "aTagWithNoClosingBracketIsNeverSpokenAndTheSpeechFollows"
+      }
+    },
+    {
+      "id": "REG-709",
+      "failure": "Screen marks appeared when a line's first audio was queued, not when it played, so with lines queued back to back the marks of the next sentence showed while the earlier one was still being spoken.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerTests.swift",
+        "function": "aPipelinedLineStartsOnlyAfterTheEarlierLinesAudioHasPlayed"
+      }
+    },
+    {
+      "id": "REG-710",
+      "failure": "A late callback from an earlier talk answer could reveal marks, or arm the four second hide, against the next answer's screenshot.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture"
+      }
+    },
+    {
+      "id": "REG-711",
+      "failure": "Turning on drawing cut the screenshots for POINT screen tags and the drive and walkthrough actions down to one display, and flagged a persistent Claude runner as image-carrying even with drawing off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+        "function": "consentOnSendsOneShotToTheBrainButKeepsEveryCaptureForPointAndDrive"
+      }
+    },
+    {
+      "id": "REG-712",
+      "failure": "One ring mark could be given a radius large enough to cover the screen, and every reveal of a sentence rebuilt the scene under new identities so the marks already shown animated in again.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+        "function": "aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen"
+      }
+    },
+    {
+      "id": "REG-720",
+      "failure": "The panel closed on a 0.1 s linear curve that missed the recorded close heights by 17 to 22 pt and snapped shut.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/GlanceTopBarTests.swift",
+        "function": "closeFitsGlancesMeasuredHeightsWithoutOvershoot"
+      }
+    },
+    {
+      "id": "REG-721",
+      "failure": "The close fit test used hidden fitting knobs (a 60 pt end and a time offset) the app never draws; it now models the real closed height and is gated against the old linear close.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theCloseSpringFitsTheMeasuredCloseBetterThanTheOldLinearClose"
+      }
+    },
+    {
+      "id": "REG-722",
+      "failure": "The cue spring could drift past 120 ms to settle over a 120 pt wing growth, or break the HUD timing bar.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theCueSpringSettlesUnder120msOver120pt"
+      }
+    },
+    {
+      "id": "REG-723",
+      "failure": "The first 120 Hz frame of a HUD cue jumped 12 percent of the way, which showed as a pop.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theFirstFrameOfACueAt120HzIsUnderTenPercent"
+      }
+    },
+    {
+      "id": "REG-724",
+      "failure": "A motion token could be given a damping that rings or never settles.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "everyDampingIsBetween075And1"
+      }
+    },
+    {
+      "id": "REG-725",
+      "failure": "Ambient loops ran at 30 Hz, which is not locked to the display and judders on a 120 Hz screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "ambientLoopsRunAtADivisorOf120"
+      }
+    },
+    {
+      "id": "REG-726",
+      "failure": "The mascot ticked at 24 or 6 Hz whatever the clip's own frame rate, so clips at 12 and 20 fps stepped unevenly.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theMascotRunsAtItsClipRateAndSixtyWhileTravelling"
+      }
+    },
+    {
+      "id": "REG-727",
+      "failure": "The app closed the panel with a linear 0.1 s curve instead of the critically damped panel close spring.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "theCloseIsTheCriticallyDampedPanelSpring"
+      }
+    },
+    {
+      "id": "REG-728",
+      "failure": "The HUD cue wing spring was a private literal pair in the app, apart from the token table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "theCueWingsUseTheCueGrowToken"
+      }
+    },
+    {
+      "id": "REG-729",
+      "failure": "A token spring still animated when Reduce Motion was on.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "aTokenSpringIsInstantUnderReduceMotion"
+      }
+    },
+    {
+      "id": "REG-730",
+      "failure": "The page spring numbers were repeated in the app apart from the token table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "thePageSpringIsThePanelResizeToken"
+      }
+    },
+    {
+      "id": "REG-731",
+      "failure": "Five copies of the peek content spring could drift apart and make the peek cards move differently.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "peekContentIsOneSpringWithATenthOfASecondDelay"
+      }
+    },
+    {
+      "id": "REG-732",
+      "failure": "Page removal, press and crossfade timings were literals spread over the views.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "pageOutAndTheWindowFadesComeFromTheTable"
+      }
+    },
+    {
+      "id": "REG-733",
+      "failure": "Ambient loops took their rate from each view instead of one table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "ambientLoopsUseTheTableRates"
+      }
+    },
+    {
+      "id": "REG-734",
+      "failure": "Switching tabs changed the open panel height with no animation because no height animation keyed on the tab.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PanelResizeMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+        "function": "theHeightKeyIsTheOpenPanelHeightOrNil"
+      }
+    },
+    {
+      "id": "REG-735",
+      "failure": "The panel height jumped by 122 pt when the tab changed between Home and another page.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PanelResizeMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+        "function": "aTabChangeAnimatesTheHeightWithThePageSpring"
+      }
+    },
+    {
+      "id": "REG-736",
+      "failure": "The old page was removed at once on a tab switch, a hard cut.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PanelResizeMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+        "function": "theOldPageFadesOutInsteadOfCutting"
+      }
+    },
+    {
+      "id": "REG-737",
+      "failure": "Visible motion ran on a 30 Hz run-loop timer that is not locked to the display, so it judders on a 120 Hz screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "noVisibleMotionRunsOnAFastRunLoopClockOutsideTheAllowlist"
+      }
+    },
+    {
+      "id": "REG-738",
+      "failure": "An animation without a value could fire for every state change and animate things it was never meant to.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "noAnimationFiresForEveryChange"
+      }
+    },
+    {
+      "id": "REG-739",
+      "failure": "Spring numbers were repeated as literals across the notch and top bar views and drifted apart.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "noSpringNumbersLiveInTheNotchOrTopBarViews"
+      }
+    },
+    {
+      "id": "REG-740",
+      "failure": "A fast-clock allowlist entry could outlive its file.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "everyAllowlistedFileStillExists"
+      }
+    },
+    {
+      "id": "REG-741",
+      "failure": "The halo, level bars, buddy waveform and spinner, thinking orb, mascot, edit wiggle, welcome sweep and bloom fade ran on a 30 Hz timer that is not locked to the display.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "theAmbientLoopsRunOnTheDisplayLink"
+      }
+    },
+    {
+      "id": "REG-742",
+      "failure": "The mascot ticked at 24 or 6 Hz whatever the clip's own frame rate, and walked its idle stroll at 6 fps.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MascotMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+        "function": "theMascotTicksAtEachClipsOwnFPSAndSixtyOnItsStroll"
+      }
+    },
+    {
+      "id": "REG-743",
+      "failure": "The buddy's window fades used the AppKit default curve and a 0.35 s fade out, so the fades did not match the other motion.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theWindowFadeInEasesOutAndTheFadeOutEasesIn"
+      }
+    },
+    {
+      "id": "REG-744",
+      "failure": "The buddy's display link was bound to the main screen, not the screen its own window is on.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theDisplayLinkFollowsTheBuddyWindowsScreenNotJustTheMainOne"
+      }
+    },
+    {
+      "id": "REG-745",
+      "failure": "The buddy controller could stop passing the explicit fade timing or go back to the main-screen link.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theFadeUsesTheTimingFunctionAndTheLinkUsesTheWindowScreen"
+      }
+    },
+    {
+      "id": "REG-746",
+      "failure": "The mascot's 60 fps stroll ran on a run-loop timer, which is not locked to the display.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MascotMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+        "function": "theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer"
+      }
+    },
+    {
+      "id": "REG-747",
+      "failure": "A frame clock whose interval was a variable could run fast and pass the lint, which only read literals.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "everyClockRateCanBeReadFromTheSource"
+      }
+    },
+    {
+      "id": "REG-748",
+      "failure": "The lint accepted any non-literal timer interval and any timeline without an interval.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "aClockWhoseRateCannotBeReadIsFlagged"
+      }
+    },
+    {
+      "id": "REG-749",
+      "failure": "The lint cut a line at a // inside a string and ignored block comments, so code could hide or be misread.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "commentsAreBlankedButStringsKeepTheirSlashes"
+      }
+    },
+    {
+      "id": "REG-750",
+      "failure": "Stock presets and duration-based springs sidestepped the rule against spring numbers outside the token table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "aSpringWrittenWithNumbersOrAPresetIsFlagged"
+      }
+    },
+    {
+      "id": "REG-751",
+      "failure": "During the 80 ms page fade the old and new pages stacked in one column, so the new page was pushed down and then jumped up.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageSwitchLayoutTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
+        "function": "theNewPageStaysPutWhileTheOldOneLeavesOverIt"
+      }
+    },
+    {
+      "id": "REG-752",
+      "failure": "A page that was fading out could still take clicks over the new page.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PageSwitchLayoutTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
+        "function": "thePageSwitchUsesTheOverlapAndALeavingPageTakesNoHits"
+      }
+    },
+    {
+      "id": "REG-753",
+      "failure": "With Reduce Motion on, the panel close, HUD cue and peek animations still ran as springs.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "theCloseCueAndPeekAnimationsAreInstantUnderReduceMotion"
+      }
+    },
+    {
+      "id": "REG-754",
+      "failure": "A view could read a token spring directly and ignore Reduce Motion.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "everyTokenAnimationHonoursReduceMotion"
+      }
+    },
+    {
+      "id": "REG-755",
+      "failure": "The Reduce Motion lint could stop matching bare token animations without anyone noticing.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "theTokenAnimationRuleSeesABareToken"
+      }
+    },
+    {
+      "id": "REG-756",
+      "failure": "The buddy's display link ran on the first window's screen, not the screen where the buddy is shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theLinkScreenIsTheOneWhereTheBuddyIsShown"
+      }
+    },
+    {
+      "id": "REG-757",
+      "failure": "After a display was plugged or unplugged the buddy's display link stayed bound to the old screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theLinkIsRecreatedWhenTheScreensChange"
+      }
+    },
+    {
       "id": "REG-637",
       "failure": "A start from the other talk key reached the owner while a turn was open, so one hold or one hands-free turn could open the microphone twice.",
       "features": [

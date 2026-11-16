@@ -131,6 +131,21 @@ enum ZeusPrompt {
     - If you used a tool or an MCP server (for example toto-brain), say what you found, not how.
     """ }
 
+    /// Added to the turn context (never to the argv persona) only when the owner turned on drawing and one
+    /// screenshot is attached. The app draws the marks; the tag is never spoken.
+    static func drawInstructions() -> String {
+        """
+        Drawing on the screen is on for this turn, and one screenshot of the display under the cursor is attached.
+        When showing something would help, write one tag first, before any spoken word, on one line:
+        [DRAW:{"s":1,"m":[{"k":"ring","x":412,"y":88,"r":24,"at":0},{"k":"arrow","from":[600,300],"to":[430,100],"at":1},{"k":"ink","pts":[[10,20],[40,22]],"at":1},{"k":"card","x":440,"y":120,"t":"Export as PDF","at":2}]}]
+        Marks: "ring" (centre x,y and radius r), "arrow" (from and to), "ink" (a line through pts) and "card" (a short label at x,y).
+        Coordinates are screenshot pixels with the origin at the top-left. "at" is the 0-based number of the
+        spoken sentence a mark appears with. Use at most 6 marks, 24 ink points, 60 characters of card text
+        and "at" no higher than 7. Leave the tag out when nothing needs showing. Never read the tag aloud or
+        mention it, and do not use [POINT] or [HIGHLIGHT] in the same reply.
+        """
+    }
+
     /// The text block sent alongside the screenshots.
     static func userText(for request: BrainRequest) -> String {
         var lines: [String] = []
