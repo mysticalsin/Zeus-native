@@ -10,10 +10,11 @@ import Testing
                        dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, polyglot: Shortcut? = nil,
                        chat: ChatHotkey = .off, voiceOverOn: Bool = false, keymap: TileKeymap? = nil,
                        dictationToggles: Bool = false, others: [TileBaseConflicts.NamedShortcut] = [],
-                       talkChord: Shortcut? = nil) -> [String] {
+                       talkChord: Shortcut? = nil, secondTalk: Shortcut? = nil) -> [String] {
         TileBaseConflicts.notes(base: base, keymap: keymap ?? TileKeymap.defaults(base: base), talk: talk,
                                 dictation: dictation, pointing: pointing, polyglot: polyglot, chat: chat,
-                                voiceOverOn: voiceOverOn, dictationToggles: dictationToggles, others: others, talkChord: talkChord)
+                                voiceOverOn: voiceOverOn, dictationToggles: dictationToggles, others: others, talkChord: talkChord,
+                                secondTalk: secondTalk)
     }
 
     /// A keyed chord on `modifiers`: left arrow, J and Space.
@@ -76,6 +77,23 @@ import Testing
         let polyglot = Shortcut(keyCode: keyT, modifiers: [.control, .option])
         #expect(notes(.standard, talk: .controlOption, dictation: .rightCommand, pointing: .controlOption, polyglot: polyglot).isEmpty)
         #expect(TileModifierBase.standard == .controlOptionCommand)
+    }
+
+    /// The second talk key (Right Option) is a hold key like the others: strictly inside a bound set it is free and waits the
+    /// confirm, and a keymap that binds Option alone makes it the holder of that set.
+    @Test func aSecondTalkKeyIsComparedWithTheBoundSets() throws {
+        let shipped = TileKeymap.defaults(base: .standard)
+        #expect(notes(.standard, talk: .controlOption, dictation: .rightCommand, pointing: .controlOption, secondTalk: .rightOption).isEmpty,
+                "Right Option is strictly inside Control-Option-Command, so the shipped keymap leaves it free")
+        #expect(TileBaseConflicts.confirm(for: .rightOption, keymap: shipped) == TileBaseConflicts.holdConfirm)
+        var keymap = TileKeymap.defaults(base: .standard)
+        try keymap.bind(Shortcut(keyCode: leftArrow, modifiers: .option), to: .retile)
+        let found = notes(.standard, talk: .controlOption, dictation: .rightCommand, pointing: .controlOption, keymap: keymap,
+                          secondTalk: .rightOption)
+        #expect(found == ["Option is also your Second talk key."], "\(found)")
+        #expect(TileBaseConflicts.confirm(for: .rightOption, keymap: keymap) == 0, "equal to a bound set, so it is refused, not delayed")
+        #expect(notes(.standard, talk: .controlOption, dictation: .rightCommand, pointing: .controlOption, keymap: keymap).isEmpty,
+                "with no second key nothing is named")
     }
 
     @Test func pointingAndDictationAreNamedWhenTheyHoldThePair() {

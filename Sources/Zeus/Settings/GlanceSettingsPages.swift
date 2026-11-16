@@ -731,6 +731,9 @@ private struct ShortcutsPage: View {
     /// Mirrors the Chat choice for SwiftUI: the monitor itself is not observable.
     @State private var chat = ChatHotkeyMonitor.shared.hotkey
     @State private var chatProblem = ChatHotkeyMonitor.shared.problem
+    /// Why the key the owner just recorded for the second talk key was not kept, and a count that redraws the page when it changes.
+    @State private var secondTalkRefusal: String?
+    @State private var secondTalkRevision = 0
 
     /// The Chat choices as the catalog names them.
     private static func title(_ key: ChatHotkey) -> String {
@@ -749,6 +752,18 @@ private struct ShortcutsPage: View {
         let chord: Shortcut?
         let clash: VoiceKey.ChatClash?
         let talkNotes: [String]
+        let secondTalk: Shortcut?
+        let secondTalkNotes: [String]
+    }
+
+    /// The sentence under the second talk key when another key has it (`VoiceKey.secondTalkKey` named the key it gave way to).
+    private static func yieldNote(_ name: String) -> String {
+        switch name {
+        case "VoiceOver": "VoiceOver uses Control and Option, so this key is off."
+        case "Chat": "Chat uses Option-Space, so this key is off. Record another key or move Chat."
+        case "Talk to Zeus": "This is already your Talk to Zeus key, so this key is off. Record another key."
+        default: "\(name) uses this key, so it is off. Record another key or change \(name.lowercased())."
+        }
     }
 
     private func routing() -> Routing {
@@ -767,10 +782,18 @@ private struct ShortcutsPage: View {
             notes.append("\(holder) uses Control-Option-Space, so it does not talk. Hold Control + Option alone to talk.")
         }
         if let problem = TalkChordHotkey.shared.problem { notes.append(problem) }
-        return Routing(chord: routing.chord, clash: clash, talkNotes: notes)
+        let second = SecondTalkRouting.current()
+        var secondNotes: [String] = []
+        if let refusal = secondTalkRefusal { secondNotes.append(refusal) }
+        if let name = second.yieldsTo { secondNotes.append(Self.yieldNote(name)) }
+        secondNotes += TilingKeyClash.notes(base: TileModifierBase(label: SettingsStore.shared.string("tiling.keyBase")))
+            .filter { $0.contains("Second talk") }
+        if second.key != nil { secondNotes.append("Hold it a quarter second before speaking.") }
+        return Routing(chord: routing.chord, clash: clash, talkNotes: notes, secondTalk: second.key, secondTalkNotes: secondNotes)
     }
 
     var body: some View {
+        let _ = secondTalkRevision
         let state = routing()
         let clash = state.clash
         GSPageHeading(section: .shortcuts, subtitle: "")
@@ -786,6 +809,20 @@ private struct ShortcutsPage: View {
                                                                              pointing: nil, voiceOverOn: true),
                                 notes: state.talkNotes) {
                 if let new = $0 { Preferences.shared.chooseTalkKey(new) }
+            }
+            GSDivider()
+            ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
+                                text: "Hold to talk, let go to send, double-tap to keep listening, like the talk key. Left Option and Right Option with a letter type as usual.",
+                                shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
+                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk,
+                                notes: state.secondTalkNotes) { new in
+                let dictation = DictationSettings.shared, polyglot = PolyglotSettings.shared
+                secondTalkRefusal = new.flatMap {
+                    VoiceKey.secondTalkRefusal($0, talk: Preferences.shared.pushToTalk, dictation: dictation.enabled ? dictation.key : nil,
+                                               polyglot: polyglot.enabled ? polyglot.hotkey : nil)
+                }
+                if secondTalkRefusal == nil { Preferences.shared.chooseSecondTalkKey(new) }
+                secondTalkRevision += 1
             }
             GSDivider()
             GSRow(symbol: "bubble.left.and.bubble.right", title: "Open the chat window",

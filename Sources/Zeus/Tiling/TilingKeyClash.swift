@@ -41,6 +41,8 @@ enum TilingKeyClash {
         var others: [TileBaseConflicts.NamedShortcut] = []
         /// Control-Option-Space while the talk chord is active (it is not when Chat or another hot key holds it), else nil.
         var talkChord: Shortcut?
+        /// The second talk key (Right Option) while it is active, else nil (`SecondTalkRouting`).
+        var secondTalk: Shortcut?
 
         /// The prompter's pause key (`PrompterHub.hotkeys`). It is registered only while the prompter shows, but it is
         /// fixed, so the tiling keys must never bind it.
@@ -77,19 +79,25 @@ enum TilingKeyClash {
                         others: presets.compactMap { name, preset in
                             preset.tilingShortcut.map { TileBaseConflicts.NamedShortcut(name: name, shortcut: $0) }
                         } + [prompterPause] + (answerKeysOn ? approvalAnswers : []),
-                        talkChord: TalkChordRouting.current(heard: heard, shared: dictation.enabled && Preferences.shared.pushToTalk == dictation.key).chord)
+                        talkChord: TalkChordRouting.current(heard: heard, shared: dictation.enabled && Preferences.shared.pushToTalk == dictation.key).chord,
+                        secondTalk: SecondTalkRouting.current().key)
         }
     }
 
     /// The first note for `base`, or nil when the keys are free. Reads settings only; nothing is installed or
     /// prompted. `keys` is the live state unless a caller gives one.
     static func note(base: TileModifierBase, keymap: TileKeymap? = nil, keys: Keys? = nil) -> String? {
+        notes(base: base, keymap: keymap, keys: keys).first
+    }
+
+    /// Every note for `base`, in the order the rule gives them.
+    static func notes(base: TileModifierBase, keymap: TileKeymap? = nil, keys: Keys? = nil) -> [String] {
         let keys = keys ?? Keys.live()
         return TileBaseConflicts.notes(
             base: base, keymap: keymap ?? TileKeymap.defaults(base: base),
             talk: keys.talk, dictation: keys.dictation, pointing: keys.pointing, polyglot: keys.polyglot, chat: keys.chat,
             voiceOverOn: keys.voiceOverOn, dictationToggles: keys.dictationToggles, others: keys.others,
-            talkChord: keys.talkChord).first
+            talkChord: keys.talkChord, secondTalk: keys.secondTalk)
     }
 
     /// Calls `changed` on the main actor each time VoiceOver starts or stops, and returns the way to stop watching.

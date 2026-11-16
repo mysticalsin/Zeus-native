@@ -45,6 +45,9 @@ final class ShortcutRecorderModel: ObservableObject {
         }
     }
 
+    /// A model freed while it listens gives the keys back: the count of listening recorders must not stay above 0.
+    isolated deinit { end() }
+
     func end() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil

@@ -29,6 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let permissions = PermissionsModel()
     private let hotkey = HotkeyMonitor()
     private var talkChordDefaultsObserver: NSObjectProtocol?
+    /// The talk chord and the second talk key as the last sync point worked them out. The talk monitor reads them on every key
+    /// event and hold tick, so they are stored here and never worked out in the key path (no access check, no Carbon call).
+    private var cachedTalkChord: Shortcut?
+    private var cachedSecondTalkKey: Shortcut?
     private var cancelTalkChordVoiceOverWatch: (() -> Void)?
     private var demo: DemoDirector!
     private var voice: VoiceTurnController!
@@ -313,10 +317,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice?.release()
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
-            // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one.
-            // Every event reads it, so it also keeps the Carbon registration that takes the press in step (a backstop to the
-            // sync points: start, a Chat or shortcut change, VoiceOver, any setting).
-            hotkey.chordProvider = { [weak self] in self?.syncTalkChord()?.keyCode }
+            // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one. Every event reads
+            // the value the sync points stored (start, access granted, a Chat or shortcut change, VoiceOver, any setting), so the
+            // key path asks neither the system for access nor Carbon for the hot key again.
+            hotkey.chordProvider = { [weak self] in self?.cachedTalkChord?.keyCode }
+            // Right Option, the second talk key, is read the same way.
+            hotkey.secondKeyProvider = { [weak self] in self?.cachedSecondTalkKey }
             // A turn that stops listening for its own reason (a failed start, the owner ending it) is told to the key
             // machine, so the next press starts a turn instead of being spent on one that is gone.
             voice?.onListeningEnded = { [weak self] in
@@ -1089,12 +1095,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: teleprompterPrivate)
     }
 
-    /// Puts the Carbon registration that takes Control-Option-Space in step with the chord the clash rule allows right now,
-    /// and returns that chord.
+    /// Puts the Carbon registration that takes Control-Option-Space in step with the chord the clash rule allows right now, and
+    /// stores that chord and the second talk key for the key path. A refused registration is asked again here, at the sync
+    /// points, and not on every key.
     @discardableResult
     private func syncTalkChord() -> Shortcut? {
         let chord = TalkChordRouting.current(heard: hotkey.keyProvider(), shared: hotkey.sharedProvider()).chord
         TalkChordHotkey.shared.sync(chord, listening: KeyListenAccess.granted)
+        let second = SecondTalkRouting.current().key
+        let changed = cachedTalkChord != chord || cachedSecondTalkKey != second
+        cachedTalkChord = chord
+        cachedSecondTalkKey = second
+        SecondTalkRouting.lastSynced = second
+        // The monitor reads the stored values on events and ticks only, so one tick tells it of a change at once: the second key
+        // turned off in the middle of a hands-free turn ends that turn now, not at the next key.
+        if changed { hotkey.configChanged() }
         return chord
     }
 

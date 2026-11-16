@@ -26,21 +26,63 @@ public enum VoiceKey {
         return voiceOverFallbacks.first { $0 != dictation && $0 != pointing } ?? chosen
     }
 
-    /// Whether a hold of the pointing key starts a pointing turn. Not when it is the talk key: the talk turn
+    /// Whether a hold of the pointing key starts a pointing turn. Not when it is the talk key or the second talk key: the talk turn
     /// owns that hold, so one hold never opens the microphone twice or plays two listening sounds.
-    public static func pointingStartsTurns(talk: Shortcut, pointing: Shortcut, pointingEnabled: Bool) -> Bool {
-        pointingEnabled && pointing != talk
+    public static func pointingStartsTurns(talk: Shortcut, pointing: Shortcut, pointingEnabled: Bool,
+                                           secondTalk: Shortcut? = nil) -> Bool {
+        pointingEnabled && pointing != talk && pointing != secondTalk
     }
 
     /// Who answers one hold of `chord`. nil: nobody in Zeus (VoiceOver has it, or it is no voice key).
     public static func owner(ofHold chord: Shortcut, talk: Shortcut, dictation: Shortcut?, pointing: Shortcut,
-                             pointingEnabled: Bool, voiceOverOn: Bool, screenRecording: Bool) -> Owner? {
+                             pointingEnabled: Bool, voiceOverOn: Bool, screenRecording: Bool, secondTalk: Shortcut? = nil) -> Owner? {
         let listened = effectiveTalkKey(chosen: talk, dictation: dictation,
                                         pointing: pointingEnabled ? pointing : nil, voiceOverOn: voiceOverOn)
         if chord == listened, !(voiceOverOn && chord == .controlOption) { return .talk(screenAware: screenRecording) }
-        guard chord == pointing, pointingStartsTurns(talk: talk, pointing: pointing, pointingEnabled: pointingEnabled),
+        if let secondTalk, chord == secondTalk { return .talk(screenAware: screenRecording) }
+        guard chord == pointing, pointingStartsTurns(talk: talk, pointing: pointing, pointingEnabled: pointingEnabled,
+                                                     secondTalk: secondTalk),
               !(voiceOverOn && pointing == .controlOption) else { return nil }
         return .pointing
+    }
+
+    /// How long the second talk key must be down alone before it acts. Right Option types accents, so a letter inside this time
+    /// reads as typing and starts nothing (docs/RIGHT-OPTION-TALK-PLAN.md). 0.25 s is a first value, not measured.
+    public static let secondKeyConfirm: TimeInterval = 0.25
+
+    /// The second key's confirm: the typing confirm, or the tiling confirm when that is longer.
+    public static func secondTalkConfirm(tiling: TimeInterval) -> TimeInterval { max(secondKeyConfirm, tiling) }
+
+    /// The second talk key the talk monitor listens on right now, or nil with the name of the key it gives way to. `chosen` is
+    /// the stored key (`ShortcutStore.loadSecondTalk`), `explicit` whether the owner chose it, `heard` the talk key as the
+    /// monitor hears it (`effectiveTalkKey`), the others nil when off. A key one of them already uses is theirs: the default
+    /// gives way to a key chosen for pointing, an explicit second key keeps it and pointing stands down (`pointingStartsTurns`).
+    /// A Carbon shortcut on Option alone (Chat on Option-Space) beats an Option-only key, as Carbon beats the chord: it may
+    /// hide the key-down of its Space from the monitors.
+    public static func secondTalkKey(chosen: Shortcut?, explicit: Bool, heard: Shortcut, dictation: Shortcut?, pointing: Shortcut?,
+                                     polyglot: Shortcut?, voiceOverOn: Bool,
+                                     carbonHolders: [(name: String, shortcut: Shortcut?)]) -> (key: Shortcut?, yieldsTo: String?) {
+        guard let chosen else { return (nil, nil) }
+        func meets(_ other: Shortcut?) -> Bool { other.map { $0 == chosen || ShortcutConflicts.overlaps(chosen, $0) } ?? false }
+        if meets(heard) { return (nil, "Talk to Zeus") }
+        if meets(dictation) { return (nil, "Dictation") }
+        if meets(polyglot) { return (nil, "Polyglot") }
+        if !explicit, meets(pointing) { return (nil, "Pointing") }
+        if voiceOverOn, chosen == .controlOption { return (nil, "VoiceOver") }
+        if chosen.isModifierOnly, chosen.modifiers == .option,
+           let holder = carbonHolders.first(where: { $0.shortcut.map { $0.keyCode != nil && $0.modifiers == .option } ?? false }) {
+            return (nil, holder.name)
+        }
+        return (chosen, nil)
+    }
+
+    /// Why `key` cannot be recorded as the second talk key: it is already the talk, dictation or Polyglot key. Nil when it can.
+    public static func secondTalkRefusal(_ key: Shortcut, talk: Shortcut, dictation: Shortcut?, polyglot: Shortcut?) -> String? {
+        let named: [(String, Shortcut?)] = [("Talk to Zeus", talk), ("Dictation", dictation), ("Polyglot", polyglot)]
+        guard let hit = named.first(where: { name, other in other.map { $0 == key || ShortcutConflicts.overlaps(key, $0) } ?? false }) else {
+            return nil
+        }
+        return "This is already your \(hit.0) key."
     }
 
     /// Control-Option-Space: Space joins the held talk key without spoiling it (docs/ULTRON-CHORD-PLAN.md).

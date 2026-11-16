@@ -67,7 +67,8 @@ enum KeyAccessNotice {
 
 /// The adapter of the voice key machine (`VoiceKeyMachine`, docs/VOICE-KEY-MACHINE-PLAN.md): it turns keyboard events,
 /// keys the tiling tap consumed and timer firings into machine events and runs the effects that come back. It keeps no
-/// state of its own: after `start()` only `machine` changes. Modifier chords, single modifiers (Right Command, Fn) and
+/// state of its own: after `start()` only `pair` changes, the machine of the talk key and of the second talk key behind one
+/// arbiter (`TalkKeyPair`; with no second key it is the machine). Modifier chords, single modifiers (Right Command, Fn) and
 /// keys with modifiers (Option-Space) are read from the event stream by the machine. Global monitoring needs
 /// Accessibility or Input Monitoring; the local monitor covers Zeus's own windows.
 @MainActor
@@ -104,6 +105,9 @@ final class HotkeyMonitor {
     /// The code of the key that may join this hold without spoiling it (Space on Control-Option, the talk chord), nil for
     /// none. Only the talk role reads it, and only in hold mode.
     var chordProvider: () -> UInt16? = { nil }
+    /// The second talk key (Right Option unless the owner chose another key or turned it off), nil for none. Only the talk role
+    /// reads it, and it is read on every event, so the owner hands back a value its sync points stored (docs/RIGHT-OPTION-TALK-PLAN.md).
+    var secondKeyProvider: () -> Shortcut? = { nil }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
     var liveModifiers: () -> ShortcutModifiers? = {
         ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
@@ -116,7 +120,9 @@ final class HotkeyMonitor {
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
-    private var machine = VoiceKeyMachine()
+    private var pair = TalkKeyPair()
+    /// A Space was seen down while the second key's turn was open (`lookForALauncherSpace`).
+    private var launcherSpaceSeen = false
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
     private var ownerTurn = 0
 
@@ -144,7 +150,13 @@ final class HotkeyMonitor {
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
             return event
         }) { keyMonitors.append(local) }
+        if let localMouse = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.mouseDown(at: event.timestamp) }
+            return event
+        }) { keyMonitors.append(localMouse) }
     }
+
+    private static let mouseDowns: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
 
     /// Global monitors only once access is on, so macOS never prompts mid-use.
     private func startGlobal() {
@@ -153,6 +165,9 @@ final class HotkeyMonitor {
             let time = event.timestamp
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
         }) { keyMonitors.append(global) }
+        if let globalMouse = NSEvent.addGlobalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.mouseDown(at: event.timestamp) }
+        }) { keyMonitors.append(globalMouse) }
     }
 
     private static func convert(_ event: NSEvent) -> ShortcutEvent? {
@@ -174,7 +189,8 @@ final class HotkeyMonitor {
     /// picture as a foreign key, so while the picture holds any ordinary key the system is asked first which of them
     /// are still down.
     func feed(_ event: ShortcutEvent, at time: TimeInterval? = nil) {
-        let held = machine.keys.keysDown
+        lookForALauncherSpace()
+        let held = pair.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
         let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
@@ -183,9 +199,9 @@ final class HotkeyMonitor {
         // a Space that came before the set spoils the hold and a Space that joined the set does not. It is read at the time
         // of the flags event, not the time that event is heard: a busy main thread must not make a short tap stand for the
         // confirm.
-        if case .flags = event, let chord = chordProvider(), !machine.keys.keysDown.contains(chord),
+        if case .flags = event, let chord = chordProvider(), !pair.keys.keysDown.contains(chord),
            keysStillDown?([chord]).contains(chord) == true {
-            send(.key(.keyDown(keyCode: chord, modifiers: machine.keys.flagModifiers), at: at))
+            send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         send(.key(event, at: at))
     }
@@ -198,6 +214,30 @@ final class HotkeyMonitor {
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
     func interrupt() { send(.interrupt(live: liveModifiers())) }
 
+    /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
+    /// second key off in the middle of a hands-free turn must.
+    func configChanged() { tick() }
+
+    /// A mouse button went down (left, right, other, a drag starts with one): an Option-click or Option-drag is not a talk turn.
+    /// The second talk key's turn, armed or held, is over and never sent; the primary key is not told (`TalkKeyPair.mouseDown`).
+    func mouseDown(at time: TimeInterval? = nil) {
+        guard role == .talk else { return }
+        // Read at the time the click happened, as a key is (`feed`): a busy main thread hears it late, and a confirm that came due
+        // in between must not decide whether the press had already started.
+        let arrived = now()
+        let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
+        let config = config, second = secondConfig
+        let before = pair.generation
+        run(pair.mouseDownTagged(at: at, primary: config, second: second), before: before, config, second)
+    }
+
+    /// A launcher on Option-Space that Carbon cannot see may tap and let go of Space between two looks at the keyboard. While the
+    /// second key's turn is open every key event and every tick asks the system, and a Space seen once means the turn is not sent.
+    private func lookForALauncherSpace() {
+        guard pair.owner == .second, keysStillDown?([49]).contains(49) == true else { return }
+        launcherSpaceSeen = true
+    }
+
     /// Sleep and wake tell the machine to drop an open turn. Idempotent.
     func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
         guard sleepObservers.isEmpty else { return }
@@ -208,7 +248,10 @@ final class HotkeyMonitor {
         }
     }
 
-    private func tick() { send(.tick(at: now(), live: liveModifiers())) }
+    private func tick() {
+        lookForALauncherSpace()
+        send(.tick(at: now(), live: liveModifiers()))
+    }
 
     // MARK: Effects
 
@@ -224,24 +267,51 @@ final class HotkeyMonitor {
                                       chord: role == .talk ? chordProvider() : nil)
     }
 
+    /// The second talk key's config: a hold key with the typing confirm (or tiling's, when longer) and no chord. Only the talk
+    /// role has one.
+    private var secondConfig: VoiceKeyMachine.Config {
+        let key = role == .talk ? secondKeyProvider() : nil
+        return VoiceKeyMachine.Config(key: key, role: .talk, mode: .hold,
+                                      voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
+                                      confirm: key.map { VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm($0)) } ?? 0, chord: nil)
+    }
+
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
     /// inside a callback meets the machine in its new state. The k-th `start` of a call is turn `generation before + k`.
     private func send(_ event: VoiceKeyMachine.Event) {
-        let config = config
-        let before = machine.generation
+        let config = config, second = secondConfig
+        let before = pair.generation
+        run(pair.handleTagged(event, primary: config, second: second), before: before, config, second)
+    }
+
+    /// Runs what the pair let through, in order. `before` is the pair's generation ahead of the call: the k-th `start` of a call is
+    /// turn `before + k`.
+    private func run(_ effects: [(slot: TalkKeyPair.Slot, effect: VoiceKeyMachine.Effect)], before: Int,
+                     _ config: VoiceKeyMachine.Config, _ second: VoiceKeyMachine.Config) {
         var started = 0
-        for effect in machine.handle(event, config: config) {
+        for (slot, effect) in effects {
+            let heard = slot == .second ? second : config
             switch effect {
             case .start:
                 started += 1
                 let turn = before + started
                 ownerTurn = turn
-                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(config.key?.title ?? "none"))")
+                launcherSpaceSeen = false
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
                 if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
-                onRelease?()
+                // A launcher or another app may hold Option-Space (Carbon cannot see it): a Space the system reports down at the release
+                // of a second-key turn means the person was not talking, so the turn is cancelled, not sent.
+                defer { launcherSpaceSeen = false }
+                if slot == .second, launcherSpaceSeen || keysStillDown?([49]).contains(49) == true {
+                    VoiceLog.log("key", "talk shortcut (\(heard.key?.title ?? "none")) released with Space down: cancelled, nothing sent")
+                    onCancel?()
+                } else {
+                    onRelease?()
+                }
             case .cancel:
-                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut became another shortcut: cancelled, nothing sent")
+                launcherSpaceSeen = false
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut (\(heard.key?.title ?? "none")) became another shortcut: cancelled, nothing sent")
                 onCancel?()
             case .refused:
                 onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")

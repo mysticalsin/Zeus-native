@@ -5261,6 +5261,49 @@
               "function": "theWholeReplyParserAndTheSanitizerAlsoStripEveryShape"
             }
           ]
+        },
+        {
+          "id": "F11.second-talk-key",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Holding Right Option alone starts the same talk turn, with one turn at a time across both keys. Left Option and quick Right Option typing never start it. The other key never ends an open turn. The default writes nothing and yields to a key chosen elsewhere.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+              "function": "aStartFromTheOtherKeyNeverReachesTheOwner"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+              "function": "rightOptionWithALetterInsideTheConfirmStartsNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+              "function": "leftOptionNeverStarts"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+              "function": "rightOptionHeldThenControlCancelsAndStartsNothingUntilAllUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+              "function": "rightOptionDoesNotEndAPrimaryHandsFreeTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "theSecondTalkKeyDefaultsToRightOptionAndWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+              "function": "theSecondKeyYieldsToAKeyChosenElsewhere"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
+              "function": "aSecondTalkKeyIsComparedWithTheBoundSets"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theSecondKeyOrdersKeepTheRules"
+            }
+          ]
         }
       ]
     },

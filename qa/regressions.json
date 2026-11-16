@@ -7199,6 +7199,102 @@
         "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
         "function": "aFailedQuarantineKeepsTheFileOutOfView"
       }
+    },
+    {
+      "id": "REG-637",
+      "failure": "A start from the other talk key reached the owner while a turn was open, so one hold or one hands-free turn could open the microphone twice.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+        "function": "aStartFromTheOtherKeyNeverReachesTheOwner"
+      }
+    },
+    {
+      "id": "REG-638",
+      "failure": "Right Option pressed with a letter at typing speed (an accent) started a talk turn: the listen sound, speech stopped and the microphone on.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+        "function": "rightOptionWithALetterInsideTheConfirmStartsNothing"
+      }
+    },
+    {
+      "id": "REG-639",
+      "failure": "Left Option started the second talk key, which belongs to Right Option only.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+        "function": "leftOptionNeverStarts"
+      }
+    },
+    {
+      "id": "REG-640",
+      "failure": "Control joining a held Right Option turn let the Control-Option start fire after the cancel, so one hold opened two turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+        "function": "rightOptionHeldThenControlCancelsAndStartsNothingUntilAllUp"
+      }
+    },
+    {
+      "id": "REG-641",
+      "failure": "Right Option ended a Control-Option hands-free turn, though only the key that opened a hands-free turn may end it.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
+        "function": "rightOptionDoesNotEndAPrimaryHandsFreeTurn"
+      }
+    },
+    {
+      "id": "REG-642",
+      "failure": "The second talk key default was written to the settings or read as the owner's choice, so it could not yield to another key or be reset.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theSecondTalkKeyDefaultsToRightOptionAndWritesNothing"
+      }
+    },
+    {
+      "id": "REG-643",
+      "failure": "The second talk key kept Right Option when the talk, dictation, Polyglot or pointing key, Chat on Option-Space or VoiceOver already used it, so one hold opened the microphone twice or typed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theSecondKeyYieldsToAKeyChosenElsewhere"
+      }
+    },
+    {
+      "id": "REG-644",
+      "failure": "The second talk key was not compared with the tiling chords, so a keymap that binds Option alone and the voice key both acted on one hold.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TileBaseConflictsTests.swift",
+        "function": "aSecondTalkKeyIsComparedWithTheBoundSets"
+      }
     }
   ]
 }
