@@ -248,7 +248,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
             "Patience. The next step is coming.",
             "Already ahead of you; hold on.",
             "Thinking it through, properly.",
-            "No half-measures; this takes a breath.",
+            "Doing it properly; this takes a breath.",
         ],
         .errorSpoken: [
             "That failed. Nothing was changed.",
