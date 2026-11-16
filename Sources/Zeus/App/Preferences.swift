@@ -80,22 +80,28 @@ enum Motion {
     static let ambientFPS = MotionRules.ambientFPS
     static let spinnerFPS = MotionRules.spinnerFPS
 
-    /// A token spring. Under Reduce Motion nothing animates.
-    static func spring(_ token: SpringToken, reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : spring(token)
-    }
-
-    /// A token spring for animations that Reduce Motion handles elsewhere (the notch checks `reduced` itself).
-    static func spring(_ token: SpringToken) -> Animation {
+    private static func raw(_ token: SpringToken) -> Animation {
         .spring(response: token.response, dampingFraction: token.damping)
     }
 
+    /// A token spring. Under Reduce Motion nothing animates.
+    static func spring(_ token: SpringToken, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : raw(token)
+    }
+
+    /// A token spring that follows the system's Reduce Motion setting right now.
+    @MainActor static func live(_ token: SpringToken) -> Animation? { spring(token, reduceMotion: reduced) }
+
+    /// Any animation, made instant under Reduce Motion.
+    static func reducible(_ animation: Animation, reduceMotion: Bool) -> Animation? { reduceMotion ? nil : animation }
+    @MainActor static func reducible(_ animation: Animation) -> Animation? { reducible(animation, reduceMotion: reduced) }
+
     /// The panel closing: no overshoot.
-    static let panelClose = spring(MotionTokens.panelClose)
+    static let panelClose = raw(MotionTokens.panelClose)
     /// HUD cue wings growing and shrinking.
-    static let cueGrow = spring(MotionTokens.cueGrow)
+    static let cueGrow = raw(MotionTokens.cueGrow)
     /// Peek cards arriving beside the closed notch.
-    static let peekContent = spring(MotionTokens.peekContent).delay(MotionTokens.peekContentDelay)
+    static let peekContent = raw(MotionTokens.peekContent).delay(MotionTokens.peekContentDelay)
     /// A page leaving the panel.
     static let pageOut = Animation.easeOut(duration: MotionTokens.pageOutDuration)
 

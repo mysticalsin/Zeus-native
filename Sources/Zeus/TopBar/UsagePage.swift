@@ -97,7 +97,7 @@ private struct MeterRing: View {
                     Circle().trim(from: 0, to: max(fraction, 0.01))
                         .stroke(UsagePage.tint(fraction), style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(Motion.spring(MotionTokens.panelResize), value: fraction)
+                        .animation(Motion.live(MotionTokens.panelResize), value: fraction)
                     Text("\(Int((fraction * 100).rounded()))").font(TopBarStyle.label(11, .bold).monospacedDigit()).foregroundStyle(Theme.cloudPrimary)
                 } else {
                     Image(systemName: "chart.bar.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.cloudSecondary)

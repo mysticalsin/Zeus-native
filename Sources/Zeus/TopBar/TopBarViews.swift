@@ -13,13 +13,13 @@ enum TopBarStyle {
     static let panelWidth: CGFloat = 870
     static let pageHeight: CGFloat = 236
     /// Glance-feel motion, from the token table: open has a touch of overshoot, close has none.
-    static let openSpring = Motion.spring(MotionTokens.panelOpen)
-    static let closeMotion = Motion.panelClose
+    @MainActor static var openSpring: Animation? { Motion.live(MotionTokens.panelOpen) }
+    @MainActor static var closeMotion: Animation? { Motion.reducible(Motion.panelClose) }
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
     static var tabLabel: Font {
         GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)
     }
-    static let openHeightSpring = Motion.spring(MotionTokens.panelOpenHeight)
+    @MainActor static var openHeightSpring: Animation? { Motion.live(MotionTokens.panelOpenHeight) }
     @MainActor static var pageSpring: Animation? { Motion.page(reduceMotion: Motion.reduced) }
     static let tile = Glass.notchTile
     static let tileStroke = Glass.notchTileStroke
@@ -1133,7 +1133,7 @@ struct ShelfPage: View {
             .frame(maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous)
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
-            .animation(Motion.spring(MotionTokens.panelResize), value: topBar.shelfTargeted)
+            .animation(Motion.live(MotionTokens.panelResize), value: topBar.shelfTargeted)
 
             PageScroll(.horizontal) {
                 HStack(spacing: 8) {

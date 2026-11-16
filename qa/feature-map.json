@@ -6540,6 +6540,10 @@
             {
               "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
               "function": "ambientLoopsUseTheTableRates"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "theCloseCueAndPeekAnimationsAreInstantUnderReduceMotion"
             }
           ],
           "id": "F13.motion-app-tokens"
@@ -6610,6 +6614,14 @@
             {
               "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
               "function": "everyClockRateCanBeReadFromTheSource"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+              "function": "theTokenAnimationRuleSeesABareToken"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+              "function": "everyTokenAnimationHonoursReduceMotion"
             }
           ],
           "id": "F13.motion-source-lint"

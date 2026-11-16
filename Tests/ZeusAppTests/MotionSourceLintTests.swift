@@ -336,6 +336,33 @@ struct MotionSourceLintTests {
         #expect(buddy.contains("Motion.spinnerFPS"), "the spinner turns at the display rate")
     }
 
+    /// The token animations are read through `Motion.reducible`, `Motion.live` or `Motion.spring(_:reduceMotion:)`, so
+    /// Reduce Motion makes them instant. The bare constants are for `Motion` itself and for tests.
+    static func tokenAnimationsIgnoringReduceMotion(in source: String) -> [String] {
+        let text = code(source)
+        let pattern = #"(?<!reducible\()Motion\.(?:panelClose|cueGrow|peekContent)\b|Motion\.spring\(MotionTokens\.\w+\)"#
+        let regex = try! NSRegularExpression(pattern: pattern)
+        let ns = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range) }
+    }
+
+    @Test func theTokenAnimationRuleSeesABareToken() {
+        #expect(!Self.tokenAnimationsIgnoringReduceMotion(in: ".animation(Motion.cueGrow, value: x)").isEmpty)
+        #expect(!Self.tokenAnimationsIgnoringReduceMotion(in: ".animation(Motion.spring(MotionTokens.panelResize), value: x)").isEmpty)
+        #expect(Self.tokenAnimationsIgnoringReduceMotion(in: ".animation(Motion.reducible(Motion.cueGrow), value: x)").isEmpty)
+        #expect(Self.tokenAnimationsIgnoringReduceMotion(in: ".animation(Motion.live(MotionTokens.panelResize), value: x)").isEmpty)
+        #expect(Self.tokenAnimationsIgnoringReduceMotion(in: "Motion.spring(MotionTokens.panelClose, reduceMotion: r)").isEmpty)
+    }
+
+    @Test func everyTokenAnimationHonoursReduceMotion() throws {
+        var problems: [String] = []
+        for file in Self.swiftFiles() where file.lastPathComponent != "Preferences.swift" {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            for hit in Self.tokenAnimationsIgnoringReduceMotion(in: source) { problems.append("\(file.lastPathComponent): \(hit)") }
+        }
+        #expect(problems.isEmpty, "wrap in Motion.reducible or use Motion.live: \(problems)")
+    }
+
     @Test func noAnimationFiresForEveryChange() throws {
         var problems: [String] = []
         for file in Self.swiftFiles() {

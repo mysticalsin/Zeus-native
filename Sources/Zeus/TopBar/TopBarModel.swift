@@ -446,7 +446,7 @@ final class TopBarModel {
         let light = NotchLightKind.hudLevel(
             kind, value: value, previousLevel: previous.seen ? previous.value : value,
             muted: muted, limitEcho: atLowerBound || atUpperBound)
-        withAnimation(Motion.cueGrow) {
+        withAnimation(Motion.reducible(Motion.cueGrow)) {
             show(cue)
             flash(light, ignoreSettings: ignoreSettings)
         }

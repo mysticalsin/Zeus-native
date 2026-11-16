@@ -25,7 +25,7 @@ private struct CardHoverLift: ViewModifier {
             .shadow(color: .black.opacity(active && hover.on && !hover.pressed ? 0.35 : 0),
                     radius: active && hover.on && !hover.pressed ? 14 : 0,
                     y: active && hover.on && !hover.pressed ? 6 : 0)
-            .animation(Motion.spring(MotionTokens.peekContent), value: scale)
+            .animation(Motion.live(MotionTokens.peekContent), value: scale)
             .onHover { inside in
                 guard inside != hover.on else { return }
                 hover.on = inside

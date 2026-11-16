@@ -23,6 +23,14 @@ struct MotionAppTokensTests {
         #expect(Motion.page(reduceMotion: true) == nil)
     }
 
+    @Test func theCloseCueAndPeekAnimationsAreInstantUnderReduceMotion() {
+        #expect(Motion.reducible(Motion.panelClose, reduceMotion: true) == nil)
+        #expect(Motion.reducible(Motion.cueGrow, reduceMotion: true) == nil)
+        #expect(Motion.reducible(Motion.peekContent, reduceMotion: true) == nil)
+        #expect(Motion.reducible(Motion.cueGrow, reduceMotion: false) == Motion.cueGrow)
+        #expect(Motion.reducible(Motion.panelClose, reduceMotion: false) == Motion.panelClose)
+    }
+
     @Test func thePageSpringIsThePanelResizeToken() {
         #expect(Motion.pageResponse == MotionTokens.panelResize.response)
         #expect(Motion.pageDamping == MotionTokens.panelResize.damping)

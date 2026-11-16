@@ -6287,6 +6287,42 @@
         "file": "Tests/ZeusAppTests/PageSwitchLayoutTests.swift",
         "function": "thePageSwitchUsesTheOverlapAndALeavingPageTakesNoHits"
       }
+    },
+    {
+      "id": "REG-753",
+      "failure": "With Reduce Motion on, the panel close, HUD cue and peek animations still ran as springs.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "theCloseCueAndPeekAnimationsAreInstantUnderReduceMotion"
+      }
+    },
+    {
+      "id": "REG-754",
+      "failure": "A view could read a token spring directly and ignore Reduce Motion.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "everyTokenAnimationHonoursReduceMotion"
+      }
+    },
+    {
+      "id": "REG-755",
+      "failure": "The Reduce Motion lint could stop matching bare token animations without anyone noticing.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "theTokenAnimationRuleSeesABareToken"
+      }
     }
   ]
 }
