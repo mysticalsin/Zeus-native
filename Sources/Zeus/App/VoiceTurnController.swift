@@ -372,7 +372,7 @@ final class VoiceTurnController {
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
         guard !transcript.isEmpty else {
-            VoiceLog.log("transcript", "(nothing heard)")
+            VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")
             buddy.idle()
             return .nothingHeard
         }

@@ -148,4 +148,27 @@ struct TalkTurnVoiceTests {
             #expect(!VoiceLog.url.path.contains("Library/Logs/Zeus"))
         }
     }
+
+    // MARK: Per-turn diagnostics
+
+    @Test func aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges() {
+        let diagnostics = CaptureDiagnostics(deviceName: "AirPods Pro", sampleRate: 24_000, channels: 1,
+                                             frames: 0, configChanges: 1)
+        #expect(diagnostics.nothingHeardSummary == "nothing heard: AirPods Pro, 24000 Hz 1 ch, 0 frames, 1 config change")
+    }
+
+    @Test func theConfigChangeCountIsPluralisedAndFramesAreReported() {
+        let diagnostics = CaptureDiagnostics(deviceName: "MacBook Pro Microphone", sampleRate: 48_000, channels: 1,
+                                             frames: 96_000, configChanges: 2)
+        #expect(diagnostics.nothingHeardSummary
+                == "nothing heard: MacBook Pro Microphone, 48000 Hz 1 ch, 96000 frames, 2 config changes")
+        #expect(CaptureDiagnostics().nothingHeardSummary
+                == "nothing heard: unknown input, 0 Hz 0 ch, 0 frames, 0 config changes")
+    }
+
+    @Test func theSummaryHasNoDashAndSurvivesANonFiniteRate() {
+        let diagnostics = CaptureDiagnostics(deviceName: "X", sampleRate: .nan, channels: 2, frames: 5, configChanges: 0)
+        #expect(!diagnostics.nothingHeardSummary.contains("\u{2014}"))
+        #expect(diagnostics.nothingHeardSummary.contains("0 Hz 2 ch"))
+    }
 }

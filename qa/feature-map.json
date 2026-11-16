@@ -5349,6 +5349,10 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "thisTestRunIsDetectedAndItsLogIsNotTheOwnersLog"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges"
             }
           ]
         }

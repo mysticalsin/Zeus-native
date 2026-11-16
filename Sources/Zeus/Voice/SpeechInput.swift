@@ -128,6 +128,8 @@ final class SpeechInput: @unchecked Sendable {
     private var generation = 0
     private var samples: [Float] = []
     private var resampler: AudioSamples.Resampler?
+    /// What the current (or last) turn's input saw. Guarded by `lock`.
+    private var captureDiagnostics = CaptureDiagnostics()
     // Regression (QA round 9, real E2E): a held dictation with a mid-sentence pause ("Meet me at
     // three, no, four pm.", PLAN-QA7's own self-correction example) consistently came back as
     // just "No." -- Apple's on-device recognizer ends a recognition task on its own the moment it
@@ -218,6 +220,7 @@ final class SpeechInput: @unchecked Sendable {
         let format = input.outputFormat(forBus: 0)
         guard Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount)
         else { throw InputError.inputUnavailable }
+        let deviceName = Self.inputDeviceName(uid: deviceUID)
         lock.lock()
         self.request = request
         latest = ""
@@ -228,6 +231,8 @@ final class SpeechInput: @unchecked Sendable {
         recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
         samples = []
         resampler = recordsSamples ? AudioSamples.Resampler(from: format) : nil
+        captureDiagnostics = CaptureDiagnostics(deviceName: deviceName, sampleRate: format.sampleRate,
+                                                channels: Int(format.channelCount))
         let current = generation
         let turnResampler = resampler // A stale tap must never mutate a replacement turn's converter.
         lock.unlock()
@@ -262,6 +267,7 @@ final class SpeechInput: @unchecked Sendable {
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self else { return }
+            self.lock.withLock { if self.generation == current { self.captureDiagnostics.frames += Int(buffer.frameLength) } }
             if policy.maximumSeconds != nil {
                 let failure = self.lock.withLock { () -> CaptureFailure? in
                     guard self.generation == current, !self.stopRequested else { return nil }
@@ -311,7 +317,11 @@ final class SpeechInput: @unchecked Sendable {
     /// reinstalls the tap and restarts the engine, keeping the same recognition request.
     private func handleConfigurationChange(engine: AVAudioEngine, session: Int, origin: UInt64,
                                            policy: CapturePolicy, startedAt: TimeInterval) {
-        let owns = lock.withLock { generation == session && !stopRequested }
+        let owns = lock.withLock { () -> Bool in
+            let owns = generation == session && !stopRequested
+            if owns { captureDiagnostics.configChanges += 1 }
+            return owns
+        }
         let endTurn = { [self] in
             let handler = onCaptureFailure
             cancel()
@@ -324,7 +334,11 @@ final class SpeechInput: @unchecked Sendable {
                 let input = engine.inputNode
                 let format = input.outputFormat(forBus: 0)
                 guard Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else { return false }
+                let name = Self.inputDeviceName(uid: deviceUID)
                 let next = lock.withLock { () -> AudioSamples.Resampler? in
+                    captureDiagnostics.deviceName = name
+                    captureDiagnostics.sampleRate = format.sampleRate
+                    captureDiagnostics.channels = Int(format.channelCount)
                     if resampler != nil { resampler = AudioSamples.Resampler(from: format) }
                     return resampler
                 }
@@ -569,6 +583,15 @@ final class SpeechInput: @unchecked Sendable {
     /// Clears the live-tap suppression only when `owner` is still the current session.
     static func releaseLiveTapSuppression(owner: Int, current: Int, suppress: inout Bool) {
         if current == owner { suppress = false }
+    }
+
+    /// The input device, format, frames and configuration changes of the current or last turn.
+    var diagnostics: CaptureDiagnostics { lock.withLock { captureDiagnostics } }
+
+    /// Name of the microphone a turn uses: the chosen one, else the system input.
+    private static func inputDeviceName(uid: String?) -> String {
+        let devices = Microphones.all()
+        return (uid.flatMap { uid in devices.first { $0.uid == uid } } ?? devices.first { $0.isDefault })?.name ?? "unknown input"
     }
 
     /// The audio heard since `start()`, as 16 kHz mono samples (when `recordsSamples`).
