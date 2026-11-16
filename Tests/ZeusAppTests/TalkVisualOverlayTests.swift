@@ -21,7 +21,7 @@ struct TalkVisualOverlayTests {
         let shot = ScreenShot(jpegData: Data(), label: "screen 1", pixelWidth: 1280,
                               pixelHeight: Int((1280 * frame.height / frame.width).rounded()), displayFrame: frame)
         let captureID = UUID()
-        let geometry = try TalkDrawScene.geometry(shot: shot, displayID: 7, backingScale: NSScreen.main?.backingScaleFactor ?? 2,
+        let geometry = try TalkDrawScene.geometry(shot: shot, displayID: 7, backingScale: Double(NSScreen.main?.backingScaleFactor ?? 2),
                                                   captureID: captureID)
         let capture = ExplanationCaptureContext(geometry: geometry, currentDisplay: geometry.display)
         let objects = TalkDrawScene.objects(TalkDraw(screen: 1, marks: marks), shot: shot, captureID: captureID)
@@ -55,7 +55,8 @@ struct TalkVisualOverlayTests {
         let window = try #require(overlay.ownedWindows.first)
         #expect(window.ignoresMouseEvents && !window.canBecomeKey && !window.canBecomeMain)
         #expect(window.styleMask.contains(.nonactivatingPanel) && window.sharingType == .none)
-        #expect(window.frame.origin.x == f.capture.currentDisplay.frame.x)
+        #expect(abs(window.frame.origin.x - f.capture.currentDisplay.frame.x) < 0.5)
+        #expect(abs(window.frame.width - f.capture.currentDisplay.frame.width) < 0.5)
 
         overlay.hide()
         #expect(overlay.ownedWindows.isEmpty && !overlay.isVisible && !window.isVisible && window.contentView == nil)

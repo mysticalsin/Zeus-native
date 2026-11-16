@@ -960,7 +960,7 @@ final class VoiceTurnController {
                             timingFirstToken = msSinceRelease()
                             VoiceLatency.shared.setBrain(engine: id, model: Self.modelLabel(id))
                             VoiceLatency.shared.mark(.firstToken)
-                            VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms)")
+                            VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms) images=\(request.screenshots.count)")
                             BrainLatencyBook.shared.record(id, firstTokenMs: Double(ms))
                         },
                         deliverDeep: { [weak self] text in
