@@ -12,7 +12,7 @@ struct FacePresenceStatusTests {
 
     /// QA m9: a state a person has to act on says why and what to do; a plain state says nothing extra.
     @Test func statesThatNeedAnActionSayWhyAndWhatToDo() {
-        #expect(Self.status(.needsCameraConsent).hint == "Allow the camera for Zeus in System Settings, Privacy and Security, Camera.")
+        #expect(Self.status(.needsCameraConsent).hint == "Allow the camera for Zeus in System Settings, Privacy & Security, Camera.")
         #expect(Self.status(.enrolling(token: 1)).hint == "Look at the camera until Zeus has learned your face.")
         for reason in [Machine.UnavailableReason.camera, .lock, .vault] {
             let hint = Self.status(.unavailable(reason)).hint

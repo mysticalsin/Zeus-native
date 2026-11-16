@@ -1426,6 +1426,7 @@ struct NotchActionButton: View {
             Text(title)
                 .font(TopBarStyle.label(12, .semibold))
                 .foregroundStyle(filled ? Theme.storm : tint)
+                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 28)
                 .background(Capsule().fill(filled ? tint : Color.white.opacity(0.12)))
@@ -1655,7 +1656,9 @@ struct ClosedWings: View {
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .permission(let text, let pane):
             HStack(spacing: 6) {
-                Text(text).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                // Wraps on word boundaries instead of cutting mid-word: the wing width is fixed and the copy varies.
+                Text(text).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit(2).multilineTextAlignment(.trailing).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                 Button("Open") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(url) }
                 }

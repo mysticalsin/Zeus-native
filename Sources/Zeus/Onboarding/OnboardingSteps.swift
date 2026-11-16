@@ -19,6 +19,9 @@ struct OnboardingStepView: View {
             default:
                 column
                     .frame(width: OB.columnWidth, alignment: .topLeading)
+                    // A step with no visual (Languages) would otherwise shrink the stack and be centred by the
+                    // window-sized frame below, landing on the footer instead of under the heading line.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .offset(x: OB.contentX, y: OB.headingTopY)
                 placedVisual
             }

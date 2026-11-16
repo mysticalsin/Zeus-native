@@ -75,14 +75,15 @@ struct ElevenLabsVoice: Sendable {
     }
 
     static func settingsMessage(status: Int, body: Data) -> String {
-        if status == 429 {
-            let detail = detailStatus(from: body)
+        let detail = detailStatus(from: body)
+        let kind = ProviderFailureMessage.kind(status: status, detail: detail == "unknown" ? "" : detail)
+        if let message = ProviderFailureMessage.message(label: "ElevenLabs", kind: kind) { return message }
+        if kind == .rateLimited {
             if detail != "unknown" {
                 return "ElevenLabs rate limit (\(detail)), using the offline voice"
             }
             return "ElevenLabs rate limit hit, using the offline voice"
         }
-        _ = body
         return "ElevenLabs key rejected, using the offline voice"
     }
 

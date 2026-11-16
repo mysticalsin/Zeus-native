@@ -162,7 +162,7 @@ struct RecordlyMeterBars: View {
 
 /// Mic and system level meters inside the live capsule. The system meter reads the capture engine's latest peak
 /// at the display's own rate (no 30 fps cap) on a clock that exists only while recording and stops off screen.
-/// The microphone is not recordable yet, so its row is idle.
+/// The Mic row shows only when microphone capture is on.
 struct RecordlyLiveMeters: View {
     let recordly: RecordlyController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -170,7 +170,9 @@ struct RecordlyLiveMeters: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            row(symbol: "mic", title: "Mic") { RecordlyMeterBars(value: 0, enabled: false) }
+            if RecordlyLiveMeterRows.showsMic(recordly.audio) {
+                row(symbol: "mic", title: "Mic") { RecordlyMeterBars(value: 0, enabled: false) }
+            }
             row(symbol: "speaker.wave.2", title: "System") { systemBars }
         }
         .accessibilityElement(children: .ignore)

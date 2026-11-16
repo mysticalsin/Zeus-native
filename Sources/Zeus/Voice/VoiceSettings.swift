@@ -213,8 +213,10 @@ final class VoiceSettings {
         }
         let label = provider.title
         switch reason {
-        case .http401, .quota:
-            fallbackMessage = "\(label): quota exceeded, using next voice"
+        case .http401:
+            fallbackMessage = ProviderFailureMessage.message(label: label, kind: .badKey)
+        case .quota:
+            fallbackMessage = ProviderFailureMessage.message(label: label, kind: .creditsUsedUp)
         case .timeout:
             fallbackMessage = "\(label): timed out, using next voice"
         case .missingModel:

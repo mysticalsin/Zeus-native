@@ -7319,6 +7319,198 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_no_async_test_holds_the_snapshot_flag_across_a_suspension"
       }
+    },
+    {
+      "id": "REG-765",
+      "failure": "The Record page showed a Mic level row while recording although microphone capture is greyed out as Soon.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyVisualsTests.swift",
+        "function": "micRowShowsOnlyWhenMicrophoneCaptureIsOn"
+      }
+    },
+    {
+      "id": "REG-766",
+      "failure": "The notch permission hint was cut off mid-word (Turn it on to use fa...) because it was a single fixed-width line.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-UIPolishSourceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "thePermissionCueWrapsInsteadOfTruncatingMidWord"
+      }
+    },
+    {
+      "id": "REG-767",
+      "failure": "Settings pop-ups were a fixed 153 points wide, so Control-Option and Automatic (best working voice) showed with an ellipsis.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-UIPolishSourceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "aSettingsPopupIsWideEnoughForItsLongestOption"
+      }
+    },
+    {
+      "id": "REG-768",
+      "failure": "The Languages onboarding step has no visual, so its column was centred in the window and its note ran into the Set up later button.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-UIPolishSourceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "theOnboardingColumnIsPinnedTopLeadingEvenWithoutAVisual"
+      }
+    },
+    {
+      "id": "REG-769",
+      "failure": "The Face presence hint sat left of the row titles and said Privacy and Security where macOS says Privacy & Security.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FacePresenceStatusTests.swift",
+        "function": "statesThatNeedAnActionSayWhyAndWhatToDo"
+      }
+    },
+    {
+      "id": "REG-800",
+      "failure": "With VoiceOver on, the open notch panel closed 0.2 s after the pointer left it, so a VoiceOver user could not switch tabs: VoiceOver's cursor is not the pointer.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-UIPolishSourceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+      }
+    },
+    {
+      "id": "REG-810",
+      "failure": "With AirPods as the microphone, the headset switched profile when the talk key went down, the audio engine stopped and was never restarted, so every talk turn heard nothing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
+      }
+    },
+    {
+      "id": "REG-811",
+      "failure": "Every talk-key press started the Ultron output engine, which pulled AirPods back to the playback profile while the microphone was opening, so the two engines fought over the Bluetooth link.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "prewarmOnKeyPressNeverPreparesTheOutputEngine"
+      }
+    },
+    {
+      "id": "REG-812",
+      "failure": "Talk turns ignored the microphone chosen in Dictation settings and always used the system input, so an AirPods default was used even when another microphone was picked.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
+      }
+    },
+    {
+      "id": "REG-813",
+      "failure": "Test runs wrote lines into the owner's real ~/Library/Logs/Zeus/voice.log, mixing test output into the evidence used to debug live voice turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "underTestsTheVoiceLogGoesToATemporaryFolderNotTheOwnersLog"
+      }
+    },
+    {
+      "id": "REG-814",
+      "failure": "Every ElevenLabs 401 said quota exceeded, so a bad key and used-up credits gave the same notice and the owner could not tell whether to paste a new key or wait.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
+        "function": "aBadKeyAsksForANewKeyAndDoesNotBlameCredits"
+      }
+    },
+    {
+      "id": "REG-815",
+      "failure": "Used-up ElevenLabs credits were reported as a rejected key, so the notice told the owner to check a key that was fine.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ProviderFailureMessageTests.swift",
+        "function": "usedUpCreditsSayTheCreditsAreUsedUpAndTheNextVoiceSpeaksUntilThePauseEnds"
+      }
+    },
+    {
+      "id": "REG-816",
+      "failure": "Talk turns could not be told to use the Mac's own microphone, so a connected Bluetooth headset always switched profile for every talk turn, and a chosen input that was unplugged was not handled.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "theBuiltInChoiceResolvesToTheBuiltInDeviceAtTurnStart"
+      }
+    },
+    {
+      "id": "REG-817",
+      "failure": "Talk turns reused the Dictation microphone, so choosing a microphone for dictation silently moved talk turns, and talk had no choice of its own.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForTalkAndDictationKeepsItsOwn"
+      }
+    },
+    {
+      "id": "REG-818",
+      "failure": "With Right Option as the talk key, Settings warned that the second talk key was off and told the owner to record another key, although the owner never set a second key and wants Right Option only.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "theDefaultSecondKeyThatDuplicatesTheTalkKeyIsQuietAndAChosenOneKeepsItsWarning"
+      }
+    },
+    {
+      "id": "REG-819",
+      "failure": "The quiet Off for a default second key must not hide the warning when the owner recorded a clashing key, or the key would be off with no explanation.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
+        "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
+      }
     }
   ]
 }

@@ -62,7 +62,7 @@ struct GSFacePresenceCard: View {
                     .foregroundStyle(GS.text.opacity(0.7))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .padding(.leading, GS.rowIconColumn).padding(.trailing, 16).padding(.vertical, 8)
             }
             ForEach(model.faces) { face in
                 GSDivider()

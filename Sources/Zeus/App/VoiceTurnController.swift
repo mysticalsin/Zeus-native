@@ -161,6 +161,16 @@ final class VoiceTurnController {
         buddy.idle()
     }
 
+    /// Talk turns listen on the microphone chosen for talk (Settings > Voice), resolved now: Automatic is no device, This Mac's
+    /// microphone is the built-in device, a specific input is itself or Automatic when it is gone. Dictation's choice is separate.
+    /// The device list is read only when a device is chosen.
+    static func applyChosenMicrophone(to speech: SpeechInput, defaults: UserDefaults = .standard,
+                                      devices: () -> [MicrophoneDevice] = { Microphones.all() },
+                                      builtInUID: () -> String? = { Microphones.builtInUID() }) {
+        let choice = TalkMicrophoneChoice.load(defaults)
+        speech.deviceUID = choice == .automatic ? nil : choice.resolvedUID(devices: devices(), builtInUID: builtInUID())
+    }
+
     @discardableResult
     func press() -> Bool {
         clearDrawingForNewTurn()
@@ -187,6 +197,7 @@ final class VoiceTurnController {
         turnEngine = DictationHub.shared.controller?.voiceEngine
         speech.recordsSamples = turnEngine != nil
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
+        Self.applyChosenMicrophone(to: speech)
         do {
             try speech.start()
         } catch {
@@ -366,7 +377,7 @@ final class VoiceTurnController {
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
         guard !transcript.isEmpty else {
-            VoiceLog.log("transcript", "(nothing heard)")
+            VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")
             buddy.idle()
             return .nothingHeard
         }

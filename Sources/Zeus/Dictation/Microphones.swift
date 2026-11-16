@@ -14,6 +14,13 @@ enum Microphones {
         }
     }
 
+    /// The UID of the Mac's own microphone: an input whose transport is built-in. Nil when there is none.
+    static func builtInUID() -> String? {
+        deviceIDs().first { id in
+            inputChannels(id) > 0 && integer(id, kAudioDevicePropertyTransportType) == kAudioDeviceTransportTypeBuiltIn
+        }.flatMap { string($0, kAudioDevicePropertyDeviceUID) }
+    }
+
     /// Sets the input device of an engine's input node (nil: the system input). Returns false
     /// when the chosen device is gone.
     @discardableResult
@@ -60,6 +67,14 @@ enum Microphones {
         guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, raw) == noErr else { return 0 }
         let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
         return list.reduce(0) { $0 + Int($1.mNumberChannels) }
+    }
+
+    private static func integer(_ id: AudioDeviceID, _ selector: AudioObjectPropertySelector) -> UInt32? {
+        var address = address(selector)
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value
     }
 
     private static func string(_ id: AudioDeviceID, _ selector: AudioObjectPropertySelector) -> String? {
