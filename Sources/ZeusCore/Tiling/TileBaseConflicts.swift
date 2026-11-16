@@ -111,7 +111,7 @@ public enum TileBaseConflicts {
     public static func notes(base: TileModifierBase, keymap: TileKeymap, talk: Shortcut, dictation: Shortcut?,
                              pointing: Shortcut?, polyglot: Shortcut?, chat: ChatHotkey, voiceOverOn: Bool,
                              dictationToggles: Bool = false, others: [NamedShortcut] = [],
-                             talkChord: Shortcut? = nil) -> [String] {
+                             talkChord: Shortcut? = nil, secondTalk: Shortcut? = nil) -> [String] {
         var out: [String] = []
         let bound = boundSets(of: keymap)
         if voiceOverOn, let set = bound.first(where: { $0.isSuperset(of: voiceOverPair) }) {

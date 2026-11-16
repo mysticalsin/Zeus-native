@@ -28,13 +28,14 @@ public enum VoiceKey {
 
     /// Whether a hold of the pointing key starts a pointing turn. Not when it is the talk key: the talk turn
     /// owns that hold, so one hold never opens the microphone twice or plays two listening sounds.
-    public static func pointingStartsTurns(talk: Shortcut, pointing: Shortcut, pointingEnabled: Bool) -> Bool {
+    public static func pointingStartsTurns(talk: Shortcut, pointing: Shortcut, pointingEnabled: Bool,
+                                           secondTalk: Shortcut? = nil) -> Bool {
         pointingEnabled && pointing != talk
     }
 
     /// Who answers one hold of `chord`. nil: nobody in Zeus (VoiceOver has it, or it is no voice key).
     public static func owner(ofHold chord: Shortcut, talk: Shortcut, dictation: Shortcut?, pointing: Shortcut,
-                             pointingEnabled: Bool, voiceOverOn: Bool, screenRecording: Bool) -> Owner? {
+                             pointingEnabled: Bool, voiceOverOn: Bool, screenRecording: Bool, secondTalk: Shortcut? = nil) -> Owner? {
         let listened = effectiveTalkKey(chosen: talk, dictation: dictation,
                                         pointing: pointingEnabled ? pointing : nil, voiceOverOn: voiceOverOn)
         if chord == listened, !(voiceOverOn && chord == .controlOption) { return .talk(screenAware: screenRecording) }
@@ -42,6 +43,18 @@ public enum VoiceKey {
               !(voiceOverOn && pointing == .controlOption) else { return nil }
         return .pointing
     }
+
+    /// STUBS of the second talk key's routing (docs/RIGHT-OPTION-TALK-PLAN.md).
+    public static let secondKeyConfirm: TimeInterval = 0
+    public static func secondTalkConfirm(tiling: TimeInterval) -> TimeInterval { tiling }
+
+    public static func secondTalkKey(chosen: Shortcut?, explicit: Bool, heard: Shortcut, dictation: Shortcut?, pointing: Shortcut?,
+                                     polyglot: Shortcut?, voiceOverOn: Bool,
+                                     carbonHolders: [(name: String, shortcut: Shortcut?)]) -> (key: Shortcut?, yieldsTo: String?) {
+        (chosen, nil)
+    }
+
+    public static func secondTalkRefusal(_ key: Shortcut, talk: Shortcut, dictation: Shortcut?, polyglot: Shortcut?) -> String? { nil }
 
     /// Control-Option-Space: Space joins the held talk key without spoiling it (docs/ULTRON-CHORD-PLAN.md).
     public static let talkChord = Shortcut(keyCode: 49, modifiers: [.control, .option])

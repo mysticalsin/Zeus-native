@@ -223,4 +223,113 @@ struct VoiceKeyTests {
         #expect(keyedC?.fix == .off, "moving Chat to C would clash again, so the fix is to turn it off")
         #expect(clash(talk: cOption, chat: .controlOptionSpace) == nil, "a keyed talk key on C leaves Space to Chat")
     }
+
+    // MARK: The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md)
+
+    private let leftOption = Shortcut(modifiers: .option, side: .left)
+
+    @Test func theSecondTalkKeyDefaultsToRightOptionAndWritesNothing() {
+        let d = defaults()
+        let before = NSDictionary(dictionary: d.dictionaryRepresentation())
+        let fresh = ShortcutStore.loadSecondTalk(d)
+        #expect(fresh.key == .rightOption && !fresh.explicit)
+        #expect(NSDictionary(dictionary: d.dictionaryRepresentation()).isEqual(before), "loading writes nothing")
+        #expect(d.object(forKey: ShortcutStore.secondTalkKey) == nil)
+        // A stored value that does not parse is no choice, and is left as it is.
+        d.set("nonsense", forKey: ShortcutStore.secondTalkKey)
+        let broken = ShortcutStore.loadSecondTalk(d)
+        #expect(broken.key == .rightOption && !broken.explicit)
+        #expect(d.string(forKey: ShortcutStore.secondTalkKey) == "nonsense")
+        // Off and a recorded key are choices.
+        d.set("off", forKey: ShortcutStore.secondTalkKey)
+        let off = ShortcutStore.loadSecondTalk(d)
+        #expect(off.key == nil && off.explicit)
+        d.set(Shortcut.stored(.function), forKey: ShortcutStore.secondTalkKey)
+        let kept = ShortcutStore.loadSecondTalk(d)
+        #expect(kept.key == .function && kept.explicit)
+        // Writing happens only when the owner records, and Reset (Right Option) puts the default back by removing the key.
+        let e = defaults()
+        ShortcutStore.recordSecondTalkChoice(nil, in: e)
+        #expect(e.string(forKey: ShortcutStore.secondTalkKey) == "off")
+        ShortcutStore.recordSecondTalkChoice(leftOption, in: e)
+        #expect(ShortcutStore.loadSecondTalk(e).key == leftOption && ShortcutStore.loadSecondTalk(e).explicit)
+        ShortcutStore.recordSecondTalkChoice(.rightOption, in: e)
+        #expect(e.object(forKey: ShortcutStore.secondTalkKey) == nil)
+        #expect(ShortcutStore.loadSecondTalk(e).key == .rightOption && !ShortcutStore.loadSecondTalk(e).explicit)
+    }
+
+    @Test func theSecondKeyYieldsToAKeyChosenElsewhere() {
+        func second(chosen: Shortcut? = .rightOption, explicit: Bool = false, talk: Shortcut = .controlOption,
+                    dictation: Shortcut? = .rightCommand, pointing: Shortcut? = nil, polyglot: Shortcut? = nil,
+                    voiceOverOn: Bool = false, holders: [Holder] = []) -> (key: Shortcut?, yieldsTo: String?) {
+            let heard = VoiceKey.effectiveTalkKey(chosen: talk, dictation: dictation, pointing: pointing, voiceOverOn: voiceOverOn)
+            return VoiceKey.secondTalkKey(chosen: chosen, explicit: explicit, heard: heard, dictation: dictation, pointing: pointing,
+                                          polyglot: polyglot, voiceOverOn: voiceOverOn, carbonHolders: holders)
+        }
+        let shipped = second()
+        #expect(shipped.key == .rightOption && shipped.yieldsTo == nil, "the shipped keys leave Right Option to the second key")
+        #expect(second(chosen: nil).key == nil && second(chosen: nil).yieldsTo == nil, "off is off")
+        // The talk key, and the VoiceOver fallback that lands on Right Option.
+        #expect(second(talk: .rightOption).key == nil && second(talk: .rightOption).yieldsTo == "Talk to Zeus")
+        let fallback = second(dictation: .optionCommand, voiceOverOn: true)
+        #expect(fallback.key == nil && fallback.yieldsTo == "Talk to Zeus", "Right Option talks once, as the talk key")
+        // Dictation and Polyglot.
+        #expect(second(dictation: .rightOption).key == nil && second(dictation: .rightOption).yieldsTo == "Dictation")
+        #expect(second(polyglot: .rightOption).key == nil && second(polyglot: .rightOption).yieldsTo == "Polyglot")
+        // Pointing: the default gives way to a key the owner chose for pointing, an explicit second key keeps it.
+        let pointingDefault = second(pointing: .rightOption)
+        #expect(pointingDefault.key == nil && pointingDefault.yieldsTo == "Pointing")
+        let pointingExplicit = second(explicit: true, pointing: .rightOption)
+        #expect(pointingExplicit.key == .rightOption && pointingExplicit.yieldsTo == nil, "talk owns it, pointing stands down")
+        // The other side of Option is a different key.
+        #expect(second(chosen: leftOption, dictation: .rightOption).key == leftOption)
+        #expect(second(dictation: leftOption).key == .rightOption)
+        // VoiceOver holds Control-Option.
+        let voiceOver = second(chosen: .controlOption, explicit: true, talk: .rightOption, voiceOverOn: true)
+        #expect(voiceOver.key == nil && voiceOver.yieldsTo == "VoiceOver")
+        #expect(second(chosen: .controlOption, explicit: true, talk: .rightOption).key == .controlOption)
+        // Chat on Option-Space is a Carbon key: it wins, because Carbon may hide Space from the monitors.
+        let chat: [Holder] = [("Chat", ChatHotkey.optionSpace.shortcut), ("Agent picker", nil)]
+        #expect(second(holders: chat).key == nil && second(holders: chat).yieldsTo == "Chat")
+        #expect(second(chosen: leftOption, holders: chat).yieldsTo == "Chat", "either side of Option")
+        #expect(second(chosen: .function, explicit: true, holders: chat).key == .function, "Fn is not Option")
+        let other: [Holder] = [("Chat", ChatHotkey.controlOptionC.shortcut), ("Quick to-do", Shortcut(keyCode: 17, modifiers: [.control, .option]))]
+        #expect(second(holders: other).key == .rightOption, "a Carbon key that holds more than Option leaves it alone")
+    }
+
+    @Test func theSecondKeyChoiceIsRefusedOnTalkDictationAndPolyglot() {
+        func refusal(_ key: Shortcut, talk: Shortcut = .controlOption, dictation: Shortcut? = .rightCommand,
+                     polyglot: Shortcut? = nil) -> String? {
+            VoiceKey.secondTalkRefusal(key, talk: talk, dictation: dictation, polyglot: polyglot)
+        }
+        #expect(refusal(.controlOption) == "This is already your Talk to Zeus key.")
+        #expect(refusal(.rightOption, talk: .rightOption) == "This is already your Talk to Zeus key.")
+        #expect(refusal(.rightCommand) == "This is already your Dictation key.")
+        #expect(refusal(.rightOption, dictation: .rightOption) == "This is already your Dictation key.")
+        #expect(refusal(.rightOption, dictation: nil, polyglot: .rightOption) == "This is already your Polyglot key.")
+        #expect(refusal(.rightOption) == nil, "the shipped keys leave Right Option free")
+        #expect(refusal(leftOption, talk: .rightOption) == nil, "the other side of Option is another key")
+        #expect(refusal(.function) == nil)
+    }
+
+    @Test func pointingStandsDownForAnExplicitSecondKey() {
+        #expect(VoiceKey.pointingStartsTurns(talk: .controlOption, pointing: .rightOption, pointingEnabled: true))
+        #expect(!VoiceKey.pointingStartsTurns(talk: .controlOption, pointing: .rightOption, pointingEnabled: true, secondTalk: .rightOption))
+        #expect(VoiceKey.pointingStartsTurns(talk: .controlOption, pointing: .rightOption, pointingEnabled: true, secondTalk: .function))
+        #expect(VoiceKey.pointingStartsTurns(talk: .controlOption, pointing: .controlOption, pointingEnabled: true, secondTalk: .rightOption) == false,
+                "the talk key still owns its own hold")
+        let hold = VoiceKey.owner(ofHold: .rightOption, talk: .controlOption, dictation: nil, pointing: .rightOption, pointingEnabled: true,
+                                  voiceOverOn: false, screenRecording: true, secondTalk: .rightOption)
+        #expect(hold == .talk(screenAware: true), "a hold of the second key is a talk turn")
+        let plain = VoiceKey.owner(ofHold: .rightOption, talk: .controlOption, dictation: nil, pointing: .rightOption, pointingEnabled: true,
+                                   voiceOverOn: false, screenRecording: true)
+        #expect(plain == .pointing, "with no second key, pointing keeps it")
+    }
+
+    @Test func theSecondKeyWaitsAtLeastTheTypingConfirm() {
+        #expect(VoiceKey.secondKeyConfirm == 0.25)
+        #expect(VoiceKey.secondTalkConfirm(tiling: 0) == 0.25, "Right Option types accents, so it never starts at the press")
+        #expect(VoiceKey.secondTalkConfirm(tiling: 0.15) == 0.25)
+        #expect(VoiceKey.secondTalkConfirm(tiling: 0.4) == 0.4, "tiling may ask for more")
+    }
 }

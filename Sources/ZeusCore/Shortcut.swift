@@ -185,6 +185,16 @@ public enum ShortcutStore {
         defaults.set(true, forKey: talkMigrationKey)
     }
 
+    /// The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md). STUB: always the default.
+    public static let secondTalkKey = "talk.secondShortcut"
+    public static let secondTalkDefault = Shortcut.rightOption
+
+    public static func loadSecondTalk(_ defaults: UserDefaults) -> (key: Shortcut?, explicit: Bool) {
+        (secondTalkDefault, false)
+    }
+
+    public static func recordSecondTalkChoice(_ shortcut: Shortcut?, in defaults: UserDefaults) {}
+
     /// nil means dictation has no key.
     public static func loadDictation(_ defaults: UserDefaults) -> Shortcut? {
         if let text = defaults.string(forKey: dictationKey) {
