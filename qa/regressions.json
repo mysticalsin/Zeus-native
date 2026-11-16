@@ -5771,6 +5771,18 @@
         "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
         "function": "drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage"
       }
+    },
+    {
+      "id": "REG-708",
+      "failure": "A screen drawing tag after spoken words, with no closing bracket, or with unbalanced braces could be read aloud as JSON, or held back the rest of the reply until the stream ended.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+        "function": "aTagWithNoClosingBracketIsNeverSpokenAndTheSpeechFollows"
+      }
     }
   ]
 }

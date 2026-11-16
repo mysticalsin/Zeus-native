@@ -5001,6 +5001,41 @@
               "function": "onlyAWinnerThatSawPixelsMayDraw"
             }
           ]
+        },
+        {
+          "id": "F11.talk-draw-leak",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A DRAW tag is never spoken: after spoken words, at the end, with no closing bracket, with unbalanced braces, with brackets inside its strings, or unterminated; the speech around it is kept and an unterminated tag is dropped at a size bound or at the stream end. Does not prove what a model writes.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "aTagAfterSpokenWordsIsNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "aTagAtTheEndOfTheReplyIsNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "aTagWithNoClosingBracketIsNeverSpokenAndTheSpeechFollows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "unbalancedBracesEndAtTheLineBreakAndTheSpeechStartsBeforeTheStreamEnds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "anUnterminatedTagIsDroppedAtTheSizeBoundAndAtTheEndOfTheStream"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "bracesAndBracketsInsideStringsDoNotEndTheTag"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
+              "function": "theWholeReplyParserAndTheSanitizerAlsoStripEveryShape"
+            }
+          ]
         }
       ]
     },
