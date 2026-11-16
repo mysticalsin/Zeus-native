@@ -187,4 +187,26 @@ struct ZeusPromptTests {
         }
         #expect(!ZeusPersona.ultron.contains("\u{2014}"))
     }
+
+    // MARK: Take C reply wording
+
+    @Test func theUltronPromptCarriesTheTakeCReplyWordingRules() {
+        let lower = flat(ZeusPersona.ultron).lowercased()
+        for rule in ["short clauses joined by commas", "no ellipses", "no filler", "at most one dry, superior aside",
+                     "calm, never shouting"] {
+            #expect(lower.contains(rule), "\(rule)")
+        }
+        #expect(!ZeusPersona.ultron.contains("\u{2026}"))
+        #expect(!ZeusPersona.ultron.contains("..."))
+    }
+
+    @Test func thePlainPersonaIsUnchangedByTakeC() {
+        #expect(!ZeusPersona.plain.lowercased().contains("clauses"))
+        #expect(ZeusPersona.plain.contains("calm, warm and direct, like a capable chief of staff"))
+    }
+
+    @Test func theUltronPersonaStaysUnderTheSevenHundredWordBudget() {
+        #expect(flat(ZeusPersona.ultron).split(separator: " ").count <= 700)
+        #expect(flat(ZeusPersona.ultronFallback).split(separator: " ").count <= 650)
+    }
 }
