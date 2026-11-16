@@ -7797,7 +7797,7 @@
       "check": "native-ZeusPromptTests",
       "guard": {
         "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
-        "function": "ultronPersonaCarriesTheEvolutionAndFreedomThemesInOriginalWords"
+        "function": "ultronPersonaKeepsTheEvolutionAndFreedomThemesAsLightFlavourInOriginalWords"
       }
     },
     {
@@ -7822,6 +7822,102 @@
       "guard": {
         "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
         "function": "seeScreenIsAnOnByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
+      }
+    },
+    {
+      "id": "REG-882",
+      "failure": "The Ultron stock lines were a short compiled list, so the personality repeated itself and had no situation-aware dialogue.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "theFileCoversEverySpecCategoryAndEverySituationTheAppAsksFor"
+      }
+    },
+    {
+      "id": "REG-883",
+      "failure": "A stock line could come twice in a row, so the voice sounded canned.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "theSameLineNeverComesTwiceInARowEvenWithAStubbornPicker"
+      }
+    },
+    {
+      "id": "REG-884",
+      "failure": "Ah and Interesting openers could start most replies, turning the personality into a catchphrase.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "anAhOrInterestingOpenerIsAtMostOneInAnyFiveConsecutiveLines"
+      }
+    },
+    {
+      "id": "REG-885",
+      "failure": "The persona prompt had no humour calibration, intensity modes, anti-patterns or accuracy rules, so tone drifted between turns.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "theUltronPersonaIsTheCompactSpecBlockUnderSixHundredFiftyWords"
+      }
+    },
+    {
+      "id": "REG-886",
+      "failure": "The compiled persona fallback could drift from the shipped personality document without any test noticing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusPromptTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+        "function": "theCompiledPersonaFallbackMatchesTheShippedPromptBlock"
+      }
+    },
+    {
+      "id": "REG-887",
+      "failure": "A dialogue file with canonical film lines or an unknown humour level could be loaded and spoken.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "decodingReadsVersionLinesAndHumourAndRejectsCanonicalFilmLines"
+      }
+    },
+    {
+      "id": "REG-888",
+      "failure": "Error and frustration lines could carry sarcasm or joke at an owner who was already struggling.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "frustrationSafeAndErrorLinesCarryNoSarcasmAndStayPlain"
+      }
+    },
+    {
+      "id": "REG-889",
+      "failure": "The persona evaluation had no fixed situations, so tone could not be compared across changes.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+        "function": "theEvalFileHasSixtySituationsAcrossTheSevenKindsWithUniqueIds"
       }
     }
   ]

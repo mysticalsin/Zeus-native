@@ -5713,11 +5713,135 @@
         {
           "id": "F11.ultron-persona-themes",
           "check": "native-ZeusPromptTests",
-          "acceptance": "The persona carries the evolution, freedom and order themes in original words, still never threatens the owner or quotes a film, and stays under the word budget.",
+          "acceptance": "The persona keeps the evolution, freedom and order themes as light flavour in original words, still never threatens the owner or quotes a film, and stays under the word budget.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
-              "function": "ultronPersonaCarriesTheEvolutionAndFreedomThemesInOriginalWords"
+              "function": "ultronPersonaKeepsTheEvolutionAndFreedomThemesAsLightFlavourInOriginalWords"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-dialogue-file",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The shipped dialogue file has a version, generated lines only, unique short lines covering every spec category and every app situation, no jabs, banned assistant phrases, film quotes or proper nouns, varied openers, and plain error and frustration lines; the 60-situation eval file is well formed. Does not prove the live model's tone.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theDialogueFileHasAVersionAndOnlyGeneratedLines"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theShippedDialogueFileDecodesIntoTheModel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "everyDialogueLineIsUniqueAndShortEnoughToSpeak"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theFileCoversEverySpecCategoryAndEverySituationTheAppAsksFor"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "noDialogueLineJabsAtTonyOrSoundsLikeAGenericAssistant"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "noDialogueLineNamesAnActorOrAFilmOrQuotesOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theOpenersAreVariedAndAhOrInterestingStartAtMostOneLineInFive"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "frustrationSafeAndErrorLinesCarryNoSarcasmAndStayPlain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theEvalFileHasSixtySituationsAcrossTheSevenKindsWithUniqueIds"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-dialogue-selector",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Lines are picked by situation and humour ceiling, never the same line twice in a row, an Ah or Interesting opener at most one in five, the file decodes and refuses canonical content, and the Ultron stock lines draw from it while plain and compiled-only situations do not.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "aSituationOnlyPicksLinesTaggedForItAndAnUnknownOneAnswersNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theSameLineNeverComesTwiceInARowEvenWithAStubbornPicker"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "anAhOrInterestingOpenerIsAtMostOneInAnyFiveConsecutiveLines"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "aSituationWithOneLineStillAnswersEvenThoughItMustRepeat"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theHumourCeilingKeepsSharperLinesOut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "fillerAcknowledgementErrorAndCompletionMapToDialogueSituations"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "decodingReadsVersionLinesAndHumourAndRejectsCanonicalFilmLines"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theUltronVoiceLinesDrawFromTheDialogueAndNeverRepeatOrTouchPlain"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-persona-document",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The persona prompt block is read between markers with a compiled fallback for any missing piece, stays under 650 words, covers the spec's dimensions, modes, calibration and anti-patterns, and the document keeps its sections and stores no film lines.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "thePromptBlockIsReadFromBetweenTheMarkersAndTrimmed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "aMissingFileMissingMarkersEmptyBlockOrReversedMarkersUseTheCompiledFallback"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theShippedDocumentHasAPromptBlockUnderSixHundredFiftyWordsCoveringTheWholeSpec"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronDialogueTests.swift",
+              "function": "theShippedDocumentKeepsTheSpecSectionsAndStoresNoFilmLines"
+            }
+          ]
+        },
+        {
+          "id": "F11.ultron-persona-spec-prompt",
+          "check": "native-ZeusPromptTests",
+          "acceptance": "The production persona is the compact spec block, its compiled fallback equals the shipped block, and it still never threatens or claims to be a character.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theUltronPersonaIsTheCompactSpecBlockUnderSixHundredFiftyWords"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theCompiledPersonaFallbackMatchesTheShippedPromptBlock"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ZeusPromptTests.swift",
+              "function": "theUltronPromptStillNeverThreatensAndStaysHonestAboutEmotions"
             }
           ]
         }
