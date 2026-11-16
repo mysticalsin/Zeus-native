@@ -851,6 +851,14 @@
       "scope": "The production VoiceTurnController runTurn with a scripted reply, a fake voice and a fake presenter: marks reveal with their sentence, nothing draws with the setting off or from a blind engine, and a new turn clears. No capture, microphone, audio or network."
     },
     {
+      "id": "native-TalkVisualOverlayTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "TalkVisualOverlayTests",
+      "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+      "scope": "Own-process drawing panels with a synthetic or main display and capture geometry: ring, arrow and label are laid out in capture space, the panel ignores input, is excluded from capture and is removed on hide. No capture, key tap or permission."
+    },
+    {
       "id": "missing-F14-contract",
       "kind": "unimplemented",
       "tier": "contract",
@@ -4906,6 +4914,25 @@
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "theNextKeyPressClearsADrawingAndANeverDrawnTurnClearsNothing"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-overlay",
+          "check": "native-TalkVisualOverlayTests",
+          "acceptance": "A ring, an arrow and a label lay out in capture space and show on the display panel, which ignores input and is gone after hide; more marks of one capture reuse the panel. Does not prove pixels on a real screen.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+              "function": "aRingAnArrowAndALabelAreLaidOutInCaptureSpaceAndHideLeavesNoPanel"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+              "function": "revealingMoreMarksReusesThePanelOfTheSameCapture"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+              "function": "aSceneWithNoMarkOfThisCaptureShowsNothing"
             }
           ]
         }

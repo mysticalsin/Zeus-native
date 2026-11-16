@@ -5747,6 +5747,18 @@
         "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
         "function": "aMarkIsRevealedWithItsSentenceBeforeTheNextLineBegins"
       }
+    },
+    {
+      "id": "REG-706",
+      "failure": "Marks from a talk answer could fail to render in capture space on the main display, take input, or stay as a window after hiding.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkVisualOverlayTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
+        "function": "aRingAnArrowAndALabelAreLaidOutInCaptureSpaceAndHideLeavesNoPanel"
+      }
     }
   ]
 }
