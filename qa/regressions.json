@@ -5906,14 +5906,14 @@
     },
     {
       "id": "REG-721",
-      "failure": "The close motion token was not checked against the recorded close heights, so a curve that stepped or bounced could ship.",
+      "failure": "The close fit test used hidden fitting knobs (a 60 pt end and a time offset) the app never draws; it now models the real closed height and is gated against the old linear close.",
       "features": [
         "F13"
       ],
       "check": "native-ZeusCoreTests",
       "guard": {
         "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
-        "function": "theCloseSpringFitsTheMeasuredCloseWithNoOvershoot"
+        "function": "theCloseSpringFitsTheMeasuredCloseBetterThanTheOldLinearClose"
       }
     },
     {

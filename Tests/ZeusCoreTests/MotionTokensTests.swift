@@ -5,24 +5,50 @@ import Testing
 /// The one table of motion tokens (docs/SMOOTH-MOTION-PLAN.md section 2) and the numbers it must meet.
 @Suite("Motion tokens")
 struct MotionTokensTests {
-    private static func fitRMS(_ spring: SpringToken) -> Double {
-        let start = GlanceTopBar.measuredClose[0].height
-        let end = GlanceTopBar.measuredCloseEnd
-        var squares = 0.0
-        for sample in GlanceTopBar.measuredClose {
-            let t = max(0, sample.ms / 1000 + GlanceTopBar.measuredCloseOffset)
-            let model = end + (start - end) * GlanceTopBar.springRemaining(at: t, response: spring.response, damping: spring.damping)
-            squares += (model - sample.height) * (model - sample.height)
+    /// What the app draws on close: the body goes from the recorded start height to the real closed body height (the
+    /// notch plus the strip that hangs below it), with no time offset and no hidden end point.
+    static var closedBodyHeight: Double { Double(GlanceTopBar.closedSize.height + NotchClosedBodyLayout.belowNotch) }
+
+    static func closeRMS(response: Double, damping: Double) -> Double {
+        let start = GlanceTopBar.measuredClose[0].height, end = closedBodyHeight
+        let squares = GlanceTopBar.measuredClose.reduce(0.0) { sum, sample in
+            let model = end + (start - end) * GlanceTopBar.springRemaining(at: sample.ms / 1000, response: response, damping: damping)
+            return sum + (model - sample.height) * (model - sample.height)
         }
         return (squares / Double(GlanceTopBar.measuredClose.count)).squareRoot()
     }
 
-    @Test func theCloseSpringFitsTheMeasuredCloseWithNoOvershoot() {
+    /// The old close: linear over 0.1 s from the same start to the same end.
+    static func linearCloseRMS(duration: Double = 0.1) -> Double {
+        let start = GlanceTopBar.measuredClose[0].height, end = closedBodyHeight
+        let squares = GlanceTopBar.measuredClose.reduce(0.0) { sum, sample in
+            let model = end + (start - end) * max(0, 1 - sample.ms / 1000 / duration)
+            return sum + (model - sample.height) * (model - sample.height)
+        }
+        return (squares / Double(GlanceTopBar.measuredClose.count)).squareRoot()
+    }
+
+    /// Measured on the recorded samples (231 down to 38 pt, no offset): the old linear 0.1 s close is 19.4 pt rms off,
+    /// the critically damped spring at response 0.175 is 12.5 pt rms off. The recording ends on a strip that fades, so
+    /// the spring cannot match its tail; the gate is that it is clearly closer than linear, is the best response of
+    /// a sweep (within a tenth of a point), never overshoots, only falls, and is done within a quarter second.
+    @Test func theCloseSpringFitsTheMeasuredCloseBetterThanTheOldLinearClose() {
         let spring = MotionTokens.panelClose
-        #expect(Self.fitRMS(spring) < 8, "rms \(Self.fitRMS(spring)) pt")
-        let lowest = (0...600).map { GlanceTopBar.springRemaining(at: Double($0) / 600, response: spring.response, damping: spring.damping) }.min()!
-        #expect(lowest > -0.0001, "the close must not bounce")
+        let rms = Self.closeRMS(response: spring.response, damping: spring.damping)
+        let linear = Self.linearCloseRMS()
+        #expect(rms < 0.75 * linear, "spring \(rms) pt rms, linear \(linear) pt rms")
+        let best = stride(from: 0.06, through: 0.4, by: 0.005).map { Self.closeRMS(response: $0, damping: 1) }.min()!
+        #expect(rms <= best + 0.1, "spring \(rms), best of the sweep \(best)")
         #expect(spring.damping >= 1)
+        var previous = 1.0
+        for frame in 0...600 {
+            let remaining = GlanceTopBar.springRemaining(at: Double(frame) / 600, response: spring.response, damping: spring.damping)
+            #expect(remaining >= -0.0001, "the close must not bounce")
+            #expect(remaining <= previous + 1e-9, "the close only falls")
+            previous = remaining
+        }
+        let distance = GlanceTopBar.measuredClose[0].height - Self.closedBodyHeight
+        #expect(GlanceTopBar.settleTime(response: spring.response, damping: spring.damping, distance: distance, tolerance: 1) <= 0.25)
     }
 
     @Test func theCueSpringSettlesUnder120msOver120pt() {

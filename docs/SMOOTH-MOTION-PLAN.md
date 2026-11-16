@@ -14,7 +14,7 @@ left alone.
 1. Panel snaps shut: `TopBarStyle.closeMotion = .linear(GlanceTopBar.closeDuration)` (TopBarViews.swift:18,
    GlanceTopBar.swift:66) drives height, width, drop and content removal (NotchView.swift:232, 235, 241, 405). The
    recorded close heights (GlanceTopBar.swift:64-65) ease into the end: linear 0.1 s misses them by 17 to 22 pt rms; a
-   critically damped spring (response 0.165, damping 1.0) by 5.2 pt. Comment at :62 ("a firm 0.40 s") contradicts the code.
+   critically damped spring (response 0.175, damping 1.0) by 12.5 pt, measured against the real closed height (38 pt) with no time offset; an earlier 5.2 pt figure used a 60 pt end and an 8 ms offset the app does not draw. Comment at :62 ("a firm 0.40 s") contradicts the code.
 2. Panel height jumps on tab switch (Home and others differ by 122 pt; also home strip and approval height): size
    depends on `selectedTab` (NotchView.swift:199) but the size animations key only on `shownHeight`, `presentation`,
    `closedWidthKey` (:231-235); a tab tap sets `selectedTab` without animation (TopBarViews.swift:314). Inferred from code.
@@ -42,7 +42,7 @@ All in one table; under Reduce Motion every token is instant or the 0.12 s cross
 | --- | --- |
 | panelOpen (width) | spring 0.30 / 0.87 (keep) |
 | panelOpenHeight | spring 0.105 / 1.0 (keep) |
-| panelClose | spring 0.165 / 1.0 (new; no overshoot) |
+| panelClose | spring 0.175 / 1.0 (new; no overshoot) |
 | panelResize, page | spring 0.34 / 0.84 (existing `Motion.page`) |
 | cueGrow | spring 0.12 / 0.90 (settles in about 105 ms over 120 pt, first frame about 7 percent) |
 | pageOut | opacity, easeOut 0.08 |

@@ -120,17 +120,11 @@ struct GlanceTopBarTests {
     }
 
     @Test func closeFitsGlancesMeasuredHeightsWithoutOvershoot() {
-        // Glance (parity/N8): the recorded body heights while it shrinks; the spring must follow within 8 pt rms.
+        // Glance (parity/N8): the recorded body heights while it shrinks. The honest model is the start height to the
+        // real closed height with no offset; the numbers are stated in MotionTokensTests.
         let spring = GlanceTopBar.closeSpring
-        let start = GlanceTopBar.measuredClose[0].height, end = GlanceTopBar.measuredCloseEnd
-        var squares = 0.0
-        for sample in GlanceTopBar.measuredClose {
-            let t = max(0, sample.ms / 1000 + GlanceTopBar.measuredCloseOffset)
-            let model = end + (start - end) * GlanceTopBar.springRemaining(at: t, response: spring.response, damping: spring.damping)
-            squares += (model - sample.height) * (model - sample.height)
-        }
-        let rms = (squares / Double(GlanceTopBar.measuredClose.count)).squareRoot()
-        #expect(rms < 8, "rms \(rms) pt from Glance")
+        let rms = MotionTokensTests.closeRMS(response: spring.response, damping: spring.damping)
+        #expect(rms < 0.75 * MotionTokensTests.linearCloseRMS(), "rms \(rms) pt from Glance")
         #expect(spring.damping >= 1)
     }
 

@@ -8,7 +8,7 @@ import ZeusCore
 @MainActor
 struct MotionAppTokensTests {
     @Test func theCloseIsTheCriticallyDampedPanelSpring() {
-        #expect(TopBarStyle.closeMotion == .spring(response: 0.165, dampingFraction: 1.0))
+        #expect(TopBarStyle.closeMotion == .spring(response: 0.175, dampingFraction: 1.0))
         #expect(Motion.panelClose == TopBarStyle.closeMotion)
     }
 

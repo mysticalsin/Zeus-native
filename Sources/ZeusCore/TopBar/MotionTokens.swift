@@ -18,7 +18,7 @@ public enum MotionTokens {
     /// Panel height on hover open; it leads the width.
     public static let panelOpenHeight = SpringToken(response: 0.105, damping: 1.0)
     /// Panel close: critically damped, no overshoot, fitted to the recorded close heights.
-    public static let panelClose = SpringToken(response: 0.165, damping: 1.0)
+    public static let panelClose = SpringToken(response: 0.175, damping: 1.0)
     /// Panel resize on a tab change, and page content.
     public static let panelResize = SpringToken(response: 0.34, damping: 0.84)
     /// HUD cue wings growing: settles in about 105 ms over 120 pt.

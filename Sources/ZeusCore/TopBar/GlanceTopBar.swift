@@ -59,7 +59,7 @@ public enum GlanceTopBar {
 
     // Motion. Open: fitted to Glance's 60 fps hover-open (parity/N7-glance.mp4, width along y 37),
     // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: a critically
-    // damped spring (no overshoot) fitted to Glance's recorded close heights, rms about 5 pt. The bloom rim is
+    // damped spring (no overshoot) fitted to Glance's recorded close heights, rms about 12 pt against the real closed height (the old linear close was 19). The bloom rim is
     // 9 pt and gone by 0.4 s.
     public static let openSpring = (response: MotionTokens.panelOpen.response, damping: MotionTokens.panelOpen.damping)
     /// Close: Glance shrinks into the notch over about 6 frames (parity/N8-glance.mp4, height at x 1000:
@@ -69,10 +69,6 @@ public enum GlanceTopBar {
     public static let measuredClose: [(ms: Double, height: Double)] = [
         (0, 231), (16.7, 184), (33.3, 157), (50, 114), (66.7, 101), (83.3, 90), (100, 72), (116.7, 65),
     ]
-    /// The height the recorded close runs toward before the thin strip fades (fitted, with the offset below).
-    public static let measuredCloseEnd = 60.0
-    /// When the fitted spring starts relative to the first recorded frame.
-    public static let measuredCloseOffset = 0.008
     public static let closeDelay = 0.5
     /// The open height leads the width: Glance's body is about 163 pt tall in the first frame the width
     /// is 311 (parity/N7, height_track.py), full by about 130 ms; fitted rms 15.6 pt (shadow in the trace).
