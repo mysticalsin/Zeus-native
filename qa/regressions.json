@@ -7331,6 +7331,18 @@
         "file": "Tests/ZeusCoreTests/RecordlyVisualsTests.swift",
         "function": "micRowShowsOnlyWhenMicrophoneCaptureIsOn"
       }
+    },
+    {
+      "id": "REG-766",
+      "failure": "The notch permission hint was cut off mid-word (Turn it on to use fa...) because it was a single fixed-width line.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "thePermissionCueWrapsInsteadOfTruncatingMidWord"
+      }
     }
   ]
 }

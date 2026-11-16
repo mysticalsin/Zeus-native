@@ -1655,7 +1655,9 @@ struct ClosedWings: View {
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .permission(let text, let pane):
             HStack(spacing: 6) {
-                Text(text).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                // Wraps on word boundaries instead of cutting mid-word: the wing width is fixed and the copy varies.
+                Text(text).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit(2).multilineTextAlignment(.trailing).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                 Button("Open") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(url) }
                 }
