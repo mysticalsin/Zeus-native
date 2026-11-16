@@ -171,6 +171,20 @@ enum SnapshotRenderer {
             save(NotchStage(model: model, topBar: topBar, footprint: .hardware(ownerNotch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("topbar-wide-notch-\(name).png"))
         }
+        // Fling's cards and papers, drawn on their own.
+        let flingDeadline = Date().addingTimeInterval(42)
+        func flingCard(_ kind: FlingPromptModel.Kind, askWhere: Bool = false) -> some View {
+            ZStack {
+                Theme.storm
+                FlingPromptCard(model: FlingPromptModel(kind: kind, deadline: flingDeadline, clock: Date.init, onAnswer: { _ in }, askWhere: askWhere))
+            }.environment(\.colorScheme, .dark)
+        }
+        saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: true)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-asked")
+        saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: false)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-starter")
+        saveSurface(flingCard(.offer(peerName: "Alpha Mac", itemCount: 3, totalBytes: 12_400_000)), size: CGSize(width: 340, height: 130), name: "fling-prompt-offer")
+        saveSurface(flingCard(.offer(peerName: "Alpha Mac", itemCount: 1, totalBytes: 4_100_000_000), askWhere: true), size: CGSize(width: 340, height: 130), name: "fling-prompt-ask")
+        saveSurface(ZStack { Theme.storm; FlingPaperView(url: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff"), peer: "Alpha Mac", close: {}) }
+            .environment(\.colorScheme, .dark), size: CGSize(width: 220, height: 160), name: "fling-paper")
         // Alerts page: nothing to show.
         saveSurface(ZStack { Theme.storm; AlertsAllClear() }.environment(\.colorScheme, .dark), size: CGSize(width: 480, height: 236), name: "alerts-page-empty")
         // The meeting card in every state, with synthetic meetings.
@@ -1203,6 +1217,10 @@ enum SnapshotRenderer {
             states.append((String(format: "%02d-page-tiling-%@", 10 + index, state.rawValue), make(.tiling) { _, t in
                 t.tilingForSnapshot = TilingController.snapshotFixture(state)
             }))
+        }
+        // The Shelf with Fling: off, Macs nearby, a send under way, Local Network refused, and a stack.
+        for (name, fling, items) in FlingSnapshotFling.shelfStates {
+            states.append(("28-page-shelf-fling-\(name)", make(.shelf) { _, t in t.fling = fling; t.shelf = items }))
         }
         // The Record page in the states a person meets: one or two displays, permission missing, countdown, recording, saved.
         for (name, displays, granted, state) in RecordlySnapshotFixtures.pageStates {
