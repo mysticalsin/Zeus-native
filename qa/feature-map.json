@@ -6910,6 +6910,66 @@
             {
               "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
               "function": "threeDeclinesMuteAnIdAndOnlyOnePromptShows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "bytesBeyondTheDeclaredSizeFailTheTransfer"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "aHashMismatchDeletesTheTempFileAndTellsTheSender"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "everyEndStateExceptDoneDeletesTheTempFolder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+              "function": "aStackIdIsRememberedForTenMinutes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "aBadOfferIsDeclinedBeforeAnyPrompt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingSaveRulesTests.swift",
+              "function": "arrivalsGoToDownloadsFlingOrTheInbox"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+              "function": "peersAreFreshForTenSecondsAndPairedFirst"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingFlickTests.swift",
+              "function": "theSensitivityThresholdsAreExact"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingShelfRecordTests.swift",
+              "function": "recordsPersistWithOwnerOnlyPermissionsAndAreCappedAtFiveHundred"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "theOfferWaitsForEveryHash"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+              "function": "connectionCapsAndTimeouts"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+              "function": "visibilityDecidesWhatIsAdvertisedAndWhichListenersRun"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingShelfRecordTests.swift",
+              "function": "anUnreadableFileIsNeverOverwritten"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "cancelFromAnyStateSendsCancelAndALostPeerNeverResumes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+              "function": "aReplayedStackIsDeclined"
             }
           ]
         },

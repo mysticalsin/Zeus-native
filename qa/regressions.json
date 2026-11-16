@@ -5855,6 +5855,150 @@
         "file": "Tests/ZeusCoreTests/FlingPairingTests.swift",
         "function": "threeDeclinesMuteAnIdAndOnlyOnePromptShows"
       }
+    },
+    {
+      "id": "REG-669",
+      "failure": "A Fling file that sent more bytes than it declared was still written.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+        "function": "bytesBeyondTheDeclaredSizeFailTheTransfer"
+      }
+    },
+    {
+      "id": "REG-670",
+      "failure": "A Fling file whose hash did not match was kept, or the sender was not told.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+        "function": "aHashMismatchDeletesTheTempFileAndTellsTheSender"
+      }
+    },
+    {
+      "id": "REG-671",
+      "failure": "A failed, declined or cancelled Fling arrival left its partial folder behind.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+        "function": "everyEndStateExceptDoneDeletesTheTempFolder"
+      }
+    },
+    {
+      "id": "REG-672",
+      "failure": "A repeated Fling stack id was accepted again inside ten minutes.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+        "function": "aStackIdIsRememberedForTenMinutes"
+      }
+    },
+    {
+      "id": "REG-674",
+      "failure": "A Fling offer that broke a rule reached a prompt instead of being declined first.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+        "function": "aBadOfferIsDeclinedBeforeAnyPrompt"
+      }
+    },
+    {
+      "id": "REG-675",
+      "failure": "Fling arrivals landed outside Downloads/Fling, or in Downloads without access.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingSaveRulesTests.swift",
+        "function": "arrivalsGoToDownloadsFlingOrTheInbox"
+      }
+    },
+    {
+      "id": "REG-676",
+      "failure": "A Fling peer stayed listed after ten seconds, or was shown under its advertised name once paired.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+        "function": "peersAreFreshForTenSecondsAndPairedFirst"
+      }
+    },
+    {
+      "id": "REG-677",
+      "failure": "A Fling flick fired below its sensitivity threshold or picked the wrong target.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingFlickTests.swift",
+        "function": "theSensitivityThresholdsAreExact"
+      }
+    },
+    {
+      "id": "REG-678",
+      "failure": "The persisted Fling Shelf record grew past 500, was world-readable, or overwrote a file it could not read.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingShelfRecordTests.swift",
+        "function": "recordsPersistWithOwnerOnlyPermissionsAndAreCappedAtFiveHundred"
+      }
+    },
+    {
+      "id": "REG-679",
+      "failure": "A Fling offer was sent before every hash was ready.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
+        "function": "theOfferWaitsForEveryHash"
+      }
+    },
+    {
+      "id": "REG-694",
+      "failure": "Fling accepted more than eight connections or two transfers from one peer.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+        "function": "connectionCapsAndTimeouts"
+      }
+    },
+    {
+      "id": "REG-695",
+      "failure": "Fling advertised or listened beyond what the visibility setting allows.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPeersTests.swift",
+        "function": "visibilityDecidesWhatIsAdvertisedAndWhichListenersRun"
+      }
     }
   ]
 }

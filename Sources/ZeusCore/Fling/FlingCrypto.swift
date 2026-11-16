@@ -1,6 +1,18 @@
 import CryptoKit
 import Foundation
 
+/// Incremental SHA-256 for files that arrive in chunks.
+public struct FlingHasher: Sendable {
+    private var hash = SHA256()
+    public init() {}
+    public mutating func update(_ data: Data) { hash.update(data: data) }
+    /// Lowercase hex of everything fed so far; the hasher can keep going afterwards.
+    public func finalHex() -> String {
+        let copy = hash
+        return copy.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+}
+
 public struct FlingPairSecrets: Equatable, Sendable {
     /// Six digits, shown on both Macs.
     public let code: String
@@ -25,6 +37,11 @@ public struct FlingPairingEntropy: Sendable {
 public enum FlingCrypto {
     public static func commitment(pub: Data, nonce: Data) -> Data {
         Data(SHA256.hash(data: pub + nonce))
+    }
+
+    /// Lowercase hex SHA-256, the form an offer carries.
+    public static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func lengthPrefixed(_ text: String) -> Data {
