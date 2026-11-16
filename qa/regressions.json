@@ -6349,6 +6349,42 @@
       }
     },
     {
+      "id": "REG-758",
+      "failure": "When the buddy followed the pointer to another display its display link stayed on the first display's refresh rate.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theLinkMovesWithTheBuddyWhenItCrossesToAnotherDisplay"
+      }
+    },
+    {
+      "id": "REG-759",
+      "failure": "The frame loop never checked which display the buddy was on, so the link was only rebound when screens changed.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-BuddyMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/BuddyMotionTests.swift",
+        "function": "theFrameLoopChecksTheBuddysDisplayEveryTick"
+      }
+    },
+    {
+      "id": "REG-760",
+      "failure": "The mascot's idle stroll switched to the 60 fps display link one clip frame (up to 83 ms) after it had started moving, so its first steps jumped.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MascotMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+        "function": "theDisplayLinkStartsOneTickBeforeTheStrollSoItsFirstFramesAreNotLate"
+      }
+    },
+    {
       "id": "REG-637",
       "failure": "A start from the other talk key reached the owner while a turn was open, so one hold or one hands-free turn could open the microphone twice.",
       "features": [

@@ -31,6 +31,22 @@ struct BuddyMotionTests {
         #expect(BuddyController.windowIndex(containing: CGPoint(x: 5000, y: 10), in: [left, right]) == nil)
     }
 
+    @Test func theLinkMovesWithTheBuddyWhenItCrossesToAnotherDisplay() {
+        #expect(BuddyController.needsRebind(shownIndex: 1, linkedIndex: 0))
+        #expect(BuddyController.needsRebind(shownIndex: 0, linkedIndex: nil))
+        #expect(!BuddyController.needsRebind(shownIndex: 1, linkedIndex: 1))
+        #expect(!BuddyController.needsRebind(shownIndex: nil, linkedIndex: 0))
+    }
+
+    @Test func theFrameLoopChecksTheBuddysDisplayEveryTick() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zeus/Overlay/BuddyController.swift"), encoding: .utf8)
+        let tick = try #require(source.range(of: "@objc private func tick(_ link: CADisplayLink)"))
+        let next = try #require(source.range(of: "private func advanceFlight(", range: tick.upperBound..<source.endIndex))
+        #expect(source[tick.upperBound..<next.lowerBound].contains("Self.needsRebind("))
+    }
+
     @Test func theLinkIsRecreatedWhenTheScreensChange() throws {
         let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -48,7 +64,7 @@ struct BuddyMotionTests {
             .appendingPathComponent("Sources/Zeus/Overlay/BuddyController.swift"), encoding: .utf8)
         #expect(source.contains("$0.timingFunction = CAMediaTimingFunction(name: timing.curve)"))
         #expect(source.contains("$0.duration = timing.duration"))
-        #expect(source.contains("Self.linkScreen(window: shownWindowScreen()"))
+        #expect(source.contains("Self.linkScreen(window: shown.flatMap { windows[$0].screen }"))
         #expect(!source.contains("(NSScreen.main ?? NSScreen.screens[0]).displayLink"))
     }
 }

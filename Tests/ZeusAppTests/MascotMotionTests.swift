@@ -188,6 +188,17 @@ struct MascotMotionTests {
         #expect(!MascotMotion.at(1, mood: .awake(.idle), size: 22).travelling)
     }
 
+    @Test func theDisplayLinkStartsOneTickBeforeTheStrollSoItsFirstFramesAreNotLate() throws {
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let before = walkStart - 0.05
+        #expect(!MascotMotion.at(before, mood: .awake(.idle), size: 22).travelling)
+        #expect(MascotMotion.travels(at: before, within: 1.0 / 12, mood: .awake(.idle), size: 22))
+        #expect(!MascotMotion.travels(at: before, within: 0.01, mood: .awake(.idle), size: 22))
+        #expect(MascotMotion.travels(at: walkStart + 0.8, within: 0, mood: .awake(.idle), size: 22))
+        let source = try String(contentsOf: Self.animDirectory.deletingLastPathComponent().appendingPathComponent("MascotMotion.swift"), encoding: .utf8)
+        #expect(source.contains("travelling: MascotMotion.travels(at: t, within: clock.interval"))
+    }
+
     @MainActor @Test func theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer() throws {
         let atlas = MascotAtlasStore(directory: Self.animDirectory)
         let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
