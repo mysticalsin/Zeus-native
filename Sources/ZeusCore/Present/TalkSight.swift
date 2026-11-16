@@ -110,7 +110,7 @@ extension TalkSightPolicy {
             text = text.replacingOccurrences(of: "\n\n" + drawInstructions, with: "")
                 .replacingOccurrences(of: drawInstructions, with: "")
         }
-        return request.with(systemPrompt: text, screenshots: [], screenReason: .imagesBlocked, carriesDrawImage: false)
+        return request.with(screenshots: [], systemPrompt: text, screenReason: .imagesBlocked, carriesDrawImage: false)
     }
 }
 

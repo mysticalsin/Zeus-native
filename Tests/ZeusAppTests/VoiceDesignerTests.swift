@@ -98,7 +98,9 @@ struct VoiceDesignerTests {
         let plain = ElevenLabsVoice.voiceSettings(for: .plain)
         let ultronStability = try #require(ultron["stability"] as? Double)
         let plainStability = try #require(plain["stability"] as? Double)
-        #expect(ultronStability < plainStability)
+        // Take C (owner choice): steadier than plain, expressive through style instead.
+        #expect(ultronStability > plainStability)
+        #expect((ultron["style"] as? Double ?? 0) > (plain["style"] as? Double ?? 0))
         #expect(ultronStability == 0.6)
         #expect((ultron["style"] as? Double ?? 0) == 0.3)
         #expect(ultron["use_speaker_boost"] as? Bool == true)
