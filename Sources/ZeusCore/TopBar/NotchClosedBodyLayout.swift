@@ -18,9 +18,9 @@ public enum NotchClosedBodyLayout {
     /// and glow show instead of sitting under the hardware.
     public static let belowNotch: CGFloat = 6
 
-    /// Spring for HUD cues widening the closed notch (R24: settle in under 120 ms).
-    public static let wingsSpringResponse: Double = 0.09
-    public static let wingsSpringDamping: Double = 0.86
+    /// Spring for HUD cues widening the closed notch (R24: settle in under 120 ms); the numbers live in `MotionTokens`.
+    public static let wingsSpringResponse: Double = MotionTokens.cueGrow.response
+    public static let wingsSpringDamping: Double = MotionTokens.cueGrow.damping
 
     /// Where the closed wings sit, as x-ranges relative to the body centre. The body stays centred on the
     /// notch and both wings grow by the same extra, so the middle gap is exactly the notch.

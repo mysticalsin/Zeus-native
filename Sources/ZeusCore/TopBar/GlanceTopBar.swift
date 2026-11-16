@@ -58,16 +58,26 @@ public enum GlanceTopBar {
     public static let tallPageHeight: CGFloat = 236
 
     // Motion. Open: fitted to Glance's 60 fps hover-open (parity/N7-glance.mp4, width along y 37),
-    // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: not yet
-    // recorded on Glance; a firm 0.40 s with no overshoot. The bloom rim is 9 pt and gone by 0.4 s.
-    public static let openSpring = (response: 0.30, damping: 0.87)
+    // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: a critically
+    // damped spring (no overshoot) fitted to Glance's recorded close heights, rms about 5 pt. The bloom rim is
+    // 9 pt and gone by 0.4 s.
+    public static let openSpring = (response: MotionTokens.panelOpen.response, damping: MotionTokens.panelOpen.damping)
     /// Close: Glance shrinks into the notch over about 6 frames (parity/N8-glance.mp4, height at x 1000:
     /// 231, 184, 157, 114, 101, 90, 72, 65, then a thin strip fades), about 0.54 s after the pointer leaves.
     public static let closeDuration = 0.1
+    public static let closeSpring = (response: MotionTokens.panelClose.response, damping: MotionTokens.panelClose.damping)
+    /// Glance's recorded close: ms after the close starts (60 fps frames), body height in pt.
+    public static let measuredClose: [(ms: Double, height: Double)] = [
+        (0, 231), (16.7, 184), (33.3, 157), (50, 114), (66.7, 101), (83.3, 90), (100, 72), (116.7, 65),
+    ]
+    /// The height the recorded close runs toward before the thin strip fades (fitted, with the offset below).
+    public static let measuredCloseEnd = 60.0
+    /// When the fitted spring starts relative to the first recorded frame.
+    public static let measuredCloseOffset = 0.008
     public static let closeDelay = 0.5
     /// The open height leads the width: Glance's body is about 163 pt tall in the first frame the width
     /// is 311 (parity/N7, height_track.py), full by about 130 ms; fitted rms 15.6 pt (shadow in the trace).
-    public static let openHeightSpring = (response: 0.105, damping: 1.0)
+    public static let openHeightSpring = (response: MotionTokens.panelOpenHeight.response, damping: MotionTokens.panelOpenHeight.damping)
 
     /// Glance's measured open: ms after the body first reaches y 37, width there in pt.
     public static let measuredOpen: [(ms: Double, width: Double)] = [
