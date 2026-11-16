@@ -97,4 +97,29 @@ import ZeusCore
         #expect(g.bodyWidth == expected)
         #expect(g.rightWing.lowerBound == 110)
     }
+
+    // MARK: Island background
+
+    @Test func theClosedBodyHangsSixPointsBelowTheHardwareNotch() {
+        #expect(NotchClosedBodyLayout.belowNotch == 6)
+    }
+
+    @Test func blackIsTheDefaultBackgroundAndAnythingUnknownIsBlack() {
+        #expect(NotchBackground.settingID == "notch.background")
+        #expect(NotchBackground.allCases.map(\.rawValue) == ["Black", "Transparent"])
+        #expect(NotchBackground.resolve("Black") == .black)
+        #expect(NotchBackground.resolve("Transparent") == .transparent)
+        for stray in ["", "black", "transparent ", "Clear", "nope"] { #expect(NotchBackground.resolve(stray) == .black) }
+    }
+
+    @Test func blackDrawsFillOutlineAndGlowInEveryPresentation() {
+        for closed in [true, false] {
+            #expect(NotchBackground.black.layers(closed: closed) == NotchBodyLayers(fill: true, outline: true, glow: true))
+        }
+    }
+
+    @Test func transparentDrawsNoFillOutlineOrGlowWhileClosedAndKeepsThemOpen() {
+        #expect(NotchBackground.transparent.layers(closed: true) == NotchBodyLayers(fill: false, outline: false, glow: false))
+        #expect(NotchBackground.transparent.layers(closed: false) == NotchBodyLayers(fill: true, outline: true, glow: true))
+    }
 }

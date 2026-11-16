@@ -721,7 +721,7 @@ final class NotchController {
 
     /// Where the line sits, in screen coordinates: centred under the notch.
     private func notificationLineRect(_ screen: NSScreen) -> CGRect {
-        let top = screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - 6
+        let top = screen.frame.maxY - topOffset - NotchFootprintRules.closedBarHeight(footprint) - 6
         // Room for the fanned stack and the hover actions, so the pointer stays on the capsule while it grows.
         let height = AlertCapsule.actionHeight + 24
         return CGRect(x: anchorFrame(screen).midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)

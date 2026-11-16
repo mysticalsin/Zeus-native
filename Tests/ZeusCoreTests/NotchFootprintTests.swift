@@ -8,6 +8,8 @@ import Testing
     private let laptop = CGRect(x: 0, y: 0, width: 1512, height: 982)
     private let external = CGRect(x: 0, y: 0, width: 1920, height: 1080)
     private let hardware = CGSize(width: 184, height: 32)
+    /// The hardware notch with the closed body's drop below it (6 pt; was 0, so the zones were 6 pt shorter).
+    private let hardwareIsland = CGSize(width: 184, height: 38)
 
     private func facts(_ frame: CGRect, inset: CGFloat = 32, left: CGFloat = 664, right: CGFloat = 664) -> NotchDisplayFacts {
         NotchDisplayFacts(frame: frame, safeAreaTop: inset, leftAreaWidth: left, rightAreaWidth: right)
@@ -102,14 +104,14 @@ import Testing
 
     @Test func hoverZoneOfTheHardwareNotchAndThePill() {
         let notch = NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: nil)
-        #expect(notch == CGRect(x: 664, y: 951, width: 184, height: 31))
+        #expect(notch == CGRect(x: 664, y: 945, width: 184, height: 37))
         let pill = NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: nil)
         #expect(pill == CGRect(x: 880, y: 1051, width: 160, height: 29))
     }
 
     @Test func hoverZoneIsTallerByTheTopOffset() {
         let notch = NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 24, wings: nil)
-        #expect(notch == CGRect(x: 664, y: 927, width: 184, height: 55))
+        #expect(notch == CGRect(x: 664, y: 921, width: 184, height: 61))
         let pill = NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 24, wings: nil)
         #expect(pill == CGRect(x: 880, y: 1027, width: 160, height: 53))
     }
@@ -134,7 +136,7 @@ import Testing
         #expect(activity.showsWings)
         for item in [light, activity, wings(none: true)] {
             #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: item)
-                    == CGRect(x: 664, y: 951, width: 184, height: 31))
+                    == CGRect(x: 664, y: 945, width: 184, height: 37))
             #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: item)
                     == CGRect(x: 880, y: 1051, width: 160, height: 29))
         }
@@ -153,12 +155,12 @@ import Testing
     @Test func clickZoneIsTheOpenRuleWithTheLayoutSize() {
         for offset: CGFloat in [0, 12, 24] {
             #expect(NotchFootprintRules.clickZone(.hardware(hardware), screenFrame: laptop, topOffset: offset)
-                    == NotchOpenRules.clickZone(screenFrame: laptop, notchSize: hardware, topOffset: offset))
+                    == NotchOpenRules.clickZone(screenFrame: laptop, notchSize: hardwareIsland, topOffset: offset))
             #expect(NotchFootprintRules.clickZone(.pill, screenFrame: external, topOffset: offset)
                     == NotchOpenRules.clickZone(screenFrame: external, notchSize: .zero, topOffset: offset))
         }
         #expect(NotchFootprintRules.clickZone(.hardware(hardware), screenFrame: laptop, topOffset: 0)
-                == CGRect(x: 664, y: 950, width: 184, height: 32))
+                == CGRect(x: 664, y: 944, width: 184, height: 38))
         #expect(NotchFootprintRules.clickZone(.pill, screenFrame: external, topOffset: 0)
                 == CGRect(x: 900, y: 1066, width: 120, height: 14))
     }
@@ -275,8 +277,8 @@ import Testing
     @Test func theClosedSizeOfTheOtherFootprintsIsTodaysLayout() {
         #expect(NotchFootprintRules.closedSize(.pill, wings: nil) == CGSize(width: 96, height: 9))
         #expect(NotchFootprintRules.closedSize(.pill, wings: wings(none: true, lights: true)) == CGSize(width: 164, height: 30))
-        #expect(NotchFootprintRules.closedSize(.hardware(hardware), wings: nil) == CGSize(width: 184, height: 32))
-        #expect(NotchFootprintRules.closedSize(.hardware(hardware), wings: wings(none: false)) == CGSize(width: 324, height: 32))
+        #expect(NotchFootprintRules.closedSize(.hardware(hardware), wings: nil) == CGSize(width: 184, height: 38))
+        #expect(NotchFootprintRules.closedSize(.hardware(hardware), wings: wings(none: false)) == CGSize(width: 324, height: 38))
         for footprint in [NotchFootprint.hardware(hardware), .pill] {
             for item in everyWingFacts {
                 #expect(NotchFootprintRules.closedSize(footprint, wings: item).width == closedWidth(footprint, item))
@@ -318,14 +320,14 @@ import Testing
     @Test func theHardwareNotchAndThePillKeepTheirZones() {
         let item = wings(none: false, extra: 58)
         #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 0, wings: item)
-                == CGRect(x: 536, y: 951, width: 440, height: 31))
+                == CGRect(x: 536, y: 945, width: 440, height: 37))
         #expect(NotchFootprintRules.hoverZone(.hardware(hardware), screenFrame: laptop, topOffset: 24, wings: item)
-                == CGRect(x: 536, y: 927, width: 440, height: 55))
+                == CGRect(x: 536, y: 921, width: 440, height: 61))
         #expect(NotchFootprintRules.hoverZone(.pill, screenFrame: external, topOffset: 0, wings: nil)
                 == CGRect(x: 880, y: 1051, width: 160, height: 29))
         for offset: CGFloat in [0, 24] {
             #expect(NotchFootprintRules.clickZone(.hardware(hardware), screenFrame: laptop, topOffset: offset, wings: item)
-                    == NotchOpenRules.clickZone(screenFrame: laptop, notchSize: hardware, topOffset: offset))
+                    == NotchOpenRules.clickZone(screenFrame: laptop, notchSize: hardwareIsland, topOffset: offset))
             #expect(NotchFootprintRules.clickZone(.pill, screenFrame: external, topOffset: offset, wings: item)
                     == NotchOpenRules.clickZone(screenFrame: external, notchSize: .zero, topOffset: offset))
         }
@@ -481,5 +483,37 @@ import Testing
                 }
             }
         }
+    }
+
+    // MARK: Closed island below the hardware notch
+
+    @Test func aHardwareIslandHangsBelowTheNotchByTheNamedConstant() {
+        let owner = NotchFootprint.hardware(CGSize(width: 220, height: 38))
+        for item in [nil, wings(none: true), wings(none: false), wings(none: false, extra: 58), wings(none: true, lights: true)] {
+            #expect(NotchFootprintRules.closedHeight(owner, wings: item) == 38 + NotchClosedBodyLayout.belowNotch)
+            #expect(NotchFootprintRules.closedSize(owner, wings: item).height == 44)
+        }
+    }
+
+    @Test func theDrawnNotchAndThePillKeepTheirHeights() {
+        let drawn = NotchFootprint.drawn(DrawnNotchShape(width: 185, height: 32, offset: 0))
+        #expect(NotchFootprintRules.closedHeight(drawn, wings: nil) == 32)
+        #expect(NotchFootprintRules.closedHeight(drawn, wings: wings(none: false)) == 32)
+        #expect(NotchFootprintRules.closedHeight(.pill, wings: nil) == 9)
+        #expect(NotchFootprintRules.closedHeight(.pill, wings: wings(none: true, lights: true)) == 30)
+    }
+
+    @Test func theZonesOfAHardwareNotchFollowTheNewHeight() {
+        let owner = NotchFootprint.hardware(CGSize(width: 220, height: 38))
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let body = NotchFootprintRules.bodyRect(owner, screenFrame: screen, topOffset: 0, wings: nil)
+        #expect(body.maxY == screen.maxY && body.minY == screen.maxY - 44)
+        let hover = NotchFootprintRules.hoverZone(owner, screenFrame: screen, topOffset: 0, wings: nil)
+        #expect(hover.height == 43, "hover keeps its 1 pt trim of the bar")
+        #expect(hover.maxY == screen.maxY)
+        let click = NotchFootprintRules.clickZone(owner, screenFrame: screen, topOffset: 10)
+        #expect(click.height == 44 + 10 && click.minY == screen.maxY - 54)
+        // The outline of the island is inside both zones.
+        #expect(hover.minY <= body.minY + 1 && click.minY <= body.minY)
     }
 }

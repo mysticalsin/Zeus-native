@@ -142,14 +142,25 @@ public enum NotchFootprintRules {
         let hasNotch = !footprint.isPill
         let shoulder: CGFloat = hasNotch && !facts.kindIsNone ? 8 : 0
         let size = footprint.layoutSize
+        let height = closedHeight(footprint, wings: wings)
         if facts.showsWings {
             let width = NotchClosedBodyLayout.bodyWidth(
                 notchWidth: footprint.wingBase, shoulder: shoulder, showWings: true, extraWidth: facts.extraWidth,
                 hasNotch: hasNotch, slimPill: footprint.isPill)
-            return CGSize(width: width, height: max(size.height, 30))
+            return CGSize(width: width, height: height)
         }
         guard hasNotch else { return footprint.idleSize }
-        return CGSize(width: size.width + 2 * shoulder, height: size.height)
+        return CGSize(width: size.width + 2 * shoulder, height: height)
+    }
+
+    /// The closed body's height. A hardware notch hangs `belowNotch` below the notch so its whole bottom outline is
+    /// seen; a drawn notch and the pill keep their own heights (the pill with wings is 30).
+    public static func closedHeight(_ footprint: NotchFootprint, wings: ClosedWingsFacts?) -> CGFloat {
+        let size = footprint.layoutSize
+        let showsWings = (wings ?? .noWings).showsWings
+        let base = showsWings ? max(size.height, 30) : (footprint.isPill ? footprint.idleSize.height : size.height)
+        if case .hardware = footprint { return base + NotchClosedBodyLayout.belowNotch }
+        return base
     }
 
     /// The closed body in screen coordinates: centred, hanging from the top offset.
@@ -158,6 +169,13 @@ public enum NotchFootprintRules {
         let size = closedSize(footprint, wings: wings)
         return CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - max(topOffset, 0) - size.height,
                       width: size.width, height: size.height)
+    }
+
+    /// The closed bar as the zones and the alert line under it see it: at least 30, plus the drop below a hardware notch.
+    public static func closedBarHeight(_ footprint: NotchFootprint) -> CGFloat {
+        let bar = max(footprint.layoutSize.height, 30)
+        if case .hardware = footprint { return bar + NotchClosedBodyLayout.belowNotch }
+        return bar
     }
 
     /// The island that opens the notch on hover. A drawn shape's zone is its body and nothing above it, so a lowered
@@ -172,14 +190,16 @@ public enum NotchFootprintRules {
         if let wings, !wings.kindIsNone {
             island += 2 * (NotchClosedBodyLayout.wingWidth + 8 + wings.extraWidth)
         }
-        return GlanceTopBar.hoverZone(screen: screenFrame, notch: CGSize(width: island, height: max(size.height, 30) + topOffset))
+        return GlanceTopBar.hoverZone(screen: screenFrame, notch: CGSize(width: island, height: closedBarHeight(footprint) + topOffset))
     }
 
     /// Where a click opens the notch. A drawn shape's zone is its body; the other footprints ignore `wings`.
     public static func clickZone(_ footprint: NotchFootprint, screenFrame: CGRect, topOffset: CGFloat,
                                  wings: ClosedWingsFacts? = nil) -> CGRect {
         if case .drawn = footprint { return bodyRect(footprint, screenFrame: screenFrame, topOffset: topOffset, wings: wings) }
-        return NotchOpenRules.clickZone(screenFrame: screenFrame, notchSize: footprint.layoutSize, topOffset: topOffset)
+        var size = footprint.layoutSize
+        if case .hardware = footprint, size.height > 0 { size.height += NotchClosedBodyLayout.belowNotch }
+        return NotchOpenRules.clickZone(screenFrame: screenFrame, notchSize: size, topOffset: topOffset)
     }
 
     /// Whether the window takes the mouse at a point: only for a closed drawn notch, on its body. The top edge
