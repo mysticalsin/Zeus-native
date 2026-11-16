@@ -104,6 +104,12 @@ struct MascotMotion: Equatable {
         }
     }
 
+    /// Code moves the sprite now or within `lookahead` seconds. The clock asks one tick ahead so the display link is
+    /// already running when the stroll starts, instead of picking it up one clip frame (up to 83 ms) late.
+    static func travels(at t: Double, within lookahead: Double, mood: Mood, size: CGFloat) -> Bool {
+        at(t, mood: mood, size: size).travelling || at(t + lookahead, mood: mood, size: size).travelling
+    }
+
     /// The pose in the cycle at `t` and how far into its slot (hence its clip) `t` is.
     static func slot(at t: Double, state: AvatarState) -> (pose: LivingPose, elapsed: Double) {
         let (poses, hold) = cycle(for: state)
@@ -215,8 +221,10 @@ struct LivingAvatar: View {
     }
 
     private func step(at date: Date) -> some View {
-        let motion = MascotMotion.at(clipTime(date.timeIntervalSinceReferenceDate), mood: mood, size: size)
-        let _ = clock.follow(interval: Self.clipInterval(for: motion, atlas: atlas), travelling: motion.travelling)
+        let t = clipTime(date.timeIntervalSinceReferenceDate)
+        let motion = MascotMotion.at(t, mood: mood, size: size)
+        let _ = clock.follow(interval: Self.clipInterval(for: motion, atlas: atlas),
+                             travelling: MascotMotion.travels(at: t, within: clock.interval, mood: mood, size: size))
         return frame(motion)
     }
 
