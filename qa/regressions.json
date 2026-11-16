@@ -6155,6 +6155,18 @@
         "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
         "function": "theAmbientLoopsRunOnTheDisplayLink"
       }
+    },
+    {
+      "id": "REG-742",
+      "failure": "The mascot ticked at 24 or 6 Hz whatever the clip's own frame rate, and walked its idle stroll at 6 fps.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MascotMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+        "function": "theMascotTicksAtEachClipsOwnFPSAndSixtyOnItsStroll"
+      }
     }
   ]
 }

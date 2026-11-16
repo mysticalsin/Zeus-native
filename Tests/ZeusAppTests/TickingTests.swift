@@ -76,9 +76,10 @@ struct TickingTests {
     }
 
     @Test func idleMascotTicksSlowly() {
-        #expect(LivingAvatar.restFPS <= 8)
-        #expect(LivingAvatar.tickInterval(asleep: false, waking: false, state: .idle) >= 1.0 / 8)
-        #expect(LivingAvatar.tickInterval(asleep: false, waking: false, state: .thinking) <= 1.0 / 24 + 0.001)
+        // The idle clip is 12 fps and the mascot ticks at the clip's own rate, never faster except on its stroll.
+        #expect(LivingAvatar.tickInterval(clipFPS: 12, travelling: false) == 1.0 / 12)
+        #expect(LivingAvatar.tickInterval(clipFPS: 24, travelling: false) <= 1.0 / 24 + 0.001)
+        #expect(LivingAvatar.tickInterval(clipFPS: 12, travelling: true) == 1.0 / 60)
     }
 
     @Test func mirrorChangeStampTracksTheStoreAndItsLog() throws {

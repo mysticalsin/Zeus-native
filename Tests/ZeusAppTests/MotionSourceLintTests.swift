@@ -134,7 +134,6 @@ struct MotionSourceLintTests {
         ("OnboardingMascot.swift", "", "24 fps sprite, the clip's own rate"),
         ("WavesPage.swift", "", "60 fps audio meter, a divisor of 120"),
         ("OnboardingVisuals.swift", "", "24 fps film-rate stage in the welcome guide"),
-        ("MascotMotion.swift", "", "the mascot's frame clock; its rate comes from the clip (MotionRules.fps)"),
         ("TopBarViews.swift", "TimelineView(", "the Scribe meeting ticker at 20 fps; meeting card motion is left alone"),
     ]
 

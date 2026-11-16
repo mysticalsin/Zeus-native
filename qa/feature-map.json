@@ -919,6 +919,14 @@
       "scope": "Static rules over the app source text; no rendering, display refresh or device acceptance.",
       "suite": "MotionSourceLintTests",
       "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift"
+    },
+    {
+      "id": "native-MascotMotionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual mascot motion rules against the shipped atlas clip files; no rendering, display refresh or device acceptance.",
+      "suite": "MascotMotionTests",
+      "file": "Tests/ZeusAppTests/MascotMotionTests.swift"
     }
   ],
   "features": [
@@ -6577,6 +6585,21 @@
             }
           ],
           "id": "F13.motion-source-lint"
+        },
+        {
+          "check": "native-MascotMotionTests",
+          "acceptance": "Native mascot tick rates follow each clip's own frame rate, and 60 on the stroll.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+              "function": "theMascotTicksAtEachClipsOwnFPSAndSixtyOnItsStroll"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MascotMotionTests.swift",
+              "function": "tickRatesStayWithinTheBudget"
+            }
+          ],
+          "id": "F13.mascot-clip-rate"
         }
       ]
     },

@@ -19,6 +19,9 @@ struct MascotMotion: Equatable {
     var scaleX: CGFloat = 1
     /// 0...1 phase of the floating Zzz while asleep. Drawn by code only when the sleeping atlas is missing.
     var sleepPhase: Double?
+    /// Code is moving the sprite across the screen (the idle stroll, the done jump, the error shake): the clock
+    /// runs at 60 fps then, so the offsets are smooth, and at the clip's own rate otherwise.
+    var travelling = false
 
     /// The mood the mascot is in: the app state, or asleep/waking when Tony is away.
     enum Mood: Equatable {
@@ -70,6 +73,7 @@ struct MascotMotion: Equatable {
                     let into = walk - (walkEvery - walkLength)
                     let p = into / walkLength
                     motion.pose = .walking
+                    motion.travelling = true
                     motion.elapsed = into
                     motion.dx = unit * 5 * CGFloat(sin(p * 2 * .pi))
                     motion.dy = -unit * 1 * CGFloat(abs(sin(p * 6 * .pi)))
@@ -79,9 +83,15 @@ struct MascotMotion: Equatable {
                     motion.elapsed = glance - (glanceEvery - glanceLength)
                 }
             case .error:
-                if slotElapsed < 0.5 { motion.dx = unit * 1.6 * CGFloat(sin(slotElapsed * 2 * .pi * 6)) }
+                if slotElapsed < 0.5 {
+                    motion.dx = unit * 1.6 * CGFloat(sin(slotElapsed * 2 * .pi * 6))
+                    motion.travelling = true
+                }
             case .done:
-                if slotElapsed < 0.5 { motion.dy = -unit * 4 * CGFloat(sin(.pi * slotElapsed / 0.5)) }
+                if slotElapsed < 0.5 {
+                    motion.dy = -unit * 4 * CGFloat(sin(.pi * slotElapsed / 0.5))
+                    motion.travelling = true
+                }
             case .thinking:
                 // QA23: the sprite's paw-at-cheek was too small at 22 pt to tell from idle. A slow sway
                 // and bob by code, the way a mind drums its fingers while it works.
@@ -112,11 +122,19 @@ struct MascotMotion: Equatable {
 @MainActor
 final class MascotClipClock: ObservableObject {
     var wakeStart: Double?
+    /// Seconds between ticks: the clip's own rate, 60 fps while travelling. It follows the pose on screen, one tick behind.
+    @Published private(set) var interval: Double = 1 / 12
+
+    func follow(_ wanted: Double) {
+        guard abs(wanted - interval) > 1e-9 else { return }
+        // Not inside the view update that asked: publishing from there is undefined.
+        DispatchQueue.main.async { [weak self] in self?.interval = wanted }
+    }
 }
 
 /// The v2 mascot, alive: plays the state's sprite animation frame by frame (timed from the atlas
 /// metadata; the 128 px atlas for the notch, 320 px for chat and onboarding) and adds code motion only
-/// for travel. Ticks at 24 fps while busy and 6 fps at rest; gone from the view tree (the notch
+/// for travel. Ticks at each clip's own frame rate (12, 20 or 24 fps) and at 60 fps while it travels; gone from the view tree (the notch
 /// hidden) means no timeline and no work. Reduce Motion shows the state's first (rest) frame, and
 /// snapshots pin `frameTime`. A missing atlas falls back to the still pose PNG.
 struct LivingAvatar: View {
@@ -137,8 +155,10 @@ struct LivingAvatar: View {
     @Environment(\.mascotRasterScale) private var mascotRasterScale
     @StateObject private var clock = MascotClipClock()
 
-    /// Rest is 6 fps: the idle clip still breathes, and a closed notch stays under the idle CPU cap.
-    static let busyFPS = 24.0, restFPS = 6.0
+    /// The fastest clip rate (the halo lights share this grid). Clips run at 12, 20 or 24 fps; the clock follows each.
+    static let busyFPS = 24.0
+    /// The rate when a clip is missing and only the still pose shows.
+    static let fallbackFPS = 12.0
 
     private var mood: MascotMotion.Mood {
         if asleep { return .asleep }
@@ -146,20 +166,20 @@ struct LivingAvatar: View {
         return .awake(state)
     }
 
-    /// Resting states tick slowly; everything the mascot is actively doing ticks faster.
-    static func tickInterval(asleep: Bool, waking: Bool, state: AvatarState) -> Double {
-        if waking { return 1 / busyFPS }
-        if asleep { return 1 / restFPS }
-        switch state {
-        case .idle, .listening, .approval: return 1 / restFPS
-        default: return 1 / busyFPS
-        }
+    /// The clock follows the sprite: its clip's own frame rate, or 60 fps while code moves it.
+    static func tickInterval(clipFPS: Double, travelling: Bool) -> Double {
+        1 / MotionRules.fps(clipFPS: clipFPS, travelling: travelling)
+    }
+
+    static func tickInterval(for motion: MascotMotion, atlas: MascotAtlasStore) -> Double {
+        let clipFPS = atlas.clip(motion.pose.clipID).map { Double($0.fps) } ?? fallbackFPS
+        return tickInterval(clipFPS: clipFPS, travelling: motion.travelling)
     }
 
     var body: some View {
         Group {
             if let pinnedPose {
-                TickingView(interval: 1 / Self.busyFPS, paused: paused) { context in
+                TickingView(interval: Self.tickInterval(for: MascotMotion(pose: pinnedPose), atlas: atlas), paused: paused) { context in
                     frame(MascotMotion(pose: pinnedPose, elapsed: context.date.timeIntervalSinceReferenceDate))
                 }
             } else if let frameTime {
@@ -167,9 +187,11 @@ struct LivingAvatar: View {
             } else if Motion.reduced || TopBarStyle.isSnapshot {
                 frame(MascotMotion(pose: asleep ? .sleepingClean : MascotMotion.cycle(for: state).poses[0]))
             } else {
-                TickingView(interval: Self.tickInterval(asleep: asleep, waking: waking, state: state), paused: paused) { context in
+                TickingView(interval: clock.interval, paused: paused) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
-                    frame(MascotMotion.at(clipTime(t), mood: mood, size: size))
+                    let motion = MascotMotion.at(clipTime(t), mood: mood, size: size)
+                    let _ = clock.follow(Self.tickInterval(for: motion, atlas: atlas))
+                    frame(motion)
                 }
             }
         }
