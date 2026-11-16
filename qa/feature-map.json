@@ -893,6 +893,14 @@
       "suite": "FlingPairingStoreTests",
       "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
       "scope": "Actual pairing store with an in-memory Keychain and a temp folder: the key only in the Keychain, an owner-only names file, Remove, and a Keychain failure. No real Keychain."
+    },
+    {
+      "id": "native-FlingArrivalTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FlingArrivalTests",
+      "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+      "scope": "Actual FlingService and TopBarModel with a recording stand-in for the transport, a throwaway defaults suite and temp folders: Shelf origin, stack and verified mark, persistence across a relaunch, the Fling light and cue gated by lights.fling, the intake watcher skip, and sending only through a gesture. No network, no Keychain, no Downloads."
     }
   ],
   "features": [
@@ -6986,6 +6994,10 @@
             {
               "file": "Tests/ZeusCoreTests/FlingTransferMachineTests.swift",
               "function": "aReplayedStackIsDeclined"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingPlistTests.swift",
+              "function": "theLocalNetworkPromptSaysWhyAndTheBonjourTypeIsDeclared"
             }
           ]
         },
@@ -7013,6 +7025,37 @@
             {
               "file": "Tests/ZeusAppTests/FlingTwoProcessTests.swift",
               "function": "aCorruptedByteIsCaughtByTheHash"
+            }
+          ]
+        },
+        {
+          "id": "F15.3",
+          "check": "native-FlingArrivalTests",
+          "acceptance": "Service to Shelf: origin, stack and verified mark, persistence, the Fling light gated by lights.fling, the intake skip, off until the switch is on, and no send without a gesture.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "arrivalsGetTheFlingOriginAStackAndTheVerifiedMark"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "flingItemsSurviveARelaunchButLocalOnesDoNot"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "theFlingLightShowsOnlyWithItsSwitchOn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "theIntakeWatcherIgnoresTheFlingFolder"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "sendingNeedsAGestureAndNothingResendsOnItsOwn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+              "function": "flingStaysOffUntilTheSwitchIsOn"
             }
           ]
         },

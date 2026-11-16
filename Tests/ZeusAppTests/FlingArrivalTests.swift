@@ -146,7 +146,7 @@ struct FlingArrivalTests {
     @Test func sendingNeedsAGestureAndNothingResendsOnItsOwn() async {
         let transport = FakeTransport()
         let m = model()
-        let service = FlingService(model: m, transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") })
+        let service = FlingService(model: m, transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
         service.reconfigure()
         let dir = temp(); defer { try? FileManager.default.removeItem(at: dir) }
         let item = TopBarModel.ShelfItem(url: file("a.png", in: dir))
@@ -174,7 +174,7 @@ struct FlingArrivalTests {
     @Test func aStackReachesTheShelfWhenItFinishesAndAVerifiedFileSurvivesAFailure() async {
         let transport = FakeTransport()
         let m = model()
-        let service = FlingService(model: m, transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") })
+        let service = FlingService(model: m, transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
         service.reconfigure()
         await settle { service.eventsAreFlowing }
         let dir = temp(); defer { try? FileManager.default.removeItem(at: dir) }
@@ -198,7 +198,7 @@ struct FlingArrivalTests {
     @Test func flingStaysOffUntilTheSwitchIsOn() {
         let transport = FakeTransport()
         var enabled = "false"
-        let service = FlingService(model: model(), transport: transport, setting: { id in id == "fling.enabled" ? enabled : (SettingsCatalog.option(id)?.defaultValue ?? "") })
+        let service = FlingService(model: model(), transport: transport, setting: { id in id == "fling.enabled" ? enabled : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
         service.reconfigure()
         #expect(transport.starts == 0 && !service.isEnabled)
         enabled = "true"; service.reconfigure()
@@ -211,7 +211,7 @@ struct FlingArrivalTests {
 
     @Test func pairingAndOffersGoThroughTheServiceAndClearWhenDone() async {
         let transport = FakeTransport()
-        let service = FlingService(model: model(), transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") })
+        let service = FlingService(model: model(), transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
         service.reconfigure()
         await settle { service.eventsAreFlowing }
         transport.emit(.pairCode(code: "123456", role: .responder, peerID: "idB", peerName: "Mac B"))

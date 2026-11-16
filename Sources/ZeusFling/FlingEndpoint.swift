@@ -39,6 +39,8 @@ public struct FlingEndpointSettings: Sendable, Equatable {
     public var saveMode: FlingSaveMode = .downloads
     /// Whether the app may write into Downloads. When false, arrivals go to the private inbox.
     public var downloadsGranted = true
+    /// The name shown to nearby Macs. Empty uses the Mac's own name.
+    public var deviceName = ""
     public init() {}
 }
 
@@ -82,11 +84,28 @@ public enum FlingDiscovery: Sendable {
     case direct
 }
 
+/// What the app needs from a Fling endpoint. The app talks to this, so its tests can use a stand-in with no network.
+public protocol FlingTransporting: AnyObject, Sendable {
+    var events: AsyncStream<FlingEvent> { get }
+    var pairedPeers: [FlingPairedPeer] { get }
+    func start()
+    func stop()
+    func updateSettings(_ settings: FlingEndpointSettings)
+    func pair(with address: FlingPeerAddress)
+    func answerPairing(accept: Bool)
+    func send(_ items: [FlingOutgoingItem], to address: FlingPeerAddress) -> UUID
+    func cancel(_ stackID: UUID)
+    func answerOffer(_ stackID: UUID, accept: Bool)
+    func removePeer(id: String) -> Bool
+    func address(of id: String) -> FlingPeerAddress?
+}
+
 /// Sends and receives files with other Macs. All state lives on one serial queue; calls from any thread are safe.
-public final class FlingEndpoint: @unchecked Sendable {
+public final class FlingEndpoint: FlingTransporting, @unchecked Sendable {
     public static let serviceType = "_zeus-fling._tcp"
 
-    let identity: FlingIdentity
+    private(set) var identity: FlingIdentity
+    private let defaultName: String
     let store: FlingPairingStore
     let saveRoot: URL
     let inbox: URL
@@ -123,6 +142,7 @@ public final class FlingEndpoint: @unchecked Sendable {
                 discovery: FlingDiscovery, queue: DispatchQueue = DispatchQueue(label: "zeus.fling.endpoint"),
                 hooks: FlingTestHooks = FlingTestHooks()) {
         self.identity = identity
+        self.defaultName = identity.name
         self.store = FlingPairingStore(keychain: keys, directory: supportDirectory)
         self.saveRoot = saveRoot
         self.inbox = inbox
@@ -167,15 +187,21 @@ public final class FlingEndpoint: @unchecked Sendable {
             for s in pairSessions.values { s.abort() }
             for s in receiveSessions.values { s.abort() }
             for s in sendSessions.values { s.abort() }
-            continuation.finish()
+            pairSessions.removeAll(); receiveSessions.removeAll(); sendSessions.removeAll()
+            transferPort = nil; pairingPort = nil
         }
     }
 
+    deinit { continuation.finish() }
+
     public func updateSettings(_ new: FlingEndpointSettings) {
         queue.async { [self] in
-            let visibilityChanged = new.visibility != settings.visibility
+            let trimmed = new.deviceName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = trimmed.isEmpty ? defaultName : String(trimmed.prefix(60))
+            let listenersChanged = new.visibility != settings.visibility || name != identity.name
+            identity.name = name
             settings = new
-            if started && visibilityChanged { applyListeners() }
+            if started && listenersChanged { applyListeners() }
         }
     }
 

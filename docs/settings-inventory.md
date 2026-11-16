@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 198 of 198 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 198 in scope). 187 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 209 of 209 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 209 in scope). 198 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 147.
+**Before this round:** has 19, partial 27, missing 158.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -93,6 +93,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Glow when a reminder is added | toggle | on | Blue crests after you add a reminder. | missing | live | `lights.reminderGlow` | Fires when ZEUS saves a reminder. |
 | Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |
 | Everyday lights | Glow when AirDrop arrives | toggle | off | Blue intake glow and drops the file on the shelf. | missing | live | `lights.airDrop` | Gated by Downloads folder access. |
+| Everyday lights | Glow when a Fling arrives | toggle | - | Glow and a short cue when files arrive from another Mac with Fling. | missing | live | `lights.fling` | Zeus addition. Gates the Fling arrival cue and glow. Also on the Shelf page. |
 | Everyday lights | Screenshot cue | toggle | off | Camera cue and shelf drop for new screenshots. | missing | live | `lights.screenshot` | Gated by Desktop folder access. |
 | Music | Show music from | menu | - | Any player shows what started playing last. | missing | live | `music.follow` | A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player. |
 | Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
@@ -313,6 +314,21 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Layout | Default split | slider | - | How much of a slot the window already there keeps when a new window joins it. | missing | live | `tiling.splitRatio` | Zeus addition. A percentage; the engine keeps it between 15 and 85. |
 | Focus | Ring the focused window | toggle | - | Draws a thin ring around the window the tiling keys act on. | missing | live | `tiling.focusBorder` | Zeus addition. Applies while tiling is on. |
 | Left out | Apps Zeus never tiles | text | - | Bundle ids, separated by commas. Their windows are left where they are. | missing | live | `tiling.excludedApps` | Zeus addition. Bundle ids, comma separated; case is kept. |
+
+## Shelf
+
+| Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Fling | Send and receive with nearby Macs | toggle | - | Lets this Mac send files to other Macs running Zeus and receive files from them. Off until you turn it on. Turning it on makes macOS ask once for Local Network access. | missing | live | `fling.enabled` | Zeus addition. Opt-in, and a settings import never turns it on. Nothing listens or advertises while it is off. Also the Turn on button on the Shelf. |
+| Fling | Receive while the notch is closed | toggle | - | Keeps receiving from paired Macs when the notch is not open. | missing | live | `fling.receiveInBackground` | Zeus addition. Applies once Fling is on. |
+| Fling | Name shown to nearby Macs | text | - | Leave empty to use this Mac's name. | missing | live | `fling.deviceName` | Zeus addition. Shown to Macs that are not paired yet; a paired Mac keeps the name it had when you paired. |
+| Fling | Who can see this Mac | segmented | - | Everyone nearby shows this Mac to nearby Macs running Zeus. Paired only shows it to Macs you already paired and closes the pairing door. Off hides it and stops receiving. | missing | live | `fling.visibility` | Zeus addition. Paired only advertises an id and nothing else. |
+| Fling | Accept from paired Macs without asking | toggle | - | A paired Mac can send without a prompt each time. Turn off to be asked for every stack. | missing | live | `fling.autoAcceptPaired` | Zeus addition. A Mac that is not paired is never accepted this way. |
+| Fling | Where arrivals go | segmented | - | Downloads folder, the clipboard, or ask each time. | missing | live | `fling.saveMode` | Zeus addition. Without Downloads access, files go to a private inbox and the Shelf says so. |
+| Fling | Show arrivals as floating papers | toggle | - | Each arrival floats on screen as a small paper you can drag out or close. Closing one never removes it from the Shelf. | missing | live | `fling.papers` | Zeus addition. Off by default. |
+| Fling | Flick sensitivity | segmented | - | How fast a drag must be to count as a flick toward a nearby Mac. | missing | live | `fling.flickSensitivity` | Zeus addition. 1800, 1200 or 800 points per second over the last 80 ms. |
+| Fling | Open received links in the browser | toggle | - | A link from a paired Mac opens in your browser when it arrives. Only http and https links. | missing | live | `fling.openLinks` | Zeus addition. A link from a Mac that is not paired is kept as a file and never opened. |
+| Fling | Paired Macs | button | - | The Macs you paired. Remove one and it must pair again before it can send. | missing | custom | `fling.pairedMacs` | Zeus addition. Hand-built list on the Shelf page; Remove deletes the key from the Keychain. |
 
 ## Zeus additions beyond the reference app
 

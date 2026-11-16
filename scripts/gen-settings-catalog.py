@@ -87,6 +87,7 @@ o(S,'Everyday lights','Purple glow while the mic listens','toggle','on','Glows w
 o(S,'Everyday lights','Glow when a reminder is added','toggle','on','Blue crests after you add a reminder.','missing','lights.reminderGlow','toggle',[],'true','live','Fires when ZEUS saves a reminder.')
 o(S,'Everyday lights','Glow when an event is added','toggle','on','Cyan ribbon after you add an event.','partial','lights.eventGlow','toggle',[],'true','live','Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm".')
 o(S,'Everyday lights','Glow when AirDrop arrives','toggle','off','Blue intake glow and drops the file on the shelf.','missing','lights.airDrop','toggle',[],'false','live','Gated by Downloads folder access.')
+o(S,'Everyday lights','Glow when a Fling arrives','toggle','-','Glow and a short cue when files arrive from another Mac with Fling.','missing','lights.fling','toggle',[],'true','live','Zeus addition. Gates the Fling arrival cue and glow. Also on the Shelf page.')
 o(S,'Everyday lights','Screenshot cue','toggle','off','Camera cue and shelf drop for new screenshots.','missing','lights.screenshot','toggle',[],'false','live','Gated by Desktop folder access.')
 o(S,'Music','Show music from','menu','-','Any player shows what started playing last.','missing','music.follow','choice',['Any player','Music','Spotify'],'Any player','live','A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player.')
 o(S,'Screen','Round the bottom screen corners','toggle','off','Rounds the two bottom corners of a notched display to match the top. Click-through.','missing','screen.roundBottomCorners','toggle',[],'false','live','Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes.')
@@ -252,7 +253,19 @@ o(S,'Layout','Default split','slider','-','How much of a slot the window already
 o(S,'Focus','Ring the focused window','toggle','-','Draws a thin ring around the window the tiling keys act on.','missing','tiling.focusBorder','toggle',[],'true','live','Zeus addition. Applies while tiling is on.')
 o(S,'Left out','Apps Zeus never tiles','text','-','Bundle ids, separated by commas. Their windows are left where they are.','missing','tiling.excludedApps','text',[],'','live','Zeus addition. Bundle ids, comma separated; case is kept.')
 
-SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents','tiling':'Tiling'}
+S='shelf'
+o(S,'Fling','Send and receive with nearby Macs','toggle','-','Lets this Mac send files to other Macs running Zeus and receive files from them. Off until you turn it on. Turning it on makes macOS ask once for Local Network access.','missing','fling.enabled','toggle',[],'false','live','Zeus addition. Opt-in, and a settings import never turns it on. Nothing listens or advertises while it is off. Also the Turn on button on the Shelf.')
+o(S,'Fling','Receive while the notch is closed','toggle','-','Keeps receiving from paired Macs when the notch is not open.','missing','fling.receiveInBackground','toggle',[],'true','live','Zeus addition. Applies once Fling is on.')
+o(S,'Fling','Name shown to nearby Macs','text','-','Leave empty to use this Mac\'s name.','missing','fling.deviceName','text',[],'','live','Zeus addition. Shown to Macs that are not paired yet; a paired Mac keeps the name it had when you paired.')
+o(S,'Fling','Who can see this Mac','segmented','-','Everyone nearby shows this Mac to nearby Macs running Zeus. Paired only shows it to Macs you already paired and closes the pairing door. Off hides it and stops receiving.','missing','fling.visibility','choice',['Everyone nearby','Paired only','Off'],'Everyone nearby','live','Zeus addition. Paired only advertises an id and nothing else.')
+o(S,'Fling','Accept from paired Macs without asking','toggle','-','A paired Mac can send without a prompt each time. Turn off to be asked for every stack.','missing','fling.autoAcceptPaired','toggle',[],'true','live','Zeus addition. A Mac that is not paired is never accepted this way.')
+o(S,'Fling','Where arrivals go','segmented','-','Downloads folder, the clipboard, or ask each time.','missing','fling.saveMode','choice',['Downloads/Fling','Clipboard','Ask each time'],'Downloads/Fling','live','Zeus addition. Without Downloads access, files go to a private inbox and the Shelf says so.')
+o(S,'Fling','Show arrivals as floating papers','toggle','-','Each arrival floats on screen as a small paper you can drag out or close. Closing one never removes it from the Shelf.','missing','fling.papers','toggle',[],'false','live','Zeus addition. Off by default.')
+o(S,'Fling','Flick sensitivity','segmented','-','How fast a drag must be to count as a flick toward a nearby Mac.','missing','fling.flickSensitivity','choice',['Low','Normal','High'],'Normal','live','Zeus addition. 1800, 1200 or 800 points per second over the last 80 ms.')
+o(S,'Fling','Open received links in the browser','toggle','-','A link from a paired Mac opens in your browser when it arrives. Only http and https links.','missing','fling.openLinks','toggle',[],'true','live','Zeus addition. A link from a Mac that is not paired is kept as a file and never opened.')
+o(S,'Fling','Paired Macs','button','-','The Macs you paired. Remove one and it must pair again before it can send.','missing','fling.pairedMacs','action',[],'','custom','Zeus addition. Hand-built list on the Shelf page; Remove deletes the key from the Keychain.')
+
+SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents','tiling':'Tiling','shelf':'Shelf'}
 
 def swift_str(s): return json.dumps(s, ensure_ascii=False)
 
@@ -266,7 +279,7 @@ def validate_table():
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl',
-              'face.presence', 'tiling.enabled')
+              'face.presence', 'tiling.enabled', 'fling.enabled')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':

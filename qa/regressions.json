@@ -6071,6 +6071,66 @@
         "file": "Tests/ZeusAppTests/FlingPairingStoreTests.swift",
         "function": "theKeyIsOnlyInTheKeychainAndTheFileIsOwnerOnly"
       }
+    },
+    {
+      "id": "REG-680",
+      "failure": "Fling Shelf items lost their origin, stack or verified mark, or did not survive a relaunch.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingArrivalTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+        "function": "flingItemsSurviveARelaunchButLocalOnesDoNot"
+      }
+    },
+    {
+      "id": "REG-681",
+      "failure": "The Fling glow showed with its Settings switch off, or reused the AirDrop colours.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingArrivalTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+        "function": "theFlingLightShowsOnlyWithItsSwitchOn"
+      }
+    },
+    {
+      "id": "REG-682",
+      "failure": "The AirDrop and screenshot watcher picked up files Fling wrote into its own folder.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingArrivalTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+        "function": "theIntakeWatcherIgnoresTheFlingFolder"
+      }
+    },
+    {
+      "id": "REG-683",
+      "failure": "The Info.plist lacked the Local Network reason or the declared Bonjour type.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingPlistTests.swift",
+        "function": "theLocalNetworkPromptSaysWhyAndTheBonjourTypeIsDeclared"
+      }
+    },
+    {
+      "id": "REG-692",
+      "failure": "Fling sent without a gesture: on a failure, an arrival, an offer or a change of peers.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-FlingArrivalTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/FlingArrivalTests.swift",
+        "function": "sendingNeedsAGestureAndNothingResendsOnItsOwn"
+      }
     }
   ]
 }

@@ -32,6 +32,9 @@ final class TopBarServices {
     private var rainGate = RainAlertGate()
     private var hudMonitor: SystemHUDMonitor?
     private var intakeWatcher: AirDropScreenshotWatcher?
+    private(set) var flingService: FlingService?
+    /// Whether the notch is open. Fling reads it only when background receiving is off.
+    var notchIsOpen: @MainActor () -> Bool = { true }
 
     init(model: TopBarModel) {
         self.model = model
@@ -61,6 +64,7 @@ final class TopBarServices {
         refreshCalendarIfAllowed()
         fetchWeather(force: false)
         updateIntakeWatcher()
+        updateFlingService()
         BannerAutoDismisser.shared.update()
 
         every(1) { [weak self] in self?.tickFocus() }
@@ -427,6 +431,22 @@ final class TopBarServices {
             throw URLError(.cannotFindHost)
         }
         return place
+    }
+
+    // MARK: Fling
+
+    /// Builds Fling once and lets Settings drive it. Nothing listens until `fling.enabled` is on.
+    func updateFlingService() {
+        if flingService == nil {
+            let service = FlingService(model: model, transport: FlingService.liveEndpoint())
+            service.notchIsOpen = { [weak self] in self?.notchIsOpen() ?? true }
+            model.shelfPersistence = FlingShelfPersistence(url: FlingService.supportDirectory.appendingPathComponent("Shelf/shelf.json"))
+            model.loadPersistedShelf()
+            model.fling = service
+            flingService = service
+            service.observeSettings()
+        }
+        flingService?.reconfigure()
     }
 
     // MARK: Intake (AirDrop and Screenshots)

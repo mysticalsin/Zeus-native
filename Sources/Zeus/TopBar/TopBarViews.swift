@@ -1549,6 +1549,8 @@ struct ClosedWings: View {
         case .rain: ("cloud.rain.fill", Theme.sky)
         case .decided: ("checkmark.circle.fill", Theme.bolt)
         case .screenshot: ("camera.fill", Theme.bolt)
+        case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
+        case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1583,6 +1585,12 @@ struct ClosedWings: View {
             Text("+\(count)").font(TopBarStyle.label(11, .bold)).foregroundStyle(Theme.bolt)
         case .screenshot(let title):
             Text(title).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingArrived(let count, let from):
+            Text("\(count) from \(from)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingSent(let count, let to):
+            Text("Sent \(count) to \(to)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingProblem(let text):
+            Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .permission(let text, let pane):
