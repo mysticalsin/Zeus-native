@@ -13,6 +13,7 @@ final class FakeTransport: FlingTransporting, @unchecked Sendable {
     private(set) var pairs: [String] = []
     private(set) var pairingAnswers: [Bool] = []
     private(set) var offerAnswers: [(UUID, Bool)] = []
+    private(set) var modeAnswers: [(stack: UUID, accept: Bool, mode: FlingSaveMode?)] = []
     var paired: [FlingPairedPeer] = []
     /// When true, `removePeer` fails the way a locked Keychain does and the record stays.
     var removeFails = false
@@ -32,7 +33,9 @@ final class FakeTransport: FlingTransporting, @unchecked Sendable {
         lock.lock(); sends.append((items, address.id)); lock.unlock(); return UUID()
     }
     func cancel(_ stackID: UUID) {}
-    func answerOffer(_ stackID: UUID, accept: Bool) { lock.lock(); offerAnswers.append((stackID, accept)); lock.unlock() }
+    func answerOffer(_ stackID: UUID, accept: Bool, saveMode: FlingSaveMode?) {
+        lock.lock(); offerAnswers.append((stackID, accept)); modeAnswers.append((stackID, accept, saveMode)); lock.unlock()
+    }
     func removePeer(id: String) -> Bool {
         if removeFails { return false }
         paired.removeAll { $0.id == id }; return true
