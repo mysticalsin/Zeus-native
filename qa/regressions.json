@@ -7319,6 +7319,18 @@
         "file": "qa/closed-loop/tests/test_source_lint.py",
         "function": "test_no_async_test_holds_the_snapshot_flag_across_a_suspension"
       }
+    },
+    {
+      "id": "REG-765",
+      "failure": "The Record page showed a Mic level row while recording although microphone capture is greyed out as Soon.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RecordlyVisualsTests.swift",
+        "function": "micRowShowsOnlyWhenMicrophoneCaptureIsOn"
+      }
     }
   ]
 }
