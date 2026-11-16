@@ -4935,6 +4935,72 @@
               "function": "aSceneWithNoMarkOfThisCaptureShowsNothing"
             }
           ]
+        },
+        {
+          "id": "F11.talk-draw-setting",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "Draw on screen while Zeus answers is a Voice toggle, off by default, live, and read as off from an empty store. Does not prove the toggle's page rendering.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-draw-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A leading DRAW tag, also split across chunks, becomes marks and is never spoken; a malformed one is stripped; marks respect the mark, ink point, text and sentence limits, drop when outside the image, and land where a POINT tag lands on 1x, 2x, downscaled and negative-origin displays; drawing needs consent and a winner that saw the screen. Does not prove the model's coordinate accuracy.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+              "function": "aLeadingDrawTagIsEmittedAndNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+              "function": "aDrawTagSplitAcrossChunksStillParses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ZeusTagParserTests.swift",
+              "function": "aMalformedDrawTagIsStrippedAndNeverSpoken"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "theMarkCountInkPointsTextAndSentenceIndexAreLimited"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksOutsideTheImageAreDroppedAndGroupedBySentence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "aCardIsClampedInsideTheImage"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnA1xDisplay"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnA2xDisplay"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnADownscaledShot"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
+              "function": "marksLandWherePointDoesOnASecondaryDisplayAtNegativeX"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+              "function": "consentOffSendsNoImages"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
+              "function": "onlyAWinnerThatSawPixelsMayDraw"
+            }
+          ]
         }
       ]
     },

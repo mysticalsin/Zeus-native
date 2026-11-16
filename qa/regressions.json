@@ -5759,6 +5759,18 @@
         "file": "Tests/ZeusAppTests/TalkVisualOverlayTests.swift",
         "function": "aRingAnArrowAndALabelAreLaidOutInCaptureSpaceAndHideLeavesNoPanel"
       }
+    },
+    {
+      "id": "REG-707",
+      "failure": "Drawing on the screen during a talk answer, which sends a screenshot, could be on without the owner choosing it, because the setting was missing or defaulted on.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "drawOnScreenIsAnOffByDefaultLiveToggleOnTheVoicePage"
+      }
     }
   ]
 }

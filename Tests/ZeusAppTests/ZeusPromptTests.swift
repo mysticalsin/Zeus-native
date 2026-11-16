@@ -89,4 +89,18 @@ struct ZeusPromptTests {
         // every documented tag is one the parser knows
         for kind in [ZeusAction.Kind.terminalAgent, .terminalOpen, .terminalRun, .research] { #expect(prompt.contains(kind.rawValue)) }
     }
+
+    @Test func drawInstructionsNameTheTagItsFieldsAndItsLimits() {
+        let text = ZeusPrompt.drawInstructions()
+        for part in ["[DRAW:", "\"ring\"", "\"arrow\"", "\"ink\"", "\"card\"", "top-left", "6 marks", "24 ink points",
+                     "60 characters", "sentence"] {
+            #expect(text.contains(part), "\(part)")
+        }
+        #expect(!text.contains("\u{2014}") && !text.contains("\u{2013}"))
+    }
+
+    @Test func theBasePromptNeverCarriesTheDrawInstructions() {
+        #expect(!ZeusPrompt.system.contains("[DRAW:"))
+        for personality in ZeusPersonality.allCases { #expect(!ZeusPrompt.system(personality: personality).contains("[DRAW:")) }
+    }
 }
