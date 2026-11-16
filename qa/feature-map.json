@@ -863,6 +863,20 @@
       "scope": "Record page fixture controller with a fake display lister; no capture, no timers, no permission request.",
       "suite": "RecordlySnapshotFixtureTests",
       "file": "Tests/ZeusAppTests/RecordlySnapshotFixtureTests.swift"
+    },
+    {
+      "id": "missing-F15-contract",
+      "kind": "unimplemented",
+      "tier": "contract",
+      "scope": "Fling rules in ZeusCore (wire, names, pairing, transfer machines, save rules, flick, peers, persistence) run through a portable group with injected inputs and no network.",
+      "reason": "The Core rules are built and run in native-ZeusCoreTests. They use CryptoKit, so no Linux portable group can run them."
+    },
+    {
+      "id": "missing-F15-device",
+      "kind": "unimplemented",
+      "tier": "device-proof",
+      "scope": "On two owner-run Macs on one network: the peer shows in Nearby, pairing codes match, a decline stores nothing, files arrive in Downloads/Fling and on the Shelf, a large video verifies, the Local Network prompt shows once, AirDrop to an iPhone opens its sheet, removing a paired Mac forgets its key, Clipboard mode pastes in Finder, floating papers steal no focus.",
+      "reason": "No CI runner has two Macs, a real Wi-Fi network, the Local Network prompt or an iPhone; only a person can check it."
     }
   ],
   "features": [
@@ -6845,6 +6859,55 @@
               "function": "unknownLockAfterFallsBackToTwoMinutes"
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "title": "Fling: send and receive between Macs from the Shelf",
+      "obligations": [
+        {
+          "id": "F15.1",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Fling pure rules on macOS: wire framing and caps, file names, offer limits, pairing, transfer machines, save rules, flick, peers, persistence and plist. Synthetic inputs, no network, no real Keychain.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+              "function": "anOversizedHeaderOrChunkIsRefusedBeforeItsPayloadArrives"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+              "function": "aDecoderThatFailedStaysFailed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+              "function": "aWrongVersionAndGarbageHeadersAreRefusedCleanly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
+              "function": "unsafeNamesAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
+              "function": "theItemCountIsBoundedAtOneHundred"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
+              "function": "linksAreHttpOrHttpsAndBounded"
+            }
+          ]
+        },
+        {
+          "id": "F15.6",
+          "check": "missing-F15-device",
+          "acceptance": "Owner-run proof on two real Macs, as listed in docs/FLING.md.",
+          "cases": []
+        },
+        {
+          "id": "F15.7",
+          "check": "missing-F15-contract",
+          "acceptance": "Fling rules hold with injected inputs and no network, run through a portable group once one can run CryptoKit.",
+          "cases": []
         }
       ]
     }

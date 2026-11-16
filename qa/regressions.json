@@ -5735,6 +5735,78 @@
         "file": "Tests/ZeusCoreTests/FacePresenceStatusTests.swift",
         "function": "statesThatNeedAnActionSayWhyAndWhatToDo"
       }
+    },
+    {
+      "id": "REG-660",
+      "failure": "A Fling frame that claimed more than its cap was buffered instead of refused from its header.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+        "function": "anOversizedHeaderOrChunkIsRefusedBeforeItsPayloadArrives"
+      }
+    },
+    {
+      "id": "REG-661",
+      "failure": "A Fling stream could resynchronise into a later frame after a bad one.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+        "function": "aDecoderThatFailedStaysFailed"
+      }
+    },
+    {
+      "id": "REG-662",
+      "failure": "A Fling hello with the wrong version, or a malformed header, was not refused cleanly.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingWireTests.swift",
+        "function": "aWrongVersionAndGarbageHeadersAreRefusedCleanly"
+      }
+    },
+    {
+      "id": "REG-667",
+      "failure": "A file name that could leave the Fling stack folder was accepted.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
+        "function": "unsafeNamesAreRejected"
+      }
+    },
+    {
+      "id": "REG-668",
+      "failure": "A Fling offer with no items or more than 100 was accepted.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
+        "function": "theItemCountIsBoundedAtOneHundred"
+      }
+    },
+    {
+      "id": "REG-693",
+      "failure": "A Fling link other than a bounded http or https address was accepted.",
+      "features": [
+        "F15"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FlingNamesTests.swift",
+        "function": "linksAreHttpOrHttpsAndBounded"
+      }
     }
   ]
 }
