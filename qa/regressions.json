@@ -6059,6 +6059,42 @@
         "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
         "function": "ambientLoopsUseTheTableRates"
       }
+    },
+    {
+      "id": "REG-734",
+      "failure": "Switching tabs changed the open panel height with no animation because no height animation keyed on the tab.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PanelResizeMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+        "function": "theHeightKeyIsTheOpenPanelHeightOrNil"
+      }
+    },
+    {
+      "id": "REG-735",
+      "failure": "The panel height jumped by 122 pt when the tab changed between Home and another page.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PanelResizeMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+        "function": "aTabChangeAnimatesTheHeightWithThePageSpring"
+      }
+    },
+    {
+      "id": "REG-736",
+      "failure": "The old page was removed at once on a tab switch, a hard cut.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-PanelResizeMotionTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+        "function": "theOldPageFadesOutInsteadOfCutting"
+      }
     }
   ]
 }

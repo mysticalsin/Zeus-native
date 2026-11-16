@@ -493,9 +493,9 @@ struct TopBarPage: View {
         .frame(height: GlanceTopBar.pageHeight(home: topBar.selectedTab == .home) + (topBar.selectedTab == .home ? topBar.homeExtraHeight : 0), alignment: .top)
         // Glance's section switch: the new page crossfades in with a small rise and scale.
         .transition(.asymmetric(insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
-                                // The old page leaves at once: fading it over the new one drew its title
-                                // (e.g. Music's "Nothing playing") on top of the Calendar's add-event field.
-                                removal: .identity))
+                                // The old page fades out fast (0.08 s). A slower fade drew its title (e.g. Music's
+                                // "Nothing playing") on top of the Calendar's add-event field.
+                                removal: reduceMotion ? .identity : .opacity.animation(Motion.pageOut)))
         .id(topBar.selectedTab)
         .animation(Motion.page(reduceMotion: reduceMotion), value: topBar.selectedTab)
     }

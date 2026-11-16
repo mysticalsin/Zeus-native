@@ -162,6 +162,16 @@ struct NotchView: View {
         model.presentation == .closed ? closedWings.motionKey : nil
     }
 
+    /// The open panel's height, or nil while it is not open. A tab change (Home is 122 pt shorter than the other
+    /// pages) or an approval changes it, so the height eases with the page spring instead of jumping.
+    static func panelHeightKey(presentation: NotchModel.Presentation, panelHeight: CGFloat) -> CGFloat? {
+        presentation == .panel ? panelHeight : nil
+    }
+
+    private var panelHeightKey: CGFloat? {
+        Self.panelHeightKey(presentation: model.presentation, panelHeight: size(for: .panel).height)
+    }
+
     private func size(for presentation: NotchModel.Presentation) -> CGSize {
         switch presentation {
         case .closed:
@@ -228,6 +238,9 @@ struct NotchView: View {
         NotchSizeReader { animated in canvas(size: animated) }
             .modifier(AnimatedNotchHeight(height: size(for: model.shownHeight).height))
             .animation(open ? TopBarStyle.openHeightSpring : TopBarStyle.closeMotion, value: model.shownHeight)
+            // Outside the open-height animation, which wins on open: this one only runs when the page or an approval
+            // changes the open panel's height.
+            .animation(TopBarStyle.pageSpring, value: panelHeightKey)
             .modifier(AnimatedNotchWidth(width: size(for: model.presentation).width))
             .animation(Self.wingsSpring, value: closedWidthKey)
             .animation(open ? TopBarStyle.openSpring : TopBarStyle.closeMotion, value: model.presentation)

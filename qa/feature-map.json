@@ -903,6 +903,14 @@
       "scope": "Actual app motion tokens as SwiftUI animations; no rendering, display refresh or device acceptance.",
       "suite": "MotionAppTokensTests",
       "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift"
+    },
+    {
+      "id": "native-PanelResizeMotionTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "The real height key and page transition source; no rendering, display refresh or device acceptance.",
+      "suite": "PanelResizeMotionTests",
+      "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift"
     }
   ],
   "features": [
@@ -6503,6 +6511,25 @@
             }
           ],
           "id": "F13.motion-app-tokens"
+        },
+        {
+          "check": "native-PanelResizeMotionTests",
+          "acceptance": "Native panel resize fixtures: the height key, its animation order and the page fade-out.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+              "function": "theHeightKeyIsTheOpenPanelHeightOrNil"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+              "function": "aTabChangeAnimatesTheHeightWithThePageSpring"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PanelResizeMotionTests.swift",
+              "function": "theOldPageFadesOutInsteadOfCutting"
+            }
+          ],
+          "id": "F13.panel-resize-motion"
         }
       ]
     },
