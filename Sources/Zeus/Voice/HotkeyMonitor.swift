@@ -148,7 +148,13 @@ final class HotkeyMonitor {
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
             return event
         }) { keyMonitors.append(local) }
+        if let localMouse = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.mouseDown() }
+            return event
+        }) { keyMonitors.append(localMouse) }
     }
+
+    private static let mouseDowns: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
 
     /// Global monitors only once access is on, so macOS never prompts mid-use.
     private func startGlobal() {
@@ -157,6 +163,9 @@ final class HotkeyMonitor {
             let time = event.timestamp
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
         }) { keyMonitors.append(global) }
+        if let globalMouse = NSEvent.addGlobalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.mouseDown() }
+        }) { keyMonitors.append(globalMouse) }
     }
 
     private static func convert(_ event: NSEvent) -> ShortcutEvent? {
@@ -202,11 +211,18 @@ final class HotkeyMonitor {
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
     func interrupt() { send(.interrupt(live: liveModifiers())) }
 
-    /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once. STUB.
-    func configChanged() {}
+    /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
+    /// second key off in the middle of a hands-free turn must.
+    func configChanged() { tick() }
 
-    /// A mouse button went down: the second talk key's turn, armed or open, is over. STUB.
-    func mouseDown() {}
+    /// A mouse button went down (left, right, other, a drag starts with one): an Option-click or Option-drag is not a talk turn.
+    /// The second talk key's turn, armed or held, is over and never sent; the primary key is not told (`TalkKeyPair.mouseDown`).
+    func mouseDown() {
+        guard role == .talk else { return }
+        let config = config, second = secondConfig
+        let before = pair.generation
+        run(pair.mouseDownTagged(at: now(), primary: config, second: second), before: before, config, second)
+    }
 
     /// Sleep and wake tell the machine to drop an open turn. Idempotent.
     func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
@@ -246,21 +262,36 @@ final class HotkeyMonitor {
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
     /// inside a callback meets the machine in its new state. The k-th `start` of a call is turn `generation before + k`.
     private func send(_ event: VoiceKeyMachine.Event) {
-        let config = config
+        let config = config, second = secondConfig
         let before = pair.generation
+        run(pair.handleTagged(event, primary: config, second: second), before: before, config, second)
+    }
+
+    /// Runs what the pair let through, in order. `before` is the pair's generation ahead of the call: the k-th `start` of a call is
+    /// turn `before + k`.
+    private func run(_ effects: [(slot: TalkKeyPair.Slot, effect: VoiceKeyMachine.Effect)], before: Int,
+                     _ config: VoiceKeyMachine.Config, _ second: VoiceKeyMachine.Config) {
         var started = 0
-        for effect in pair.handle(event, primary: config, second: secondConfig) {
+        for (slot, effect) in effects {
+            let heard = slot == .second ? second : config
             switch effect {
             case .start:
                 started += 1
                 let turn = before + started
                 ownerTurn = turn
-                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(config.key?.title ?? "none"))")
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
                 if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
-                onRelease?()
+                // A launcher or another app may hold Option-Space (Carbon cannot see it): a Space the system reports down at the release
+                // of a second-key turn means the person was not talking, so the turn is cancelled, not sent.
+                if slot == .second, keysStillDown?([49]).contains(49) == true {
+                    VoiceLog.log("key", "talk shortcut (\(heard.key?.title ?? "none")) released with Space down: cancelled, nothing sent")
+                    onCancel?()
+                } else {
+                    onRelease?()
+                }
             case .cancel:
-                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut became another shortcut: cancelled, nothing sent")
+                VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut (\(heard.key?.title ?? "none")) became another shortcut: cancelled, nothing sent")
                 onCancel?()
             case .refused:
                 onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")

@@ -1101,9 +1101,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func syncTalkChord() -> Shortcut? {
         let chord = TalkChordRouting.current(heard: hotkey.keyProvider(), shared: hotkey.sharedProvider()).chord
         TalkChordHotkey.shared.sync(chord, listening: KeyListenAccess.granted)
+        let second = SecondTalkRouting.current().key
+        let changed = cachedTalkChord != chord || cachedSecondTalkKey != second
         cachedTalkChord = chord
-        cachedSecondTalkKey = SecondTalkRouting.current().key
-        SecondTalkRouting.lastSynced = cachedSecondTalkKey
+        cachedSecondTalkKey = second
+        SecondTalkRouting.lastSynced = second
+        // The monitor reads the stored values on events and ticks only, so one tick tells it of a change at once: the second key
+        // turned off in the middle of a hands-free turn ends that turn now, not at the next key.
+        if changed { hotkey.configChanged() }
         return chord
     }
 
