@@ -5029,7 +5029,7 @@
         {
           "id": "F11.ultron-eleven-kokoro",
           "check": "native-ZeusCoreTests",
-          "acceptance": "The Ultron voice defaults to ElevenLabs, then Kokoro (am_michael, same effect chain), then the Mac voice; only an explicit owner pick overrides it. Any ElevenLabs failure leaves Kokoro next: a bad key or empty credits pause it 15 minutes, a network error, timeout or rate limit 60 seconds, and the pause expires so ElevenLabs is retried.",
+          "acceptance": "The Ultron voice defaults to ElevenLabs, then Kokoro (am_michael, same effect chain), then the Mac voice; only an explicit owner pick overrides it. Any ElevenLabs failure leaves Kokoro next: a bad key or empty credits pause it 15 minutes, a network error, timeout or rate limit 60 seconds, and the pause expires so ElevenLabs is retried. The first-audio deadline bounds headers and first audio together, no later route or Studio retry runs past it, and a late fragment is discarded so Kokoro speaks the whole sentence. An imported provider never pins an engine.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
@@ -5062,6 +5062,34 @@
             {
               "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
               "function": "kokoroSpeaksAsTheSameUltronCharacter"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "theDeadlineBoundsHeadersAndFirstAudioTogether"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "noFurtherRouteIsTriedOnceTheDeadlinePassed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "theFastModelRetryIsSkippedWhenPausedOrPastTheDeadline"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "aPartialChunkAtTheDeadlineIsDiscarded"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "aBadKeyOrEmptyCreditsPauseFifteenMinutesAndExpire"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "anUnreachableRequestPausesOneMinuteInMemoryOnly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ElevenLabsFailsafeTests.swift",
+              "function": "anImportedProviderWithoutAnExplicitAutoFlagStaysAutomatic"
             }
           ]
         },
