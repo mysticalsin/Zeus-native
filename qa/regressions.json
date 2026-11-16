@@ -7607,6 +7607,54 @@
         "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
         "function": "aStopThatLandsWhileTheFormatIsReadSchedulesNoRetry"
       }
+    },
+    {
+      "id": "REG-834",
+      "failure": "Zeus started on Kokoro whenever Kokoro was set up, even with a working ElevenLabs key and no owner pick, against the owner decision of ElevenLabs first.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+        "function": "aKokoroStoredWithoutAnOwnerPickDoesNotBeatElevenLabs"
+      }
+    },
+    {
+      "id": "REG-835",
+      "failure": "The Settings default provider was Kokoro whenever Kokoro was set up, so a usable ElevenLabs key was not shown as the default.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+        "function": "elevenLabsIsTheDefaultProviderEvenWhenKokoroIsSetUp"
+      }
+    },
+    {
+      "id": "REG-836",
+      "failure": "A slow reading for ElevenLabs demoted it behind Kokoro in automatic mode, and a demoted engine was never tried again, so Kokoro stayed first for good.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+        "function": "aSlowElevenLabsStillLeadsAndTheTimeoutIsTheFailsafe"
+      }
+    },
+    {
+      "id": "REG-837",
+      "failure": "A network error or first-audio timeout from ElevenLabs did not pause it, so every following sentence paid up to 4 seconds before Kokoro spoke it.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronElevenFirstTests.swift",
+        "function": "aNetworkErrorOrTimeoutPausesElevenLabsBrieflySoTheNextSentencesGoToKokoro"
+      }
     }
   ]
 }
