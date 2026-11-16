@@ -11,10 +11,10 @@ import Testing
         return (defaults, { defaults.removePersistentDomain(forName: name) })
     }
 
-    @Test func voiceIsUltronAtSixtyPercent() {
+    @Test func voiceIsUltronAtSeventyFivePercent() {
         let (defaults, cleanup) = fresh(); defer { cleanup() }
         #expect(ZeusPersonality.current(defaults) == .ultron)
-        #expect(UltronEffectParameters.defaultPercent == 60)
+        #expect(UltronEffectParameters.defaultPercent == 75)
         #expect(!UltronEffectParameters.make(percent: Double(UltronEffectParameters.defaultPercent)).isNeutral)
     }
 

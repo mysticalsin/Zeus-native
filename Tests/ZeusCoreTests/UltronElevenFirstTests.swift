@@ -105,7 +105,7 @@ struct UltronElevenFirstTests {
     @Test func kokoroSpeaksAsTheSameUltronCharacter() {
         #expect(UltronCloudVoice.kokoroVoice == "am_michael")
         #expect(UltronCloudVoice.kokoroSpeed < 1)
-        #expect(UltronEffectParameters.defaultPercent == 60)
+        #expect(UltronEffectParameters.defaultPercent == 75)
         #expect(!UltronEffectParameters.make(percent: Double(UltronEffectParameters.defaultPercent)).isNeutral)
     }
 }
