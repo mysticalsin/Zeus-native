@@ -446,10 +446,7 @@ final class TopBarModel {
         let light = NotchLightKind.hudLevel(
             kind, value: value, previousLevel: previous.seen ? previous.value : value,
             muted: muted, limitEcho: atLowerBound || atUpperBound)
-        let spring = Animation.spring(
-            response: NotchClosedBodyLayout.wingsSpringResponse,
-            dampingFraction: NotchClosedBodyLayout.wingsSpringDamping)
-        withAnimation(spring) {
+        withAnimation(Motion.cueGrow) {
             show(cue)
             flash(light, ignoreSettings: ignoreSettings)
         }

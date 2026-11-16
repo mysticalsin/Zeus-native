@@ -5975,6 +5975,90 @@
         "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
         "function": "theMascotRunsAtItsClipRateAndSixtyWhileTravelling"
       }
+    },
+    {
+      "id": "REG-727",
+      "failure": "The app closed the panel with a linear 0.1 s curve instead of the critically damped panel close spring.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "theCloseIsTheCriticallyDampedPanelSpring"
+      }
+    },
+    {
+      "id": "REG-728",
+      "failure": "The HUD cue wing spring was a private literal pair in the app, apart from the token table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "theCueWingsUseTheCueGrowToken"
+      }
+    },
+    {
+      "id": "REG-729",
+      "failure": "A token spring still animated when Reduce Motion was on.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "aTokenSpringIsInstantUnderReduceMotion"
+      }
+    },
+    {
+      "id": "REG-730",
+      "failure": "The page spring numbers were repeated in the app apart from the token table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "thePageSpringIsThePanelResizeToken"
+      }
+    },
+    {
+      "id": "REG-731",
+      "failure": "Five copies of the peek content spring could drift apart and make the peek cards move differently.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "peekContentIsOneSpringWithATenthOfASecondDelay"
+      }
+    },
+    {
+      "id": "REG-732",
+      "failure": "Page removal, press and crossfade timings were literals spread over the views.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "pageOutAndTheWindowFadesComeFromTheTable"
+      }
+    },
+    {
+      "id": "REG-733",
+      "failure": "Ambient loops took their rate from each view instead of one table.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionAppTokensTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+        "function": "ambientLoopsUseTheTableRates"
+      }
     }
   ]
 }

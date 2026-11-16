@@ -152,9 +152,7 @@ struct NotchView: View {
     }
 
     /// How the closed notch grows into (and out of) its wings.
-    static let wingsSpring = Animation.spring(
-        response: NotchClosedBodyLayout.wingsSpringResponse,
-        dampingFraction: NotchClosedBodyLayout.wingsSpringDamping)
+    static let wingsSpring = Motion.cueGrow
 
     private var closedWings: ClosedWingsFacts { topBar.map(ClosedWingsFacts.init(of:)) ?? .noWings }
 
@@ -340,8 +338,8 @@ struct NotchView: View {
             topBar.flash(.entrance(style, tint))
             topBar.flash(.edgeWave(tint))
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.approval?.id)
-        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: model.sessions.count)
+        .animation(Motion.spring(MotionTokens.peekContent), value: model.approval?.id)
+        .animation(Motion.spring(MotionTokens.panelResize), value: model.sessions.count)
         .animation(Self.wingsSpring, value: topBar.map { ClosedWings.kind(of: $0) })
     }
 
@@ -364,19 +362,19 @@ struct NotchView: View {
                         .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
                 } else if let completion = model.completion {
                     CompletionCardView(completion: completion) { model.completion = nil }
-                        .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                        .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.peekContent))
                 } else if let failure = model.failure {
                     AgentTroubleCard(kind: .failed, sessionID: failure.sessionID, agent: failure.agent, project: failure.project, reason: failure.reason) {
                         NotchControllerBridge.dismissFailure()
                     }
-                    .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                    .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.peekContent))
                 } else if let session = stalledPeek {
                     AgentTroubleCard(kind: .stalled, sessionID: session.id, agent: session.agent, project: session.project,
                                      reason: session.reason ?? "No activity for a while") {
                         model.peekSessionID = nil
                         NotchControllerBridge.closePeek()
                     }
-                    .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                    .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.peekContent))
                 } else if let edit = model.selectionEdit {
                     SelectionEditBody(edit: edit)
                         .padding(.horizontal, 16)
@@ -386,7 +384,7 @@ struct NotchView: View {
                 } else if let recap = model.recap {
                     WelcomeRecapCardView(recap: recap) { model.recap = nil; NotchControllerBridge.closePeek() }
                         .padding(.horizontal, 16)
-                        .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                        .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.peekContent))
                 }
             }
             .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.1)))

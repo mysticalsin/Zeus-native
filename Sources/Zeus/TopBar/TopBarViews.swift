@@ -12,15 +12,14 @@ enum TopBarStyle {
     /// Glance's open panel: about 870 x 340 pt. Pages get the room under the tab row.
     static let panelWidth: CGFloat = 870
     static let pageHeight: CGFloat = 236
-    /// Glance-feel motion: a soft spring with a touch of overshoot for open/close and pages.
-    /// Measured from Glance's hover video: opens with no visible overshoot, closes firmly.
-    static let openSpring = Animation.spring(response: GlanceTopBar.openSpring.response, dampingFraction: GlanceTopBar.openSpring.damping)
-    static let closeMotion = Animation.linear(duration: GlanceTopBar.closeDuration)
+    /// Glance-feel motion, from the token table: open has a touch of overshoot, close has none.
+    static let openSpring = Motion.spring(MotionTokens.panelOpen)
+    static let closeMotion = Motion.panelClose
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
     static var tabLabel: Font {
         GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)
     }
-    static let openHeightSpring = Animation.spring(response: GlanceTopBar.openHeightSpring.response, dampingFraction: GlanceTopBar.openHeightSpring.damping)
+    static let openHeightSpring = Motion.spring(MotionTokens.panelOpenHeight)
     @MainActor static var pageSpring: Animation? { Motion.page(reduceMotion: Motion.reduced) }
     static let tile = Glass.notchTile
     static let tileStroke = Glass.notchTileStroke

@@ -895,6 +895,14 @@
       "scope": "Record page fixture controller with a fake display lister; no capture, no timers, no permission request.",
       "suite": "RecordlySnapshotFixtureTests",
       "file": "Tests/ZeusAppTests/RecordlySnapshotFixtureTests.swift"
+    },
+    {
+      "id": "native-MotionAppTokensTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual app motion tokens as SwiftUI animations; no rendering, display refresh or device acceptance.",
+      "suite": "MotionAppTokensTests",
+      "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift"
     }
   ],
   "features": [
@@ -6460,6 +6468,41 @@
               "function": "theRoutineCardFooterActionsAreDrawnLight"
             }
           ]
+        },
+        {
+          "check": "native-MotionAppTokensTests",
+          "acceptance": "Native app motion tokens read the one table and are instant under Reduce Motion.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "theCloseIsTheCriticallyDampedPanelSpring"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "theCueWingsUseTheCueGrowToken"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "aTokenSpringIsInstantUnderReduceMotion"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "thePageSpringIsThePanelResizeToken"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "peekContentIsOneSpringWithATenthOfASecondDelay"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "pageOutAndTheWindowFadesComeFromTheTable"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionAppTokensTests.swift",
+              "function": "ambientLoopsUseTheTableRates"
+            }
+          ],
+          "id": "F13.motion-app-tokens"
         }
       ]
     },
