@@ -147,6 +147,39 @@ to the key starts nothing, and a sleep, wake or timeout takes the live modifiers
 When talk and dictation share one key, the hold begins only on an exact match: nothing else may be down when it is armed
 (Command pressed first, then Control and Option, starts nothing). Once the hold runs, a foreign key or modifier cancels it (Shift on dictation only marks the turn).
 
+## The second talk key: Right Option
+
+Right Option alone is a second talk key beside Control+Option (and its Space chord). It starts the same talk turn, which
+can drive the Mac and asks the same approvals. Plan: `docs/RIGHT-OPTION-TALK-PLAN.md`.
+
+`TalkKeyPair` (`Sources/ZeusCore/TalkKeyPair.swift`) is a pure arbiter in front of two unchanged `VoiceKeyMachine`s, one
+for each key, with one owner and one bar. It sits inside the talk `HotkeyMonitor` in place of the single machine. Dictation
+and Polyglot give it no second key, and then it passes every effect through (`aPairWithoutASecondKeyActsAsTheMachine`).
+
+- **I10. One talk turn.** Across both talk keys at most one turn is open. A start while a turn is open never reaches the
+  owner. Every send or cancel belongs to the open turn and is judged by I1 to I9 against the own set of the key that opened it.
+- **I11. The other key waits.** After a turn ends (send, cancel or abandon) with any key still down, the other talk key
+  starts nothing until every key is up.
+- **I8p.** From rest, pressing exactly either key's own set acts. When a hands-free turn is open, only the key that opened
+  it ends it. The other key is swallowed: it neither continues nor ends the turn.
+
+Right Option is a typing key, so its second key waits `VoiceKey.secondKeyConfirm` (0.25 s, or the tiling confirm when that
+is longer) before it starts. A letter inside that time reads as typing and starts nothing (accents). Left Option never
+starts it, and joining a Right Option turn cancels it. A tap shorter than the confirm does nothing; a double tap latches.
+
+**The default is written nowhere.** `ShortcutStore.loadSecondTalk` returns Right Option when `talk.secondShortcut` is
+absent or does not parse, and never writes. Only the recorder writes (`off`, or a key); Reset removes the key.
+
+**The default yields** (`VoiceKey.secondTalkKey`, in this order): to the talk key as heard (the VoiceOver fallback on Right
+Option included), to dictation, to Polyglot, to pointing when pointing is on the same key and the second key is still the
+default, to VoiceOver when the key is Control-Option, and to a Carbon shortcut on Option alone (Chat on Option-Space), since
+Carbon may hide Space from the monitors. A key the owner recorded for the second key is kept against pointing, and
+`pointingStartsTurns(secondTalk:)` makes pointing stand down. Recording the talk, dictation or Polyglot key is refused
+(`VoiceKey.secondTalkRefusal`).
+
+Tests: `TalkKeyPairTests`, runs K and K0 and `theSecondKeyOrdersKeepTheRules` in `VoiceKeyWalkTests`, the second-key tests
+in `VoiceKeyTests` and `TileBaseConflictsTests`, `HotkeyMonitorMachineTests`, `TilingKeyClashTests`. Rows REG-637 to REG-644.
+
 ## VoiceOver
 
 VoiceOver uses Control+Option as its own modifier. While VoiceOver is on, Zeus leaves Control+Option to it and the

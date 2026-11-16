@@ -49,6 +49,12 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 - Pointing stays its own reducer (`PointingKeyGesture`, item 22) and reads the same key facts.
 - Tests: `VoiceKeyMachineTests` (every transition and the chord), `VoiceKeyWalkTests` (every press order against the rules), `KeyFactsTests`, `HotkeyMonitorMachineTests` (the adapter), `TilingConsumedKeyTests`, `TileBaseConflictsTests` (the tiling clash rule).
 
+### 25. Pair of talk keys (Control-Option and Right Option). EXPLICIT (2026-11-15)
+- Where: `ZeusCore/TalkKeyPair.swift` (`TalkKeyPair`), driven by `Zeus/Voice/HotkeyMonitor.swift` in place of the single machine; the second key comes from `SecondTalkRouting` (`Zeus/Voice/TalkChordHotkey.swift`) and `VoiceKey.secondTalkKey`. Plan: `docs/RIGHT-OPTION-TALK-PLAN.md`.
+- Two unchanged `VoiceKeyMachine`s (item 24, a zero diff) behind a pure arbiter with one owner and one bar. Every event but an abandon goes to both, primary first, each with its own config; each effect is let through or swallowed (rules P1 to P9). With the second key off the pair is the machine, which `aPairWithoutASecondKeyActsAsTheMachine` walks. Dictation and Polyglot never have a second key.
+- Rules: I10 one talk turn across both keys (a start while a turn is open never reaches the owner), I11 the other key waits after a turn ends until every key is up, I8p only the key that opened a hands-free turn ends it. Right Option waits 0.25 s, so a letter inside it (an accent) starts nothing.
+- Tests: `TalkKeyPairTests` (the cases of the plan), `VoiceKeyWalkTests` runs K and K0 with the arbiter checked on every order and `theSearchSeesAPairThatLetsTheOtherKeyStart`, `HotkeyMonitorMachineTests` (the adapter).
+
 ## Fixed
 
 ### 1. Dictation job phase (live, file, history re-run). FIXED, severity high
