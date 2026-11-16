@@ -7343,6 +7343,18 @@
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "thePermissionCueWrapsInsteadOfTruncatingMidWord"
       }
+    },
+    {
+      "id": "REG-767",
+      "failure": "Settings pop-ups were a fixed 153 points wide, so Control-Option and Automatic (best working voice) showed with an ellipsis.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
+        "function": "aSettingsPopupIsWideEnoughForItsLongestOption"
+      }
     }
   ]
 }

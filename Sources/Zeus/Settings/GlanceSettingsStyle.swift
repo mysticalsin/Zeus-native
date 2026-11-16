@@ -335,12 +335,25 @@ struct GSPopup: View {
     /// What VoiceOver calls the pop-up (the setting it changes). Name it at every call site.
     var label: String? = nil
     var body: some View {
-        // Glance's settings pop-ups are a fixed 153 x 24, inset 13.5 pt inside the card edge.
+        // Glance's settings pop-ups are 153 x 24, inset 13.5 pt inside the card edge. A longer option name
+        // widens the control (up to `maxWidth`) so the shown value is never cut with an ellipsis.
         popup.padding(.trailing, 13.5)
     }
 
+    static let minWidth: CGFloat = 153
+    static let maxWidth: CGFloat = 270
+    /// Text inset (12 + 9), the gap and the chevron, plus a little slack.
+    private static let chrome: CGFloat = 12 + 9 + 8 + 10 + 4
+
+    /// 153 for short names; otherwise wide enough for the longest option at the pop-up's 14.5 pt font.
+    static func width(for options: [String]) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 14.5)
+        let longest = options.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return min(maxWidth, max(minWidth, ceil(longest) + chrome))
+    }
+
     @ViewBuilder private var popup: some View {
-        let control = OBPopup(selection: $selection, options: options, width: 153).environment(\.ob, OB.Palette.settings)
+        let control = OBPopup(selection: $selection, options: options, width: Self.width(for: options)).environment(\.ob, OB.Palette.settings)
         if let label, !label.isEmpty {
             control.accessibilityLabel(label)
         } else {
