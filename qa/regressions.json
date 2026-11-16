@@ -7391,6 +7391,18 @@
         "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
         "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
       }
+    },
+    {
+      "id": "REG-810",
+      "failure": "With AirPods as the microphone, the headset switched profile when the talk key went down, the audio engine stopped and was never restarted, so every talk turn heard nothing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
+      }
     }
   ]
 }

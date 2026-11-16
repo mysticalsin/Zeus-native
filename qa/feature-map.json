@@ -1053,6 +1053,14 @@
       "suite": "FlingSecurityAppTests",
       "file": "Tests/ZeusAppTests/FlingSecurityTests.swift",
       "scope": "Actual FlingService and prompt model with a recording stand-in transport, plus the file sink in a temp folder: the one second input delay, private links not opening, Pair again, the named pairing answer, quarantine and case-only name clashes. No browser, no network."
+    },
+    {
+      "id": "native-TalkTurnVoiceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "TalkTurnVoiceTests",
+      "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+      "scope": "The talk-turn capture recovery sequence, output engine start timing, microphone choice and per-turn diagnostics with spies and pure helpers. No audio hardware, Bluetooth link or speech recognition is exercised."
     }
   ],
   "features": [
@@ -5310,6 +5318,17 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theSecondKeyOrdersKeepTheRules"
+            }
+          ]
+        },
+        {
+          "id": "F11.talk-turn-voice",
+          "check": "native-TalkTurnVoiceTests",
+          "acceptance": "Talk turns keep listening through a headset profile change, start the output engine only when audio is scheduled, use the chosen microphone and report what the input saw when nothing was heard. Spies and pure helpers: no Bluetooth link, capture hardware or speech recognition.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aConfigurationChangeReinstallsTheTapThenRestartsTheEngineAndKeepsTheTurn"
             }
           ]
         }

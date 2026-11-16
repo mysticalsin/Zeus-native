@@ -233,15 +233,14 @@ final class SpeechInput: @unchecked Sendable {
         lock.unlock()
         let startedAt = ProcessInfo.processInfo.systemUptime
 
-        if capturePolicy.cancelOnConfigurationChange {
-            configurationObserver = NotificationCenter.default.addObserver(
-                forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
-            ) { [weak self] _ in
-                guard let self, self.lock.withLock({ self.generation == current && !self.stopRequested }) else { return }
-                let handler = self.onCaptureFailure
-                self.cancel()
-                handler?(current, controllerGeneration, .configurationChanged)
-            }
+        // Bluetooth headsets re-negotiate their profile when capture opens, which stops the engine and can
+        // change the input format. Without `cancelOnConfigurationChange` the turn recovers in place.
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
+        ) { [weak self, weak engine] _ in
+            guard let self, let engine else { return }
+            self.handleConfigurationChange(engine: engine, session: current, origin: controllerGeneration,
+                                           policy: capturePolicy, startedAt: startedAt)
         }
 
         if recognizes, let activeRecognizer {
@@ -249,19 +248,30 @@ final class SpeechInput: @unchecked Sendable {
                              turn: RecognitionTurn(sessionID: current, origin: controllerGeneration))
         }
 
+        installTap(on: input, format: format, session: current, origin: controllerGeneration,
+                   policy: capturePolicy, startedAt: startedAt, resampler: turnResampler)
+        engine.prepare()
+        do { try engine.start() } catch { cancel(); throw error }
+        return current
+    }
+
+    /// Installs the microphone tap for one session. Called at the start of a turn and again after a
+    /// configuration change, always on the same recognition request (read through `request` per buffer).
+    private func installTap(on input: AVAudioInputNode, format: AVAudioFormat, session current: Int, origin: UInt64,
+                            policy: CapturePolicy, startedAt: TimeInterval, resampler: AudioSamples.Resampler?) {
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self else { return }
-            if capturePolicy.maximumSeconds != nil {
+            if policy.maximumSeconds != nil {
                 let failure = self.lock.withLock { () -> CaptureFailure? in
                     guard self.generation == current, !self.stopRequested else { return nil }
-                    let result = capturePolicy.failure(elapsed: ProcessInfo.processInfo.systemUptime - startedAt,
-                                                       storedSamples: self.samples.count, incomingSamples: 0)
+                    let result = policy.failure(elapsed: ProcessInfo.processInfo.systemUptime - startedAt,
+                                                storedSamples: self.samples.count, incomingSamples: 0)
                     if result != nil { self.stopRequested = true }
                     return result
                 }
                 if let failure {
-                    self.reportCaptureFailure(failure, session: current, origin: controllerGeneration)
+                    self.reportCaptureFailure(failure, session: current, origin: origin)
                     return
                 }
                 guard self.lock.withLock({ self.generation == current && !self.stopRequested }) else { return }
@@ -270,18 +280,18 @@ final class SpeechInput: @unchecked Sendable {
                 let currentRequest = self.lock.withLock { self.request }
                 currentRequest?.append(buffer)
             }
-            if let resampler = turnResampler {
+            if let resampler = resampler {
                 let converted = resampler.convert(buffer)
                 let (admitted, failure) = self.lock.withLock { () -> (Bool, CaptureFailure?) in
-                    if capturePolicy.maximumSamples != nil,
+                    if policy.maximumSamples != nil,
                        (self.generation != current || self.stopRequested) { return (false, nil) }
-                    let failure = capturePolicy.failure(elapsed: ProcessInfo.processInfo.systemUptime - startedAt,
-                                                        storedSamples: self.samples.count, incomingSamples: converted.count)
+                    let failure = policy.failure(elapsed: ProcessInfo.processInfo.systemUptime - startedAt,
+                                                 storedSamples: self.samples.count, incomingSamples: converted.count)
                     if failure != nil { self.stopRequested = true } else { self.samples += converted }
                     return (failure == nil, failure)
                 }
                 if let failure {
-                    self.reportCaptureFailure(failure, session: current, origin: controllerGeneration)
+                    self.reportCaptureFailure(failure, session: current, origin: origin)
                     return
                 }
                 guard admitted else { return }
@@ -294,9 +304,39 @@ final class SpeechInput: @unchecked Sendable {
                 self.onLevel?(Double(min(max((rms - 0.008) * 10.2, 0), 1)))
             }
         }
-        engine.prepare()
-        do { try engine.start() } catch { cancel(); throw error }
-        return current
+    }
+
+    /// The audio hardware changed under a running capture (a headset switching profile, a device
+    /// leaving). Cancels the turn when the policy says so; otherwise rebuilds the input format,
+    /// reinstalls the tap and restarts the engine, keeping the same recognition request.
+    private func handleConfigurationChange(engine: AVAudioEngine, session: Int, origin: UInt64,
+                                           policy: CapturePolicy, startedAt: TimeInterval) {
+        let owns = lock.withLock { generation == session && !stopRequested }
+        let endTurn = { [self] in
+            let handler = onCaptureFailure
+            cancel()
+            handler?(session, origin, .configurationChanged)
+        }
+        CaptureRecovery.handle(
+            cancelsTurn: policy.cancelOnConfigurationChange, ownsSession: owns,
+            cancelTurn: endTurn,
+            reinstallTap: { [self] in
+                let input = engine.inputNode
+                let format = input.outputFormat(forBus: 0)
+                guard Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) else { return false }
+                let next = lock.withLock { () -> AudioSamples.Resampler? in
+                    if resampler != nil { resampler = AudioSamples.Resampler(from: format) }
+                    return resampler
+                }
+                installTap(on: input, format: format, session: session, origin: origin,
+                           policy: policy, startedAt: startedAt, resampler: next)
+                return true
+            },
+            restartEngine: { engine.prepare(); try engine.start() },
+            recoveryFailed: { outcome in
+                VoiceLog.log("listen", "input recovery failed (\(outcome))")
+                if outcome.endsTurn { endTurn() }
+            })
     }
 
     /// Debug/E2E (`dictate-file`): open Apple on-device recognition on an empty request and feed
