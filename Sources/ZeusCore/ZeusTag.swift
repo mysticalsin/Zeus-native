@@ -105,6 +105,8 @@ public enum ZeusTag: Equatable, Sendable {
     case point(PointTarget?)
     case highlight(HighlightTarget)
     case action(ZeusAction)
+    /// Marks to draw on the screen the model was shown, tied to spoken sentences (`TalkDraw`).
+    case draw(TalkDraw)
 
     /// The tag as a model would write it; `ZeusTagParser.parse` reads it back.
     /// Labels can't contain ":" or "]" (the tag syntax has no escaping).
@@ -121,6 +123,8 @@ public enum ZeusTag: Equatable, Sendable {
             return "[HIGHLIGHT:\(area.x),\(area.y),\(area.width),\(area.height)\(fields(area.label, area.screen))]"
         case .action(let action):
             return action.tagText
+        case .draw(let draw):
+            return "[DRAW:\(draw.json)]"
         }
     }
 }
@@ -128,7 +132,7 @@ public enum ZeusTag: Equatable, Sendable {
 /// Parses ZEUS reply tags. Tags are expected at the start of a reply; a trailing tag
 /// (an older tag style) is also accepted so a model that ignores the instruction still works.
 public enum ZeusTagParser {
-    static let prefixes = ["[POINT:", "[HIGHLIGHT:", "[ACTION:"]
+    static let prefixes = ["[POINT:", "[HIGHLIGHT:", "[ACTION:", "[DRAW:"]
 
     public struct Result: Equatable, Sendable {
         public let tags: [ZeusTag]
@@ -168,14 +172,14 @@ public enum ZeusTagParser {
         }
         let body = text.dropFirst(prefix.count)
 
-        if prefix == "[ACTION:" {
+        if prefix == "[ACTION:" || prefix == "[DRAW:" {
             guard let jsonEnd = endOfJSONObject(in: body) else { return .incomplete }
             let afterJSON = body[jsonEnd...].drop(while: \.isWhitespace)
             guard let close = afterJSON.first else { return .incomplete }
             guard close == "]" else { return .notATag }
             let json = String(body[body.startIndex..<jsonEnd])
             let length = text.distance(from: text.startIndex, to: afterJSON.startIndex) + 1
-            return .complete(parseAction(json), length: length)
+            return .complete(prefix == "[DRAW:" ? TalkDrawParser.parse(json).map(ZeusTag.draw) : parseAction(json), length: length)
         }
 
         guard let closeIndex = body.firstIndex(of: "]") else { return .incomplete }

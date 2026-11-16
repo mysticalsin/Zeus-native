@@ -818,6 +818,8 @@ final class VoiceTurnController {
                 }
             case .tag(.point(nil)):
                 break
+            case .tag(.draw):
+                break // Drawn once the presenter is wired in.
             case .text(let text):
                 guard !haltedForHallucination, !haltedForPersonaLimit else { break }
                 var sanitizedDelta = ResponseSanitizer.stripArtifacts(text)
