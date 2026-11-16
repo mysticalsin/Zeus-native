@@ -938,6 +938,8 @@ private struct Sim {
         var arrivingChord = false
         var chordMoved = false
         var stage = Stage(phase: .idle, pointing: 0)
+        /// When the timer this slot owes ahead of the key was due.
+        var dueAt: TimeInterval?
     }
 
     /// One event reaches the pair (runs K and K0). Each slot is judged as `feed` judges one key, on what the pair let through
@@ -969,6 +971,7 @@ private struct Sim {
                 }
             }
             if key != nil, !p.configChange, case .key(let shortcut, let time) = event { p.owed = overdue(config, at: time, event: shortcut) }
+            if p.owed != nil { p.dueAt = dueTime(config) }
             pre[slot] = p
         }
         select(0)
@@ -1020,9 +1023,39 @@ private struct Sim {
         select(0)
         judgeTimeOrder(trace: trace, owed: pre.map { $0.owed?.effects.count ?? 0 }, seenBefore: pre[0].seenBefore, barBefore: barBefore,
                        ownerBefore: ownerBefore)
+        judgeDueOrder(trace: trace, owed: pre.map { $0.owed?.effects.count ?? 0 }, due: pre.map(\.dueAt))
         judgePair(trace.filter(\.emitted), event, strays: strays, seenBefore: pre[0].seenBefore)
         runOwner(tagged.map(\.effect), config: configs[0], run)
         if drain, held == nil, kind != .tick, kind != .sweep, kind != .echo { drainWakes(run) }
+    }
+
+    /// When the press or the tap a slot is in comes due: its confirm after the press, the 0.4 s gap after the tap.
+    private func dueTime(_ config: VoiceKeyMachine.Config) -> TimeInterval? {
+        switch machine.phase {
+        case .armed(let since, _): return since + (config.mode == .hold ? config.confirm : 0)
+        case .tapped(let at, true): return at + 0.4
+        default: return nil
+        }
+    }
+
+    /// I14: the effects that timers owed ahead of a key come out in the order the timers fell due, across both keys. A pair that runs each
+    /// machine's late timer inside that machine's own call lets a send that fell due at 0.5 out before a start that fell due at 0.45.
+    private mutating func judgeDueOrder(trace: [TalkKeyPair.Raw], owed: [Int], due: [TimeInterval?]) {
+        var items: [(index: Int, due: TimeInterval)] = []
+        for (position, slot) in [TalkKeyPair.Slot.primary, .second].enumerated() {
+            guard owed[position] > 0, let when = due[position] else { continue }
+            var count = 0
+            for (index, entry) in trace.enumerated() where entry.slot == slot {
+                defer { count += 1 }
+                guard count < owed[position], entry.emitted else { continue }
+                if case .wake = entry.effect { continue }
+                items.append((index, when))
+            }
+        }
+        items.sort { $0.index < $1.index }
+        for pair in zip(items, items.dropFirst()) where pair.1.due < pair.0.due - 0.001 {
+            found.append("I14: an effect that fell due at \(pair.0.due) s came out before one that fell due at \(pair.1.due) s")
+        }
     }
 
     /// Timers that fell due before a key are the pair's to run first, in due order, across both keys (review of the pair, major 1). Two

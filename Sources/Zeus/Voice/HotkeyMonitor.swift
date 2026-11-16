@@ -121,6 +121,8 @@ final class HotkeyMonitor {
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
     private var pair = TalkKeyPair()
+    /// A Space was seen down while the second key's turn was open (`lookForALauncherSpace`).
+    private var launcherSpaceSeen = false
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
     private var ownerTurn = 0
 
@@ -187,6 +189,7 @@ final class HotkeyMonitor {
     /// picture as a foreign key, so while the picture holds any ordinary key the system is asked first which of them
     /// are still down.
     func feed(_ event: ShortcutEvent, at time: TimeInterval? = nil) {
+        lookForALauncherSpace()
         let held = pair.keys.keysDown
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
@@ -219,9 +222,20 @@ final class HotkeyMonitor {
     /// The second talk key's turn, armed or held, is over and never sent; the primary key is not told (`TalkKeyPair.mouseDown`).
     func mouseDown(at time: TimeInterval? = nil) {
         guard role == .talk else { return }
+        // Read at the time the click happened, as a key is (`feed`): a busy main thread hears it late, and a confirm that came due
+        // in between must not decide whether the press had already started.
+        let arrived = now()
+        let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
         let config = config, second = secondConfig
         let before = pair.generation
-        run(pair.mouseDownTagged(at: now(), primary: config, second: second), before: before, config, second)
+        run(pair.mouseDownTagged(at: at, primary: config, second: second), before: before, config, second)
+    }
+
+    /// A launcher on Option-Space that Carbon cannot see may tap and let go of Space between two looks at the keyboard. While the
+    /// second key's turn is open every key event and every tick asks the system, and a Space seen once means the turn is not sent.
+    private func lookForALauncherSpace() {
+        guard pair.owner == .second, keysStillDown?([49]).contains(49) == true else { return }
+        launcherSpaceSeen = true
     }
 
     /// Sleep and wake tell the machine to drop an open turn. Idempotent.
@@ -234,7 +248,10 @@ final class HotkeyMonitor {
         }
     }
 
-    private func tick() { send(.tick(at: now(), live: liveModifiers())) }
+    private func tick() {
+        lookForALauncherSpace()
+        send(.tick(at: now(), live: liveModifiers()))
+    }
 
     // MARK: Effects
 
@@ -279,18 +296,21 @@ final class HotkeyMonitor {
                 started += 1
                 let turn = before + started
                 ownerTurn = turn
+                launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
                 if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
                 // A launcher or another app may hold Option-Space (Carbon cannot see it): a Space the system reports down at the release
                 // of a second-key turn means the person was not talking, so the turn is cancelled, not sent.
-                if slot == .second, keysStillDown?([49]).contains(49) == true {
+                defer { launcherSpaceSeen = false }
+                if slot == .second, launcherSpaceSeen || keysStillDown?([49]).contains(49) == true {
                     VoiceLog.log("key", "talk shortcut (\(heard.key?.title ?? "none")) released with Space down: cancelled, nothing sent")
                     onCancel?()
                 } else {
                     onRelease?()
                 }
             case .cancel:
+                launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut (\(heard.key?.title ?? "none")) became another shortcut: cancelled, nothing sent")
                 onCancel?()
             case .refused:
