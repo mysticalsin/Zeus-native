@@ -122,12 +122,13 @@ final class BuddyController: NSObject {
     /// start, whenever the screens change (the old link may belong to a display that is gone), and when the buddy
     /// crosses to another display, so a 60 Hz external screen does not pace a buddy shown on the 120 Hz built-in one.
     private func startDisplayLink() {
+        let shown = shownWindowIndex()
+        linkedWindowIndex = shown
+        // No screen to bind to: keep the current link rather than leave the buddy without a frame loop.
+        guard let screen = Self.linkScreen(window: shown.flatMap { windows[$0].screen }, main: NSScreen.main, all: NSScreen.screens) else { return }
         let wasPaused = displayLink?.isPaused ?? false
         displayLink?.invalidate()
         displayLink = nil
-        let shown = shownWindowIndex()
-        linkedWindowIndex = shown
-        guard let screen = Self.linkScreen(window: shown.flatMap { windows[$0].screen }, main: NSScreen.main, all: NSScreen.screens) else { return }
         let link = screen.displayLink(target: self, selector: #selector(tick(_:)))
         link.isPaused = wasPaused
         lastTimestamp = 0
