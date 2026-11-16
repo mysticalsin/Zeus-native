@@ -77,8 +77,8 @@ enum Motion {
     static let windowFadeIn = MotionTokens.windowFadeInDuration
     static let windowFadeOut = MotionTokens.windowFadeOutDuration
     /// Frame rates of clock-driven loops.
-    static let ambientFPS = Double(MotionRules.ambientFPS)
-    static let spinnerFPS = Double(MotionRules.spinnerFPS)
+    static let ambientFPS = MotionRules.ambientFPS
+    static let spinnerFPS = MotionRules.spinnerFPS
 
     /// A token spring. Under Reduce Motion nothing animates.
     static func spring(_ token: SpringToken, reduceMotion: Bool) -> Animation? {

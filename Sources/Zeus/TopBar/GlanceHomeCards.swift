@@ -207,7 +207,7 @@ private struct Wiggle: ViewModifier {
 
     func body(content: Content) -> some View {
         if active && !Motion.reduced && !TopBarStyle.isSnapshot {
-            TickingView(interval: 1.0 / 24.0) { context in
+            DisplaySynchronizedView(preferredFramesPerSecond: Motion.ambientFPS) { context in
                 content.rotationEffect(.degrees(sin(context.date.timeIntervalSinceReferenceDate * 13 + seed * 1.7) * 0.9))
             }
         } else {

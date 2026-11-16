@@ -43,7 +43,7 @@ struct MotionAppTokensTests {
     }
 
     @Test func ambientLoopsUseTheTableRates() {
-        #expect(Motion.ambientFPS == Double(MotionRules.ambientFPS))
-        #expect(Motion.spinnerFPS == Double(MotionRules.spinnerFPS))
+        #expect(Motion.ambientFPS == MotionRules.ambientFPS)
+        #expect(Motion.spinnerFPS == MotionRules.spinnerFPS)
     }
 }

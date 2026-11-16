@@ -136,15 +136,6 @@ struct MotionSourceLintTests {
         ("OnboardingVisuals.swift", "", "24 fps film-rate stage in the welcome guide"),
         ("MascotMotion.swift", "", "the mascot's frame clock; its rate comes from the clip (MotionRules.fps)"),
         ("TopBarViews.swift", "TimelineView(", "the Scribe meeting ticker at 20 fps; meeting card motion is left alone"),
-        // Moved to a display link in the next step (C6); these entries go with it.
-        ("NotchView.swift", "TickingView(", "halo breathing, until C6"),
-        ("TopBarViews.swift", "TickingView(", "level bars, until C6"),
-        ("BuddyOverlayView.swift", "", "buddy waveform and spinner, until C6"),
-        ("ThinkingOrb.swift", "", "thinking orb, until C6"),
-        ("LivingMascot.swift", "", "living mascot, until C6"),
-        ("GlanceHomeCards.swift", "", "edit wiggle, until C6"),
-        ("OnboardingView.swift", "", "welcome guide timeline, until C6"),
-        ("GlassBloom.swift", "", "bloom fade, until C6"),
     ]
 
     static func isAllowed(file: String, hit: String) -> Bool {
@@ -202,6 +193,18 @@ struct MotionSourceLintTests {
     @Test func everyAllowlistedFileStillExists() throws {
         let names = Set(Self.swiftFiles().map(\.lastPathComponent))
         for entry in Self.fastClockAllowlist { #expect(names.contains(entry.file), "\(entry.file) is gone: remove it from the allowlist") }
+    }
+
+    @Test func theAmbientLoopsRunOnTheDisplayLink() throws {
+        for path in ["Notch/NotchView.swift", "TopBar/TopBarViews.swift", "Overlay/BuddyOverlayView.swift", "Voice/ThinkingOrb.swift",
+                     "Avatar/LivingMascot.swift", "TopBar/GlanceHomeCards.swift", "App/OnboardingView.swift", "Notch/GlassBloom.swift"] {
+            let source = try String(contentsOf: Self.sources.appendingPathComponent(path), encoding: .utf8)
+            #expect(source.contains("DisplaySynchronizedView("), "\(path) should drive its motion from the display link")
+        }
+        let bloom = try String(contentsOf: Self.sources.appendingPathComponent("Notch/GlassBloom.swift"), encoding: .utf8)
+        #expect(bloom.contains("until:"), "the bloom stops its link at an end time")
+        let buddy = try String(contentsOf: Self.sources.appendingPathComponent("Overlay/BuddyOverlayView.swift"), encoding: .utf8)
+        #expect(buddy.contains("Motion.spinnerFPS"), "the spinner turns at the display rate")
     }
 
     @Test func noAnimationFiresForEveryChange() throws {

@@ -283,7 +283,7 @@ struct NotchView: View {
         let shape = NotchShape(shoulder: shoulder, earHeight: earHeight, bottomRadius: bottomRadius)
         let glanceOpen = topBar != nil && model.presentation == .panel
         return ZStack(alignment: .top) {
-            TickingView(interval: 1 / 30, paused: !breathing) { context in
+            DisplaySynchronizedView(paused: !breathing, preferredFramesPerSecond: Motion.ambientFPS) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 let period = status == .needsYou ? 1.8 : 2.6
                 // Reduce Motion: a steady glow instead of breathing.

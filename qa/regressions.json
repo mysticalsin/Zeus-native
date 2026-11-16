@@ -6143,6 +6143,18 @@
         "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
         "function": "everyAllowlistedFileStillExists"
       }
+    },
+    {
+      "id": "REG-741",
+      "failure": "The halo, level bars, buddy waveform and spinner, thinking orb, mascot, edit wiggle, welcome sweep and bloom fade ran on a 30 Hz timer that is not locked to the display.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-MotionSourceLintTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+        "function": "theAmbientLoopsRunOnTheDisplayLink"
+      }
     }
   ]
 }

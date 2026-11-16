@@ -153,7 +153,7 @@ struct LevelBars: View {
     var height: CGFloat = 14
 
     var body: some View {
-        TickingView(interval: 1 / 30, paused: !active || Motion.reduced) { context in
+        DisplaySynchronizedView(paused: !active || Motion.reduced, preferredFramesPerSecond: Motion.ambientFPS) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<count, id: \.self) { index in

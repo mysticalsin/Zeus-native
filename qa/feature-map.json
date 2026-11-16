@@ -6570,6 +6570,10 @@
             {
               "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
               "function": "noSpringNumbersLiveInTheNotchOrTopBarViews"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MotionSourceLintTests.swift",
+              "function": "theAmbientLoopsRunOnTheDisplayLink"
             }
           ],
           "id": "F13.motion-source-lint"
