@@ -5891,6 +5891,90 @@
         "file": "Tests/ZeusCoreTests/TalkDrawTests.swift",
         "function": "aRingRadiusIsClampedSoOneMarkCannotCoverTheScreen"
       }
+    },
+    {
+      "id": "REG-720",
+      "failure": "The panel closed on a 0.1 s linear curve that missed the recorded close heights by 17 to 22 pt and snapped shut.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/GlanceTopBarTests.swift",
+        "function": "closeFitsGlancesMeasuredHeightsWithoutOvershoot"
+      }
+    },
+    {
+      "id": "REG-721",
+      "failure": "The close motion token was not checked against the recorded close heights, so a curve that stepped or bounced could ship.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theCloseSpringFitsTheMeasuredCloseWithNoOvershoot"
+      }
+    },
+    {
+      "id": "REG-722",
+      "failure": "The cue spring could drift past 120 ms to settle over a 120 pt wing growth, or break the HUD timing bar.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theCueSpringSettlesUnder120msOver120pt"
+      }
+    },
+    {
+      "id": "REG-723",
+      "failure": "The first 120 Hz frame of a HUD cue jumped 12 percent of the way, which showed as a pop.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theFirstFrameOfACueAt120HzIsUnderTenPercent"
+      }
+    },
+    {
+      "id": "REG-724",
+      "failure": "A motion token could be given a damping that rings or never settles.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "everyDampingIsBetween075And1"
+      }
+    },
+    {
+      "id": "REG-725",
+      "failure": "Ambient loops ran at 30 Hz, which is not locked to the display and judders on a 120 Hz screen.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "ambientLoopsRunAtADivisorOf120"
+      }
+    },
+    {
+      "id": "REG-726",
+      "failure": "The mascot ticked at 24 or 6 Hz whatever the clip's own frame rate, so clips at 12 and 20 fps stepped unevenly.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MotionTokensTests.swift",
+        "function": "theMascotRunsAtItsClipRateAndSixtyWhileTravelling"
+      }
     }
   ]
 }
