@@ -7523,6 +7523,18 @@
         "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
         "function": "aChosenTalkMicrophoneDeviceIsNeverExported"
       }
+    },
+    {
+      "id": "REG-831",
+      "failure": "The capture recovery path (stop landing during the engine restart, an input with no usable format) had no test, so a stop race could reopen the microphone or a flapping input could retry for ever unnoticed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeechInputRecoveryTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
+        "function": "aStopWhileTheEngineIsStartingLeavesItStoppedWithTheTapRemoved"
+      }
     }
   ]
 }
