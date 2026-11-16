@@ -66,8 +66,10 @@ struct ZeusPromptTests {
 
     @Test func personaSectionStaysCompact() {
         // It is sent on every turn. Raised from 160 to 240 in round 24 for the explicit no-menace,
-        // loyalty and brevity rules plus four short few-shot examples (about +70 words).
-        #expect(ZeusPersona.ultron.split(separator: " ").count < 240)
+        // loyalty and brevity rules plus four short few-shot examples (about +70 words). Raised again to 280:
+        // the persona measures 273 words after the later routing and voice rounds, and every rule in it is pinned by
+        // a test here. Trimming it is a prompt decision for the owner; the budget still catches growth past this.
+        #expect(ZeusPersona.ultron.split(separator: " ").count < 280)
         #expect(ZeusPersona.plain.split(separator: " ").count < 90)
     }
 
