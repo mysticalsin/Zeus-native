@@ -9,7 +9,7 @@ public enum UltronSpeechText {
 
     /// Replaces "..." and the single "…" with a comma, or a period when the sentence ends there
     /// (end of text, or a capital letter follows). No mark when punctuation or a closing quote follows
-    /// ("Hmm...?" becomes "Hmm?"). Number ranges ("1...5"), code-like tokens ("a...b") and a bracketed
+    /// ("Hmm...?" becomes "Hmm?"). Number ranges ("1...5"), single-letter tokens ("a...b") and a bracketed
     /// "[...]" are left as written.
     public static func sanitize(_ text: String) -> String {
         guard let ellipsis, text.contains(".") || text.contains("\u{2026}") else { return text }
@@ -23,8 +23,7 @@ public enum UltronSpeechText {
             if before.isEmpty { result.replaceSubrange(range, with: ""); continue }
             if let last = before.last, openers.contains(last) { continue }
             let tight = !matched.contains(where: \.isWhitespace)
-            if tight, let last = before.last, let first = after.first, last.isLetter || last.isNumber,
-               first.isLetter || first.isNumber { continue }
+            if tight, keepsTightToken(before: before, after: after) { continue }
             let next = after.first
             let beforeEnd = before.last
             let mark: String
@@ -37,6 +36,16 @@ public enum UltronSpeechText {
             result.replaceSubrange(range, with: mark + (spaced ? " " : ""))
         }
         return result
+    }
+
+    /// A tight "x...y" stays as written only for a number range ("1...5") or single-character
+    /// tokens ("a...b"); words joined by dots ("Well...yes") are speech and get a pause mark.
+    private static func keepsTightToken(before: Substring, after: Substring) -> Bool {
+        let left = before.reversed().prefix { $0.isLetter || $0.isNumber }
+        let right = after.prefix { $0.isLetter || $0.isNumber }
+        guard !left.isEmpty, !right.isEmpty else { return false }
+        if left.allSatisfy(\.isNumber) && right.allSatisfy(\.isNumber) { return true }
+        return left.count == 1 && right.count == 1
     }
 
     /// The text to hand a voice: sanitized for the Ultron personality, untouched for plain.

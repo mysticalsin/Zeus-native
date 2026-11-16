@@ -74,6 +74,12 @@ struct UltronTakeCCoreTests {
         #expect(UltronSpeechText.sanitize("The [...] part.") == "The [...] part.")
     }
 
+    @Test func wordsJoinedByATightEllipsisBecomeACommaPause() {
+        #expect(UltronSpeechText.sanitize("Well...yes, that works.") == "Well, yes, that works.")
+        #expect(UltronSpeechText.sanitize("Hmm...okay.") == "Hmm, okay.")
+        #expect(UltronSpeechText.sanitize("Wait\u{2026}Now we see.") == "Wait. Now we see.")
+    }
+
     @Test func anEllipsisBeforeALowercaseWordStaysInOneStreamedSentence() {
         var splitter = SentenceSplitter()
         #expect(splitter.feed("Fine... that works. ") == ["Fine... that works."])
