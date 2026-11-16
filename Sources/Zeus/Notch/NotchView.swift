@@ -709,12 +709,7 @@ private struct TopBarPanelBody: View {
     /// glow is content-driven (music hue when playing, otherwise copper behind Calendar).
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // Glance (parity/N4): brightest under the fourth card's left edge, about 77 % across,
-            // and it never reaches the tab row (y 37 stays black edge to edge).
-            RadialGradient(colors: [contentGlow.opacity(0.35), .clear], center: UnitPoint(x: 0.77, y: 1.0),
-                           startRadius: 10, endRadius: 170)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            // Absolute black behind the content: no ambient glow (the owner's choice over the reference look).
             VStack(alignment: .leading, spacing: 0) {
                 Color.clear.frame(height: GlanceTopBar.tabRowTop)
                 TopBarHeader(topBar: topBar, agentCount: model.sessions.count, needsYou: model.status == .needsYou,
@@ -734,15 +729,6 @@ private struct TopBarPanelBody: View {
                 .padding(.horizontal, GlanceTopBar.cardInset)
             }
         }
-    }
-
-    /// Content tint: playing music paints a violet/album glow (Codex review 1 live pair); idle Home
-    /// keeps the copper behind Calendar from TOPBAR-SPEC §2.
-    private var contentGlow: Color {
-        if let playing = topBar.nowPlaying {
-            return ArtworkStore.shared.tint(for: playing, saturation: 0.45, brightness: 0.55, scale: 0.8)
-        }
-        return GlanceTint.glow
     }
 
     private var summary: String {
