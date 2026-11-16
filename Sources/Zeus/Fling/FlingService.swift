@@ -215,6 +215,7 @@ final class FlingService: FlingSending {
             }
             let name = nearby.first { $0.id == id }?.name ?? address.name
             let total = items.reduce(Int64(0)) { $0 + Self.fileSize($1.url) }
+            if FlingLimits.shouldWarn(totalBytes: total) { model.show(.flingProblem(Self.largeSendWarning(total))) }
             let stack = transport.send(items.map { .file($0.url) }, to: address)
             sends[stack] = (items.count, name, id)
             lastProblem = nil
