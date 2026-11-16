@@ -7511,6 +7511,18 @@
         "file": "Tests/ZeusCoreTests/VoiceKeyTests.swift",
         "function": "aRightOptionTalkKeyLeavesTheDefaultSecondKeyOffQuietlyButANeverRecordedKeyIsTheOnlyQuietOne"
       }
+    },
+    {
+      "id": "REG-830",
+      "failure": "A settings export carried the talk microphone as device:<Core Audio UID>, a device id from this Mac that the catalog and docs say is never exported.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SettingsCatalogTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+        "function": "aChosenTalkMicrophoneDeviceIsNeverExported"
+      }
     }
   ]
 }
