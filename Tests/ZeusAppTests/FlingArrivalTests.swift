@@ -197,4 +197,26 @@ struct FlingArrivalTests {
         #expect(transport.offerAnswers.count == 1 && transport.offerAnswers[0].0 == stack && transport.offerAnswers[0].1 == false)
         #expect(service.pendingOffer == nil)
     }
+
+    /// REG-699: a send over 2 GB says so before it goes; a small one says nothing; the gesture still sends.
+    @Test func aSendOverTwoGigabytesWarnsAndStillGoesWithItsGesture() throws {
+        let dir = temp(); defer { try? FileManager.default.removeItem(at: dir) }
+        let big = dir.appendingPathComponent("big.mov")
+        FileManager.default.createFile(atPath: big.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: big)
+        try handle.truncate(atOffset: 2_100_000_000)
+        try handle.close()
+        let small = file("small.txt", in: dir)
+
+        let transport = FakeTransport()
+        let m = model()
+        let service = FlingService(model: m, transport: transport, setting: { id in id == "fling.enabled" ? "true" : (SettingsCatalog.option(id)?.defaultValue ?? "") }, downloadsGranted: { true })
+        service.reconfigure()
+        service.send([TopBarModel.ShelfItem(url: small)], to: .peer(id: "idB"), gesture: .button)
+        #expect(m.cue == nil && transport.sends.count == 1)
+        service.send([TopBarModel.ShelfItem(url: big)], to: .peer(id: "idB"), gesture: .drop)
+        guard case .flingProblem(let text)? = m.cue else { Issue.record("no warning: \(String(describing: m.cue))"); return }
+        #expect(text.contains("GB"), "\(text)")
+        #expect(transport.sends.count == 2, "the warning does not stop a send the person asked for")
+    }
 }
