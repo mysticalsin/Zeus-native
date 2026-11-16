@@ -119,4 +119,34 @@ struct FlingWireTests {
             #expect(try FlingWire.decode(parsed) == message)
         }
     }
+
+    /// REG-738: thousands of frames in one read are decoded in one pass, not by copying the rest of the buffer per frame.
+    @Test func manyFramesInOneReadAreDecodedQuickly() throws {
+        var bytes = Data()
+        for i in 0..<60_000 { bytes.append(try FlingWire.encode(.fileDone(FlingFileDone(index: i)))) }
+        var decoder = FlingFrameDecoder()
+        let start = Date()
+        let frames = try decoder.feed(bytes)
+        #expect(frames.count == 60_000 && decoder.bufferedByteCount == 0)
+        #expect(Date().timeIntervalSince(start) < 1.5)
+        // A frame split at every byte still arrives whole.
+        var slow = FlingFrameDecoder()
+        var got = 0
+        for byte in try FlingWire.encode(.fileDone(FlingFileDone(index: 3))) { got += try slow.feed(Data([byte])).count }
+        #expect(got == 1)
+    }
+
+    /// REG-738: a chunk with an index and no data carries nothing and is refused.
+    @Test func aChunkWithNoDataIsMalformed() {
+        #expect(throws: FlingWireError.malformed) { try FlingWire.decode(FlingFrame(type: .chunk, payload: Data([0, 0, 0, 1]))) }
+    }
+
+    @Test func aHelloCarriesAnOptionalNonceAndProof() throws {
+        let hello = FlingHello(id: "A", name: "n", model: "m", nonce: "abc", proof: "def")
+        var decoder = FlingFrameDecoder()
+        let frame = try #require(try decoder.feed(try FlingWire.encode(.hello(hello))).first)
+        #expect(try FlingWire.decode(frame) == .hello(hello))
+        let plain = FlingFrame(type: .hello, payload: Data(#"{"v":1,"id":"A","name":"n","model":"m"}"#.utf8))
+        #expect(try FlingWire.decode(plain) == .hello(FlingHello(id: "A", name: "n", model: "m")))
+    }
 }

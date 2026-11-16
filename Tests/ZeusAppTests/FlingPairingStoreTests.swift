@@ -69,6 +69,27 @@ struct FlingPairingStoreTests {
         #expect(lonely.psk(for: "idB") == nil)
         #expect(lonely.pskTable().isEmpty && lonely.pairedNames().isEmpty)
     }
+
+    /// REG-743: pairing an id that is already paired never silently swaps its key.
+    @Test func anAlreadyPairedIdKeepsItsKeyUnlessReplacementIsAskedFor() {
+        let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
+        let (store, _) = make(dir: dir)
+        let other = Data(repeating: 9, count: 32)
+        #expect(store.add(id: "idB", name: "Beta", model: "m", psk: psk, now: Date()))
+        #expect(!store.add(id: "idB", name: "Mallory", model: "m", psk: other, now: Date()))
+        #expect(store.psk(for: "idB") == psk && store.peers.first?.name == "Beta")
+        #expect(store.isPaired("idB") && !store.isPaired("idC"))
+        #expect(store.add(id: "idB", name: "Beta", model: "m", psk: other, now: Date(), replace: true))
+        #expect(store.psk(for: "idB") == other)
+    }
+
+    /// REG-735: a peer's name is capped at 60 bytes when it is stored, so no folder name built from it can grow.
+    @Test func aPeerNameIsCappedWhenStored() {
+        let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
+        let (store, _) = make(dir: dir)
+        _ = store.add(id: "idB", name: String(repeating: "é", count: 200), model: "m", psk: psk, now: Date())
+        #expect((store.peers.first?.name.utf8.count ?? 999) <= 60)
+    }
 }
 
 private final class RefusingBackend: KeychainBackend, @unchecked Sendable {

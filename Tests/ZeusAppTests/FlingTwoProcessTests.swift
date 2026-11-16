@@ -127,6 +127,7 @@ private struct Rig {
         let code = try #require(codeA["code"] as? String)
         #expect(code.count == 6 && code.allSatisfy(\.isNumber))
         b.command(["cmd": "answerPairing", "accept": true])
+        a.command(["cmd": "answerPairing", "accept": true])
         try a.wait(for: "paired", from: markA)
         try b.wait(for: "paired", from: markB)
         let rebuilt = try b.wait(for: "listening", from: markB)
@@ -145,11 +146,6 @@ private func randomData(_ count: Int) -> Data {
     _ = data.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, count, $0.baseAddress!) }
     return data
 }
-private func listing(_ root: URL) -> [String] {
-    let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
-    return (e?.allObjects as? [URL] ?? []).map { $0.path.replacingOccurrences(of: root.path, with: "") }.sorted()
-}
-
 @Suite("Fling two processes", .serialized, .timeLimit(.minutes(2)))
 struct FlingTwoProcessTests {
     private func write(_ data: Data, _ name: String, in dir: URL) throws -> URL {
@@ -297,5 +293,55 @@ struct FlingTwoProcessTests {
         Thread.sleep(forTimeInterval: 0.3)
         #expect(listing(rig.b.root).allSatisfy { !$0.contains("c.bin") && !$0.contains(".fling-partial-") })
         #expect(rig.b.events(named: "itemVerified", from: markB).isEmpty)
+    }
+
+    /// REG-730: the Mac that started the pairing can decline too, and then neither side keeps a key.
+    @Test func theStartingMacCanDeclineAndNeitherSideStoresAKey() throws {
+        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("fling-e2e-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let a = try PeerProcess(name: "Mac A", parent: parent), b = try PeerProcess(name: "Mac B", parent: parent)
+        defer { a.quit(); b.quit(); try? FileManager.default.removeItem(at: parent) }
+        let pairPort = try b.wait(for: "listening")["pairPort"] as! Int
+        try a.wait(for: "listening")
+        let markA = a.mark, markB = b.mark
+        a.command(["cmd": "pair", "host": "127.0.0.1", "pairPort": pairPort])
+        try b.wait(for: "pairCode", from: markB); try a.wait(for: "pairCode", from: markA)
+        b.command(["cmd": "answerPairing", "accept": true])
+        Thread.sleep(forTimeInterval: 0.3)
+        a.command(["cmd": "answerPairing", "accept": false])
+        try a.wait(for: "pairEnded", from: markA)
+        try b.wait(for: "pairEnded", from: markB)
+        Thread.sleep(forTimeInterval: 0.4)
+        #expect(a.events(named: "paired", from: markA).isEmpty && b.events(named: "paired", from: markB).isEmpty)
+        // With no key the starting Mac cannot send at all.
+        let file = parent.appendingPathComponent("x.bin"); try Data(count: 100).write(to: file)
+        let markA2 = a.mark
+        a.command(["cmd": "send", "host": "127.0.0.1", "port": 1, "peerID": b.id, "items": [["path": file.path]]])
+        #expect(try a.wait(for: "failed", from: markA2)["reason"] as? String == "notPaired")
+    }
+
+    /// REG-732: a paired Mac that claims another paired Mac's id in its hello is turned away, and that other Mac still works.
+    @Test func aPairedMacClaimingAnotherPairedMacsIdIsRejected() throws {
+        var rig = try Rig.make(); defer { rig.stop() }
+        try rig.pair()
+        let c = try PeerProcess(name: "Mac C", parent: rig.parent); defer { c.quit() }
+        try c.wait(for: "listening")
+        let markC = c.mark, markB = rig.b.mark
+        c.command(["cmd": "pair", "host": "127.0.0.1", "pairPort": rig.bPairPort])
+        try rig.b.wait(for: "pairCode", from: markB); try c.wait(for: "pairCode", from: markC)
+        rig.b.command(["cmd": "answerPairing", "accept": true]); c.command(["cmd": "answerPairing", "accept": true])
+        try c.wait(for: "paired", from: markC); try rig.b.wait(for: "paired", from: markB)
+        let port = try rig.b.wait(for: "listening", from: markB)["port"] as! Int
+        let file = rig.parent.appendingPathComponent("spoof.bin"); try Data(count: 2000).write(to: file)
+        let markA = rig.a.mark, markB2 = rig.b.mark
+        rig.a.command(["cmd": "send", "host": "127.0.0.1", "port": port, "spoofID": c.id, "items": [["path": file.path]]])
+        let rejected = try rig.b.wait(for: "rejected", from: markB2)
+        #expect(rejected["reason"] as? String == "idMismatch")
+        try rig.a.wait(for: "failed", from: markA)
+        #expect(rig.b.events(named: "itemVerified", from: markB2).isEmpty)
+        // The Mac whose id was claimed still sends normally.
+        let markC2 = c.mark
+        c.command(["cmd": "send", "host": "127.0.0.1", "port": port, "items": [["path": file.path]]])
+        try c.wait(for: "sendDone", from: markC2)
     }
 }

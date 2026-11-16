@@ -28,7 +28,8 @@ final class FakeTransport: FlingTransporting, @unchecked Sendable {
     func stop() { lock.lock(); stops += 1; lock.unlock() }
     func updateSettings(_ settings: FlingEndpointSettings) {}
     func pair(with address: FlingPeerAddress) { lock.lock(); pairs.append(address.id); lock.unlock() }
-    func answerPairing(accept: Bool) { lock.lock(); pairingAnswers.append(accept); lock.unlock() }
+    private(set) var pairingPeers: [String?] = []
+    func answerPairing(accept: Bool, peerID: String?) { lock.lock(); pairingAnswers.append(accept); pairingPeers.append(peerID); lock.unlock() }
     func send(_ items: [FlingOutgoingItem], to address: FlingPeerAddress) -> UUID {
         lock.lock(); sends.append((items, address.id)); lock.unlock(); return UUID()
     }

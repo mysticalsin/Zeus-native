@@ -27,14 +27,6 @@ struct FlingSaveRulesTests {
         #expect(dest(.downloads, peer: "").lastPathComponent.hasPrefix("Mac "))
     }
 
-    @Test func theFlingFolderIsRecognisedByItsPath() {
-        #expect(FlingSaveRules.isInsideFlingFolder(URL(fileURLWithPath: "/Users/a/Downloads/Fling/Stack/a.png")))
-        #expect(FlingSaveRules.isInsideFlingFolder(URL(fileURLWithPath: "/Users/a/Downloads/Fling/a.png")))
-        #expect(!FlingSaveRules.isInsideFlingFolder(URL(fileURLWithPath: "/Users/a/Downloads/a.png")))
-        #expect(!FlingSaveRules.isInsideFlingFolder(URL(fileURLWithPath: "/Users/a/Downloads/Flingo/a.png")))
-        #expect(!FlingSaveRules.isInsideFlingFolder(URL(fileURLWithPath: "/Users/a/Downloads/Fling")))
-    }
-
     @Test func aWeblocFileHoldsTheLinkAndIsNeverAnythingElse() throws {
         let data = FlingSaveRules.weblocData(for: "https://example.com/a?b=1&c=2")
         let plist = try #require(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])

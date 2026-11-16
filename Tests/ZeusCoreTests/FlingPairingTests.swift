@@ -85,18 +85,48 @@ struct FlingPairingTests {
     }
 
     /// REG-665: the key is stored only when both sides confirm; every other ending stores nothing.
-    @Test func theKeyIsStoredOnlyAfterBothConfirm() throws {
+    @Test func theKeyIsStoredOnlyAfterBothPeopleAccept() throws {
         var (i, r) = pair()
         let start = pump(&i, &r, first: i.handle(.start(now: t0)), now: t0)
         #expect(stored(start.i).isEmpty && stored(start.r).isEmpty)
         #expect(i.state == .showingCode(code: try #require(shownCode(start.i)), deadline: t0.addingTimeInterval(60)))
         let accepted = pump(&i, &r, fromInitiator: false, first: r.handle(.userAccept), now: t0)
+        // The responder's person said yes. The starting Mac's person has not, so nothing is stored there yet.
+        #expect(stored(accepted.i).isEmpty && stored(accepted.r).isEmpty)
+        #expect(i.state == .showingCode(code: try #require(shownCode(start.i)), deadline: t0.addingTimeInterval(60)))
+        let own = pump(&i, &r, first: i.handle(.userAccept), now: t0)
         #expect(i.state == .confirmed && r.state == .confirmed)
-        let si = stored(accepted.i), sr = stored(accepted.r)
+        let si = stored(own.i), sr = stored(own.r)
         #expect(si.count == 1 && sr.count == 1)
         #expect(si[0].0 == "idB" && sr[0].0 == "idA")
         #expect(si[0].1 == sr[0].1 && si[0].1.count == 32)
-        #expect(accepted.i.contains(.close) && accepted.r.contains(.close))
+        #expect(own.i.contains(.close) && own.r.contains(.close))
+        // The confirmation goes out before the key is stored, so a lost send never leaves a one-sided pairing.
+        let sendAt = own.i.firstIndex { if case .send(.pairConfirm) = $0 { true } else { false } }
+        let storeAt = own.i.firstIndex { if case .storePSK = $0 { true } else { false } }
+        #expect(try #require(sendAt) < #require(storeAt))
+    }
+
+    /// REG-730: a peer that answers at once is not paired until the person on the starting Mac says the codes match.
+    @Test func theStartingMacStoresNothingUntilItsOwnPersonAccepts() throws {
+        var (i, r) = pair()
+        _ = pump(&i, &r, first: i.handle(.start(now: t0)), now: t0)
+        // Accepting first waits for the peer and sends nothing.
+        let early = i.handle(.userAccept)
+        #expect(early.isEmpty)
+        #expect(i.state != .confirmed)
+        let done = pump(&i, &r, fromInitiator: false, first: r.handle(.userAccept), now: t0)
+        #expect(i.state == .confirmed && r.state == .confirmed)
+        #expect(stored(done.i).count == 1 && stored(done.r).count == 1)
+    }
+
+    @Test func theStartingMacDecliningAfterThePeerConfirmedStoresNothing() {
+        var (i, r) = pair()
+        _ = pump(&i, &r, first: i.handle(.start(now: t0)), now: t0)
+        let confirmed = pump(&i, &r, fromInitiator: false, first: r.handle(.userAccept), now: t0)
+        let declined = pump(&i, &r, first: i.handle(.userDecline), now: t0)
+        #expect(i.state == .declined && r.state == .declined)
+        #expect(stored(confirmed.i + declined.i).isEmpty && stored(confirmed.r + declined.r).isEmpty)
     }
 
     @Test func declineCancelExpiryAndLossStoreNothing() {
@@ -177,5 +207,31 @@ struct FlingPairingTests {
         gate.end()
         let out5 = gate.tryBegin("idB")
         #expect(out5)
+    }
+
+    /// REG-731: failed attempts of every kind count, by id and by address, so a rotating id cannot dodge the mute.
+    @Test func everyFailedAttemptCountsAndAnAddressIsMutedWhateverIdsItUses() {
+        var ledger = FlingMuteLedger()
+        ledger.recordFailure("id1", address: "10.0.0.7", now: t0)
+        ledger.recordFailure("id2", address: "10.0.0.7", now: t0.addingTimeInterval(5))
+        #expect(!ledger.isMuted("id9", address: "10.0.0.7", now: t0.addingTimeInterval(6)))
+        ledger.recordFailure("id3", address: "10.0.0.7", now: t0.addingTimeInterval(10))
+        #expect(ledger.isMuted("id9", address: "10.0.0.7", now: t0.addingTimeInterval(11)), "a brand new id from the same address is muted")
+        #expect(!ledger.isMuted("id9", address: "10.0.0.8", now: t0.addingTimeInterval(11)))
+        #expect(!ledger.isMuted("id9", address: "10.0.0.7", now: t0.addingTimeInterval(10 + 601)))
+        var byID = FlingMuteLedger()
+        for k in 0..<3 { byID.recordFailure("same", address: "10.0.0.\(k)", now: t0.addingTimeInterval(Double(k))) }
+        #expect(byID.isMuted("same", address: "10.9.9.9", now: t0.addingTimeInterval(4)))
+    }
+
+    /// REG-732: the hello proves the claimed id with its key, bound to the receiver's fresh nonce.
+    @Test func aHelloProofNeedsTheClaimedIdsKeyAndTheNonce() {
+        let key = Data(repeating: 7, count: 32), other = Data(repeating: 8, count: 32)
+        let proof = FlingCrypto.helloProof(psk: key, nonce: "n1", id: "idA")
+        #expect(FlingCrypto.isValidHelloProof(proof, psk: key, nonce: "n1", id: "idA"))
+        #expect(!FlingCrypto.isValidHelloProof(proof, psk: other, nonce: "n1", id: "idA"), "another peer's key")
+        #expect(!FlingCrypto.isValidHelloProof(proof, psk: key, nonce: "n2", id: "idA"), "a replayed proof")
+        #expect(!FlingCrypto.isValidHelloProof(proof, psk: key, nonce: "n1", id: "idB"), "a different claimed id")
+        #expect(!FlingCrypto.isValidHelloProof("not base64!!", psk: key, nonce: "n1", id: "idA"))
     }
 }

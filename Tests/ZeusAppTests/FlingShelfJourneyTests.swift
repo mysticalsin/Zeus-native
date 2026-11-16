@@ -208,7 +208,7 @@ struct FlingShelfJourneyTests {
             @MainActor func cardModel(_ box: Box, now: Box2) -> FlingPromptModel {
                 FlingPromptModel(kind: .offer(peerName: "Alpha Mac", itemCount: 1, totalBytes: 3), deadline: Date(timeIntervalSince1970: 60),
                                  clock: { Date(timeIntervalSince1970: now.seconds) },
-                                 onAnswer: { accept in _ = box.machine.handle(accept ? .userAccept : .userDecline) })
+                                 onAnswer: { accept in _ = box.machine.handle(accept ? .userAccept : .userDecline) }, inputDelay: 0)
             }
 
             // Accept.
@@ -241,21 +241,23 @@ struct FlingShelfJourneyTests {
         }
     }
 
-    @Test func thePairingCardOnTheStartingMacOffersCancelOnly() async throws {
+    /// REG-730: the starting Mac's card also needs its person: "Codes match" or Cancel, and both answer.
+    @Test func thePairingCardOnTheStartingMacAsksForCodesMatchOrCancel() async throws {
         try await OwnedWindowJourneyLease.perform {
             let original = try OwnedWindowFixtureApplication.prepare()
             defer { OwnedWindowFixtureApplication.restore(original) }
-            var answers: [Bool] = []
-            let model = FlingPromptModel(kind: .pairing(code: "042917", peerName: "Beta Mac", canAccept: false), deadline: Date().addingTimeInterval(60),
-                                         clock: Date.init, onAnswer: { answers.append($0) })
-            let registry = OwnedWindowControlRegistry()
-            let window = host(FlingPromptCard(model: model), registry: registry)
-            defer { OwnedWindowFixtureApplication.close(window) }
-            let driver = OwnedWindowEventDriver(registry: registry); driver.register(window)
-            #expect(registry.probes(for: "fling.prompt.accept", in: window).isEmpty)
-            try await driver.click("fling.prompt.decline", in: window)
-            #expect(answers == [false])
-            #expect(model.codeText == "042 917")
+            for press in ["fling.prompt.accept", "fling.prompt.decline"] {
+                var answers: [Bool] = []
+                let model = FlingPromptModel(kind: .pairing(code: "042917", peerName: "Beta Mac", canAccept: true, starter: true), deadline: Date().addingTimeInterval(60),
+                                             clock: Date.init, onAnswer: { answers.append($0) }, inputDelay: 0)
+                let registry = OwnedWindowControlRegistry()
+                let window = host(FlingPromptCard(model: model), registry: registry)
+                defer { OwnedWindowFixtureApplication.close(window) }
+                let driver = OwnedWindowEventDriver(registry: registry); driver.register(window)
+                try await driver.click(press, in: window)
+                #expect(answers == [press == "fling.prompt.accept"])
+                #expect(model.codeText == "042 917")
+            }
         }
     }
 }

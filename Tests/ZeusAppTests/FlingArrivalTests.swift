@@ -96,10 +96,14 @@ struct FlingArrivalTests {
 
     /// REG-682: the screenshot and AirDrop watcher skips the Fling folder, dot files and Fling's partial folders.
     @Test func theIntakeWatcherIgnoresTheFlingFolder() {
-        #expect(AirDropScreenshotWatcher.isIgnored(URL(fileURLWithPath: "/Users/a/Downloads/Fling/Stack/a.png")))
-        #expect(AirDropScreenshotWatcher.isIgnored(URL(fileURLWithPath: "/Users/a/Downloads/Fling/.fling-partial-X/0")))
-        #expect(AirDropScreenshotWatcher.isIgnored(URL(fileURLWithPath: "/Users/a/Downloads/.hidden")))
-        #expect(!AirDropScreenshotWatcher.isIgnored(URL(fileURLWithPath: "/Users/a/Downloads/photo.png")))
+        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+        let inbox = FlingService.supportDirectory.appendingPathComponent("Fling/Inbox")
+        #expect(AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("Fling/Stack/a.png")))
+        #expect(AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("Fling/.fling-partial-X/0")))
+        #expect(AirDropScreenshotWatcher.isIgnored(inbox.appendingPathComponent("Stack/a.png")))
+        #expect(AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent(".hidden")))
+        #expect(!AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("photo.png")))
+        #expect(!AirDropScreenshotWatcher.isIgnored(downloads.appendingPathComponent("Other/Fling/a.png")), "REG-736: only Zeus's own folders")
     }
 
     /// REG-683: the service type the app browses for is the one the plist declares.
