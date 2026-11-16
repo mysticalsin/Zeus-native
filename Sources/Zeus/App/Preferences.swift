@@ -51,6 +51,15 @@ extension Preferences {
         ShortcutStore.recordTalkChoice(shortcut, in: defaults)
     }
 
+    /// The second talk key as stored: Right Option unless the owner chose another key, nil when turned off. Whether it talks
+    /// right now is `SecondTalkRouting.current()`.
+    var secondTalkKey: Shortcut? { ShortcutStore.loadSecondTalk(defaults).key }
+
+    /// The owner recorded the second talk key (nil: turned off). Recording Right Option, the default, is Reset: the stored value goes.
+    func chooseSecondTalkKey(_ shortcut: Shortcut?) {
+        ShortcutStore.recordSecondTalkChoice(shortcut, in: defaults)
+    }
+
     /// One line for `zeus status` and hints: what the talk key does right now.
     var talkKeyHint: String {
         let d = DictationSettings.shared
@@ -58,6 +67,7 @@ extension Preferences {
             return "double-tap \(pushToTalk.title) to talk, hold it to dictate"
         }
         var line = "hold \(pushToTalk.title) to talk, double-tap to latch"
+        if let second = SecondTalkRouting.current().key { line += " (or hold \(second.title))" }
         if d.enabled { line += "; dictation: " + (d.key.map { "hold \($0.title)" } ?? "off") }
         return line
     }
