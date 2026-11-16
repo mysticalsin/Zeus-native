@@ -7415,6 +7415,18 @@
         "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
         "function": "prewarmOnKeyPressNeverPreparesTheOutputEngine"
       }
+    },
+    {
+      "id": "REG-812",
+      "failure": "Talk turns ignored the microphone chosen in Dictation settings and always used the system input, so an AirPods default was used even when another microphone was picked.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-TalkTurnVoiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+        "function": "aTalkTurnListensOnTheMicrophoneChosenForDictation"
+      }
     }
   ]
 }

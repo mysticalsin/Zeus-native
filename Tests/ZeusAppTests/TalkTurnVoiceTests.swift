@@ -101,4 +101,22 @@ struct TalkTurnVoiceTests {
         #expect(chain.engineStarts == 1, "a running engine is not started again")
         chain.stop()
     }
+
+    // MARK: Chosen microphone
+
+    @Test @MainActor func aTalkTurnListensOnTheMicrophoneChosenForDictation() {
+        let suite = NSTemporaryDirectory() + "zeus.talkturn.mic.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = DictationSettings(defaults: defaults)
+        let speech = SpeechInput()
+
+        settings.microphoneUID = "BuiltInMicrophoneDevice"
+        VoiceTurnController.applyChosenMicrophone(to: speech, from: settings)
+        #expect(speech.deviceUID == "BuiltInMicrophoneDevice")
+
+        settings.microphoneUID = nil
+        VoiceTurnController.applyChosenMicrophone(to: speech, from: settings)
+        #expect(speech.deviceUID == nil, "dropping the choice follows the system input again")
+    }
 }

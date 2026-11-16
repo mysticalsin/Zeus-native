@@ -161,6 +161,11 @@ final class VoiceTurnController {
         buddy.idle()
     }
 
+    /// Talk turns listen on the microphone chosen in Dictation settings, like dictation does; nil follows the system input.
+    static func applyChosenMicrophone(to speech: SpeechInput, from settings: DictationSettings = .shared) {
+        speech.deviceUID = settings.microphoneUID
+    }
+
     @discardableResult
     func press() -> Bool {
         clearDrawingForNewTurn()
@@ -187,6 +192,7 @@ final class VoiceTurnController {
         turnEngine = DictationHub.shared.controller?.voiceEngine
         speech.recordsSamples = turnEngine != nil
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
+        Self.applyChosenMicrophone(to: speech)
         do {
             try speech.start()
         } catch {

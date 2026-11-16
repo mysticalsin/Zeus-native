@@ -5337,6 +5337,10 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "theFirstScheduledAudioStartsTheOutputEngineOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
+              "function": "aTalkTurnListensOnTheMicrophoneChosenForDictation"
             }
           ]
         }
