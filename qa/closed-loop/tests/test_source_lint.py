@@ -1366,5 +1366,54 @@ class TalkChordOrderLint(unittest.TestCase):
         self.assertGreaterEqual(pairs, 1, "the shortcut change handler runs both")
 
 
+def closure_after(lines, needle):
+    """The text of the closure assigned on the first line with `needle`: from that line to where its braces balance."""
+    for index, line in enumerate(lines):
+        if needle not in line:
+            continue
+        depth, text = 0, []
+        for current in lines[index:]:
+            text.append(current)
+            depth += current.count("{") - current.count("}")
+            if depth <= 0 and "{" in "".join(text):
+                break
+        return "\n".join(text)
+    return None
+
+
+class TalkKeyPathLint(unittest.TestCase):
+    """The talk monitor reads its chord and its second key on every key event and every hold tick. Those closures read what the
+    sync points stored. Asking the system for access (AXIsProcessTrusted and Input Monitoring) or asking Carbon for a hot key
+    again on each event is work in the key path: a refused registration was retried on every key, and the access check ran
+    every time (review of the talk chord, minor a)."""
+
+    BANNED = ("syncTalkChord", "KeyListenAccess", "TalkChordHotkey", "TalkChordRouting", "SecondTalkRouting", "RegisterEventHotKey",
+              "ShortcutStore", "UserDefaults", "Preferences")
+
+    def test_the_key_path_closures_read_only_what_the_sync_points_stored(self):
+        lines = [line for _, line in code_lines(APP / "App/AppDelegate.swift")]
+        for name, stored in (("hotkey.chordProvider =", "cachedTalkChord"), ("hotkey.secondKeyProvider =", "cachedSecondTalkKey")):
+            text = closure_after(lines, name)
+            self.assertIsNotNone(text, f"{name} must be assigned in AppDelegate")
+            self.assertIn(stored, text, f"{name} must read the value the sync points stored ({stored})")
+            for banned in self.BANNED:
+                self.assertNotIn(banned, text, f"{name} runs on every key event and must not use {banned}")
+
+    def test_the_sync_points_store_what_the_key_path_reads(self):
+        lines = [line for _, line in code_lines(APP / "App/AppDelegate.swift")]
+        text = closure_after(lines, "private func syncTalkChord()") or ""
+        for stored in ("cachedTalkChord =", "cachedSecondTalkKey ="):
+            self.assertIn(stored, text, f"syncTalkChord() must store {stored.split()[0]}")
+        self.assertIn("KeyListenAccess.granted", text, "the access check belongs to the sync points")
+
+    def test_the_lint_sees_the_shapes_it_exists_for(self):
+        bad = ["hotkey.chordProvider = { [weak self] in self?.syncTalkChord()?.keyCode }"]
+        self.assertIn("syncTalkChord", closure_after(bad, "hotkey.chordProvider ="))
+        good = ["hotkey.secondKeyProvider = { [weak self] in", "    self?.cachedSecondTalkKey", "}", "other()"]
+        text = closure_after(good, "hotkey.secondKeyProvider =")
+        self.assertIn("cachedSecondTalkKey", text)
+        self.assertNotIn("other()", text)
+
+
 if __name__ == "__main__":
     unittest.main()

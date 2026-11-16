@@ -49,4 +49,14 @@ struct ShortcutRecorderModelTests {
             #expect(!model.recording && calls() == [true, false], "a local monitor hears nothing once another app is in front: \(calls())")
         }
     }
+
+    @Test func aRecordingModelThatIsFreedGivesTheKeysBack() {
+        watching { calls in
+            do {
+                let model = ShortcutRecorderModel()
+                model.begin { _ in }
+            }
+            #expect(calls() == [true, false], "a model freed while it listens must not leave the keys paused: \(calls())")
+        }
+    }
 }

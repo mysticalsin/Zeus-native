@@ -39,6 +39,8 @@ import Testing
 // while Control and Option are down.
 //
 // The whole search takes minutes under load. `WALK_ONLY=A,B2` runs only the runs whose names start with one of those.
+// Both of these are off by default: `WALK_PROGRESS=path` appends the size of each search to that file as it grows (the runner holds
+// its output until it ends), `WALK_LIMIT=n` stops a search past n states, for measuring a run before it is put in the list.
 //
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
@@ -184,8 +186,9 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     /// K and K0 (docs/RIGHT-OPTION-TALK-PLAN.md): the pair of talk keys. Primary Control-Option with the chord, second Right Option
     /// with the 0.25 s confirm and no chord. Option is either side for the primary key, so Control with Right Option is its own
     /// set; Left Option alone is nothing, and beside Right Option it is foreign to the second key.
-    static func talkPair(_ name: String, primaryConfirm: TimeInterval, late: Bool, arbitrate: Bool = true) -> WalkRun {
-        WalkRun(name, keys: [.control, .option, .rightOption, .leftArrow, .spaceOnPair], own: [59, 58, 61],
+    static func talkPair(_ name: String, primaryConfirm: TimeInterval, late: Bool, arbitrate: Bool = true, space: Bool = true,
+                         leftOption: Bool = true) -> WalkRun {
+        WalkRun(name, keys: [.control] + (leftOption ? [.option] : []) + [.rightOption, .leftArrow] + (space ? [.spaceOnPair] : []), own: [59, 58, 61],
                 configs: [hold(.talk, .controlOption, confirm: primaryConfirm, chord: 49)], late: late, refusal: true, chord: true,
                 groups: [[59], [58, 61]],
                 second: (own: [61], config: Config(key: .rightOption, role: .talk, mode: .hold, confirm: 0.25)),
@@ -244,8 +247,10 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
                 configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true, carbon: true),
         // K: the pair of talk keys, Control-Option and Right Option, one turn at a time. K0: the same with no confirm on the
         // primary key and no late timers.
-        talkPair("K talk pair Control-Option confirm 0.15 and Right Option confirm 0.25", primaryConfirm: 0.15, late: true),
-        talkPair("K0 talk pair Control-Option confirm 0 and Right Option confirm 0.25", primaryConfirm: 0, late: false),
+        // Fallbacks of the plan's walk budget: K has no late timers and no Space (the full K did not finish in 30 minutes), K0 has no
+        // Space (with it, past 730,000 states and still growing). The chord beside Right Option stays in the unit tests.
+        talkPair("K talk pair Control-Option confirm 0.15 and Right Option confirm 0.25", primaryConfirm: 0.15, late: false, space: false),
+        talkPair("K0 talk pair Control-Option confirm 0 and Right Option confirm 0.25", primaryConfirm: 0, late: false, space: false),
     ]
 }
 
@@ -1475,8 +1480,24 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         }
     }
 
+    // `WALK_PROGRESS=path` appends the size of the search to that file as it grows (the runner holds its output until it ends);
+    // `WALK_LIMIT=n` stops it past n states (a violation), for measuring a run before it is put in the list.
+    let progress = ProcessInfo.processInfo.environment["WALK_PROGRESS"]
+    let limit = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? Int.max
     var cursor = 0
     while cursor < frontier.count {
+        if let progress, cursor % 100_000 == 0 {
+            let line = "[walk] \(run.name): \(seen.count) states, \(cursor) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
+            if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
+                handle.seekToEndOfFile()
+                handle.write(Data(line.utf8))
+                try? handle.close()
+            }
+        }
+        if seen.count > limit {
+            report.violations.append("the search passed the limit of \(limit) states")
+            break
+        }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
         guard let sim = frontier[cursor] else { cursor += 1; continue }
@@ -1500,6 +1521,11 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     }
     report.states = seen.count
     report.seconds = Date().timeIntervalSince(start)
+    if let progress, let handle = FileHandle(forWritingAtPath: progress) {
+        handle.seekToEndOfFile()
+        handle.write(Data("[walk] \(run.name): DONE \(seen.count) states, \(report.moves) moves, \(Int(report.seconds)) s\n".utf8))
+        try? handle.close()
+    }
     report.visited = Set(seen.keys)
     return report
 }
@@ -1649,6 +1675,30 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         let report = search(blind, until: "I6s")
         #expect(report.violations.contains { $0.hasPrefix("I6s") }, "\(report.violations)")
         print("voice key walk A-carbon, injection off: \(report.violations.first ?? "no violation")")
+    }
+
+    /// I6s judged only a `start`. A hands-free turn ended by a press that came down beside a swallowed Space, which the keyboard
+    /// did not earn as a chord, is as wrong as a start there: the adapter that never learns of that Space must be reported when it
+    /// ends the turn, whether the press stayed alone (ended by its tick) or was let go at once (ended by the release).
+    @Test func theSearchSeesAHandsFreeTurnEndedBesideASwallowedSpace() {
+        let carbon = WalkRun.all.first { $0.name.hasPrefix("A-carbon") }!
+        let blind = WalkRun("A-carbon with no live-state injection", keys: carbon.keys, own: carbon.ownCodes, configs: carbon.configs,
+                            late: true, chord: true, carbon: true, injection: false)
+        let pair = ["Control", "Option", "Option", "Control"]
+        let latched = pair + pair + ["wait 0.5", "Space swallowed"]
+        let cases: [(String, [String])] = [
+            ("a press that stays alone past the confirm", latched + ["Control", "Option", "wait 0.5", "Option", "Control", "wait 0.5"]),
+            ("a press let go at once", latched + ["Control", "Option", "Option", "Control", "wait 0.5"]),
+        ]
+        for (name, moves) in cases {
+            let found = replay(blind, moves)
+            #expect(found.contains { $0.hasPrefix("I6s: a hands-free turn was ended") }, "\(name): \(found)")
+        }
+        // The shipped adapter hears of that Space, so the same orders break nothing.
+        for (name, moves) in cases {
+            let found = replay(carbon, moves)
+            #expect(found.isEmpty, "\(name), with the injection: \(found)")
+        }
     }
 
     /// The mistake the chord search must see: a machine that does not tolerate the chord reads a clean Space as foreign and
