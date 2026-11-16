@@ -29,13 +29,26 @@ public struct TalkKeyPair: Sendable, Equatable {
     var bar: Slot?
     /// The search turns this off to prove it can see a pair that lets the other key's start through.
     var arbitrate = true
+    /// STUB: the timers that fell due before a key are delivered ahead of it, across both machines.
+    var deliverInOrder = true
     /// Effects that belonged to no open turn (P5). The walk asserts it stays 0.
     public internal(set) var strays = 0
     /// What each slot's machine returned in the last call and whether the pair let it through. Read by the search only.
     struct Raw: Equatable { var slot: Slot; var effect: Effect; var emitted: Bool }
     var trace: [Raw] = []
 
+    /// The key code a mouse button stands for inside the second key's machine: a foreign key that is down and up at once.
+    public static let mouseCode: UInt16 = 0xFFF0
+
     public init() {}
+
+    /// A mouse button went down: foreign to the second key only. STUB.
+    public mutating func mouseDown(at time: TimeInterval, primary primaryConfig: Config, second secondConfig: Config) -> [Effect] {
+        mouseDownTagged(at: time, primary: primaryConfig, second: secondConfig).map(\.effect)
+    }
+
+    mutating func mouseDownTagged(at time: TimeInterval, primary primaryConfig: Config,
+                                  second secondConfig: Config) -> [(slot: Slot, effect: Effect)] { trace = []; return [] }
 
     /// The picture of the keyboard. Both machines hear every key event, so their pictures are the same.
     public var keys: ShortcutState { primary.keys }

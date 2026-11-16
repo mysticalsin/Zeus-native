@@ -149,6 +149,90 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log == ["press", "press", "release"], "\(calls.log)")
     }
 
+    /// The clock the monitor reads, set by the test, so keys can be fed at times the real timers have not reached (a busy main thread).
+    private final class FakeClock { var seconds = 0.0 }
+
+    @Test func aSecondStartDueBeforeTheControlKeyActsBeforeItWhenTheTimerIsLate() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        let clock = FakeClock()
+        monitor.now = { clock.seconds }
+        rightOptionDown(monitor)
+        clock.seconds = 0.3
+        monitor.feed(.flags(keyCode: 59, modifiers: [.control, .option]), at: 0.3)
+        #expect(calls.log == ["press", "cancel"], "Right Option started at 0.25, Control cancelled it, and the primary start is swallowed: \(calls.log)")
+        try await wait(0.4)
+        monitor.feed(.flags(keyCode: 59, modifiers: [.option]), at: 0.8)
+        monitor.feed(.flags(keyCode: 61, modifiers: []), at: 0.8)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "cancel"], "\(calls.log)")
+    }
+
+    @Test func aGapSendDueBeforeASecondKeyReleaseIsOneSendWhenTheTimerIsLate() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        let clock = FakeClock()
+        monitor.now = { clock.seconds }
+        controlOption(monitor)
+        clock.seconds = 0.1
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control]), at: 0.1)
+        monitor.feed(.flags(keyCode: 59, modifiers: []), at: 0.1)
+        clock.seconds = 0.2
+        rightOptionDown(monitor)
+        clock.seconds = 0.6
+        monitor.feed(.flags(keyCode: 61, modifiers: []), at: 0.6)
+        #expect(calls.log == ["press", "release"], "one turn, sent once, no second start: \(calls.log)")
+    }
+
+    @Test func aSpaceDownAtTheReleaseOfASecondKeyTurnCancelsItInsteadOfSendingIt() async throws {
+        // Space may be held by a launcher on Option-Space that Zeus cannot see; the system's own key state says it is down.
+        let (monitor, calls) = make(second: .rightOption)
+        var spaceDown = false
+        monitor.keysStillDown = { spaceDown ? $0.intersection([49]) : [] }
+        rightOptionDown(monitor)
+        try await wait(0.5)
+        spaceDown = true
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "cancel"], "\(calls.log)")
+        spaceDown = false
+        rightOptionDown(monitor)
+        try await wait(0.5)
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "cancel", "press", "release"], "a plain release still sends: \(calls.log)")
+    }
+
+    @Test func aMouseDownWhileTheSecondKeyIsHeldCancelsItAndNeverSendsIt() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        rightOptionDown(monitor)
+        try await wait(0.5)
+        monitor.mouseDown()
+        rightOptionUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "cancel"], "\(calls.log)")
+    }
+
+    @Test func aMouseDownDuringTheControlOptionKeyChangesNothing() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        controlOption(monitor)
+        try await wait(0.3)
+        monitor.mouseDown()
+        allUp(monitor)
+        try await wait(0.1)
+        #expect(calls.log == ["press", "release"], "\(calls.log)")
+    }
+
+    @Test func aSecondKeyTurnedOffDuringAHandsFreeTurnIsCancelledAtOnce() async throws {
+        let (monitor, calls) = make(second: .rightOption)
+        var second: Shortcut? = .rightOption
+        monitor.secondKeyProvider = { second }
+        rightOptionDown(monitor); rightOptionUp(monitor)
+        rightOptionDown(monitor); rightOptionUp(monitor)
+        #expect(calls.log == ["press"], "a double tap goes hands-free: \(calls.log)")
+        second = nil
+        monitor.configChanged()
+        #expect(calls.log == ["press", "cancel"], "the next sync point applies the change at once: \(calls.log)")
+    }
+
     @Test func theDictationMonitorNeverHearsTheSecondKey() async throws {
         let (monitor, calls) = make(key: .rightCommand, role: .dictation, second: .rightOption)
         rightOptionDown(monitor)

@@ -265,6 +265,10 @@ struct SettingsCatalogTests {
         #expect(other.stamp == nil)
     }
 
+    @MainActor @Test func theSecondTalkKeyTravelsWithAnExport() {
+        #expect(SettingsStore.appKeys.contains(ShortcutStore.secondTalkKey), "the key the recorder writes is exported and imported like the talk key")
+    }
+
     @MainActor @Test func theStampKeysAreNeverExportedOrImported() throws {
         let keys = Set(SettingsStore.appKeys)
         for key in [ScribeAutoStartOptIn.key, ScribeAutoStartOptIn.legacyKey, ScribeAutoStartOptIn.firstRecordingKey] {

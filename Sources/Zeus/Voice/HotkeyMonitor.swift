@@ -202,6 +202,12 @@ final class HotkeyMonitor {
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
     func interrupt() { send(.interrupt(live: liveModifiers())) }
 
+    /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once. STUB.
+    func configChanged() {}
+
+    /// A mouse button went down: the second talk key's turn, armed or open, is over. STUB.
+    func mouseDown() {}
+
     /// Sleep and wake tell the machine to drop an open turn. Idempotent.
     func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
         guard sleepObservers.isEmpty else { return }

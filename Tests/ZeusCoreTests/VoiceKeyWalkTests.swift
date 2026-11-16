@@ -116,6 +116,11 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     /// The pair lets another key's start through (`TalkKeyPair.arbitrate`). Only the regression test that the search can see
     /// that mistake turns it off.
     let arbitrate: Bool
+    /// The pair delivers the timers that fell due before a key ahead of that key, across both machines (`TalkKeyPair.deliverInOrder`).
+    /// Only the regression test that the search can see a pair that does not turns it off.
+    let inOrder: Bool
+    /// A mouse button may go down while the second key is held (it cancels that key's turn, never the primary key's).
+    let mouse: Bool
 
     struct PressSet: Sendable { var slot: Int; var codes: [UInt16] }
 
@@ -135,13 +140,15 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     init(_ name: String, keys: [WalkKey], own: [UInt16], configs: [VoiceKeyMachine.Config], pointing: Bool = false,
          late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false,
          processingTime: Bool = false, chord: Bool = false, carbon: Bool = false, injection: Bool = true,
-         groups: [[UInt16]]? = nil, second: (own: [UInt16], config: VoiceKeyMachine.Config)? = nil,
-         pressSets: [PressSet] = [], arbitrate: Bool = true) {
+         groups: [[UInt16]]? = nil, second: (own: [UInt16], configs: [VoiceKeyMachine.Config])? = nil,
+         pressSets: [PressSet] = [], arbitrate: Bool = true, inOrder: Bool = true, mouse: Bool = false) {
         self.name = name
+        self.mouse = mouse
         self.arbitrate = arbitrate
+        self.inOrder = inOrder
         self.pressSets = pressSets
-        self.secondViews = second.map { [WalkRun(name + ", second key", keys: keys, own: $0.own, configs: [$0.config], late: late,
-                                                  refusal: refusal)] } ?? []
+        self.secondViews = second.map { [WalkRun(name + ", second key", keys: keys, own: $0.own, configs: $0.configs, late: late,
+                                                  quietFlip: quietFlip, refusal: refusal)] } ?? []
         self.injection = injection
         self.chord = chord
         self.carbon = carbon && chord
@@ -187,13 +194,17 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     /// with the 0.25 s confirm and no chord. Option is either side for the primary key, so Control with Right Option is its own
     /// set; Left Option alone is nothing, and beside Right Option it is foreign to the second key.
     static func talkPair(_ name: String, primaryConfirm: TimeInterval, late: Bool, arbitrate: Bool = true, space: Bool = true,
-                         leftOption: Bool = true) -> WalkRun {
-        WalkRun(name, keys: [.control] + (leftOption ? [.option] : []) + [.rightOption, .leftArrow] + (space ? [.spaceOnPair] : []), own: [59, 58, 61],
-                configs: [hold(.talk, .controlOption, confirm: primaryConfirm, chord: 49)], late: late, refusal: true, chord: true,
-                groups: [[59], [58, 61]],
-                second: (own: [61], config: Config(key: .rightOption, role: .talk, mode: .hold, confirm: 0.25)),
-                pressSets: [PressSet(slot: 0, codes: [59, 58]), PressSet(slot: 0, codes: [59, 61]), PressSet(slot: 1, codes: [61])],
-                arbitrate: arbitrate)
+                         leftOption: Bool = true, refusal: Bool = true, inOrder: Bool = true, flip: Bool = false, mouse: Bool = false) -> WalkRun {
+        let primary = hold(.talk, .controlOption, confirm: primaryConfirm, chord: 49)
+        let second = Config(key: .rightOption, role: .talk, mode: .hold, confirm: 0.25)
+        // K-flip turns the second key off and on, riding on the next key event, while the primary key stays as it is.
+        let sets = [PressSet(slot: 0, codes: leftOption ? [59, 58] : [59, 61]), PressSet(slot: 1, codes: [61])]
+            + (leftOption ? [PressSet(slot: 0, codes: [59, 61])] : [])
+        return WalkRun(name, keys: [.control] + (leftOption ? [.option] : []) + [.rightOption, .leftArrow] + (space ? [.spaceOnPair] : []),
+                       own: [59, 58, 61], configs: flip ? [primary, primary] : [primary], late: late, quietFlip: flip, refusal: refusal,
+                       chord: true, groups: [[59], [58, 61]],
+                       second: (own: [61], configs: flip ? [second, Config(key: nil, role: .talk, mode: .hold)] : [second]),
+                       pressSets: sets, arbitrate: arbitrate, inOrder: inOrder, mouse: mouse)
     }
 
     /// The runs of the search: A to I with A0 and E2, J (config changes ride on key events) and B2 (shipped dictation, late).
@@ -251,6 +262,12 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
         // Space (with it, past 730,000 states and still growing). The chord beside Right Option stays in the unit tests.
         talkPair("K talk pair Control-Option confirm 0.15 and Right Option confirm 0.25", primaryConfirm: 0.15, late: false, space: false),
         talkPair("K0 talk pair Control-Option confirm 0 and Right Option confirm 0.25", primaryConfirm: 0, late: false, space: false),
+        // K-late and K-flip: the cross-machine orders that K and K0 cannot see, a timer that runs late and a second key that is turned
+        // off or on between two keys. Three keys (no Left Option, no Space) keep them bounded.
+        talkPair("K-late15 talk pair, late timers, primary confirm 0.15", primaryConfirm: 0.15, late: true, space: false, leftOption: false),
+        talkPair("K-late0 talk pair, late timers, primary confirm 0", primaryConfirm: 0, late: true, space: false, leftOption: false),
+        talkPair("K-flip talk pair, second key turned off and on", primaryConfirm: 0.15, late: false, space: false, leftOption: false,
+                 refusal: false, flip: true, mouse: true),
     ]
 }
 
@@ -307,6 +324,8 @@ private enum Move: Hashable {
     /// The main thread was busy for this many steps while an event was held back: the event is then heard at the time it
     /// happened, ahead of the wakes that fell due meanwhile (`busy`), or after them (`catchUp`).
     case busy(Int), catchUp(Int)
+    /// A mouse button goes down (run K-flip): foreign to the second key only.
+    case mouse
     /// Time passes and a due timer waits for the next event. A config change that waits for the next event. An ordinary
     /// key comes up and no monitor hears. The owner starts or stops refusing the turns it is asked to start.
     case waitLate, flipQuiet, missUp(Int), refusing
@@ -328,6 +347,7 @@ private enum Move: Hashable {
         case .flipQuiet: "flip (rides on the next event)"
         case .missUp(let index): run.keys[index].name + " up (no event)"
         case .refusing: "owner refuses turns"
+        case .mouse: "mouse down"
         }
     }
 }
@@ -580,6 +600,7 @@ private struct Sim {
         if !run.secondViews.isEmpty {
             var made = TalkKeyPair()
             made.arbitrate = run.arbitrate
+            made.deliverInOrder = run.inOrder
             pair = made
         }
         guard run.pointing, let key = run.configs[0].key else { return }
@@ -674,6 +695,10 @@ private struct Sim {
         if run.late, held == nil, !allWakes.isEmpty, allWakes.allSatisfy({ step - $0 < 1 }) { out.append(.waitLate) }
         if run.quietFlip, run.configs.count > 1 { out.append(.flipQuiet) }
         if run.refusal { out.append(.refusing) }
+        // The mouse is offered while Right Option is held: the second key's turn is armed or open.
+        if run.mouse, pair != nil, let index = run.keys.firstIndex(where: { $0.code == 61 }), down & (UInt16(1) << UInt16(index)) != 0 {
+            out.append(.mouse)
+        }
         if run.missed, held == nil {
             // An own key whose key-up is lost is pressed again before anything can tell, so only foreign keys go missing.
             for index in run.keys.indices where run.keys[index].flag == nil && run.ownMask & (UInt16(1) << UInt16(index)) == 0 {
@@ -724,6 +749,7 @@ private struct Sim {
         case .flipQuiet: cfg = (cfg + 1) % run.configs.count
         case .missUp(let index): missUp(index, run)
         case .refusing: refusing.toggle()
+        case .mouse: feedPair(.key(.keyUp(keyCode: TalkKeyPair.mouseCode), at: now), .key, run, key: nil, drain: true, mouse: true)
         }
         if !checker.ownWasDown { checker.pressForeign = false }
         if !other.checker.ownWasDown { other.checker.pressForeign = false }
@@ -800,7 +826,7 @@ private struct Sim {
         let confirmSteps = Int(((machine.config ?? run.configs[cfg]).confirm / 0.05).rounded())
         if checker.ownWasDown, confirmSteps > 0 { checker.pressAge = min(checker.pressAge + 1, confirmSteps) }
         if let pair, let view = run.secondViews.first {
-            let secondSteps = Int(((pair.second.config ?? view.configs[0]).confirm / 0.05).rounded())
+            let secondSteps = Int(((pair.second.config ?? view.configs[min(cfg, view.configs.count - 1)]).confirm / 0.05).rounded())
             if other.checker.ownWasDown, secondSteps > 0 { other.checker.pressAge = min(other.checker.pressAge + 1, secondSteps) }
         }
         if deliver { drainWakes(run) }
@@ -916,11 +942,12 @@ private struct Sim {
 
     /// One event reaches the pair (runs K and K0). Each slot is judged as `feed` judges one key, on what the pair let through
     /// of its machine's effects; what the pair itself must keep (one open turn, the other key waits) is judged across both.
-    private mutating func feedPair(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)?, drain: Bool) {
+    private mutating func feedPair(_ event: VoiceKeyMachine.Event, _ kind: Kind, _ run: WalkRun, key: (Int, Bool)?, drain: Bool,
+                                   mouse: Bool = false) {
         guard let view = run.secondViews.first else { return }
         if key != nil { sweepStale(run); injectSwallowedSpace(event, run) }
         let views = [run, view]
-        let configs = [run.configs[cfg], view.configs[0]]
+        let configs = [run.configs[cfg], view.configs[min(cfg, view.configs.count - 1)]]
         let stampStep = step - arrivalLag
         var pre = [Pre(), Pre()]
         for slot in 0..<2 {
@@ -946,7 +973,9 @@ private struct Sim {
         }
         select(0)
         let strays = pair?.strays ?? 0
-        let tagged = pair?.handleTagged(event, primary: configs[0], second: configs[1]) ?? []
+        let time = now
+        let tagged = (mouse ? pair?.mouseDownTagged(at: time, primary: configs[0], second: configs[1])
+                            : pair?.handleTagged(event, primary: configs[0], second: configs[1])) ?? []
         let trace = pair?.trace ?? []
         log += tagged.map(\.effect)
         for slot in 0..<2 {
@@ -1433,7 +1462,10 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
         sim.log = []
         let wasLatched = sim.isLatchedNow
         let owner = base.pair?.owner.map { $0 == .primary ? 0 : 1 }
-        let slotConfig = slot == 0 ? config : (run.secondViews.first?.configs[0] ?? config)
+        let secondView = run.secondViews.first
+        let slotConfig = slot == 0 ? config : (secondView?.configs[min(base.cfg, secondView!.configs.count - 1)] ?? config)
+        // A second key that is off has no press to test.
+        if slot == 1, slotConfig.key == nil { continue }
         func tap(_ sim: inout Sim) {
             for index in order { sim.apply(.toggle(index), run) }
             sim.apply(.wait, run); sim.apply(.wait, run)
@@ -1780,12 +1812,23 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         print("voice key walk K, arbiter off: \(report.violations.first ?? "no violation")")
     }
 
+    /// The mistake of the review of the pair: each machine settled its own overdue timer after the pair had ruled on the key, so a
+    /// timer that was due first acted second. K-late with the delivery in due order off must be reported.
+    @Test func theSearchSeesAPairThatDeliversTimersAfterTheKey() {
+        let blind = WalkRun.talkPair("K-late with the timers after the key", primaryConfirm: 0, late: true, space: false,
+                                     leftOption: false, inOrder: false)
+        let report = search(blind, stopAtFirst: true)
+        #expect(report.violations.contains { $0.hasPrefix("I10") || $0.hasPrefix("I11") || $0.hasPrefix("P5") || $0.contains("overdue") },
+                "\(report.violations)")
+        print("voice key walk K-late, timers after the key: \(report.violations.first ?? "no violation")")
+    }
+
     /// With no second key the pair is the machine: run A walked plainly to length 5 (66,429 sequences), the machine against the
     /// pair with the second key off, the same effects after every move.
     @Test func aPairWithoutASecondKeyActsAsTheMachine() {
         let run = WalkRun.all[0]
         let asPair = WalkRun(run.name + " as a pair", keys: run.keys, own: run.ownCodes, configs: run.configs, late: run.late, chord: true,
-                             second: (own: [], config: VoiceKeyMachine.Config(key: nil, role: .talk, mode: .hold)))
+                             second: (own: [], configs: [VoiceKeyMachine.Config(key: nil, role: .talk, mode: .hold)]))
         var sequences = 0
         var problems: [String] = []
         func walk(_ machine: Sim, _ pair: Sim, depth: Int, trail: [Move]) {

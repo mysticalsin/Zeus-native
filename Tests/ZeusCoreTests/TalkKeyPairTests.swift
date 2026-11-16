@@ -73,6 +73,13 @@ import Testing
         /// The owner ends the turn it was given last, as `HotkeyMonitor.turnEnded` does.
         func abandon(turn: Int? = nil) { feed(.abandon(turn: turn ?? machine?.generation ?? pair.generation)) }
         func interrupt() { feed(.interrupt(live: mods)) }
+        /// A mouse button goes down (the owner's decision: it cancels the second key's turn, armed or open).
+        func mouse(at t: TimeInterval) {
+            now = t
+            let out = pair.mouseDown(at: t, primary: primary, second: second)
+            log += out
+            for case .wake(let after) in out { wakes.append(t + after) }
+        }
     }
 
     // MARK: Without a second key
@@ -434,5 +441,148 @@ import Testing
         rig.type(Self.space, at: 0.6); same("Space")
         rig.release(Self.ctrl, Self.optL, at: 0.7); same("the rest up")
         #expect(rig.pair.keys == rig.pair.primary.keys)
+    }
+
+    // MARK: Timers that fall due before a key, across both machines (review of the pair, major 1)
+
+    /// The same keys with the main thread busy: no timer runs until the end, so every wake that fell due is still owed when the
+    /// next key arrives. The effects must be those of the timers running on time.
+    private func run(_ rig: Rig, late: Bool, _ steps: [(Double, Bool, [UInt16])]) {
+        for (time, down, codes) in steps {
+            if !late { rig.wait(until: time) }
+            for code in codes {
+                if code == Self.letter {
+                    if down { rig.type(code, at: time) } else { rig.untype(code, at: time) }
+                } else if down {
+                    rig.press(code, at: time)
+                } else {
+                    rig.release(code, at: time)
+                }
+            }
+        }
+        rig.wait(until: (steps.last?.0 ?? 0) + 3)
+    }
+
+    @Test func aGapSendDueBeforeTheSecondKeyStartsIsDeliveredAheadOfItsRelease() {
+        // Control-Option held 0.1 s and let go at once (no confirm: a turn is open for the 0.4 s gap, due at 0.5). Right Option goes down
+        // at 0.2 (its start is due at 0.45) and up at 0.6, with the main thread busy meanwhile.
+        let steps: [(Double, Bool, [UInt16])] = [(0, true, [Self.ctrl, Self.optL]), (0.1, false, [Self.optL, Self.ctrl]),
+                                                  (0.2, true, [Self.optR]), (0.6, false, [Self.optR])]
+        let onTime = Rig(), late = Rig()
+        onTime.primary = Config(key: .controlOption, role: .talk, mode: .hold, confirm: 0)
+        late.primary = onTime.primary
+        run(onTime, late: false, steps)
+        run(late, late: true, steps)
+        #expect(onTime.effects == [.start, .send], "on time: the second key's start is swallowed, the gap sends once")
+        #expect(late.effects == onTime.effects, "late: \(late.effects)")
+    }
+
+    @Test func aSecondStartDueBeforeTheControlKeyActsFirstWhateverTheLateOrder() {
+        // Control-Option with no confirm starts at the press. Right Option held from 0 (its start is due at 0.25), Control at 0.3.
+        let steps: [(Double, Bool, [UInt16])] = [(0, true, [Self.optR]), (0.3, true, [Self.ctrl]), (0.5, false, [Self.ctrl, Self.optR])]
+        let onTime = Rig(), late = Rig()
+        onTime.primary = Config(key: .controlOption, role: .talk, mode: .hold, confirm: 0)
+        late.primary = onTime.primary
+        run(onTime, late: false, steps)
+        run(late, late: true, steps)
+        #expect(onTime.effects == [.start, .cancel], "on time: Right Option starts, Control cancels it, nothing starts until all up")
+        #expect(late.effects == onTime.effects, "late: \(late.effects)")
+        #expect(late.pair.owner == nil)
+    }
+
+    @Test func aGapSendThatSettlesOnTheSecondKeyDownDoesNotBarASecondPressThatCameAfterIt() {
+        // The gap send is due at 0.5. Right Option goes down at 0.6, after it in real time, so nothing was down when the turn ended.
+        let steps: [(Double, Bool, [UInt16])] = [(0, true, [Self.ctrl, Self.optL]), (0.1, false, [Self.optL, Self.ctrl]),
+                                                  (0.6, true, [Self.optR]), (1.2, false, [Self.optR])]
+        let onTime = Rig(), late = Rig()
+        onTime.primary = Config(key: .controlOption, role: .talk, mode: .hold, confirm: 0)
+        late.primary = onTime.primary
+        run(onTime, late: false, steps)
+        run(late, late: true, steps)
+        #expect(onTime.effects == [.start, .send, .start, .send], "on time: the second press starts after its confirm")
+        #expect(late.effects == onTime.effects, "late: \(late.effects)")
+    }
+
+    /// Every short order of the keys at a few times, with the timers on time and with them all late: the same effects.
+    @Test func timersThatRunLateGiveTheEffectsOfTimersThatRunOnTime() {
+        let keys: [UInt16] = [Self.ctrl, Self.optL, Self.optR, Self.letter]
+        let gaps: [Double] = [0.1, 0.3, 0.5]
+        var problems: [String] = []
+        var scripts = 0
+        func build(_ depth: Int, _ steps: [(Double, Bool, [UInt16])], _ time: Double, _ down: Set<UInt16>) {
+            if depth == 4 {
+                scripts += 1
+                for confirm in [0.0, 0.15] where problems.count < 5 {
+                    let onTime = Rig(), late = Rig()
+                    onTime.primary = Config(key: .controlOption, role: .talk, mode: .hold, confirm: confirm, chord: 49)
+                    late.primary = onTime.primary
+                    run(onTime, late: false, steps)
+                    run(late, late: true, steps)
+                    if onTime.effects != late.effects || late.pair.strays != 0 {
+                        problems.append("confirm \(confirm), \(steps): on time \(onTime.effects), late \(late.effects)")
+                    }
+                }
+                return
+            }
+            for key in keys {
+                for gap in gaps {
+                    var next = down
+                    let pressing = !next.contains(key)
+                    if pressing { next.insert(key) } else { next.remove(key) }
+                    build(depth + 1, steps + [(time + gap, pressing, [key])], time + gap, next)
+                }
+            }
+        }
+        build(0, [], 0, [])
+        #expect(scripts == 20_736)
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    // MARK: The mouse (owner decision, review of the pair, minor b)
+
+    @Test func rightOptionHeldPastTheConfirmThenAMouseDownCancelsAndNeverSends() {
+        let rig = Rig()
+        rig.press(Self.optR, at: 0)
+        rig.wait(until: 0.5)
+        rig.mouse(at: 0.6)
+        rig.wait(until: 1)
+        rig.release(Self.optR, at: 1.1)
+        rig.wait(until: 2)
+        #expect(rig.effects == [.start, .cancel], "an Option-click or Option-drag is not a talk turn: \(rig.effects)")
+        #expect(rig.pair.owner == nil)
+        // Nothing starts until every key is up, then the key acts again.
+        rig.press(Self.optR, at: 3)
+        rig.wait(until: 3.5)
+        rig.release(Self.optR, at: 3.6)
+        #expect(rig.effects == [.start, .cancel, .start, .send])
+    }
+
+    @Test func aMouseDownInsideTheConfirmDropsThePress() {
+        let rig = Rig()
+        rig.press(Self.optR, at: 0)
+        rig.mouse(at: 0.1)
+        rig.wait(until: 1)
+        rig.release(Self.optR, at: 1.1)
+        rig.wait(until: 2)
+        #expect(rig.effects == [], "nothing started, nothing to cancel: \(rig.effects)")
+        rig.press(Self.optR, at: 3)
+        rig.wait(until: 3.5)
+        rig.release(Self.optR, at: 3.6)
+        #expect(rig.effects == [.start, .send], "once every key is up the key acts again")
+    }
+
+    @Test func aMouseDownLeavesThePrimaryKeyAndAHandsFreeSecondTurnAlone() {
+        let primary = Rig()
+        primary.press(Self.ctrl, Self.optL, at: 0)
+        primary.wait(until: 0.5)
+        primary.mouse(at: 0.6)
+        primary.release(Self.optL, Self.ctrl, at: 0.7)
+        #expect(primary.effects == [.start, .send], "Control-Option is unchanged: \(primary.effects)")
+        let handsFree = Rig()
+        handsFree.press(Self.optR, at: 0); handsFree.release(Self.optR, at: 0.1)
+        handsFree.press(Self.optR, at: 0.2); handsFree.release(Self.optR, at: 0.3)
+        handsFree.mouse(at: 1)
+        handsFree.wait(until: 2)
+        #expect(handsFree.effects == [.start] && handsFree.pair.isLatched, "a click during a hands-free turn is not Option-click")
     }
 }
