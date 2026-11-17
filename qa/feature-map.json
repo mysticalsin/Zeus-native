@@ -107,6 +107,14 @@
       "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift"
     },
     {
+      "id": "native-SystemNotificationServiceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Fake notification client; no UNUserNotificationCenter, no banner reaches macOS.",
+      "suite": "SystemNotificationServiceTests",
+      "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift"
+    },
+    {
       "id": "native-EngineBrandLogoTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -4512,6 +4520,33 @@
           "check": "missing-pointing-device",
           "acceptance": "On a consented Mac the self-test receipt passes every required check, and the manual demo (hold over the Finder Share button, ask, hear and see the ring, interrupt) works in the packaged app.",
           "cases": []
+        },
+        {
+          "id": "F09.cue-banner-dedupe",
+          "check": "native-SystemNotificationServiceTests",
+          "acceptance": "A notch cue shown again and again gives one macOS banner until it has been quiet for two minutes, a later repeat replaces that banner instead of stacking another, and a finished timer or focus round always gets its banner.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "repeatedCueDeliversOneBannerPerWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "cueBannersCarryAStableReplaceKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "continuousCueRepeatStaysSilentPastTheWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "focusFinishedIsNeverDeduped"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "replaceIdentifierIsStableAndOpaque"
+            }
+          ]
         }
       ]
     },

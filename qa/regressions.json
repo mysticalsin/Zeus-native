@@ -8327,6 +8327,18 @@
         "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift",
         "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
       }
+    },
+    {
+      "id": "REG-945",
+      "failure": "Every repeat of a banner-eligible notch cue (permission and access hints, the capture cue re-shown every 2 s, usage, keep awake) posted a new macOS banner with a fresh id, so Notification Centre filled with copies.",
+      "features": [
+        "F09"
+      ],
+      "check": "native-SystemNotificationServiceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+        "function": "repeatedCueDeliversOneBannerPerWindow"
+      }
     }
 ]
 }
