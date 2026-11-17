@@ -99,6 +99,14 @@
       "file": "Tests/ZeusAppTests/KeychainImportTests.swift"
     },
     {
+      "id": "native-SpeakerRouteTextTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Pure check of the route line text; no audio.",
+      "suite": "SpeakerRouteTextTests",
+      "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift"
+    },
+    {
       "id": "native-EngineBrandLogoTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -6084,6 +6092,17 @@
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "aStreamedEllipsisReplyIsOneSpokenLineForUltron"
+            }
+          ]
+        },
+        {
+          "id": "F11.route-text-effect",
+          "check": "native-SpeakerRouteTextTests",
+          "acceptance": "The voice route line names the Ultron effect only when the effect is on.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift",
+              "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
             }
           ]
         }

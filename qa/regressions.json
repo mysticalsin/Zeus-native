@@ -8315,6 +8315,18 @@
         "file": "Tests/ZeusAppTests/KeychainImportTests.swift",
         "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
       }
+    },
+    {
+      "id": "REG-944",
+      "failure": "Settings described every voice route as \"with the Ultron effect\" even with the effect off, so the clean take C voice was reported as processed.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-SpeakerRouteTextTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift",
+        "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
+      }
     }
-  ]
+]
 }

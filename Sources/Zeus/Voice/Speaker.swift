@@ -91,8 +91,15 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     var isSpeaking: Bool { synthesizer.isSpeaking || pump != nil || chain.isPlaying || systemRendering }
 
     var engineDescription: String {
-        guard let first = VoiceSettings.shared.routeDecisions().first else { return "Mac voice \(systemVoiceName) with the Ultron effect" }
-        return first.engine == .system ? "Mac voice \(systemVoiceName) with the Ultron effect" : "\(first.engine.label) with the Ultron effect"
+        let first = VoiceSettings.shared.routeDecisions().first
+        let name = first == nil || first?.engine == .system ? "Mac voice \(systemVoiceName)" : first!.engine.label
+        return Self.describe(engine: name, effectOn: UltronVoiceEffect.enabled())
+    }
+
+    /// The route line shown in Settings. It names the Ultron effect only when the effect is on, so a
+    /// clean take C voice is not described as processed.
+    nonisolated static func describe(engine: String, effectOn: Bool) -> String {
+        effectOn ? "\(engine) with the Ultron effect" : engine
     }
 
     // MARK: Entry points
