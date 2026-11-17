@@ -7,10 +7,10 @@ extension Shortcut {
 
 extension ShortcutConflicts {
     /// Warnings for the pointing key against the other global keys. Warnings only; nothing blocks.
-    /// `showMeKey` is the show-me hold (left Command by default).
+    /// `showMeKey` is the show-me hold (left Control by default).
     public static func pointingWarnings(pointing: Shortcut, talk: Shortcut, dictation: Shortcut?, chat: ChatHotkey,
                                         doubleControlTextEntry: Bool,
-                                        showMeKey: Shortcut = Shortcut(modifiers: .command, side: .left),
+                                        showMeKey: Shortcut = .showMe,
                                         voiceOverOn: Bool = false) -> [String] {
         var out = warnings(for: pointing, other: nil, otherName: "", voiceOverOn: voiceOverOn)
         // The same key as Talk to Zeus is the shipped design, not a conflict: the talk turn owns that hold
@@ -29,6 +29,9 @@ extension ShortcutConflicts {
             let loneControl = Shortcut(modifiers: .control)
             if talk == loneControl || dictation == loneControl {
                 out.append("Double-tap Control for text entry overlaps your talk or dictation key (Control alone).")
+            }
+            if showMeKey.modifiers.contains(.control) {
+                out.append("Show me uses \(ShowMeKey.displayName), and double-tap Control for text entry also uses Control. Tapping Control twice can start text entry, and holding it starts Show me.")
             }
             out.append("Double-tap Control may also be macOS Dictation's \"Press Control key twice\" shortcut. Turn one off if both fire.")
         }

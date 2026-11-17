@@ -320,7 +320,7 @@ struct SettingsView: View {
                 }
             }
             GlassCard(title: "Show me and drive") {
-                GlassRow(title: "Draw on screen", note: "Hold the left Command key, then circle or underline anything. ZEUS answers about that spot.") {
+                GlassRow(title: "Draw on screen", note: "Hold the left Control key, then circle or underline anything. ZEUS answers about that spot.") {
                     GlassToggle(isOn: $annotateEnabled, label: "Show me")
                 }
                 GlassDivider()
