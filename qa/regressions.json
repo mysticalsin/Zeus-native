@@ -8039,6 +8039,42 @@
         "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
         "function": "marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers"
       }
+    },
+    {
+      "id": "REG-940",
+      "failure": "A voice ID saved in the Keychain by a script or another Zeus process was never picked up until restart, because the store only served its launch-time cache.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "refreshPicksUpAValueSavedOutsideTheStore"
+      }
+    },
+    {
+      "id": "REG-941",
+      "failure": "A refresh from the Keychain could wrongly keep a deleted secret, or drop one that exists but could not be read without a dialog.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "refreshClearsAnAccountDeletedOutsideTheStoreButKeepsAnUnreadableOne"
+      }
+    },
+    {
+      "id": "REG-942",
+      "failure": "Re-reading a Keychain account on every spoken sentence could hit the backend each time instead of at most once per five seconds.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "refreshReadsTheBackendAtMostOncePerFiveSecondsPerAccount"
+      }
     }
   ]
 }

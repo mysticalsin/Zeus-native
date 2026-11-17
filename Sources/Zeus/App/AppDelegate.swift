@@ -110,6 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.panelUI) { WikiController.shared.flushEdit() }
     }
 
+    /// A voice saved outside the app (a script, another ZEUS) is picked up when the app comes forward.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        Task.detached(priority: .utility) { _ = Keychain.fresh("elevenlabs.voice-id") }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Load the Keychain cache off the main thread early; every later read is a dictionary lookup.
         Task.detached(priority: .userInitiated) { Keychain.store.load() }

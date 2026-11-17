@@ -84,7 +84,7 @@ struct ElevenLabsVoice: Sendable {
     /// The voice picked or designed in Settings, read on each request so a new choice applies to the
     /// next sentence without restarting. Nil when none was saved.
     static func savedVoiceID() -> String? {
-        let saved = Keychain.get("elevenlabs.voice-id")?.filter { $0.isLetter || $0.isNumber }
+        let saved = Keychain.fresh("elevenlabs.voice-id")?.filter { $0.isLetter || $0.isNumber }
         return saved?.isEmpty == false ? saved : nil
     }
 
