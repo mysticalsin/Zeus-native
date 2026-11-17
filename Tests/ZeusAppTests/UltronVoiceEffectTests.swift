@@ -123,12 +123,15 @@ import ZeusCore
         return defaults
     }
 
-    @Test func freshInstallIsUltronWithTheEffectOnAtSixtyPercent() {
+    @Test func freshInstallIsUltronWithTheEffectOffAndSeventyFivePercentWhenTurnedOn() {
         let defaults = fresh()
         #expect(ZeusPersonality.current(defaults) == .ultron)
-        #expect(UltronVoiceEffect.enabled(defaults))
-        #expect(UltronVoiceEffect.intensity(defaults) == 0.6)
+        #expect(!UltronVoiceEffect.enabled(defaults))
+        #expect(UltronVoiceEffect.parameters(defaults).isNeutral)
+        #expect(UltronVoiceEffect.intensity(defaults) == 0.75)
+        defaults.set(true, forKey: UltronVoiceEffect.enabledKey)
         #expect(!UltronVoiceEffect.parameters(defaults).isNeutral)
+        #expect(UltronVoiceEffect.intensity(defaults) == 0.75)
     }
 
     @Test func anExplicitOwnerChoiceIsKept() {

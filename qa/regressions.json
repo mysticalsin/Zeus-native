@@ -2829,7 +2829,7 @@
       "check": "native-UltronVoiceEffectTests",
       "guard": {
         "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
-        "function": "freshInstallIsUltronWithTheEffectOnAtSixtyPercent"
+        "function": "freshInstallIsUltronWithTheEffectOffAndSeventyFivePercentWhenTurnedOn"
       }
     },
     {
@@ -8062,6 +8062,18 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
         "function": "defaultIsStudioAndModelsAreTheNamedConstants"
+      }
+    },
+    {
+      "id": "REG-903",
+      "failure": "A fresh install layered the Ultron audio effect at 75 percent over the approved clean take C voice.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-UltronVoiceEffectTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
+        "function": "freshInstallIsUltronWithTheEffectOffAndSeventyFivePercentWhenTurnedOn"
       }
     }
   ]

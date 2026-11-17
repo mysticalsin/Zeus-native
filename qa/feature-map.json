@@ -4987,11 +4987,11 @@
         {
           "id": "F11.ultron-defaults",
           "check": "native-UltronVoiceEffectTests",
-          "acceptance": "A fresh install is the Ultron persona with the effect on at 60 percent, an explicit owner choice is kept, and the first line with no keys uses the Mac voice, never Samantha.",
+          "acceptance": "A fresh install is the Ultron persona with the effect off (75 percent when turned on), an explicit owner choice is kept, and the first line with no keys uses the Mac voice, never Samantha.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
-              "function": "freshInstallIsUltronWithTheEffectOnAtSixtyPercent"
+              "function": "freshInstallIsUltronWithTheEffectOffAndSeventyFivePercentWhenTurnedOn"
             },
             {
               "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift",
