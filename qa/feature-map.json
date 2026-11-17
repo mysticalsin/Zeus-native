@@ -6289,6 +6289,18 @@
               "function": "removalOfAbsentSecretIsIdempotentAndDoesNotTouchOtherAccounts"
             },
             {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "refreshPicksUpAValueSavedOutsideTheStore"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "refreshClearsAnAccountDeletedOutsideTheStoreButKeepsAnUnreadableOne"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "refreshReadsTheBackendAtMostOncePerFiveSecondsPerAccount"
+            },
+            {
               "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
               "function": "nonReadingPeerDoesNotBlockMainActorAndReplyTimesOut"
             },
