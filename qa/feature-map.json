@@ -4524,7 +4524,7 @@
         {
           "id": "F09.cue-banner-dedupe",
           "check": "native-SystemNotificationServiceTests",
-          "acceptance": "A notch cue shown again and again gives one macOS banner per title and text per two minutes, and a later repeat replaces that banner instead of stacking another.",
+          "acceptance": "A notch cue shown again and again gives one macOS banner until it has been quiet for two minutes, a later repeat replaces that banner instead of stacking another, and a finished timer or focus round always gets its banner.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
@@ -4533,6 +4533,18 @@
             {
               "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
               "function": "cueBannersCarryAStableReplaceKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "continuousCueRepeatStaysSilentPastTheWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "focusFinishedIsNeverDeduped"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
+              "function": "replaceIdentifierIsStableAndOpaque"
             }
           ]
         }

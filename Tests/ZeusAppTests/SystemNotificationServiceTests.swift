@@ -127,6 +127,54 @@ struct SystemNotificationServiceTests {
         #expect(Set(keys).count == 1)
     }
 
+    /// REG-945: a cue that keeps repeating (a capture cue held for minutes) stays one banner; the window
+    /// restarts on each repeat instead of re-alerting every two minutes.
+    @MainActor
+    @Test func continuousCueRepeatStaysSilentPastTheWindow() async {
+        var enabled = true
+        var now = Date(timeIntervalSince1970: 1_000_000)
+        let client = FakeClient()
+        client.status = .authorized
+        let service = SystemNotificationService(client: client, isEnabled: { enabled }, setEnabled: { enabled = $0 },
+                                                clock: { now })
+        for _ in 0..<150 {   // 5 minutes of a cue re-shown every 2 s
+            await service.deliver(.hint("A command-line request is capturing audio or screen"))
+            now += 2
+        }
+        #expect(client.delivered.count == 1)
+    }
+
+    /// REG-945: a finished timer or focus round is a new event each time, even with the same text.
+    @MainActor
+    @Test func focusFinishedIsNeverDeduped() async {
+        var enabled = true
+        var now = Date(timeIntervalSince1970: 1_000_000)
+        let client = FakeClient()
+        client.status = .authorized
+        let service = SystemNotificationService(client: client, isEnabled: { enabled }, setEnabled: { enabled = $0 },
+                                                clock: { now })
+        await service.deliver(.focusFinished("Time's up."))
+        now += 30
+        await service.deliver(.focusFinished("Time's up."))
+        #expect(client.delivered.count == 2)
+        #expect(client.delivered.allSatisfy { $0.dedupeKey == nil })
+    }
+
+    /// REG-945: the macOS request id is what makes a repeat replace its banner. Same key, same opaque id;
+    /// no key, a fresh id each time.
+    @Test func replaceIdentifierIsStableAndOpaque() {
+        let a = SystemNotificationPayload(title: "Zeus needs access", body: "Screen Recording is off for Zeus.",
+                                          dedupeKey: "cue|Zeus needs access|Screen Recording is off for Zeus.")
+        let b = a
+        #expect(a.replaceIdentifier != nil)
+        #expect(a.replaceIdentifier == b.replaceIdentifier)
+        #expect(a.replaceIdentifier?.hasPrefix("zeus.alert.") == true)
+        #expect(a.replaceIdentifier?.contains("Screen") == false)
+        #expect(SystemNotificationPayload(title: "x", body: "y").replaceIdentifier == nil)
+        let agent = AgentAlert.failed(agent: "Claude Code", project: "Zeus", reason: "boom", session: "s1").payload(showDetails: true)
+        #expect(agent.replaceIdentifier == AgentAlert.opaqueID(agent.dedupeKey ?? ""))
+    }
+
     @Test func onlyFocusedCuesCreateSystemBannerPayloads() {
         #expect(SystemNotificationPayload.forCue(.usageAlert("Claude Code at 82%")) ==
                 SystemNotificationPayload(title: "Usage limit getting close", body: "Claude Code at 82%"))
