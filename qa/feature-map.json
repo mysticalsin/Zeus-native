@@ -5900,7 +5900,7 @@
         {
           "id": "F11.ultron-take-c-voice",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Ultron ElevenLabs delivery is take C (stability 0.6, similarity 0.85, style 0.3, speed 1.0), the fast model stays the default and Studio is the known eleven_multilingual_v2. Does not prove how it sounds.",
+          "acceptance": "Ultron ElevenLabs delivery is take C (stability 0.6, similarity 0.85, style 0.3, speed 1.2), Studio (eleven_multilingual_v2) is the default quality and the fast model is the fallback. Does not prove how it sounds.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
@@ -5908,7 +5908,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
-              "function": "theStudioChoiceIsAKnownModelAndTheFastDefaultStays"
+              "function": "theStudioModelIsTheKnownDefaultAndFastIsTheFallback"
             }
           ]
         },

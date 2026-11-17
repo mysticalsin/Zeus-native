@@ -90,7 +90,7 @@ final class VoiceSettings {
     /// A key that could not be saved, or a preview that was written to a file instead of played.
     var keyMessage: String?
     var previewMessage: String?
-    /// "Fastest" (ElevenLabs flash, the default for talking to Zeus) or "Studio" (highest quality, expressive).
+    /// "Studio" (multilingual v2, the default, expressive) or "Fastest" (ElevenLabs flash, lowest delay).
     var elevenQuality: ElevenLabsQuality = .resolve(stored: UserDefaults.standard.string(forKey: ElevenLabsQuality.defaultsKey)) {
         didSet { defaults.set(elevenQuality.rawValue, forKey: ElevenLabsQuality.defaultsKey) }
     }

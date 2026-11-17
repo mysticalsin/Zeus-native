@@ -150,10 +150,10 @@ struct UltronDialogueEllipsisLintTests {
 
 @Suite("Ultron take C voice")
 struct UltronTakeCVoiceTests {
-    @Test func theStudioChoiceIsAKnownModelAndTheFastDefaultStays() {
+    @Test func theStudioModelIsTheKnownDefaultAndFastIsTheFallback() {
         #expect(ElevenLabsQuality.studioModel == "eleven_multilingual_v2")
         #expect(ElevenLabsQuality.fastModel == "eleven_flash_v2_5")
-        #expect(ElevenLabsQuality.resolve(stored: nil).modelID == "eleven_flash_v2_5")
+        #expect(ElevenLabsQuality.resolve(stored: nil).modelID == "eleven_multilingual_v2")
     }
 
     @Test func takeCSettingsAreFasterAndSteadier() {
@@ -161,6 +161,6 @@ struct UltronTakeCVoiceTests {
         #expect(settings["stability"] == 0.6)
         #expect(settings["similarity_boost"] == 0.85)
         #expect(settings["style"] == 0.3)
-        #expect(settings["speed"] == 1.0)
+        #expect(settings["speed"] == 1.2)
     }
 }

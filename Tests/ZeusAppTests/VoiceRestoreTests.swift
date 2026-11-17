@@ -16,7 +16,7 @@ struct VoiceRestoreTests {
         #expect(ultron["similarity_boost"] as? Double == 0.85)
         #expect(ultron["style"] as? Double == 0.3)
         #expect(ultron["use_speaker_boost"] as? Bool == true)
-        #expect(ultron["speed"] as? Double == 1.0)
+        #expect(ultron["speed"] as? Double == 1.2)
         let body = ElevenLabsVoice.speechBody(text: "Ready.", personality: .ultron)
         #expect(body["model_id"] as? String == "eleven_flash_v2_5")
     }
@@ -31,7 +31,7 @@ struct VoiceRestoreTests {
         #expect(studioBody["model_id"] as? String == "eleven_multilingual_v2")
         let studio = studioBody["voice_settings"] as? [String: Any] ?? [:]
         #expect(studio["stability"] as? Double == 0.6)
-        #expect(studio["speed"] as? Double == 1.0)
+        #expect(studio["speed"] as? Double == 1.2)
         #expect(studio["use_speaker_boost"] as? Bool == true)
     }
 

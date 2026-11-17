@@ -7941,7 +7941,7 @@
       "check": "native-ZeusCoreTests",
       "guard": {
         "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
-        "function": "theStudioChoiceIsAKnownModelAndTheFastDefaultStays"
+        "function": "theStudioModelIsTheKnownDefaultAndFastIsTheFallback"
       }
     },
     {
@@ -8038,6 +8038,30 @@
       "guard": {
         "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
         "function": "marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers"
+      }
+    },
+    {
+      "id": "REG-900",
+      "failure": "Ultron spoke at speed 1.0 instead of the approved take C speed 1.2.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/UltronTakeCTests.swift",
+        "function": "takeCSettingsAreFasterAndSteadier"
+      }
+    },
+    {
+      "id": "REG-901",
+      "failure": "The default voice quality was the fast model instead of Studio (eleven_multilingual_v2), so the approved Ultron voice was not what shipped.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceSpeedTests.swift",
+        "function": "defaultIsStudioAndModelsAreTheNamedConstants"
       }
     }
   ]
