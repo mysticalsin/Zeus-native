@@ -8039,6 +8039,78 @@
         "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
         "function": "marksTheImageEngineBeganAreClearedBeforeTheTextEngineAnswers"
       }
+    },
+    {
+      "id": "REG-920",
+      "failure": "Settings > Voice offered only a few OpenAI voices, so the ten catalog voices (marin, cedar and the rest) could not be chosen and a saved voice never reached the speech request.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
+        "function": "openAICatalogHasTheTenCatalogVoicesAndKeepsTheOlderOnes"
+      }
+    },
+    {
+      "id": "REG-921",
+      "failure": "Settings > Voice had no way to choose among the thirty Gemini voices; a mistyped or removed voice name was sent to the API instead of falling back.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
+        "function": "geminiCatalogHasExactlyTheThirtyPrebuiltVoices"
+      }
+    },
+    {
+      "id": "REG-922",
+      "failure": "The Gemini speech request put the key in the URL or body, or used the wrong endpoint, header, voice field or audio format.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
+        "function": "geminiBodyCarriesTextVoiceAndRawPCMFormat"
+      }
+    },
+    {
+      "id": "REG-923",
+      "failure": "A Gemini key or its request could reach a log line, exposing the key.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
+        "function": "geminiKeyNeverAppearsInTheBodyOrTheLogSummary"
+      }
+    },
+    {
+      "id": "REG-924",
+      "failure": "Adding the Gemini voice changed the engine order for owners without a Gemini key, or pushed it ahead of ElevenLabs.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
+        "function": "noGeminiKeyLeavesProviderSelectionUnchanged"
+      }
+    },
+    {
+      "id": "REG-925",
+      "failure": "A Gemini reply that came back as a WAV file, or without audio, was played as noise or crashed the reader instead of being handled.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
+        "function": "geminiWAVReplyHasItsHeaderStripped"
+      }
     }
   ]
 }
