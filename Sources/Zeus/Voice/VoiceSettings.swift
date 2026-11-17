@@ -79,6 +79,12 @@ final class VoiceSettings {
     var elevenLabsPausedUntil: Date? { elevenLabsPause.persistedUntil }
     var openAIKeyDraft = ""
     private(set) var openAIKeySaved: Bool
+    var geminiKeyDraft = ""
+    private(set) var geminiKeySaved: Bool
+    /// The voice names the OpenAI and Gemini pickers write (`voice.openai.voice`, `voice.gemini.voice`).
+    var openAIVoice: String { didSet { defaults.set(openAIVoice, forKey: "voice.openai.voice") } }
+    var geminiVoice: String { didSet { defaults.set(geminiVoice, forKey: "voice.gemini.voice") } }
+    var openAIModel: String { UserDefaults.standard.string(forKey: "voice.openai.model") ?? UltronCloudVoice.openAIModel }
     private var fallbackMessage: String?
     /// The fallback notice stays only while the pause behind it lasts (and until a provider works again).
     private var fallbackMessageUntil: Date?
@@ -128,6 +134,9 @@ final class VoiceSettings {
         kokoroSpeed = UserDefaults.standard.object(forKey: "voice.kokoro.speed") as? Double ?? ElevenLabsVoice.offlineKokoroSpeed
         elevenKeySaved = Keychain.get("elevenlabs.api-key") != nil
         openAIKeySaved = Keychain.get("openai-tts.api-key") != nil
+        geminiKeySaved = Keychain.get("gemini-tts.api-key") != nil
+        openAIVoice = UserDefaults.standard.string(forKey: "voice.openai.voice") ?? UltronCloudVoice.openAIVoice
+        geminiVoice = GeminiVoiceCatalog.resolve(stored: UserDefaults.standard.string(forKey: "voice.gemini.voice"))
         kokoroReady = kokoroSetUp
         elevenLabsPause = ElevenLabsPause(persistedUntil: pausedUntil)
         if kokoroSetUp { verifyKokoro() }
@@ -146,7 +155,8 @@ final class VoiceSettings {
             kokoroReady: kokoroReady,
             chatterboxReady: ChatterboxVoice.isReady,
             elevenLabsConfigured: elevenKeySaved && !elevenLabsPaused,
-            openAIConfigured: openAIKeySaved
+            openAIConfigured: openAIKeySaved,
+            geminiConfigured: geminiKeySaved
         )
     }
 
@@ -158,6 +168,7 @@ final class VoiceSettings {
         case .chatterbox: .chatterbox
         case .elevenLabs: .elevenLabs
         case .openAICompatible: .openAI
+        case .gemini: .gemini
         }
     }
 
@@ -165,6 +176,7 @@ final class VoiceSettings {
         UltronEngineAvailability(
             elevenLabsConfigured: ElevenLabsVoice.hasRoute, elevenLabsPaused: isProviderPaused(.elevenLabs, now: now),
             openAIConfigured: openAIKeySaved, openAIPaused: isProviderPaused(.openAICompatible, now: now),
+            geminiConfigured: geminiKeySaved, geminiPaused: isProviderPaused(.gemini, now: now),
             kokoroReady: kokoroReady, kokoroPaused: isProviderPaused(.kokoro, now: now),
             chatterboxReady: ChatterboxVoice.isReady, chatterboxPaused: isProviderPaused(.chatterbox, now: now))
     }
@@ -253,6 +265,31 @@ final class VoiceSettings {
         openAIKeyDraft = ""
         keyMessage = nil
         defaults.removeObject(forKey: "voice.provider.pause.openAICompatible")
+    }
+
+    func saveGeminiKey() {
+        let key = geminiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if key.isEmpty { geminiKeyDraft = ""; return }
+        // A failed Keychain write keeps the draft, so the pasted key is never lost silently.
+        guard Keychain.set(key, for: "gemini-tts.api-key") else {
+            keyMessage = "Couldn't save the Gemini key to your Keychain. It is still in the field."
+            return
+        }
+        geminiKeyDraft = ""
+        keyMessage = nil
+        geminiKeySaved = true
+        clearProviderPause(.gemini)
+    }
+
+    func removeGeminiKey() {
+        guard Keychain.remove("gemini-tts.api-key") else {
+            keyMessage = "Couldn't remove the Gemini key. Check Keychain access and try again."
+            return
+        }
+        geminiKeySaved = false
+        geminiKeyDraft = ""
+        keyMessage = nil
+        defaults.removeObject(forKey: "voice.provider.pause.gemini")
     }
 
     // MARK: ElevenLabs

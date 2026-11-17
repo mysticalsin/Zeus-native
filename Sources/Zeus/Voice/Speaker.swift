@@ -220,6 +220,13 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.openAICompatible, reason: .offline) }
             return nil
+        case .gemini:
+            if let voice = await speakGemini(text, began: began) {
+                settings.clearProviderPause(.gemini)
+                return voice
+            }
+            if Self.countsAsFailure() { settings.noteProviderFailure(.gemini, reason: .offline) }
+            return nil
         case .kokoro:
             if await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) {
                 settings.clearProviderPause(.kokoro)
@@ -270,6 +277,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         let model: String? = switch engine {
         case .elevenLabs: lastElevenModel
         case .openAI: OpenAITTSVoice.config()?.model
+        case .gemini: GeminiTTSVoice.config()?.model
         default: nil
         }
         VoiceLatency.shared.setSpeech(engine: engine.logName, voice: voice, model: model, reason: reason,
@@ -411,6 +419,24 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         }
     }
 
+    /// Gemini returns the whole sentence as base64 PCM, so it is decoded and scheduled in one piece.
+    private func speakGemini(_ text: String, began: Date) async -> String? {
+        guard let config = GeminiTTSVoice.config(),
+              let request = GeminiTTSRequest.makeRequest(text: text, config: config, timeout: 20) else { return nil }
+        let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
+        do {
+            let (data, response) = try await Self.urlSession.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200, let pcm = GeminiTTSRequest.pcm(fromResponse: data) else { return nil }
+            guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { return nil }
+            feeder.push(pcm)
+            feeder.finish()
+            return feeder.scheduledAny ? config.voice : nil
+        } catch {
+            feeder.discard()
+            return nil
+        }
+    }
+
     private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> Bool {
         guard let url = await KokoroVoice.render(text, voice: voice, speed: speed) else { return false }
         // Rendering takes seconds: if the owner interrupted meanwhile, the finished line is thrown away, never played.
@@ -501,6 +527,11 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
                 }
             case .openAI:
                 if let url = await OpenAITTSVoice.render(text, session: Self.urlSession), (try? VoiceWAVPlayback.writeProcessedCopy(from: url, to: destination)) != nil {
+                    try? FileManager.default.removeItem(at: url)
+                    return true
+                }
+            case .gemini:
+                if let url = await GeminiTTSVoice.render(text, session: Self.urlSession), (try? VoiceWAVPlayback.writeProcessedCopy(from: url, to: destination)) != nil {
                     try? FileManager.default.removeItem(at: url)
                     return true
                 }

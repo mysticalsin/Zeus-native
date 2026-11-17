@@ -13,6 +13,7 @@ public enum VoiceProviderKeychain {
         case .elevenLabs: ["elevenlabs.api-key"]
         case .chatterbox: ["chatterbox.api-key"]
         case .openAICompatible: ["openai-tts.api-key"]
+        case .gemini: ["gemini-tts.api-key"]
         case .kokoro: []
         }
     }

@@ -8,6 +8,7 @@ struct ZeusVoiceCards: View {
     private var settings: DictationSettings { DictationSettings.shared }
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
     private var testModel: VoiceTestModel { VoiceTestModel.shared }
+    private var preview: VoicePreviewModel { VoicePreviewModel.shared }
     static let automaticTitle = "Automatic (best working voice)"
 
     var body: some View {
@@ -127,6 +128,39 @@ struct ZeusVoiceCards: View {
                     Button("Save key") { voice.saveOpenAIKey() }.buttonStyle(GSButtonStyle()).disabled(voice.openAIKeyDraft.isEmpty)
                     if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle()) }
                 }
+            }
+            if voice.openAIKeySaved {
+                GSDivider()
+                GSRow(symbol: "person.wave.2", title: "OpenAI voice", text: "Used when OpenAI speaks. Marin and Cedar need the gpt-4o-mini-tts model.") {
+                    voicePicker(provider: .openAICompatible, voices: OpenAIVoiceCatalog.voices(forModel: voice.openAIModel),
+                                selected: voice.openAIVoice, label: "OpenAI voice") { voice.openAIVoice = $0 }
+                }
+            }
+            GSDivider()
+            GSRow(symbol: "key", title: "Gemini TTS key", text: voice.geminiKeySaved ? "Saved in Keychain." : "Optional Google voice. Create a key in Google AI Studio, then paste it here. Stored only in your Keychain.") {
+                HStack(spacing: 10) {
+                    SecureField(voice.geminiKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.geminiKeyDraft }, set: { voice.geminiKeyDraft = $0 }))
+                        .textFieldStyle(.plain)
+                        .snapshotSafeText(voice.geminiKeyDraft, placeholder: voice.geminiKeySaved ? "Saved" : "Paste a key", secure: true)
+                        .font(OB.font(13.5)).foregroundStyle(GS.text)
+                        .padding(.horizontal, 10).frame(width: 200, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                        .accessibilityLabel("Gemini TTS key")
+                        .onSubmit { voice.saveGeminiKey() }
+                    Button("Save key") { voice.saveGeminiKey() }.buttonStyle(GSButtonStyle()).disabled(voice.geminiKeyDraft.isEmpty)
+                    if voice.geminiKeySaved { Button("Clear") { voice.removeGeminiKey() }.buttonStyle(GSButtonStyle()) }
+                }
+            }
+            if voice.geminiKeySaved {
+                GSDivider()
+                GSRow(symbol: "person.wave.2", title: "Gemini voice", text: "Thirty Google voices. Preview speaks one short sentence with your key.") {
+                    voicePicker(provider: .gemini, voices: GeminiVoiceCatalog.voices,
+                                selected: voice.geminiVoice, label: "Gemini voice") { voice.geminiVoice = $0 }
+                }
+            }
+            if let line = preview.message {
+                GSInfo(text: line)
             }
             if voice.elevenKeySaved {
                 GSDivider()
@@ -255,6 +289,22 @@ struct ZeusVoiceCards: View {
             }
             return "ElevenLabs"
         case .openAICompatible: return "OpenAI-compatible TTS"
+        case .gemini: return "Google Gemini TTS"
+        }
+    }
+
+    /// A voice popup with a Preview button. Rows read "Name, tone"; the id is what gets saved.
+    private func voicePicker(provider: VoiceTTSProvider, voices: [CatalogVoice], selected: String, label: String,
+                             choose: @escaping (String) -> Void) -> some View {
+        func rowTitle(_ item: CatalogVoice) -> String { "\(item.title), \(item.detail)" }
+        return HStack(spacing: 10) {
+            GSPopup(selection: Binding(get: { voices.first { $0.id == selected }.map(rowTitle) ?? selected },
+                                       set: { title in if let item = voices.first(where: { rowTitle($0) == title }) { choose(item.id) } }),
+                    options: voices.map(rowTitle), label: label)
+            Button(preview.isActive(provider, selected) ? (preview.loading ? "Loading" : "Stop") : "Preview") {
+                preview.toggle(provider, voice: selected)
+            }
+            .buttonStyle(GSButtonStyle()).accessibilityLabel("\(label) preview")
         }
     }
 

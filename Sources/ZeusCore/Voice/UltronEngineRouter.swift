@@ -2,12 +2,13 @@ import Foundation
 
 /// Every engine that can speak, in the order `auto` prefers them.
 public enum UltronEngine: String, CaseIterable, Sendable {
-    case elevenLabs, openAI, kokoro, chatterbox, system
+    case elevenLabs, openAI, gemini, kokoro, chatterbox, system
 
     public var label: String {
         switch self {
         case .elevenLabs: "ElevenLabs"
         case .openAI: "OpenAI voice"
+        case .gemini: "Gemini voice"
         case .kokoro: "Kokoro"
         case .chatterbox: "Chatterbox"
         case .system: "Mac voice"
@@ -24,6 +25,8 @@ public struct UltronEngineAvailability: Equatable, Sendable {
     public var elevenLabsPaused: Bool
     public var openAIConfigured: Bool
     public var openAIPaused: Bool
+    public var geminiConfigured: Bool
+    public var geminiPaused: Bool
     public var kokoroReady: Bool
     public var kokoroPaused: Bool
     public var chatterboxReady: Bool
@@ -31,12 +34,15 @@ public struct UltronEngineAvailability: Equatable, Sendable {
 
     public init(elevenLabsConfigured: Bool = false, elevenLabsPaused: Bool = false,
                 openAIConfigured: Bool = false, openAIPaused: Bool = false,
+                geminiConfigured: Bool = false, geminiPaused: Bool = false,
                 kokoroReady: Bool = false, kokoroPaused: Bool = false,
                 chatterboxReady: Bool = false, chatterboxPaused: Bool = false) {
         self.elevenLabsConfigured = elevenLabsConfigured
         self.elevenLabsPaused = elevenLabsPaused
         self.openAIConfigured = openAIConfigured
         self.openAIPaused = openAIPaused
+        self.geminiConfigured = geminiConfigured
+        self.geminiPaused = geminiPaused
         self.kokoroReady = kokoroReady
         self.kokoroPaused = kokoroPaused
         self.chatterboxReady = chatterboxReady
@@ -48,6 +54,7 @@ public struct UltronEngineAvailability: Equatable, Sendable {
         switch engine {
         case .elevenLabs: !elevenLabsConfigured ? "no ElevenLabs key or worker" : (elevenLabsPaused ? "ElevenLabs paused after a failure" : nil)
         case .openAI: !openAIConfigured ? "no OpenAI key" : (openAIPaused ? "OpenAI paused after a failure" : nil)
+        case .gemini: !geminiConfigured ? "no Gemini key" : (geminiPaused ? "Gemini paused after a failure" : nil)
         case .kokoro: !kokoroReady ? "Kokoro not set up" : (kokoroPaused ? "Kokoro paused after a failure" : nil)
         case .chatterbox: !chatterboxReady ? "Chatterbox not ready" : (chatterboxPaused ? "Chatterbox paused after a failure" : nil)
         case .system: nil
@@ -74,7 +81,7 @@ public enum UltronEngineRouter {
     /// demoted engine is never tried, so its reading could not recover; its first-audio timeout and a short
     /// pause after a failure send a slow reply to Kokoro instead.
     /// Chatterbox clones from a reference clip the owner supplies, so it is used only when chosen explicitly.
-    public static let autoOrder: [UltronEngine] = [.elevenLabs, .openAI, .kokoro, .system]
+    public static let autoOrder: [UltronEngine] = [.elevenLabs, .openAI, .gemini, .kokoro, .system]
     public static let slowMs = 2_500
 
     public static func chain(choice: UltronEngineChoice, availability: UltronEngineAvailability,
