@@ -9,9 +9,9 @@ enum KeychainSelfTest {
     /// Accounts a script may import with `Zeus --keychain-import <account> < file`. The app itself
     /// writes the item, so its own signature owns it and later reads never prompt. The value is
     /// read from stdin and never printed.
-    static let importable: Set<String> = [JevKey.account, "worker.url", "worker.token", "elevenlabs.api-key"]
+    static let importable: Set<String> = [JevKey.account, "worker.url", "worker.token", "elevenlabs.api-key", "elevenlabs.voice-id"]
     /// Other spellings scripts may use, mapped to the account the app reads.
-    static let aliases = ["elevenlabs-api-key": "elevenlabs.api-key"]
+    static let aliases = ["elevenlabs-api-key": "elevenlabs.api-key", "elevenlabs-voice-id": "elevenlabs.voice-id"]
 
     static func runIfRequested() {
         let args = CommandLine.arguments

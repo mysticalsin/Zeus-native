@@ -91,6 +91,14 @@
       "file": "Tests/ZeusAppTests/UltronVoiceEffectTests.swift"
     },
     {
+      "id": "native-KeychainImportTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Pure check of the --keychain-import allow list and aliases; no Keychain write.",
+      "suite": "KeychainImportTests",
+      "file": "Tests/ZeusAppTests/KeychainImportTests.swift"
+    },
+    {
       "id": "native-EngineBrandLogoTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -7638,6 +7646,17 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.keychain-import-voice",
+          "check": "native-KeychainImportTests",
+          "acceptance": "Scripts can hand Zeus the saved ElevenLabs voice ID through --keychain-import, so the Keychain item is owned by Zeus and readable without a dialog.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/KeychainImportTests.swift",
+              "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
             }
           ]
         }

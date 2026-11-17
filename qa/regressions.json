@@ -8303,6 +8303,18 @@
         "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
         "function": "refreshReadsTheBackendAtMostOncePerFiveSecondsPerAccount"
       }
+    },
+    {
+      "id": "REG-943",
+      "failure": "A voice ID written by the security tool was readable only by Apple tools, so Zeus silently spoke the stock voice; --keychain-import refused the voice-id account.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-KeychainImportTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/KeychainImportTests.swift",
+        "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
+      }
     }
   ]
 }
