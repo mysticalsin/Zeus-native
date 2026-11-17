@@ -4145,6 +4145,34 @@
               "function": "thePresetRemembersAndRestoresTheDictationKey"
             },
             {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "theShowMeKeyIsLeftControlAlone"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "onlyLeftControlAloneArmsTheHold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "aQuickControlClickNeverArmsBecauseAMouseButtonIsDown"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "theHoldHasAHalfSecondOrLessDelayBeforeItTakesTheMouse"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "releasingControlEndsTheHoldAndAnotherModifierCancelsIt"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "theConflictsDefaultIsTheSharedKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+              "function": "doubleTapControlTextEntryWarnsThatShowMeUsesControl"
+            },
+            {
               "file": "Tests/ZeusCoreTests/PointingInkTrailTests.swift",
               "function": "hoveringBeginsAStrokeAndExtendsIt"
             },

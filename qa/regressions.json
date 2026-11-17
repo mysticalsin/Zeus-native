@@ -8147,6 +8147,66 @@
         "file": "Tests/ZeusCoreTests/VoiceCatalogTests.swift",
         "function": "geminiWAVReplyHasItsHeaderStripped"
       }
+    },
+    {
+      "id": "REG-910",
+      "failure": "Show me still armed on left Command, which collides with right-Command dictation and Command shortcuts; the key must be left Control alone.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+        "function": "theShowMeKeyIsLeftControlAlone"
+      }
+    },
+    {
+      "id": "REG-911",
+      "failure": "Show me armed on right Control or on Control with another modifier, stealing the talk chord.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+        "function": "onlyLeftControlAloneArmsTheHold"
+      }
+    },
+    {
+      "id": "REG-912",
+      "failure": "A quick Control-click (a right click) was captured by the Show me overlay instead of reaching the app underneath.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+        "function": "aQuickControlClickNeverArmsBecauseAMouseButtonIsDown"
+      }
+    },
+    {
+      "id": "REG-913",
+      "failure": "Releasing Control did not end a Show me drawing, or a second modifier did not cancel it.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+        "function": "releasingControlEndsTheHoldAndAnotherModifierCancelsIt"
+      }
+    },
+    {
+      "id": "REG-914",
+      "failure": "Double-tap Control text entry gave no warning that Show me also uses Control.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-pointing",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
+        "function": "doubleTapControlTextEntryWarnsThatShowMeUsesControl"
+      }
     }
   ]
 }
