@@ -21,7 +21,7 @@ public enum UltronCloudVoice {
     /// ElevenLabs delivery for the designed or stock voice (take C): steadier, faster, fewer breaths, a little style.
     /// `use_speaker_boost` (a Bool) is added next to these by `ElevenLabsVoice.voiceSettings`.
     public static let elevenLabsSettings: [String: Double] = [
-        "stability": 0.6, "similarity_boost": 0.85, "style": 0.3, "speed": 1.0,
+        "stability": 0.6, "similarity_boost": 0.85, "style": 0.3, "speed": 1.2,
     ]
 
     /// Kokoro: a deep male voice, slowed.

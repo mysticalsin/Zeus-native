@@ -104,7 +104,7 @@ struct VoiceDesignerTests {
         #expect(ultronStability == 0.6)
         #expect((ultron["style"] as? Double ?? 0) == 0.3)
         #expect(ultron["use_speaker_boost"] as? Bool == true)
-        #expect(ultron["speed"] as? Double == 1.0)
+        #expect(ultron["speed"] as? Double == 1.2)
         let body = ElevenLabsVoice.speechBody(text: "Done.", personality: .ultron)
         #expect(body["model_id"] as? String == "eleven_flash_v2_5")
         #expect(body["text"] as? String == "Done.")
