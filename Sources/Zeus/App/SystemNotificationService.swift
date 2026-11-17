@@ -206,9 +206,9 @@ private final class UserNotificationCenterClient: NSObject, SystemNotificationCl
             registerAgentCategory()
             content.categoryIdentifier = AgentNotificationIDs.category
             if let session = payload.sessionID { content.userInfo = [AgentNotificationIDs.sessionKey: session] }
-            // A repeat of the same alert replaces the banner instead of stacking another.
-            if let key = payload.dedupeKey { identifier = AgentAlert.opaqueID(key) }
         }
+        // A repeat of the same alert or cue replaces its banner instead of stacking another.
+        if let key = payload.dedupeKey { identifier = AgentAlert.opaqueID(key) }
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         try? await center.add(request)
     }
@@ -330,10 +330,15 @@ final class SystemNotificationService {
     func openSystemSettingsAfterUserAction() { client.openSystemSettings() }
 
     /// Delivers only already-authorized, explicitly enabled cues. This path never requests access.
+    /// Cues repeat (the capture cue re-shows every 2 s, permission hints fire on each try), so the same
+    /// title and text gets one banner per dedupe window, and a later repeat replaces that banner.
     func deliver(_ cue: NotchCue) async {
-        guard isEnabled(), let payload = SystemNotificationPayload.forCue(cue) else { return }
+        guard isEnabled(), var payload = SystemNotificationPayload.forCue(cue) else { return }
         authorization = await client.authorizationStatus()
         guard authorization == .authorized, isEnabled() else { return }
+        let key = "cue|\(payload.title)|\(payload.body)"
+        guard dedupe.shouldDeliver(key, now: clock()) else { return }
+        payload.dedupeKey = key
         await client.deliver(payload)
     }
 
