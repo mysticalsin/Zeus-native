@@ -604,6 +604,8 @@ private struct SoundsPage: View {
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.octagon", title: "Failure sound", text: "A short sound when an agent turn fails.", isOn: bool("sound.failure"))
             GSDivider()
+            GSToggleRow(symbol: "play.circle", title: "Chime when an agent starts working", text: "Off by default; busy sessions start often.", isOn: bool("sound.agentStart"))
+            GSDivider()
             GSToggleRow(symbol: "waveform", title: "Ambient loop while an agent works", text: "A quiet loop under a running agent, at half volume.", isOn: bool("sound.runningLoop"))
         }
         // These switches still gate playback (ZeusSound.play), whatever style a cue above is set to.

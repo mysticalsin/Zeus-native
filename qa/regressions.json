@@ -8207,6 +8207,66 @@
         "file": "Tests/ZeusCoreTests/ShowMeKeyTests.swift",
         "function": "doubleTapControlTextEntryWarnsThatShowMeUsesControl"
       }
+    },
+    {
+      "id": "REG-930",
+      "failure": "Agent start chimed on every working turn with no way to turn it off, so busy Claude Code sessions dinged constantly.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentChimePolicyTests.swift",
+        "function": "aStartedAgentIsSilentUnlessTheStartSettingIsOn"
+      }
+    },
+    {
+      "id": "REG-931",
+      "failure": "Short automated agent turns (background task notifications) chimed done every few seconds.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentChimePolicyTests.swift",
+        "function": "aShortAutomatedTurnNeverChimesDone"
+      }
+    },
+    {
+      "id": "REG-932",
+      "failure": "Done chimes counted sessions in aggregate, so one session finishing could chime for another session's short turn.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentChimePolicyTests.swift",
+        "function": "eachSessionTimesItsOwnStretch"
+      }
+    },
+    {
+      "id": "REG-933",
+      "failure": "Several sessions finishing together played a burst of chimes instead of one.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentChimePolicyTests.swift",
+        "function": "atMostOneChimeEveryThreeSecondsAcrossSessions"
+      }
+    },
+    {
+      "id": "REG-934",
+      "failure": "An approval answered within two seconds still played the answer chime right after the approval chime.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentChimePolicyTests.swift",
+        "function": "aNewApprovalChimesAndAFastAnswerStaysSilent"
+      }
     }
   ]
 }
