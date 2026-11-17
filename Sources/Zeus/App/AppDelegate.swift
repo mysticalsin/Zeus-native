@@ -954,10 +954,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var teleprompterPrivate = false
     private var lastHidden: Bool?
-    private var lastApproval = false
+    private var chimePolicy = AgentChimePolicy()
     private var lastApprovalSeen = false
-    private var lastDone = 0
-    private var lastWorking = 0
     private var lastFailed = 0
     private var feedTicks = 0
     private var lastMeetingCheck = Date.distantPast
@@ -1057,20 +1055,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func playAgentChime(_ cue: AgentChimePolicy.Cue?) {
+        switch cue {
+        case .start: ZeusSound.play(.start)
+        case .done: ZeusSound.play(.done)
+        case .approval: ZeusSound.play(.approval)
+        case .answer: ZeusSound.play(.answer)
+        case nil: break
+        }
+    }
+
     /// Sounds on new approvals and finished agents, and keeps windows out of screen shares when asked.
     private func feedExtras() {
         let extras = ExtraPreferences.shared
         let approval = notch.model.approval != nil
-        if approval, !lastApproval { ZeusSound.play(.approval) }
-        lastApproval = approval
-        if !approval, lastApprovalSeen { ZeusSound.play(.answer) }
+        let now = Date()
+        playAgentChime(chimePolicy.approval(visible: approval, at: now))
         if approval != lastApprovalSeen { lastApprovalSeen = approval; registerShortcuts() }
-        let done = notch.model.sessions.filter { $0.status == .done }.count
-        if done > lastDone { ZeusSound.play(.done) }
-        lastDone = done
+        let startEnabled = SettingsStore.shared.bool("sound.agentStart")
+        for session in notch.model.sessions {
+            playAgentChime(chimePolicy.session(session.id, status: session.status, at: now, startEnabled: startEnabled))
+        }
+        chimePolicy.forget(keeping: Set(notch.model.sessions.map(\.id)))
         let working = notch.model.sessions.filter { $0.status == .working }.count
-        if working > lastWorking { ZeusSound.play(.start) }
-        lastWorking = working
         let failed = notch.model.sessions.filter { $0.status == .failed }.count
         if failed > lastFailed, SettingsStore.shared.bool("sound.failure") { ZeusSound.play(.failure) }
         lastFailed = failed
@@ -1081,7 +1088,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let options = SettingsStore.shared
         agentsAwake.set(options.bool("general.keepAwake") && working > 0)
         feedTicks += 1
-        let now = Date()
         if now.timeIntervalSince(lastMeetingCheck) >= 2 {
             lastMeetingCheck = now
             MeetingState.refresh(ownMicInUse: topBar.isDictating || AvatarStatus.shared.current == .listening)
