@@ -21,7 +21,7 @@ public struct MediaIslandFeature: Equatable, Sendable {
 
 public enum MediaIslandFeatures {
     /// System-wide now playing. Off until the owner turns it on.
-    /// The perl script prints the line `SystemNowPlayingAdapter` reads. Nothing launches it yet.
+    /// The perl script prints the line `SystemNowPlayingAdapter` reads. The app launches it only while the setting is on.
     public static let systemNowPlaying = MediaIslandFeature(enabled: false)
     /// Earbud overlay. Needs Bluetooth and starts off. No radio or battery read is wired.
     public static let earbudOverlay = MediaIslandFeature(enabled: false, permission: .bluetooth,
@@ -57,6 +57,13 @@ public struct SystemNowPlayingLine: Equatable, Sendable {
 }
 
 /// The perl script prints one tab-separated line: title, artist, album, 1 or 0, position, duration.
+public enum SystemNowPlayingLaunch {
+    public static let settingID = "music.systemNowPlaying"
+    public static let timeout: TimeInterval = 2
+    public static let maxOutputBytes = 4096
+    public static let executable = "/usr/bin/perl"
+}
+
 public enum SystemNowPlayingAdapter {
     public static let command = ["perl", "scripts/now-playing.pl"]
 

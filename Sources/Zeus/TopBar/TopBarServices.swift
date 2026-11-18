@@ -12,6 +12,7 @@ final class TopBarServices {
     let model: TopBarModel
     /// What the notch shows from Music, Spotify and later sources, and where a music command goes.
     let nowPlayingHub: NowPlayingHub
+    let systemNowPlaying: SystemNowPlayingFeed
     private let musicFeed: MusicPlayerFeed
     private let browserFeed: BrowserMediaFeed
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
@@ -36,12 +37,16 @@ final class TopBarServices {
     init(model: TopBarModel) {
         self.model = model
         nowPlayingHub = NowPlayingHub(model: model, ports: NowPlayingHub.livePorts(model: model))
+        systemNowPlaying = SystemNowPlayingFeed(hub: nowPlayingHub)
         musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
         browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
     }
 
     func start() {
         nowPlayingHub.attach()
+        if SettingsStore.shared.bool(SystemNowPlayingLaunch.settingID) {
+            systemNowPlaying.setEnabled(true)
+        }
         model.chooseOutputDevice = { [weak self] in self?.showOutputDevices() }
         model.requestCalendarAccess = { [weak self] in self?.requestCalendar() }
         model.refreshWeather = { [weak self] in self?.fetchWeather(force: true) }

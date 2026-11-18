@@ -18,7 +18,8 @@ public enum BoundedSubprocess {
 
     public static func run(_ executable: String, _ arguments: [String], input: Data? = nil,
                            environment: [String: String]? = nil,
-                           timeout: TimeInterval = 600, maxOutputBytes: Int = 8 * 1024 * 1024) -> Result {
+                           timeout: TimeInterval = 600, maxOutputBytes: Int = 8 * 1024 * 1024,
+                           launched: ((Process) -> Void)? = nil) -> Result {
         guard timeout.isFinite, timeout > 0, maxOutputBytes > 0 else {
             return Result(status: 125, output: "", error: "Invalid helper limits.")
         }
@@ -48,6 +49,7 @@ public enum BoundedSubprocess {
         do { try process.run() } catch {
             return Result(status: 126, output: "", error: error.localizedDescription)
         }
+        launched?(process)
         try? out.fileHandleForWriting.close()
         try? err.fileHandleForWriting.close()
         try? incoming.fileHandleForReading.close()

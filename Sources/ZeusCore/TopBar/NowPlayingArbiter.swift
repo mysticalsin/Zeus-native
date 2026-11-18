@@ -70,7 +70,7 @@ public struct NowPlayingArbiter: Equatable, Sendable {
         entries.keys.contains { source in
             switch source {
             case .player: true
-            case .browser: false
+            case .browser, .system: false
             }
         }
     }
@@ -105,6 +105,7 @@ public struct NowPlayingArbiter: Equatable, Sendable {
     }
 
     private static func ranks(_ a: (key: NowPlayingSource, value: Entry), before b: (key: NowPlayingSource, value: Entry)) -> Bool {
+        if Self.isSystem(a.key) != Self.isSystem(b.key) { return !Self.isSystem(a.key) }
         // The pool is all playing or all not, so one entry says which order applies.
         if !a.value.isPlaying, a.value.lastPlayingAt != b.value.lastPlayingAt { return a.value.lastPlayingAt > b.value.lastPlayingAt }
         if a.value.startedAt != b.value.startedAt { return a.value.startedAt > b.value.startedAt }
@@ -121,6 +122,12 @@ public struct NowPlayingArbiter: Equatable, Sendable {
             case .spotify: (1, 0, "")
             }
         case .browser(let key): (2, key.tabID, key.documentID)
+        case .system: (3, 0, "")
         }
+    }
+
+    private static func isSystem(_ source: NowPlayingSource) -> Bool {
+        if case .system = source { return true }
+        return false
     }
 }

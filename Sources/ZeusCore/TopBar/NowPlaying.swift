@@ -79,6 +79,7 @@ public struct NowPlaying: Equatable, Sendable {
         switch source {
         case .player: lyricsHold = askable
         case .browser: lyricsHold = askable && duration > 0
+        case .system: lyricsHold = false
         }
         if !lyricsHold { result.remove(.lyrics) }
         return result

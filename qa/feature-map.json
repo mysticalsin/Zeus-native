@@ -763,6 +763,14 @@
       "scope": "Actual NowPlayingHub and TopBarModel with recording closures for every effect: no player, browser, Apple Event, artwork fetch or permission, and no device acceptance."
     },
     {
+      "id": "native-SystemNowPlayingFeedTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "SystemNowPlayingFeedTests",
+      "file": "Tests/ZeusAppTests/SystemNowPlayingFeedTests.swift",
+      "scope": "The real hub and top-bar model fed a fake helper line. One case starts /bin/sleep and checks stop() terminates it. The perl helper is not started."
+    },
+    {
       "id": "native-LyricTimingWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8033,6 +8041,25 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.system-now-playing",
+          "check": "native-SystemNowPlayingFeedTests",
+          "acceptance": "A parsed helper line becomes the system source on the real model, and turning the feed off clears it. The live reader uses the two second timeout and the four kilobyte cap.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SystemNowPlayingFeedTests.swift",
+              "function": "aParsedLineReachesTheModelAndStoppingClearsIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNowPlayingFeedTests.swift",
+              "function": "theRealReaderUsesTheBoundedHelperLimits"
+            },
+            {
+              "file": "Tests/ZeusAppTests/SystemNowPlayingFeedTests.swift",
+              "function": "stopTerminatesTheHelper"
             }
           ]
         },
