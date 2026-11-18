@@ -20,10 +20,17 @@ struct MediaIslandFeatureTests {
         #expect(arbiter.shown(follow: .any)?.playing.source == .player(.music))
     }
 
-    @Test func systemNowPlayingIsOffUntilAskedAndParsesThePerlLine() {
+    @Test func systemNowPlayingIsOffUntilAskedAndParsesThePerlLine() throws {
         #expect(MediaIslandFeatures.systemNowPlaying.enabled == false)
         #expect(MediaIslandFeatures.systemNowPlaying.permission == nil)
         #expect(SystemNowPlayingAdapter.command.last == "now-playing.pl")
+        let script = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("scripts/now-playing.pl"), encoding: .utf8)
+        #expect(script.contains("DynaLoader"))
+        #expect(script.contains("MediaRemote.framework/MediaRemote"))
+        #expect(script.contains("MRMediaRemoteGetNowPlayingInfo"))
+        #expect(!script.contains("ZEUS_NOW_TITLE"))
         let line = SystemNowPlayingAdapter.parse("Night Drive\tAda\tCoast\t1\t12.5\t180\n")
         #expect(line == SystemNowPlayingLine(title: "Night Drive", artist: "Ada", album: "Coast", playing: true, position: 12.5, duration: 180))
         #expect(SystemNowPlayingAdapter.parse("nope") == nil)

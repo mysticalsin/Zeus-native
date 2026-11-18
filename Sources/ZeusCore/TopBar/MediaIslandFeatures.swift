@@ -21,7 +21,7 @@ public struct MediaIslandFeature: Equatable, Sendable {
 
 public enum MediaIslandFeatures {
     /// System-wide now playing. Off until the owner turns it on.
-    /// The perl script prints the line `SystemNowPlayingAdapter` reads. The app launches it only while the setting is on.
+    /// The perl script loads MediaRemote and prints the line `SystemNowPlayingAdapter` reads. The app launches it only while the setting is on.
     public static let systemNowPlaying = MediaIslandFeature(enabled: false)
     /// Earbud overlay. Needs Bluetooth and starts off. The notch shows a connected audio device, then dismisses it.
     public static let earbudOverlay = MediaIslandFeature(enabled: false, permission: .bluetooth,
