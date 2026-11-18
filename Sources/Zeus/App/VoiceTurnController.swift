@@ -71,6 +71,8 @@ final class VoiceTurnController {
     var seams = Seams()
     /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
     private var talkSession: Int?
+    /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
+    private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
@@ -205,6 +207,9 @@ final class VoiceTurnController {
 
     @discardableResult
     func press() -> Bool {
+        // A press while a turn is live (`zeus listen`, a second key) must not start a second capture:
+        // a failed start would strip the live turn of its capture-failure handler and session.
+        guard !listening else { return false }
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
@@ -227,7 +232,11 @@ final class VoiceTurnController {
         speech.recordsSamples = turnEngine != nil
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
         Self.applyChosenMicrophone(to: speech)
+        captureFailures.reset()
+        let failures = captureFailures
         speech.onCaptureFailure = { [weak self] session, origin, failure in
+            // Recorded on the calling thread, so a release before the main-actor hop below still sees it.
+            failures.record(session: session, failure: failure)
             Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
         }
         do {
@@ -263,6 +272,11 @@ final class VoiceTurnController {
 
     func release() {
         guard listening else { return }
+        // Capture already gave up for this turn: end it as a failure and do not read or send the partial.
+        if let session = talkSession, let failure = captureFailures.failure(for: session) {
+            handleCaptureFailure(session: session, origin: 0, failure: failure)
+            return
+        }
         listening = false
         speech.onCaptureFailure = nil
         talkSession = nil
@@ -295,6 +309,8 @@ final class VoiceTurnController {
     func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
         guard listening, CaptureFailureHint.owns(session: session, active: talkSession) else { return }
         guard endListeningWithoutSending() else { return }
+        // A flapping microphone must not reopen another hands-free turn.
+        wakeConversationActive = false
         VoiceLog.log("listen", "capture failed (\(failure)): the turn ended without sending")
         ZeusSound.play(.voiceError)
         notch.topBar?.show(.hint(CaptureFailureHint.text(for: failure)))
@@ -399,6 +415,7 @@ final class VoiceTurnController {
 
     /// `zeus listen`: a hands-free voice turn of up to `seconds`, as if the talk key were held.
     func listenTurn(seconds: Double) async -> TurnResult {
+        guard !listening else { return TurnResult(error: "Zeus is already listening.") }
         guard press() else {
             return TurnResult(error: "Zeus can't hear yet: microphone or speech recognition access is missing.")
         }

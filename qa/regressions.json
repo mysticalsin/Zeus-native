@@ -8409,7 +8409,20 @@
       "check": "native-CaptureFailureEndsTurnTests",
       "guard": {
         "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
-        "function": "aTalkTurnEndsAndShowsTheHintWhenCaptureGivesUp"
+        "function": "aFailureDeliveredByTheSpeechInputEndsALivePressTurn"
+      }
+    },
+    {
+      "id": "REG-961",
+      "failure": "Dictation never wired the capture-failure handler, so a microphone that kept changing left a toggled dictation recording nothing with no message; and a talk release that beat the failure's main-actor hop still sent the half-heard words.",
+      "features": [
+        "F01",
+        "F11"
+      ],
+      "check": "native-CaptureFailureEndsTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+        "function": "aFailureDeliveredByTheSpeechInputEndsALiveDictation"
       }
     }
 ]

@@ -916,6 +916,7 @@ final class DictationController {
 
     /// Closes a visible preview card through its own Cancel path, which resumes its review.
     private static func dismissPreviewCard() {
+        // `NSApp` is only nil without a running app (tests, headless): nothing to dismiss then.
         for window in NSApp?.windows ?? [] {
             if let panel = window as? PreviewPanel, panel.isVisible { _ = panel.onKey(.cancel) }
         }
