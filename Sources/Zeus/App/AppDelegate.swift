@@ -984,7 +984,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard SettingsStore.shared.bool("shortcut.answerKeys"), notch.model.approval != nil else { return [] }
         let mods = UInt32(controlKey | optionKey)
         func answer(_ verdict: HookDecision.Verdict) -> () -> Void {
-            { [weak self] in self?.notch.model.approval?.resolve(verdict) }
+            { [weak self] in
+                guard let approval = self?.notch.model.approval else { return }
+                if verdict == .allow, !ApprovalPolicy.canApprove(risk: approval.risk, by: .shortcut) { return }
+                approval.resolve(verdict)
+            }
         }
         return [(UInt32(kVK_ANSI_Y), mods, answer(.allow)), (UInt32(kVK_ANSI_N), mods, answer(.deny)), (UInt32(kVK_ANSI_O), mods, answer(.ask))]
     }

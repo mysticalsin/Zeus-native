@@ -508,6 +508,12 @@ private struct ApprovalBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
+            if !approval.position.isEmpty {
+                Text(approval.position)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .accessibilityLabel("Request \(approval.position)")
+            }
             if MeetingState.hideDetails, approval.detail?.hasOwnActions == true {
                 // The rich detail (questions, plans) is the content itself, so it stays out of view; Deny remains.
                 HStack(spacing: 8) {

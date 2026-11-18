@@ -55,6 +55,8 @@ final class NotchModel {
         var detail: ApprovalDetail?
         /// The agent session, for "Allow this whole chat". Nil hides that button.
         var sessionID: String?
+        /// "1 of N" while other requests wait behind this card.
+        var position: String = ""
         /// Trusts the session, then approves (set only when the request is safe enough to offer it).
         var trustChat: (@MainActor () -> Void)?
         var resolve: @MainActor (HookDecision.Verdict) -> Void

@@ -98,6 +98,7 @@ final class AgentEventServer {
             }
             // A chat the person trusted ("Allow this whole chat") runs without a card, unless it is risky.
             if TrustedChatStore.shared.autoApproves(session: sessionID, tool: event.tool, input: event.input, risk: risk) {
+                ApprovalAuditLog.recordTrustedApproval(session: sessionID, command: Self.command(tool: event.tool, input: event.input))
                 notch.upsertSession(id: sessionID, agent: agent, project: project,
                                     task: Self.describe(tool: event.tool ?? "Tool", input: event.input), status: .working)
                 return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .allow))

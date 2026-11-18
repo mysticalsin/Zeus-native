@@ -253,18 +253,34 @@ final class NotchController {
                          onTimeout: HookDecision.Verdict = .deny,
                          detail: ApprovalDetail? = nil,
                          trust: (session: String, onTrust: @MainActor () -> Void)? = nil) async -> HookDecision.Verdict {
-        // A cancelled caller (`zeus cancel`, Esc) must not spin here: sleep throws at once when cancelled.
-        while model.approval != nil, !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(200))
-        }
         if Task.isCancelled { return .deny }
+        let id = UUID().uuidString
+        let arrived = Date()
+        let ticket = ApprovalTicket(id: id, arrived: arrived,
+                                    helperDeadline: arrived.addingTimeInterval(ApprovalQueueState.helperDeadline),
+                                    risk: risk)
+        let turn = await ApprovalGate.shared.enqueue(ticket)
+        let position: String
+        switch turn {
+        case .expired:
+            return .deny
+        case .show(let place):
+            position = place
+        case .waiting:
+            await ApprovalGate.shared.waitUntilFront(id)
+            position = await ApprovalGate.shared.position(of: id) ?? ""
+        }
+        if Task.isCancelled {
+            _ = await ApprovalGate.shared.clearFront()
+            return .deny
+        }
         return await withCheckedContinuation { continuation in
-            let id = UUID().uuidString
             var finished = false
             let finish: @MainActor (HookDecision.Verdict) -> Void = { [weak self] verdict in
                 guard !finished else { return }
                 finished = true
                 if self?.model.approval?.id == id { self?.model.approval = nil }
+                Task { await ApprovalGate.shared.clearFront() }
                 continuation.resume(returning: verdict)
             }
             let seconds = Double(timeout.components.seconds)
@@ -274,13 +290,19 @@ final class NotchController {
             case .deny: "then it's denied"
             }
             var trustChat: (@MainActor () -> Void)?
-            if let onTrust = trust?.onTrust {
-                trustChat = { onTrust(); finish(.allow) }
+            if let onTrust = trust?.onTrust, let session = trust?.session {
+                trustChat = {
+                    guard ApprovalPolicy.canApprove(risk: risk, by: .trustChat) else { return }
+                    ApprovalAuditLog.recordTrustedApproval(session: session, command: command)
+                    onTrust()
+                    finish(.allow)
+                }
             }
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
                 deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
+                position: position,
                 trustChat: trustChat,
                 resolve: finish
             )
@@ -295,7 +317,7 @@ final class NotchController {
             setIgnoresMouse(false)
             Task { @MainActor in
                 try? await Task.sleep(for: timeout)
-                finish(onTimeout)
+                finish(ApprovalPolicy.timeoutVerdict(risk: risk, requested: onTimeout))
             }
         }
     }
