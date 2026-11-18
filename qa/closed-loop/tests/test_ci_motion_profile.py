@@ -173,6 +173,31 @@ class CIMotionProfileTests(unittest.TestCase):
             self.assertIn("restored=true", text)
             self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", text)
 
+    def test_host_applies_harness_reduced_motion_before_loading_tests(self):
+        repo = Path(__file__).resolve().parents[3]
+        host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
+        key = 'environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1"'
+        load = host.index("dlopen(args[2]")
+        self.assertLess(host.index(key), load)
+        marker = host.index(f'environment["{profile.MARKER}"] == "1"')
+        workspace = host.index("!NSWorkspace.shared.accessibilityDisplayShouldReduceMotion")
+        self.assertLess(host.index(key), marker)
+        self.assertLess(marker, workspace)
+        self.assertLess(workspace, load)
+        harness_body = host[host.index(key):marker]
+        self.assertNotIn("NSWorkspace", harness_body)
+        self.assertNotIn("defaults", harness_body)
+        self.assertNotIn("universalaccess", harness_body)
+        self.assertIn("harness reduced-motion profile applied before loading tests", harness_body)
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        reduced = motion[motion.index("static var reduced"):motion.index("static let feedbackDuration")]
+        self.assertIn("ZEUS_HARNESS_REDUCE_MOTION", reduced)
+        self.assertIn("#if DEBUG", reduced)
+        self.assertIn("NSWorkspace.shared.accessibilityDisplayShouldReduceMotion", reduced)
+        film = (repo / "Sources/Zeus/Onboarding/OnboardingVisuals.swift").read_text()
+        self.assertIn("motionReduction || Motion.reduced", film)
+        self.assertIn("let systemReduction = Motion.reduced", film)
+
     def test_fresh_host_requires_real_normal_motion_before_loading_tests(self):
         repo = Path(__file__).resolve().parents[3]
         host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
