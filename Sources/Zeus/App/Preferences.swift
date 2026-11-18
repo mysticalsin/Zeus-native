@@ -139,4 +139,21 @@ final class MotionCenter {
     func refresh() {
         reduced = Motion.read()
     }
+
+    /// Test seam. Sets the published value without touching System Settings,
+    /// `com.apple.universalaccess`, or `defaults`. Production code never calls it.
+    #if DEBUG
+    func testingSetReduced(_ value: Bool) {
+        reduced = value
+    }
+    #endif
+}
+
+/// A body that reads `Motion.reduced` publishes the value it applied.
+/// The macOS live-update test reads this after flipping `MotionCenter`.
+struct MotionLiveSampleKey: PreferenceKey {
+    static let defaultValue: Bool? = nil
+    static func reduce(value: inout Bool?, nextValue: () -> Bool?) {
+        value = nextValue() ?? value
+    }
 }
