@@ -103,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         equaliser?.shutdown()
         topBarServices.systemNowPlaying.stop()
         topBarServices.receiverNames.setEnabled(false)
+        topBarServices.earbudOverlay.stop()
         // Tiling removes its key tap, observers and overlays. It never moves a window on the way out. The controller
         // is not even made when the service is denied.
         if on(.tiling) { TilingController.shared.stop() }
@@ -1016,6 +1017,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "audio.equaliser": self?.equaliser?.setSwitch(store.bool(id))
             case SystemNowPlayingLaunch.settingID: self?.topBarServices.systemNowPlaying.setEnabled(store.bool(id))
             case ReceiverCatalog.settingID: self?.topBarServices.receiverNames.setEnabled(store.bool(id))
+            case EarbudOverlayRule.settingID: self?.topBarServices.earbudOverlay.setEnabled(store.bool(id))
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
             case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break

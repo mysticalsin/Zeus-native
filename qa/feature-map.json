@@ -779,6 +779,14 @@
       "scope": "Receiver names recorded without a Bonjour search, then turned into output-menu rows. No network and no permission prompt."
     },
     {
+      "id": "native-EarbudOverlayTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "EarbudOverlayTests",
+      "file": "Tests/ZeusAppTests/EarbudOverlayTests.swift",
+      "scope": "The notch model fed a fake connected audio device. Bluetooth is not opened and no radio is used."
+    },
+    {
       "id": "native-LyricTimingWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8090,6 +8098,28 @@
             {
               "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
               "function": "bothReceiverServiceTypesBecomeMenuNames"
+            }
+          ]
+        },
+        {
+          "id": "F13.earbud-overlay",
+          "check": "native-EarbudOverlayTests",
+          "acceptance": "A connected audio device is stored on the notch model with its in-range battery values, and turning the overlay off clears it. Bluetooth is not opened.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/EarbudOverlayTests.swift",
+              "function": "aFoundDeviceReachesTheNotchModelAndStoppingClearsIt"
+            }
+          ]
+        },
+        {
+          "id": "F13.earbud-overlay-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Only a connected audio device is shown. Battery values outside 0 to 100 are dropped. The overlay is gone at eight seconds.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
+              "function": "aConnectedAudioDeviceShowsItsBatteryUntilTheOverlayTimesOut"
             }
           ]
         },

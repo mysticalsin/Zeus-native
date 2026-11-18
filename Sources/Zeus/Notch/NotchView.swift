@@ -379,6 +379,12 @@ struct NotchView: View {
             }
 
             content
+                .overlay(alignment: .bottom) {
+                    if let reading = topBar?.earbud, model.presentation == .panel {
+                        EarbudOverlayView(reading: reading)
+                            .padding(.bottom, 8)
+                    }
+                }
                 .padding(.horizontal, glanceOpen ? shoulder : shoulder + (model.presentation == .panel ? 18 : 14))
                 // Laid out at the final size and revealed by the growing outline, like Glance
                 // (laying it out at the in-between size squeezed the cards and cut their text).

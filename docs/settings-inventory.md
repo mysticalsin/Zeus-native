@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 206 of 206 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 206 in scope). 195 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 207 of 207 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 207 in scope). 196 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 155.
+**Before this round:** has 19, partial 27, missing 156.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -98,6 +98,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Music | Collapse when paused | toggle | off | The player folds to one line while nothing is playing. | missing | live | `music.collapseOnPause` | Zeus addition. Off by default. Uses the existing page motion, and Reduce Motion changes the layout at once. |
 | Music | Show what this Mac is playing | toggle | off | Reads the current audio through a local helper. It stays behind a player that is already playing. | missing | live | `music.systemNowPlaying` | Zeus addition. Off by default. The helper is killed when this is turned off or Zeus quits. |
 | Music | Show receiver names | toggle | off | Lists receivers found on the local network in the output menu. | missing | live | `music.receiverNames` | Zeus addition. Off by default. The search stops when this is turned off. |
+| Music | Earbud overlay | toggle | off | Shows a connected audio device inside the notch, then dismisses it. | missing | live | `music.earbudOverlay` | Zeus addition. Off by default. Needs Bluetooth. The public device API does not expose battery, so a percentage appears only when one was supplied. |
 | Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
 | Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 

@@ -23,7 +23,7 @@ public enum MediaIslandFeatures {
     /// System-wide now playing. Off until the owner turns it on.
     /// The perl script prints the line `SystemNowPlayingAdapter` reads. The app launches it only while the setting is on.
     public static let systemNowPlaying = MediaIslandFeature(enabled: false)
-    /// Earbud overlay. Needs Bluetooth and starts off. No radio or battery read is wired.
+    /// Earbud overlay. Needs Bluetooth and starts off. The notch shows a connected audio device, then dismisses it.
     public static let earbudOverlay = MediaIslandFeature(enabled: false, permission: .bluetooth,
                                                           usageStringKey: "NSBluetoothAlwaysUsageDescription")
     /// Lock-screen player contract: a private window-server space that collects no input.
@@ -79,6 +79,42 @@ public enum LockScreenPlayerSpace {
     public static let isPrivateWindowServer = true
     /// The space would show the player and not collect clicks or typing. Nothing is shown.
     public static let collectsInput = false
+}
+
+public struct EarbudReading: Equatable, Sendable {
+    public var name: String
+    public var left: Int?
+    public var right: Int?
+    public var casePercent: Int?
+
+    public init(name: String, left: Int?, right: Int?, casePercent: Int?) {
+        self.name = name
+        self.left = left
+        self.right = right
+        self.casePercent = casePercent
+    }
+}
+
+public enum EarbudOverlayRule {
+    public static let settingID = "music.earbudOverlay"
+    public static let visibleFor: TimeInterval = 8
+
+    /// A connected audio device. A battery value outside 0...100 is treated as not exposed.
+    public static func reading(name: String, audio: Bool, connected: Bool, left: Int?, right: Int?, casePercent: Int?) -> EarbudReading? {
+        guard audio, connected else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        func level(_ value: Int?) -> Int? {
+            guard let value, (0...100).contains(value) else { return nil }
+            return value
+        }
+        return EarbudReading(name: trimmed, left: level(left), right: level(right), casePercent: level(casePercent))
+    }
+
+    public static func visible(reading: EarbudReading?, enabled: Bool, now: Date, shownAt: Date?) -> Bool {
+        guard enabled, reading != nil, let shownAt else { return false }
+        return now < shownAt.addingTimeInterval(visibleFor)
+    }
 }
 
 public enum FocusNameReader {

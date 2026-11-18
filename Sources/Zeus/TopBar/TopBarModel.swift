@@ -127,6 +127,9 @@ final class TopBarModel {
 
     // MARK: Live data
 
+    /// A connected audio device shown inside the notch, then cleared when the overlay times out.
+    var earbud: EarbudReading?
+    var earbudShownAt: Date?
     var nowPlaying: NowPlaying? {
         didSet {
             guard oldValue?.isPlaying != nowPlaying?.isPlaying else { return }
