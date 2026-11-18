@@ -541,6 +541,7 @@ final class DictationController {
         removeEscape()
         // A cancelled turn must not leave its preview card waiting on screen.
         Self.dismissPreviewCard()
+        speech.onCaptureFailure = nil
         speech.cancel()
         speech.onSamples = nil
         turnStream?.cancel()
@@ -580,6 +581,11 @@ final class DictationController {
         speech.recognizes = appleOnDevice
         speech.recordsSamples = true
         speech.deviceUID = settings.microphoneUID
+        speech.onCaptureFailure = { [weak self] session, origin, failure in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
+            }
+        }
         useLocal = local
         targetApp = NSWorkspace.shared.frontmostApplication
         let insertionField = insertionTracker.beginTurn()
@@ -605,6 +611,7 @@ final class DictationController {
             turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
                                                selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
         } catch {
+            speech.onCaptureFailure = nil
             ownership.invalidate()
             insertionTracker.invalidate()
             turnStream?.cancel()
@@ -735,6 +742,23 @@ final class DictationController {
         guard flow.isActive else { return }
         apply(.cancelRequested)
         topBar.show(.dictation("Dictation cancelled"))
+    }
+
+    /// The microphone kept changing and capture gave up under a listening turn: end it and say why.
+    /// Only the turn that opened this speech session may be ended; a late callback is dropped.
+    func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        guard false else { return }
+        VoiceLog.log("listen", "dictation capture failed (\(failure)): the turn ended")
+        apply(.cancelRequested)
+        topBar.show(.hint(CaptureFailureHint.text(for: failure)))
+    }
+
+    /// Test seam: opens a listening turn on `session` without the microphone. Returns the turn.
+    func beginListeningForTesting(session: Int) -> UInt64 {
+        let turn = ownership.beginTurn()
+        ownership.bind(speechSessionID: session, generation: turn)
+        apply(.micOpened(turn: turn))
+        return turn
     }
 
     func finish() {
@@ -888,6 +912,7 @@ final class DictationController {
         // A ready local engine makes the final text, so release does not wait for Apple's second pass.
         let live = await speech.stop(waitForFinal: !(context.useLocal && context.engine != nil))
         guard isCurrent() else { return .init(text: "", engine: .apple, samples: []) }
+        speech.onCaptureFailure = nil
         let samples = speech.takeSamples()
         speech.onSamples = nil
         turnStream = nil

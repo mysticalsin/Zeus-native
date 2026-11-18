@@ -52,6 +52,8 @@ final class VoiceTurnController {
     private var listening = false {
         didSet { if oldValue, !listening { onListeningEnded?() } }
     }
+    /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
+    private var talkSession: Int?
     private var screenshotsTask: Task<[ScreenShot], Never>?
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
@@ -211,9 +213,13 @@ final class VoiceTurnController {
         speech.recordsSamples = turnEngine != nil
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
         Self.applyChosenMicrophone(to: speech)
+        speech.onCaptureFailure = { [weak self] session, origin, failure in
+            Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
+        }
         do {
-            try speech.start()
+            talkSession = try speech.start()
         } catch {
+            speech.onCaptureFailure = nil
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -244,6 +250,8 @@ final class VoiceTurnController {
     func release() {
         guard listening else { return }
         listening = false
+        speech.onCaptureFailure = nil
+        talkSession = nil
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
@@ -265,8 +273,33 @@ final class VoiceTurnController {
 
     /// The talk keys became another shortcut while held (⌃⌥C opens Chat): stop listening and send nothing.
     func cancelListening() {
-        guard listening else { return }
+        guard endListeningWithoutSending() else { return }
+        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+    }
+
+    /// The microphone kept changing (AirPods switching) and capture gave up: end the turn, send nothing, say why.
+    func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        guard false else { return }
+        guard endListeningWithoutSending() else { return }
+        VoiceLog.log("listen", "capture failed (\(failure)): the turn ended without sending")
+        ZeusSound.play(.voiceError)
+        notch.topBar?.show(.hint(CaptureFailureHint.text(for: failure)))
+    }
+
+    /// Test seam: marks a turn as listening on `session` without opening the microphone.
+    func beginListeningForTesting(session: Int) {
+        listening = true
+        talkSession = session
+    }
+
+    var isListeningForTesting: Bool { listening }
+
+    @discardableResult
+    private func endListeningWithoutSending() -> Bool {
+        guard listening else { return false }
         listening = false
+        speech.onCaptureFailure = nil
+        talkSession = nil
         handsFreeTask?.cancel()
         handsFreeTask = nil
         ahead.cancel()
@@ -281,7 +314,7 @@ final class VoiceTurnController {
         buddy.model.audioLevel = nil
         buddy.model.captionVisible = false
         buddy.idle()
-        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+        return true
     }
 
     /// "Hey Zeus, open Spotify": the request already heard by the wake-word listener runs as a
