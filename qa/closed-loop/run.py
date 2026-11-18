@@ -343,7 +343,7 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         row.update(exit_code=code, duration_seconds=seconds)
         if kind == "portable":
             structured = swift_testing_xunit_path(xunit)
-            count, suites, functions = swift_structured_results(structured.read_text())
+            count, suites, functions = swift_structured_results(structured.read_text(), code, log.read_text())
         else:
             count, suites, functions = (python_summary if kind in {"selftests", "release-mocks"} else swift_summary)(log.read_text(), code)
         row.update(tests=count, suites=suites, passed_functions=functions)

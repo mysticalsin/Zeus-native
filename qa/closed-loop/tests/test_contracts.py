@@ -181,18 +181,18 @@ class EvidenceContractTests(unittest.TestCase):
   </testsuite>
 </testsuites>
 """
-        count, suites, functions = c.swift_structured_results(text)
+        count, suites, functions = c.swift_structured_results(text, 0)
         self.assertEqual((count, suites), (2, 1))
         self.assertEqual(functions, ["holdStartsImmediately", "oneXDisplayWithANegativeOrigin"])
         failed = text.replace('name="holdStartsImmediately()" time="0.001" />',
                               'name="holdStartsImmediately()" time="0.001"><failure message="no">x</failure></testcase>')
         with self.assertRaises(c.Invalid):
-            c.swift_structured_results(failed)
+            c.swift_structured_results(failed, 0)
         skipped = text.replace(
             '<testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />',
             '<testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001"><skipped /></testcase>')
         with self.assertRaises(c.Invalid):
-            c.swift_structured_results(skipped)
+            c.swift_structured_results(skipped, 0)
 
     def test_structured_results_fail_closed_when_a_required_case_is_missing(self):
         text = """<?xml version="1.0" encoding="UTF-8"?>
@@ -202,7 +202,7 @@ class EvidenceContractTests(unittest.TestCase):
   </testsuite>
 </testsuites>
 """
-        _, _, functions = c.swift_structured_results(text)
+        _, _, functions = c.swift_structured_results(text, 0)
         run = (c.ROOT / "qa/closed-loop/run.py").read_text()
         gate = (c.ROOT / "qa/closed-loop/gate.py").read_text()
         self.assertIn("--xunit-output", run)

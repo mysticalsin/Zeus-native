@@ -318,7 +318,7 @@ def main():
             row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log),
                    "results": str(structured)}
             try:
-                count, suites, functions = swift_structured_results(structured.read_text())
+                count, suites, functions = swift_structured_results(structured.read_text(), result.returncode, log.read_text())
                 row.update(tests=count, suites=suites, passed_functions=functions)
             except (Invalid, OSError) as error:
                 row["structured_error"] = str(error)

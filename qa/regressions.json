@@ -4402,6 +4402,18 @@
         "file": "qa/closed-loop/tests/test_contracts.py",
         "function": "test_structured_results_fail_closed_when_a_required_case_is_missing"
       }
+    },
+    {
+      "id": "REG-418",
+      "failure": "A Swift Testing xUnit file could pass the portable gate when the process exited nonzero, the text log reported a failure, a testsuite failures/errors/skipped count was nonzero or not an integer, or the file contained a doctype, an entity, or more than 32 MiB. Those signals now fail closed. The native-fixture check kind still reads the text log; a torn native log can drop a required case, and that limitation is left in place.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_structured_results_reject_unsafe_xml_and_nonzero_signals"
+      }
     }
   ]
 }

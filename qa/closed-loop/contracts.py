@@ -281,12 +281,32 @@ def swift_testing_xunit_path(requested):
     return requested.with_name(f"{requested.stem}-swift-testing{requested.suffix}")
 
 
-def swift_structured_results(text):
-    """Per-test Swift Testing xUnit. Identity comes from each testcase, not the summary line."""
+XUNIT_MAX_BYTES = 32 * 1024 * 1024
+
+
+def swift_structured_results(text, returncode, log=""):
+    """Per-test Swift Testing xUnit. Identity comes from each testcase, not the summary line.
+
+    The process exit code and the text log are separate signals. Either one can
+    reject a document whose testcases look clean.
+    """
+    require(type(returncode) is int and returncode == 0, f"command exited {returncode}")
+    require(not re.search(r"(?:✘|Test run .* failed|[1-9]\d* failures?)", log),
+            "failure diagnostic in otherwise passing log")
+    encoded = text.encode("utf-8")
+    require(len(encoded) <= XUNIT_MAX_BYTES, "Swift Testing xUnit exceeds 32 MiB")
+    require(not re.search(r"<!DOCTYPE|<!ENTITY", text, re.IGNORECASE),
+            "Swift Testing xUnit contains a doctype or entity")
     try:
         root = ET.fromstring(text)
     except ET.ParseError as error:
         raise Invalid(f"Swift Testing xUnit is not XML: {error}") from error
+    for suite in root.iter("testsuite"):
+        for attr in ("failures", "errors", "skipped"):
+            raw = suite.get(attr)
+            require(raw is not None and re.fullmatch(r"[0-9]+", raw),
+                    f"Swift Testing xUnit {attr} is not an integer")
+            require(int(raw) == 0, f"Swift Testing xUnit {attr} is {raw}")
     cases = list(root.iter("testcase"))
     require(cases, "Swift Testing xUnit has no test cases")
     failed = []
