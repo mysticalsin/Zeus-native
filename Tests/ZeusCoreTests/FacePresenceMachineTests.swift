@@ -39,6 +39,13 @@ struct FacePresenceMachineTests {
     static func enrolling() -> Machine {
         var machine = Machine()
         _ = machine.handle(switchOn(faces: 0))
+        _ = machine.handle(.enroll)
+        return machine
+    }
+
+    static func awaitingEnrollConfirm() -> Machine {
+        var machine = Machine()
+        _ = machine.handle(switchOn(faces: 0))
         return machine
     }
 
@@ -66,7 +73,8 @@ struct FacePresenceMachineTests {
         var off = Machine()
         _ = off.handle(.launch(storedOn: false))
         var states: [(String, Machine)] = [
-            ("off", off), ("needsCameraConsent", consent), ("enrolling", enrolling()), ("watching", watching()),
+            ("off", off), ("needsCameraConsent", consent), ("needsEnrollmentConfirm", awaitingEnrollConfirm()),
+            ("enrolling", enrolling()), ("watching", watching()),
             ("present", present()), ("away", away()), ("unavailable", unavailable),
         ]
         for reason in [Machine.PauseReason.launch, .screenLocked, .asleep, .lockedByZeus, .noFace, .zeusCapture] {
@@ -149,13 +157,14 @@ struct FacePresenceMachineTests {
         #expect(machine.wantsCamera)
     }
 
-    @Test func switchOnWithNoFacesStartsEnrolling() {
+    @Test func switchOnWithNoFacesWaitsForConfirm() {
         var machine = Machine()
         let effects = machine.handle(Self.switchOn(faces: 0))
-        #expect(machine.state == .enrolling(token: 1))
-        #expect(effects == [.beginEnrollment(token: 1)])
-        #expect(machine.wantsCamera)
+        #expect(machine.state == .needsEnrollmentConfirm)
+        #expect(effects.isEmpty)
+        #expect(!machine.wantsCamera)
         #expect(!machine.wantsTicks)
+        #expect(machine.canEnroll)
     }
 
     @Test func switchOnWithFacesStartsWatching() {
@@ -177,8 +186,8 @@ struct FacePresenceMachineTests {
         var none = Machine()
         _ = none.handle(Self.switchOn(.denied, faces: 0))
         let second = none.handle(.consentAnswered(granted: true, enabledFaces: 0, uptime: 140))
-        #expect(none.state == .enrolling(token: 1))
-        #expect(second == [.beginEnrollment(token: 1)])
+        #expect(none.state == .needsEnrollmentConfirm)
+        #expect(second.isEmpty)
     }
 
     @Test func consentRefusedStaysWaitingAndDoesNothing() {
@@ -273,7 +282,7 @@ struct FacePresenceMachineTests {
     }
 
     @Test func enrollIsIgnoredEverywhereElse() {
-        for (label, start) in Self.everyState() where !["watching", "present", "away"].contains(label) {
+        for (label, start) in Self.everyState() where !["watching", "present", "away", "needsEnrollmentConfirm"].contains(label) {
             var machine = start
             let before = machine.state
             let effects = machine.handle(.enroll)

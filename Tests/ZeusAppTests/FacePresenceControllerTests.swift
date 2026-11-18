@@ -213,12 +213,15 @@ struct FacePresenceControllerTests {
         #expect(rig.source.starts == 0)
     }
 
-    @Test func switchOnWithNoFacesStartsEnrolling() {
+    @Test func switchOnWithNoFacesWaitsUntilEnrollIsPressed() {
         let rig = Rig(); defer { rig.cleanUp() }
         rig.turnOn()
+        #expect(rig.controller.machine.state == .needsEnrollmentConfirm)
+        #expect(rig.source.starts == 0)
+        #expect(rig.controller.status().word == "Confirm")
+        rig.controller.enroll()
         #expect(rig.controller.machine.state == .enrolling(token: 1))
         #expect(rig.source.starts == 1)
-        #expect(rig.controller.status().word == "Enrolling")
     }
 
     @Test func switchOnWithoutTheEventFreeLockIsUnavailableAndStartsNothing() {
