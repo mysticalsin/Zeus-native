@@ -118,6 +118,86 @@ class CIMotionProfileTests(unittest.TestCase):
                     self.assertEqual(profile.main([]), native_code or 1)
                     self.assertIn("restored=false", output.getvalue())
 
+    def test_harness_injects_reduced_motion_without_touching_defaults(self):
+        cases = [
+            ("Linux", {}),
+            ("Darwin", {"GITHUB_ACTIONS": "false"}),
+            ("Darwin", {"RUNNER_ENVIRONMENT": "self-hosted"}),
+            ("Darwin", {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted"}),
+        ]
+        for system, environment in cases:
+            with self.subTest(system=system, environment=environment):
+                fixture = DefaultsFixture(True)
+                observed = {}
+
+                def native(arguments, observed=observed):
+                    observed["arguments"] = list(arguments)
+                    observed["reduced"] = os.environ.get("ZEUS_HARNESS_REDUCE_MOTION")
+                    observed["marker"] = os.environ.get(profile.MARKER)
+                    return 7
+
+                with self.context(fixture, native, system=system, environment=environment) as (command, run, output):
+                    self.assertEqual(profile.main(["--harness", "--jobs", "2"]), 7)
+                    command.assert_not_called()
+                    run.assert_called_once()
+                    self.assertEqual(fixture.writes, [])
+                    self.assertEqual(observed["arguments"], ["--jobs", "2"])
+                    self.assertEqual(observed["reduced"], "1")
+                    self.assertIsNone(observed["marker"])
+                    self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", os.environ)
+                    text = output.getvalue()
+                    self.assertNotIn(profile.DOMAIN, text)
+                    self.assertNotIn("/usr/bin/defaults", text)
+                    self.assertIn("defaults_untouched=true", text)
+
+    def test_hosted_ci_path_does_not_use_the_harness_override(self):
+        fixture = DefaultsFixture(True)
+
+        def native(arguments):
+            self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", os.environ)
+            self.assertEqual(os.environ[profile.MARKER], "1")
+            self.assertIs(fixture.value, False)
+            self.assertEqual(arguments, ["--jobs", "4"])
+            return 0
+
+        with self.context(fixture, native) as (command, _, output):
+            self.assertEqual(profile.main(["--jobs", "4"]), 0)
+            self.assertIs(fixture.value, True)
+            self.assertEqual(fixture.writes, [False, True])
+            for call in command.call_args_list:
+                argv = call.args[0]
+                self.assertEqual(argv[0], "/usr/bin/defaults")
+                self.assertEqual(argv[2:4], [profile.DOMAIN, profile.KEY])
+            text = output.getvalue()
+            self.assertIn("original_reduce_motion=true", text)
+            self.assertIn("restored=true", text)
+            self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", text)
+
+    def test_host_applies_harness_reduced_motion_before_loading_tests(self):
+        repo = Path(__file__).resolve().parents[3]
+        host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
+        key = 'environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1"'
+        load = host.index("dlopen(args[2]")
+        self.assertLess(host.index(key), load)
+        marker = host.index(f'environment["{profile.MARKER}"] == "1"')
+        workspace = host.index("!NSWorkspace.shared.accessibilityDisplayShouldReduceMotion")
+        self.assertLess(host.index(key), marker)
+        self.assertLess(marker, workspace)
+        self.assertLess(workspace, load)
+        harness_body = host[host.index(key):marker]
+        self.assertNotIn("NSWorkspace", harness_body)
+        self.assertNotIn("defaults", harness_body)
+        self.assertNotIn("universalaccess", harness_body)
+        self.assertIn("harness reduced-motion profile applied before loading tests", harness_body)
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        reduced = motion[motion.index("static var reduced"):motion.index("static let feedbackDuration")]
+        self.assertIn("ZEUS_HARNESS_REDUCE_MOTION", reduced)
+        self.assertIn("#if DEBUG", reduced)
+        self.assertIn("NSWorkspace.shared.accessibilityDisplayShouldReduceMotion", reduced)
+        film = (repo / "Sources/Zeus/Onboarding/OnboardingVisuals.swift").read_text()
+        self.assertIn("motionReduction || Motion.reduced", film)
+        self.assertIn("let systemReduction = Motion.reduced", film)
+
     def test_fresh_host_requires_real_normal_motion_before_loading_tests(self):
         repo = Path(__file__).resolve().parents[3]
         host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()

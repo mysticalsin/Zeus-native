@@ -138,7 +138,7 @@ struct OnboardingFilmLifecycleTests {
             view.setReducedMotion(true) // The same view update used by NSViewRepresentable.
             try await requirePaused(view)
             view.setReducedMotion(false) // Never overrides the person's OS Reduce Motion preference.
-            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { try await requirePaused(view) }
+            if Motion.reduced { try await requirePaused(view) }
             else { try await requireAdvancing(view) }
         }
     }
