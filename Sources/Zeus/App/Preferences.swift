@@ -67,7 +67,16 @@ extension Preferences {
 
 enum Motion {
     /// System Settings › Accessibility › Display › Reduce motion.
-    @MainActor static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    /// A debug test host may inject reduced motion with ZEUS_HARNESS_REDUCE_MOTION.
+    /// Release builds ignore that variable and keep the system preference.
+    @MainActor static var reduced: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1" {
+            return true
+        }
+        #endif
+        return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
 
     /// Shared interaction timings. Capture/completion choreography keeps its own longer sequence.
     static let feedbackDuration = 0.12

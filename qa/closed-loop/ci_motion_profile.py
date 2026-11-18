@@ -43,7 +43,39 @@ def interrupted(_signal, _frame):
     raise KeyboardInterrupt
 
 
+HARNESS_FLAG = "--harness"
+HARNESS_KEY = "ZEUS_HARNESS_REDUCE_MOTION"
+
+
+def run_harness(arguments):
+    """Run native checks with reduced motion injected, never touching user defaults."""
+    previous = os.environ.get(HARNESS_KEY)
+    code = 1
+    try:
+        os.environ[HARNESS_KEY] = "1"
+        code = run_native(arguments)
+        if type(code) is not int or not 0 <= code <= 255:
+            code = 1
+    except KeyboardInterrupt:
+        code = 130
+    except SystemExit as error:
+        code = error.code if type(error.code) is int and 1 <= error.code <= 255 else 1
+    except Exception:
+        print("CI motion harness failed")
+        code = 1
+    finally:
+        if previous is None:
+            os.environ.pop(HARNESS_KEY, None)
+        else:
+            os.environ[HARNESS_KEY] = previous
+    print(f"CI motion harness: wrapper_exit={code}; reduced_motion=injected; defaults_untouched=true")
+    return code
+
+
 def main(arguments=None):
+    forwarded = list(sys.argv[1:] if arguments is None else arguments)
+    if HARNESS_FLAG in forwarded:
+        return run_harness([item for item in forwarded if item != HARNESS_FLAG])
     if not (platform.system() == "Darwin" and os.environ.get("GITHUB_ACTIONS") == "true"
             and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"):
         print("CI motion profile unavailable: requires a GitHub-hosted Mac runner")
@@ -60,7 +92,7 @@ def main(arguments=None):
     try:
         write_preference(False)
         os.environ[MARKER] = "1"
-        code = run_native(sys.argv[1:] if arguments is None else arguments)
+        code = run_native(forwarded)
         if type(code) is not int or not 0 <= code <= 255:
             code = 1
     except KeyboardInterrupt:

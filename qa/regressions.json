@@ -4368,6 +4368,30 @@
       }
     },
     {
+      "id": "REG-410",
+      "failure": "A local or non-hosted motion run could read or write com.apple.universalaccess reduceMotion. Harness mode injects reduced motion only through ZEUS_HARNESS_REDUCE_MOTION and never calls defaults. The hosted CI path still records, clears, and restores the real boolean.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_harness_injects_reduced_motion_without_touching_defaults"
+      }
+    },
+    {
+      "id": "REG-411",
+      "failure": "The motion harness set ZEUS_HARNESS_REDUCE_MOTION but the owned-window host loaded tests without applying it, so the app under test still followed the real NSWorkspace setting. The host now applies that profile before dlopen, and debug Motion.reduced reads the same key. Release builds ignore it and keep the system preference.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_host_applies_harness_reduced_motion_before_loading_tests"
+      }
+    },
+    {
       "id": "REG-412",
       "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
       "features": [

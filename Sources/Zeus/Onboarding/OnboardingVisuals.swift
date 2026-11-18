@@ -129,7 +129,7 @@ struct LoopingFilm: NSViewRepresentable {
         }
 
         var playbackState: PlaybackState {
-            let systemReduction = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            let systemReduction = Motion.reduced
             let effectiveReduction = motionReduction || systemReduction
             let eligible: Bool
             if !disposed, !closing, !effectiveReduction, !isHiddenOrHasHiddenAncestor, let window {
@@ -249,7 +249,7 @@ struct LoopingFilm: NSViewRepresentable {
         }
 
         private var reducesMotion: Bool {
-            motionReduction || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            motionReduction || Motion.reduced
         }
 
         private func synchronizePlayback() {
