@@ -763,6 +763,14 @@
       "scope": "Actual NowPlayingHub and TopBarModel with recording closures for every effect: no player, browser, Apple Event, artwork fetch or permission, and no device acceptance."
     },
     {
+      "id": "native-PlayerCollapseTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "PlayerCollapseTests",
+      "file": "Tests/ZeusAppTests/PlayerCollapseTests.swift",
+      "scope": "The real TopBarModel fed a synthetic now-playing item, plus the settings catalog default. No player process and no permission."
+    },
+    {
       "id": "native-PageArtworkDiskTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8009,6 +8017,32 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.collapse-on-pause",
+          "check": "native-PlayerCollapseTests",
+          "acceptance": "A paused item on the real top-bar model collapses the player only when the setting is on. Nothing playing stays open. The setting starts off.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/PlayerCollapseTests.swift",
+              "function": "theSettingStartsOff"
+            },
+            {
+              "file": "Tests/ZeusAppTests/PlayerCollapseTests.swift",
+              "function": "aPausedItemOnTheRealModelCollapsesOnlyWhenTheSettingIsOn"
+            }
+          ]
+        },
+        {
+          "id": "F13.collapse-on-pause-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The collapse rule is off unless playback is paused and the setting is on. Reduce Motion skips the existing page animation.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
+              "function": "pauseCollapsesThePlayerAndDevicesHaveIcons"
             }
           ]
         },

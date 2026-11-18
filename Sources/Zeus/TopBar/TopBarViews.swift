@@ -585,6 +585,13 @@ final class LyricsToggle: ObservableObject {
     @Published var show = TopBarStyle.isSnapshot && LyricsToggle.snapshotShow
 }
 
+/// The music page asks this before it draws the large player. The same function is what the wiring test calls.
+enum PlayerChrome {
+    static func collapsed(model: TopBarModel, settingOn: Bool) -> Bool {
+        PlaybackCollapse.collapsed(isPlaying: model.nowPlaying?.isPlaying, settingOn: settingOn)
+    }
+}
+
 struct MusicPage: View {
     let topBar: TopBarModel
     /// The SwiftUI @State macro is unavailable to this toolchain, so the toggle lives in an ObservableObject.
@@ -598,8 +605,9 @@ struct MusicPage: View {
         let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
         // Lyrics a source cannot give are not shown, even if the toggle was on for the last one.
         let showLyrics = lyricsToggle.show && shown.contains(.lyrics)
+        let collapsed = PlayerChrome.collapsed(model: topBar, settingOn: SettingsStore.shared.bool(PlaybackCollapse.settingID))
         HStack(spacing: 14) {
-            AlbumTile(playing: topBar.nowPlaying, size: 132)
+            AlbumTile(playing: topBar.nowPlaying, size: collapsed ? 64 : 132)
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     if let playing = topBar.nowPlaying {
@@ -608,7 +616,10 @@ struct MusicPage: View {
                             .lineLimit(1).truncationMode(.middle)
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        if showLyrics {
+                        if collapsed {
+                            Text(topBar.nowPlaying?.title ?? "Nothing playing")
+                                .font(TopBarStyle.label(15, .bold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                        } else if showLyrics {
                             Text([topBar.nowPlaying?.title, topBar.nowPlaying?.artist].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
                                 .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
                             LyricsView(playing: topBar.nowPlaying, rows: 3, rowHeight: 24, fontSize: 14)
@@ -621,7 +632,7 @@ struct MusicPage: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if let playing = topBar.nowPlaying {
+                if let playing = topBar.nowPlaying, !collapsed {
                     let tint = ArtworkStore.shared.tint(for: playing, saturation: 0.55, brightness: 1)
                     TickingView(interval: 1) { context in
                         let elapsed = scrub.fraction.map { $0 * playing.duration } ?? playing.elapsed(at: context.date)
@@ -658,6 +669,7 @@ struct MusicPage: View {
             }
         }
         .padding(.vertical, 6)
+        .animation(PlaybackCollapse.animates(reduceMotion: Motion.reduced) ? TopBarStyle.pageSpring : nil, value: collapsed)
         .onAppear { topBar.musicPageVisible = true }
         .onDisappear { topBar.musicPageVisible = false }
     }

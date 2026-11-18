@@ -99,7 +99,18 @@ public enum FacePresenceSecretPolicy {
 }
 
 public enum PlaybackCollapse {
+    public static let settingID = "music.collapseOnPause"
+
     public static func collapsed(paused: Bool, enabled: Bool) -> Bool { enabled && paused }
+
+    /// Nothing on screen is not a pause, so the player stays open.
+    public static func collapsed(isPlaying: Bool?, settingOn: Bool) -> Bool {
+        guard let isPlaying else { return false }
+        return collapsed(paused: !isPlaying, enabled: settingOn)
+    }
+
+    /// The collapse uses the existing page spring. Reduce Motion skips it.
+    public static func animates(reduceMotion: Bool) -> Bool { !reduceMotion }
 }
 
 public enum OutputDeviceKind: Equatable, Sendable { case speakers, headphones, receiver }
