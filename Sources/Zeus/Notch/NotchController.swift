@@ -38,6 +38,11 @@ final class NotchController {
     var now: () -> Date = { Date() }
     /// Where the pointer is; tests replace it.
     var pointer: () -> CGPoint = { NSEvent.mouseLocation }
+    /// Tests give the frame the zones centre on, so no window or display is needed.
+    var frameOverride: CGRect?
+    private var activeFrame: CGRect? { frameOverride ?? screen.map(anchorFrame) }
+    /// What the window was last told: true is click-through. Read by tests.
+    private(set) var clickThrough = true
     /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
     private var alertWake: Task<Void, Never>?
     /// Alerts waiting out their ten minute snooze, by alert id.
@@ -551,8 +556,8 @@ final class NotchController {
     /// Whether the closed window passes the mouse through right now. It takes it only over a drawn notch's body,
     /// so what the shape hides is not pressed; the hardware notch and the pill stay click-through.
     private func ignoresMouseWhileClosed() -> Bool {
-        guard let screen else { return true }
-        return !NotchFootprintRules.takesMouse(footprint, closed: true, point: NSEvent.mouseLocation, screenFrame: anchorFrame(screen),
+        guard let frame = activeFrame else { return true }
+        return !NotchFootprintRules.takesMouse(footprint, closed: true, point: pointer(), screenFrame: frame,
                                                topOffset: topOffset, wings: topBar.map(ClosedWingsFacts.init(of:)))
     }
 
@@ -568,14 +573,15 @@ final class NotchController {
         switch presentation {
         case .closed: return ignoresMouseWhileClosed()
         case .peek:
-            guard let screen else { return true }
+            guard let frame = activeFrame else { return true }
             return !Self.peekTakesMouse(model: model, footprint: footprint, pointer: pointer(),
-                                        screenFrame: anchorFrame(screen), topOffset: topOffset)
+                                        screenFrame: frame, topOffset: topOffset)
         case .panel: return false
         }
     }
 
     private func setIgnoresMouse(_ ignore: Bool) {
+        clickThrough = ignore
         for entry in panels {
             // Only the window on the active display ever takes the mouse.
             let want = ignore || entry.screen != screen
