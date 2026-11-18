@@ -257,6 +257,28 @@ struct FlingSecurityAppTests {
         #expect(transport.pairingPeers == ["idB"])
     }
 
+    @Test func aSymlinkParentCannotReceiveTheFile() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("fling-sink-\(UUID().uuidString)", isDirectory: true)
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent("fling-sink-out-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let via = root.appendingPathComponent("via")
+        try FileManager.default.createSymbolicLink(at: via, withDestinationURL: outside)
+        let sink = FlingFileSink(stackID: UUID(), partialParent: root, destination: via.appendingPathComponent("Stack"))
+        try sink.makeTemp()
+        try sink.write(index: 0, data: Data("secret".utf8))
+        _ = try sink.verify(index: 0)
+        var refused = false
+        do { _ = try sink.commit(index: 0, name: "notes.txt") } catch { refused = true }
+        #expect(refused)
+        #expect(!FileManager.default.fileExists(atPath: outside.appendingPathComponent("Stack/notes.txt").path))
+        #expect(!FileManager.default.fileExists(atPath: outside.appendingPathComponent("notes.txt").path))
+    }
+
     /// REG-788: a received file carries Zeus's quarantine mark, so Gatekeeper still looks at what a peer sent.
     @Test func receivedFilesAreQuarantinedAsFromZeus() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fling-q-\(UUID().uuidString)", isDirectory: true)

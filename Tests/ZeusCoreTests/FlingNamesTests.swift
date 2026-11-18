@@ -49,6 +49,21 @@ struct FlingNamesTests {
         #expect(!FlingNames.isContained(URL(fileURLWithPath: "/tmp/Fling/Stack2/a"), in: root))
         #expect(!FlingNames.isContained(root, in: root))
     }
+
+    @Test func aSymlinkCannotEscapeTheRealRoot() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("fling-root-\(UUID().uuidString)", isDirectory: true)
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent("fling-out-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let link = root.appendingPathComponent("escape")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        #expect(!FlingNames.isContained(link, in: root))
+        #expect(!FlingNames.isContained(link.appendingPathComponent("secret.txt"), in: root))
+    }
 }
 
 @Suite("Fling offer validation")
