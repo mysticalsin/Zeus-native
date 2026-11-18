@@ -8339,6 +8339,18 @@
         "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
         "function": "repeatedCueDeliversOneBannerPerWindow"
       }
+    },
+    {
+      "id": "REG-950",
+      "failure": "The meeting card was too big at 440 x 156 with a 24 pt title; the owner chose a compact 340 x 96 card and nothing locked the size or checked that every row fits it.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+        "function": "everyRowAndTheActionCapsuleFitInsideTheSlabForTheTallestState"
+      }
     }
 ]
 }

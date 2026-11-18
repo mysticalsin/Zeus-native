@@ -1907,6 +1907,29 @@
           "acceptance": "Automated disposable calendar permission denial/grant, display changes, focus restoration and one-tap launch trace.",
           "cases": [],
           "id": "F04.3"
+        },
+        {
+          "id": "F04.compact-meeting-card",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The meeting card is a compact 340 by 96 point slab with a 22 point corner, a 40 point orb, 16 point app tiles and a 15 point title, and its title row, status row and action capsule fit inside the slab height. Does not prove how the glass looks on a real desktop.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "theSlabIsACompactGlassCardOfThreeHundredAndFortyByNinetySix"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "theOrbColumnIsANarrowSixtyFourAndHoldsTheOrbTheRingAndThreeTiles"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "theWindowAddsTheShadowRoomOnEverySideAndTheOrbSitsInTheLeftColumn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "everyRowAndTheActionCapsuleFitInsideTheSlabForTheTallestState"
+            }
+          ]
         }
       ]
     },

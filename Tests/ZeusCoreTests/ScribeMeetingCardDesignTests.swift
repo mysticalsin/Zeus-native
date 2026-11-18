@@ -305,9 +305,9 @@ struct ScribeJoinAppsTests {
         #expect(chosen.map(\.bundleID) == ["p", "b1", "b2"])
     }
 
-    @Test func atMostFourAppsAreChosen() {
+    @Test func atMostThreeAppsAreChosen() {
         let chosen = ScribeJoinApps.choose(provider: [app("p")], browsers: (1...6).map { app("b\($0)") })
-        #expect(chosen.count == 4)
+        #expect(chosen.count == 3)
         #expect(chosen.first?.bundleID == "p")
         #expect(ScribeJoinApps.choose(provider: [], browsers: []).isEmpty)
     }
