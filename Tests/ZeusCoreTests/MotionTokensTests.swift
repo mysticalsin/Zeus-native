@@ -32,6 +32,13 @@ struct MotionTokensTests {
     /// the critically damped spring at response 0.175 is 12.5 pt rms off. The recording ends on a strip that fades, so
     /// the spring cannot match its tail; the gate is that it is clearly closer than linear, is the best response of
     /// a sweep (within a tenth of a point), never overshoots, only falls, and is done within a quarter second.
+    @Test func theRestoredCloseAndShelfAndSessionSpringsStayPinned() {
+        #expect(MotionTokens.closeDuration == 0.1)
+        #expect(GlanceTopBar.closeDuration == 0.1)
+        #expect(MotionTokens.sessionCount == SpringToken(response: 0.42, damping: 0.8))
+        #expect(MotionTokens.shelfTarget == SpringToken(response: 0.3, damping: 0.7))
+    }
+
     @Test func theCloseSpringFitsTheMeasuredCloseBetterThanTheOldLinearClose() {
         let spring = MotionTokens.panelClose
         let rms = Self.closeRMS(response: spring.response, damping: spring.damping)
