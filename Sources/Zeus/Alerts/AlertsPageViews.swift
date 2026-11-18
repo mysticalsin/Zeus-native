@@ -7,7 +7,7 @@ import ZeusCore
 struct AlertsGroupedList: View {
     @Bindable var notifications: NotificationsController
     @State private var expandedOverride: [String: Bool] = [:]
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     private var groups: [AlertGroup] {
         AlertGrouping.groups(notifications.visibleItems) { notifications.appName($0) }

@@ -8,13 +8,15 @@ struct HomeBackdropView: View {
     let backdrop: HomeBackdrop
     /// Home is on screen. The page sets this; a hidden Home never ticks.
     var visible = true
-    var reduceMotion: Bool = Motion.reduced
+    /// `nil` follows `Motion.reduced` from this view's body. Snapshots pass `true`.
+    var reduceMotion: Bool? = nil
 
     var body: some View {
+        let reduced = reduceMotion ?? Motion.reduced
         if backdrop == .off {
             Color.clear
         } else {
-            let animates = HomeBackdrop.animates(backdrop, visible: visible, reduceMotion: reduceMotion) && !TopBarStyle.isSnapshot
+            let animates = HomeBackdrop.animates(backdrop, visible: visible, reduceMotion: reduced) && !TopBarStyle.isSnapshot
             TickingView(interval: 1.0 / 24.0, paused: !animates) { context in
                 Canvas(opaque: false, rendersAsynchronously: false) { gc, size in
                     let t = animates ? context.date.timeIntervalSinceReferenceDate : HomeBackdrop.stillTime

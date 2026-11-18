@@ -83,7 +83,7 @@ final class RecorderPill {
         if !panel.isVisible {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
-            NSAnimationContext.runAnimationGroup({ $0.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.16
+            NSAnimationContext.runAnimationGroup({ $0.duration = Motion.reduced ? 0 : 0.16
                 panel.animator().alphaValue = 1 }, completionHandler: nil)
         }
     }

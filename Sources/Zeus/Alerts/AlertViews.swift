@@ -80,7 +80,7 @@ struct AlertCapsule: View {
     @State private var landed: Bool
     @State private var sweep: Double
     @State private var sweepDone: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     init(item: AlertItem, depth: Int, hovered: Bool, hiddenCount: Int = 0, startSettled: Bool = false, actions: AlertActions = AlertActions()) {
         self.item = item; self.depth = depth; self.hovered = hovered; self.hiddenCount = hiddenCount; self.actions = actions
@@ -246,7 +246,7 @@ struct AlertStackView: View {
     var settled = false
     var actions = AlertActions()
     var onHover: (Bool) -> Void = { _ in }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         ZStack(alignment: .top) {
