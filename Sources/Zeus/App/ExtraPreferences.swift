@@ -184,6 +184,9 @@ enum ZeusSound {
         play(slot: event.slot, style: event.name)
     }
 
+    /// Tests set this so no cue plays. Always false in the app.
+    nonisolated(unsafe) static var isMutedForTesting = false
+
     private static var players: [AVAudioPlayer] = []
 
     /// The bundled file for a slot and style; nil for "Off" or when the resource is missing.
@@ -197,6 +200,7 @@ enum ZeusSound {
     /// Plays one sound at the Settings volume. Previews use it too.
     @discardableResult
     static func play(slot: SoundSlot, style: String?, loops: Int = 0) -> AVAudioPlayer? {
+        guard !isMutedForTesting else { return nil }
         guard let url = url(slot: slot, style: style), let player = try? AVAudioPlayer(contentsOf: url) else { return nil }
         FlightRecorder.shared.record("sound", slot.rawValue, style ?? "")
         player.volume = Float(ExtraPreferences.shared.soundVolume) / 100

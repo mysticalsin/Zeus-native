@@ -52,6 +52,23 @@ final class VoiceTurnController {
     private var listening = false {
         didSet { if oldValue, !listening { onListeningEnded?() } }
     }
+    /// What a press, a release and an end do outside this controller: warm-ups, volume ducking, screen capture,
+    /// the microphone start and stop. Tests swap these so no audio, volume, screen or process is touched.
+    @MainActor struct Seams {
+        var warmOnPress: @MainActor () -> Void = {
+            BrainWarmScheduler.shared.talkKeyDown()
+            KeyDownWarmer.talkKeyDown()
+            // Off the critical path: the local-model check is read from this cache when the answer starts.
+            Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        }
+        var duckBegin: @MainActor () -> Void = { SystemAudioDucker.begin() }
+        var duckEnd: @MainActor () -> Void = { SystemAudioDucker.end() }
+        var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureAll() }
+        var speechStart: @MainActor (SpeechInput) throws -> Int = { try $0.start() }
+        var speechStop: @MainActor (SpeechInput) async -> String = { await $0.stop() }
+        static func silent() -> Seams { Seams(warmOnPress: {}, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
+    }
+    var seams = Seams()
     /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
     private var talkSession: Int?
     private var screenshotsTask: Task<[ScreenShot], Never>?
@@ -170,7 +187,7 @@ final class VoiceTurnController {
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
         speaker.stop()
-        SystemAudioDucker.end()
+        seams.duckEnd()
         wakeConversationActive = false
         buddy.model.captionVisible = false
         buddy.idle()
@@ -191,7 +208,6 @@ final class VoiceTurnController {
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
-        BrainWarmScheduler.shared.talkKeyDown()
         fastRace?.cancel()
         // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
         handsFreeTask?.cancel()
@@ -199,9 +215,7 @@ final class VoiceTurnController {
         turnRun.invalidate()
         // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
         PersistentClaudeSession.shared.abortBusy()
-        KeyDownWarmer.talkKeyDown()
-        // Off the critical path: the local-model check is read from this cache when the answer starts.
-        Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        seams.warmOnPress()
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -217,7 +231,7 @@ final class VoiceTurnController {
             Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
         }
         do {
-            talkSession = try speech.start()
+            talkSession = try seams.speechStart(speech)
         } catch {
             speech.onCaptureFailure = nil
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
@@ -232,7 +246,7 @@ final class VoiceTurnController {
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
         ZeusSound.play(.listenStart)
-        SystemAudioDucker.begin()
+        seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
         FastPath.shared.reset()
@@ -240,7 +254,7 @@ final class VoiceTurnController {
         buddy.model.audioLevel = 0
         buddy.listen()
         // Screens are captured while you talk, so the answer isn't waiting on them.
-        screenshotsTask = Task { await ScreenCapture.captureAll() }
+        screenshotsTask = Task { await seams.captureScreens() }
         // With Chrome in front, the extension reads the page you're looking at.
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
@@ -256,7 +270,7 @@ final class VoiceTurnController {
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
         ZeusSound.play(.listenStop)
-        SystemAudioDucker.end()
+        seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil
         buddy.think()
@@ -293,6 +307,16 @@ final class VoiceTurnController {
     }
 
     var isListeningForTesting: Bool { listening }
+    var captureHandlerInstalledForTesting: Bool { speech.onCaptureFailure != nil }
+    var talkSessionForTesting: Int? { talkSession }
+    var wakeConversationActiveForTesting: Bool {
+        get { wakeConversationActive }
+        set { wakeConversationActive = newValue }
+    }
+    /// Test seam: the speech input reports a capture failure the way its audio thread does.
+    func deliverCaptureFailureForTesting(session: Int, failure: SpeechInput.CaptureFailure) {
+        speech.onCaptureFailure?(session, 0, failure)
+    }
 
     @discardableResult
     private func endListeningWithoutSending() -> Bool {
@@ -309,7 +333,7 @@ final class VoiceTurnController {
         tabTask?.cancel()
         tabTask = nil
         turnEngine = nil
-        SystemAudioDucker.end()
+        seams.duckEnd()
         liveWords.clear()
         buddy.model.audioLevel = nil
         buddy.model.captionVisible = false
@@ -337,7 +361,7 @@ final class VoiceTurnController {
         let heardAt = ContinuousClock.now
         VoiceLatency.shared.begin(at: heardAt)
         // Only the LLM path uses these; the fast path never waits for them.
-        screenshotsTask = Task { await ScreenCapture.captureAll() }
+        screenshotsTask = Task { await seams.captureScreens() }
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
@@ -408,7 +432,7 @@ final class VoiceTurnController {
     }
 
     private func finishTurn() async -> TurnResult {
-        var transcript = await speech.stop().trimmingCharacters(in: .whitespacesAndNewlines)
+        var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
             transcript = await dictation.transcribeVoice(samples: samples, live: transcript, with: engine)
@@ -1230,12 +1254,12 @@ final class VoiceTurnController {
     func say(_ text: String) {
         VoiceLog.logContent("spoken", text)
         if SettingsStore.shared.bool("voice.speakReplies") {
-            SystemAudioDucker.begin()
+            seams.duckBegin()
             speaker.speak(Self.voiced(text))
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 while self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
-                SystemAudioDucker.end()
+                self.seams.duckEnd()
             }
         }
         buddy.showCaption(text)

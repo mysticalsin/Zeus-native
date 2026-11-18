@@ -268,6 +268,17 @@ final class DictationController {
     private let topBar: TopBarModel
     private let settings = DictationSettings.shared
     private let speech = SpeechInput()
+    /// What a begin and a finish do against the microphone, permissions, engines and media. Tests swap these so
+    /// nothing real is opened, downloaded or paused.
+    struct Seams {
+        struct Access { var speech: Bool, microphone: Bool, language: Bool, onDevice: Bool }
+        var access: ((SpeechInput, DictationSettings) -> Access)?
+        var readyEngine: (() -> (any TranscriptionEngine)?)?
+        var speechStart: (SpeechInput, UInt64) throws -> Int = { try $0.start(controllerGeneration: $1) }
+        var speechStop: (SpeechInput, Bool) async -> String = { await $0.stop(waitForFinal: $1) }
+        var pauseMedia: ((TopBarModel) -> NowPlayingSource?)?
+    }
+    var seams = Seams()
     private let ownership = DictationTurnOwnership()
     private let hotkey = HotkeyMonitor()
     private let store: DictationStore
@@ -485,6 +496,11 @@ final class DictationController {
     var modesFolder: URL { store.root.appendingPathComponent("modes", isDirectory: true) }
 
     var topBarModel: TopBarModel { topBar }
+    var captureHandlerInstalledForTesting: Bool { speech.onCaptureFailure != nil }
+    /// Test seam: the speech input reports a capture failure the way its audio thread does.
+    func deliverCaptureFailureForTesting(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        speech.onCaptureFailure?(session, origin, failure)
+    }
 
     /// Saves a custom mode (or an edit of a built-in one) as its JSON file.
     func saveMode(_ mode: DictationMode) {
@@ -554,17 +570,18 @@ final class DictationController {
         guard flow.canStartJob else { return }
         ExplanationAudioArbitration.yieldToNewCapture()
         fallbackNote = nil
-        let speechAllowed = SFSpeechRecognizer.authorizationStatus() == .authorized
-        let languageAvailable = speech.configure(localeIdentifier: settings.language.localeIdentifier)
-        turnEngine = readyEngine
+        let real = seams.access?(speech, settings)
+        let speechAllowed = real?.speech ?? (SFSpeechRecognizer.authorizationStatus() == .authorized)
+        let languageAvailable = real?.language ?? speech.configure(localeIdentifier: settings.language.localeIdentifier)
+        if let override = seams.readyEngine { turnEngine = override() } else { turnEngine = readyEngine }
         // Key down: start loading the speech model now so it is ready when the first chunk is.
         (turnEngine as? ParakeetEngine)?.prewarm()
         let local = turnEngine != nil
         // A local model only needs the microphone; Apple also needs Speech Recognition.
-        let microphoneAllowed = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let microphoneAllowed = real?.microphone ?? (AVCaptureDevice.authorizationStatus(for: .audio) == .authorized)
         // Apple recognition only runs on this Mac: a language without on-device support fails
         // closed (or is skipped when a local engine listens) instead of reaching Apple's servers.
-        let appleOnDevice = speechAllowed && languageAvailable && speech.supportsOnDevice
+        let appleOnDevice = speechAllowed && languageAvailable && (real?.onDevice ?? speech.supportsOnDevice)
         guard microphoneAllowed, appleOnDevice || local else {
             let reason = !speechAllowed
                 ? "Allow Microphone and Speech Recognition in Zeus setup first."
@@ -575,7 +592,7 @@ final class DictationController {
             topBar.show(.dictation(microphoneAllowed ? "Speech recognition is unavailable" : "Dictation needs the microphone"))
             return
         }
-        if settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel(explicit: false) }
+        if seams.readyEngine == nil, settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel(explicit: false) }
         // Apple runs alongside a local model for the live words in the notch. The audio is
         // always kept so the dictation can be reprocessed later with another engine.
         speech.recognizes = appleOnDevice
@@ -605,7 +622,7 @@ final class DictationController {
         do {
             // The start cue sounds first: on key down, before the microphone warms up.
             let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
-                try speech.start(controllerGeneration: turnGeneration)
+                try seams.speechStart(speech, turnGeneration)
             }
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
             turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
@@ -626,7 +643,8 @@ final class DictationController {
         topBar.dictationModeSymbol = mode.symbol
         topBar.dictationPartial = ""
         apply(.micOpened(turn: turnGeneration))
-        if settings.pauseMedia { pausedMedia = topBar.pauseForDictation() }
+        if let pause = seams.pauseMedia { pausedMedia = pause(topBar) }
+        else if settings.pauseMedia { pausedMedia = topBar.pauseForDictation() }
         guard AccessibilityGate.trusted else { return }
         escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
@@ -910,7 +928,7 @@ final class DictationController {
                                 stream: (any TranscriptionStream)?) async -> DictationFinishFlow.Heard {
         let isCurrent: () -> Bool = { [ownership] in ownership.owns(generation: context.generation) }
         // A ready local engine makes the final text, so release does not wait for Apple's second pass.
-        let live = await speech.stop(waitForFinal: !(context.useLocal && context.engine != nil))
+        let live = await seams.speechStop(speech, !(context.useLocal && context.engine != nil))
         guard isCurrent() else { return .init(text: "", engine: .apple, samples: []) }
         speech.onCaptureFailure = nil
         let samples = speech.takeSamples()
