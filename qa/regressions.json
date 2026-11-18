@@ -4304,7 +4304,7 @@
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
-        "function": "theCardNeverExpiresUnderThePointer"
+        "function": "theCardStaysUpUnderThePointerUntilThePointerLeaves"
       }
     },
     {
