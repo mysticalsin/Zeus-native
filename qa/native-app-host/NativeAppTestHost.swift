@@ -97,8 +97,13 @@ private enum NativeAppTestHost {
                   (args[6] as NSString).isAbsolutePath else {
                 throw HostFailure("unexpected host arguments")
             }
-            if ProcessInfo.processInfo.environment["ZEUS_CI_REQUIRE_NORMAL_MOTION"] == "1" {
-                let environment = ProcessInfo.processInfo.environment
+            let environment = ProcessInfo.processInfo.environment
+            if environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1" {
+                guard environment["ZEUS_CI_REQUIRE_NORMAL_MOTION"] != "1" else {
+                    throw HostFailure("harness reduced-motion profile cannot be combined with the CI normal-motion requirement")
+                }
+                report("harness reduced-motion profile applied before loading tests")
+            } else if environment["ZEUS_CI_REQUIRE_NORMAL_MOTION"] == "1" {
                 guard environment["GITHUB_ACTIONS"] == "true",
                       environment["RUNNER_ENVIRONMENT"] == "github-hosted",
                       !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
