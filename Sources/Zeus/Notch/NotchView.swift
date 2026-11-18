@@ -134,10 +134,52 @@ struct NotchView: View {
         return ClosedWings.kind(of: topBar) == .none
     }
     /// A stalled session the peek is talking about (no card of its own to compete with).
-    private var stalledPeek: NotchModel.Session? {
+    private var stalledPeek: NotchModel.Session? { Self.stalledPeek(model) }
+
+    private static func stalledPeek(_ model: NotchModel) -> NotchModel.Session? {
         guard model.approval == nil, model.completion == nil, model.failure == nil,
               let session = model.peekSession, session.status == .stalled else { return nil }
         return session
+    }
+
+    /// Whether the peek draws a card under its bar. A bar-only peek takes the mouse like the closed notch.
+    static func peekHasCard(model: NotchModel) -> Bool {
+        model.approval != nil || model.completion != nil || model.failure != nil || stalledPeek(model) != nil
+            || model.selectionEdit != nil || model.workBehind?.streaming == true || model.recap != nil
+    }
+
+    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt Accept row.
+    static func selectionEditHeight(_ edit: SelectionEdit) -> CGFloat {
+        let lines = edit.diff.reduce(CGFloat(0)) { $0 + 15 * CGFloat(min(2, max(1, ($1.text.count + 2 + 53) / 54))) }
+        return lines + 4 * CGFloat(edit.diff.count) + 28
+    }
+
+    /// The peek card as drawn (the peek always has the 8 pt shoulders). The window's click-through rule reads it too.
+    static func peekSize(model: NotchModel, footprint: NotchFootprint) -> CGSize {
+        let notch = footprint.layoutSize
+        let barHeight = max(notch.height, 30)
+        let shoulder: CGFloat = 8
+        if let approval = model.approval {
+            let wide = (approval.detail?.height ?? 0) > 0
+            // 6 pt more than before for the avatar header row of the shared card grammar.
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, wide ? 520 : 440), height: barHeight + 98 + approval.extraHeight)
+        }
+        if model.completion != nil {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 460), height: barHeight + 10 + CompletionCardView.height)
+        }
+        if model.failure != nil || stalledPeek(model) != nil {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
+        }
+        if let edit = model.selectionEdit {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 10 + selectionEditHeight(edit))
+        }
+        if let preview = model.workBehind, preview.streaming {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 440), height: barHeight + 10 + 24)
+        }
+        if let recap = model.recap {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))
+        }
+        return CGSize(width: (notch.width > 0 ? notch.width : 120) + 2 * shoulder + 230, height: barHeight)
     }
 
     private var shoulder: CGFloat {
@@ -189,21 +231,7 @@ struct NotchView: View {
             if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: closedBodyHeight) }
             return footprint.idleSize
         case .peek:
-            if let approval = model.approval {
-                let wide = (approval.detail?.height ?? 0) > 0
-                // 6 pt more than before for the avatar header row of the shared card grammar.
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, wide ? 520 : 440), height: barHeight + 98 + approval.extraHeight)
-            }
-            if model.completion != nil {
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, 460), height: barHeight + 10 + CompletionCardView.height)
-            }
-            if model.failure != nil || stalledPeek != nil {
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
-            }
-            if let recap = model.recap {
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))
-            }
-            return CGSize(width: (hasNotch ? notch.width : 120) + 2 * shoulder + 230, height: barHeight)
+            return Self.peekSize(model: model, footprint: footprint)
         case .panel:
             if let topBar {
                 return Self.topBarPanelSize(barHeight: barHeight, hasApproval: model.approval != nil, extra: model.approval?.extraHeight ?? 0,

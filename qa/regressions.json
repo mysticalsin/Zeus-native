@@ -8484,6 +8484,30 @@
         "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
         "function": "previewDoesNotRenderOrCallOpenAIAfterShutdown"
       }
+    },
+    {
+      "id": "REG-970",
+      "failure": "While an agent approval, completion or trouble card was up, the whole 1800 x 470 notch window took the mouse, so every click across the top of the screen was swallowed until the choice was answered or timed out.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchPeekHitRulesTests.swift",
+        "function": "pointerFarBelowTheCardIsClickThrough"
+      }
+    },
+    {
+      "id": "REG-971",
+      "failure": "A completion, failure or recap card set while a peek was already up, or an approval answered while the peek lingered, left the notch window with the click-through rule of the previous card, so the new card could not be clicked or the old card's area kept swallowing clicks.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NotchPeekClickThroughTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+        "function": "aCompletionSetWhileABarOnlyPeekIsUpTakesTheMouseWithoutAMouseMove"
+      }
     }
 ]
 }
