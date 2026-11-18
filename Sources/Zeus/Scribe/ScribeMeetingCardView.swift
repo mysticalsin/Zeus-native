@@ -135,25 +135,17 @@ private struct ScribeMeetingCardBody: View {
     private var slab: some View {
         HStack(spacing: 0) {
             leftColumn.frame(width: M.leftColumnWidth)
-            Rectangle()
-                .fill(Color.white.opacity(0.18))
-                .frame(width: 1, height: M.height - 2 * M.padding - 18)
-                .accessibilityHidden(true)
-            rightColumn
-                .padding(.leading, 18)
-                .padding(.trailing, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            rightColumn.frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, M.padding)
+        .padding(M.padding)
         .frame(width: M.width, height: M.height)
         .scribeCardGlass(surface, snapshot: TopBarStyle.isSnapshot)
-        .overlay(alignment: .topTrailing) { close.padding(.top, 10).padding(.trailing, 12) }
     }
 
     // MARK: Left column
 
     private var leftColumn: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: M.orbTileGap) {
             orb
             tiles
         }
@@ -168,7 +160,7 @@ private struct ScribeMeetingCardBody: View {
                 .fill(LinearGradient(colors: [Color(hex: 0x9378FF), Color(hex: 0x3D5BFF), Color(hex: 0x1F8CFF)],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: M.orb, height: M.orb)
-                .shadow(color: Color(hex: 0x9DBAFF).opacity(0.5), radius: 9)
+                .shadow(color: Color(hex: 0x9DBAFF).opacity(0.5), radius: 6)
                 .overlay {
                     // A bright cap, like light on a glass sphere.
                     Ellipse()
@@ -182,9 +174,9 @@ private struct ScribeMeetingCardBody: View {
                                                          startPoint: .top, endPoint: .bottom), lineWidth: 1)
                 }
             Image(systemName: ScribeMeetingCardText.orbSymbol)
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: M.orbSymbolSize, weight: .semibold))
                 .foregroundStyle(Color.white)
-                .shadow(color: Color(hex: 0x1B2A9A).opacity(0.5), radius: 3, y: 1)
+                .shadow(color: Color(hex: 0x1B2A9A).opacity(0.5), radius: 2, y: 1)
             ring
         }
         .frame(width: M.ringDiameter, height: M.ringDiameter)
@@ -216,6 +208,7 @@ private struct ScribeMeetingCardBody: View {
         HStack(spacing: M.tileSpacing) {
             ForEach(Array(spec.joinApps.prefix(M.maxApps).enumerated()), id: \.element.bundleID) { index, app in
                 ScribeMeetingCardTile(app: app, chosen: index == 0 && canJoin)
+                    .ownedJourneyWords("scribe.meetingCard.tile", app.name)
             }
         }
         .frame(height: M.tile)
@@ -225,99 +218,125 @@ private struct ScribeMeetingCardBody: View {
     // MARK: Right column
 
     private var rightColumn: some View {
+        // Three rows: the title with the close button, the status, and the third line beside the action.
         VStack(alignment: .leading, spacing: 0) {
-            words
-            Spacer(minLength: 6)
-            capsule
+            titleRow.frame(height: M.titleRowHeight)
+            status.padding(.top, M.titleGap)
+            Spacer(minLength: M.bottomGap)
+            bottomRow.frame(height: M.capsuleHeight)
         }
         .id(card.stateID)
         .transition(.opacity)
         .animation(ScribeMeetingCardMotion.crossfade, value: card.stateID)
     }
 
-    /// One element for the words, "<title>, <status>"; the buttons stay elements of their own.
-    private var words: some View {
-        // One value for the Text and for the owned host's probe, so what is read back cannot drift from what is drawn.
-        let line = card.meeting.map(timeLineText)
-        return VStack(alignment: .leading, spacing: 0) {
-            pill
-            if let meeting = card.meeting, let line {
+    /// The title, which is the one element for the words, "<title>, <status>"; the close button stays an element
+    /// of its own, and the status and the third line are drawn for the eye and hidden from VoiceOver because the
+    /// label already says them.
+    private var titleRow: some View {
+        HStack(spacing: 6) {
+            if let meeting = card.meeting {
                 Text(ScribeMeetingCardText.title(meeting))
-                    .font(TopBarStyle.label(M.titleSize, .bold))
+                    .font(TopBarStyle.label(M.titleSize, .semibold))
                     .foregroundStyle(Color.white)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .padding(.top, 3)
-                timeLine(line).padding(.top, 1)
-                thirdLine(meeting).padding(.top, 2)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(ScribeMeetingCardText.label(card, now: spec.now))
             }
+            Spacer(minLength: 0)
+            close
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ScribeMeetingCardText.label(card, now: spec.now))
+    }
+
+    private var status: some View {
+        // One value for the Text and for the owned host's probe, so what is read back cannot drift from what is drawn.
+        let line = card.meeting.map(timeLineText)
+        return HStack(spacing: 8) {
+            pill
+            if let line {
+                // Where the pill and the whole line cannot share the row, the range gives way to the relative time.
+                ViewThatFits(in: .horizontal) {
+                    timeLine(line, showRange: true)
+                    timeLine(line, showRange: false)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(height: M.statusRowHeight)
+        .accessibilityHidden(true)
         // Outside the ignored accessibility subtree, so the owned host can read what the time Text drew.
         .ownedJourneyWords("scribe.meetingCard.time", line?.relative ?? "")
     }
 
     private var pill: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             if case .starting = card {
                 progress
             } else {
-                Circle().fill(ScribeMeetingCardPalette.dot(ScribeMeetingCardText.tone(card))).frame(width: 6, height: 6)
+                Circle().fill(ScribeMeetingCardPalette.dot(ScribeMeetingCardText.tone(card))).frame(width: 5, height: 5)
             }
             Text(ScribeMeetingCardText.pill(card, now: spec.now))
-                .font(TopBarStyle.label(11.5, .semibold).monospacedDigit())
+                .font(TopBarStyle.label(M.pillTextSize, .semibold).monospacedDigit())
                 .foregroundStyle(ScribeMeetingCardPalette.ink)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 20)
+        .padding(.horizontal, 8)
+        .frame(height: M.pillHeight)
         .background(Capsule().fill(Color.white.opacity(0.14)))
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.75))
+        .fixedSize()
     }
 
     private func timeLineText(_ meeting: ScribeMeeting) -> ScribeMeetingCardText.TimeLine {
         ScribeMeetingCardText.timeLine(meeting, now: spec.now, locale: spec.locale, timeZone: spec.timeZone)
     }
 
-    private func timeLine(_ line: ScribeMeetingCardText.TimeLine) -> some View {
-        HStack(spacing: 7) {
+    private func timeLine(_ line: ScribeMeetingCardText.TimeLine, showRange: Bool) -> some View {
+        HStack(spacing: 5) {
             Image(systemName: "clock")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: M.timeSize - 2, weight: .medium))
                 .foregroundStyle(ScribeMeetingCardPalette.inkSecondary)
-            if let range = line.range {
+            if showRange, let range = line.range {
                 Text(range)
-                    .font(TopBarStyle.label(14, .medium).monospacedDigit())
+                    .font(TopBarStyle.label(M.timeSize, .medium).monospacedDigit())
                     .foregroundStyle(ScribeMeetingCardPalette.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Rectangle().fill(Color.white.opacity(0.3)).frame(width: 1, height: 14)
+                Rectangle().fill(Color.white.opacity(0.3)).frame(width: 1, height: M.timeSize - 2)
             }
             Text(line.relative)
-                .font(TopBarStyle.label(14, .semibold).monospacedDigit())
+                .font(TopBarStyle.label(M.timeSize, .semibold).monospacedDigit())
                 .foregroundStyle(ScribeMeetingCardPalette.violet)
                 .lineLimit(1)
-                .layoutPriority(1)
         }
-        .frame(height: 18)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
-    /// A reason or a wait where the state has one, else the participants where the calendar gave any.
+    /// The third line, a reason or a wait where the state has one, else the participants where the calendar gave
+    /// any, at the leading edge; the one action at the trailing edge. The action never gives way, the line does.
+    private var bottomRow: some View {
+        HStack(spacing: 8) {
+            if let meeting = card.meeting { thirdLine(meeting) }
+            Spacer(minLength: 0)
+            capsule.fixedSize(horizontal: true, vertical: false).layoutPriority(1)
+        }
+    }
+
     @ViewBuilder private func thirdLine(_ meeting: ScribeMeeting) -> some View {
         let detail = ScribeMeetingCardText.detail(card)
         if let text = detail ?? ScribeMeetingCardText.participants(meeting) {
-            HStack(spacing: 7) {
+            HStack(spacing: 5) {
                 Image(systemName: detail == nil ? "person.2.fill" : detailSymbol)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: M.detailSize - 1, weight: .medium))
                 Text(text)
-                    .font(TopBarStyle.label(13, .regular))
+                    .font(TopBarStyle.label(M.detailSize, .regular))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    // The drawn width is read back by the owned host and tests, to see whether the line was cut.
+                    .ownedJourneyWords("scribe.meetingCard.detail", text)
             }
             .foregroundStyle(ScribeMeetingCardPalette.inkSecondary)
-            .frame(height: 16)
-        } else {
-            Color.clear.frame(height: 16)
+            .accessibilityHidden(true)
         }
     }
 
@@ -329,7 +348,7 @@ private struct ScribeMeetingCardBody: View {
     /// A small spinner, or three dots with Reduce Motion. The still render has no spinner to draw.
     @ViewBuilder private var progress: some View {
         if reduceMotion || TopBarStyle.isSnapshot {
-            Image(systemName: "ellipsis").font(.system(size: 9, weight: .bold)).foregroundStyle(ScribeMeetingCardPalette.ink)
+            Image(systemName: "ellipsis").font(.system(size: M.pillTextSize - 1, weight: .bold)).foregroundStyle(ScribeMeetingCardPalette.ink)
                 .accessibilityHidden(true)
         } else {
             ProgressView().controlSize(.mini).accessibilityHidden(true)
@@ -344,13 +363,13 @@ private struct ScribeMeetingCardBody: View {
         if canJoin, let first = spec.joinApps.first {
             HStack(spacing: 0) {
                 Button { spec.onJoin(card, first) } label: {
-                    CapsuleLabel(symbol: ScribeMeetingCardText.symbol, title: ScribeMeetingCardText.join(first.name))
+                    CapsuleLabel(symbol: ScribeMeetingCardText.symbol, title: ScribeMeetingCardText.joinShort)
                 }
+                .accessibilityLabel(ScribeMeetingCardText.join(first.name))
                 .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
                 .keyboardShortcut(.defaultAction)
                 .ownedJourneyControl("scribe.meetingCard.primary")
                 appsMenu
-                Spacer(minLength: 0)
             }
             .modifier(CapsuleChrome(hovered: spec.hovered))
         } else if let title = ScribeMeetingCardText.primary(card) {
@@ -387,9 +406,9 @@ private struct ScribeMeetingCardBody: View {
 
     private var chevron: some View {
         Image(systemName: "chevron.down")
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: M.capsuleSymbolSize - 1, weight: .semibold))
             .foregroundStyle(ScribeMeetingCardPalette.ink)
-            .frame(width: 26, height: M.capsuleHeight)
+            .frame(width: 22, height: M.capsuleHeight)
     }
 
     private var menu: some View {
@@ -415,7 +434,7 @@ private struct ScribeMeetingCardBody: View {
         if ScribeMeetingCardText.canDismiss(card) {
             Button { spec.onDismiss(card) } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: M.closeSymbolSize, weight: .bold))
                     .foregroundStyle(ScribeMeetingCardPalette.ink)
                     .frame(width: M.closeSize, height: M.closeSize)
                     .background(Circle().fill(Color.white.opacity(0.14)))
@@ -449,7 +468,7 @@ struct ScribeMeetingCardGlow: View {
         Circle()
             .fill(Color(hex: 0x9DBAFF))
             .frame(width: ScribeMeetingCardMetrics.orb + 8, height: ScribeMeetingCardMetrics.orb + 8)
-            .blur(radius: 15)
+            .blur(radius: 10)
             .opacity(level)
             .allowsHitTesting(false)
             .onAppear {
@@ -517,10 +536,10 @@ private struct ScribeMeetingCardTile: View {
         ZStack {
             shape.fill(Color.white.opacity(0.2))
             if let image = AppIconCache.shared.entry(for: app.bundleID).image {
-                Image(nsImage: image).resizable().interpolation(.high).padding(1.5)
+                Image(nsImage: image).resizable().interpolation(.high).padding(1)
             } else {
                 Image(systemName: AppBrandCatalog.glyph(for: app.bundleID) ?? "app.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: ScribeMeetingCardMetrics.tileSymbolSize, weight: .semibold))
                     .foregroundStyle(ScribeMeetingCardPalette.ink)
             }
         }
@@ -536,18 +555,18 @@ private struct CapsuleLabel: View {
     let title: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 5) {
             if let symbol {
-                Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
+                Image(systemName: symbol).font(.system(size: ScribeMeetingCardMetrics.capsuleSymbolSize, weight: .semibold))
             }
             Text(title)
-                .font(TopBarStyle.label(13, .semibold))
+                .font(TopBarStyle.label(ScribeMeetingCardMetrics.capsuleLabelSize, .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
         .foregroundStyle(ScribeMeetingCardPalette.ink)
-        .padding(.leading, 14)
-        .padding(.trailing, 6)
+        .padding(.leading, 10)
+        .padding(.trailing, 10)
         .frame(height: ScribeMeetingCardMetrics.capsuleHeight)
         .contentShape(Rectangle())
     }
@@ -559,7 +578,6 @@ private struct CapsuleChrome: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: ScribeMeetingCardMetrics.capsuleHeight)
             .background(Capsule().fill(Color.white.opacity(hovered ? 0.2 : 0.13)))
             .overlay {

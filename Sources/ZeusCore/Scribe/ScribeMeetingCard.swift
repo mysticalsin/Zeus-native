@@ -46,34 +46,63 @@ public enum ScribeMeetingCard: Equatable, Sendable {
 
 
 /// The card's measurements, in points. One place, so the view, the panel and the tests read the same numbers.
+/// The compact card of 2026-11-18 (docs/MEETING-START-PLAN.md, MS5).
 public enum ScribeMeetingCardMetrics {
+    /// The longest fixed detail wording that fits beside the widest action capsule ("Try again", or "Join" with its
+    /// menu) at the detail size. `ScribeMeetingCardFitTests` measures the real card.
+    public static let detailMaxCharacters = 15
     /// The glass slab.
-    public static let width: CGFloat = 440
-    public static let height: CGFloat = 156
-    public static let cornerRadius: CGFloat = 32
+    public static let width: CGFloat = 340
+    public static let height: CGFloat = 96
+    public static let cornerRadius: CGFloat = 22
     public static let rim: CGFloat = 1.25
     /// Padding inside the slab.
-    public static let padding: CGFloat = 14
+    public static let padding: CGFloat = 12
     /// Room the window adds on every side so the shadow is not cut off.
-    public static let shadowRoom: CGFloat = 24
+    public static let shadowRoom: CGFloat = 16
+    /// The slab's soft shadow.
+    public static let shadowRadius: CGFloat = 12
+    public static let shadowY: CGFloat = 6
     /// The slab's distance from the top and right edges of the visible frame.
     public static let margin: CGFloat = 24
 
-    /// The left column: the orb with its ring, then the app tiles.
-    public static let leftShare: CGFloat = 0.3
-    public static var leftColumnWidth: CGFloat { width * leftShare }
-    public static let orb: CGFloat = 64
-    public static let ringInset: CGFloat = 6
+    /// The left column: the orb with its ring, then the app tiles. A narrow fixed column, no split and no divider.
+    public static let leftColumnWidth: CGFloat = 64
+    public static let orb: CGFloat = 40
+    public static let orbSymbolSize: CGFloat = 18
+    public static let ringInset: CGFloat = 4
     public static var ringDiameter: CGFloat { orb + 2 * ringInset }
     public static let ringWidth: CGFloat = 2
-    public static let tile: CGFloat = 22
-    public static let tileSpacing: CGFloat = 6
-    public static let maxApps = 4
+    public static let tile: CGFloat = 16
+    public static let tileSpacing: CGFloat = 4
+    public static let tileSymbolSize: CGFloat = 9
+    /// The tile row's cap. The Join menu has its own, `ScribeJoinApps.maxApps`.
+    public static let maxApps = 3
+    /// The gap between the ring and the tile row.
+    public static let orbTileGap: CGFloat = 6
+    public static var orbGroupHeight: CGFloat { ringDiameter + orbTileGap + tile }
 
-    /// The right column.
-    public static let titleSize: CGFloat = 24
-    public static let capsuleHeight: CGFloat = 32
-    public static let closeSize: CGFloat = 28
+    /// The right column, three rows: the title (with the close button), the status, and the bottom row that holds
+    /// the third line and the action capsule.
+    public static let titleSize: CGFloat = 15
+    public static let titleRowHeight: CGFloat = 20
+    public static let closeSize: CGFloat = 20
+    public static let closeSymbolSize: CGFloat = 9
+    public static let pillTextSize: CGFloat = 10
+    public static let pillHeight: CGFloat = 16
+    public static let timeSize: CGFloat = 12
+    public static let statusRowHeight: CGFloat = 16
+    public static let detailSize: CGFloat = 11
+    public static let capsuleHeight: CGFloat = 26
+    public static let capsuleLabelSize: CGFloat = 12
+    public static let capsuleSymbolSize: CGFloat = 11
+    /// The gaps between the rows. The second is a minimum: the bottom row sits at the bottom of the slab.
+    public static let titleGap: CGFloat = 3
+    public static let bottomGap: CGFloat = 4
+    /// The three rows and their gaps, which must fit inside the padding.
+    public static var contentHeight: CGFloat {
+        titleRowHeight + titleGap + statusRowHeight + bottomGap + capsuleHeight
+    }
 
     /// The window around the slab.
     public static var windowSize: CGSize {
@@ -83,9 +112,8 @@ public enum ScribeMeetingCardMetrics {
     /// The orb's centre in slab coordinates, from the top left. The ring is centred on it, so a reader of
     /// pixels knows where to look. The orb and the tile row are one group centred in the column.
     public static var orbCenter: CGPoint {
-        let group = ringDiameter + 10 + tile
-        let top = padding + (height - 2 * padding - group) / 2
-        return CGPoint(x: leftColumnWidth / 2, y: top + ringDiameter / 2)
+        let top = padding + (height - 2 * padding - orbGroupHeight) / 2
+        return CGPoint(x: padding + leftColumnWidth / 2, y: top + ringDiameter / 2)
     }
 }
 
@@ -230,11 +258,25 @@ public enum ScribeMeetingCardText {
 
     /// The line that holds a reason or a wait. Nil when there is nothing to say; the card then shows the
     /// participants, if the calendar gave any.
+    /// Short wording: the line sits beside the action capsule (`detailMaxCharacters`); the status text and the
+    /// spoken label keep the full sentence.
     public static func detail(_ card: ScribeMeetingCard) -> String? {
         switch card {
-        case .offer(_, let blocked): return blocked.flatMap { reason($0) }
-        case .failed(_, let failure): return reason(failure)
-        case .waiting: return "Starts once your last meeting is saved"
+        case .offer(_, let blocked):
+            switch blocked {
+            case .microphoneNotAsked: return "Mic not allowed"
+            case .microphoneDenied: return "Mic is off"
+            case .firstRecordingOwed: return "Record first"
+            case .notChosen, .noOptIn, nil: return nil
+            }
+        case .failed(_, let failure):
+            switch failure {
+            case .microphoneOff: return "Mic is off"
+            case .stillSaving: return "Still saving"
+            case .noResponse: return "Didn't start"
+            case .captureFailed: return "Couldn't start"
+            }
+        case .waiting: return "After last save"
         default: return nil
         }
     }
@@ -270,7 +312,10 @@ public enum ScribeMeetingCardText {
         return "\(names.count + 1) participants"
     }
 
+    /// The spoken words and the menu entries. The capsule itself shows `joinShort`, so a long app name never
+    /// widens it.
     public static func join(_ appName: String) -> String { "Join in \(appName)" }
+    public static let joinShort = "Join"
 
     /// Join replaces the offer's own action only before the start, with a link Zeus already holds and an app
     /// to open it in. Every other state keeps its own action.

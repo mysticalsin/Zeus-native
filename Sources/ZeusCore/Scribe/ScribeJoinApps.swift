@@ -15,7 +15,8 @@ public struct ScribeJoinApp: Equatable, Hashable, Sendable {
 }
 
 public enum ScribeJoinApps {
-    public static let maxApps = ScribeMeetingCardMetrics.maxApps
+    /// The Join menu's cap: the first app on the capsule and up to three more in the menu.
+    public static let maxApps = 4
 
     /// The call app whose own links these are, or nil for a link no call brand owns.
     public static func providerBrand(for url: URL) -> AppBrandCatalog.Brand? {

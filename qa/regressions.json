@@ -8351,6 +8351,54 @@
         "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
         "function": "safeLinksTeamsMeetupJoinIsUnwrapped"
       }
+    },
+    {
+      "id": "REG-950",
+      "failure": "The meeting card was too big at 440 x 156 with a 24 pt title; the owner chose a compact 340 x 96 card and nothing locked the size or checked that every row fits it.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+        "function": "everyRowAndTheActionCapsuleFitInsideTheSlabForTheTallestState"
+      }
+    },
+    {
+      "id": "REG-951",
+      "failure": "On the compact meeting card the reason line beside the action capsule cut its key words (\"Automatic sta...\", \"Starts once your last meeti...\"), so a blocked or waiting card hid why.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+        "function": "everyFixedDetailFitsBesideTheWidestCapsule"
+      }
+    },
+    {
+      "id": "REG-952",
+      "failure": "On the compact meeting card the Join capsule read \"Join in <installed app>\", so a long app name (Microsoft Teams, Google Chrome) widened it and cut the reason line beside it, and a capture error's raw text was cut (\"No input device is avail...\"). The old guard only counted characters.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ScribeMeetingCardFitTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/ScribeMeetingCardFitTests.swift",
+        "function": "everyDetailLineIsDrawnWholeBesideTheWidestCapsule"
+      }
+    },
+    {
+      "id": "REG-953",
+      "failure": "The Join menu was silently cut from four apps to three when the compact tile cap was reused for it.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+        "function": "theJoinMenuHoldsFourAppsAndTheTileRowThree"
+      }
     }
 ]
 }

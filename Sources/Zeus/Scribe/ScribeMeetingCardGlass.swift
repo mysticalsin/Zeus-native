@@ -59,7 +59,8 @@ private struct ScribeMeetingCardGlass: ViewModifier {
         content
             .background { base.clipShape(shape) }
             .overlay { rim }
-            .shadow(color: ScribeMeetingCardPalette.shadow.opacity(0.5), radius: 18, y: 10)
+            .shadow(color: ScribeMeetingCardPalette.shadow.opacity(0.5), radius: ScribeMeetingCardMetrics.shadowRadius,
+                    y: ScribeMeetingCardMetrics.shadowY)
     }
 
     @ViewBuilder private var base: some View {
