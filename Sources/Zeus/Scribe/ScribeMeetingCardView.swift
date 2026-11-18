@@ -363,8 +363,9 @@ private struct ScribeMeetingCardBody: View {
         if canJoin, let first = spec.joinApps.first {
             HStack(spacing: 0) {
                 Button { spec.onJoin(card, first) } label: {
-                    CapsuleLabel(symbol: ScribeMeetingCardText.symbol, title: ScribeMeetingCardText.join(first.name))
+                    CapsuleLabel(symbol: ScribeMeetingCardText.symbol, title: ScribeMeetingCardText.joinShort)
                 }
+                .accessibilityLabel(ScribeMeetingCardText.join(first.name))
                 .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
                 .keyboardShortcut(.defaultAction)
                 .ownedJourneyControl("scribe.meetingCard.primary")

@@ -48,8 +48,8 @@ public enum ScribeMeetingCard: Equatable, Sendable {
 /// The card's measurements, in points. One place, so the view, the panel and the tests read the same numbers.
 /// The compact card of 2026-11-18 (docs/MEETING-START-PLAN.md, MS5).
 public enum ScribeMeetingCardMetrics {
-    /// The longest fixed detail wording that fits beside the widest action capsule ("Join in Zoom" with its menu)
-    /// at the detail size, measured from the rendered card.
+    /// The longest fixed detail wording that fits beside the widest action capsule ("Try again", or "Join" with its
+    /// menu) at the detail size. `ScribeMeetingCardFitTests` measures the real card.
     public static let detailMaxCharacters = 15
     /// The glass slab.
     public static let width: CGFloat = 340
@@ -76,6 +76,7 @@ public enum ScribeMeetingCardMetrics {
     public static let tile: CGFloat = 16
     public static let tileSpacing: CGFloat = 4
     public static let tileSymbolSize: CGFloat = 9
+    /// The tile row's cap. The Join menu has its own, `ScribeJoinApps.maxApps`.
     public static let maxApps = 3
     /// The gap between the ring and the tile row.
     public static let orbTileGap: CGFloat = 6
@@ -273,7 +274,7 @@ public enum ScribeMeetingCardText {
             case .microphoneOff: return "Mic is off"
             case .stillSaving: return "Still saving"
             case .noResponse: return "Didn't start"
-            case .captureFailed: return reason(failure)
+            case .captureFailed: return "Couldn't start"
             }
         case .waiting: return "After last save"
         default: return nil
@@ -311,7 +312,10 @@ public enum ScribeMeetingCardText {
         return "\(names.count + 1) participants"
     }
 
+    /// The spoken words and the menu entries. The capsule itself shows `joinShort`, so a long app name never
+    /// widens it.
     public static func join(_ appName: String) -> String { "Join in \(appName)" }
+    public static let joinShort = "Join"
 
     /// Join replaces the offer's own action only before the start, with a link Zeus already holds and an app
     /// to open it in. Every other state keeps its own action.

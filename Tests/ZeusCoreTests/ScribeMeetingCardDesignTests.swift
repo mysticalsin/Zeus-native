@@ -229,6 +229,10 @@ struct ScribeMeetingCardDesignTests {
 
     // MARK: Join and controls
 
+    @Test func theCapsuleSaysJoinAndTheSpokenWordsNameTheApp() {
+        #expect(ScribeMeetingCardText.joinShort == "Join")
+    }
+
     @Test func joinNamesTheApp() {
         #expect(ScribeMeetingCardText.join("Synthetic App") == "Join in Synthetic App")
     }

@@ -609,10 +609,10 @@ Content, states, actions, motion, keyboard, VoiceOver labels and ids are unchang
 | Shadow room (window adds it on every side) | 16 pt | 24 |
 | Shadow | radius 12, y 6 | radius 18, y 10 |
 | Margin from the top and right of the visible frame | 24 pt (unchanged) | 24 |
-| Window | 372 x 128 pt, flush with the corner (8 pt less than the margin) | 488 x 204 |
+| Window | 372 x 128 pt, 8 pt in from the corner; the slab is 24 pt in | 488 x 204 |
 | Orb column | 64 pt wide, no 30 percent split, no divider | 30 percent, hairline |
 | Orb, ring, ring width | 40, 48, 2 pt; orb symbol 18 pt | 64, 76, 2; symbol 28 |
-| App tiles | 16 pt, spacing 4, at most 3, under the ring (gap 6) | 22, 6, 4 |
+| App tiles | 16 pt, spacing 4, at most 3 tiles, under the ring (gap 6); the Join menu still offers at most four apps | 22, 6, 4 |
 | Title | 15 pt semibold, one line, tail truncation | 24 bold |
 | Close button | 20 pt, in the title row at the trailing edge, symbol 9 pt | 28, over the corner |
 | Status pill | 10 pt semibold, 16 pt capsule, dot 5 pt | 11.5, 20 |
@@ -626,7 +626,10 @@ Layout. The slab is one row: the orb column, then the text column. The text colu
 1. Title row, 20 pt: the title, and the close button at the trailing edge where the card can be dismissed.
 2. Status row, 16 pt: the status pill, then the clock, the time range and the relative time ("In 5 min", "Now").
 3. Bottom row, 26 pt: the third line at the leading edge (the reason, the wait, or the participants), and the
-   one action capsule at the trailing edge, hugging its label. Where there is no action the row keeps its
+   one action capsule at the trailing edge, hugging its label. The capsule title is short ("Join", "Record",
+   "Try again", "Cancel", "Switch", "Allow"): the Join capsule says only "Join", and the installed app's name
+   ("Join in Microsoft Teams") lives in the menu entries and the spoken label, so a long app name never widens
+   the capsule and squeezes the line beside it. Where there is no action the row keeps its
    height, so the card never changes size.
 
 The rows total 62 pt, leaving 10 pt for the gaps, so the card is 96 pt at every state. The orb group (ring 48,
@@ -640,14 +643,19 @@ Decisions where the compact size forced a change:
   need 20 + 16 + 14 + 26 = 76 pt, more than the 72 pt available. The cost is that a long reason beside a wide
   capsule can meet the tail ellipsis earlier; the spoken label carries the full words (decision D7 above), and the
   capsule never truncates before the reason does.
-- The bottom row therefore uses short fixed wording, at most 15 characters (`detailMaxCharacters`, measured on the
-  rendered card beside "Join in Zoom" with its menu): "Mic not allowed", "Mic is off", "Record first",
-  "Still saving", "Didn't start", "After last save". The status text and the spoken label keep the full sentence.
-  Only a capture error's own text can still meet the ellipsis (REG-951).
+- The bottom row therefore uses short fixed wording on screen, at most 15 characters (`detailMaxCharacters`):
+  "Mic not allowed", "Mic is off", "Record first", "Still saving", "Didn't start", "After last save", and
+  "Couldn't start" for a capture error. The full sentence (the blocked reason, the wait, the capture error's own
+  text) stays in the status text and the spoken label. The wording is fixed, so the line cannot be cut by an
+  error message of any length. `ScribeMeetingCardFitTests` hosts the real card with long app names and checks
+  that every detail line is drawn at its natural width beside the widest capsule and that the card keeps its
+  size (REG-951, REG-952).
+- The Join menu keeps up to four apps (`ScribeJoinApps.maxApps`); only the tile row under the orb is capped at
+  three (`ScribeMeetingCardMetrics.maxApps`).
 - The close button moves into the title row so the title never runs under it; it still shows on hover and is
   always there for VoiceOver and the keyboard.
-- The time range gives way before the relative time: where the status row cannot hold both, the range is left
-  out and the relative time stays.
+- The time range gives way before the relative time: where the status row cannot hold the pill, the range and the
+  relative time, the range is left out and the relative time stays. This is intended, not a cut.
 - Hover, press, entrance, crossfade, the ring sweep and the breathing glow are unchanged. The glow is sized from the
   orb.
 

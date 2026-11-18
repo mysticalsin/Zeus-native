@@ -459,6 +459,14 @@
       "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift"
     },
     {
+      "id": "native-ScribeMeetingCardFitTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual compact meeting card hosted in an offscreen NSWindow with long installed app names and synthetic meetings: the drawn width of the bottom-row detail line against its natural width and the widest capsule, and the card size. No calendar, microphone, permission prompt, display change or device acceptance.",
+      "suite": "ScribeMeetingCardFitTests",
+      "file": "Tests/ZeusAppTests/ScribeMeetingCardFitTests.swift"
+    },
+    {
       "id": "native-ScribeDetectorTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -1932,6 +1940,37 @@
             {
               "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
               "function": "everyFixedDetailFitsBesideTheWidestCapsule"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "aCaptureFailureShowsShortWordingButSaysTheWholeReasonInTheStatusAndTheSpokenLabel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "theJoinMenuHoldsFourAppsAndTheTileRowThree"
+            }
+          ]
+        },
+        {
+          "id": "F04.compact-meeting-card-fit",
+          "check": "native-ScribeMeetingCardFitTests",
+          "acceptance": "The real compact card, hosted with long installed app names, keeps its slab plus shadow size in every state, draws every bottom-row detail line at its natural width beside the widest capsule, and shows at most three app tiles. Does not prove how the glass looks on a real desktop.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardFitTests.swift",
+              "function": "everyStateKeepsTheSlabPlusShadowSizeWithLongAppNames"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardFitTests.swift",
+              "function": "everyDetailLineIsDrawnWholeBesideTheWidestCapsule"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardFitTests.swift",
+              "function": "theDetailWordingIsFixedAndShortWhateverTheCaptureErrorSays"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeMeetingCardFitTests.swift",
+              "function": "theTileRowShowsAtMostThreeAppsWhileTheJoinMenuKeepsFour"
             }
           ]
         }
