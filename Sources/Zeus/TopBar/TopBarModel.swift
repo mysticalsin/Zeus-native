@@ -161,6 +161,8 @@ final class TopBarModel {
     var focus = FocusTimer()
     /// The Mac's active Focus, read only while that setting is on.
     var systemFocus: FocusNameStatus = .off
+    /// The lock-screen player. Unavailable until a private space that ignores input exists.
+    var lockScreenPlayer: LockScreenPlayerStatus = .off
     var note: String {
         didSet { defaults.set(note, forKey: "topBar.note") }
     }

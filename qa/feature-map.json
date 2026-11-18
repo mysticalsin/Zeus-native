@@ -795,6 +795,14 @@
       "scope": "The Focus page model fed synthetic store bytes or a permission denial. The user's Do Not Disturb files are not opened."
     },
     {
+      "id": "native-LockScreenPlayerTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "LockScreenPlayerTests",
+      "file": "Tests/ZeusAppTests/LockScreenPlayerTests.swift",
+      "scope": "The player model with an injected space. No private window-server call and no window."
+    },
+    {
       "id": "native-LyricTimingWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8154,6 +8162,32 @@
             {
               "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
               "function": "theActiveFocusNameComesFromTheStoreOrNeedsAccess"
+            }
+          ]
+        },
+        {
+          "id": "F13.lock-screen-player",
+          "check": "native-LockScreenPlayerTests",
+          "acceptance": "Without a private space the player is unavailable and no window is created. A space that ignores input can be shown. Turning it off clears the state.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/LockScreenPlayerTests.swift",
+              "function": "aMissingPrivateSpaceStaysUnavailableAndCreatesNoWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LockScreenPlayerTests.swift",
+              "function": "aSpaceThatIgnoresInputCanBeShown"
+            }
+          ]
+        },
+        {
+          "id": "F13.lock-screen-player-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The player is off when disabled, unavailable unless a space exists and ignores input, and shown only then.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
+              "function": "theLockScreenPlayerFailsClosedWithoutAPrivateSpace"
             }
           ]
         },

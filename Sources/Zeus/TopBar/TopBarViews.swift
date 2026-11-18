@@ -615,6 +615,11 @@ struct MusicPage: View {
                             .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
                             .lineLimit(1).truncationMode(.middle)
                     }
+                    if topBar.lockScreenPlayer != .off {
+                        Text(LockScreenPlayerText.line(topBar.lockScreenPlayer))
+                            .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
+                            .lineLimit(1)
+                    }
                     VStack(alignment: .leading, spacing: 8) {
                         if collapsed {
                             Text(topBar.nowPlaying?.title ?? "Nothing playing")

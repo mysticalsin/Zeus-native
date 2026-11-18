@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 208 of 208 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 208 in scope). 197 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 209 of 209 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 209 in scope). 198 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 157.
+**Before this round:** has 19, partial 27, missing 158.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -100,6 +100,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Music | Show receiver names | toggle | off | Lists receivers found on the local network in the output menu. | missing | live | `music.receiverNames` | Zeus addition. Off by default. The search stops when this is turned off. |
 | Music | Earbud overlay | toggle | off | Shows a connected audio device inside the notch, then dismisses it. | missing | live | `music.earbudOverlay` | Zeus addition. Off by default. Needs Bluetooth. The public device API does not expose battery, so a percentage appears only when one was supplied. |
 | Music | Show the Focus name | toggle | off | Shows the active Focus on the Focus page. | missing | live | `music.focusName` | Zeus addition. Off by default. Needs Full Disk Access. If it is not granted, the page says so and nothing is read. |
+| Music | Lock screen player | toggle | off | Shows the player on the lock screen. | missing | live | `music.lockScreenPlayer` | Zeus addition. Off by default. The private space is not created; the player reports unavailable and no window is opened. |
 | Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
 | Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 

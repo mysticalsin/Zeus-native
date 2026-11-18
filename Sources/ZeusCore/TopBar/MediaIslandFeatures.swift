@@ -26,8 +26,8 @@ public enum MediaIslandFeatures {
     /// Earbud overlay. Needs Bluetooth and starts off. The notch shows a connected audio device, then dismisses it.
     public static let earbudOverlay = MediaIslandFeature(enabled: false, permission: .bluetooth,
                                                           usageStringKey: "NSBluetoothAlwaysUsageDescription")
-    /// Lock-screen player contract: a private window-server space that collects no input.
-    /// No window is created.
+    /// Lock-screen player. Starts off. A private space that ignores input is required; otherwise it stays unavailable
+    /// and no window is created.
     public static let lockScreenPlayer = MediaIslandFeature(enabled: false)
     /// The active Focus name. Needs Full Disk Access and starts off. That permission has no usage string.
     /// The store reader reports when access is missing and does not write the files.
@@ -71,6 +71,23 @@ public enum SystemNowPlayingAdapter {
         let fields = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
         guard fields.count == 6, let playing = Int(fields[3]), let position = Double(fields[4]), let duration = Double(fields[5]) else { return nil }
         return SystemNowPlayingLine(title: fields[0], artist: fields[1], album: fields[2], playing: playing != 0, position: position, duration: duration)
+    }
+}
+
+public enum LockScreenPlayerStatus: Equatable, Sendable {
+    case off
+    case unavailable
+    case shown
+}
+
+public enum LockScreenPlayerGate {
+    public static let settingID = "music.lockScreenPlayer"
+
+    /// Shown only when a private space exists and it ignores input. Anything else stays unavailable.
+    public static func result(enabled: Bool, spaceAvailable: Bool, inputIgnored: Bool) -> LockScreenPlayerStatus {
+        guard enabled else { return .off }
+        guard spaceAvailable, inputIgnored else { return .unavailable }
+        return .shown
     }
 }
 
