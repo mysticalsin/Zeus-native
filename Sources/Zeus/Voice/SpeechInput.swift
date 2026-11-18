@@ -118,7 +118,7 @@ final class SpeechInput: @unchecked Sendable {
     // the input node can come back with a stale/invalid format on the next `start()`. A fresh
     // `AVAudioEngine()` per turn (built in `start()`, see below) sidesteps that state machine
     // entirely -- this is Apple's own documented workaround for repeated start/stop engines.
-    private var engine = AVAudioEngine()
+    private var engine: any CaptureEngine = AVCaptureEngine(AVAudioEngine())
     private var recognizer: SFSpeechRecognizer?
     private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -208,7 +208,7 @@ final class SpeechInput: @unchecked Sendable {
         // Fresh engine every turn (see the stored property's comment): avoids the second-turn
         // silent-audio bug from reusing a stopped engine's input node.
         let engine = AVAudioEngine()
-        lock.withLock { self.engine = engine }
+        lock.withLock { self.engine = AVCaptureEngine(engine) }
 
         let request = makeRequest(recognizer: activeRecognizer)
 
@@ -415,7 +415,7 @@ final class SpeechInput: @unchecked Sendable {
                                 serverAllowed: allowServerRecognition) else { throw InputError.onDeviceUnavailable }
         cancel()
         let freshEngine = AVAudioEngine()
-        lock.withLock { engine = freshEngine }
+        lock.withLock { engine = AVCaptureEngine(freshEngine) }
         let request = makeRequest(recognizer: activeRecognizer)
         lock.lock()
         self.request = request
@@ -661,6 +661,7 @@ final class SpeechInput: @unchecked Sendable {
             stopRequested = true
             return generation
         }
+        beforeStopAudioForTesting?()
         stopAudio()
         guard recognizes else { return "" }
         let (alreadyDone, text) = lock.withLock { () -> (Bool, String) in
@@ -697,19 +698,31 @@ final class SpeechInput: @unchecked Sendable {
             defer { task = nil }
             return task
         }
+        beforeStopAudioForTesting?()
         stopAudio()
         oldTask?.cancel()
         finish()
     }
 
     /// Test seam: opens a session the way `start` does, without touching audio hardware.
-    func beginSessionForTesting(requestFormat format: AVAudioFormat?) -> Int {
-        lock.withLock {
+    /// Test seams: run between a stop's or cancel's first lock and its engine teardown, to land a newer `start` in that gap.
+    var beforeStopAudioForTesting: (() -> Void)?
+    var hasConfigurationObserverForTesting: Bool { lock.withLock { configurationObserver != nil } }
+
+    func beginSessionForTesting(requestFormat format: AVAudioFormat?, engine fake: (any CaptureEngine)? = nil) -> Int {
+        let observer = fake == nil ? nil
+            : NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: nil) { _ in }
+        return lock.withLock {
+            if let fake { engine = fake; configurationObserver = observer }
             generation += 1
             recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
             requestFormat = format
             return generation
         }
+    }
+
+    /// After `engine.start()` returns, a stop or a newer turn may have landed during the start.
+    func closeCaptureIfNotOwned(_ engine: any CaptureEngine, session: Int) {
     }
 
     private func ownsCapture(_ session: Int) -> Bool {
@@ -740,7 +753,7 @@ final class SpeechInput: @unchecked Sendable {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         let current = lock.withLock { engine }
         if current.isRunning { current.stop() }
-        current.inputNode.removeTap(onBus: 0)
+        current.removeInputTap()
     }
 
     private func reportCaptureFailure(_ failure: CaptureFailure, session: Int, origin: UInt64) {
