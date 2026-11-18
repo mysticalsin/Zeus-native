@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -160,6 +161,226 @@ class EvidenceContractTests(unittest.TestCase):
                            (passed + "✘ Test bad() failed\n", 0)]:
             with self.assertRaises(c.Invalid):
                 c.swift_summary(text, code)
+
+    def test_torn_portable_pointing_log_marks_required_cases_not_run(self):
+        # Exact portable-pointing test.log from artifact 14448317026 (run 44344835181).
+        # Stdout lines were torn, so the text parser never sees these pass lines.
+        log = (Path(__file__).resolve().parent / "fixtures" / "portable-pointing-44344835181.log").read_text()
+        _, _, functions = c.swift_summary(log, 0)
+        check = {"status": "passed", "passed_functions": functions}
+        for name in ("holdStartsImmediately", "oneXDisplayWithANegativeOrigin"):
+            with self.assertRaises(c.Invalid) as caught:
+                c.case_passed({"file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift", "function": name}, check, Path("/unused"))
+            self.assertIn(f"required case did not run: {name}", str(caught.exception))
+
+    def test_structured_results_keep_cases_the_torn_log_dropped(self):
+        text = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="2" failures="0" skipped="0" time="0.001">
+    <testcase classname="PointingKeyGestureTests" name="holdStartsImmediately()" time="0.001" />
+    <testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        count, suites, functions = c.swift_structured_results(text, 0)
+        self.assertEqual((count, suites), (2, 1))
+        self.assertEqual(functions, ["holdStartsImmediately", "oneXDisplayWithANegativeOrigin"])
+        failed = text.replace('name="holdStartsImmediately()" time="0.001" />',
+                              'name="holdStartsImmediately()" time="0.001"><failure message="no">x</failure></testcase>')
+        with self.assertRaises(c.Invalid):
+            c.swift_structured_results(failed, 0)
+        skipped = text.replace(
+            '<testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />',
+            '<testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001"><skipped /></testcase>')
+        with self.assertRaises(c.Invalid):
+            c.swift_structured_results(skipped, 0)
+
+    def test_structured_results_fail_closed_when_a_required_case_is_missing(self):
+        text = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="PointingKeyGestureTests" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        _, _, functions = c.swift_structured_results(text, 0)
+        run = (c.ROOT / "qa/closed-loop/run.py").read_text()
+        gate = (c.ROOT / "qa/closed-loop/gate.py").read_text()
+        self.assertIn("--xunit-output", run)
+        self.assertIn("swift_structured_results", run)
+        self.assertIn("swift_structured_results", gate)
+        check = {"status": "passed", "passed_functions": functions}
+        c.case_passed({"file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift", "function": "holdStartsImmediately"}, check, Path("/unused"))
+        with self.assertRaises(c.Invalid) as caught:
+            c.case_passed({"file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift", "function": "oneXDisplayWithANegativeOrigin"}, check, Path("/unused"))
+        self.assertIn("required case did not run: oneXDisplayWithANegativeOrigin", str(caught.exception))
+
+    def test_structured_results_reject_unsafe_xml_and_nonzero_signals(self):
+        passing = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        clean_log = "✔ Test holdStartsImmediately() passed after 0.001 seconds.\n"
+        count, suites, functions = c.swift_structured_results(passing, 0, clean_log)
+        self.assertEqual((count, suites, functions), (1, 1, ["holdStartsImmediately"]))
+        rejected = {
+            "empty": ("", 0, ""),
+            "truncated": ("<testsuites><testsuite>", 0, ""),
+            "doctype": ('<!DOCTYPE testsuites [<!ENTITY x "holdStartsImmediately">]>'
+                        '<testsuites><testsuite name="T" tests="1" failures="0" errors="0" skipped="0">'
+                        '<testcase name="&x;()" classname="S" time="0.001"/></testsuite></testsuites>', 0, ""),
+            "entity": (passing.replace(
+                "<testcase",
+                "<!ENTITY x \"a\"><testcase",
+            ), 0, ""),
+            "duplicate pass and fail": (passing.replace(
+                "</testsuite>",
+                '<testcase classname="S" name="holdStartsImmediately()" time="0.001"><failure message="no">x</failure></testcase></testsuite>',
+            ), 0, ""),
+            "nonzero exit": (passing, 1, clean_log),
+            "failure diagnostic": (passing, 0, clean_log + "✘ Test bad() failed\n"),
+            "nonzero failures": (passing.replace('failures="0"', 'failures="1"'), 0, clean_log),
+            "nonzero errors": (passing.replace('errors="0"', 'errors="2"'), 0, clean_log),
+            "nonzero skipped": (passing.replace('skipped="0"', 'skipped="1"'), 0, clean_log),
+            "non-integer failures": (passing.replace('failures="0"', 'failures="no"'), 0, clean_log),
+            "oversized": (passing + "<!--" + ("x" * (32 * 1024 * 1024)) + "-->", 0, clean_log),
+        }
+        for name, (text, code, log) in rejected.items():
+            with self.subTest(name):
+                with self.assertRaises(c.Invalid):
+                    c.swift_structured_results(text, code, log)
+
+    def test_xunit_counts_root_totals_and_bounded_read_fail_closed(self):
+        one = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        torn = (Path(__file__).resolve().parent / "fixtures" / "portable-pointing-44344835181.log").read_text()
+        clean = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="2" failures="0" skipped="0" time="0.001">
+    <testcase classname="PointingKeyGestureTests" name="holdStartsImmediately()" time="0.001" />
+    <testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        _, _, functions = c.swift_structured_results(clean, 0, torn)
+        self.assertEqual(functions, ["holdStartsImmediately", "oneXDisplayWithANegativeOrigin"])
+        with self.subTest("truncated"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results("<testsuites><testsuite>", 0)
+        with self.subTest("empty suite"):
+            empty = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="0" failures="0" skipped="0" time="0"></testsuite>
+</testsuites>
+"""
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(empty, 0)
+        with self.subTest("tests count mismatch"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace('tests="1"', 'tests="2"'), 0)
+        with self.subTest("root failures"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace("<testsuites>", '<testsuites failures="1">'), 0)
+        with self.subTest("root malformed"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace("<testsuites>", '<testsuites errors="no">'), 0)
+        with self.subTest("nested mismatch"):
+            nested = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Outer" errors="0" tests="5" failures="0" skipped="0">
+    <testsuite name="Inner" errors="0" tests="1" failures="0" skipped="0">
+      <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+    </testsuite>
+  </testsuite>
+</testsuites>
+"""
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(nested, 0)
+        with self.subTest("bom"):
+            _, _, bom_functions = c.swift_structured_results("\ufeff" + one, 0)
+            self.assertEqual(bom_functions, ["holdStartsImmediately"])
+        with self.subTest("nested direct counts"):
+            nested_ok = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Outer" errors="0" tests="0" failures="0" skipped="0">
+    <testsuite name="Inner" errors="0" tests="1" failures="0" skipped="0">
+      <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+    </testsuite>
+  </testsuite>
+</testsuites>
+"""
+            _, _, nested_functions = c.swift_structured_results(nested_ok, 0)
+            self.assertEqual(nested_functions, ["holdStartsImmediately"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "results-swift-testing.xml"
+            path.write_bytes("x".encode() * 9)
+            with self.subTest("bounded read"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(path, limit=8)
+            path.write_bytes("\xff\xfe<\x00".encode("latin1") if False else b"\xff\xfe<\x00")
+            with self.subTest("utf-16"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(path, limit=32)
+
+    def test_xunit_testcase_must_sit_in_a_suite_and_paths_stay_closed(self):
+        one = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        stray = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testcase classname="S" name="outside()" time="0.001" />
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        wrapped = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="0" failures="0" skipped="0" time="0.001">
+    <wrapper>
+      <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+    </wrapper>
+  </testsuite>
+</testsuites>
+"""
+        with self.subTest("testcase directly under testsuites"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(stray, 0)
+        with self.subTest("testcase outside a testsuite"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(wrapped, 0)
+        with self.subTest("missing tests"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace(' tests="1"', ""), 0)
+        with self.subTest("tests not an integer"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace('tests="1"', 'tests="no"'), 0)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "results-swift-testing.xml"
+            target.write_text(one)
+            link = root / "linked.xml"
+            link.symlink_to(target)
+            with self.subTest("symlink"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(link)
+            folder = root / "not-a-file"
+            folder.mkdir()
+            with self.subTest("not a regular file"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(folder)
 
     def test_python_skips_and_zero_cases_do_not_pass(self):
         passed = "test_one (Suite.test_one) ... ok\nRan 1 test in 0.1s\nOK\n"
@@ -372,7 +593,14 @@ class PortableRetryTests(unittest.TestCase):
         """Run one portable check whose successive attempts write the given logs; return row and call count."""
         calls = []
         def execute(command, log, timeout, environment=None):
-            log.write_text(logs[min(len(calls), len(logs) - 1)])
+            text = logs[min(len(calls), len(logs) - 1)]
+            log.write_text(text)
+            names = re.findall(r"✔ Test ([A-Za-z_][A-Za-z_0-9]*)\(\) passed", text)
+            cases = "\n".join(f'    <testcase classname="Fixture" name="{name}()" time="0.001" />' for name in names)
+            xunit = (f'<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n'
+                     f'  <testsuite name="TestResults" errors="0" tests="{len(names)}" failures="0" skipped="0" time="0.001">\n'
+                     f"{cases}\n  </testsuite>\n</testsuites>\n")
+            (log.parent / "results-swift-testing.xml").write_text(xunit)
             calls.append(command)
             return 0, 0.1
         with tempfile.TemporaryDirectory() as directory:
