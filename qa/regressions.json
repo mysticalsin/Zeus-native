@@ -4486,6 +4486,18 @@
         "file": "qa/closed-loop/tests/test_contracts.py",
         "function": "test_xunit_counts_root_totals_and_bounded_read_fail_closed"
       }
+    },
+    {
+      "id": "REG-420",
+      "failure": "A testcase placed directly under testsuites, or under any element other than testsuite, was still accepted when some other suite's own tests count matched. Every testcase must have a testsuite parent, and the suite totals must add up to the testcase count.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_xunit_testcase_must_sit_in_a_suite_and_paths_stay_closed"
+      }
     }
   ]
 }

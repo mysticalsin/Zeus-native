@@ -344,8 +344,20 @@ def swift_structured_results(text, returncode, log=""):
         direct = sum(1 for child in suite if child.tag == "testcase")
         declared = _xunit_integer(suite, "tests", required=True)
         require(declared == direct, f"Swift Testing xUnit testsuite tests is {declared}, not {direct}")
+    declared_sum = 0
+    for suite in root.iter("testsuite"):
+        declared_sum += _xunit_integer(suite, "tests", required=True)
+    def parent_is_suite(element, parent):
+        if element.tag == "testcase":
+            require(parent is not None and parent.tag == "testsuite",
+                    "Swift Testing xUnit testcase is not inside a testsuite")
+        for child in element:
+            parent_is_suite(child, element)
+    parent_is_suite(root, None)
     cases = list(root.iter("testcase"))
     require(cases, "Swift Testing xUnit has no test cases")
+    require(declared_sum == len(cases),
+            f"Swift Testing xUnit suite totals are {declared_sum}, not {len(cases)}")
     failed = []
     functions = []
     for case in cases:
