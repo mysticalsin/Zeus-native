@@ -24,11 +24,16 @@ final class VoicePreviewModel {
 
     func isActive(_ provider: VoiceTTSProvider, _ voice: String) -> Bool { activeID == Self.id(provider, voice) }
 
-    func toggle(_ provider: VoiceTTSProvider, voice: String) {
+    func toggle(_ provider: VoiceTTSProvider, voice: String, now: Date = Date(), defaults: UserDefaults = .standard,
+                renderer: @escaping (VoiceTTSProvider, String) async -> URL? = { await VoicePreviewModel.render($0, voice: $1) }) {
         let id = Self.id(provider, voice)
         let wasActive = activeID == id
         stop()
         if wasActive { return }
+        if provider == .openAICompatible, OpenAITTSVoice.isRetired(defaults: defaults, now: now) {
+            message = OpenAISpeechRetirement.endedNote
+            return
+        }
         let env = ProcessInfo.processInfo.environment
         let audibleOK = (env["AUDIBLE-OK"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if env["ZEUS_SILENT_TESTS"] == "1" || audibleOK == "0" || audibleOK == "false" {
@@ -39,7 +44,7 @@ final class VoicePreviewModel {
         loading = true
         message = nil
         task = Task { [weak self] in
-            let url = await Self.render(provider, voice: voice)
+            let url = await renderer(provider, voice)
             guard let self, self.activeID == id, !Task.isCancelled else {
                 if let url { try? FileManager.default.removeItem(at: url) }
                 return
@@ -85,7 +90,7 @@ final class VoicePreviewModel {
     }
 
     /// A temporary WAV for the sentence in `voice`, or nil. Uses the saved key, never a bundled clip.
-    private static func render(_ provider: VoiceTTSProvider, voice: String) async -> URL? {
+    static func render(_ provider: VoiceTTSProvider, voice: String) async -> URL? {
         let sentence = VoiceCatalogPreview.sentence
         switch provider {
         case .openAICompatible:

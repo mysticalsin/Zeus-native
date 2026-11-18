@@ -8436,6 +8436,54 @@
         "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
         "function": "readsAfterAnInvalidationReturnThePreviousSnapshotWithoutEnumeratingOnMain"
       }
+    },
+    {
+      "id": "REG-966",
+      "failure": "Once OpenAI shuts down its speech models on 2027-01-06, the engine router would still pick OpenAI and the saved OpenAI choice would fail every line before falling back.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+        "function": "routerNeverSelectsOpenAIAfterShutdownAndFallsThroughLikeNoKey"
+      }
+    },
+    {
+      "id": "REG-967",
+      "failure": "After the OpenAI speech shutdown the Settings picker would still offer OpenAI voices that no longer speak, and before it carried no warning that they end.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+        "function": "catalogHidesOpenAIVoicesAfterShutdownOnly"
+      }
+    },
+    {
+      "id": "REG-968",
+      "failure": "After the OpenAI speech shutdown the pointing explanation would still build and send an OpenAI speech request instead of using its fallback.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-OpenAISpeechRetirementAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+        "function": "pointingRouterFallsBackToTheSystemVoiceWithoutSendingAfterShutdown"
+      }
+    },
+    {
+      "id": "REG-969",
+      "failure": "After the OpenAI speech shutdown a voice preview would still call OpenAI and report a connection problem.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-OpenAISpeechRetirementAppTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+        "function": "previewDoesNotRenderOrCallOpenAIAfterShutdown"
+      }
     }
 ]
 }

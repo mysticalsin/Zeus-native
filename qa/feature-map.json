@@ -83,6 +83,14 @@
       "file": "Tests/ZeusAppTests/BrainCaptureModelTests.swift"
     },
     {
+      "id": "native-OpenAISpeechRetirementAppTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "scope": "Actual pointing speech router, voice preview model and OpenAI config gate with an injected date and isolated defaults; no network, Keychain write or audio.",
+      "suite": "OpenAISpeechRetirementAppTests",
+      "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift"
+    },
+    {
       "id": "native-UltronVoiceEffectTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5185,6 +5193,92 @@
             {
               "file": "Tests/ZeusCoreTests/TurnRaceTests.swift",
               "function": "deepTriggerHeuristic"
+            }
+          ]
+        },
+        {
+          "id": "F11.openai-speech-retirement",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "From 2027-01-06T00:00:00Z the five listed OpenAI speech model ids (exact ids, no prefix matching) on OpenAI's own endpoint count as retired: the engine router never selects OpenAI and falls through to the same engines as when no key is saved (ElevenLabs, Kokoro, Mac voice), the picker lists no OpenAI voices, and a saved OpenAI choice is kept with a line naming the engine that speaks instead. A custom OpenAI-compatible base URL is never retired and gets no note. Before the date routing is unchanged and Settings shows one note about the end date. Checked with an injected clock on pure functions; no network call or audio is made, and the Settings view layout and its 30 second refresh are not rendered.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "retirementDateIsJanuarySixth2027Utc"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "deprecatedSpeechModelsAreRetiredFromTheShutdownInstant"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "onlyTheFiveListedIdsAreRetiredNotPrefixes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "onlyTheOpenAIHostIsRetiredACustomBaseURLKeepsWorking"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "aSavedOpenAIChoiceAfterShutdownShowsTheFallbackEngine"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "otherModelsAreNeverRetiredByThisPolicy"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "routerNeverSelectsOpenAIAfterShutdownAndFallsThroughLikeNoKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "routerWithOnlyOpenAIAfterShutdownSpeaksWithTheMacVoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "routerBeforeShutdownIsUnchanged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "catalogHidesOpenAIVoicesAfterShutdownOnly"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "settingsNoteIsOnePlainSentencePairBeforeAndAfter"
+            }
+          ]
+        },
+        {
+          "id": "F11.openai-speech-retirement-app",
+          "check": "native-OpenAISpeechRetirementAppTests",
+          "acceptance": "From 2027-01-06T00:00:00Z the pointing speech path reads no key and sends no request (checked with an injected key reader and transport that fail if reached) and falls back to the system voice, the OpenAI voice preview never reaches its renderer and shows the ended note, and OpenAITTSVoice.config returns a config before the date with a key and nothing after it. A custom base URL keeps its config after the date. Checked with an injected clock and isolated defaults; no network call, audio or Keychain access is made.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "pointingOpenAISpeechReadsNoKeyAndSendsNothingAfterShutdown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "pointingOpenAISpeechSendsThroughTheSeamBeforeShutdown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "pointingRouterFallsBackToTheSystemVoiceWithoutSendingAfterShutdown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "pointingRetirementFollowsTheExactModelIds"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "openAIConfigIsNilAfterShutdownAndPresentBeforeWithAKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "aCustomBaseURLKeepsWorkingAfterShutdown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "previewDoesNotRenderOrCallOpenAIAfterShutdown"
             }
           ]
         },

@@ -31,12 +31,15 @@ public struct UltronEngineAvailability: Equatable, Sendable {
     public var kokoroPaused: Bool
     public var chatterboxReady: Bool
     public var chatterboxPaused: Bool
+    /// OpenAI speech has shut down (`OpenAISpeechRetirement`): treated like a missing key, the saved choice is kept.
+    public var openAIRetired: Bool
 
     public init(elevenLabsConfigured: Bool = false, elevenLabsPaused: Bool = false,
                 openAIConfigured: Bool = false, openAIPaused: Bool = false,
                 geminiConfigured: Bool = false, geminiPaused: Bool = false,
                 kokoroReady: Bool = false, kokoroPaused: Bool = false,
-                chatterboxReady: Bool = false, chatterboxPaused: Bool = false) {
+                chatterboxReady: Bool = false, chatterboxPaused: Bool = false,
+                openAIRetired: Bool = false) {
         self.elevenLabsConfigured = elevenLabsConfigured
         self.elevenLabsPaused = elevenLabsPaused
         self.openAIConfigured = openAIConfigured
@@ -47,13 +50,14 @@ public struct UltronEngineAvailability: Equatable, Sendable {
         self.kokoroPaused = kokoroPaused
         self.chatterboxReady = chatterboxReady
         self.chatterboxPaused = chatterboxPaused
+        self.openAIRetired = openAIRetired
     }
 
     /// Nil when usable, else the plain reason it is skipped.
     public func skipReason(_ engine: UltronEngine) -> String? {
         switch engine {
         case .elevenLabs: !elevenLabsConfigured ? "no ElevenLabs key or worker" : (elevenLabsPaused ? "ElevenLabs paused after a failure" : nil)
-        case .openAI: !openAIConfigured ? "no OpenAI key" : (openAIPaused ? "OpenAI paused after a failure" : nil)
+        case .openAI: openAIRetired ? "OpenAI voices ended January 6, 2027" : !openAIConfigured ? "no OpenAI key" : (openAIPaused ? "OpenAI paused after a failure" : nil)
         case .gemini: !geminiConfigured ? "no Gemini key" : (geminiPaused ? "Gemini paused after a failure" : nil)
         case .kokoro: !kokoroReady ? "Kokoro not set up" : (kokoroPaused ? "Kokoro paused after a failure" : nil)
         case .chatterbox: !chatterboxReady ? "Chatterbox not ready" : (chatterboxPaused ? "Chatterbox paused after a failure" : nil)
