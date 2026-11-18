@@ -248,6 +248,12 @@ final class NotchController {
 
     /// Shows an approval card and waits for Approve / Deny (click or voice). One card at a time:
     /// a second request waits for the first. On timeout it returns `onTimeout`.
+    func browseApproval(by delta: Int) {
+        guard var approval = model.approval else { return }
+        approval.queueIndex = ApprovalCard.step(index: approval.queueIndex, count: approval.queueCount, by: delta)
+        model.approval = approval
+    }
+
     func requestApproval(agent: String, project: String, tool: String, command: String, risk: HookEvent.Risk,
                          timeout: Duration = .seconds(120),
                          onTimeout: HookDecision.Verdict = .deny,
@@ -268,6 +274,7 @@ final class NotchController {
             position = place
         case .waiting:
             await ApprovalGate.shared.waitUntilFront(id)
+            if await ApprovalGate.shared.wasCancelled(id) { return .deny }
             position = await ApprovalGate.shared.position(of: id) ?? ""
         }
         if Task.isCancelled {
@@ -300,12 +307,20 @@ final class NotchController {
                     finish(.allow)
                 }
             }
+            let count = Int(position.split(separator: " ").last.map(String.init) ?? "") ?? 1
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
                 deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
                 position: position,
+                appearedAt: Date(),
+                queueCount: max(count, 1),
                 trustChat: trustChat,
+                onJump: trust?.session.map { session in { AgentTerminals.shared.jump(to: session) } },
+                onDenyAll: { [weak self] in
+                    Task { await ApprovalGate.shared.denyAll() }
+                    finish(.deny)
+                },
                 resolve: finish
             )
             model.completion = nil

@@ -57,6 +57,24 @@ final class NotchModel {
         var sessionID: String?
         /// "1 of N" while other requests wait behind this card.
         var position: String = ""
+        var appearedAt = Date()
+        var changedFile: String? = nil
+        var addedLines: Int? = nil
+        var removedLines: Int? = nil
+        var fetchHost: String? = nil
+        var why: String? = nil
+        var reasons: [String] = []
+        var sessionTitle: String = ""
+        var queueCount: Int = 1
+        var queueIndex: Int = 0
+        var expandedCommand = false
+        var modifiersHeld = false
+        var holdElapsed: Double = 0
+        var allowStep: ApprovalAllowStep = .idle
+        var phase: ApprovalCardPhase = .asking
+        var onJump: (@MainActor () -> Void)? = nil
+        var onDenyAll: (@MainActor () -> Void)? = nil
+        var onBrowse: (@MainActor (Int) -> Void)? = nil
         /// Trusts the session, then approves (set only when the request is safe enough to offer it).
         var trustChat: (@MainActor () -> Void)?
         var resolve: @MainActor (HookDecision.Verdict) -> Void

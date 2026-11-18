@@ -83,6 +83,20 @@ public actor ApprovalGate {
         }
     }
 
+    private var cancelled: Set<String> = []
+
+    public func denyAll() {
+        let denied = state.denyAll()
+        for ticket in denied { cancelled.insert(ticket.id) }
+        let pending = waiters
+        waiters = [:]
+        for waiter in pending.values { waiter.resume() }
+    }
+
+    public func wasCancelled(_ id: String) -> Bool {
+        cancelled.remove(id) != nil
+    }
+
     @discardableResult
     public func clearFront() -> ApprovalTicket? {
         let removed = state.clearFront()

@@ -379,6 +379,14 @@
       "scope": "Actual WikiController graph selection, save/navigation, deletion and forget using disposable app-owned records; no native UI input, personal vault or capture."
     },
     {
+      "id": "native-ApprovalCardSnapshotTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ApprovalCardSnapshotTests",
+      "file": "Tests/ZeusAppTests/ApprovalCardSnapshotTests.swift",
+      "scope": "Offscreen approval cards rendered from synthetic requests. No network, no live agent, and no permission prompt."
+    },
+    {
       "id": "native-HaloRendererTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -1165,6 +1173,17 @@
       "id": "F05",
       "title": "Recording animation, pill and mini-window motion parity",
       "obligations": [
+        {
+          "id": "F05.approval-cards",
+          "check": "native-ApprovalCardSnapshotTests",
+          "acceptance": "Synthetic approval cards render to PNG: a run, an edit, a high-risk hold, a queue of three, an allowed flash, a normal timeout, a reduced-motion confirm, and light and dark.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ApprovalCardSnapshotTests.swift",
+              "function": "theApprovalStatesRenderWithSyntheticData"
+            }
+          ]
+        },
         {
           "id": "F05.halo-geometry",
           "check": "native-HaloRendererTests",
