@@ -18,7 +18,8 @@ enum SystemNowPlayingProcess {
     static func read() -> String? {
         stop()
         guard let script = scriptPath() else { return nil }
-        let result = run(SystemNowPlayingLaunch.executable, [script], timeout: timeout, maxOutputBytes: maxOutputBytes)
+        let caller = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/zeus-now-playing").path
+        let result = run(SystemNowPlayingLaunch.executable, [script, caller], timeout: timeout, maxOutputBytes: maxOutputBytes)
         guard result.status == 0 else { return nil }
         return result.output
     }
@@ -51,6 +52,10 @@ enum SystemNowPlayingProcess {
         if let given = ProcessInfo.processInfo.environment["ZEUS_NOW_PLAYING_SCRIPT"],
            FileManager.default.isReadableFile(atPath: given) {
             return given
+        }
+        if let bundled = Bundle.main.url(forResource: "now-playing", withExtension: "pl"),
+           FileManager.default.isReadableFile(atPath: bundled.path) {
+            return bundled.path
         }
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("scripts/now-playing.pl")
         if FileManager.default.isReadableFile(atPath: cwd.path) { return cwd.path }

@@ -43,7 +43,10 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :ZeusBuildStamp string $(date +%Y%m%d%H%M%S)-$$" "$APP/Contents/Info.plist" >/dev/null
 cp Resources/AppIcon.icns Resources/Logo.png Resources/Logo.pdf Resources/MenuBarTemplate.png Resources/MenuBarTemplate@2x.png \
   Resources/NOTICES.txt \
+  scripts/now-playing.pl \
   "$APP/Contents/Resources/"
+# Built here, with the app, and signed below. The perl script only runs this path.
+xcrun clang -fblocks -O2 -o "$APP/Contents/Resources/zeus-now-playing" scripts/now-playing-media.c -framework CoreFoundation
 cp "$BIN/Zeus" "$APP/Contents/MacOS/Zeus"
 cp "$BIN/zeus-hook" "$BIN/zeus-bridge" "$APP/Contents/Helpers/"
 cp "$BIN/zeus-cli" "$APP/Contents/Helpers/zeus"
@@ -75,6 +78,8 @@ fi
 for helper in "$APP/Contents/Helpers/"*; do
   codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$helper"
 done
+codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" \
+  "$APP/Contents/Resources/zeus-now-playing"
 codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" --entitlements Resources/Zeus.entitlements \
   ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$APP"
 codesign --verify --deep --strict "$APP"
