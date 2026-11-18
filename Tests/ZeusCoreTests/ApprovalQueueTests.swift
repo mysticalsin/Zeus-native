@@ -61,8 +61,8 @@ struct ApprovalRiskTests {
             let substring = CommandRisk.assess(tool: "Bash", input: input)
             let shell = ShellRiskClassifier.assess(command).cardRisk
             let result = ApprovalRisk.effective(tool: "Bash", input: input, command: command)
-            #expect(result.risk >= substring, command)
-            #expect(result.risk >= shell, command)
+            #expect(result.risk >= substring, Comment(rawValue: command))
+            #expect(result.risk >= shell, Comment(rawValue: command))
             #expect(!result.reasons.isEmpty || result.risk == .low)
         }
     }
