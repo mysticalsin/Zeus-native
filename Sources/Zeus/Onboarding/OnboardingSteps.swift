@@ -287,7 +287,7 @@ private struct AgentsStep: View {
 private struct AgentSegmented: View {
     @Binding var selection: OnboardingFlow.AgentChoice
     @Environment(\.ob) private var ob
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.onboardingReduceMotion) private var motionOverride
     private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     var body: some View {

@@ -72,7 +72,7 @@ struct VoiceGlow: ViewModifier {
     let layer: Layer
     let driver: VoiceGlowDriver
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     init(level: @escaping @MainActor () -> Double, processing: Bool, preset: VoiceGlowGeometry = .default,
          variant: VoiceGlowVariant = .colorful, customColors: [Color] = [], strength: Double = 1,

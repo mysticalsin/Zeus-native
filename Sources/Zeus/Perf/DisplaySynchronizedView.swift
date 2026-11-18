@@ -12,7 +12,7 @@ struct DisplaySynchronizedView<Content: View>: View {
     var until: Date?
     let content: (TickContext) -> Content
     @StateObject private var clock = DisplayAnimationClock()
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     init(paused: Bool = false, preferredFramesPerSecond: Int = 240, until: Date? = nil,
          @ViewBuilder content: @escaping (TickContext) -> Content) {

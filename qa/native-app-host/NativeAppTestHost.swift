@@ -102,6 +102,7 @@ private enum NativeAppTestHost {
                 guard environment["ZEUS_CI_REQUIRE_NORMAL_MOTION"] != "1" else {
                     throw HostFailure("harness reduced-motion profile cannot be combined with the CI normal-motion requirement")
                 }
+                setenv("ZEUS_MOTION_HARNESS_ACTIVE", "1", 1)
                 report("harness reduced-motion profile applied before loading tests")
             } else if environment["ZEUS_CI_REQUIRE_NORMAL_MOTION"] == "1" {
                 guard environment["GITHUB_ACTIONS"] == "true",

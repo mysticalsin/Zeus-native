@@ -9,7 +9,7 @@ struct ExplanationPane: View {
     @Bindable var controller: ExplanationController
     let conversationID: UUID
     let submit: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @AppStorage("opt.explanation.shortcut") private var shortcut = "Command-Shift-Space"
     @AppStorage("opt.explanation.localOnly") private var localOnly = "false"
     @AppStorage("opt.explanation.voice") private var voiceIdentifier = ""

@@ -6,7 +6,7 @@ import ZeusCore
 struct ScribePage: View {
     let topBar: TopBarModel
     let scribe: ScribeController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {

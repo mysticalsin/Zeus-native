@@ -4390,6 +4390,66 @@
         "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
         "function": "test_host_applies_harness_reduced_motion_before_loading_tests"
       }
+    },
+    {
+      "id": "REG-412",
+      "failure": "SwiftUI and AppKit still read Reduce Motion themselves, so the debug harness override never reached those animations. Every read now goes through Motion, which keeps the system setting unless the test host has armed the harness.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_reduce_motion_reads_go_through_motion_only"
+      }
+    },
+    {
+      "id": "REG-413",
+      "failure": "scripts/bundle.sh could be asked for a release signature while compiling a non-release configuration. RELEASE=1 now refuses unless CONFIG is release, before swift build.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_bundle_refuses_release_without_release_config"
+      }
+    },
+    {
+      "id": "REG-414",
+      "failure": "The motion harness printed defaults_untouched=true without reading the preference, so the line could not be true. It no longer claims that, and it still never writes defaults.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_harness_does_not_claim_an_unchecked_defaults_result"
+      }
+    },
+    {
+      "id": "REG-415",
+      "failure": "ZEUS_HARNESS_REDUCE_MOTION changed motion in any debug process, including a normal Zeus launch. The override now applies only after the test host sets ZEUS_MOTION_HARNESS_ACTIVE; otherwise it is ignored and a warning is printed.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_harness_override_requires_the_test_host_marker"
+      }
+    },
+    {
+      "id": "REG-416",
+      "failure": "Button and toggle styles copied Motion.reduced inside makeBody, so they kept the old Reduce Motion value after the setting changed. MotionEffect's body reads it and applies the scale and animation; those styles apply that one modifier instead.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_style_make_body_tracks_motion_through_one_modifier"
+      }
     }
   ]
 }

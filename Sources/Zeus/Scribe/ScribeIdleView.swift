@@ -289,7 +289,7 @@ private struct ScribeCaptureRow: View {
 struct ScribeBreathingWaveView: View {
     let bars: Int
     let range: Range<Int>
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         TickingView(interval: 1.0 / 15, paused: reduceMotion) { context in

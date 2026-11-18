@@ -53,7 +53,7 @@ struct ScribeMemoryLane: View {
     let hoveringList: Bool
     let searching: Bool
     let isEmpty: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         GeometryReader { proxy in

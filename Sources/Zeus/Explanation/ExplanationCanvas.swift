@@ -17,7 +17,7 @@ struct ExplanationCanvas: View {
     var approvedImages: [String: NSImage] = [:]
     var snapshotImage: NSImage? = nil
     var onEdit: (ExplanationOperation) -> Void = { _ in }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @FocusState private var focused: Bool
     @State private var viewportID = UUID()
 
