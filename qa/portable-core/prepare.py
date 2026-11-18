@@ -8,7 +8,6 @@ The production Package.swift and source files are never changed.
 import argparse
 import hashlib
 import json
-import re
 from pathlib import Path
 import subprocess
 import sys
@@ -307,17 +306,27 @@ def main():
         root = prepare(output, group)
         print(f"Prepared {group}: {root}", flush=True)
         if args.run:
-            command = ["swift", "test", "--package-path", str(root), "--jobs", str(args.jobs)]
+            sys.path.insert(0, str(REPO / "qa/closed-loop"))
+            from contracts import Invalid, read_swift_testing_xunit, swift_structured_results, swift_testing_xunit_path
+            xunit = root / "results.xml"
+            command = ["swift", "test", "--package-path", str(root), "--jobs", str(args.jobs),
+                       "--xunit-output", str(xunit)]
             log = root / "test.log"
             with log.open("w") as stream:
                 result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, check=False)
-            row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log)}
-            summaries = re.findall(r"Test run with (\d+) tests? in (\d+) suites? (passed|failed)", log.read_text())
-            if summaries:
-                count, suites, status = summaries[-1]
-                row.update(tests=int(count), suites=int(suites), test_summary=status)
+            structured = swift_testing_xunit_path(xunit)
+            row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log),
+                   "results": str(structured)}
+            try:
+                count, suites, functions = swift_structured_results(
+                    read_swift_testing_xunit(structured), result.returncode, log.read_text())
+                row.update(tests=count, suites=suites, passed_functions=functions)
+            except (Invalid, OSError) as error:
+                row["structured_error"] = str(error)
+                if row["exit_code"] == 0:
+                    row["exit_code"] = 1
             results.append(row)
-            print(f"{group}: exit {result.returncode}; {log}", flush=True)
+            print(f"{group}: exit {row['exit_code']}; {log}", flush=True)
     if results:
         (output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
     raise SystemExit(1 if any(row["exit_code"] for row in results) else 0)

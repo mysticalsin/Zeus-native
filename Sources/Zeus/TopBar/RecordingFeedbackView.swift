@@ -7,7 +7,7 @@ struct RecordingFeedbackView: View {
     let snapshot: RecordingFeedback.Snapshot
     let open: () -> Void
     @StateObject private var status: RecordingFeedbackStatusDriver
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     init(snapshot: RecordingFeedback.Snapshot, open: @escaping () -> Void) {

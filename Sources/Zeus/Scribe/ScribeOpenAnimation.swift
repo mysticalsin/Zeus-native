@@ -51,7 +51,7 @@ extension View {
 private struct ScribeEntrance: ViewModifier {
     let stage: ScribeOpenSequence.Stage
     @Environment(\.scribeOpen) private var open
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     func body(content: Content) -> some View {
         content
@@ -73,7 +73,7 @@ private struct ScribeEntrance: ViewModifier {
 
 private struct ScribeLightSweep: ViewModifier {
     @Environment(\.scribeOpen) private var open
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     func body(content: Content) -> some View {
         content.overlay {

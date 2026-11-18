@@ -127,6 +127,13 @@ class RequiredGateTests(unittest.TestCase):
                                              "sha256": gate.digest(package / "validation-manifest.json")})
                     log = "".join(f"✔ Test {name}() passed after 0.001 seconds.\n" for name in names)
                     log += f"✔ Test run with {len(names)} tests in 1 suite passed after 0.1 seconds.\n"
+                    cases = "\n".join(f'    <testcase classname="Fixture" name="{name}()" time="0.001" />' for name in names)
+                    xunit = (f'<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n'
+                             f'  <testsuite name="TestResults" errors="0" tests="{len(names)}" failures="0" skipped="0" time="0.001">\n'
+                             f'{cases}\n  </testsuite>\n</testsuites>\n')
+                    (folder / "results-swift-testing.xml").write_text(xunit)
+                    row["artifacts"].append({"path": str((folder / "results-swift-testing.xml").relative_to(root)),
+                                             "sha256": gate.digest(folder / "results-swift-testing.xml")})
                 else:
                     log = "".join(f"{name} (Fixture) ... ok\n" for name in names)
                     log += f"Ran {len(names)} tests in 0.1s\nOK\n"

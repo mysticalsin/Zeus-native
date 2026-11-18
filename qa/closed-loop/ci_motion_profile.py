@@ -68,7 +68,7 @@ def run_harness(arguments):
             os.environ.pop(HARNESS_KEY, None)
         else:
             os.environ[HARNESS_KEY] = previous
-    print(f"CI motion harness: wrapper_exit={code}; reduced_motion=injected; defaults_untouched=true")
+    print(f"CI motion harness: wrapper_exit={code}; reduced_motion=injected")
     return code
 
 

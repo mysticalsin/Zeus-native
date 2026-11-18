@@ -67,12 +67,22 @@ extension Preferences {
 
 enum Motion {
     /// System Settings › Accessibility › Display › Reduce motion.
-    /// A debug test host may inject reduced motion with ZEUS_HARNESS_REDUCE_MOTION.
-    /// Release builds ignore that variable and keep the system preference.
-    @MainActor static var reduced: Bool {
+    /// Live value: `MotionCenter` republishes `read()` when the system setting changes.
+    /// A debug test host may inject reduced motion only after it sets
+    /// `ZEUS_MOTION_HARNESS_ACTIVE`. Release builds ignore that variable.
+    /// The person's own Reduce Motion setting is never turned off.
+    @MainActor static var reduced: Bool { MotionCenter.shared.reduced }
+
+    @MainActor static func read() -> Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1" {
-            return true
+        if motionEnvironmentFlag("ZEUS_HARNESS_REDUCE_MOTION") {
+            if motionEnvironmentFlag("ZEUS_MOTION_HARNESS_ACTIVE") {
+                return true
+            }
+            if !MotionHarnessWarning.shared.warned {
+                MotionHarnessWarning.shared.warned = true
+                FileHandle.standardError.write(Data("ZEUS_HARNESS_REDUCE_MOTION is ignored outside the test host\n".utf8))
+            }
         }
         #endif
         return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -92,5 +102,102 @@ enum Motion {
     /// Layout changes settle promptly. Reduced motion changes geometry immediately.
     static func page(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .spring(response: pageResponse, dampingFraction: pageDamping)
+    }
+}
+
+#if DEBUG
+@MainActor
+private final class MotionHarnessWarning {
+    static let shared = MotionHarnessWarning()
+    var warned = false
+}
+
+private func motionEnvironmentFlag(_ name: String) -> Bool {
+    guard let value = getenv(name) else { return false }
+    return String(cString: value) == "1"
+}
+#endif
+
+/// One observable Reduce Motion value for SwiftUI. Updated from `Motion.read()` when the
+/// system accessibility display options change, so views keep tracking the person's setting.
+@MainActor
+@Observable
+final class MotionCenter {
+    static let shared = MotionCenter()
+    private(set) var reduced: Bool
+    private var token: NSObjectProtocol?
+
+    private init() {
+        reduced = Motion.read()
+        token = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { MotionCenter.shared.refresh() }
+        }
+    }
+
+    func refresh() {
+        reduced = Motion.read()
+    }
+
+    /// Test seam. Sets the published value without touching System Settings,
+    /// `com.apple.universalaccess`, or `defaults`. Production code never calls it.
+    #if DEBUG
+    func testingSetReduced(_ value: Bool) {
+        reduced = value
+    }
+    #endif
+}
+
+/// A body that reads `Motion.reduced` publishes the value it applied.
+/// The macOS live-update test reads this after flipping `MotionCenter`.
+struct MotionLiveSampleKey: PreferenceKey {
+    static let defaultValue: Bool? = nil
+    static func reduce(value: inout Bool?, nextValue: () -> Bool?) {
+        value = nextValue() ?? value
+    }
+}
+
+/// Press scale and the animation that follows it. `body` reads `Motion.reduced`,
+/// so SwiftUI updates this when that setting changes. Button and toggle styles
+/// apply it from `makeBody` and do not read `Motion.reduced` themselves.
+struct MotionEffect: ViewModifier {
+    enum Curve { case feedback, page }
+
+    /// Pressed, or a toggle's isOn. The animation tracks this value.
+    var active: Bool
+    var enabled: Bool = true
+    /// Uses `Motion.pressedScale` only while active, enabled, and motion is allowed.
+    var presses: Bool = false
+    var curve: Curve = .feedback
+    /// Replaces the system value when set, including `false` (`PressableStyle`'s override).
+    var forced: Bool? = nil
+    /// Onboarding fixtures may add reduction. They cannot turn the person's setting off.
+    var includesOnboardingOverride: Bool = false
+
+    @Environment(\.onboardingReduceMotion) private var onboardingOverride
+
+    func body(content: Content) -> some View {
+        let reduced = resolved
+        content
+            .scaleEffect(presses && active && enabled && !reduced ? Motion.pressedScale : 1)
+            .animation(animation(reduced), value: active)
+            .preference(key: MotionLiveSampleKey.self, value: reduced)
+    }
+
+    private var resolved: Bool {
+        if let forced { return forced }
+        let system = Motion.reduced
+        guard includesOnboardingOverride else { return system }
+        return OnboardingMotionPolicy.reduced(system: system, override: onboardingOverride)
+    }
+
+    private func animation(_ reduced: Bool) -> Animation? {
+        switch curve {
+        case .feedback: Motion.feedback(reduceMotion: reduced)
+        case .page: Motion.page(reduceMotion: reduced)
+        }
     }
 }
