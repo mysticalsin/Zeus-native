@@ -47,7 +47,7 @@ extension View {
 /// page already played its entrance (`enabled: false`), start settled.
 struct RecordlyEntranceModifier: ViewModifier {
     let item: RecordlyEntrance.Item
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var shown: Bool
 
     init(item: RecordlyEntrance.Item, enabled: Bool = true) {
@@ -77,7 +77,7 @@ extension View {
 /// animation stops the moment the view goes away. Still under Reduce Motion.
 struct RecordlyLiveFrame: View {
     let opacity: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var breathing = false
 
     var body: some View {
@@ -99,7 +99,7 @@ struct RecordlyLiveFrame: View {
 struct RecordlyCountdownNumeral: View {
     let remaining: Int
     let beganAt: Date?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         if reduceMotion || TopBarStyle.isSnapshot {
@@ -165,7 +165,7 @@ struct RecordlyMeterBars: View {
 /// The Mic row shows only when microphone capture is on.
 struct RecordlyLiveMeters: View {
     let recordly: RecordlyController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var box = RecordlyMeterBox()
 
     var body: some View {
@@ -247,7 +247,7 @@ struct RecordlyLiveCapsule: View {
 
 /// The live dot with a slow halo. Standing still under Reduce Motion.
 struct RecordlyPulseDotView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var pulsing = false
 
     var body: some View {
@@ -277,7 +277,7 @@ struct RecordlySourceChip: View {
     let help: String
     let action: () -> Void
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         let shape = Capsule()
@@ -350,7 +350,7 @@ struct RecordlySourceChip: View {
 struct RecordlyClipCard: View {
     let recordly: RecordlyController
     @Binding var showsEditing: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {

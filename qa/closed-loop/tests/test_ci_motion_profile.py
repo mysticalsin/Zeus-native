@@ -2,6 +2,7 @@
 import contextlib
 import io
 import os
+import re
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -118,6 +119,130 @@ class CIMotionProfileTests(unittest.TestCase):
                     self.assertEqual(profile.main([]), native_code or 1)
                     self.assertIn("restored=false", output.getvalue())
 
+    def test_harness_injects_reduced_motion_without_touching_defaults(self):
+        cases = [
+            ("Linux", {}),
+            ("Darwin", {"GITHUB_ACTIONS": "false"}),
+            ("Darwin", {"RUNNER_ENVIRONMENT": "self-hosted"}),
+            ("Darwin", {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted"}),
+        ]
+        for system, environment in cases:
+            with self.subTest(system=system, environment=environment):
+                fixture = DefaultsFixture(True)
+                observed = {}
+
+                def native(arguments, observed=observed):
+                    observed["arguments"] = list(arguments)
+                    observed["reduced"] = os.environ.get("ZEUS_HARNESS_REDUCE_MOTION")
+                    observed["marker"] = os.environ.get(profile.MARKER)
+                    return 7
+
+                with self.context(fixture, native, system=system, environment=environment) as (command, run, output):
+                    self.assertEqual(profile.main(["--harness", "--jobs", "2"]), 7)
+                    command.assert_not_called()
+                    run.assert_called_once()
+                    self.assertEqual(fixture.writes, [])
+                    self.assertEqual(observed["arguments"], ["--jobs", "2"])
+                    self.assertEqual(observed["reduced"], "1")
+                    self.assertIsNone(observed["marker"])
+                    self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", os.environ)
+                    text = output.getvalue()
+                    self.assertNotIn(profile.DOMAIN, text)
+                    self.assertNotIn("/usr/bin/defaults", text)
+                    self.assertNotIn("defaults_untouched", text)
+
+    def test_hosted_ci_path_does_not_use_the_harness_override(self):
+        fixture = DefaultsFixture(True)
+
+        def native(arguments):
+            self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", os.environ)
+            self.assertEqual(os.environ[profile.MARKER], "1")
+            self.assertIs(fixture.value, False)
+            self.assertEqual(arguments, ["--jobs", "4"])
+            return 0
+
+        with self.context(fixture, native) as (command, _, output):
+            self.assertEqual(profile.main(["--jobs", "4"]), 0)
+            self.assertIs(fixture.value, True)
+            self.assertEqual(fixture.writes, [False, True])
+            for call in command.call_args_list:
+                argv = call.args[0]
+                self.assertEqual(argv[0], "/usr/bin/defaults")
+                self.assertEqual(argv[2:4], [profile.DOMAIN, profile.KEY])
+            text = output.getvalue()
+            self.assertIn("original_reduce_motion=true", text)
+            self.assertIn("restored=true", text)
+            self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", text)
+
+    def test_host_applies_harness_reduced_motion_before_loading_tests(self):
+        repo = Path(__file__).resolve().parents[3]
+        host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
+        key = 'environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1"'
+        load = host.index("dlopen(args[2]")
+        self.assertLess(host.index(key), load)
+        marker = host.index(f'environment["{profile.MARKER}"] == "1"')
+        workspace = host.index("!NSWorkspace.shared.accessibilityDisplayShouldReduceMotion")
+        self.assertLess(host.index(key), marker)
+        self.assertLess(marker, workspace)
+        self.assertLess(workspace, load)
+        harness_body = host[host.index(key):marker]
+        self.assertNotIn("NSWorkspace", harness_body)
+        self.assertNotIn("defaults", harness_body)
+        self.assertNotIn("universalaccess", harness_body)
+        self.assertIn("harness reduced-motion profile applied before loading tests", harness_body)
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        reduced = motion[motion.index("static var reduced"):motion.index("static let feedbackDuration")]
+        self.assertIn("ZEUS_HARNESS_REDUCE_MOTION", reduced)
+        self.assertIn("#if DEBUG", reduced)
+        self.assertIn("NSWorkspace.shared.accessibilityDisplayShouldReduceMotion", reduced)
+        film = (repo / "Sources/Zeus/Onboarding/OnboardingVisuals.swift").read_text()
+        self.assertIn("motionReduction || Motion.reduced", film)
+        self.assertIn("let systemReduction = Motion.reduced", film)
+
+    def test_reduce_motion_reads_go_through_motion_only(self):
+        repo = Path(__file__).resolve().parents[3]
+        allowed = repo / "Sources/Zeus/App/Preferences.swift"
+        offenders = []
+        for path in (repo / "Sources/Zeus").rglob("*.swift"):
+            if path.resolve() == allowed.resolve():
+                continue
+            for number, line in enumerate(path.read_text().splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("//"):
+                    continue
+                if "accessibilityReduceMotion" in line or "accessibilityDisplayShouldReduceMotion" in line:
+                    offenders.append(f"{path.relative_to(repo)}:{number}")
+        self.assertEqual(offenders, [])
+
+    def test_bundle_refuses_release_without_release_config(self):
+        script = (Path(__file__).resolve().parents[3] / "scripts/bundle.sh").read_text()
+        before_build = script.split("swift build", 1)[0]
+        self.assertIn("Release builds must use CONFIG=release", before_build)
+        self.assertIn('[ "$CONFIG" != release ]', before_build)
+
+    def test_harness_does_not_claim_an_unchecked_defaults_result(self):
+        fixture = DefaultsFixture(True)
+        with self.context(fixture, lambda _: 0, system="Linux", environment={}) as (command, _, output):
+            self.assertEqual(profile.main(["--harness"]), 0)
+            text = output.getvalue()
+            writes = [call.args[0] for call in command.call_args_list if "write" in call.args[0]]
+            self.assertEqual(writes, [])
+            if "defaults_untouched=true" in text:
+                reads = [call.args[0] for call in command.call_args_list if call.args[0][1] in {"read", "read-type"}]
+                self.assertGreaterEqual(len(reads), 2)
+                self.assertNotIn("write", " ".join(" ".join(argv) for argv in (call.args[0] for call in command.call_args_list)))
+            else:
+                self.assertNotIn("defaults_untouched", text)
+
+    def test_harness_override_requires_the_test_host_marker(self):
+        repo = Path(__file__).resolve().parents[3]
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        reduced = motion[motion.index("static var reduced"):motion.index("static let feedbackDuration")]
+        self.assertIn("ZEUS_MOTION_HARNESS_ACTIVE", reduced)
+        self.assertIn("ZEUS_HARNESS_REDUCE_MOTION is ignored outside the test host", reduced)
+        host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
+        self.assertLess(host.index('setenv("ZEUS_MOTION_HARNESS_ACTIVE", "1", 1)'), host.index("dlopen(args[2]"))
+
     def test_fresh_host_requires_real_normal_motion_before_loading_tests(self):
         repo = Path(__file__).resolve().parents[3]
         host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
@@ -127,6 +252,78 @@ class CIMotionProfileTests(unittest.TestCase):
         self.assertLess(host.index("!NSWorkspace.shared.accessibilityDisplayShouldReduceMotion"), host.index("dlopen(args[2]"))
         workflow = (repo / ".github/workflows/build.yml").read_text()
         self.assertIn("python3 qa/closed-loop/ci_motion_profile.py --output", workflow)
+
+    def test_style_make_body_tracks_motion_through_one_modifier(self):
+        repo = Path(__file__).resolve().parents[3]
+        sample = "struct ExampleStyle: ButtonStyle {\n    func makeBody(configuration: Configuration) -> some View {\n        let copied = Motion.reduced\n        return configuration.label.opacity(copied ? 0 : 1)\n    }\n}\n"
+        self.assertEqual(style_make_body_offenders(sample), ["ExampleStyle"])
+        clean = sample.replace("Motion.reduced", "forced")
+        self.assertEqual(style_make_body_offenders(clean), [])
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        self.assertEqual(motion.count("struct MotionEffect: ViewModifier"), 1)
+        effect = motion[motion.index("struct MotionEffect: ViewModifier"):]
+        effect = effect[:effect.index("\nstruct ") if "\nstruct " in effect else len(effect)]
+        self.assertIn("func body", effect)
+        self.assertIn("Motion.reduced", effect)
+        self.assertIn("scaleEffect", effect)
+        self.assertIn(".animation(", effect)
+        bodies = {}
+        offenders = []
+        for path in (repo / "Sources/Zeus").rglob("*.swift"):
+            for name, body in style_make_bodies(path.read_text()):
+                self.assertNotIn(name, bodies)
+                bodies[name] = (path.relative_to(repo).as_posix(), body)
+                hits = [token for token in ("Motion.reduced", "Glass.quick", "Glass.spring", "TopBarStyle.pageSpring") if token in body]
+                if hits:
+                    offenders.append(f"{name}: {hits}")
+        self.assertEqual(offenders, [])
+        for name in ("GlassButtonStyle", "GlassToggleStyle", "PressableStyle", "OBToggleStyle", "GlassHoverRowStyle"):
+            self.assertIn("MotionEffect", bodies[name][1])
+        backdrop = (repo / "Sources/Zeus/TopBar/HomeBackdrops.swift").read_text()
+        self.assertNotIn("= Motion.reduced", backdrop)
+        self.assertIn("reduceMotion ?? Motion.reduced", backdrop)
+
+
+_STYLE_DECL = re.compile(
+    r"^(?:(?:public|private|fileprivate|internal|open|final)\s+)*struct\s+(\w+)[^{]*\b(?:ButtonStyle|ToggleStyle|LabelStyle)\b"
+)
+_MAKE_BODY = re.compile(r"^    func makeBody\b")
+_NEXT_MEMBER = re.compile(r"^    (?:func |private |fileprivate |public |var |@|init\b|static )")
+_BANNED_IN_MAKE_BODY = ("Motion.reduced", "Glass.quick", "Glass.spring", "TopBarStyle.pageSpring")
+
+
+def style_make_bodies(text):
+    lines = text.splitlines()
+    bodies = []
+    struct_name = None
+    is_style = False
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.strip().startswith("//"):
+            index += 1
+            continue
+        match = _STYLE_DECL.match(line)
+        if match:
+            struct_name = match.group(1)
+            is_style = True
+        elif re.match(r"^(?:(?:public|private|fileprivate|internal|open|final)\s+)*(?:struct|class|enum|extension|actor)\s+", line):
+            is_style = False
+            struct_name = None
+        if is_style and _MAKE_BODY.match(line):
+            body = [line]
+            index += 1
+            while index < len(lines) and lines[index] != "}" and not _NEXT_MEMBER.match(lines[index]):
+                body.append(lines[index])
+                index += 1
+            bodies.append((struct_name, "\n".join(body)))
+            continue
+        index += 1
+    return bodies
+
+
+def style_make_body_offenders(text):
+    return [name for name, body in style_make_bodies(text) if any(token in body for token in _BANNED_IN_MAKE_BODY)]
 
 
 if __name__ == "__main__":

@@ -403,6 +403,18 @@ or consent prompts are involved. Each fresh owned-window host independently
 checks the real NSWorkspace property before loading tests. Requested reduced
 motion remains covered through the production view policy.
 
+`--harness` is a separate local mode. It runs the same native arguments on Linux
+or on a Mac that is not a GitHub-hosted runner, and it never reads or writes
+`com.apple.universalaccess` or any other user defaults. It sets
+`ZEUS_HARNESS_REDUCE_MOTION=1` for that process. The owned-window host then sets
+`ZEUS_MOTION_HARNESS_ACTIVE` before loading tests. Debug `Motion.read()` returns
+reduced motion only when both are set, and otherwise keeps the system preference,
+warning if the first variable appears without the host marker. Release builds
+ignore both. Every Zeus reduce-motion read goes through `Motion.reduced`, which
+republishes that value when the system accessibility setting changes. The hosted
+path above is unchanged and still records, clears, and restores the real
+`reduceMotion` boolean. The harness does not claim the defaults domain was checked.
+
 The film diagnostic exposes actual reduction/eligibility and raw player statuses.
 The failure-only AX snapshot now emits bounded fixed phase names immediately,
 so a trap cannot erase all progress markers; rejected semantic presses retain

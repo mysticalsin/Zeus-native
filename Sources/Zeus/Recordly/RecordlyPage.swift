@@ -5,7 +5,7 @@ import ZeusCore
 struct RecordlyPage: View {
     let topBar: TopBarModel
     let recordly: RecordlyController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     private var isEditor: Bool { if case .editor = recordly.phase { true } else { false } }
 
@@ -37,7 +37,7 @@ struct RecordlyPage: View {
 /// Export percentages, controls and success/failure still come exclusively from its controller.
 private struct RecordlyCardBeam: View {
     let recordly: RecordlyController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var timeline: RecordingFeedback.BeamTimeline?
     @State private var workSnapshot: RecordingFeedback.Snapshot?
@@ -113,7 +113,7 @@ private struct RecordlyCapture: View {
     @State private var navigation = RecordlyRecordNavigation()
     /// The staggered entrance plays once, when the page opens, not again after Back.
     @State private var entranceDone = TopBarStyle.isSnapshot
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         RecordlyFitOrScroll(minimumHeight: RecordlyRecordLayout.minimumHeight, resetToken: navigation.openCount) {
@@ -334,7 +334,7 @@ private struct RecordlySideColumn: View {
     let topBar: TopBarModel
     let showsPermission: Bool
     let entrance: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         VStack(alignment: .leading, spacing: RecordlyRecordLayout.sectionGap) {
@@ -367,7 +367,7 @@ private struct RecordlySideColumn: View {
 private struct RecordlySourceSwitcher: View {
     let recordly: RecordlyController
     @Namespace private var selection
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private static func symbol(_ kind: RecordlyCaptureSource.Kind) -> String {
@@ -438,7 +438,7 @@ private struct RecordlyWindowGrid: View {
     let recordly: RecordlyController
     let onClick: (RecordlySourceSelection.SelectionIntent, Int) -> Void
     @State private var page = 0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         switch recordly.pickerState {
@@ -602,7 +602,7 @@ private struct RecordlyWindowTile: View {
     let selected: Bool
     let dimmed: Bool
     @State private var hovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -883,7 +883,7 @@ private struct RecordlyOptionChips: View {
 private struct RecordlyStageFrame<Content: View>: View {
     let recordly: RecordlyController
     @ViewBuilder var content: Content
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         let tokens = RecordlyVisualTokens.tokens(for: recordly.visualPhase)
@@ -952,7 +952,7 @@ private struct RecordlyDisplayTile: View {
     let thumbnail: CGImage?
     let action: (Int) -> Void
     @State private var hovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         Button { action(RecordlyClick.count()) } label: { tile }
@@ -1135,7 +1135,7 @@ struct RecordlyCaptureControl: View {
     /// Spoken while capturing ("Stop recording").
     let stopLabel: String
     let action: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hovering = false
 

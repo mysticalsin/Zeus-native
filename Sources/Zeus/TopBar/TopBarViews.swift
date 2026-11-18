@@ -258,7 +258,7 @@ struct TopBarHeader: View {
     let notchWidth: CGFloat
     let height: CGFloat
     @Namespace private var pill
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     /// Glance's layout: the menu-bar row stays clear around the notch (Mini ZEUS sits left of it),
     /// and the tabs live in one glass capsule just under it, the selected one showing its name.
@@ -456,7 +456,7 @@ struct TopBarPage: View {
     let topBar: TopBarModel
     let agentSummary: String
     let agents: AnyView
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         PageSwitcher(key: topBar.selectedTab, reduceMotion: reduceMotion) { page }
@@ -1691,7 +1691,7 @@ enum ScribeWings {
         /// True where this meter is the only Scribe indicator (the combined Recordly wings): it then
         /// is its own accessibility element. Alone, the trailing ticker speaks for Scribe.
         var announces = false
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        private var reduceMotion: Bool { Motion.reduced }
 
         var body: some View {
             if compact {
@@ -1748,7 +1748,7 @@ enum ScribeWings {
     struct Trailing: View {
         let scribe: ScribeController
         let topBar: TopBarModel
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        private var reduceMotion: Bool { Motion.reduced }
 
         var body: some View {
             // Ending is confirmed on the page, so this only brings the person there (capture continues).

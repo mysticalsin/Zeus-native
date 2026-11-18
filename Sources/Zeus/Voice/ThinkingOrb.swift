@@ -18,7 +18,7 @@ struct ThinkingOrbView: View {
     var diameter: CGFloat = 18
     var tint: Color = RecorderPill.accent
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         Group {

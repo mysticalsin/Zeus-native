@@ -411,7 +411,7 @@ final class ScribeController {
         optInDefaults: UserDefaults = .standard,
         endWindow: ScribeEndWindow? = nil,
         transcriptionEngine: @escaping () -> TranscriptionEngineKind = { DictationSettings.shared.engine },
-        motionReduced: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+        motionReduced: @escaping () -> Bool = { Motion.reduced }
     ) {
         self.provider = provider
         self.generator = generator

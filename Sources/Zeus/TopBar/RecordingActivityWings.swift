@@ -6,7 +6,7 @@ import ZeusCore
 enum RecordingActivityWings {
     struct Leading: View {
         let input: RecordingMotion.Input
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        private var reduceMotion: Bool { Motion.reduced }
 
         var body: some View {
             let pulse = RecordingMotion.present(input, reduceMotion: reduceMotion).pulse
@@ -24,7 +24,7 @@ enum RecordingActivityWings {
         let input: RecordingMotion.Input
         let elapsedText: String?
         let onStop: () -> Void
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        private var reduceMotion: Bool { Motion.reduced }
 
         var body: some View {
             let presentation = RecordingMotion.present(input, reduceMotion: reduceMotion)

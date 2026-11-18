@@ -5,7 +5,7 @@ import ZeusCore
 /// The graph draws at most eight neighbors; the list keeps every matching result reachable.
 struct WikiGraphView: View {
     let controller: WikiController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @FocusState private var searchFocused: Bool
 
     var body: some View {

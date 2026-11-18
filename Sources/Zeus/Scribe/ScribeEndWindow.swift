@@ -56,7 +56,7 @@ final class ScribeEndWindow {
 private struct ScribeEndWindowView: View {
     let scribe: ScribeController
     let dismiss: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

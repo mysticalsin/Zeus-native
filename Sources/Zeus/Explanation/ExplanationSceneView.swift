@@ -23,7 +23,7 @@ struct ExplanationSceneView: View {
     var compact = false
     var registry: ExplanationRegistry = .empty
     var onEdit: (ExplanationOperation) -> Void = { _ in }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var pauseMotion = false
     @State private var frozenScene: ExplanationScene?
     @State private var resetCamera = ExplanationCamera()
