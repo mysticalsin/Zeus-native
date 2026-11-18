@@ -66,6 +66,20 @@ struct MediaIslandFeatureTests {
         #expect(OutputDeviceIcon.kind(transport: 0x626C746E) == .speakers)
     }
 
+    @Test func aLineWithWordTimesUsesThemAndAPlainLineUsesEqualSlices() {
+        let timed = LyricLine(time: 1, text: "one two", wordStamps: [
+            LyricWord(text: "one ", start: 1, end: 1.4),
+            LyricWord(text: "two", start: 1.4, end: 1.4),
+        ])
+        let kept = LyricWordTiming.displayWords(in: timed, lineEnd: 2)
+        #expect(kept.map(\.start) == [1, 1.4])
+        #expect(kept.last?.end == 2)
+        let plain = LyricWordTiming.displayWords(in: LyricLine(time: 0, text: "one two three"), lineEnd: 3)
+        #expect(plain.map(\.start) == [0, 1, 2])
+        #expect(plain.last?.end == 3)
+        #expect(plain[1].start == plain[0].end)
+    }
+
     @Test func wordsShareTheLineIntervalExactly() {
         let words = WordTiming.words("one two three", start: 1, end: 4)
         #expect(words.map(\.text) == ["one", "two", "three"])
