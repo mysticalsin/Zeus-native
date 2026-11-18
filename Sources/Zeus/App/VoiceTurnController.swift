@@ -55,18 +55,14 @@ final class VoiceTurnController {
     /// What a press, a release and an end do outside this controller: warm-ups, volume ducking, screen capture,
     /// the microphone start and stop. Tests swap these so no audio, volume, screen or process is touched.
     @MainActor struct Seams {
-        var warmOnPress: @MainActor () -> Void = {
-            BrainWarmScheduler.shared.talkKeyDown()
-            KeyDownWarmer.talkKeyDown()
-            // Off the critical path: the local-model check is read from this cache when the answer starts.
-            Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
-        }
+        /// The key-press warm-ups (brain, voice, local-model probe) stay written in `press()`; tests turn them off.
+        var warmsOnPress = true
         var duckBegin: @MainActor () -> Void = { SystemAudioDucker.begin() }
         var duckEnd: @MainActor () -> Void = { SystemAudioDucker.end() }
         var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureAll() }
         var speechStart: @MainActor (SpeechInput) throws -> Int = { try $0.start() }
         var speechStop: @MainActor (SpeechInput) async -> String = { await $0.stop() }
-        static func silent() -> Seams { Seams(warmOnPress: {}, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
+        static func silent() -> Seams { Seams(warmsOnPress: false, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
     }
     var seams = Seams()
     /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
@@ -211,6 +207,7 @@ final class VoiceTurnController {
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
+        if seams.warmsOnPress { BrainWarmScheduler.shared.talkKeyDown() }
         fastRace?.cancel()
         // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
         handsFreeTask?.cancel()
@@ -218,7 +215,11 @@ final class VoiceTurnController {
         turnRun.invalidate()
         // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
         PersistentClaudeSession.shared.abortBusy()
-        seams.warmOnPress()
+        if seams.warmsOnPress {
+            KeyDownWarmer.talkKeyDown()
+            // Off the critical path: the local-model check is read from this cache when the answer starts.
+            Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        }
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
