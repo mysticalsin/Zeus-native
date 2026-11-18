@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import contracts as c
+import native_evidence
 
 SPEC = importlib.util.spec_from_file_location("zeus_closed_loop_runner", c.ROOT / "qa/closed-loop/run.py")
 runner = importlib.util.module_from_spec(SPEC)
@@ -51,6 +52,20 @@ class MatrixContractTests(unittest.TestCase):
                         row for row in feature["obligations"] if checks[row["check"]]["tier"] != tier]
                     with self.assertRaisesRegex(c.Invalid, feature["id"] + " needs contract, native integration, and device proof"):
                         c.validate_map(data, self.portable)
+
+    def test_a_suite_nested_in_a_serialized_parent_is_named_parent_slash_suite(self):
+        # Swift Testing reports a nested suite as Module.Parent/Suite/test(); the map names it the same way.
+        checks = c.validate_map(self.data, self.portable)
+        fit = checks["native-ScribeMeetingCardFitTests"]
+        self.assertEqual(fit["suite"], "ScribeMeetingCardHosted/ScribeMeetingCardFitTests")
+        self.assertRegex("ZeusAppTests.ScribeMeetingCardHosted/ScribeMeetingCardFitTests/fit()",
+                         native_evidence.selector([fit]))
+        for bad in ("WrongParent/ScribeMeetingCardFitTests", "ScribeMeetingCardHosted/InventedTests",
+                    "A/B/ScribeMeetingCardFitTests", "ScribeMeetingCardHosted/"):
+            data = copy.deepcopy(self.data)
+            next(row for row in data["checks"] if row["id"] == fit["id"])["suite"] = bad
+            with self.assertRaises(c.Invalid, msg=bad):
+                c.validate_map(data, self.portable)
 
     def test_missing_native_suite_and_missing_case_are_errors(self):
         data = copy.deepcopy(self.data)
