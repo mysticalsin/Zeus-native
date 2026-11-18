@@ -320,7 +320,7 @@ private struct ScribeMemoryMeeting: View {
     let scribe: ScribeController
     let row: ScribeMemoryRow
     @State private var showTranscript = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         let notes = row.recap.notes

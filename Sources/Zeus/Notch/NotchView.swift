@@ -825,7 +825,7 @@ private struct NotchSizeReader<Content: View>: View {
 
 /// Dims on press so custom-drawn buttons still show feedback.
 struct PressableStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.isEnabled) private var isEnabled
     private let reduceMotionOverride: Bool?
 

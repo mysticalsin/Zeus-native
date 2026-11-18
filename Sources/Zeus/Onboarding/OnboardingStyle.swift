@@ -247,7 +247,7 @@ struct StepDashes: View {
     let current: Int
     let count: Int
     @Environment(\.ob) private var ob
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.onboardingReduceMotion) private var motionOverride
     private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     var body: some View {
@@ -276,7 +276,7 @@ struct StepDashes: View {
 private struct OBButtonFeedback: ViewModifier {
     let pressed: Bool
     var scales = true
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.onboardingReduceMotion) private var motionOverride
     private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     @Environment(\.isEnabled) private var isEnabled
@@ -454,7 +454,7 @@ struct OBToggleStyle: ToggleStyle {
     enum Size { case small, large }
     var size: Size = .small
     @Environment(\.ob) private var ob
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.onboardingReduceMotion) private var motionOverride
     private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     func makeBody(configuration: Configuration) -> some View {

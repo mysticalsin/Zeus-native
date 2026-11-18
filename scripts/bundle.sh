@@ -9,6 +9,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${CONFIG:-release}"
+if [ "${RELEASE:-0}" = 1 ] && [ "$CONFIG" != release ]; then
+  echo "Release builds must use CONFIG=release (CONFIG=$CONFIG)." >&2
+  exit 1
+fi
 if [ "${RELEASE:-0}" = 1 ] && { [ -z "${SIGN_IDENTITY:-}" ] || [ "${SIGN_IDENTITY:-}" = - ]; }; then
   echo "Release builds require an explicit Developer ID Application signing identity." >&2
   exit 1

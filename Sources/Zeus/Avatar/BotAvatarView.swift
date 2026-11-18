@@ -27,7 +27,7 @@ struct BotAvatarView: View {
     let lightAngle: Double
     let customPath: BotPath?
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @StateObject private var input = BotAvatarInput()
 
     init(type: BotAvatarType, face: BotFace = .mouth, state: BotAvatarState = .default, size: CGFloat = 28,

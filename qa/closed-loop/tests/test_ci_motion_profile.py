@@ -148,7 +148,7 @@ class CIMotionProfileTests(unittest.TestCase):
                     text = output.getvalue()
                     self.assertNotIn(profile.DOMAIN, text)
                     self.assertNotIn("/usr/bin/defaults", text)
-                    self.assertIn("defaults_untouched=true", text)
+                    self.assertNotIn("defaults_untouched", text)
 
     def test_hosted_ci_path_does_not_use_the_harness_override(self):
         fixture = DefaultsFixture(True)

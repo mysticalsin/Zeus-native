@@ -65,12 +65,22 @@ extension Preferences {
 
 enum Motion {
     /// System Settings › Accessibility › Display › Reduce motion.
-    /// A debug test host may inject reduced motion with ZEUS_HARNESS_REDUCE_MOTION.
-    /// Release builds ignore that variable and keep the system preference.
-    @MainActor static var reduced: Bool {
+    /// Live value: `MotionCenter` republishes `read()` when the system setting changes.
+    /// A debug test host may inject reduced motion only after it sets
+    /// `ZEUS_MOTION_HARNESS_ACTIVE`. Release builds ignore that variable.
+    /// The person's own Reduce Motion setting is never turned off.
+    @MainActor static var reduced: Bool { MotionCenter.shared.reduced }
+
+    @MainActor static func read() -> Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["ZEUS_HARNESS_REDUCE_MOTION"] == "1" {
-            return true
+        if motionEnvironmentFlag("ZEUS_HARNESS_REDUCE_MOTION") {
+            if motionEnvironmentFlag("ZEUS_MOTION_HARNESS_ACTIVE") {
+                return true
+            }
+            if !MotionHarnessWarning.shared.warned {
+                MotionHarnessWarning.shared.warned = true
+                FileHandle.standardError.write(Data("ZEUS_HARNESS_REDUCE_MOTION is ignored outside the test host\n".utf8))
+            }
         }
         #endif
         return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -90,5 +100,43 @@ enum Motion {
     /// Layout changes settle promptly. Reduced motion changes geometry immediately.
     static func page(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .spring(response: pageResponse, dampingFraction: pageDamping)
+    }
+}
+
+#if DEBUG
+@MainActor
+private final class MotionHarnessWarning {
+    static let shared = MotionHarnessWarning()
+    var warned = false
+}
+
+private func motionEnvironmentFlag(_ name: String) -> Bool {
+    guard let value = getenv(name) else { return false }
+    return String(cString: value) == "1"
+}
+#endif
+
+/// One observable Reduce Motion value for SwiftUI. Updated from `Motion.read()` when the
+/// system accessibility display options change, so views keep tracking the person's setting.
+@MainActor
+@Observable
+final class MotionCenter {
+    static let shared = MotionCenter()
+    private(set) var reduced: Bool
+    private var token: NSObjectProtocol?
+
+    private init() {
+        reduced = Motion.read()
+        token = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { MotionCenter.shared.refresh() }
+        }
+    }
+
+    func refresh() {
+        reduced = Motion.read()
     }
 }

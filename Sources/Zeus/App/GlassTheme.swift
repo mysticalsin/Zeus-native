@@ -284,7 +284,7 @@ struct GlassDivider: View {
 
 /// Pill switch: white knob on the bolt when on, smoke when off.
 struct GlassToggleStyle: ToggleStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     func makeBody(configuration: Configuration) -> some View {
         Button { withAnimation(Motion.page(reduceMotion: reduceMotion)) { configuration.isOn.toggle() } } label: {
@@ -316,7 +316,7 @@ struct GlassButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, quiet, danger }
     var kind: Kind = .secondary
     var compact = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -357,7 +357,7 @@ struct GlassSegmented<Value: Hashable>: View {
     let options: [(Value, String)]
     let selection: Binding<Value>
     @Namespace private var pill
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         HStack(spacing: 2) {

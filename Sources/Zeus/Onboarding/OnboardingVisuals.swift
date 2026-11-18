@@ -10,7 +10,7 @@ import SwiftUI
 /// More than one film plays as a loop of the list.
 struct FilmCard: View {
     let films: [OnboardingFilm]
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.onboardingReduceMotion) private var motionOverride
     private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     var body: some View {
@@ -538,7 +538,7 @@ struct SoundsPreviewTile: View {
 struct HaloPreviewCard: View {
     var options: OnboardingOptions = .live
     var height: CGFloat = 81
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.onboardingReduceMotion) private var motionOverride
     private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     private var drawn: Double { options.haloDrawn }

@@ -76,7 +76,7 @@ enum OnboardingTransition {
                            removal: .opacity.combined(with: .offset(x: -travel)))
     }
 
-    @MainActor static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    @MainActor static var reduceMotion: Bool { Motion.reduced }
 }
 
 /// The guide's earcons: the soft check on each step and Zeus's success sound at the end. Both obey the
@@ -250,7 +250,7 @@ struct OnboardingRoot: View {
     var options: OnboardingOptions = .live
     private var theme: String { options.string("general.windowTheme") }
     @Environment(\.colorScheme) private var systemScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     private var palette: OB.Palette {
         switch theme {

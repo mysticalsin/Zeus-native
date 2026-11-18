@@ -92,7 +92,7 @@ struct VoiceRingView: View {
     /// Rings that stay on screen together need different ids so each keeps its own motion.
     var runnerID = "voice-ring"
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         let runner = VoiceRingRunner.runner(runnerID)
