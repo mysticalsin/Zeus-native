@@ -24,4 +24,18 @@ import Testing
         #expect(ok == false)
         #expect(posted == false)
     }
+
+    @Test func theShortcutFallbackIsFalseUntilTheSessionReportsLocked() {
+        var posted = false
+        var locked = false
+        let refused = ScreenLock.lock(using: nil, postShortcut: {
+            posted = true
+            return true
+        }, isLocked: { locked }, attempts: 2, pause: {})
+        #expect(posted)
+        #expect(refused == false)
+        locked = true
+        let confirmed = ScreenLock.lock(using: nil, postShortcut: { true }, isLocked: { locked }, attempts: 1, pause: {})
+        #expect(confirmed)
+    }
 }
