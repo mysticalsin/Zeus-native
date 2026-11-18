@@ -516,6 +516,8 @@ in its own code; no third-party logo or image is bundled.
 
 ### Behaviour and design
 
+Sizes, the left column and the type scale in this section are superseded by "Compact card (2026-11-18)" below.
+
 - One wide liquid-glass slab, 440 pt wide and 156 pt tall, continuous corner radius 32 pt, in a window that adds
   24 pt of room on every side for its shadow. The slab sits 24 pt from the top and right edges of the visible
   frame (below the menu bar), so the window is flush with the corner and the margin is even.
@@ -590,6 +592,63 @@ The link: `ScribeCalendarSlot` gains `callLink: URL?` (default nil) and the watc
 already searched for the link. Only the Join action reads it; it is never logged or stored. A meeting without
 `callLink` keeps the old Record action, so the card works before any watcher change lands. `AppBrandCatalog`
 brands for call apps list the hosts of their links, so the provider of a link is found from the catalog.
+
+### Compact card (2026-11-18)
+
+The owner found the card too big and chose a compact one. This section supersedes the sizes, the left column
+split, the type sizes and the vertical stack in "Behaviour and design" above (the 440 pt by 156 pt slab, radius 32,
+the 30 percent column with its hairline, the 64 pt orb, 22 pt tiles, the 24 pt bold title, the 32 pt capsule).
+Content, states, actions, motion, keyboard, VoiceOver labels and ids are unchanged. The numbers live in
+`ScribeMeetingCardMetrics`; the view reads them, and the tests lock them.
+
+| Part | Compact value | Was |
+|---|---|---|
+| Slab | 340 x 96 pt | 440 x 156 |
+| Corner radius | 22 pt, continuous | 32 |
+| Padding | 12 pt | 14 |
+| Shadow room (window adds it on every side) | 16 pt | 24 |
+| Shadow | radius 12, y 6 | radius 18, y 10 |
+| Margin from the top and right of the visible frame | 24 pt (unchanged) | 24 |
+| Window | 372 x 128 pt, flush with the corner (8 pt less than the margin) | 488 x 204 |
+| Orb column | 64 pt wide, no 30 percent split, no divider | 30 percent, hairline |
+| Orb, ring, ring width | 40, 48, 2 pt; orb symbol 18 pt | 64, 76, 2; symbol 28 |
+| App tiles | 16 pt, spacing 4, at most 3, under the ring (gap 6) | 22, 6, 4 |
+| Title | 15 pt semibold, one line, tail truncation | 24 bold |
+| Close button | 20 pt, in the title row at the trailing edge, symbol 9 pt | 28, over the corner |
+| Status pill | 10 pt semibold, 16 pt capsule, dot 5 pt | 11.5, 20 |
+| Time line | 12 pt (range medium, relative semibold), clock 10 pt | 14 |
+| Third line (reason, wait or participants) | 11 pt, one line, tail truncation | 13 |
+| Action capsule | 26 pt tall, label 12 pt semibold, symbol 11 pt | 32, 13, 14 |
+
+Layout. The slab is one row: the orb column, then the text column. The text column has three rows inside the
+72 pt the padding leaves:
+
+1. Title row, 20 pt: the title, and the close button at the trailing edge where the card can be dismissed.
+2. Status row, 16 pt: the status pill, then the clock, the time range and the relative time ("In 5 min", "Now").
+3. Bottom row, 26 pt: the third line at the leading edge (the reason, the wait, or the participants), and the
+   one action capsule at the trailing edge, hugging its label. Where there is no action the row keeps its
+   height, so the card never changes size.
+
+The rows total 62 pt, leaving 10 pt for the gaps, so the card is 96 pt at every state. The orb group (ring 48,
+gap 6, tile row 16) is 70 pt, so it also fits in the 72 pt.
+
+Decisions where the compact size forced a change:
+
+- The 64 pt narrow column was chosen over the 30 percent split: 30 percent of 340 is 102 pt, which would take a
+  third of the text width for one 48 pt ring. A hairline is dropped for the same reason.
+- The third line shares the bottom row with the capsule, because a separate third line plus the capsule would
+  need 20 + 16 + 14 + 26 = 76 pt, more than the 72 pt available. The cost is that a long reason beside a wide
+  capsule can meet the tail ellipsis earlier; the spoken label carries the full words (decision D7 above), and the
+  capsule never truncates before the reason does.
+- The close button moves into the title row so the title never runs under it; it still shows on hover and is
+  always there for VoiceOver and the keyboard.
+- The time range gives way before the relative time: where the status row cannot hold both, the range is left
+  out and the relative time stays.
+- Hover, press, entrance, crossfade, the ring sweep and the breathing glow are unchanged. The glow is sized from the
+  orb.
+
+Tests (this section): `ScribeMeetingCardDesignTests` lock the numbers above and one test checks that every row and
+the capsule fit inside the slab height for the tallest state.
 
 ### Tests first
 
