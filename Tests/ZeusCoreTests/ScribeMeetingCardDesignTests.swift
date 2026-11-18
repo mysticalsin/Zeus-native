@@ -202,7 +202,8 @@ struct ScribeMeetingCardDesignTests {
     @Test func everyFixedDetailFitsBesideTheWidestCapsule() {
         let m = meeting()
         let blocks: [ScribeAutoStartBlock] = [.notChosen, .noOptIn, .microphoneNotAsked, .microphoneDenied, .firstRecordingOwed]
-        let failures: [ScribeStartFailure] = [.microphoneOff, .stillSaving, .noResponse]
+        let failures: [ScribeStartFailure] = [.microphoneOff, .stillSaving, .noResponse,
+                                              .captureFailed("some long error text that goes on")]
         var cards: [ScribeMeetingCard] = blocks.map { .offer(m, blocked: $0) } + failures.map { .failed(m, $0) }
         cards.append(.waiting(m))
         for card in cards {
@@ -211,6 +212,19 @@ struct ScribeMeetingCardDesignTests {
         }
         #expect(ScribeMeetingCardText.status(.offer(m, blocked: .firstRecordingOwed), now: m.slot?.start ?? Date())
                 == "Automatic start needs one recording first")
+    }
+
+    @Test func aCaptureFailureShowsShortWordingButSaysTheWholeReasonInTheStatusAndTheSpokenLabel() {
+        let m = meeting()
+        let card = ScribeMeetingCard.failed(m, .captureFailed("No input device is available"))
+        #expect(ScribeMeetingCardText.detail(card) == "Couldn't start")
+        #expect(ScribeMeetingCardText.status(card, now: Date()) == "No input device is available")
+        #expect(ScribeMeetingCardText.label(card, now: Date()).hasSuffix("No input device is available"))
+    }
+
+    @Test func theJoinMenuHoldsFourAppsAndTheTileRowThree() {
+        #expect(ScribeJoinApps.maxApps == 4)
+        #expect(ScribeMeetingCardMetrics.maxApps == 3)
     }
 
     // MARK: Join and controls
@@ -321,9 +335,9 @@ struct ScribeJoinAppsTests {
         #expect(chosen.map(\.bundleID) == ["p", "b1", "b2"])
     }
 
-    @Test func atMostThreeAppsAreChosen() {
+    @Test func atMostFourAppsAreChosen() {
         let chosen = ScribeJoinApps.choose(provider: [app("p")], browsers: (1...6).map { app("b\($0)") })
-        #expect(chosen.count == 3)
+        #expect(chosen.count == 4)
         #expect(chosen.first?.bundleID == "p")
         #expect(ScribeJoinApps.choose(provider: [], browsers: []).isEmpty)
     }

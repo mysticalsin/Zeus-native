@@ -208,6 +208,7 @@ private struct ScribeMeetingCardBody: View {
         HStack(spacing: M.tileSpacing) {
             ForEach(Array(spec.joinApps.prefix(M.maxApps).enumerated()), id: \.element.bundleID) { index, app in
                 ScribeMeetingCardTile(app: app, chosen: index == 0 && canJoin)
+                    .ownedJourneyWords("scribe.meetingCard.tile", app.name)
             }
         }
         .frame(height: M.tile)
@@ -331,6 +332,8 @@ private struct ScribeMeetingCardBody: View {
                     .font(TopBarStyle.label(M.detailSize, .regular))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    // The drawn width is read back by the owned host and tests, to see whether the line was cut.
+                    .ownedJourneyWords("scribe.meetingCard.detail", text)
             }
             .foregroundStyle(ScribeMeetingCardPalette.inkSecondary)
             .accessibilityHidden(true)
