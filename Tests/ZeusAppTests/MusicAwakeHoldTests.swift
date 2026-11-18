@@ -331,6 +331,17 @@ private final class Scheduled {
 
     // MARK: Lease timing wiring
 
+    @Test func renewDoesNothingWhenNoAssertionIsHeld() {
+        let rig = Rig()
+        rig.refuseCreate = true
+        rig.hold.setEnabled(true)
+        rig.hold.setPlaying(true)
+        #expect(rig.events == ["create nil"])
+        rig.hold.evaluate(renewLease: true)
+        #expect(rig.events == ["create nil"])
+        #expect(rig.renewTimers.isEmpty)
+    }
+
     @Test func aFailedRenewWithNoAssertionDoesNotKeepTheTimer() {
         let rig = Rig()
         rig.refuseCreate = true
