@@ -123,6 +123,17 @@ public enum OutputDeviceIcon {
         case .receiver: "airplayaudio"
         }
     }
+
+    /// CoreAudio `kAudioDevicePropertyTransportType` values, as four-character codes.
+    /// Bluetooth and its low-energy form are headphones. The network receiver transport is a receiver.
+    /// Everything else, including the built-in output, is a speaker.
+    public static func kind(transport: UInt32) -> OutputDeviceKind {
+        switch transport {
+        case 0x626C7565, 0x626C6561: .headphones
+        case 0x61697270: .receiver
+        default: .speakers
+        }
+    }
 }
 
 public struct TimedWord: Equatable, Sendable {

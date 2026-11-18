@@ -92,13 +92,14 @@ final class TopBarServices {
     // MARK: Output devices
 
     private func showOutputDevices() {
-        let devices = OutputDevices.all()
+        let devices = OutputDeviceMenuRows.make(OutputDevices.all())
         let menu = NSMenu(title: "Output")
         for device in devices {
             let item = NSMenuItem(title: device.name, action: #selector(OutputDeviceTarget.choose(_:)), keyEquivalent: "")
             item.target = OutputDeviceTarget.shared
             item.representedObject = device.id
             item.state = device.isDefault ? .on : .off
+            item.image = NSImage(systemSymbolName: device.symbol, accessibilityDescription: device.name)
             menu.addItem(item)
         }
         if devices.isEmpty { menu.addItem(withTitle: "No outputs found", action: nil, keyEquivalent: "") }

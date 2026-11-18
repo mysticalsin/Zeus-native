@@ -8,14 +8,25 @@ enum OutputDevices {
         var id: AudioDeviceID
         var name: String
         var isDefault: Bool
+        /// `kAudioDevicePropertyTransportType`, or 0 when the device does not report one.
+        var transport: UInt32 = 0
     }
 
     static func all() -> [Device] {
         let current = defaultOutput()
         return ids().compactMap { id -> Device? in
             guard channels(id) > 0, let name = name(id) else { return nil }
-            return Device(id: id, name: name, isDefault: id == current)
+            return Device(id: id, name: name, isDefault: id == current, transport: transport(id))
         }
+    }
+
+    static func transport(_ id: AudioDeviceID) -> UInt32 {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyTransportType,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr else { return 0 }
+        return value
     }
 
     @discardableResult
@@ -76,6 +87,23 @@ enum OutputDevices {
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
         return value.takeRetainedValue() as String
+    }
+}
+
+struct OutputMenuRow: Equatable {
+    var id: AudioDeviceID
+    var name: String
+    var isDefault: Bool
+    var symbol: String
+}
+
+enum OutputDeviceMenuRows {
+    static func make(_ devices: [OutputDevices.Device]) -> [OutputMenuRow] {
+        devices.map { device in
+            let kind = OutputDeviceIcon.kind(transport: device.transport)
+            return OutputMenuRow(id: device.id, name: device.name, isDefault: device.isDefault,
+                                 symbol: OutputDeviceIcon.symbol(for: kind))
+        }
     }
 }
 

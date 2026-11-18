@@ -763,6 +763,14 @@
       "scope": "Actual NowPlayingHub and TopBarModel with recording closures for every effect: no player, browser, Apple Event, artwork fetch or permission, and no device acceptance."
     },
     {
+      "id": "native-OutputDeviceIconTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "OutputDeviceIconTests",
+      "file": "Tests/ZeusAppTests/OutputDeviceIconTests.swift",
+      "scope": "Menu rows built from synthetic devices that carry CoreAudio transport codes. No device list is read from the Mac."
+    },
+    {
       "id": "native-PlayerCollapseTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8017,6 +8025,17 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.output-device-icons",
+          "check": "native-OutputDeviceIconTests",
+          "acceptance": "The output menu rows take their symbol from the device transport code: headphones for Bluetooth, a receiver for the network transport, a speaker otherwise.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/OutputDeviceIconTests.swift",
+              "function": "theMenuRowsUseTheTransportTheDeviceReports"
             }
           ]
         },
