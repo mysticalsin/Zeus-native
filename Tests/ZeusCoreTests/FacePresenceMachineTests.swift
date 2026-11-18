@@ -603,6 +603,19 @@ struct FacePresenceMachineTests {
 
     // MARK: Screen lock and sleep
 
+    @Test func lockingOrSleepingDropsAPendingEnrollmentConfirm() {
+        var locked = Self.awaitingEnrollConfirm()
+        let lockEffects = locked.handle(.screenLocked)
+        #expect(locked.state == .paused(.screenLocked))
+        #expect(lockEffects.isEmpty)
+        #expect(!locked.wantsCamera)
+        var asleep = Self.awaitingEnrollConfirm()
+        let sleepEffects = asleep.handle(.willSleep)
+        #expect(asleep.state == .paused(.asleep))
+        #expect(sleepEffects.isEmpty)
+        #expect(!asleep.wantsCamera)
+    }
+
     @Test func lockingTheScreenStopsTheCameraFromEveryOnState() {
         for (label, start) in Self.onStates {
             var machine = start

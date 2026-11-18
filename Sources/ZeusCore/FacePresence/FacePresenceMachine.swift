@@ -303,7 +303,9 @@ public struct FacePresenceMachine: Equatable, Sendable {
 
     private mutating func pauseForLockOrSleep(_ reason: PauseReason) -> [Effect] {
         switch state {
-        case .watching, .present, .away, .enrolling:
+        case .watching, .present, .away, .enrolling, .needsEnrollmentConfirm:
+            // A pending enrollment confirm is not an enrollment yet, so there is no token to cancel.
+            // Leaving the confirm state is what drops it.
             return move(to: .paused(reason))
         case .paused(.lockedByZeus) where reason == .screenLocked:
             // The lock Zeus asked for arrives as a lock notice: keep saying so.
