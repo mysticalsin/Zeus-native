@@ -29,6 +29,19 @@ struct MediaIslandFeatureTests {
         #expect(SystemNowPlayingAdapter.parse("nope") == nil)
     }
 
+    @Test func aConnectedAudioDeviceShowsItsBatteryUntilTheOverlayTimesOut() {
+        #expect(EarbudOverlayRule.settingID == "music.earbudOverlay")
+        #expect(EarbudOverlayRule.visibleFor == 8)
+        let reading = EarbudOverlayRule.reading(name: " Buds ", audio: true, connected: true, left: 80, right: 101, casePercent: -1)
+        #expect(reading == EarbudReading(name: "Buds", left: 80, right: nil, casePercent: nil))
+        #expect(EarbudOverlayRule.reading(name: "Buds", audio: true, connected: false, left: 1, right: 1, casePercent: 1) == nil)
+        #expect(EarbudOverlayRule.reading(name: "Speaker", audio: false, connected: true, left: nil, right: nil, casePercent: nil) == nil)
+        let shownAt = Date(timeIntervalSince1970: 10)
+        #expect(EarbudOverlayRule.visible(reading: reading, enabled: true, now: shownAt.addingTimeInterval(7), shownAt: shownAt))
+        #expect(!EarbudOverlayRule.visible(reading: reading, enabled: true, now: shownAt.addingTimeInterval(8), shownAt: shownAt))
+        #expect(!EarbudOverlayRule.visible(reading: reading, enabled: false, now: shownAt, shownAt: shownAt))
+    }
+
     @Test func theEarbudOverlayNeedsBluetoothAndStartsOff() {
         #expect(MediaIslandFeatures.earbudOverlay.enabled == false)
         #expect(MediaIslandFeatures.earbudOverlay.permission == .bluetooth)
