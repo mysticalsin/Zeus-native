@@ -5191,7 +5191,7 @@
         {
           "id": "F11.openai-speech-retirement",
           "check": "native-ZeusCoreTests",
-          "acceptance": "From 2027-01-06T00:00:00Z the OpenAI speech models (tts-1, tts-1-hd, gpt-4o-mini-tts and dated snapshots) count as retired: the engine router never selects OpenAI and falls through to the same engines as when no key is saved (ElevenLabs, Kokoro, Mac voice), the picker lists no OpenAI voices, the pointing speech path and voice previews build no OpenAI request, and a saved OpenAI choice is kept. Before the date routing is unchanged and Settings shows one note about the end date. Checked with an injected clock; no network call, audio or live OpenAI request is made, and the Settings view layout is not rendered.",
+          "acceptance": "From 2027-01-06T00:00:00Z the five listed OpenAI speech model ids (exact ids, no prefix matching) on OpenAI's own endpoint count as retired: the engine router never selects OpenAI and falls through to the same engines as when no key is saved (ElevenLabs, Kokoro, Mac voice), the picker lists no OpenAI voices, and a saved OpenAI choice is kept with a line naming the engine that speaks instead. A custom OpenAI-compatible base URL is never retired and gets no note. Before the date routing is unchanged and Settings shows one note about the end date. Checked with an injected clock on pure functions; no network call or audio is made, and the Settings view layout and its 30 second refresh are not rendered.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
@@ -5200,6 +5200,18 @@
             {
               "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
               "function": "deprecatedSpeechModelsAreRetiredFromTheShutdownInstant"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "onlyTheFiveListedIdsAreRetiredNotPrefixes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "onlyTheOpenAIHostIsRetiredACustomBaseURLKeepsWorking"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
+              "function": "aSavedOpenAIChoiceAfterShutdownShowsTheFallbackEngine"
             },
             {
               "file": "Tests/ZeusCoreTests/OpenAISpeechRetirementTests.swift",
@@ -5230,27 +5242,35 @@
         {
           "id": "F11.openai-speech-retirement-app",
           "check": "native-OpenAISpeechRetirementAppTests",
-          "acceptance": "From 2027-01-06T00:00:00Z the pointing speech path builds no OpenAI request and falls back to the system voice, the OpenAI voice preview makes no call and shows the ended note, and the OpenAI config gate returns nothing; before the date the pointing request is unchanged. Checked with an injected clock and isolated defaults; no network call, audio or Keychain access is made.",
+          "acceptance": "From 2027-01-06T00:00:00Z the pointing speech path reads no key and sends no request (checked with an injected key reader and transport that fail if reached) and falls back to the system voice, the OpenAI voice preview never reaches its renderer and shows the ended note, and OpenAITTSVoice.config returns a config before the date with a key and nothing after it. A custom base URL keeps its config after the date. Checked with an injected clock and isolated defaults; no network call, audio or Keychain access is made.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-              "function": "pointingOpenAISpeechBuildsNoRequestAfterShutdown"
+              "function": "pointingOpenAISpeechReadsNoKeyAndSendsNothingAfterShutdown"
             },
             {
               "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-              "function": "pointingOpenAISpeechIsUnchangedBeforeShutdown"
+              "function": "pointingOpenAISpeechSendsThroughTheSeamBeforeShutdown"
             },
             {
               "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-              "function": "pointingRouterFallsBackToTheSystemVoiceAfterShutdown"
+              "function": "pointingRouterFallsBackToTheSystemVoiceWithoutSendingAfterShutdown"
             },
             {
               "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-              "function": "openAIConfigIsNilAfterShutdownEvenWithASavedModel"
+              "function": "pointingRetirementFollowsTheExactModelIds"
             },
             {
               "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-              "function": "previewDoesNotCallOpenAIAfterShutdown"
+              "function": "openAIConfigIsNilAfterShutdownAndPresentBeforeWithAKey"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "aCustomBaseURLKeepsWorkingAfterShutdown"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
+              "function": "previewDoesNotRenderOrCallOpenAIAfterShutdown"
             }
           ]
         },

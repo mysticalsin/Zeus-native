@@ -10,6 +10,9 @@ struct ZeusVoiceCards: View {
     private var testModel: VoiceTestModel { VoiceTestModel.shared }
     private var preview: VoicePreviewModel { VoicePreviewModel.shared }
     static let automaticTitle = "Automatic (best working voice)"
+    /// Re-read every 30 seconds and on appear, so the OpenAI note and picker flip at the shutdown instant with the window open.
+    @State private var now = Date()
+    private var openAINote: String? { OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now) }
 
     var body: some View {
         GSCard {
@@ -68,6 +71,10 @@ struct ZeusVoiceCards: View {
                     else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
                 }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
             }
+            if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
+                                                                 effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
+                GSInfo(text: line)
+            }
             GSDivider()
             GSRow(symbol: "sparkles", title: "Voice quality", text: voice.elevenQuality.detail) {
                 GSPopup(selection: Binding(get: { voice.elevenQuality.title }, set: { title in
@@ -114,7 +121,7 @@ struct ZeusVoiceCards: View {
                 GSInfo(text: line)
             }
             GSDivider()
-            GSRow(symbol: "key", title: "OpenAI TTS key", text: voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.") {
+            GSRow(symbol: "key", title: "OpenAI TTS key", text: openAINote ?? (voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.")) {
                 HStack(spacing: 10) {
                     SecureField(voice.openAIKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.openAIKeyDraft }, set: { voice.openAIKeyDraft = $0 }))
                         .textFieldStyle(.plain)
@@ -132,13 +139,13 @@ struct ZeusVoiceCards: View {
             if voice.openAIKeySaved {
                 GSDivider()
                 GSRow(symbol: "person.wave.2", title: "OpenAI voice",
-                      text: OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, at: Date())
+                      text: openAINote
                           ?? "Used when OpenAI speaks. Marin and Cedar need the gpt-4o-mini-tts model.") {
-                    if voice.openAIRetired() {
+                    if voice.openAIRetired(now: now) {
                         Text(OpenAISpeechRetirement.endedNote).font(OB.font(13.5)).foregroundStyle(GS.text.opacity(0.5))
                             .accessibilityLabel("OpenAI voice, ended")
                     } else {
-                        voicePicker(provider: .openAICompatible, voices: OpenAIVoiceCatalog.voices(forModel: voice.openAIModel, at: Date()),
+                        voicePicker(provider: .openAICompatible, voices: OpenAIVoiceCatalog.voices(forModel: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now),
                                     selected: voice.openAIVoice, label: "OpenAI voice") { voice.openAIVoice = $0 }
                     }
                 }
@@ -222,6 +229,8 @@ struct ZeusVoiceCards: View {
             }
             designRows
         }
+        .onAppear { now = Date() }
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { now = $0 }
         GSCard("Speech to text") {
             GSRow(symbol: "waveform.and.mic", title: "Hears you with", text: settings.engine.detail) {
                 GSPopup(selection: Binding(get: { SpeechEngineBoard.shared.pickerTitle(settings.engine) },

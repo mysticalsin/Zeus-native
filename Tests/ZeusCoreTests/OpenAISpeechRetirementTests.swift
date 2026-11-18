@@ -37,7 +37,7 @@ struct OpenAISpeechRetirementTests {
             #expect(OpenAISpeechRetirement.settingsNote(model: "tts-1", baseURL: base, at: before) == OpenAISpeechRetirement.upcomingNote)
         }
         for base in ["http://localhost:8000/v1", "https://tts.example.com/v1", "not a url"] {
-            #expect(!OpenAISpeechRetirement.isRetired(model: "tts-1", baseURL: base, at: after), base)
+            #expect(!OpenAISpeechRetirement.isRetired(model: "tts-1", baseURL: base, at: after), "\(base)")
             #expect(OpenAISpeechRetirement.settingsNote(model: "tts-1", baseURL: base, at: before) == nil)
             #expect(OpenAISpeechRetirement.settingsNote(model: "tts-1", baseURL: base, at: after) == nil)
             #expect(OpenAIVoiceCatalog.voices(forModel: "tts-1", baseURL: base, at: after).count == 9)

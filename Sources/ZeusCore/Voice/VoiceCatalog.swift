@@ -29,8 +29,8 @@ public enum OpenAIVoiceCatalog {
     }
 
     /// The picker list at `now`: empty once OpenAI has shut the model down, so retired voices are not offered.
-    public static func voices(forModel model: String, at now: Date) -> [CatalogVoice] {
-        OpenAISpeechRetirement.isRetired(model: model, at: now) ? [] : voices(forModel: model)
+    public static func voices(forModel model: String, baseURL: String? = nil, at now: Date) -> [CatalogVoice] {
+        OpenAISpeechRetirement.isRetired(model: model, baseURL: baseURL, at: now) ? [] : voices(forModel: model)
     }
 }
 

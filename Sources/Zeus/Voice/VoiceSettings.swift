@@ -84,6 +84,7 @@ final class VoiceSettings {
     /// The voice names the OpenAI and Gemini pickers write (`voice.openai.voice`, `voice.gemini.voice`).
     var openAIVoice: String { didSet { defaults.set(openAIVoice, forKey: "voice.openai.voice") } }
     var geminiVoice: String { didSet { defaults.set(geminiVoice, forKey: "voice.gemini.voice") } }
+    var openAIBaseURL: String? { UserDefaults.standard.string(forKey: "voice.openai.baseURL") }
     var openAIModel: String { UserDefaults.standard.string(forKey: "voice.openai.model") ?? UltronCloudVoice.openAIModel }
     private var fallbackMessage: String?
     /// The fallback notice stays only while the pause behind it lasts (and until a provider works again).
@@ -151,7 +152,7 @@ final class VoiceSettings {
     }
 
     /// OpenAI speech has shut down for the configured model (`OpenAISpeechRetirement`). A saved key and choice stay.
-    func openAIRetired(now: Date = Date()) -> Bool { OpenAISpeechRetirement.isRetired(model: openAIModel, at: now) }
+    func openAIRetired(now: Date = Date()) -> Bool { OpenAISpeechRetirement.isRetired(model: openAIModel, baseURL: openAIBaseURL, at: now) }
 
     func ttsAvailability(elevenLabsPaused: Bool, now: Date = Date()) -> VoiceProviderFallback.Availability {
         VoiceProviderFallback.Availability(

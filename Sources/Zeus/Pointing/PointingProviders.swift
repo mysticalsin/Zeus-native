@@ -388,9 +388,11 @@ final class PointingOpenAISpeech: SpeechOutputProvider {
     private let key: () -> String?
     private let now: () -> Date
     private let defaults: UserDefaults
+    private let transport: (URLRequest) async throws -> Data
     init(key: @escaping () -> String? = { PointingCredentials.openAIKey }, now: @escaping () -> Date = { Date() },
-         defaults: UserDefaults = .standard) {
-        self.key = key; self.now = now; self.defaults = defaults
+         defaults: UserDefaults = .standard,
+         transport: @escaping (URLRequest) async throws -> Data = { try await PointingOpenAISpeech.fetch($0) }) {
+        self.key = key; self.now = now; self.defaults = defaults; self.transport = transport
     }
 
     /// OpenAI shuts the speech model down on 2027-01-06; from then on no request is built (`OpenAISpeechRetirement`).
@@ -414,10 +416,13 @@ final class PointingOpenAISpeech: SpeechOutputProvider {
 
     func render(_ request: ExplanationSpeechRequest) async throws -> ExplanationPreparedAudio {
         try Task.checkCancellation()
-        guard !Self.isRetired(defaults: defaults, now: now()) else { throw ExplanationAudioError.unavailable }
+        guard !Self.isRetired(defaults: defaults, now: now()) else {
+            VoiceLog.log("pointing", "openai speech skipped: ended January 6, 2027")
+            throw ExplanationAudioError.unavailable
+        }
         guard let key = key() else { throw ExplanationAudioError.unavailable }
         let urlRequest = try Self.request(text: request.speech.text, key: key, defaults: defaults)
-        let pcm = try await Self.fetch(urlRequest)
+        let pcm = try await transport(urlRequest)
         try Task.checkCancellation()
         return try await PointingPCM.prepare(request, pcm16: pcm, sampleRate: 24_000)
     }

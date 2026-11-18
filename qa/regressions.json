@@ -8458,7 +8458,7 @@
       "check": "native-OpenAISpeechRetirementAppTests",
       "guard": {
         "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-        "function": "pointingRouterFallsBackToTheSystemVoiceAfterShutdown"
+        "function": "pointingRouterFallsBackToTheSystemVoiceWithoutSendingAfterShutdown"
       }
     },
     {
@@ -8470,7 +8470,7 @@
       "check": "native-OpenAISpeechRetirementAppTests",
       "guard": {
         "file": "Tests/ZeusAppTests/OpenAISpeechRetirementAppTests.swift",
-        "function": "previewDoesNotCallOpenAIAfterShutdown"
+        "function": "previewDoesNotRenderOrCallOpenAIAfterShutdown"
       }
     }
 ]
