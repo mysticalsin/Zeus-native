@@ -252,6 +252,83 @@ class EvidenceContractTests(unittest.TestCase):
                 with self.assertRaises(c.Invalid):
                     c.swift_structured_results(text, code, log)
 
+    def test_xunit_counts_root_totals_and_bounded_read_fail_closed(self):
+        one = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        torn = (Path(__file__).resolve().parent / "fixtures" / "portable-pointing-44344835181.log").read_text()
+        clean = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="2" failures="0" skipped="0" time="0.001">
+    <testcase classname="PointingKeyGestureTests" name="holdStartsImmediately()" time="0.001" />
+    <testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        _, _, functions = c.swift_structured_results(clean, 0, torn)
+        self.assertEqual(functions, ["holdStartsImmediately", "oneXDisplayWithANegativeOrigin"])
+        with self.subTest("truncated"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results("<testsuites><testsuite>", 0)
+        with self.subTest("empty suite"):
+            empty = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="0" failures="0" skipped="0" time="0"></testsuite>
+</testsuites>
+"""
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(empty, 0)
+        with self.subTest("tests count mismatch"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace('tests="1"', 'tests="2"'), 0)
+        with self.subTest("root failures"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace("<testsuites>", '<testsuites failures="1">'), 0)
+        with self.subTest("root malformed"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace("<testsuites>", '<testsuites errors="no">'), 0)
+        with self.subTest("nested mismatch"):
+            nested = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Outer" errors="0" tests="5" failures="0" skipped="0">
+    <testsuite name="Inner" errors="0" tests="1" failures="0" skipped="0">
+      <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+    </testsuite>
+  </testsuite>
+</testsuites>
+"""
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(nested, 0)
+        with self.subTest("bom"):
+            _, _, bom_functions = c.swift_structured_results("\ufeff" + one, 0)
+            self.assertEqual(bom_functions, ["holdStartsImmediately"])
+        with self.subTest("nested direct counts"):
+            nested_ok = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Outer" errors="0" tests="0" failures="0" skipped="0">
+    <testsuite name="Inner" errors="0" tests="1" failures="0" skipped="0">
+      <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+    </testsuite>
+  </testsuite>
+</testsuites>
+"""
+            _, _, nested_functions = c.swift_structured_results(nested_ok, 0)
+            self.assertEqual(nested_functions, ["holdStartsImmediately"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "results-swift-testing.xml"
+            path.write_bytes("x".encode() * 9)
+            with self.subTest("bounded read"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(path, limit=8)
+            path.write_bytes("\xff\xfe<\x00".encode("latin1") if False else b"\xff\xfe<\x00")
+            with self.subTest("utf-16"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(path, limit=32)
+
     def test_python_skips_and_zero_cases_do_not_pass(self):
         passed = "test_one (Suite.test_one) ... ok\nRan 1 test in 0.1s\nOK\n"
         self.assertEqual(runner.python_summary(passed, 0), (1, 1, ["test_one"]))
