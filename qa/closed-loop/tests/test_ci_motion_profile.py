@@ -2,6 +2,7 @@
 import contextlib
 import io
 import os
+import re
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -251,6 +252,78 @@ class CIMotionProfileTests(unittest.TestCase):
         self.assertLess(host.index("!NSWorkspace.shared.accessibilityDisplayShouldReduceMotion"), host.index("dlopen(args[2]"))
         workflow = (repo / ".github/workflows/build.yml").read_text()
         self.assertIn("python3 qa/closed-loop/ci_motion_profile.py --output", workflow)
+
+    def test_style_make_body_tracks_motion_through_one_modifier(self):
+        repo = Path(__file__).resolve().parents[3]
+        sample = "struct ExampleStyle: ButtonStyle {\n    func makeBody(configuration: Configuration) -> some View {\n        let copied = Motion.reduced\n        return configuration.label.opacity(copied ? 0 : 1)\n    }\n}\n"
+        self.assertEqual(style_make_body_offenders(sample), ["ExampleStyle"])
+        clean = sample.replace("Motion.reduced", "forced")
+        self.assertEqual(style_make_body_offenders(clean), [])
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        self.assertEqual(motion.count("struct MotionEffect: ViewModifier"), 1)
+        effect = motion[motion.index("struct MotionEffect: ViewModifier"):]
+        effect = effect[:effect.index("\nstruct ") if "\nstruct " in effect else len(effect)]
+        self.assertIn("func body", effect)
+        self.assertIn("Motion.reduced", effect)
+        self.assertIn("scaleEffect", effect)
+        self.assertIn(".animation(", effect)
+        bodies = {}
+        offenders = []
+        for path in (repo / "Sources/Zeus").rglob("*.swift"):
+            for name, body in style_make_bodies(path.read_text()):
+                self.assertNotIn(name, bodies)
+                bodies[name] = (path.relative_to(repo).as_posix(), body)
+                hits = [token for token in ("Motion.reduced", "Glass.quick", "Glass.spring", "TopBarStyle.pageSpring") if token in body]
+                if hits:
+                    offenders.append(f"{name}: {hits}")
+        self.assertEqual(offenders, [])
+        for name in ("GlassButtonStyle", "GlassToggleStyle", "PressableStyle", "OBToggleStyle", "GlassHoverRowStyle"):
+            self.assertIn("MotionEffect", bodies[name][1])
+        backdrop = (repo / "Sources/Zeus/TopBar/HomeBackdrops.swift").read_text()
+        self.assertNotIn("= Motion.reduced", backdrop)
+        self.assertIn("reduceMotion ?? Motion.reduced", backdrop)
+
+
+_STYLE_DECL = re.compile(
+    r"^(?:(?:public|private|fileprivate|internal|open|final)\s+)*struct\s+(\w+)[^{]*\b(?:ButtonStyle|ToggleStyle|LabelStyle)\b"
+)
+_MAKE_BODY = re.compile(r"^    func makeBody\b")
+_NEXT_MEMBER = re.compile(r"^    (?:func |private |fileprivate |public |var |@|init\b|static )")
+_BANNED_IN_MAKE_BODY = ("Motion.reduced", "Glass.quick", "Glass.spring", "TopBarStyle.pageSpring")
+
+
+def style_make_bodies(text):
+    lines = text.splitlines()
+    bodies = []
+    struct_name = None
+    is_style = False
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.strip().startswith("//"):
+            index += 1
+            continue
+        match = _STYLE_DECL.match(line)
+        if match:
+            struct_name = match.group(1)
+            is_style = True
+        elif re.match(r"^(?:(?:public|private|fileprivate|internal|open|final)\s+)*(?:struct|class|enum|extension|actor)\s+", line):
+            is_style = False
+            struct_name = None
+        if is_style and _MAKE_BODY.match(line):
+            body = [line]
+            index += 1
+            while index < len(lines) and lines[index] != "}" and not _NEXT_MEMBER.match(lines[index]):
+                body.append(lines[index])
+                index += 1
+            bodies.append((struct_name, "\n".join(body)))
+            continue
+        index += 1
+    return bodies
+
+
+def style_make_body_offenders(text):
+    return [name for name, body in style_make_bodies(text) if any(token in body for token in _BANNED_IN_MAKE_BODY)]
 
 
 if __name__ == "__main__":

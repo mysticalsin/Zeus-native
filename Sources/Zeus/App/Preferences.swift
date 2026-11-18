@@ -157,3 +157,45 @@ struct MotionLiveSampleKey: PreferenceKey {
         value = nextValue() ?? value
     }
 }
+
+/// Press scale and the animation that follows it. `body` reads `Motion.reduced`,
+/// so SwiftUI updates this when that setting changes. Button and toggle styles
+/// apply it from `makeBody` and do not read `Motion.reduced` themselves.
+struct MotionEffect: ViewModifier {
+    enum Curve { case feedback, page }
+
+    /// Pressed, or a toggle's isOn. The animation tracks this value.
+    var active: Bool
+    var enabled: Bool = true
+    /// Uses `Motion.pressedScale` only while active, enabled, and motion is allowed.
+    var presses: Bool = false
+    var curve: Curve = .feedback
+    /// Replaces the system value when set, including `false` (`PressableStyle`'s override).
+    var forced: Bool? = nil
+    /// Onboarding fixtures may add reduction. They cannot turn the person's setting off.
+    var includesOnboardingOverride: Bool = false
+
+    @Environment(\.onboardingReduceMotion) private var onboardingOverride
+
+    func body(content: Content) -> some View {
+        let reduced = resolved
+        content
+            .scaleEffect(presses && active && enabled && !reduced ? Motion.pressedScale : 1)
+            .animation(animation(reduced), value: active)
+            .preference(key: MotionLiveSampleKey.self, value: reduced)
+    }
+
+    private var resolved: Bool {
+        if let forced { return forced }
+        let system = Motion.reduced
+        guard includesOnboardingOverride else { return system }
+        return OnboardingMotionPolicy.reduced(system: system, override: onboardingOverride)
+    }
+
+    private func animation(_ reduced: Bool) -> Animation? {
+        switch curve {
+        case .feedback: Motion.feedback(reduceMotion: reduced)
+        case .page: Motion.page(reduceMotion: reduced)
+        }
+    }
+}

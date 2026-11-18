@@ -454,9 +454,6 @@ struct OBToggleStyle: ToggleStyle {
     enum Size { case small, large }
     var size: Size = .small
     @Environment(\.ob) private var ob
-    private var systemReduceMotion: Bool { Motion.reduced }
-    @Environment(\.onboardingReduceMotion) private var motionOverride
-    private var reduceMotion: Bool { OnboardingMotionPolicy.reduced(system: systemReduceMotion, override: motionOverride) }
     func makeBody(configuration: Configuration) -> some View {
         let track = size == .small ? CGSize(width: 44, height: 20) : CGSize(width: 64, height: 24)
         return Button { configuration.isOn.toggle() } label: {
@@ -465,7 +462,7 @@ struct OBToggleStyle: ToggleStyle {
                 Capsule().fill(configuration.isOn ? Color(rgb: 225, 235, 254) : Color(rgb: 223, 224, 224))
                     .frame(width: track.width * 0.6, height: track.height - 4).padding(.horizontal, 2)
             }
-            .animation(Motion.page(reduceMotion: reduceMotion), value: configuration.isOn)
+            .modifier(MotionEffect(active: configuration.isOn, curve: .page, includesOnboardingOverride: true))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Switch"))

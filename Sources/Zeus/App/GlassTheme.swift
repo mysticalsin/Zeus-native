@@ -284,10 +284,8 @@ struct GlassDivider: View {
 
 /// Pill switch: white knob on the bolt when on, smoke when off.
 struct GlassToggleStyle: ToggleStyle {
-    private var reduceMotion: Bool { Motion.reduced }
-
     func makeBody(configuration: Configuration) -> some View {
-        Button { withAnimation(Motion.page(reduceMotion: reduceMotion)) { configuration.isOn.toggle() } } label: {
+        Button { configuration.isOn.toggle() } label: {
             HStack {
                 configuration.label
                 ZStack(alignment: configuration.isOn ? .trailing : .leading) {
@@ -297,6 +295,7 @@ struct GlassToggleStyle: ToggleStyle {
                 }
                 .frame(width: 36, height: 20)
             }
+            .modifier(MotionEffect(active: configuration.isOn, curve: .page))
         }
         .buttonStyle(.plain)
         .accessibilityValue(configuration.isOn ? "On" : "Off")
@@ -316,7 +315,6 @@ struct GlassButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, quiet, danger }
     var kind: Kind = .secondary
     var compact = false
-    private var reduceMotion: Bool { Motion.reduced }
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -329,8 +327,7 @@ struct GlassButtonStyle: ButtonStyle {
             .background(Capsule().fill(background(pressed)))
             .overlay(Capsule().strokeBorder(kind == .secondary ? Glass.hairline : .clear, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.45)
-            .scaleEffect(pressed && isEnabled && !reduceMotion ? Motion.pressedScale : 1)
-            .animation(Motion.feedback(reduceMotion: reduceMotion), value: pressed)
+            .modifier(MotionEffect(active: pressed, enabled: isEnabled, presses: true))
             .contentShape(Capsule())
     }
 

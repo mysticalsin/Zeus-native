@@ -4438,6 +4438,18 @@
         "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
         "function": "test_harness_override_requires_the_test_host_marker"
       }
+    },
+    {
+      "id": "REG-416",
+      "failure": "Button and toggle styles copied Motion.reduced inside makeBody, so they kept the old Reduce Motion value after the setting changed. MotionEffect's body reads it and applies the scale and animation; those styles apply that one modifier instead.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
+        "function": "test_style_make_body_tracks_motion_through_one_modifier"
+      }
     }
   ]
 }

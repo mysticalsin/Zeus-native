@@ -9,7 +9,8 @@ import Testing
 /// button style, and a toggle style to publish the new value.
 ///
 /// A style's `makeBody` is not a tracked body. On 5f97d942 the button and toggle
-/// styles copy `Motion.reduced` there, so they keep the old value and this test fails.
+/// styles copied `Motion.reduced` there and this test failed. They now apply
+/// `MotionEffect`, whose body reads `Motion.reduced` and publishes it.
 @MainActor
 @Suite("Motion style live update", .serialized)
 struct MotionStyleLiveUpdateTests {
