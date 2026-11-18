@@ -717,5 +717,30 @@ class ScribeMeetingCardTests(unittest.TestCase):
         self.assertIn("FlightRecorder.shared.record(", driver)
 
 
+class ZeusActivationTests(unittest.TestCase):
+    def test_shipped_plist_is_an_agent_app(self):
+        import plistlib
+        info = plistlib.loads((ROOT / "Resources/Info.plist").read_bytes())
+        self.assertIs(info.get("LSUIElement"), True)
+
+    def test_main_and_the_guide_test_use_the_shared_activation_function(self):
+        main = (ROOT / "Sources/Zeus/App/main.swift").read_text()
+        launch = main[main.index("let delegate = AppDelegate"):]
+        self.assertIn("ZeusActivation.configure(app)", launch)
+        self.assertNotIn("setActivationPolicy(.accessory)", launch)
+        source = (ROOT / "Sources/Zeus/App/ZeusActivation.swift").read_text()
+        self.assertIn("static func configure(_ app: NSApplication)", source)
+        self.assertIn("setActivationPolicy(.accessory)", source)
+        guide = (ROOT / "Tests/ZeusAppTests/PermissionSweepGuideTests.swift").read_text()
+        self.assertIn("ZeusActivation.configure(application)", guide)
+        self.assertNotIn(".accessory", guide)
+        self.assertLess(guide.index("let wasActive = application.isActive"),
+                        guide.index("ZeusActivation.configure(application)"))
+        self.assertLess(guide.index("ZeusActivation.configure(application)"),
+                        guide.index("let afterSetup = application.isActive"))
+        self.assertIn("application.isActive == wasActive", guide)
+        self.assertIn("application.isActive == afterSetup", guide)
+
+
 if __name__ == "__main__":
     unittest.main()

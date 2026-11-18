@@ -39,14 +39,13 @@ struct PermissionSweepGuideTests {
         let application = NSApplication.shared
         // swift test is unbundled, so it has no LSUIElement and stays .regular. A synthetic
         // leftMouseDown never reaches the window server, and AppKit then activates a regular
-        // process when the panel becomes key. Zeus is accessory (Info.plist LSUIElement and
-        // setActivationPolicy in main.swift); a real click on this nonactivating panel does not.
+        // process when the panel becomes key. The shipped app uses ZeusActivation.configure.
+        let wasActive = application.isActive
         let originalPolicy = application.activationPolicy()
-        if originalPolicy != .accessory {
-            try #require(application.setActivationPolicy(.accessory))
-        }
+        ZeusActivation.configure(application)
+        let afterSetup = application.isActive
         defer {
-            if originalPolicy != .accessory {
+            if application.activationPolicy() != originalPolicy {
                 _ = application.setActivationPolicy(originalPolicy)
             }
         }
@@ -70,8 +69,6 @@ struct PermissionSweepGuideTests {
         #expect(panel.canBecomeKey)
         #expect(!panel.becomesKeyOnlyIfNeeded)
         #expect(panel.styleMask.contains(.nonactivatingPanel))
-        #expect(application.activationPolicy() == .accessory)
-        let wasActive = application.isActive
         let point = NSPoint(x: content.bounds.midX, y: content.bounds.midY)
         let down = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: point,
                                                     modifierFlags: [],
@@ -83,6 +80,7 @@ struct PermissionSweepGuideTests {
                                                     pressure: 1))
         panel.sendEvent(down)
         #expect(panel.isKeyWindow)
+        #expect(application.isActive == afterSetup)
         #expect(application.isActive == wasActive)
     }
 }

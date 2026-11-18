@@ -4366,6 +4366,30 @@
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
         "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
       }
+    },
+    {
+      "id": "REG-412",
+      "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_shipped_plist_is_an_agent_app"
+      }
+    },
+    {
+      "id": "REG-413",
+      "failure": "A guide click test hard-coded the accessory policy instead of the function the shipped app uses, so it could pass while main.swift set a different policy. The test now calls ZeusActivation.configure and still checks that the click does not change activation.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_main_and_the_guide_test_use_the_shared_activation_function"
+      }
     }
   ]
 }
