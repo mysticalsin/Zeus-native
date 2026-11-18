@@ -37,7 +37,19 @@ struct PermissionSweepGuideTests {
 
     @Test func aClickInTheGuideArmsTheKeyboardWithoutShowTakingKey() throws {
         let application = NSApplication.shared
-        let wasActive = application.isActive
+        // swift test is unbundled, so it has no LSUIElement and stays .regular. A synthetic
+        // leftMouseDown never reaches the window server, and AppKit then activates a regular
+        // process when the panel becomes key. Zeus is accessory (Info.plist LSUIElement and
+        // setActivationPolicy in main.swift); a real click on this nonactivating panel does not.
+        let originalPolicy = application.activationPolicy()
+        if originalPolicy != .accessory {
+            try #require(application.setActivationPolicy(.accessory))
+        }
+        defer {
+            if originalPolicy != .accessory {
+                _ = application.setActivationPolicy(originalPolicy)
+            }
+        }
         let front = KeyStandInWindow(contentRect: NSRect(x: 40, y: 40, width: 80, height: 40),
                                      styleMask: [.borderless],
                                      backing: .buffered,
@@ -58,6 +70,8 @@ struct PermissionSweepGuideTests {
         #expect(panel.canBecomeKey)
         #expect(!panel.becomesKeyOnlyIfNeeded)
         #expect(panel.styleMask.contains(.nonactivatingPanel))
+        #expect(application.activationPolicy() == .accessory)
+        let wasActive = application.isActive
         let point = NSPoint(x: content.bounds.midX, y: content.bounds.midY)
         let down = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: point,
                                                     modifierFlags: [],

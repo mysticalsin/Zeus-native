@@ -4297,7 +4297,7 @@
     },
     {
       "id": "REG-404",
-      "failure": "A hover used to hold the meeting card forever, which was the bug. The hover now pauses dismissal for at most 30 s, then the card dismisses.",
+      "failure": "A hover used to hold the meeting card forever, which was the bug. The hover now pauses dismissal for at most 30 s, then the card dismisses. The card lifetime stays 45 s.",
       "features": [
         "F04"
       ],
