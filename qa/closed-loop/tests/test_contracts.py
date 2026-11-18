@@ -329,6 +329,58 @@ class EvidenceContractTests(unittest.TestCase):
                 with self.assertRaises(c.Invalid):
                     c.read_swift_testing_xunit(path, limit=32)
 
+    def test_xunit_testcase_must_sit_in_a_suite_and_paths_stay_closed(self):
+        one = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        stray = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testcase classname="S" name="outside()" time="0.001" />
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        wrapped = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="0" failures="0" skipped="0" time="0.001">
+    <wrapper>
+      <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+    </wrapper>
+  </testsuite>
+</testsuites>
+"""
+        with self.subTest("testcase directly under testsuites"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(stray, 0)
+        with self.subTest("testcase outside a testsuite"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(wrapped, 0)
+        with self.subTest("missing tests"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace(' tests="1"', ""), 0)
+        with self.subTest("tests not an integer"):
+            with self.assertRaises(c.Invalid):
+                c.swift_structured_results(one.replace('tests="1"', 'tests="no"'), 0)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "results-swift-testing.xml"
+            target.write_text(one)
+            link = root / "linked.xml"
+            link.symlink_to(target)
+            with self.subTest("symlink"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(link)
+            folder = root / "not-a-file"
+            folder.mkdir()
+            with self.subTest("not a regular file"):
+                with self.assertRaises(c.Invalid):
+                    c.read_swift_testing_xunit(folder)
+
     def test_python_skips_and_zero_cases_do_not_pass(self):
         passed = "test_one (Suite.test_one) ... ok\nRan 1 test in 0.1s\nOK\n"
         self.assertEqual(runner.python_summary(passed, 0), (1, 1, ["test_one"]))
