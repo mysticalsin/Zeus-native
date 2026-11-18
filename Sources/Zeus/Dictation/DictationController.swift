@@ -268,6 +268,17 @@ final class DictationController {
     private let topBar: TopBarModel
     private let settings = DictationSettings.shared
     private let speech = SpeechInput()
+    /// What a begin and a finish do against the microphone, permissions, engines and media. Tests swap these so
+    /// nothing real is opened, downloaded or paused.
+    struct Seams {
+        struct Access { var speech: Bool, microphone: Bool, language: Bool, onDevice: Bool }
+        var access: ((SpeechInput, DictationSettings) -> Access)?
+        var readyEngine: (() -> (any TranscriptionEngine)?)?
+        var speechStart: (SpeechInput, UInt64) throws -> Int = { try $0.start(controllerGeneration: $1) }
+        var speechStop: (SpeechInput, Bool) async -> String = { await $0.stop(waitForFinal: $1) }
+        var pauseMedia: ((TopBarModel) -> NowPlayingSource?)?
+    }
+    var seams = Seams()
     private let ownership = DictationTurnOwnership()
     private let hotkey = HotkeyMonitor()
     private let store: DictationStore
@@ -485,6 +496,11 @@ final class DictationController {
     var modesFolder: URL { store.root.appendingPathComponent("modes", isDirectory: true) }
 
     var topBarModel: TopBarModel { topBar }
+    var captureHandlerInstalledForTesting: Bool { speech.onCaptureFailure != nil }
+    /// Test seam: the speech input reports a capture failure the way its audio thread does.
+    func deliverCaptureFailureForTesting(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        speech.onCaptureFailure?(session, origin, failure)
+    }
 
     /// Saves a custom mode (or an edit of a built-in one) as its JSON file.
     func saveMode(_ mode: DictationMode) {
@@ -541,6 +557,7 @@ final class DictationController {
         removeEscape()
         // A cancelled turn must not leave its preview card waiting on screen.
         Self.dismissPreviewCard()
+        speech.onCaptureFailure = nil
         speech.cancel()
         speech.onSamples = nil
         turnStream?.cancel()
@@ -553,17 +570,18 @@ final class DictationController {
         guard flow.canStartJob else { return }
         ExplanationAudioArbitration.yieldToNewCapture()
         fallbackNote = nil
-        let speechAllowed = SFSpeechRecognizer.authorizationStatus() == .authorized
-        let languageAvailable = speech.configure(localeIdentifier: settings.language.localeIdentifier)
-        turnEngine = readyEngine
+        let real = seams.access?(speech, settings)
+        let speechAllowed = real?.speech ?? (SFSpeechRecognizer.authorizationStatus() == .authorized)
+        let languageAvailable = real?.language ?? speech.configure(localeIdentifier: settings.language.localeIdentifier)
+        if let override = seams.readyEngine { turnEngine = override() } else { turnEngine = readyEngine }
         // Key down: start loading the speech model now so it is ready when the first chunk is.
         (turnEngine as? ParakeetEngine)?.prewarm()
         let local = turnEngine != nil
         // A local model only needs the microphone; Apple also needs Speech Recognition.
-        let microphoneAllowed = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let microphoneAllowed = real?.microphone ?? (AVCaptureDevice.authorizationStatus(for: .audio) == .authorized)
         // Apple recognition only runs on this Mac: a language without on-device support fails
         // closed (or is skipped when a local engine listens) instead of reaching Apple's servers.
-        let appleOnDevice = speechAllowed && languageAvailable && speech.supportsOnDevice
+        let appleOnDevice = speechAllowed && languageAvailable && (real?.onDevice ?? speech.supportsOnDevice)
         guard microphoneAllowed, appleOnDevice || local else {
             let reason = !speechAllowed
                 ? "Allow Microphone and Speech Recognition in Zeus setup first."
@@ -574,12 +592,17 @@ final class DictationController {
             topBar.show(.dictation(microphoneAllowed ? "Speech recognition is unavailable" : "Dictation needs the microphone"))
             return
         }
-        if settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel(explicit: false) }
+        if seams.readyEngine == nil, settings.engine == .parakeet, !parakeet.isDownloaded { prepareModel(explicit: false) }
         // Apple runs alongside a local model for the live words in the notch. The audio is
         // always kept so the dictation can be reprocessed later with another engine.
         speech.recognizes = appleOnDevice
         speech.recordsSamples = true
         speech.deviceUID = settings.microphoneUID
+        speech.onCaptureFailure = { [weak self] session, origin, failure in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
+            }
+        }
         useLocal = local
         targetApp = NSWorkspace.shared.frontmostApplication
         let insertionField = insertionTracker.beginTurn()
@@ -599,12 +622,13 @@ final class DictationController {
         do {
             // The start cue sounds first: on key down, before the microphone warms up.
             let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
-                try speech.start(controllerGeneration: turnGeneration)
+                try seams.speechStart(speech, turnGeneration)
             }
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
             turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
                                                selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
         } catch {
+            speech.onCaptureFailure = nil
             ownership.invalidate()
             insertionTracker.invalidate()
             turnStream?.cancel()
@@ -619,7 +643,8 @@ final class DictationController {
         topBar.dictationModeSymbol = mode.symbol
         topBar.dictationPartial = ""
         apply(.micOpened(turn: turnGeneration))
-        if settings.pauseMedia { pausedMedia = topBar.pauseForDictation() }
+        if let pause = seams.pauseMedia { pausedMedia = pause(topBar) }
+        else if settings.pauseMedia { pausedMedia = topBar.pauseForDictation() }
         guard AccessibilityGate.trusted else { return }
         escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
@@ -735,6 +760,23 @@ final class DictationController {
         guard flow.isActive else { return }
         apply(.cancelRequested)
         topBar.show(.dictation("Dictation cancelled"))
+    }
+
+    /// The microphone kept changing and capture gave up under a listening turn: end it and say why.
+    /// Only the turn that opened this speech session may be ended; a late callback is dropped.
+    func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        guard flow.isListening, ownership.accepts(sessionID: session, generation: origin) else { return }
+        VoiceLog.log("listen", "dictation capture failed (\(failure)): the turn ended")
+        apply(.cancelRequested)
+        topBar.show(.hint(CaptureFailureHint.text(for: failure)))
+    }
+
+    /// Test seam: opens a listening turn on `session` without the microphone. Returns the turn.
+    func beginListeningForTesting(session: Int) -> UInt64 {
+        let turn = ownership.beginTurn()
+        ownership.bind(speechSessionID: session, generation: turn)
+        apply(.micOpened(turn: turn))
+        return turn
     }
 
     func finish() {
@@ -874,7 +916,8 @@ final class DictationController {
 
     /// Closes a visible preview card through its own Cancel path, which resumes its review.
     private static func dismissPreviewCard() {
-        for window in NSApp.windows {
+        // `NSApp` is only nil without a running app (tests, headless): nothing to dismiss then.
+        for window in NSApp?.windows ?? [] {
             if let panel = window as? PreviewPanel, panel.isVisible { _ = panel.onKey(.cancel) }
         }
     }
@@ -886,8 +929,9 @@ final class DictationController {
                                 stream: (any TranscriptionStream)?) async -> DictationFinishFlow.Heard {
         let isCurrent: () -> Bool = { [ownership] in ownership.owns(generation: context.generation) }
         // A ready local engine makes the final text, so release does not wait for Apple's second pass.
-        let live = await speech.stop(waitForFinal: !(context.useLocal && context.engine != nil))
+        let live = await seams.speechStop(speech, !(context.useLocal && context.engine != nil))
         guard isCurrent() else { return .init(text: "", engine: .apple, samples: []) }
+        speech.onCaptureFailure = nil
         let samples = speech.takeSamples()
         speech.onSamples = nil
         turnStream = nil

@@ -337,6 +337,8 @@ final class SpeechInput: @unchecked Sendable {
             return (owns, captureDiagnostics.configChanges)
         }
         let endTurn = { [self] in
+            // A newer session owns the engine now: this one's late change must not cancel it.
+            guard lock.withLock({ generation == session }) else { return }
             let handler = onCaptureFailure
             cancel()
             handler?(session, origin, .configurationChanged)

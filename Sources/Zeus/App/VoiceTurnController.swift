@@ -52,6 +52,23 @@ final class VoiceTurnController {
     private var listening = false {
         didSet { if oldValue, !listening { onListeningEnded?() } }
     }
+    /// What a press, a release and an end do outside this controller: warm-ups, volume ducking, screen capture,
+    /// the microphone start and stop. Tests swap these so no audio, volume, screen or process is touched.
+    @MainActor struct Seams {
+        /// The key-press warm-ups (brain, voice, local-model probe) stay written in `press()`; tests turn them off.
+        var warmsOnPress = true
+        var duckBegin: @MainActor () -> Void = { SystemAudioDucker.begin() }
+        var duckEnd: @MainActor () -> Void = { SystemAudioDucker.end() }
+        var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureAll() }
+        var speechStart: @MainActor (SpeechInput) throws -> Int = { try $0.start() }
+        var speechStop: @MainActor (SpeechInput) async -> String = { await $0.stop() }
+        static func silent() -> Seams { Seams(warmsOnPress: false, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
+    }
+    var seams = Seams()
+    /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
+    private var talkSession: Int?
+    /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
+    private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
@@ -168,7 +185,7 @@ final class VoiceTurnController {
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
         speaker.stop()
-        SystemAudioDucker.end()
+        seams.duckEnd()
         wakeConversationActive = false
         buddy.model.captionVisible = false
         buddy.idle()
@@ -186,10 +203,11 @@ final class VoiceTurnController {
 
     @discardableResult
     func press() -> Bool {
+        // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
-        BrainWarmScheduler.shared.talkKeyDown()
+        if seams.warmsOnPress { BrainWarmScheduler.shared.talkKeyDown() }
         fastRace?.cancel()
         // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
         handsFreeTask?.cancel()
@@ -197,9 +215,11 @@ final class VoiceTurnController {
         turnRun.invalidate()
         // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
         PersistentClaudeSession.shared.abortBusy()
-        KeyDownWarmer.talkKeyDown()
-        // Off the critical path: the local-model check is read from this cache when the answer starts.
-        Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        if seams.warmsOnPress {
+            KeyDownWarmer.talkKeyDown()
+            // Off the critical path: the local-model check is read from this cache when the answer starts.
+            Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        }
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -211,9 +231,18 @@ final class VoiceTurnController {
         speech.recordsSamples = turnEngine != nil
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
         Self.applyChosenMicrophone(to: speech)
+        captureFailures.reset()
+        let failures = captureFailures
+        speech.onCaptureFailure = { [weak self] session, origin, failure in
+            // Recorded on the calling thread, so a release before the main-actor hop below still sees it.
+            failures.record(session: session, failure: failure)
+            Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
+        }
         do {
-            try speech.start()
+            talkSession = try seams.speechStart(speech)
         } catch {
+            // A start throws before it touches a running capture, so a live turn keeps its handler and session.
+            if !listening { speech.onCaptureFailure = nil }
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -226,7 +255,7 @@ final class VoiceTurnController {
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
         ZeusSound.play(.listenStart)
-        SystemAudioDucker.begin()
+        seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
         FastPath.shared.reset()
@@ -234,7 +263,7 @@ final class VoiceTurnController {
         buddy.model.audioLevel = 0
         buddy.listen()
         // Screens are captured while you talk, so the answer isn't waiting on them.
-        screenshotsTask = Task { await ScreenCapture.captureAll() }
+        screenshotsTask = Task { await seams.captureScreens() }
         // With Chrome in front, the extension reads the page you're looking at.
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
@@ -243,12 +272,19 @@ final class VoiceTurnController {
 
     func release() {
         guard listening else { return }
+        // Capture already gave up for this turn: end it as a failure and do not read or send the partial.
+        if let session = talkSession, let failure = captureFailures.failure(for: session) {
+            handleCaptureFailure(session: session, origin: 0, failure: failure)
+            return
+        }
         listening = false
+        speech.onCaptureFailure = nil
+        talkSession = nil
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
         ZeusSound.play(.listenStop)
-        SystemAudioDucker.end()
+        seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil
         buddy.think()
@@ -265,8 +301,45 @@ final class VoiceTurnController {
 
     /// The talk keys became another shortcut while held (⌃⌥C opens Chat): stop listening and send nothing.
     func cancelListening() {
-        guard listening else { return }
+        guard endListeningWithoutSending() else { return }
+        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+    }
+
+    /// The microphone kept changing (AirPods switching) and capture gave up: end the turn, send nothing, say why.
+    func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        guard listening, CaptureFailureHint.owns(session: session, active: talkSession) else { return }
+        guard endListeningWithoutSending() else { return }
+        // A flapping microphone must not reopen another hands-free turn.
+        wakeConversationActive = false
+        VoiceLog.log("listen", "capture failed (\(failure)): the turn ended without sending")
+        ZeusSound.play(.voiceError)
+        notch.topBar?.show(.hint(CaptureFailureHint.text(for: failure)))
+    }
+
+    /// Test seam: marks a turn as listening on `session` without opening the microphone.
+    func beginListeningForTesting(session: Int) {
+        listening = true
+        talkSession = session
+    }
+
+    var isListeningForTesting: Bool { listening }
+    var captureHandlerInstalledForTesting: Bool { speech.onCaptureFailure != nil }
+    var talkSessionForTesting: Int? { talkSession }
+    var wakeConversationActiveForTesting: Bool {
+        get { wakeConversationActive }
+        set { wakeConversationActive = newValue }
+    }
+    /// Test seam: the speech input reports a capture failure the way its audio thread does.
+    func deliverCaptureFailureForTesting(session: Int, failure: SpeechInput.CaptureFailure) {
+        speech.onCaptureFailure?(session, 0, failure)
+    }
+
+    @discardableResult
+    private func endListeningWithoutSending() -> Bool {
+        guard listening else { return false }
         listening = false
+        speech.onCaptureFailure = nil
+        talkSession = nil
         handsFreeTask?.cancel()
         handsFreeTask = nil
         ahead.cancel()
@@ -276,12 +349,12 @@ final class VoiceTurnController {
         tabTask?.cancel()
         tabTask = nil
         turnEngine = nil
-        SystemAudioDucker.end()
+        seams.duckEnd()
         liveWords.clear()
         buddy.model.audioLevel = nil
         buddy.model.captionVisible = false
         buddy.idle()
-        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+        return true
     }
 
     /// "Hey Zeus, open Spotify": the request already heard by the wake-word listener runs as a
@@ -304,7 +377,7 @@ final class VoiceTurnController {
         let heardAt = ContinuousClock.now
         VoiceLatency.shared.begin(at: heardAt)
         // Only the LLM path uses these; the fast path never waits for them.
-        screenshotsTask = Task { await ScreenCapture.captureAll() }
+        screenshotsTask = Task { await seams.captureScreens() }
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
@@ -342,6 +415,7 @@ final class VoiceTurnController {
 
     /// `zeus listen`: a hands-free voice turn of up to `seconds`, as if the talk key were held.
     func listenTurn(seconds: Double) async -> TurnResult {
+        guard !listening else { return TurnResult(error: "Zeus is already listening.") }
         guard press() else {
             return TurnResult(error: "Zeus can't hear yet: microphone or speech recognition access is missing.")
         }
@@ -375,7 +449,7 @@ final class VoiceTurnController {
     }
 
     private func finishTurn() async -> TurnResult {
-        var transcript = await speech.stop().trimmingCharacters(in: .whitespacesAndNewlines)
+        var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
             transcript = await dictation.transcribeVoice(samples: samples, live: transcript, with: engine)
@@ -1197,12 +1271,12 @@ final class VoiceTurnController {
     func say(_ text: String) {
         VoiceLog.logContent("spoken", text)
         if SettingsStore.shared.bool("voice.speakReplies") {
-            SystemAudioDucker.begin()
+            seams.duckBegin()
             speaker.speak(Self.voiced(text))
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 while self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
-                SystemAudioDucker.end()
+                self.seams.duckEnd()
             }
         }
         buddy.showCaption(text)

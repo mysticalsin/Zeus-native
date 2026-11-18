@@ -1095,6 +1095,14 @@
       "scope": "The talk-turn capture recovery sequence, output engine start timing, microphone choice and per-turn diagnostics with spies and pure helpers. No audio hardware, Bluetooth link or speech recognition is exercised."
     },
     {
+      "id": "native-CaptureFailureEndsTurnTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "CaptureFailureEndsTurnTests",
+      "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+      "scope": "The actual talk turn controller and dictation controller running press, release, begin and finish with the microphone start and stop, warm-ups, ducking, screen capture, permissions, media and sounds swapped out: the handler is wired and cleared, the turn ends, the key machine is told, the hint shows and a stale session is ignored. No microphone, Bluetooth link, speech recognition or real device flapping is exercised."
+    },
+    {
       "id": "native-SpeechInputRecoveryTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5691,6 +5699,85 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges"
+            }
+          ]
+        },
+        {
+          "id": "F11.capture-failure-ends-turn",
+          "check": "native-CaptureFailureEndsTurnTests",
+          "acceptance": "When the microphone keeps changing and capture gives up, a talk turn and a dictation end instead of staying on listening, the talk key machine is told, the person sees a short hint, and a late callback from an older session never ends a newer turn. press, release, begin and finish run for real with the microphone, warm-ups, ducking, screens, permissions, media and sounds swapped out: the real device flapping is not exercised.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aTalkPressInstallsTheHandlerAndReleaseClearsIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "cancellingAListeningTalkTurnClearsTheHandler"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aTalkStartThatFailsLeavesNoHandlerAndNoSession"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aFailedCutInKeepsTheLiveTurnsHandlerAndSession"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aFailureDeliveredByTheSpeechInputEndsALivePressTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aReleaseThatBeatsTheMainHopNeverSendsThePartial"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aReleaseWithoutAFailureStillFinishesTheTurn"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aCaptureFailureEndsAHandsFreeConversation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aTalkTurnEndsAndShowsTheHintWhenCaptureGivesUp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aLateFailureFromAnOlderTalkSessionLeavesTheNewTurnAlone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aFailureWhenNoTalkTurnIsListeningChangesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aDictationBeginInstallsTheHandlerAndCancelClearsIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aDictationStartThatFailsLeavesNoHandler"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aFailureDeliveredByTheSpeechInputEndsALiveDictation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "finishingADictationClearsTheHandler"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aListeningDictationEndsAndShowsTheHintWhenCaptureGivesUp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aStaleFailureLeavesTheCurrentDictationRunning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aPressDuringALiveTurnStillCutsInWithAHandler"
             }
           ]
         },
