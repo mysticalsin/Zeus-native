@@ -147,7 +147,7 @@ class CIMotionProfileTests(unittest.TestCase):
                     self.assertNotIn("ZEUS_HARNESS_REDUCE_MOTION", os.environ)
                     text = output.getvalue()
                     self.assertNotIn(profile.DOMAIN, text)
-                    self.assertNotIn("defaults", text)
+                    self.assertNotIn("/usr/bin/defaults", text)
                     self.assertIn("defaults_untouched=true", text)
 
     def test_hosted_ci_path_does_not_use_the_harness_override(self):
