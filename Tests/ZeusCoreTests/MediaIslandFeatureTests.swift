@@ -49,6 +49,17 @@ struct MediaIslandFeatureTests {
         #expect(FocusNameReader.parse("  ") == nil)
     }
 
+    @Test func bothReceiverServiceTypesBecomeMenuNames() {
+        #expect(ReceiverCatalog.settingID == "music.receiverNames")
+        let names = ReceiverCatalog.names([
+            ReceiverService(name: "Kitchen", type: "_airplay._tcp"),
+            ReceiverService(name: "AABBCC@Bedroom", type: "_raop._tcp"),
+            ReceiverService(name: "Kitchen", type: "_raop._tcp"),
+            ReceiverService(name: "Other", type: "_http._tcp"),
+        ])
+        #expect(names == ["Kitchen", "Bedroom"])
+    }
+
     @Test func receiverNamesNeedLocalNetworkAndStartOff() {
         #expect(MediaIslandFeatures.receiverNames.enabled == false)
         #expect(MediaIslandFeatures.receiverNames.permission == .localNetwork)
