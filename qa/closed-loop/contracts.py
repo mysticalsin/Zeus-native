@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -272,6 +273,35 @@ def swift_summary(log, returncode):
     functions = sorted(set(re.findall(r"✔ Test ([A-Za-z_][A-Za-z_0-9]*)\([^\n]*\) passed after", log)))
     require(functions, "no passed test cases")
     return int(count), int(suites), functions
+
+
+def swift_testing_xunit_path(requested):
+    """`swift test --xunit-output results.xml` writes Swift Testing cases beside it."""
+    requested = Path(requested)
+    return requested.with_name(f"{requested.stem}-swift-testing{requested.suffix}")
+
+
+def swift_structured_results(text):
+    """Per-test Swift Testing xUnit. Identity comes from each testcase, not the summary line."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as error:
+        raise Invalid(f"Swift Testing xUnit is not XML: {error}") from error
+    cases = list(root.iter("testcase"))
+    require(cases, "Swift Testing xUnit has no test cases")
+    failed = []
+    functions = []
+    for case in cases:
+        name = case.get("name") or ""
+        match = re.match(r"([A-Za-z_][A-Za-z_0-9]*)\(", name)
+        require(match, "Swift Testing xUnit testcase has no function name")
+        if any(child.tag in {"failure", "error", "skipped"} for child in case):
+            failed.append(match.group(1))
+        functions.append(match.group(1))
+    require(not failed, "Swift Testing xUnit has a failed or skipped test: " + ", ".join(sorted(set(failed))))
+    suite_count = sum(1 for suite in root.iter("testsuite") if any(child.tag == "testcase" for child in suite))
+    require(suite_count > 0, "Swift Testing xUnit has no test suite")
+    return len(cases), suite_count, sorted(set(functions))
 
 
 def manifest_matches(actual_root, expected_root):

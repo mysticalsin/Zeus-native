@@ -172,6 +172,48 @@ class EvidenceContractTests(unittest.TestCase):
                 c.case_passed({"file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift", "function": name}, check, Path("/unused"))
             self.assertIn(f"required case did not run: {name}", str(caught.exception))
 
+    def test_structured_results_keep_cases_the_torn_log_dropped(self):
+        text = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="2" failures="0" skipped="0" time="0.001">
+    <testcase classname="PointingKeyGestureTests" name="holdStartsImmediately()" time="0.001" />
+    <testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        count, suites, functions = c.swift_structured_results(text)
+        self.assertEqual((count, suites), (2, 1))
+        self.assertEqual(functions, ["holdStartsImmediately", "oneXDisplayWithANegativeOrigin"])
+        failed = text.replace('name="holdStartsImmediately()" time="0.001" />',
+                              'name="holdStartsImmediately()" time="0.001"><failure message="no">x</failure></testcase>')
+        with self.assertRaises(c.Invalid):
+            c.swift_structured_results(failed)
+        skipped = text.replace(
+            '<testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001" />',
+            '<testcase classname="PointingOverlayGeometryTests" name="oneXDisplayWithANegativeOrigin()" time="0.001"><skipped /></testcase>')
+        with self.assertRaises(c.Invalid):
+            c.swift_structured_results(skipped)
+
+    def test_structured_results_fail_closed_when_a_required_case_is_missing(self):
+        text = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="PointingKeyGestureTests" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        _, _, functions = c.swift_structured_results(text)
+        run = (c.ROOT / "qa/closed-loop/run.py").read_text()
+        gate = (c.ROOT / "qa/closed-loop/gate.py").read_text()
+        self.assertIn("--xunit-output", run)
+        self.assertIn("swift_structured_results", run)
+        self.assertIn("swift_structured_results", gate)
+        check = {"status": "passed", "passed_functions": functions}
+        c.case_passed({"file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift", "function": "holdStartsImmediately"}, check, Path("/unused"))
+        with self.assertRaises(c.Invalid) as caught:
+            c.case_passed({"file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift", "function": "oneXDisplayWithANegativeOrigin"}, check, Path("/unused"))
+        self.assertIn("required case did not run: oneXDisplayWithANegativeOrigin", str(caught.exception))
+
     def test_python_skips_and_zero_cases_do_not_pass(self):
         passed = "test_one (Suite.test_one) ... ok\nRan 1 test in 0.1s\nOK\n"
         self.assertEqual(runner.python_summary(passed, 0), (1, 1, ["test_one"]))

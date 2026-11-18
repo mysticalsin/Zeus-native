@@ -365,6 +365,7 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
         if not isinstance(evidence, list) or not evidence:
             raise ValueError(f"feature check has no evidence: {ident}")
         logs = []
+        structured = []
         for entry in evidence:
             if not isinstance(entry, dict):
                 raise ValueError(f"feature check has invalid evidence: {ident}")
@@ -373,10 +374,16 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
                 raise ValueError(f"feature check evidence hash mismatch: {ident}")
             if path.name == "test.log":
                 logs.append(path)
+            if path.name == "results-swift-testing.xml":
+                structured.append(path)
         if len(logs) != 1:
             raise ValueError(f"feature check must have exactly one test log: {ident}")
         log = logs[0].read_text()
-        if definition["kind"] in {"portable", "native-fixture"}:
+        if definition["kind"] == "portable":
+            if len(structured) != 1:
+                raise ValueError(f"feature check must have exactly one Swift Testing result: {ident}")
+            actual_tests, _, functions = contracts.swift_structured_results(structured[0].read_text())
+        elif definition["kind"] == "native-fixture":
             actual_tests, _, functions = contracts.swift_summary(log, 0)
         else:
             actual_tests = positive_test_count("release-scripts", logs[0])

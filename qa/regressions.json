@@ -4390,6 +4390,18 @@
         "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
         "function": "test_host_applies_harness_reduced_motion_before_loading_tests"
       }
+    },
+    {
+      "id": "REG-417",
+      "failure": "The portable pointing log from run 44344835181 tore stdout together, and the text parser then reported holdStartsImmediately and oneXDisplayWithANegativeOrigin as not run even though the suite summary said every test passed. Portable gates now read Swift Testing xUnit testcases. A required case that is absent there still fails closed.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_structured_results_fail_closed_when_a_required_case_is_missing"
+      }
     }
   ]
 }
