@@ -35,6 +35,11 @@ elif name == "hdiutil":
     pathlib.Path(args[-1]).write_text("new-dmg")
 elif name == "xcrun" and args[:2] == ["notarytool", "submit"]:
     print(json.dumps({"status": os.environ.get("NOTARY_STATUS", "Accepted")}))
+elif name == "xcrun" and "clang" in args and "-o" in args:
+    out = pathlib.Path(args[args.index("-o") + 1])
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("helper")
+    out.chmod(0o755)
 elif name == "plutil":
     print(json.loads(pathlib.Path(args[-1]).read_text())["status"])
 elif name == "pgrep": sys.exit(0 if os.environ.get("APP_RUNNING") == "1" else 1)
@@ -63,7 +68,7 @@ class ReleaseScripts(unittest.TestCase):
         (self.root / "scripts").mkdir()
         (self.root / "build").mkdir()
         (self.root / "Resources").mkdir()
-        for name in ("bundle.sh", "package.sh", "verify-release-signature.sh", "install.sh", "test.sh"):
+        for name in ("bundle.sh", "package.sh", "verify-release-signature.sh", "install.sh", "test.sh", "now-playing.pl", "now-playing-media.c"):
             shutil.copy2(REPO / "scripts" / name, self.root / "scripts" / name)
         self.log = self.root / "commands.jsonl"
         self.bin = self.root / "bin"
@@ -124,7 +129,8 @@ class ReleaseScripts(unittest.TestCase):
         result = self.run_script("bundle.sh", RELEASE="1", SIGN_IDENTITY="Developer ID Application: Test")
         self.assertEqual(result.returncode, 0, result.stderr)
         signatures = [c for c in self.commands() if c[:2] == ["codesign", "--force"]]
-        self.assertEqual(len(signatures), 4)
+        self.assertEqual(len(signatures), 5)
+        self.assertTrue(any(c[-1].endswith("zeus-now-playing") for c in signatures))
         self.assertTrue(all("--timestamp" in c and "--timestamp=none" not in c for c in signatures))
 
     def test_ad_hoc_bundle_remains_available_for_local_validation(self):
@@ -132,7 +138,8 @@ class ReleaseScripts(unittest.TestCase):
         result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
         self.assertEqual(result.returncode, 0, result.stderr)
         signatures = [c for c in self.commands() if c[:2] == ["codesign", "--force"]]
-        self.assertEqual(len(signatures), 4)
+        self.assertEqual(len(signatures), 5)
+        self.assertTrue(any(c[-1].endswith("zeus-now-playing") for c in signatures))
         self.assertTrue(all("--timestamp=none" in c for c in signatures))
 
     def test_bundle_strips_symbols_from_app_and_helpers_before_signing(self):
@@ -164,6 +171,8 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         resources = self.root / "build/Zeus.app/Contents/Resources"
         self.assertTrue((resources / "Zeus_Zeus.bundle/resource.txt").is_file())
+        self.assertTrue((resources / "now-playing.pl").is_file())
+        self.assertTrue((resources / "zeus-now-playing").is_file())
         self.assertEqual(sorted(p.name for p in resources.glob("*Tests.bundle")), [])
 
     def test_release_requires_identity_and_profile_before_build(self):

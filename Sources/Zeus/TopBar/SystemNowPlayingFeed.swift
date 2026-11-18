@@ -6,14 +6,19 @@ import ZeusCore
 enum SystemNowPlayingProcess {
     static let timeout = SystemNowPlayingLaunch.timeout
     static let maxOutputBytes = SystemNowPlayingLaunch.maxOutputBytes
-    private static let lock = NSLock()
-    private static var running: Process?
+    /// The helper process, guarded by its own lock. The stored reference is immutable, so this is not shared mutable global state.
+    private static let running = RunningHelper()
 
-    static var isHelperRunning: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return running?.isRunning == true
+    private final class RunningHelper: @unchecked Sendable {
+        private let lock = NSLock()
+        private var process: Process?
+        var isRunning: Bool { lock.withLock { process?.isRunning == true } }
+        func store(_ process: Process) { lock.withLock { self.process = process } }
+        func clear(_ process: Process) { lock.withLock { if self.process === process { self.process = nil } } }
+        func take() -> Process? { lock.withLock { let current = process; process = nil; return current } }
     }
+
+    static var isHelperRunning: Bool { running.isRunning }
 
     static func read() -> String? {
         stop()
@@ -28,23 +33,15 @@ enum SystemNowPlayingProcess {
     static func run(_ executable: String, _ arguments: [String], timeout: TimeInterval, maxOutputBytes: Int) -> BoundedSubprocess.Result {
         var launched: Process?
         let result = BoundedSubprocess.run(executable, arguments, timeout: timeout, maxOutputBytes: maxOutputBytes) { process in
-            lock.lock()
-            running = process
+            running.store(process)
             launched = process
-            lock.unlock()
         }
-        lock.lock()
-        if running === launched { running = nil }
-        lock.unlock()
+        if let launched { running.clear(launched) }
         return result
     }
 
     static func stop() {
-        lock.lock()
-        let process = running
-        running = nil
-        lock.unlock()
-        guard let process, process.isRunning else { return }
+        guard let process = running.take(), process.isRunning else { return }
         process.terminate()
     }
 

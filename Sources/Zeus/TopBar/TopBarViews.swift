@@ -587,6 +587,7 @@ final class LyricsToggle: ObservableObject {
 
 /// The music page asks this before it draws the large player. The same function is what the wiring test calls.
 enum PlayerChrome {
+    @MainActor
     static func collapsed(model: TopBarModel, settingOn: Bool) -> Bool {
         PlaybackCollapse.collapsed(isPlaying: model.nowPlaying?.isPlaying, settingOn: settingOn)
     }
