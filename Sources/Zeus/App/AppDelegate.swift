@@ -278,6 +278,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.release(builtinCue: false)
             }
+            // Same listening path and the same installed cues as the hold. The monitor plays the cues.
+            hotkey.onRightCommandStart = { [weak self] in
+                self?.talkKeyPressed(builtinCue: false) ?? false
+            }
             hotkey.onListenAccessMissing = { [weak self] in
                 if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
@@ -570,8 +574,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    private func talkKeyPressed(builtinCue: Bool = true) {
-        guard on(.talkHotkey), voice != nil else { return }
+    @discardableResult
+    private func talkKeyPressed(builtinCue: Bool = true) -> Bool {
+        guard on(.talkHotkey), voice != nil else { return false }
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
@@ -586,9 +591,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let access = await VoicePermissions.ensure(explicit: true)
                 if access == .ready { self.topBar.show(.hint("Zeus can hear you now: hold Control + Option again")) }
             }
-            return
+            return false
         }
-        voice?.press(builtinCue: builtinCue)
+        return voice?.press(builtinCue: builtinCue) ?? false
     }
 
     /// Desktop pointing: on by default (`docs/FIRST-RUN-DEFAULTS.md`). Starting it only installs the key

@@ -57,6 +57,21 @@ struct RightCommandTapTests {
         #expect(!tap.listening)
     }
 
+    @Test func aMissingCueFileUsesTheNeutralMacSound() {
+        var tap = RightCommandTap()
+        let started = tap.rightUp(at: 0.1, afterDownAt: 0, fileIsReadable: { _ in false })
+        #expect(started == [.toggle(listening: true, cue: TalkCuePlay(kind: .start, source: .system(TalkCueFiles.fallbackSystemSound)))])
+    }
+
+    @Test func aRejectedStartLeavesTheNextTapAbleToStart() {
+        var tap = RightCommandTap()
+        _ = tap.rightUp(at: 0.1, afterDownAt: 0)
+        tap.noteStartRejected()
+        #expect(!tap.listening)
+        let again = tap.rightUp(at: 1.1, afterDownAt: 1)
+        #expect(again == [.toggle(listening: true, cue: startCue)])
+    }
+
     @Test func cuesStillPlayWhenReduceMotionIsOn() {
         #expect(RightCommandTap.playsAudio(reduceMotion: true))
         var tap = RightCommandTap()

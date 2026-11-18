@@ -70,6 +70,9 @@ final class HotkeyMonitor {
     /// Control+Option hold, after the debounce. Separate from `onPress` so other shortcuts keep their path.
     var onTalkBegin: (() -> Void)?
     var onTalkEnd: (() -> Void)?
+    /// A solo right Command tap. Returns whether listening actually started. Nil leaves the tap inert,
+    /// so the dictation monitor does not also toggle.
+    var onRightCommandStart: (() -> Bool)?
     /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
     var onListenAccessMissing: (() -> Void)?
     var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
@@ -112,6 +115,9 @@ final class HotkeyMonitor {
     private var state = ShortcutState()
     private var talkHold = TalkHold()
     private var talkCheck: DispatchWorkItem?
+    private var rightCommand = RightCommandTap()
+    private var rightCommandDown = false
+    private var rightCommandHoldOwned = false
 
     func start() {
         // The local monitor is installed below either way. Without trust, flags from other apps never arrive.
@@ -145,6 +151,7 @@ final class HotkeyMonitor {
     /// One keyboard event from either monitor (also the entry point for tests and the self-test).
     func feed(_ event: ShortcutEvent) {
         state.apply(event)
+        driveRightCommand(event)
         if case .keyDown(let code, _) = event {
             // Only to spot shortcuts made with the shared key (⌘C): never reads or keeps the key.
             if keyProvider()?.keyCode != code { otherKeyPressed(); spoilHold() }
@@ -205,14 +212,74 @@ final class HotkeyMonitor {
                 talkCheck?.cancel()
                 talkCheck = nil
             case .begin:
+                rightCommand.noteSession(listening: true)
                 cues?.playStart()
                 (onTalkBegin ?? onPress)?()
             case .end:
+                rightCommand.noteSession(listening: false)
                 (onTalkEnd ?? onRelease)?()
                 cues?.playEnd()
             case .abort:
+                rightCommand.noteSession(listening: false)
                 onCancel?()
                 cues?.playEnd()
+            }
+        }
+    }
+
+    /// Right Command tap. Runs beside the Control+Option machine and never replaces it.
+    /// While the hold is pending or talking, the tap is discarded. A tap that already started
+    /// listening stays the one session: the hold's begin keeps it on, and the hold's end turns it off.
+    private func driveRightCommand(_ event: ShortcutEvent) {
+        guard onRightCommandStart != nil else { return }
+        let owns = talkHold.phase != .idle
+        if owns, !rightCommandHoldOwned {
+            _ = rightCommand.holdOwnsKeyboard()
+        } else if !owns, rightCommandHoldOwned {
+            rightCommand.holdReleasedKeyboard()
+        }
+        rightCommandHoldOwned = owns
+        let now = ProcessInfo.processInfo.systemUptime
+        switch event {
+        case .flags(let code, _):
+            // Any other key that goes down while right Command is down makes this press a modifier.
+            if code != RightCommandTap.rightKeyCode, rightCommandDown, state.deviceKeys.contains(code) {
+                _ = rightCommand.otherKey()
+            }
+            if code == RightCommandTap.leftKeyCode {
+                if state.deviceKeys.contains(code) { _ = rightCommand.leftDown(at: now) }
+                else { _ = rightCommand.leftUp(at: now) }
+                return
+            }
+            guard code == RightCommandTap.rightKeyCode else { return }
+            let down = state.deviceKeys.contains(code)
+            if down, !rightCommandDown {
+                rightCommandDown = true
+                let other = !state.keysDown.isEmpty || !state.modifiers.subtracting(.command).isEmpty
+                _ = rightCommand.rightDown(at: now, otherKeyDown: other)
+            } else if !down, rightCommandDown {
+                rightCommandDown = false
+                applyRightCommand(rightCommand.rightUp(at: now))
+            }
+        case .keyDown:
+            _ = rightCommand.otherKey()
+        case .keyUp:
+            break
+        }
+    }
+
+    private func applyRightCommand(_ signals: [RightCommandTap.Signal]) {
+        for signal in signals {
+            switch signal {
+            case .toggle(let listening, _):
+                if listening {
+                    cues?.playStart()
+                    let started = onRightCommandStart?() ?? false
+                    if !started { rightCommand.noteStartRejected() }
+                } else {
+                    onTalkEnd?()
+                    cues?.playEnd()
+                }
             }
         }
     }
