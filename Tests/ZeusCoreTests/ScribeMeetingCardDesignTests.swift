@@ -23,21 +23,35 @@ private func bareCall() -> ScribeMeeting {
 struct ScribeMeetingCardDesignTests {
     // MARK: Metrics
 
-    @Test func theSlabIsAWideGlassCardOfAboutFourHundredAndFortyByOneHundredAndFifty() {
+    @Test func theSlabIsACompactGlassCardOfThreeHundredAndFortyByNinetySix() {
         typealias M = ScribeMeetingCardMetrics
-        #expect(M.width == 440)
-        #expect((140...165).contains(M.height))
-        #expect(M.cornerRadius == 32)
-        #expect(M.orb == 64)
-        #expect(M.tile == 22)
-        #expect(M.maxApps == 4)
+        #expect(M.width == 340)
+        #expect((90...100).contains(M.height))
+        #expect(M.height == 96)
+        #expect(M.cornerRadius == 22)
+        #expect(M.padding == 12)
+        #expect(M.orb == 40)
+        #expect(M.ringDiameter == 48)
+        #expect(M.ringWidth == 2)
+        #expect(M.orbSymbolSize == 18)
+        #expect(M.tile == 16)
+        #expect(M.maxApps == 3)
         #expect((1...1.5).contains(M.rim))
-        #expect(M.titleSize == 24)
+        #expect(M.titleSize == 15)
+        #expect(M.pillTextSize == 10)
+        #expect(M.pillHeight == 16)
+        #expect(M.timeSize == 12)
+        #expect(M.detailSize == 11)
+        #expect(M.capsuleHeight == 26)
+        #expect(M.capsuleLabelSize == 12)
+        #expect(M.closeSize == 20)
+        #expect(M.shadowRadius == 12)
+        #expect(M.shadowY == 6)
     }
 
-    @Test func theLeftColumnIsThirtyPercentAndHoldsTheOrbTheRingAndFourTiles() {
+    @Test func theOrbColumnIsANarrowSixtyFourAndHoldsTheOrbTheRingAndThreeTiles() {
         typealias M = ScribeMeetingCardMetrics
-        #expect(abs(M.leftColumnWidth - M.width * 0.3) < 0.001)
+        #expect(M.leftColumnWidth == 64)
         #expect(M.orb + 2 * M.ringInset <= M.leftColumnWidth)
         let row = CGFloat(M.maxApps) * M.tile + CGFloat(M.maxApps - 1) * M.tileSpacing
         #expect(row <= M.leftColumnWidth)
@@ -45,10 +59,31 @@ struct ScribeMeetingCardDesignTests {
 
     @Test func theWindowAddsTheShadowRoomOnEverySideAndTheOrbSitsInTheLeftColumn() {
         typealias M = ScribeMeetingCardMetrics
+        #expect(M.shadowRoom == 16)
         #expect(M.windowSize == CGSize(width: M.width + 2 * M.shadowRoom, height: M.height + 2 * M.shadowRoom))
+        #expect(M.windowSize == CGSize(width: 372, height: 128))
         let center = M.orbCenter
-        #expect(center.x == M.leftColumnWidth / 2)
+        #expect(center.x == M.padding + M.leftColumnWidth / 2)
         #expect(center.y > M.orb / 2 && center.y < M.height / 2)
+        #expect(center.y - M.ringDiameter / 2 >= M.padding)
+    }
+
+    @Test func everyRowAndTheActionCapsuleFitInsideTheSlabForTheTallestState() {
+        typealias M = ScribeMeetingCardMetrics
+        let inner = M.height - 2 * M.padding
+        // The tallest state has a title with a close button, the status row, and a reason beside an action.
+        #expect(M.titleRowHeight >= M.closeSize)
+        #expect(M.titleRowHeight >= M.titleSize * 1.25, "the title's line fits its row")
+        #expect(M.pillHeight >= M.pillTextSize * 1.25)
+        #expect(M.statusRowHeight >= M.timeSize * 1.25, "the time text fits the status row")
+        #expect(M.capsuleHeight >= M.detailSize * 1.25, "the third line fits beside the capsule")
+        #expect(M.capsuleHeight >= M.capsuleLabelSize * 1.25)
+        #expect(M.contentHeight == M.titleRowHeight + M.titleGap + M.statusRowHeight + M.bottomGap + M.capsuleHeight)
+        #expect(M.contentHeight <= inner, "title, status and capsule rows fit the \(inner) pt inside the padding")
+        #expect(M.orbGroupHeight <= inner, "the ring and the tiles fit the same height")
+        #expect(M.orbGroupHeight == M.ringDiameter + M.orbTileGap + M.tile)
+        let textWidth = M.width - 2 * M.padding - M.leftColumnWidth
+        #expect(textWidth >= 240, "the text column keeps room for the status row")
     }
 
     // MARK: Placement
