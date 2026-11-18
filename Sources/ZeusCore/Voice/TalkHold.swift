@@ -149,9 +149,9 @@ public struct TalkRehearsal: Sendable {
     public private(set) var hold = TalkHold()
     public private(set) var plays: [TalkCuePlay] = []
     public private(set) var preloaded = false
-    public var fileIsReadable: (String) -> Bool
+    public var fileIsReadable: @Sendable (String) -> Bool
 
-    public init(fileIsReadable: @escaping (String) -> Bool = { _ in true }) {
+    public init(fileIsReadable: @escaping @Sendable (String) -> Bool = { _ in true }) {
         self.fileIsReadable = fileIsReadable
     }
 
