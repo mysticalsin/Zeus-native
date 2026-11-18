@@ -30,10 +30,10 @@ public enum MediaIslandFeatures {
     /// No window is created.
     public static let lockScreenPlayer = MediaIslandFeature(enabled: false)
     /// The active Focus name. Needs Full Disk Access and starts off. That permission has no usage string.
-    /// `FocusNameReader` only trims text. It does not read the system Focus setting.
+    /// The store reader reports when access is missing and does not write the files.
     public static let focusName = MediaIslandFeature(enabled: false, permission: .fullDiskAccess)
     /// Receiver names. Needs Local Network and starts off.
-    /// The service types are declared. Nothing browses them.
+    /// The app browses the two service types while the setting is on.
     public static let receiverNames = MediaIslandFeature(enabled: false, permission: .localNetwork,
                                                           usageStringKey: "NSLocalNetworkUsageDescription")
 }

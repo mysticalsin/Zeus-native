@@ -787,6 +787,14 @@
       "scope": "The notch model fed a fake connected audio device. Bluetooth is not opened and no radio is used."
     },
     {
+      "id": "native-FocusNameTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "FocusNameTests",
+      "file": "Tests/ZeusAppTests/FocusNameTests.swift",
+      "scope": "The Focus page model fed synthetic store bytes or a permission denial. The user's Do Not Disturb files are not opened."
+    },
+    {
       "id": "native-LyricTimingWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8120,6 +8128,32 @@
             {
               "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
               "function": "aConnectedAudioDeviceShowsItsBatteryUntilTheOverlayTimesOut"
+            }
+          ]
+        },
+        {
+          "id": "F13.focus-name",
+          "check": "native-FocusNameTests",
+          "acceptance": "A readable synthetic store puts the Focus name on the page model, a denied store says Full Disk Access is needed, and turning it off clears the name. The user's files are not opened.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/FocusNameTests.swift",
+              "function": "aReadableStoreReachesTheFocusPageModelAndStoppingClearsIt"
+            },
+            {
+              "file": "Tests/ZeusAppTests/FocusNameTests.swift",
+              "function": "aDeniedStoreSaysItNeedsFullDiskAccess"
+            }
+          ]
+        },
+        {
+          "id": "F13.focus-name-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The active assertion's mode name is shown. No assertion is unavailable. A denied read asks for Full Disk Access. Off stays off.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
+              "function": "theActiveFocusNameComesFromTheStoreOrNeedsAccess"
             }
           ]
         },

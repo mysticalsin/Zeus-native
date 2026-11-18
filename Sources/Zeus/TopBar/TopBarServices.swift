@@ -15,6 +15,7 @@ final class TopBarServices {
     let systemNowPlaying: SystemNowPlayingFeed
     let receiverNames: ReceiverNameBrowser
     let earbudOverlay: EarbudOverlayController
+    let focusName: FocusNameController
     private let musicFeed: MusicPlayerFeed
     private let browserFeed: BrowserMediaFeed
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
@@ -42,6 +43,7 @@ final class TopBarServices {
         systemNowPlaying = SystemNowPlayingFeed(hub: nowPlayingHub)
         receiverNames = ReceiverNameBrowser()
         earbudOverlay = EarbudOverlayController(model: model)
+        focusName = FocusNameController(model: model)
         musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
         browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
     }
@@ -56,6 +58,9 @@ final class TopBarServices {
         }
         if SettingsStore.shared.bool(EarbudOverlayRule.settingID) {
             earbudOverlay.setEnabled(true)
+        }
+        if SettingsStore.shared.bool(FocusNameStore.settingID) {
+            focusName.setEnabled(true)
         }
         model.chooseOutputDevice = { [weak self] in self?.showOutputDevices() }
         model.requestCalendarAccess = { [weak self] in self?.requestCalendar() }

@@ -1265,6 +1265,12 @@ struct FocusPage: View {
                         }
                     }
                 }
+                if topBar.systemFocus != .off {
+                    Text(FocusNameStatusText.line(topBar.systemFocus))
+                        .font(TopBarStyle.label(10.5))
+                        .foregroundStyle(Theme.cloudSecondary)
+                        .lineLimit(2)
+                }
                 Spacer()
             }
         }

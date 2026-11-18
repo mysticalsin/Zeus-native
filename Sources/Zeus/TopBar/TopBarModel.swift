@@ -159,6 +159,8 @@ final class TopBarModel {
     var clipboard = ClipboardHistory()
     var shelf: [ShelfItem] = []
     var focus = FocusTimer()
+    /// The Mac's active Focus, read only while that setting is on.
+    var systemFocus: FocusNameStatus = .off
     var note: String {
         didSet { defaults.set(note, forKey: "topBar.note") }
     }
