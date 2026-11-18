@@ -1095,6 +1095,14 @@
       "scope": "The talk-turn capture recovery sequence, output engine start timing, microphone choice and per-turn diagnostics with spies and pure helpers. No audio hardware, Bluetooth link or speech recognition is exercised."
     },
     {
+      "id": "native-MicrophoneListCacheTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "MicrophoneListCacheTests",
+      "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+      "scope": "The cached microphone list with a counting fake enumerator: one enumeration for many reads, re-enumeration after a device change, a correct cold first read, no enumeration on the main thread once warm, and the same talk microphone chosen as from a live list. No Core Audio device, listener callback, Bluetooth link or capture is exercised."
+    },
+    {
       "id": "native-CaptureFailureEndsTurnTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5699,6 +5707,53 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges"
+            }
+          ]
+        },
+        {
+          "id": "F11.microphone-list-off-main",
+          "check": "native-MicrophoneListCacheTests",
+          "acceptance": "Pressing the talk key or drawing the explanation pane reads a cached microphone list instead of asking Core Audio on the main thread. The list is read once; after a device-list or default-input change reads keep returning the last list while one background refresh (never more than one at a time, never an older result over a newer one) replaces it; a read before the first refresh is still correct; the same microphone is chosen for a saved, missing or automatic choice. The real Core Audio listener and device stalls are not exercised.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "manyReadsAfterWarmUpEnumerateOnce"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "theFirstReadBeforeWarmUpIsStillCorrect"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "readsAfterAnInvalidationReturnThePreviousSnapshotWithoutEnumeratingOnMain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "anEnumerationThatBeganBeforeAnInvalidationIsNeverStoredAsFresh"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "manyInvalidationsDuringOneRefreshCostExactlyOneMoreEnumeration"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "aMainThreadReadNeverEnumeratesOnceWarm"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "theChosenMicrophoneThroughTheCacheMatchesTheSameListRead"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "aSavedInputThatLeavesStopsBeingChosenOnceTheRefreshLands"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "aSavedInputThatIsGoneIsRefusedSoTalkFallsBackToTheSystemInput"
+            },
+            {
+              "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+              "function": "theExplanationPickerModelFollowsTheCacheAfterARefresh"
             }
           ]
         },

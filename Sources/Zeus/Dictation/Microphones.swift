@@ -5,18 +5,38 @@ import ZeusCore
 
 /// Audio inputs from Core Audio, and how to point an audio engine at one.
 enum Microphones {
-    static func all() -> [MicrophoneDevice] {
+    /// The list every main-thread caller reads: Core Audio is asked off main and again only after a device change.
+    static let cache: MicrophoneListCache = {
+        let cache = MicrophoneListCache(enumerate: { snapshot() })
+        cache.startListening()
+        cache.warmInBackground()
+        return cache
+    }()
+
+    /// Enumerates Core Audio now. It can block for tens of milliseconds (more with Bluetooth or aggregate devices),
+    /// so main-thread code reads `cache` instead.
+    static func all() -> [MicrophoneDevice] { devices(in: deviceIDs()) }
+
+    /// The UID of the Mac's own microphone: an input whose transport is built-in. Nil when there is none.
+    static func builtInUID() -> String? { builtInUID(in: deviceIDs()) }
+
+    /// Devices and built-in UID from one device-list read.
+    static func snapshot() -> MicrophoneListCache.Snapshot {
+        let ids = deviceIDs()
+        return .init(devices: devices(in: ids), builtInUID: builtInUID(in: ids))
+    }
+
+    private static func devices(in ids: [AudioDeviceID]) -> [MicrophoneDevice] {
         let defaultID = defaultInputID()
-        return deviceIDs().compactMap { id -> MicrophoneDevice? in
+        return ids.compactMap { id -> MicrophoneDevice? in
             guard inputChannels(id) > 0, let uid = string(id, kAudioDevicePropertyDeviceUID),
                   let name = string(id, kAudioObjectPropertyName) else { return nil }
             return MicrophoneDevice(uid: uid, name: name, isDefault: id == defaultID)
         }
     }
 
-    /// The UID of the Mac's own microphone: an input whose transport is built-in. Nil when there is none.
-    static func builtInUID() -> String? {
-        deviceIDs().first { id in
+    private static func builtInUID(in ids: [AudioDeviceID]) -> String? {
+        ids.first { id in
             inputChannels(id) > 0 && integer(id, kAudioDevicePropertyTransportType) == kAudioDeviceTransportTypeBuiltIn
         }.flatMap { string($0, kAudioDevicePropertyDeviceUID) }
     }
@@ -83,6 +103,116 @@ enum Microphones {
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
         return value.takeRetainedValue() as String
+    }
+}
+
+/// The audio inputs and the built-in one, cached, stale-while-revalidate. A read returns the last snapshot at once; a
+/// Core Audio device-list or default-input change marks it dirty and the next read (or the listener) starts one
+/// background refresh. Only a read before any snapshot exists enumerates itself, once, so it is never wrong.
+final class MicrophoneListCache: @unchecked Sendable {
+    struct Snapshot: Equatable, Sendable {
+        var devices: [MicrophoneDevice]
+        var builtInUID: String?
+    }
+
+    private let enumerate: @Sendable () -> Snapshot
+    private let lock = NSLock()
+    private var cached: Snapshot?
+    private var dirty = false
+    /// Bumped by every invalidation, so an enumeration that began before a change never counts as fresh.
+    private var generation = 0
+    /// True from the moment a refresh is scheduled until it stores a fresh snapshot: at most one runs at a time.
+    private var refreshing = false
+    private var onChange: (@Sendable (Snapshot) -> Void)?
+    private let queue = DispatchQueue(label: "zeus.microphone-list", qos: .utility)
+    private var listenerBlocks: [AudioObjectPropertyListenerBlock] = []
+
+    init(enumerate: @escaping @Sendable () -> Snapshot) { self.enumerate = enumerate }
+
+    /// The cached snapshot, or nil before the first enumeration. Never enumerates.
+    func peek() -> Snapshot? { lock.withLock { cached } }
+    var isRefreshing: Bool { lock.withLock { refreshing } }
+
+    /// Called off the main thread with each fresh snapshot that differs from the one before it.
+    func setOnChange(_ handler: (@Sendable (Snapshot) -> Void)?) { lock.withLock { onChange = handler } }
+
+    func devices() -> [MicrophoneDevice] { snapshot().devices }
+    func builtInUID() -> String? { snapshot().builtInUID }
+
+    func invalidate() {
+        lock.withLock { dirty = true; generation += 1 }
+    }
+
+    /// Starts a background refresh unless one is already running or the snapshot is current and present.
+    func warmInBackground() {
+        lock.withLock { scheduleLocked(force: cached == nil || dirty) }
+    }
+
+    private func snapshot() -> Snapshot {
+        let (hit, started) = lock.withLock { () -> (Snapshot?, Int) in
+            if cached != nil, dirty { scheduleLocked(force: true) }
+            return (cached, generation)
+        }
+        if let hit { return hit }
+        let fresh = enumerate()
+        let changed = lock.withLock { () -> Bool in
+            guard cached == nil, generation == started else { return false }
+            cached = fresh
+            return true
+        }
+        if changed { notify(fresh) }
+        return fresh
+    }
+
+    private func scheduleLocked(force: Bool) {
+        guard force, !refreshing else { return }
+        refreshing = true
+        queue.async { [self] in refreshLoop() }
+    }
+
+    /// Enumerates until one result is stored under an unchanged generation; an invalidation mid-flight costs one more pass.
+    private func refreshLoop() {
+        while true {
+            let started = lock.withLock { generation }
+            let fresh = enumerate()
+            let (stored, previous, handler) = lock.withLock { () -> (Bool, Snapshot?, (@Sendable (Snapshot) -> Void)?) in
+                guard generation == started else { return (false, nil, nil) }
+                let previous = cached
+                cached = fresh
+                dirty = false
+                refreshing = false
+                return (true, previous, onChange)
+            }
+            if stored {
+                if previous != fresh { handler?(fresh) }
+                return
+            }
+        }
+    }
+
+    private func notify(_ snapshot: Snapshot) {
+        lock.withLock { onChange }?(snapshot)
+    }
+
+    /// Watches the system device list and default input for the life of the app. Each selector registers on its own.
+    func startListening() {
+        lock.withLock {
+            guard listenerBlocks.isEmpty else { return }
+            for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice] {
+                let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                    self?.invalidate()
+                    self?.warmInBackground()
+                }
+                var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
+                                                         mElement: kAudioObjectPropertyElementMain)
+                let status = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, block)
+                if status == noErr {
+                    listenerBlocks.append(block)
+                } else {
+                    VoiceLog.log("mic", "microphone list watch not registered for selector \(selector) (OSStatus \(status))")
+                }
+            }
+        }
     }
 }
 
@@ -163,5 +293,22 @@ final class MicrophoneTester {
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
+    }
+}
+
+/// What the Explanation microphone picker reads, so a SwiftUI body never enumerates and still updates on a device change.
+@MainActor
+@Observable
+final class MicrophoneListModel {
+    static let shared = MicrophoneListModel(cache: Microphones.cache)
+    private(set) var devices: [MicrophoneDevice]
+
+    init(cache: MicrophoneListCache) {
+        devices = cache.peek()?.devices ?? []
+        cache.setOnChange { [weak self] snapshot in
+            Task { @MainActor in self?.devices = snapshot.devices }
+        }
+        // A snapshot that landed between the peek and the handler would otherwise be missed.
+        if let landed = cache.peek()?.devices, landed != devices { devices = landed }
     }
 }

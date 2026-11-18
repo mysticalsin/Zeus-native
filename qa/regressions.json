@@ -8424,6 +8424,18 @@
         "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
         "function": "aFailureDeliveredByTheSpeechInputEndsALiveDictation"
       }
+    },
+    {
+      "id": "REG-965",
+      "failure": "Every talk key press listed the microphones by asking Core Audio on the main thread (and the explanation pane did so on every render), which can stall for tens of milliseconds and longer with Bluetooth or aggregate devices, delaying the start of listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-MicrophoneListCacheTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/MicrophoneListCacheTests.swift",
+        "function": "readsAfterAnInvalidationReturnThePreviousSnapshotWithoutEnumeratingOnMain"
+      }
     }
 ]
 }
