@@ -164,7 +164,7 @@ private struct EqualiserAppRow: View {
     let isOpen: Bool
     let controller: (any EqualiserControlling)?
     let toggleOpen: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     private var actions: EqualiserCardActions? { controller.map(EqualiserCardActions.init) }
     private var excluded: Bool { row.exclusion != nil }

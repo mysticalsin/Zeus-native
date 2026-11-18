@@ -98,7 +98,7 @@ private struct ScribeMeetingCardBody: View {
     let spec: ScribeMeetingCardView
     private let still: Bool
     @State private var landed: Bool
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var systemReduceMotion: Bool { Motion.reduced }
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
 
     init(spec: ScribeMeetingCardView) {

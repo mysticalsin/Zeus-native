@@ -172,7 +172,7 @@ final class ScribeMeetingCardPanel: ScribeMeetingCardRendering {
     /// Fades to `alpha`. Leaving also drifts up a few points, so the card goes the way it came from; Reduce
     /// Motion only fades.
     private static let animatedFade: Fade = { panel, alpha, completion in
-        let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let reduced = Motion.reduced
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = reduced ? AlertMotion.reducedFade : AlertMotion.stretchResponse / 2
             panel.animator().alphaValue = alpha
