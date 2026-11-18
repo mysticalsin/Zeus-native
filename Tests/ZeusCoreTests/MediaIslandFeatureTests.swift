@@ -60,6 +60,10 @@ struct MediaIslandFeatureTests {
         #expect(OutputDeviceIcon.symbol(for: .speakers) == "speaker.wave.2.fill")
         #expect(OutputDeviceIcon.symbol(for: .headphones) == "headphones")
         #expect(OutputDeviceIcon.symbol(for: .receiver) == "airplayaudio")
+        #expect(OutputDeviceIcon.kind(transport: 0x626C7565) == .headphones)
+        #expect(OutputDeviceIcon.kind(transport: 0x626C6561) == .headphones)
+        #expect(OutputDeviceIcon.kind(transport: 0x61697270) == .receiver)
+        #expect(OutputDeviceIcon.kind(transport: 0x626C746E) == .speakers)
     }
 
     @Test func wordsShareTheLineIntervalExactly() {
