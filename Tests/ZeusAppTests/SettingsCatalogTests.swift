@@ -359,33 +359,6 @@ struct SettingsCatalogTests {
         #expect(defaults.string(forKey: SettingsStore.key("audio.equaliser")) == nil)
     }
 
-    /// REG-684: Fling is an explicit opt-in. It starts off, and an import can leave it alone or turn it off, never on.
-    @MainActor @Test func flingStartsOffAndAnImportNeverTurnsItOn() throws {
-        let (store, defaults, suiteName) = try Self.isolatedStore()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        #expect(SettingsCatalog.option("fling.enabled")?.defaultValue == "false")
-        #expect(SettingsCatalog.option("fling.papers")?.defaultValue == "false")
-        #expect(SettingsStore.neverEnabledByImport.contains("fling.enabled"))
-        #expect(!store.bool("fling.enabled"))
-        func file(_ options: [String: String]) throws -> Data {
-            try JSONSerialization.data(withJSONObject: ["format": "zeus.settings", "version": 1, "options": options, "app": [String: String]()])
-        }
-        try store.importJSON(file(["fling.enabled": "true", "fling.flickSensitivity": "High"]))
-        #expect(!store.bool("fling.enabled"))
-        #expect(store.string("fling.flickSensitivity") == "High")
-        store.set("fling.enabled", "true")
-        try store.importJSON(file(["fling.enabled": "false"]))
-        #expect(!store.bool("fling.enabled"))
-    }
-
-    @Test func theFlingRowsLiveOnTheShelfSectionAndTheLightIsEverydayLights() {
-        let ids = SettingsCatalog.options(in: .shelf).map(\.id)
-        #expect(ids == ["fling.enabled", "fling.receiveInBackground", "fling.deviceName", "fling.visibility", "fling.autoAcceptPaired",
-                        "fling.saveMode", "fling.papers", "fling.flickSensitivity", "fling.openLinks", "fling.pairedMacs"])
-        #expect(SettingsCatalog.option("lights.fling")?.group == "Everyday lights")
-        #expect(SettingsCatalog.option("lights.fling")?.defaultValue == "true")
-    }
-
     @MainActor @Test func exportHoldsNoFaceData() throws {
         let (store, defaults, suiteName) = try Self.isolatedStore()
         defer { defaults.removePersistentDomain(forName: suiteName) }

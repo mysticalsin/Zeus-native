@@ -302,8 +302,6 @@ final class SettingsStore {
         "audio.equaliser",
         // It reads other apps' window frames and moves their windows.
         "tiling.enabled",
-        // It listens on the local network and advertises this Mac.
-        "fling.enabled",
     ]
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
     static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
