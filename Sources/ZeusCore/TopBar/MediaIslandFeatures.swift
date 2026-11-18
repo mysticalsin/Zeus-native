@@ -1,37 +1,41 @@
 import Foundation
 
-public enum CanopyPermission: Equatable, Sendable {
+public enum MediaIslandPermission: Equatable, Sendable {
     case bluetooth
     case fullDiskAccess
     case localNetwork
 }
 
 /// One optional playback feature. Anything that needs a new permission starts off.
-public struct CanopyFeature: Equatable, Sendable {
+public struct MediaIslandFeature: Equatable, Sendable {
     public var enabled: Bool
-    public var permission: CanopyPermission?
+    public var permission: MediaIslandPermission?
     public var usageStringKey: String?
 
-    public init(enabled: Bool, permission: CanopyPermission? = nil, usageStringKey: String? = nil) {
+    public init(enabled: Bool, permission: MediaIslandPermission? = nil, usageStringKey: String? = nil) {
         self.enabled = enabled
         self.permission = permission
         self.usageStringKey = usageStringKey
     }
 }
 
-public enum CanopyFeatures {
-    /// System-wide now playing, read through the perl adapter. Off until the owner turns it on.
-    public static let systemNowPlaying = CanopyFeature(enabled: false)
-    /// Earbud overlay. Needs Bluetooth and starts off.
-    public static let airPodsOverlay = CanopyFeature(enabled: false, permission: .bluetooth,
-                                                      usageStringKey: "NSBluetoothAlwaysUsageDescription")
-    /// A player on the lock screen. It uses a private window-server space and asks for no permission.
-    public static let lockScreenPlayer = CanopyFeature(enabled: false)
+public enum MediaIslandFeatures {
+    /// System-wide now playing. Off until the owner turns it on.
+    /// The perl script prints the line `SystemNowPlayingAdapter` reads. Nothing launches it yet.
+    public static let systemNowPlaying = MediaIslandFeature(enabled: false)
+    /// Earbud overlay. Needs Bluetooth and starts off. No radio or battery read is wired.
+    public static let earbudOverlay = MediaIslandFeature(enabled: false, permission: .bluetooth,
+                                                          usageStringKey: "NSBluetoothAlwaysUsageDescription")
+    /// Lock-screen player contract: a private window-server space that collects no input.
+    /// No window is created.
+    public static let lockScreenPlayer = MediaIslandFeature(enabled: false)
     /// The active Focus name. Needs Full Disk Access and starts off. That permission has no usage string.
-    public static let focusName = CanopyFeature(enabled: false, permission: .fullDiskAccess)
-    /// Names of AirPlay receivers. Needs Local Network and starts off.
-    public static let airPlayNames = CanopyFeature(enabled: false, permission: .localNetwork,
-                                                    usageStringKey: "NSLocalNetworkUsageDescription")
+    /// `FocusNameReader` only trims text. It does not read the system Focus setting.
+    public static let focusName = MediaIslandFeature(enabled: false, permission: .fullDiskAccess)
+    /// Receiver names. Needs Local Network and starts off.
+    /// The service types are declared. Nothing browses them.
+    public static let receiverNames = MediaIslandFeature(enabled: false, permission: .localNetwork,
+                                                          usageStringKey: "NSLocalNetworkUsageDescription")
 }
 
 public struct SystemNowPlayingLine: Equatable, Sendable {
@@ -52,7 +56,7 @@ public struct SystemNowPlayingLine: Equatable, Sendable {
     }
 }
 
-/// The perl adapter prints one tab-separated line: title, artist, album, 1 or 0, position, duration.
+/// The perl script prints one tab-separated line: title, artist, album, 1 or 0, position, duration.
 public enum SystemNowPlayingAdapter {
     public static let command = ["perl", "scripts/now-playing.pl"]
 
@@ -64,9 +68,9 @@ public enum SystemNowPlayingAdapter {
 }
 
 public enum LockScreenPlayerSpace {
-    /// Drawn on a private window-server space, not on the owner's desktop.
+    /// The intended space is private to the window server. No panel is opened.
     public static let isPrivateWindowServer = true
-    /// The space shows the player. It does not collect clicks or typing.
+    /// The space would show the player and not collect clicks or typing. Nothing is shown.
     public static let collectsInput = false
 }
 
@@ -77,7 +81,7 @@ public enum FocusNameReader {
     }
 }
 
-public enum AirPlayNames {
+public enum ReceiverNames {
     public static let bonjourTypes = ["_airplay._tcp", "_raop._tcp"]
 
     /// A record that starts with a device hex prefix still shows the service name.
@@ -98,14 +102,14 @@ public enum PlaybackCollapse {
     public static func collapsed(paused: Bool, enabled: Bool) -> Bool { enabled && paused }
 }
 
-public enum OutputDeviceKind: Equatable, Sendable { case speakers, headphones, airPlay }
+public enum OutputDeviceKind: Equatable, Sendable { case speakers, headphones, receiver }
 
 public enum OutputDeviceIcon {
     public static func symbol(for kind: OutputDeviceKind) -> String {
         switch kind {
         case .speakers: "speaker.wave.2.fill"
         case .headphones: "headphones"
-        case .airPlay: "airplayaudio"
+        case .receiver: "airplayaudio"
         }
     }
 }
