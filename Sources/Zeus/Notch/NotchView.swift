@@ -142,6 +142,18 @@ struct NotchView: View {
         return session
     }
 
+    /// Whether the peek draws a card under its bar. A bar-only peek takes the mouse like the closed notch.
+    static func peekHasCard(model: NotchModel) -> Bool {
+        model.approval != nil || model.completion != nil || model.failure != nil || stalledPeek(model) != nil
+            || model.selectionEdit != nil || model.workBehind?.streaming == true || model.recap != nil
+    }
+
+    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt Accept row.
+    static func selectionEditHeight(_ edit: SelectionEdit) -> CGFloat {
+        let lines = edit.diff.reduce(CGFloat(0)) { $0 + 15 * CGFloat(min(2, max(1, ($1.text.count + 2 + 53) / 54))) }
+        return lines + 4 * CGFloat(edit.diff.count) + 28
+    }
+
     /// The peek card as drawn (the peek always has the 8 pt shoulders). The window's click-through rule reads it too.
     static func peekSize(model: NotchModel, footprint: NotchFootprint) -> CGSize {
         let notch = footprint.layoutSize
@@ -157,6 +169,12 @@ struct NotchView: View {
         }
         if model.failure != nil || stalledPeek(model) != nil {
             return CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
+        }
+        if let edit = model.selectionEdit {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 10 + selectionEditHeight(edit))
+        }
+        if let preview = model.workBehind, preview.streaming {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 440), height: barHeight + 10 + 24)
         }
         if let recap = model.recap {
             return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))

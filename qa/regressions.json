@@ -8436,6 +8436,18 @@
         "file": "Tests/ZeusCoreTests/NotchPeekHitRulesTests.swift",
         "function": "pointerFarBelowTheCardIsClickThrough"
       }
+    },
+    {
+      "id": "REG-971",
+      "failure": "A completion, failure or recap card set while a peek was already up, or an approval answered while the peek lingered, left the notch window with the click-through rule of the previous card, so the new card could not be clicked or the old card's area kept swallowing clicks.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NotchPeekClickThroughTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+        "function": "aCompletionSetWhileABarOnlyPeekIsUpTakesTheMouseWithoutAMouseMove"
+      }
     }
 ]
 }
