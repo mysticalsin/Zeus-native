@@ -189,12 +189,28 @@ struct ScribeMeetingCardDesignTests {
         let m = meeting()
         #expect(ScribeMeetingCardText.detail(.offer(m, blocked: nil)) == nil)
         #expect(ScribeMeetingCardText.detail(.offer(m, blocked: .notChosen)) == nil)
-        #expect(ScribeMeetingCardText.detail(.offer(m, blocked: .microphoneDenied)) == "Microphone is off for Zeus")
-        #expect(ScribeMeetingCardText.detail(.failed(m, .stillSaving)) == "Still saving your last meeting")
-        #expect(ScribeMeetingCardText.detail(.waiting(m)) == "Starts once your last meeting is saved")
+        #expect(ScribeMeetingCardText.detail(.offer(m, blocked: .microphoneDenied)) == "Mic is off")
+        #expect(ScribeMeetingCardText.detail(.failed(m, .stillSaving)) == "Still saving")
+        #expect(ScribeMeetingCardText.detail(.waiting(m)) == "After last save")
         #expect(ScribeMeetingCardText.detail(.countdown(m, seconds: 5, deadline: 105, total: 5)) == nil)
         #expect(ScribeMeetingCardText.detail(.recording(m)) == nil)
         #expect(ScribeMeetingCardText.detail(.next(m)) == nil)
+    }
+
+    /// REG-951: the compact card's detail line sits beside the action capsule, so its fixed wording must fit
+    /// without a tail cut ("Automatic sta..."). The full reason stays in the status text and the spoken label.
+    @Test func everyFixedDetailFitsBesideTheWidestCapsule() {
+        let m = meeting()
+        let blocks: [ScribeAutoStartBlock] = [.notChosen, .noOptIn, .microphoneNotAsked, .microphoneDenied, .firstRecordingOwed]
+        let failures: [ScribeStartFailure] = [.microphoneOff, .stillSaving, .noResponse]
+        var cards: [ScribeMeetingCard] = blocks.map { .offer(m, blocked: $0) } + failures.map { .failed(m, $0) }
+        cards.append(.waiting(m))
+        for card in cards {
+            let text = ScribeMeetingCardText.detail(card) ?? ""
+            #expect(text.count <= ScribeMeetingCardMetrics.detailMaxCharacters, "\(text)")
+        }
+        #expect(ScribeMeetingCardText.status(.offer(m, blocked: .firstRecordingOwed), now: m.slot?.start ?? Date())
+                == "Automatic start needs one recording first")
     }
 
     // MARK: Join and controls

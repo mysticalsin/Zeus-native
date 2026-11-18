@@ -1928,6 +1928,10 @@
             {
               "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
               "function": "everyRowAndTheActionCapsuleFitInsideTheSlabForTheTallestState"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+              "function": "everyFixedDetailFitsBesideTheWidestCapsule"
             }
           ]
         }

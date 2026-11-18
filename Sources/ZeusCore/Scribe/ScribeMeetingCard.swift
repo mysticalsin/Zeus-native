@@ -48,6 +48,9 @@ public enum ScribeMeetingCard: Equatable, Sendable {
 /// The card's measurements, in points. One place, so the view, the panel and the tests read the same numbers.
 /// The compact card of 2026-11-18 (docs/MEETING-START-PLAN.md, MS5).
 public enum ScribeMeetingCardMetrics {
+    /// The longest fixed detail wording that fits beside the widest action capsule ("Join in Zoom" with its menu)
+    /// at the detail size, measured from the rendered card.
+    public static let detailMaxCharacters = 15
     /// The glass slab.
     public static let width: CGFloat = 340
     public static let height: CGFloat = 96
@@ -254,11 +257,25 @@ public enum ScribeMeetingCardText {
 
     /// The line that holds a reason or a wait. Nil when there is nothing to say; the card then shows the
     /// participants, if the calendar gave any.
+    /// Short wording: the line sits beside the action capsule (`detailMaxCharacters`); the status text and the
+    /// spoken label keep the full sentence.
     public static func detail(_ card: ScribeMeetingCard) -> String? {
         switch card {
-        case .offer(_, let blocked): return blocked.flatMap { reason($0) }
-        case .failed(_, let failure): return reason(failure)
-        case .waiting: return "Starts once your last meeting is saved"
+        case .offer(_, let blocked):
+            switch blocked {
+            case .microphoneNotAsked: return "Mic not allowed"
+            case .microphoneDenied: return "Mic is off"
+            case .firstRecordingOwed: return "Record first"
+            case .notChosen, .noOptIn, nil: return nil
+            }
+        case .failed(_, let failure):
+            switch failure {
+            case .microphoneOff: return "Mic is off"
+            case .stillSaving: return "Still saving"
+            case .noResponse: return "Didn't start"
+            case .captureFailed: return reason(failure)
+            }
+        case .waiting: return "After last save"
         default: return nil
         }
     }

@@ -8351,6 +8351,18 @@
         "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
         "function": "everyRowAndTheActionCapsuleFitInsideTheSlabForTheTallestState"
       }
+    },
+    {
+      "id": "REG-951",
+      "failure": "On the compact meeting card the reason line beside the action capsule cut its key words (\"Automatic sta...\", \"Starts once your last meeti...\"), so a blocked or waiting card hid why.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
+        "function": "everyFixedDetailFitsBesideTheWidestCapsule"
+      }
     }
 ]
 }

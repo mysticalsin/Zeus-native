@@ -640,6 +640,10 @@ Decisions where the compact size forced a change:
   need 20 + 16 + 14 + 26 = 76 pt, more than the 72 pt available. The cost is that a long reason beside a wide
   capsule can meet the tail ellipsis earlier; the spoken label carries the full words (decision D7 above), and the
   capsule never truncates before the reason does.
+- The bottom row therefore uses short fixed wording, at most 15 characters (`detailMaxCharacters`, measured on the
+  rendered card beside "Join in Zoom" with its menu): "Mic not allowed", "Mic is off", "Record first",
+  "Still saving", "Didn't start", "After last save". The status text and the spoken label keep the full sentence.
+  Only a capture error's own text can still meet the ellipsis (REG-951).
 - The close button moves into the title row so the title never runs under it; it still shows on hover and is
   always there for VoiceOver and the keyboard.
 - The time range gives way before the relative time: where the status row cannot hold both, the range is left
