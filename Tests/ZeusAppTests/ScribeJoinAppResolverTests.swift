@@ -59,11 +59,11 @@ struct ScribeJoinAppResolverTests {
         #expect(ScribeJoinAppResolver(workspace: mac.workspace()).apps(for: other).map(\.bundleID) == ["b.one"])
     }
 
-    @Test func atMostFourAreOffered() {
+    @Test func atMostThreeAreOffered() {
         let mac = Mac()
         for index in 1...6 { mac.installed["b.\(index)"] = url("B\(index)") }
         mac.browsers = (1...6).map { url("B\($0)") }
-        #expect(ScribeJoinAppResolver(workspace: mac.workspace()).apps(for: link).count == 4)
+        #expect(ScribeJoinAppResolver(workspace: mac.workspace()).apps(for: link).count == 3)
     }
 
     @Test func aMeetingWithNoLinkHasNoAppsAndNothingIsAsked() {
