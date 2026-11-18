@@ -661,6 +661,22 @@ struct KokoroWorkerSessionTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launch-request-received").path))
     }
 
+    @Test func launchEntryWaitLetsConfigurationEnter() async throws {
+        let probe = LaunchProbe()
+        let started = ContinuousClock.now
+        let configuration = Task.detached {
+            try? await Task.sleep(for: .milliseconds(20))
+            probe.hold(limit: 30)
+        }
+        // The failing tests call this from the async test. A semaphore wait
+        // occupies the cooperative thread, so this detached configuration never enters.
+        let entered = probe.waitUntilEntered(seconds: 1)
+        #expect(entered)
+        #expect(started.duration(to: .now) < .milliseconds(500))
+        probe.release()
+        _ = await configuration.value
+    }
+
     /// Configuration under load costs about 0.4s, so the deadline has to outlast it
     /// or the launch is rejected before `probe.entered`.
     @Test func slowConfigurationStillEntersTheLaunchProbe() async throws {
