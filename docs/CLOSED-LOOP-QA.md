@@ -61,6 +61,8 @@ The runner refuses an existing output directory, records commands/exit codes/cou
 
 ## Turning caught failures into guards
 
-Add each reproduced failure to [`qa/regressions.json`](../qa/regressions.json) with its feature IDs, executable checker, and an actual uniquely named test function. Repair the production behavior and run the guard. The schema rejects missing functions, helper functions masquerading as tests, ambiguous case names, unsafe command kinds, and stale sources. The runner verifies that the named case actually passed in the relevant compiled package; a source reference or a positive count alone is insufficient.
+Add each reproduced failure to [`qa/regressions.json`](../qa/regressions.json) with its feature IDs, executable checker, and an actual uniquely named test function. Repair the production behavior and run the guard.
+
+Portable gates read Swift Testing xUnit testcases. The `native-fixture` check kind still identifies passed cases from the Swift Testing text log via `swift_summary`. A torn native log can drop a required case. That limitation is recorded and left in place. The schema rejects missing functions, helper functions masquerading as tests, ambiguous case names, unsafe command kinds, and stale sources. The runner verifies that the named case actually passed in the relevant compiled package; a source reference or a positive count alone is insufficient.
 
 Changes to this workflow, the gate, the acceptance map, or the verifier are security-sensitive review points: code in a pull request cannot independently prove that its own merge policy is untampered. Protect those paths and review policy changes when repository permissions permit. GitHub protection and independent review remain separate from the YAML's fail-closed behavior.

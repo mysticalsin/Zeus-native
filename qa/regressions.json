@@ -4450,6 +4450,54 @@
         "file": "qa/closed-loop/tests/test_ci_motion_profile.py",
         "function": "test_style_make_body_tracks_motion_through_one_modifier"
       }
+    },
+    {
+      "id": "REG-417",
+      "failure": "The portable pointing log from run 44344835181 tore stdout together, and the text parser then reported holdStartsImmediately and oneXDisplayWithANegativeOrigin as not run even though the suite summary said every test passed. Portable gates now read Swift Testing xUnit testcases. A required case that is absent there still fails closed.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_structured_results_fail_closed_when_a_required_case_is_missing"
+      }
+    },
+    {
+      "id": "REG-418",
+      "failure": "A Swift Testing xUnit file could pass the portable gate when the process exited nonzero, the text log reported a failure, a testsuite failures/errors/skipped count was nonzero or not an integer, or the file contained a doctype, an entity, or more than 32 MiB. Those signals now fail closed. The native-fixture check kind still reads the text log; a torn native log can drop a required case, and that limitation is left in place.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_structured_results_reject_unsafe_xml_and_nonzero_signals"
+      }
+    },
+    {
+      "id": "REG-419",
+      "failure": "Swift Testing xUnit could report a suite tests count that did not match its testcase children, and the root testsuites element could carry a nonzero or malformed count. The file was also read in full before the 32 MiB cap was applied. Suite and root counts are now checked, and callers read at most the cap plus one byte.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_xunit_counts_root_totals_and_bounded_read_fail_closed"
+      }
+    },
+    {
+      "id": "REG-420",
+      "failure": "A testcase placed directly under testsuites, or under any element other than testsuite, was still accepted when some other suite's own tests count matched. Every testcase must have a testsuite parent, and the suite totals must add up to the testcase count.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_xunit_testcase_must_sit_in_a_suite_and_paths_stay_closed"
+      }
     }
   ]
 }
