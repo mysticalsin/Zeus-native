@@ -353,7 +353,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             talkChordDefaultsObserver = NotificationCenter.default.addObserver(
                 forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.syncTalkChord() }
+                // syncTalkChord returns the chord; Xcode 26.1 cannot infer the closure type from a discarded result.
+                MainActor.assumeIsolated { _ = self?.syncTalkChord() }
             }
             cancelTalkChordVoiceOverWatch = TilingKeyClash.watchVoiceOver { [weak self] in self?.syncTalkChord() }
         }
