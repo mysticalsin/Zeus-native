@@ -198,6 +198,50 @@ class CIMotionProfileTests(unittest.TestCase):
         self.assertIn("motionReduction || Motion.reduced", film)
         self.assertIn("let systemReduction = Motion.reduced", film)
 
+    def test_reduce_motion_reads_go_through_motion_only(self):
+        repo = Path(__file__).resolve().parents[3]
+        allowed = repo / "Sources/Zeus/App/Preferences.swift"
+        offenders = []
+        for path in (repo / "Sources/Zeus").rglob("*.swift"):
+            if path.resolve() == allowed.resolve():
+                continue
+            for number, line in enumerate(path.read_text().splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("//"):
+                    continue
+                if "accessibilityReduceMotion" in line or "accessibilityDisplayShouldReduceMotion" in line:
+                    offenders.append(f"{path.relative_to(repo)}:{number}")
+        self.assertEqual(offenders, [])
+
+    def test_bundle_refuses_release_without_release_config(self):
+        script = (Path(__file__).resolve().parents[3] / "scripts/bundle.sh").read_text()
+        before_build = script.split("swift build", 1)[0]
+        self.assertIn("Release builds must use CONFIG=release", before_build)
+        self.assertIn('[ "$CONFIG" != release ]', before_build)
+
+    def test_harness_does_not_claim_an_unchecked_defaults_result(self):
+        fixture = DefaultsFixture(True)
+        with self.context(fixture, lambda _: 0, system="Linux", environment={}) as (command, _, output):
+            self.assertEqual(profile.main(["--harness"]), 0)
+            text = output.getvalue()
+            writes = [call.args[0] for call in command.call_args_list if "write" in call.args[0]]
+            self.assertEqual(writes, [])
+            if "defaults_untouched=true" in text:
+                reads = [call.args[0] for call in command.call_args_list if call.args[0][1] in {"read", "read-type"}]
+                self.assertGreaterEqual(len(reads), 2)
+                self.assertNotIn("write", " ".join(" ".join(argv) for argv in (call.args[0] for call in command.call_args_list)))
+            else:
+                self.assertNotIn("defaults_untouched", text)
+
+    def test_harness_override_requires_the_test_host_marker(self):
+        repo = Path(__file__).resolve().parents[3]
+        motion = (repo / "Sources/Zeus/App/Preferences.swift").read_text()
+        reduced = motion[motion.index("static var reduced"):motion.index("static let feedbackDuration")]
+        self.assertIn("ZEUS_MOTION_HARNESS_ACTIVE", reduced)
+        self.assertIn("ZEUS_HARNESS_REDUCE_MOTION is ignored outside the test host", reduced)
+        host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
+        self.assertLess(host.index('setenv("ZEUS_MOTION_HARNESS_ACTIVE", "1", 1)'), host.index("dlopen(args[2]"))
+
     def test_fresh_host_requires_real_normal_motion_before_loading_tests(self):
         repo = Path(__file__).resolve().parents[3]
         host = (repo / "qa/native-app-host/NativeAppTestHost.swift").read_text()
