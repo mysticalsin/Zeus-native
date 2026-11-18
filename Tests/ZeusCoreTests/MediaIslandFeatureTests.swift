@@ -48,6 +48,14 @@ struct MediaIslandFeatureTests {
         #expect(MediaIslandFeatures.earbudOverlay.usageStringKey == "NSBluetoothAlwaysUsageDescription")
     }
 
+    @Test func theLockScreenPlayerFailsClosedWithoutAPrivateSpace() {
+        #expect(LockScreenPlayerGate.settingID == "music.lockScreenPlayer")
+        #expect(LockScreenPlayerGate.result(enabled: false, spaceAvailable: true, inputIgnored: true) == .off)
+        #expect(LockScreenPlayerGate.result(enabled: true, spaceAvailable: false, inputIgnored: false) == .unavailable)
+        #expect(LockScreenPlayerGate.result(enabled: true, spaceAvailable: true, inputIgnored: false) == .unavailable)
+        #expect(LockScreenPlayerGate.result(enabled: true, spaceAvailable: true, inputIgnored: true) == .shown)
+    }
+
     @Test func theLockScreenPlayerUsesAPrivateSpaceAndAsksForNothing() {
         #expect(MediaIslandFeatures.lockScreenPlayer.enabled == false)
         #expect(MediaIslandFeatures.lockScreenPlayer.permission == nil)
