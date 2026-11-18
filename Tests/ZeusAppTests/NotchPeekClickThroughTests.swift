@@ -41,7 +41,7 @@ import ZeusCore
     @Test func approvalCardSizeMatchesWhatTheViewDraws() {
         let model = approvalModel()
         let size = NotchView.peekSize(model: model, footprint: notch)
-        #expect(size.width == max(184 + 2 * 8 + 240, 440))
+        #expect(size.width == 440)
         #expect(size.height == 32 + 98 + (model.approval?.extraHeight ?? 0))
     }
 }

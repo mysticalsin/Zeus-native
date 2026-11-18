@@ -8424,6 +8424,18 @@
         "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
         "function": "aFailureDeliveredByTheSpeechInputEndsALiveDictation"
       }
+    },
+    {
+      "id": "REG-970",
+      "failure": "While an agent approval, completion or trouble card was up, the whole 1800 x 470 notch window took the mouse, so every click across the top of the screen was swallowed until the choice was answered or timed out.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchPeekHitRulesTests.swift",
+        "function": "pointerFarBelowTheCardIsClickThrough"
+      }
     }
 ]
 }

@@ -19,6 +19,8 @@ CLICK_GUARD = "topBar != nil || !model.sessions.isEmpty || model.approval != nil
 CLICK_RULE = "NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel"
 CALIBRATION_GUARD = "drawnNotch.isCalibrating"
 HELPER = "ignoresMouseWhileClosed()"
+# The router for closed and peek: its closed case is the helper above.
+ROUTER = "ignoresMouse(for:"
 DASHES = (chr(0x2013), chr(0x2014))
 
 
@@ -104,7 +106,7 @@ def unrouted_ignores_mouse_calls(text):
         if line.strip() in panel_half_lines(panel_half):
             continue
         argument = line[line.index("setIgnoresMouse(") + len("setIgnoresMouse("):].rsplit(")", 1)[0]
-        if argument.strip() == "false" or HELPER in argument:
+        if argument.strip() == "false" or HELPER in argument or ROUTER in argument:
             continue
         found.append(f"{number}: {line.strip()}")
     return found

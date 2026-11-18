@@ -7577,6 +7577,25 @@
           ]
         },
         {
+          "id": "F13.peek-click-through",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "While a peek or an approval card is up, the full-width notch window takes the mouse only over the card and 6 pt of slack; below and beside it clicks reach the app underneath.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/NotchPeekHitRulesTests.swift",
+              "function": "pointerOverThePeekCardTakesTheMouse"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchPeekHitRulesTests.swift",
+              "function": "pointerFarBelowTheCardIsClickThrough"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchPeekHitRulesTests.swift",
+              "function": "pointerBesideTheCardIsClickThrough"
+            }
+          ]
+        },
+        {
           "id": "F13.closed-island-background",
           "check": "native-ZeusCoreTests",
           "acceptance": "The island background is Black by default; Transparent draws no body fill, outline or glow while the notch is closed, and the open panel keeps all three.",

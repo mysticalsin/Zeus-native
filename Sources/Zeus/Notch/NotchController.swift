@@ -36,6 +36,8 @@ final class NotchController {
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
+    /// Where the pointer is; tests replace it.
+    var pointer: () -> CGPoint = { NSEvent.mouseLocation }
     /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
     private var alertWake: Task<Void, Never>?
     /// Alerts waiting out their ten minute snooze, by alert id.
@@ -152,7 +154,7 @@ final class NotchController {
         model.presentation = presentation
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
-        setIgnoresMouse(presentation == .closed && ignoresMouseWhileClosed())
+        setIgnoresMouse(ignoresMouse(for: presentation))
         // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
         model.alerts.setSuspended(presentation != .closed, now: now())
         alertsChanged()
@@ -328,7 +330,7 @@ final class NotchController {
                 .priority: NSAccessibilityPriorityLevel.high.rawValue,
             ])
             if model.presentation == .closed { show(.peek) }
-            setIgnoresMouse(false)
+            setIgnoresMouse(ignoresMouse(for: model.presentation))
             Task { @MainActor in
                 try? await Task.sleep(for: timeout)
                 finish(onTimeout)
@@ -340,6 +342,8 @@ final class NotchController {
     /// always has something to show, so it opens after a short dwell (no accidental flashes).
     private func mouseMoved() {
         followPointer()
+        // A peek takes the mouse over its card only; the rest of the window lets clicks through.
+        if model.presentation == .peek { setIgnoresMouse(ignoresMouse(for: .peek)) }
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
         switch model.presentation {
         case .closed, .peek:
@@ -552,6 +556,25 @@ final class NotchController {
                                                topOffset: topOffset, wings: topBar.map(ClosedWingsFacts.init(of:)))
     }
 
+    /// Whether a peek card takes the mouse at `pointer`: only over the card and a little slack around it.
+    static func peekTakesMouse(model: NotchModel, footprint: NotchFootprint, pointer: CGPoint, screenFrame: CGRect,
+                               topOffset: CGFloat) -> Bool {
+        NotchPeekHitRules.takesMouse(pointer, size: NotchView.peekSize(model: model, footprint: footprint),
+                                     screenFrame: screenFrame, topOffset: topOffset)
+    }
+
+    /// Closed and peek take the mouse only over their own shape; the open panel is handled as the pointer moves.
+    private func ignoresMouse(for presentation: NotchModel.Presentation) -> Bool {
+        switch presentation {
+        case .closed: return ignoresMouseWhileClosed()
+        case .peek:
+            guard let screen else { return true }
+            return !Self.peekTakesMouse(model: model, footprint: footprint, pointer: pointer(),
+                                        screenFrame: anchorFrame(screen), topOffset: topOffset)
+        case .panel: return false
+        }
+    }
+
     private func setIgnoresMouse(_ ignore: Bool) {
         for entry in panels {
             // Only the window on the active display ever takes the mouse.
@@ -638,7 +661,7 @@ final class NotchController {
         }
         let primary = panels.first
         screen = primary?.screen ?? NSScreen.main ?? NSScreen.screens.first
-        setIgnoresMouse(model.presentation == .closed && ignoresMouseWhileClosed())
+        setIgnoresMouse(ignoresMouse(for: model.presentation))
         let describes = NSScreen.screens.map(Self.describe)
         drawnNotch.displaysChanged(targetsWithoutNotch: targets.filter { !$0.hasNotch }.count,
                                    connectedWithoutNotch: describes.filter { !$0.hasNotch }.count)
