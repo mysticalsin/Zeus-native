@@ -236,7 +236,7 @@ struct ExplanationPane: View {
                 controller.stop(); controller.deviceUID = $0.isEmpty ? nil : $0
             })) {
                 Text("System default").tag("")
-                ForEach(Microphones.cache.devices(), id: \.uid) { device in Text(device.name).tag(device.uid) }
+                ForEach(MicrophoneListModel.shared.devices, id: \.uid) { device in Text(device.name).tag(device.uid) }
             }
             Toggle("Use already-loaded WhisperKit", isOn: Binding(get: { controller.useInstalledWhisper }, set: {
                 controller.stop(); controller.useInstalledWhisper = $0
