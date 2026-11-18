@@ -8399,6 +8399,18 @@
         "file": "Tests/ZeusCoreTests/ScribeMeetingCardDesignTests.swift",
         "function": "theJoinMenuHoldsFourAppsAndTheTileRowThree"
       }
+    },
+    {
+      "id": "REG-960",
+      "failure": "When the microphone kept changing (AirPods switching) and input recovery gave up, the talk turn and dictation were never told: the listening UI and the talk key stayed on with a dead microphone, a toggled dictation kept recording nothing, and a talk release sent half-heard words, all with no message.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-CaptureFailureEndsTurnTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+        "function": "aTalkTurnEndsAndShowsTheHintWhenCaptureGivesUp"
+      }
     }
 ]
 }

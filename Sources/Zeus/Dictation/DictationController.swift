@@ -747,7 +747,7 @@ final class DictationController {
     /// The microphone kept changing and capture gave up under a listening turn: end it and say why.
     /// Only the turn that opened this speech session may be ended; a late callback is dropped.
     func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
-        guard false else { return }
+        guard flow.isListening, ownership.accepts(sessionID: session, generation: origin) else { return }
         VoiceLog.log("listen", "dictation capture failed (\(failure)): the turn ended")
         apply(.cancelRequested)
         topBar.show(.hint(CaptureFailureHint.text(for: failure)))
@@ -898,7 +898,7 @@ final class DictationController {
 
     /// Closes a visible preview card through its own Cancel path, which resumes its review.
     private static func dismissPreviewCard() {
-        for window in NSApp.windows {
+        for window in NSApp?.windows ?? [] {
             if let panel = window as? PreviewPanel, panel.isVisible { _ = panel.onKey(.cancel) }
         }
     }

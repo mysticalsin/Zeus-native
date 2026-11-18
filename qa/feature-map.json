@@ -1095,6 +1095,14 @@
       "scope": "The talk-turn capture recovery sequence, output engine start timing, microphone choice and per-turn diagnostics with spies and pure helpers. No audio hardware, Bluetooth link or speech recognition is exercised."
     },
     {
+      "id": "native-CaptureFailureEndsTurnTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "CaptureFailureEndsTurnTests",
+      "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+      "scope": "The actual talk turn controller and dictation controller handling a capture failure through test seams: the turn ends, the key machine is told, the hint shows and a stale session is ignored. No microphone, Bluetooth link, speech recognition or real device flapping is exercised."
+    },
+    {
       "id": "native-SpeechInputRecoveryTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5691,6 +5699,29 @@
             {
               "file": "Tests/ZeusAppTests/TalkTurnVoiceTests.swift",
               "function": "aTurnWithNothingHeardNamesTheDeviceFormatFramesAndConfigChanges"
+            }
+          ]
+        },
+        {
+          "id": "F11.capture-failure-ends-turn",
+          "check": "native-CaptureFailureEndsTurnTests",
+          "acceptance": "When the microphone keeps changing and capture gives up, a talk turn and a dictation end instead of staying on listening, the talk key machine is told, the person sees a short hint, and a late callback from an older session never ends a newer turn. Test seams, no microphone or Bluetooth link: the real device flapping is not exercised.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aTalkTurnEndsAndShowsTheHintWhenCaptureGivesUp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aLateFailureFromAnOlderTalkSessionLeavesTheNewTurnAlone"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aListeningDictationEndsAndShowsTheHintWhenCaptureGivesUp"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aStaleFailureLeavesTheCurrentDictationRunning"
             }
           ]
         },

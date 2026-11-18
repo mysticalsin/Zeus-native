@@ -279,7 +279,7 @@ final class VoiceTurnController {
 
     /// The microphone kept changing (AirPods switching) and capture gave up: end the turn, send nothing, say why.
     func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
-        guard false else { return }
+        guard listening, CaptureFailureHint.owns(session: session, active: talkSession) else { return }
         guard endListeningWithoutSending() else { return }
         VoiceLog.log("listen", "capture failed (\(failure)): the turn ended without sending")
         ZeusSound.play(.voiceError)
