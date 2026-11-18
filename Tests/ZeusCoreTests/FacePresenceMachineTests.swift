@@ -139,6 +139,16 @@ struct FacePresenceMachineTests {
         #expect(!machine.wantsCamera)
     }
 
+    @Test func theFirstEnableWithNoFaceWaitsForASecondConfirm() {
+        var machine = Machine()
+        let first = machine.handle(Self.switchOn(faces: 0))
+        #expect(!first.contains { if case .beginEnrollment = $0 { return true } else { return false } })
+        #expect(machine.wantsCamera == false)
+        let second = machine.handle(.enroll)
+        #expect(second.contains { if case .beginEnrollment = $0 { return true } else { return false } })
+        #expect(machine.wantsCamera)
+    }
+
     @Test func switchOnWithNoFacesStartsEnrolling() {
         var machine = Machine()
         let effects = machine.handle(Self.switchOn(faces: 0))
