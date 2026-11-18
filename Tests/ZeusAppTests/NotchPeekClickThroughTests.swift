@@ -53,7 +53,9 @@ import ZeusCore
 
     private func controller(pointerFromTop fromTop: CGFloat, x: CGFloat? = nil) -> NotchController {
         let controller = NotchController()
-        controller.frameOverride = screen
+        #if DEBUG
+        controller.frameOverride = screen // a release build has no frame seam
+        #endif
         controller.pointer = { CGPoint(x: x ?? 756, y: 982 - fromTop) }
         return controller
     }
@@ -220,8 +222,10 @@ import ZeusCore
 
     @Test func aLongSelectionEditCardPinsEachRowToTheHeightTheSizeUses() {
         let layout = NotchView.selectionEditLayout(longEdit(lines: 3), barHeight: 32)
+        #expect(layout.rows.count == 3)
         #expect(layout.rows.allSatisfy { $0.textLines == 2 && $0.height == 30 })
         let short = NotchView.selectionEditLayout(SelectionEdit(kind: .replace, before: "a", after: "b"), barHeight: 32)
+        #expect(short.rows.count == 2)
         #expect(short.rows.allSatisfy { $0.textLines == 1 && $0.height == 15 })
     }
 
