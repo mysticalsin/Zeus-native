@@ -1643,6 +1643,11 @@ class UsageStringTests(unittest.TestCase):
         )
         self.assertIn("Face presence", plist["NSCameraUsageDescription"])
 
+    def test_corner_rebuild_closes_the_panels(self):
+        text = (ROOT / "Sources/Zeus/Notch/ScreenCornerOverlay.swift").read_text()
+        rebuild = text.split("private func rebuild()", maxsplit=1)[1].split("static func makePanel", maxsplit=1)[0]
+        self.assertIn("panel.close()", rebuild)
+
 
 if __name__ == "__main__":
     unittest.main()
