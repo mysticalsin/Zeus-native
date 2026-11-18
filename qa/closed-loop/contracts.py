@@ -284,6 +284,38 @@ def swift_testing_xunit_path(requested):
 XUNIT_MAX_BYTES = 32 * 1024 * 1024
 
 
+def read_swift_testing_xunit(path, limit=XUNIT_MAX_BYTES):
+    """Read at most `limit` bytes. A larger file is rejected before the rest is loaded."""
+    path = Path(path)
+    require(path.is_file() and not path.is_symlink(), "Swift Testing xUnit is missing or redirected")
+    require(path.stat().st_size <= limit, "Swift Testing xUnit exceeds 32 MiB")
+    with path.open("rb") as handle:
+        data = handle.read(limit + 1)
+    require(len(data) <= limit, "Swift Testing xUnit exceeds 32 MiB")
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        raise Invalid("Swift Testing xUnit is not UTF-8")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise Invalid(f"Swift Testing xUnit is not UTF-8: {error}") from error
+
+
+def _xunit_integer(element, attr, required):
+    raw = element.get(attr)
+    if raw is None:
+        require(not required, f"Swift Testing xUnit {element.tag} {attr} is missing")
+        return None
+    require(re.fullmatch(r"[0-9]+", raw) is not None,
+            f"Swift Testing xUnit {element.tag} {attr} is not an integer")
+    return int(raw)
+
+
+def _xunit_zero(element, attr, required):
+    value = _xunit_integer(element, attr, required)
+    if value is not None:
+        require(value == 0, f"Swift Testing xUnit {element.tag} {attr} is {value}")
+
+
 def swift_structured_results(text, returncode, log=""):
     """Per-test Swift Testing xUnit. Identity comes from each testcase, not the summary line.
 
@@ -301,12 +333,17 @@ def swift_structured_results(text, returncode, log=""):
         root = ET.fromstring(text)
     except ET.ParseError as error:
         raise Invalid(f"Swift Testing xUnit is not XML: {error}") from error
+    declared_total = None
+    if root.tag == "testsuites":
+        for attr in ("failures", "errors", "skipped"):
+            _xunit_zero(root, attr, required=False)
+        declared_total = _xunit_integer(root, "tests", required=False)
     for suite in root.iter("testsuite"):
         for attr in ("failures", "errors", "skipped"):
-            raw = suite.get(attr)
-            require(raw is not None and re.fullmatch(r"[0-9]+", raw),
-                    f"Swift Testing xUnit {attr} is not an integer")
-            require(int(raw) == 0, f"Swift Testing xUnit {attr} is {raw}")
+            _xunit_zero(suite, attr, required=True)
+        direct = sum(1 for child in suite if child.tag == "testcase")
+        declared = _xunit_integer(suite, "tests", required=True)
+        require(declared == direct, f"Swift Testing xUnit testsuite tests is {declared}, not {direct}")
     cases = list(root.iter("testcase"))
     require(cases, "Swift Testing xUnit has no test cases")
     failed = []
@@ -319,6 +356,8 @@ def swift_structured_results(text, returncode, log=""):
             failed.append(match.group(1))
         functions.append(match.group(1))
     require(not failed, "Swift Testing xUnit has a failed or skipped test: " + ", ".join(sorted(set(failed))))
+    if declared_total is not None:
+        require(declared_total == len(cases), f"Swift Testing xUnit testsuites tests is {declared_total}, not {len(cases)}")
     suite_count = sum(1 for suite in root.iter("testsuite") if any(child.tag == "testcase" for child in suite))
     require(suite_count > 0, "Swift Testing xUnit has no test suite")
     return len(cases), suite_count, sorted(set(functions))

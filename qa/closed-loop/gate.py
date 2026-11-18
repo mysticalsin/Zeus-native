@@ -382,7 +382,8 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
         if definition["kind"] == "portable":
             if len(structured) != 1:
                 raise ValueError(f"feature check must have exactly one Swift Testing result: {ident}")
-            actual_tests, _, functions = contracts.swift_structured_results(structured[0].read_text(), check["exit_code"], log)
+            actual_tests, _, functions = contracts.swift_structured_results(
+                contracts.read_swift_testing_xunit(structured[0]), check["exit_code"], log)
         elif definition["kind"] == "native-fixture":
             actual_tests, _, functions = contracts.swift_summary(log, 0)
         else:

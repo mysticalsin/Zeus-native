@@ -307,7 +307,7 @@ def main():
         print(f"Prepared {group}: {root}", flush=True)
         if args.run:
             sys.path.insert(0, str(REPO / "qa/closed-loop"))
-            from contracts import Invalid, swift_structured_results, swift_testing_xunit_path
+            from contracts import Invalid, read_swift_testing_xunit, swift_structured_results, swift_testing_xunit_path
             xunit = root / "results.xml"
             command = ["swift", "test", "--package-path", str(root), "--jobs", str(args.jobs),
                        "--xunit-output", str(xunit)]
@@ -318,7 +318,8 @@ def main():
             row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log),
                    "results": str(structured)}
             try:
-                count, suites, functions = swift_structured_results(structured.read_text(), result.returncode, log.read_text())
+                count, suites, functions = swift_structured_results(
+                    read_swift_testing_xunit(structured), result.returncode, log.read_text())
                 row.update(tests=count, suites=suites, passed_functions=functions)
             except (Invalid, OSError) as error:
                 row["structured_error"] = str(error)

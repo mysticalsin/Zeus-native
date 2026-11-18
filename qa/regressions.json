@@ -4474,6 +4474,18 @@
         "file": "qa/closed-loop/tests/test_contracts.py",
         "function": "test_structured_results_reject_unsafe_xml_and_nonzero_signals"
       }
+    },
+    {
+      "id": "REG-419",
+      "failure": "Swift Testing xUnit could report a suite tests count that did not match its testcase children, and the root testsuites element could carry a nonzero or malformed count. The file was also read in full before the 32 MiB cap was applied. Suite and root counts are now checked, and callers read at most the cap plus one byte.",
+      "features": [
+        "F09"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_contracts.py",
+        "function": "test_xunit_counts_root_totals_and_bounded_read_fail_closed"
+      }
     }
   ]
 }

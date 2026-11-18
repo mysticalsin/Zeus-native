@@ -18,8 +18,8 @@ import trusted_ax
 import shutil
 
 from contracts import (ROOT, Invalid, case_passed, digest, evaluate_features, load,
-                       manifest_matches, require, source_snapshot, swift_structured_results, swift_summary,
-                       swift_testing_xunit_path, validate_map, validate_registry, validate_native_build)
+                       manifest_matches, read_swift_testing_xunit, require, source_snapshot, swift_structured_results,
+                       swift_summary, swift_testing_xunit_path, validate_map, validate_registry, validate_native_build)
 
 
 TRUSTED_COMMAND = "scripts/trusted-ax-journey.sh"
@@ -343,7 +343,7 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         row.update(exit_code=code, duration_seconds=seconds)
         if kind == "portable":
             structured = swift_testing_xunit_path(xunit)
-            count, suites, functions = swift_structured_results(structured.read_text(), code, log.read_text())
+            count, suites, functions = swift_structured_results(read_swift_testing_xunit(structured), code, log.read_text())
         else:
             count, suites, functions = (python_summary if kind in {"selftests", "release-mocks"} else swift_summary)(log.read_text(), code)
         row.update(tests=count, suites=suites, passed_functions=functions)
