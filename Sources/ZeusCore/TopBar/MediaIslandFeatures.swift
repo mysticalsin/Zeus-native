@@ -88,6 +88,34 @@ public enum FocusNameReader {
     }
 }
 
+public struct ReceiverService: Equatable, Sendable {
+    public var name: String
+    public var type: String
+
+    public init(name: String, type: String) {
+        self.name = name
+        self.type = type
+    }
+}
+
+public enum ReceiverCatalog {
+    public static let settingID = "music.receiverNames"
+
+    /// Names from the two receiver service types, in the order they were found. A repeated name is kept once.
+    public static func names(_ services: [ReceiverService]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for service in services {
+            let type = service.type.hasSuffix(".") ? String(service.type.dropLast()) : service.type
+            guard ReceiverNames.bonjourTypes.contains(type) else { continue }
+            let shown = ReceiverNames.displayName(service: service.name, recordHexPrefix: service.name)
+            guard !shown.isEmpty, seen.insert(shown).inserted else { continue }
+            result.append(shown)
+        }
+        return result
+    }
+}
+
 public enum ReceiverNames {
     public static let bonjourTypes = ["_airplay._tcp", "_raop._tcp"]
 

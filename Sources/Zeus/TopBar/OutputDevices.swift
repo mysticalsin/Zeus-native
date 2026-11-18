@@ -95,6 +95,8 @@ struct OutputMenuRow: Equatable {
     var name: String
     var isDefault: Bool
     var symbol: String
+    /// A discovered receiver name is shown and is not a local output that can be selected.
+    var selectable: Bool = true
 }
 
 enum OutputDeviceMenuRows {
@@ -103,6 +105,13 @@ enum OutputDeviceMenuRows {
             let kind = OutputDeviceIcon.kind(transport: device.transport)
             return OutputMenuRow(id: device.id, name: device.name, isDefault: device.isDefault,
                                  symbol: OutputDeviceIcon.symbol(for: kind))
+        }
+    }
+
+    static func receivers(_ names: [String]) -> [OutputMenuRow] {
+        names.map { name in
+            OutputMenuRow(id: 0, name: name, isDefault: false,
+                          symbol: OutputDeviceIcon.symbol(for: .receiver), selectable: false)
         }
     }
 }

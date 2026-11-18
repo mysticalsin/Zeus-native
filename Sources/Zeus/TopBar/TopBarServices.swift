@@ -13,6 +13,7 @@ final class TopBarServices {
     /// What the notch shows from Music, Spotify and later sources, and where a music command goes.
     let nowPlayingHub: NowPlayingHub
     let systemNowPlaying: SystemNowPlayingFeed
+    let receiverNames: ReceiverNameBrowser
     private let musicFeed: MusicPlayerFeed
     private let browserFeed: BrowserMediaFeed
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
@@ -38,6 +39,7 @@ final class TopBarServices {
         self.model = model
         nowPlayingHub = NowPlayingHub(model: model, ports: NowPlayingHub.livePorts(model: model))
         systemNowPlaying = SystemNowPlayingFeed(hub: nowPlayingHub)
+        receiverNames = ReceiverNameBrowser()
         musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
         browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
     }
@@ -46,6 +48,9 @@ final class TopBarServices {
         nowPlayingHub.attach()
         if SettingsStore.shared.bool(SystemNowPlayingLaunch.settingID) {
             systemNowPlaying.setEnabled(true)
+        }
+        if SettingsStore.shared.bool(ReceiverCatalog.settingID) {
+            receiverNames.setEnabled(true)
         }
         model.chooseOutputDevice = { [weak self] in self?.showOutputDevices() }
         model.requestCalendarAccess = { [weak self] in self?.requestCalendar() }
@@ -98,6 +103,7 @@ final class TopBarServices {
 
     private func showOutputDevices() {
         let devices = OutputDeviceMenuRows.make(OutputDevices.all())
+        let receivers = OutputDeviceMenuRows.receivers(receiverNames.names)
         let menu = NSMenu(title: "Output")
         for device in devices {
             let item = NSMenuItem(title: device.name, action: #selector(OutputDeviceTarget.choose(_:)), keyEquivalent: "")
@@ -107,7 +113,15 @@ final class TopBarServices {
             item.image = NSImage(systemSymbolName: device.symbol, accessibilityDescription: device.name)
             menu.addItem(item)
         }
-        if devices.isEmpty { menu.addItem(withTitle: "No outputs found", action: nil, keyEquivalent: "") }
+        if devices.isEmpty, receivers.isEmpty { menu.addItem(withTitle: "No outputs found", action: nil, keyEquivalent: "") }
+        if !receivers.isEmpty {
+            if !devices.isEmpty { menu.addItem(.separator()) }
+            for row in receivers {
+                let item = NSMenuItem(title: row.name, action: nil, keyEquivalent: "")
+                item.image = NSImage(systemSymbolName: row.symbol, accessibilityDescription: row.name)
+                menu.addItem(item)
+            }
+        }
         model.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
         model.menuOpen = false

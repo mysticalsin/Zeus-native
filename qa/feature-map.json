@@ -771,6 +771,14 @@
       "scope": "The real hub and top-bar model fed a fake helper line. One case starts /bin/sleep and checks stop() terminates it. The perl helper is not started."
     },
     {
+      "id": "native-ReceiverNameTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ReceiverNameTests",
+      "file": "Tests/ZeusAppTests/ReceiverNameTests.swift",
+      "scope": "Receiver names recorded without a Bonjour search, then turned into output-menu rows. No network and no permission prompt."
+    },
+    {
       "id": "native-LyricTimingWiringTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8060,6 +8068,28 @@
             {
               "file": "Tests/ZeusAppTests/SystemNowPlayingFeedTests.swift",
               "function": "stopTerminatesTheHelper"
+            }
+          ]
+        },
+        {
+          "id": "F13.receiver-names",
+          "check": "native-ReceiverNameTests",
+          "acceptance": "Names from both receiver service types appear as non-selectable output-menu rows, and turning the browser off clears them. No Bonjour search is opened by the test.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ReceiverNameTests.swift",
+              "function": "foundReceiversAppearInTheOutputMenuAndStoppingClearsThem"
+            }
+          ]
+        },
+        {
+          "id": "F13.receiver-names-core",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Both receiver service types become one name each. A repeated name and any other service type are dropped.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MediaIslandFeatureTests.swift",
+              "function": "bothReceiverServiceTypesBecomeMenuNames"
             }
           ]
         },

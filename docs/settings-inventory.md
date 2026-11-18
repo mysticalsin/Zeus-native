@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 205 of 205 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 205 in scope). 194 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 206 of 206 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 206 in scope). 195 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 154.
+**Before this round:** has 19, partial 27, missing 155.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -97,6 +97,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Music | Show music from | menu | - | Any player shows what started playing last. | missing | live | `music.follow` | A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player. |
 | Music | Collapse when paused | toggle | off | The player folds to one line while nothing is playing. | missing | live | `music.collapseOnPause` | Zeus addition. Off by default. Uses the existing page motion, and Reduce Motion changes the layout at once. |
 | Music | Show what this Mac is playing | toggle | off | Reads the current audio through a local helper. It stays behind a player that is already playing. | missing | live | `music.systemNowPlaying` | Zeus addition. Off by default. The helper is killed when this is turned off or Zeus quits. |
+| Music | Show receiver names | toggle | off | Lists receivers found on the local network in the output menu. | missing | live | `music.receiverNames` | Zeus addition. Off by default. The search stops when this is turned off. |
 | Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
 | Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 
