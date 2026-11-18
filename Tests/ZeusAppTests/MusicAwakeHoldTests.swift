@@ -31,6 +31,7 @@ private final class Scheduled {
     var scheduled: [Scheduled] = []
     var nextID: IOPMAssertionID = 100
     var lastLease: TimeInterval = 0
+    var refuseCreate = false
     private let monitor: PowerMonitor?
 
     init(monitor: PowerMonitor? = nil) {
@@ -44,6 +45,10 @@ private final class Scheduled {
         rules: { [unowned self] in self.rules },
         create: { [unowned self] lease in
             self.lastLease = lease
+            if self.refuseCreate {
+                self.events.append("create nil")
+                return nil
+            }
             self.nextID += 1
             self.created.append(self.nextID)
             self.events.append("create \(self.nextID)")
@@ -325,6 +330,16 @@ private final class Scheduled {
     }
 
     // MARK: Lease timing wiring
+
+    @Test func aFailedRenewWithNoAssertionDoesNotKeepTheTimer() {
+        let rig = Rig()
+        rig.refuseCreate = true
+        rig.hold.setEnabled(true)
+        rig.hold.setPlaying(true)
+        #expect(!rig.hold.isHolding)
+        #expect(rig.renewTimers.isEmpty)
+        #expect(rig.events == ["create nil"])
+    }
 
     @Test func theHoldTakesTheSharedLeaseAndRenewsOnTheSharedPeriod() {
         let rig = Rig()
