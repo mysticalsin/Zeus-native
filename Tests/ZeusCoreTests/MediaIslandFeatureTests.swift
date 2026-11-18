@@ -50,8 +50,12 @@ struct MediaIslandFeatureTests {
     }
 
     @Test func pauseCollapsesThePlayerAndDevicesHaveIcons() {
+        #expect(PlaybackCollapse.settingID == "music.collapseOnPause")
         #expect(PlaybackCollapse.collapsed(paused: true, enabled: true))
         #expect(!PlaybackCollapse.collapsed(paused: false, enabled: true))
+        #expect(!PlaybackCollapse.collapsed(isPlaying: nil, settingOn: true))
+        #expect(!PlaybackCollapse.animates(reduceMotion: true))
+        #expect(PlaybackCollapse.animates(reduceMotion: false))
         #expect(!PlaybackCollapse.collapsed(paused: true, enabled: false))
         #expect(OutputDeviceIcon.symbol(for: .speakers) == "speaker.wave.2.fill")
         #expect(OutputDeviceIcon.symbol(for: .headphones) == "headphones")
