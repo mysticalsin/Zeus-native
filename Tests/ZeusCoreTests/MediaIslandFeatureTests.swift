@@ -55,6 +55,17 @@ struct MediaIslandFeatureTests {
         #expect(LockScreenPlayerSpace.collectsInput == false)
     }
 
+    @Test func theActiveFocusNameComesFromTheStoreOrNeedsAccess() {
+        let configurations = Data(#"{"data":[{"modeIdentifier":"com.apple.focus.work","mode":{"name":"Work"}}]}"#.utf8)
+        let assertions = Data(#"{"data":[{"assertionDetails":{"assertionDetailsModeIdentifier":"com.apple.focus.work"}}]}"#.utf8)
+        let files = FocusNameStore.Files(configurations: configurations, assertions: assertions, permissionDenied: false)
+        #expect(FocusNameStore.settingID == "music.focusName")
+        #expect(FocusNameStore.status(enabled: false, files: files) == .off)
+        #expect(FocusNameStore.status(enabled: true, files: files) == .named("Work"))
+        #expect(FocusNameStore.status(enabled: true, files: FocusNameStore.Files(configurations: nil, assertions: nil, permissionDenied: true)) == .needsFullDiskAccess)
+        #expect(FocusNameStore.status(enabled: true, files: FocusNameStore.Files(configurations: configurations, assertions: Data("{}".utf8), permissionDenied: false)) == .unavailable)
+    }
+
     @Test func focusNameNeedsFullDiskAccessAndStartsOff() {
         #expect(MediaIslandFeatures.focusName.enabled == false)
         #expect(MediaIslandFeatures.focusName.permission == .fullDiskAccess)
