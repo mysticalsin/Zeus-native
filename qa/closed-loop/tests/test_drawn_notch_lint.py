@@ -19,8 +19,8 @@ CLICK_GUARD = "topBar != nil || !model.sessions.isEmpty || model.approval != nil
 CLICK_RULE = "NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel"
 CALIBRATION_GUARD = "drawnNotch.isCalibrating"
 HELPER = "ignoresMouseWhileClosed()"
-# The router for closed and peek: its closed case is the helper above.
-ROUTER = "ignoresMouse(for:"
+# The router for closed and peek: only this exact call, and its closed case must return the helper above.
+ROUTER_CALL = re.compile(r"ignoresMouse\(for: \.?[A-Za-z_][A-Za-z0-9_.]*\)")
 DASHES = (chr(0x2013), chr(0x2014))
 
 
@@ -106,10 +106,16 @@ def unrouted_ignores_mouse_calls(text):
         if line.strip() in panel_half_lines(panel_half):
             continue
         argument = line[line.index("setIgnoresMouse(") + len("setIgnoresMouse("):].rsplit(")", 1)[0]
-        if argument.strip() == "false" or HELPER in argument or ROUTER in argument:
+        if argument.strip() == "false" or HELPER in argument or ROUTER_CALL.fullmatch(argument.strip()):
             continue
         found.append(f"{number}: {line.strip()}")
     return found
+
+
+def router_closed_arm_is_the_helper(text):
+    """The router's `.closed` arm returns the helper, so a closed notch never takes the mouse by another rule."""
+    body = function_body(text, "private func ignoresMouse(for presentation")
+    return re.search(r"case \.closed:\s*return ignoresMouseWhileClosed\(\)", body) is not None
 
 
 def panel_half_lines(panel_half):
@@ -181,6 +187,17 @@ class DrawnNotchWiring(unittest.TestCase):
 
     def test_every_closed_state_ignore_goes_through_the_helper(self):
         self.assertEqual(unrouted_ignores_mouse_calls(self.CONTROLLER_TEXT), [])
+
+    def test_the_router_is_only_accepted_as_an_exact_call(self):
+        sample = self.CONTROLLER_TEXT.replace("setIgnoresMouse(ignoresMouse(for: presentation))",
+                                              "setIgnoresMouse(ignoresMouse(for: presentation) && true)", 1)
+        self.assertNotEqual(unrouted_ignores_mouse_calls(sample), [])
+
+    def test_the_router_closed_arm_returns_the_helper(self):
+        self.assertTrue(router_closed_arm_is_the_helper(self.CONTROLLER_TEXT))
+        sample = self.CONTROLLER_TEXT.replace("case .closed: return ignoresMouseWhileClosed()", "case .closed: return true", 1)
+        self.assertNotEqual(sample, self.CONTROLLER_TEXT)
+        self.assertFalse(router_closed_arm_is_the_helper(sample))
 
     def test_build_reports_the_displays_to_the_model(self):
         self.assertTrue(build_reports_displays(self.CONTROLLER_TEXT))
