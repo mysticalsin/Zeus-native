@@ -111,13 +111,13 @@ public enum ApprovalCard {
     public static func keycap(_ key: ApprovalCardKey, risk: HookEvent.Risk, modifiersHeld: Bool) -> String? {
         guard modifiersHeld else { return nil }
         switch key {
-        case .allow: "Y"
-        case .deny: "N"
-        case .open: "O"
-        case .jump: "J"
-        case .previous: "←"
-        case .next: "→"
-        case .allowChat: risk == .high ? nil : "A"
+        case .allow: return "Y"
+        case .deny: return "N"
+        case .open: return "O"
+        case .jump: return "J"
+        case .previous: return "←"
+        case .next: return "→"
+        case .allowChat: return risk == .high ? nil : "A"
         }
     }
 
