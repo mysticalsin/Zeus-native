@@ -1,10 +1,134 @@
-# ZEUS
+<p align="center">
+  <img src="Resources/Logo.png" width="96" alt="ZEUS logo">
+</p>
 
-A voice- and screen-aware assistant for macOS that routes every request through your own AI CLIs
-(Claude Code, Codex, Gemini, cursor-agent, Ollama) and the Dust API, points at things on your
-screen, supervises your coding agents from the notch, and acts in your real Chrome profile.
+<h1 align="center">ZEUS</h1>
 
-Development is in progress. A passing subset of tests does not establish native feature completion or a sellable release. The [19-item acceptance map](qa/feature-map.json) and [closed-loop verification guide](docs/CLOSED-LOOP-QA.md) track what is executable, unverified, or still missing. Verification is automated; no manual click-through substitutes for a missing check.
+<p align="center">
+  <b>Your Mac's notch, turned into a voice and screen aware co-pilot.</b><br>
+  Talk to it, point at things, watch your coding agents, record meetings, and stay in flow.
+</p>
+
+<p align="center">
+  <img alt="macOS 14.2+" src="https://img.shields.io/badge/macOS-14.2%2B-000000?logo=apple&logoColor=white">
+  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
+  <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-2ea44f">
+  <img alt="Keys in Keychain" src="https://img.shields.io/badge/keys-Keychain%20only-6f42c1">
+</p>
+
+<p align="center">
+  <img src="docs/media/hero-island.gif" width="860" alt="The ZEUS notch island cycling through Home, Today, Agents, Music, Calendar, Focus, Teleprompter, Recordly, Scribe, Tiling, Shelf and Polyglot">
+</p>
+
+> ZEUS routes every request through **your own** AI tools (Claude Code, Codex, Gemini, cursor-agent, Ollama)
+> and the Dust API. No account, no cloud of ours, no telemetry.
+
+---
+
+## What it does
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Talk, and it answers
+Hold your talk key, speak, let go. ZEUS hears you on device, thinks with the brain you chose, and answers out
+loud in its own voice, with a caption next to the spark.
+
+<img src="docs/media/spark.gif" width="100%" alt="The spark following the pointer, listening, thinking, flying and striking">
+
+</td>
+<td width="50%" valign="top">
+
+### It lives in your notch
+Music, focus timer, weather, agenda, to-dos, clipboard, teleprompter, recording and more, one hover away.
+Pick a home style that fits your desk.
+
+<img src="docs/media/home-styles.gif" width="100%" alt="Six home styles for the notch island">
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### Your coding agents, supervised
+Claude Code, Codex and Cursor report into the notch: running, done, stalled, failed. Risky commands wait
+for your **Approve** or **Deny**, with a countdown, and never block the rest of your screen.
+
+<img src="docs/media/agent-cards.gif" width="100%" alt="Agent cards in the notch: running, approval, plan, question, diff, done, failed, stalled">
+
+</td>
+<td width="50%" valign="top">
+
+### Meetings, without the fuss
+Two minutes before a call, a compact card offers to record. Teams, Zoom and Meet links are found even
+inside Outlook Safe Links. Scribe transcribes on device and names the speakers.
+
+<img src="docs/media/meeting-card.gif" width="100%" alt="The meeting card counting down and starting a recording">
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### A face for every state
+Idle, listening, thinking, speaking, pointing, typing, browsing, waiting on an agent, done.
+You always know what ZEUS is doing at a glance.
+
+<img src="docs/media/avatar-states.gif" width="100%" alt="ZEUS avatar states in the notch">
+
+</td>
+<td width="50%" valign="top">
+
+### Light that means something
+Halos and entrance lights for volume, copy, caps lock, battery, reminders and timers, tuned to stay out of
+your way and to respect Reduce Motion.
+
+<img src="docs/media/halos.gif" width="100%" alt="Notch halo and entrance light styles">
+
+</td>
+</tr>
+</table>
+
+### Approvals that respect your screen
+
+<p align="center">
+  <img src="docs/media/approval.png" width="760" alt="A Claude Code approval card in the notch with Deny and Approve">
+</p>
+
+### Your day, in one card
+
+<p align="center">
+  <img src="docs/media/brief-card.png" width="480" alt="The morning brief card with events and to-dos">
+</p>
+
+---
+
+## Highlights
+
+| | |
+| --- | --- |
+| 🎙️ **Voice** | Push to talk on the key you choose, on-device recognition, ElevenLabs voice with Kokoro as an offline failsafe |
+| 👉 **Show me** | Hold Control and draw on screen; ZEUS sees what you circled |
+| 🤖 **Agents** | Live status, approvals, diffs and plans from Claude Code, Codex and Cursor |
+| 📝 **Scribe** | Meeting detection, compact start card, on-device transcription and speaker names |
+| 🎬 **Recordly** | Screen recording with cursor follow and a polished export |
+| 🌍 **Polyglot** | Listens and translates while it runs |
+| 📋 **Shelf and Fling** | Drop files in the notch, send them to your other Mac |
+| 🪟 **Tiling** | Keyboard window layouts from the notch |
+| 🔒 **Private by design** | No telemetry, keys only in the Keychain, nothing captured without your OS consent |
+
+## Download
+
+Builds are attached to the [GitHub releases](https://github.com/mysticalsin/Zeus-native/releases).
+Current DMGs are **local previews**: ad hoc signed and not yet notarized, so macOS asks for confirmation
+on first open. A notarized release follows the steps in [Release and installation](#release-and-installation).
+
+## Status
+
+Development is in progress. A passing subset of tests does not establish native feature completion or a sellable release. The [acceptance map](qa/feature-map.json) and [closed-loop verification guide](docs/CLOSED-LOOP-QA.md) track what is executable, unverified, or still missing. Verification is automated; no manual click-through substitutes for a missing check.
+
+All images on this page are rendered by the app itself with `Zeus --snapshots <dir>` from built-in fixtures.
 
 ## Layout
 
