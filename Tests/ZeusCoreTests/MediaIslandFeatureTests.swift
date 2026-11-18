@@ -4,6 +4,22 @@ import Testing
 
 @Suite("Media island features")
 struct MediaIslandFeatureTests {
+    @Test func theSystemReaderIsBoundedAndLosesToAPlayingPlayer() {
+        #expect(SystemNowPlayingLaunch.settingID == "music.systemNowPlaying")
+        #expect(SystemNowPlayingLaunch.timeout == 2)
+        #expect(SystemNowPlayingLaunch.maxOutputBytes == 4096)
+        #expect(SystemNowPlayingLaunch.executable == "/usr/bin/perl")
+        var arbiter = NowPlayingArbiter()
+        let now = Date(timeIntervalSince1970: 10)
+        let player = NowPlaying(source: .player(.music), title: "Live", artist: "Band", album: "", isPlaying: true,
+                                duration: 100, position: 1, positionAt: now)
+        let system = NowPlaying(source: .system, title: "Helper", artist: "", album: "", isPlaying: true,
+                                duration: 100, position: 1, positionAt: now)
+        #expect(arbiter.update(.system, system, now: now))
+        #expect(arbiter.update(.player(.music), player, now: now.addingTimeInterval(1)))
+        #expect(arbiter.shown(follow: .any)?.playing.source == .player(.music))
+    }
+
     @Test func systemNowPlayingIsOffUntilAskedAndParsesThePerlLine() {
         #expect(MediaIslandFeatures.systemNowPlaying.enabled == false)
         #expect(MediaIslandFeatures.systemNowPlaying.permission == nil)
