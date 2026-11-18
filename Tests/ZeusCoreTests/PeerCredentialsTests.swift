@@ -43,6 +43,20 @@ struct PeerCredentialsTests {
         #expect(PeerCheck.decide(policy, ownUID: 501, peer: lookalike).isAllowed == false, "only the file name counts, not a folder")
     }
 
+    @Test func aSupportOverrideNeverDropsTheSignatureCheck() {
+        let policy = ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"])
+        #expect(policy.requiresSignedApp)
+        #expect(UnixSocketServer.mustVerifySignature(policy: .sameUser, supportOverride: "/tmp/zeus-test"))
+        #expect(!UnixSocketServer.mustVerifySignature(policy: .sameUser, supportOverride: nil))
+        #expect(!UnixSocketServer.mustVerifySignature(policy: .sameUser, supportOverride: ""))
+        let owned = SupportDirectoryFacts(isSymlink: false, uid: 501, mode: 0o700)
+        #expect(SupportDirectoryRule.accepted(path: "/tmp/z", allowOverride: false, uid: 501, facts: owned) == nil)
+        #expect(SupportDirectoryRule.accepted(path: "/tmp/z", allowOverride: true, uid: 501, facts: owned) == "/tmp/z")
+        #expect(SupportDirectoryRule.accepted(path: "/tmp/z", allowOverride: true, uid: 501, facts: SupportDirectoryFacts(isSymlink: true, uid: 501, mode: 0o700)) == nil)
+        #expect(SupportDirectoryRule.accepted(path: "/tmp/z", allowOverride: true, uid: 501, facts: SupportDirectoryFacts(isSymlink: false, uid: 501, mode: 0o755)) == nil)
+        #expect(SupportDirectoryRule.accepted(path: "/tmp/z", allowOverride: true, uid: 0, facts: owned) == nil)
+    }
+
     @Test func aRelocatedSupportFolderIsTheOnlyWayToDropTheProgramNameRule() {
         #expect(ChromeSocketPeers.policy(environment: [:]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
         #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": ""]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
