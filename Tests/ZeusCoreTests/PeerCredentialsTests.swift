@@ -60,7 +60,7 @@ struct PeerCredentialsTests {
     @Test func aRelocatedSupportFolderIsTheOnlyWayToDropTheProgramNameRule() {
         #expect(ChromeSocketPeers.policy(environment: [:]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
         #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": ""]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
-        #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"]) == .sameUser)
+        #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
     }
 
     @Test func theKernelReportsThisProcessForAConnectedPair() throws {

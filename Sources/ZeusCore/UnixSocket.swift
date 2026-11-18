@@ -196,6 +196,14 @@ public enum UnixSocket {
 /// tasks or approvals. Calling a reply is always nonblocking, including from MainActor. Only
 /// the first call can write, and every connection descriptor closes exactly once.
 public final class UnixSocketServer: @unchecked Sendable {
+    /// A support-directory override never skips the signature verifier, including in a debug build. The unsigned
+    /// same-user policy still applies to the ordinary socket when nothing has relocated it.
+    public static func mustVerifySignature(policy: PeerPolicy, supportOverride: String?) -> Bool {
+        if policy.requiresSignedApp { return true }
+        if let supportOverride, !supportOverride.isEmpty { return true }
+        return false
+    }
+
     public typealias Reply = @Sendable (Data?) -> Void
     public typealias Handler = @Sendable (Data, @escaping Reply) -> Void
     /// Like `Handler`, plus what the handler may ask about the peer that sent the line.
@@ -307,7 +315,11 @@ public final class UnixSocketServer: @unchecked Sendable {
                 return true
             }
             guard admitted else { connection.cancel(); continue }
-            guard peerPolicy.requiresSignedApp else { connection.receive(handler); continue }
+            let relocated = ProcessInfo.processInfo.environment["ZEUS_SUPPORT_DIR"]
+            guard Self.mustVerifySignature(policy: peerPolicy, supportOverride: relocated) else {
+                connection.receive(handler)
+                continue
+            }
             // A program that must be this app's own is judged by its signature too, since a file name proves nothing.
             // The check reads the peer's code and can be slow, so it runs per connection off the accept queue: one slow
             // check never holds up another accept. The connection is already counted against the limit and reads

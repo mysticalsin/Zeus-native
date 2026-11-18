@@ -29,6 +29,7 @@ struct NativeHostProcessTests {
             }
             root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-nh-\(UUID().uuidString.prefix(8))")
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
             process.executableURL = executable
             process.environment = ["ZEUS_SUPPORT_DIR": root.path]
             process.standardInput = input; process.standardOutput = output; process.standardError = errors

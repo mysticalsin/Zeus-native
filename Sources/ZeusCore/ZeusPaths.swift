@@ -7,10 +7,10 @@ public enum ZeusPaths {
     /// unpacked extension is loaded from.
     public static let extensionID = "dkpclhaealkdnnihlccglmonmmjfjobe"
 
-    /// ~/Library/Application Support/Zeus. `ZEUS_SUPPORT_DIR` moves it (tests, a second build),
-    /// so a ZEUS you are running is never touched.
+    /// ~/Library/Application Support/Zeus. A debug build may move it with `ZEUS_SUPPORT_DIR` when that
+    /// directory is this user's and mode 0700. A release build ignores the variable.
     public static var supportDirectory: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_SUPPORT_DIR"], !override.isEmpty {
+        if let override = SupportDirectoryRule.resolved() {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         return FileManager.default.homeDirectoryForCurrentUser

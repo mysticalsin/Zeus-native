@@ -144,6 +144,52 @@ public enum PeerCheck {
     #endif
 }
 
+public struct SupportDirectoryFacts: Equatable, Sendable {
+    public var isSymlink: Bool
+    public var uid: UInt32
+    /// Permission bits only (`st_mode & 0777`), not the file type.
+    public var mode: UInt32
+
+    public init(isSymlink: Bool, uid: UInt32, mode: UInt32) {
+        self.isSymlink = isSymlink
+        self.uid = uid
+        self.mode = mode
+    }
+}
+
+public enum SupportDirectoryRule {
+    /// The override exists for tests and debug builds. A release build never honours it.
+    public static var allowOverride: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Usable only when the override is allowed and `lstat` says this user owns a real directory at 0700.
+    public static func accepted(path: String, allowOverride: Bool, uid: UInt32, facts: SupportDirectoryFacts?) -> String? {
+        guard allowOverride, !path.isEmpty, let facts else { return nil }
+        guard !facts.isSymlink, facts.uid == uid, (facts.mode & 0o777) == 0o700 else { return nil }
+        return path
+    }
+
+    public static func facts(at path: String) -> SupportDirectoryFacts? {
+        var info = stat()
+        guard lstat(path, &info) == 0 else { return nil }
+        let type = info.st_mode & mode_t(S_IFMT)
+        return SupportDirectoryFacts(isSymlink: type == mode_t(S_IFLNK), uid: info.st_uid, mode: UInt32(info.st_mode))
+    }
+
+    /// The relocated support directory, or nil when the override is absent, forbidden, or not a private directory.
+    public static func resolved(environment: [String: String] = ProcessInfo.processInfo.environment,
+                                allowOverride: Bool = SupportDirectoryRule.allowOverride,
+                                uid: UInt32 = UInt32(geteuid())) -> String? {
+        guard let path = environment["ZEUS_SUPPORT_DIR"], !path.isEmpty else { return nil }
+        return accepted(path: path, allowOverride: allowOverride, uid: uid, facts: facts(at: path))
+    }
+}
+
 /// The browser bridge socket (`chrome.sock`) is served by `zeus-bridge`, which Chrome starts.
 /// Its only legitimate client is the Zeus app itself. The program name below is a first filter; the
 /// server then requires the peer's code signature to tie it to this app (`PeerBinaryRule`).
@@ -157,11 +203,11 @@ public enum ChromeSocketPeers {
     /// bridge alone also accepts the app bundle that ships a bridge of its name (an ad hoc development build).
     public static let verifier: PeerVerifier = { PeerSigning.verifyApp(auditToken: $0, expectedPeerIdentifier: expectedPeerIdentifier, trustShippingBundle: true) }
 
-    /// The policy for this bridge process. A bridge started with `ZEUS_SUPPORT_DIR` set serves a
-    /// relocated socket (tests, a second build) that the installed app never talks to, so only the
-    /// same-user rule applies there. Whoever can set the bridge's environment can already move the socket.
+    /// The policy for this bridge process. A relocated support directory never turns the signature check off.
+    /// Release builds ignore `ZEUS_SUPPORT_DIR` entirely; a debug build may use the path only after
+    /// `SupportDirectoryRule` confirms it is this user's directory at mode 0700.
     public static func policy(environment: [String: String]) -> PeerPolicy {
-        if let override = environment["ZEUS_SUPPORT_DIR"], !override.isEmpty { return .sameUser }
+        _ = environment
         return .sameUserExecutable(allowedExecutables)
     }
 }
