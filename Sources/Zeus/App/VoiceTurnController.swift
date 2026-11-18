@@ -101,6 +101,7 @@ final class VoiceTurnController {
          drawConsent: @escaping () -> Bool = { FeatureSettings.talkDrawOnScreen() },
          seeScreen: @escaping () -> Bool = { FeatureSettings.talkSeeScreen() },
          screenPermission: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
+        _ = Microphones.cache // starts the device watch and the first list read off main, before any press
         self.drawConsent = drawConsent
         seeScreenConsent = seeScreen
         self.screenPermission = screenPermission
@@ -195,8 +196,8 @@ final class VoiceTurnController {
     /// microphone is the built-in device, a specific input is itself or Automatic when it is gone. Dictation's choice is separate.
     /// The device list is read only when a device is chosen.
     static func applyChosenMicrophone(to speech: SpeechInput, defaults: UserDefaults = .standard,
-                                      devices: () -> [MicrophoneDevice] = { Microphones.all() },
-                                      builtInUID: () -> String? = { Microphones.builtInUID() }) {
+                                      devices: () -> [MicrophoneDevice] = { Microphones.cache.devices() },
+                                      builtInUID: () -> String? = { Microphones.cache.builtInUID() }) {
         let choice = TalkMicrophoneChoice.load(defaults)
         speech.deviceUID = choice == .automatic ? nil : choice.resolvedUID(devices: devices(), builtInUID: builtInUID())
     }

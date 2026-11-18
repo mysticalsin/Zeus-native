@@ -87,14 +87,18 @@ struct MicrophoneListCacheTests {
 
     @Test func aCacheWithTheSavedInputRemovedStopsChoosingItAfterAChange() {
         let counter = Counter()
-        var devices = [Self.usb, Self.builtIn]
-        let lock = NSLock()
+        final class Box: @unchecked Sendable {
+            let lock = NSLock()
+            private var value = [MicrophoneListCacheTests.usb, MicrophoneListCacheTests.builtIn]
+            var devices: [MicrophoneDevice] { get { lock.withLock { value } } set { lock.withLock { value = newValue } } }
+        }
+        let box = Box()
         let cache = MicrophoneListCache(enumerate: {
             counter.tick()
-            return .init(devices: lock.withLock { devices }, builtInUID: Self.builtIn.uid)
+            return .init(devices: box.devices, builtInUID: Self.builtIn.uid)
         })
         #expect(TalkMicrophoneChoice.device("usb-1").resolvedUID(devices: cache.devices(), builtInUID: cache.builtInUID()) == "usb-1")
-        lock.withLock { devices = [Self.builtIn] }
+        box.devices = [Self.builtIn]
         cache.invalidate()
         #expect(TalkMicrophoneChoice.device("usb-1").resolvedUID(devices: cache.devices(), builtInUID: cache.builtInUID()) == nil)
     }

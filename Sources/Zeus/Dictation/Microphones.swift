@@ -5,6 +5,16 @@ import ZeusCore
 
 /// Audio inputs from Core Audio, and how to point an audio engine at one.
 enum Microphones {
+    /// The list every main-thread caller reads: Core Audio is asked off main and again only after a device change.
+    static let cache: MicrophoneListCache = {
+        let cache = MicrophoneListCache(enumerate: { .init(devices: all(), builtInUID: builtInUID()) })
+        cache.startListening()
+        cache.warmInBackground()
+        return cache
+    }()
+
+    /// Enumerates Core Audio now. It can block for tens of milliseconds (more with Bluetooth or aggregate devices),
+    /// so main-thread code reads `cache` instead.
     static func all() -> [MicrophoneDevice] {
         let defaultID = defaultInputID()
         return deviceIDs().compactMap { id -> MicrophoneDevice? in
@@ -83,6 +93,63 @@ enum Microphones {
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
         return value.takeRetainedValue() as String
+    }
+}
+
+/// The audio inputs and the built-in one, cached. Reads are O(1) once warm; a Core Audio device-list or
+/// default-input change drops the copy and refreshes it off the main thread. A read before the first
+/// refresh finishes enumerates once itself, so it is never wrong, only slower that one time.
+final class MicrophoneListCache: @unchecked Sendable {
+    struct Snapshot: Equatable, Sendable {
+        var devices: [MicrophoneDevice]
+        var builtInUID: String?
+    }
+
+    private let enumerate: @Sendable () -> Snapshot
+    private let lock = NSLock()
+    private var cached: Snapshot?
+    /// Bumped by every invalidation, so an enumeration that began before a change never overwrites the newer state.
+    private var generation = 0
+    private let queue = DispatchQueue(label: "zeus.microphone-list", qos: .utility)
+    private var listeners: [(AudioObjectPropertySelector, AudioObjectPropertyListenerBlock)] = []
+
+    init(enumerate: @escaping @Sendable () -> Snapshot) { self.enumerate = enumerate }
+
+    func devices() -> [MicrophoneDevice] { snapshot().devices }
+    func builtInUID() -> String? { snapshot().builtInUID }
+
+    func invalidate() {
+        lock.withLock { cached = nil; generation += 1 }
+    }
+
+    func warmInBackground() {
+        queue.async { [self] in _ = snapshot() }
+    }
+
+    private func snapshot() -> Snapshot {
+        let (hit, started) = lock.withLock { (cached, generation) }
+        if let hit { return hit }
+        let fresh = enumerate()
+        lock.withLock { if generation == started { cached = fresh } }
+        return fresh
+    }
+
+    /// Watches the system device list and default input for the life of the app.
+    func startListening() {
+        lock.withLock {
+            guard listeners.isEmpty else { return }
+            for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice] {
+                let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                    self?.invalidate()
+                    self?.warmInBackground()
+                }
+                var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
+                                                         mElement: kAudioObjectPropertyElementMain)
+                if AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, block) == noErr {
+                    listeners.append((selector, block))
+                }
+            }
+        }
     }
 }
 

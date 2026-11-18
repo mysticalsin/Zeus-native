@@ -640,7 +640,7 @@ final class SpeechInput: @unchecked Sendable {
 
     /// Name of the microphone a turn uses: the chosen one, else the system input.
     private static func inputDeviceName(uid: String?) -> String {
-        let devices = Microphones.all()
+        let devices = Microphones.cache.devices()
         return (uid.flatMap { uid in devices.first { $0.uid == uid } } ?? devices.first { $0.isDefault })?.name ?? "unknown input"
     }
 
