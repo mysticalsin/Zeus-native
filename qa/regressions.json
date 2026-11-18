@@ -8339,6 +8339,18 @@
         "file": "Tests/ZeusAppTests/SystemNotificationServiceTests.swift",
         "function": "repeatedCueDeliversOneBannerPerWindow"
       }
+    },
+    {
+      "id": "REG-946",
+      "failure": "A meeting link rewritten by Microsoft Safe Links or a Google redirect was not recognised, so the calendar slot had no call link: a live Teams call never paired with its meeting and the next-meeting offer never appeared while another call was recording.",
+      "features": [
+        "F04"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+        "function": "safeLinksTeamsMeetupJoinIsUnwrapped"
+      }
     }
 ]
 }
