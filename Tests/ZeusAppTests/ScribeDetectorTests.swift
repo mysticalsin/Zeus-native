@@ -323,10 +323,24 @@ struct ScribeDetectorTests {
     }
 
     @Test func theExitObserverWatchesWhileOffAndBusyAndIsRemovedByHalt() async throws {
-        // The observer reads a real app's pid, bundle id and launch date; any app of this login session has them.
-        let app = try #require(NSWorkspace.shared.runningApplications.first {
-            $0.processIdentifier > 0 && $0.bundleIdentifier != nil && $0.launchDate != nil
-        })
+        // The observer reads a real app's pid, bundle id and launch date. Apps opened at login carry no launch date, so on
+        // a fresh runner (GitHub's) none may qualify: then a hidden Calculator is opened for the test and quit after it.
+        let qualifies = { (app: NSRunningApplication) in
+            app.processIdentifier > 0 && app.bundleIdentifier != nil && app.launchDate != nil
+        }
+        var opened: NSRunningApplication?
+        defer { opened?.terminate() }
+        let app: NSRunningApplication
+        if let running = NSWorkspace.shared.runningApplications.first(where: qualifies) {
+            app = running
+        } else {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = false
+            configuration.hides = true
+            opened = try await NSWorkspace.shared.openApplication(
+                at: URL(fileURLWithPath: "/System/Applications/Calculator.app"), configuration: configuration)
+            app = try #require(opened.flatMap { qualifies($0) ? $0 : nil })
+        }
         let exit = { (harness: Harness) in
             harness.workspace.post(name: NSWorkspace.didTerminateApplicationNotification, object: nil,
                                    userInfo: [NSWorkspace.applicationUserInfoKey: app])
