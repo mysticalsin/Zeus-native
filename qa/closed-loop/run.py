@@ -222,7 +222,7 @@ def discover_native(args, output, source_hash, definitions):
     try:
         require(snapshot(output)["sha256"] == source_hash, "Source changed before native discovery")
         row["command"] = native.discovery_command(str(output))
-        code, seconds = execute(row["command"], log, args.timeout)
+        code, seconds = execute(row["command"], log, args.timeout, {"ZEUS_ALLOC_CHECK": "1"})
         row.update(exit_code=code, duration_seconds=seconds)
         row["artifacts"] = [artifact(path, output) for path in (log, folder / "events.jsonl") if path.is_file()]
         row["status"] = "passed"
@@ -266,7 +266,7 @@ def run_native_check(definition, args, output, native_build, discovery_receipt, 
     log, events = folder / "test.log", folder / "events.jsonl"
     try:
         row["command"] = native.run_command(selection, args.jobs, str(output), definition["id"], ROOT)
-        environment = {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")}
+        environment = {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts"), "ZEUS_ALLOC_CHECK": "1"}
         if native.native_app_host.selected(selection):
             environment.update(native.native_app_host.prepare(output, definition["id"]))
         code, seconds = execute(row["command"], log, args.timeout, environment)
@@ -342,8 +342,10 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         row["command"] = command
         attempt = 1
         while True:
-            code, seconds = execute(command, log, args.timeout,
-                                    {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")})
+            environment = {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")}
+            if kind == "portable" and definition.get("group") == "equaliser":
+                environment["ZEUS_ALLOC_CHECK"] = "1"
+            code, seconds = execute(command, log, args.timeout, environment)
             # A passing run whose console log lost lines is rerun, not trusted or failed: the runner
             # drops lines under machine load. Failing runs and complete logs are never rerun.
             if kind != "portable" or code != 0 or attempt == PORTABLE_LOG_ATTEMPTS or swift_log_complete(log.read_text()):
