@@ -208,7 +208,6 @@ final class SpeechInput: @unchecked Sendable {
         // Fresh engine every turn (see the stored property's comment): avoids the second-turn
         // silent-audio bug from reusing a stopped engine's input node.
         let engine = AVAudioEngine()
-        lock.withLock { self.engine = AVCaptureEngine(engine) }
 
         let request = makeRequest(recognizer: activeRecognizer)
 
@@ -224,6 +223,9 @@ final class SpeechInput: @unchecked Sendable {
         else { throw InputError.inputUnavailable }
         let deviceName = Self.inputDeviceName(uid: deviceUID)
         lock.lock()
+        // The engine changes hands in the same critical section as the generation: a stop that already
+        // took the old engine closes that one, and one that comes later finds this one with its session.
+        self.engine = AVCaptureEngine(engine)
         self.request = request
         latest = ""
         finalizedText = ""
@@ -261,6 +263,7 @@ final class SpeechInput: @unchecked Sendable {
                    policy: capturePolicy, startedAt: startedAt, resampler: turnResampler)
         engine.prepare()
         do { try engine.start() } catch { cancel(); throw error }
+        closeCaptureIfNotOwned(AVCaptureEngine(engine), session: current)
         return current
     }
 
@@ -415,9 +418,9 @@ final class SpeechInput: @unchecked Sendable {
                                 serverAllowed: allowServerRecognition) else { throw InputError.onDeviceUnavailable }
         cancel()
         let freshEngine = AVAudioEngine()
-        lock.withLock { engine = AVCaptureEngine(freshEngine) }
         let request = makeRequest(recognizer: activeRecognizer)
         lock.lock()
+        engine = AVCaptureEngine(freshEngine)
         self.request = request
         latest = ""
         finalizedText = ""
@@ -657,12 +660,12 @@ final class SpeechInput: @unchecked Sendable {
     /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
     /// final text, so release must not wait for Apple's second pass).
     func stop(waitForFinal: Bool = true) async -> String {
-        let session = lock.withLock { () -> Int in
+        let (session, capture) = lock.withLock { () -> (Int, Capture) in
             stopRequested = true
-            return generation
+            return (generation, takeCapture())
         }
         beforeStopAudioForTesting?()
-        stopAudio()
+        release(capture)
         guard recognizes else { return "" }
         let (alreadyDone, text) = lock.withLock { () -> (Bool, String) in
             request?.endAudio()
@@ -693,13 +696,13 @@ final class SpeechInput: @unchecked Sendable {
     }
 
     func cancel() {
-        let oldTask = lock.withLock { () -> SFSpeechRecognitionTask? in
+        let (oldTask, capture) = lock.withLock { () -> (SFSpeechRecognitionTask?, Capture) in
             stopRequested = true
             defer { task = nil }
-            return task
+            return (task, takeCapture())
         }
         beforeStopAudioForTesting?()
-        stopAudio()
+        release(capture)
         oldTask?.cancel()
         finish()
     }
@@ -722,7 +725,11 @@ final class SpeechInput: @unchecked Sendable {
     }
 
     /// After `engine.start()` returns, a stop or a newer turn may have landed during the start.
+    /// It closes the mic again: a stopped turn must never leave capture running.
     func closeCaptureIfNotOwned(_ engine: any CaptureEngine, session: Int) {
+        guard !ownsCapture(session) else { return }
+        if engine.isRunning { engine.stop() }
+        engine.removeInputTap()
     }
 
     private func ownsCapture(_ session: Int) -> Bool {
@@ -745,15 +752,20 @@ final class SpeechInput: @unchecked Sendable {
         return status == .error || output.frameLength == 0 ? nil : output
     }
 
-    private func stopAudio() {
-        let observer = lock.withLock { () -> (any NSObjectProtocol)? in
-            defer { configurationObserver = nil }
-            return configurationObserver
-        }
-        if let observer { NotificationCenter.default.removeObserver(observer) }
-        let current = lock.withLock { engine }
-        if current.isRunning { current.stop() }
-        current.removeInputTap()
+    /// The engine and configuration observer of the turn being stopped.
+    private typealias Capture = (engine: any CaptureEngine, observer: (any NSObjectProtocol)?)
+
+    /// Takes the current turn's engine and observer. Holds `lock` at the call site, in the same critical section as
+    /// the stop request, so a `start` that swaps in the next engine afterwards is never torn down by this stop.
+    private func takeCapture() -> Capture {
+        defer { configurationObserver = nil }
+        return (engine, configurationObserver)
+    }
+
+    private func release(_ capture: Capture) {
+        if let observer = capture.observer { NotificationCenter.default.removeObserver(observer) }
+        if capture.engine.isRunning { capture.engine.stop() }
+        capture.engine.removeInputTap()
     }
 
     private func reportCaptureFailure(_ failure: CaptureFailure, session: Int, origin: UInt64) {

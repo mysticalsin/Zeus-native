@@ -1135,6 +1135,14 @@
       "scope": "SpeechInput configuration-change recovery with a fake capture engine: the stop race around the engine restart, the retry limit for an input with no format, and a format with no converter. No audio hardware or speech recognition is exercised."
     },
     {
+      "id": "native-CaptureEngineLifecycleRaceTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "CaptureEngineLifecycleRaceTests",
+      "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+      "scope": "SpeechInput stop and cancel against a newer turn's engine swap, with fake capture engines: which engine a late stop closes, and that a stopped turn's engine is closed again if it finished starting afterwards. No audio hardware or speech recognition."
+    },
+    {
       "id": "native-ZeusPromptTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -5758,6 +5766,33 @@
             {
               "file": "Tests/ZeusAppTests/SpeechInputRecoveryTests.swift",
               "function": "aMissingConverterForADifferentFormatEndsTheTurnInsteadOfFeedingTheWrongFormat"
+            }
+          ]
+        },
+        {
+          "id": "F11.capture-engine-lifecycle-race",
+          "check": "native-CaptureEngineLifecycleRaceTests",
+          "acceptance": "A late stop or cancel closes the engine of the turn it belongs to and never a newer turn's engine or configuration observer, and an engine that finished starting after its turn was stopped is closed again so the microphone is not left running. Fake capture engines: no audio hardware or speech recognition.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aStopThatLosesTheRaceToANewStartLeavesTheNewEngineRunning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aCancelThatLosesTheRaceToANewStartLeavesTheNewEngineRunning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aStopWithNoRaceStillClosesTheEngineAndDropsTheObserver"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "anEngineStartedAfterTheTurnWasStoppedIsClosedAgain"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "anEngineStartedForALiveTurnIsLeftRunning"
             }
           ]
         },

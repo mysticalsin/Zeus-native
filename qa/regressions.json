@@ -8652,6 +8652,30 @@
         "file": "qa/closed-loop/tests/test_contracts.py",
         "function": "test_xunit_testcase_must_sit_in_a_suite_and_paths_stay_closed"
       }
+    },
+    {
+      "id": "REG-973",
+      "failure": "A stop that ran off the main actor read the speech engine after the next turn had swapped in its own, so it stopped the new turn's engine, removed its tap and dropped its configuration observer while the new turn believed it was recording.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-CaptureEngineLifecycleRaceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+        "function": "aStopThatLosesTheRaceToANewStartLeavesTheNewEngineRunning"
+      }
+    },
+    {
+      "id": "REG-974",
+      "failure": "A turn's engine could finish starting after a stop had already landed, leaving the microphone running with nothing to stop it. The start now checks ownership once the engine is up and closes it again.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-CaptureEngineLifecycleRaceTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+        "function": "anEngineStartedAfterTheTurnWasStoppedIsClosedAgain"
+      }
     }
 ]
 }
