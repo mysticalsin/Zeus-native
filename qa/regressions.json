@@ -8508,6 +8508,18 @@
         "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
         "function": "aCompletionSetWhileABarOnlyPeekIsUpTakesTheMouseWithoutAMouseMove"
       }
+    },
+    {
+      "id": "REG-972",
+      "failure": "A long selection edit made the notch peek card taller than the 470 pt notch window, so its Accept row sat outside the window and the clip: it was not drawn and could not be clicked.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-NotchPeekClickThroughTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+        "function": "aLongSelectionEditCardKeepsItsAcceptRowInsideTheNotchWindow"
+      }
     }
 ]
 }

@@ -148,11 +148,30 @@ struct NotchView: View {
             || model.selectionEdit != nil || model.workBehind?.streaming == true || model.recap != nil
     }
 
-    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt Accept row.
-    static func selectionEditHeight(_ edit: SelectionEdit) -> CGFloat {
-        let lines = edit.diff.reduce(CGFloat(0)) { $0 + 15 * CGFloat(min(2, max(1, ($1.text.count + 2 + 53) / 54))) }
-        return lines + 4 * CGFloat(edit.diff.count) + 28
+    /// One diff row of the edit card and how many 15 pt text lines it takes.
+    struct SelectionEditRow: Identifiable {
+        var line: TextDiffLine
+        var textLines: Int
+        var id: Int { line.id }
+        var height: CGFloat { 15 * CGFloat(textLines) }
     }
+
+    /// The edit card body: the visible rows, how many were left out, and the whole height.
+    struct SelectionEditLayout {
+        var rows: [SelectionEditRow]
+        var hidden: Int
+        var height: CGFloat
+        /// The plain line shown under a capped list, nil when every row is visible.
+        var moreText: String? { hidden > 0 ? "+\(hidden) more lines" : nil }
+    }
+
+    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt Accept row.
+    static func selectionEditLayout(_ edit: SelectionEdit) -> SelectionEditLayout {
+        let rows = edit.diff.map { SelectionEditRow(line: $0, textLines: min(2, max(1, ($0.text.count + 2 + 53) / 54))) }
+        return SelectionEditLayout(rows: rows, hidden: 0, height: rows.reduce(CGFloat(28)) { $0 + $1.height + 4 })
+    }
+
+    static func selectionEditHeight(_ edit: SelectionEdit) -> CGFloat { selectionEditLayout(edit).height }
 
     /// The peek card as drawn (the peek always has the 8 pt shoulders). The window's click-through rule reads it too.
     static func peekSize(model: NotchModel, footprint: NotchFootprint) -> CGSize {
