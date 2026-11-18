@@ -200,7 +200,7 @@ import ZeusCore
 
     @Test func aLongSelectionEditCardLayoutFitsTheBudgetAndCountsWhatItHides() {
         let edit = longEdit(lines: 60)
-        let layout = NotchView.selectionEditLayout(edit)
+        let layout = NotchView.selectionEditLayout(edit, barHeight: 32)
         #expect(layout.hidden > 0)
         #expect(layout.moreText == "+\(layout.hidden) more lines")
         #expect(layout.rows.count + layout.hidden == edit.diff.count)
@@ -210,7 +210,7 @@ import ZeusCore
 
     @Test func aShortSelectionEditCardIsUnchangedAndHidesNothing() {
         let edit = SelectionEdit(kind: .replace, before: "one", after: "two")
-        let layout = NotchView.selectionEditLayout(edit)
+        let layout = NotchView.selectionEditLayout(edit, barHeight: 32)
         #expect(layout.hidden == 0)
         #expect(layout.moreText == nil)
         #expect(layout.rows.count == edit.diff.count)
@@ -219,9 +219,9 @@ import ZeusCore
     }
 
     @Test func aLongSelectionEditCardPinsEachRowToTheHeightTheSizeUses() {
-        let layout = NotchView.selectionEditLayout(longEdit(lines: 3))
+        let layout = NotchView.selectionEditLayout(longEdit(lines: 3), barHeight: 32)
         #expect(layout.rows.allSatisfy { $0.textLines == 2 && $0.height == 30 })
-        let short = NotchView.selectionEditLayout(SelectionEdit(kind: .replace, before: "a", after: "b"))
+        let short = NotchView.selectionEditLayout(SelectionEdit(kind: .replace, before: "a", after: "b"), barHeight: 32)
         #expect(short.rows.allSatisfy { $0.textLines == 1 && $0.height == 15 })
     }
 

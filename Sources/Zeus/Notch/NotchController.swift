@@ -38,8 +38,12 @@ final class NotchController {
     var now: () -> Date = { Date() }
     /// Where the pointer is; tests replace it.
     var pointer: () -> CGPoint = { NSEvent.mouseLocation }
-    /// Tests give the frame the zones centre on, so no window or display is needed.
+    /// Tests give the frame the zones centre on, so no window or display is needed. Release builds have no override.
+    #if DEBUG
     var frameOverride: CGRect?
+    #else
+    private let frameOverride: CGRect? = nil
+    #endif
     private var activeFrame: CGRect? { frameOverride ?? screen.map(anchorFrame) }
     /// What the window was last told: true is click-through. Read by tests.
     private(set) var clickThrough = true
