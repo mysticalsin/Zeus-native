@@ -115,6 +115,10 @@ final class MicrophoneListCache: @unchecked Sendable {
 
     init(enumerate: @escaping @Sendable () -> Snapshot) { self.enumerate = enumerate }
 
+    /// The cached snapshot, or nil before the first enumeration. Never enumerates.
+    func peek() -> Snapshot? { lock.withLock { cached } }
+    var isRefreshing: Bool { false }
+
     func devices() -> [MicrophoneDevice] { snapshot().devices }
     func builtInUID() -> String? { snapshot().builtInUID }
 
@@ -231,4 +235,13 @@ final class MicrophoneTester {
         engine?.stop()
         engine = nil
     }
+}
+
+/// What the Explanation microphone picker reads, so a SwiftUI body never enumerates and still updates on a device change.
+@MainActor
+@Observable
+final class MicrophoneListModel {
+    static let shared = MicrophoneListModel(cache: Microphones.cache)
+    private(set) var devices: [MicrophoneDevice] = []
+    init(cache: MicrophoneListCache) {}
 }
