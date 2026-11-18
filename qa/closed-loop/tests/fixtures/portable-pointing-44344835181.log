@@ -1,0 +1,367 @@
+Building for debugging...
+[0/7] /Users/runner/work/_temp/zeus-results/feature-map/portable-pointing/pointing/.build/arm64-apple-macosx/debug/ZeusPortableValidationPackageTests.derived/runner.swift
+[1/7] Write sources
+[4/7] Write swift-version-1977FEB4D2752686.txt
+[6/31] Compiling ZeusCore ChatHotkey.swift
+[7/31] Compiling ZeusCore ExplanationAnthropicStream.swift
+[8/31] Compiling ZeusCore ExplanationChartMath.swift
+[9/31] Compiling ZeusCore ExplanationCompletionStream.swift
+[10/31] Compiling ZeusCore ExplanationCoordinates.swift
+[11/31] Compiling ZeusCore ExplanationModel3D.swift
+[12/31] Compiling ZeusCore ExplanationModelMotion.swift
+[13/31] Compiling ZeusCore ExplanationModelReducer.swift
+[14/31] Emitting module ZeusCore
+[15/31] Compiling ZeusCore PointingInkTrail.swift
+[16/31] Compiling ZeusCore PointingKeyGesture.swift
+[17/31] Compiling ZeusCore PointingProviderSelection.swift
+[18/31] Compiling ZeusCore PointingSceneResolver.swift
+[19/31] Compiling ZeusCore PointingSession.swift
+[20/31] Compiling ZeusCore PointingShortcutConflicts.swift
+[21/31] Compiling ZeusCore PointingSpeechAlignment.swift
+[22/31] Compiling ZeusCore ExplanationModelWire.swift
+[23/31] Compiling ZeusCore ExplanationProtocol.swift
+[24/31] Compiling ZeusCore ExplanationRecipes.swift
+[25/31] Compiling ZeusCore ExplanationReducer.swift
+[26/31] Compiling ZeusCore ExplanationStream.swift
+[27/31] Compiling ZeusCore PointingCardAnchors.swift
+[28/31] Compiling ZeusCore PointingContext.swift
+[29/31] Compiling ZeusCore PointingDeixis.swift
+[30/38] Compiling ZeusCore PointingStaleTarget.swift
+[31/38] Compiling ZeusCore PointingStrokeTargeting.swift
+[32/38] Compiling ZeusCore PointingTrace.swift
+[33/38] Compiling ZeusCore PointingTraceSpans.swift
+[34/38] Compiling ZeusCore CoordinateMapper.swift
+[35/38] Compiling ZeusCore SpatialTrail.swift
+[36/38] Compiling ZeusCore Shortcut.swift
+[37/51] Compiling ZeusCoreTests ExplanationProtocolV2Tests.swift
+[38/51] Compiling ZeusCoreTests ExplanationProtocolV3Tests.swift
+[39/51] Compiling ZeusCoreTests PointingCardAnchorsTests.swift
+[40/51] Compiling ZeusCoreTests PointingCoordinateTests.swift
+[41/51] Compiling ZeusCoreTests PointingDeixisTests.swift
+[42/51] Compiling ZeusCoreTests PointingInkTrailTests.swift
+[43/51] Compiling ZeusCoreTests PointingKeyGestureTests.swift
+[44/51] Compiling ZeusCoreTests PointingOverlayGeometryTests.swift
+[45/51] Emitting module ZeusCoreTests
+[46/55] Compiling ZeusCoreTests PointingProviderTests.swift
+[47/55] Compiling ZeusCoreTests PointingRobustnessTests.swift
+[48/55] Compiling ZeusCoreTests PointingSessionTests.swift
+[49/55] Compiling ZeusCoreTests PointingStaleTargetTests.swift
+[50/55] Compiling ZeusCoreTests PointingStrokeTargetingTests.swift
+[51/55] Compiling ZeusCoreTests PointingTraceSpansTests.swift
+[52/55] Compiling ZeusCoreTests PointingTraceTests.swift
+[53/55] Compiling ZeusCoreTests ShortcutConflictsPointingTests.swift
+[54/57] Compiling ZeusPortableValidationPackageTests runner.swift
+[55/57] Emitting module ZeusPortableValidationPackageTests
+[55/57] Write Objects.LinkFileList
+[56/57] Linking ZeusPortableValidationPackageTests
+Build complete! (21.98s)
+Test Suite 'All tests' started at 2026-11-18 16:45:35.071.
+Test Suite 'All tests' passed at 2026-11-18 16:45:35.074.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.003) seconds
+◇ Test run started.
+↳ Testing Library Version: 1501
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Pointing trace spans" started.
+◇ Suite "Pointing stroke targeting" started.
+◇ Suite "Pointing robustness: stuck keys, sleep, wake, display change" started.
+◇ Suite "Pointing deixis" started.
+◇ Suite "Pointing session state machine" started.
+◇ Suite "Pointing ink trail" started.
+◇ Suite "Pointing trace" started.
+◇ Suite "Pointing shortcut conflicts" started.
+◇ Suite "Explanation protocol v3: additive chart axis spec" started.
+◇ Suite "Desktop card anchors: app-issued protected regions in global points" started.
+◇ Suite "Pointing stale target" started.
+◇ Suite "Pointing key gesture" started.
+◇ Suite "Pointing provider selection" started.
+◇ Suite "Pointing overlay geometry: the ring lands on the candidate" started.
+◇ Suite "Pointing coordinates: AX Quartz to AppKit to delivered-image pixels" started.
+◇ Suite "Explanation protocol v2 (pointing targetID) and the scene resolver" started.
+◇ Suite "Pointing vendor wire formats" started.
+◇ Test everyMarkAppearsOnce() started.
+◇ Test theFirstWriteOfAMarkWins() started.
+◇ Test pointerFillColourIgnoresTheDefaultWhiteAndBadValues() started.
+◇ Test nonFiniteTimesAreIgnoredAndEarlierThanKeyDownClampsToZero() started.
+◇ Test theLineCarriesNoFreeTextOnlyKnownTokens() started.
+◇ Test aNeverWrittenTraceIsEmpty() started.
+◇ Test theLineHasOffsetsInMillisecondsAndDashesForMissingMarks() started.
+◇ Test sleepOrADisplayChangeCancelsAHoldAndBlocksRestartUntilKeysAreUp() started.
+◇ Test sleepWakeAndDisplayChangesStopATurnInFlight() started.
+◇ Test theWatchdogDoesNothingWhenNoHoldIsActive() started.
+◇ Test aMissedReleaseIsCaughtWhenTheLiveKeysAreUp() started.
+◇ Test aHoldPastTheBoundEndsEvenWhenTheLiveKeysAreUnknown() started.
+◇ Test interruptingWithNoHoldReportsNothing() started.
+◇ Test sleepWakeAndDisplayChangesCancelAHoldWithoutARequest() started.
+◇ Test systemEventsWhileIdleDoNothing() started.
+◇ Test aTimedOutHoldProcessesTheTurnLikeARelease() started.
+◇ Test afterATimeoutANewHoldNeedsEveryKeyUpFirst() started.
+◇ Test aDotPicksTheControlUnderIt() started.
+◇ Test nonFinitePointsProduceNoBounds() started.
+◇ Test aRegionIsClippedToTheImageAndDroppedWhenOutside() started.
+◇ Test theCandidateListStaysBounded() started.
+◇ Test aLoopAroundSeveralControlsRanksTheTighterFitFirst() started.
+◇ Test evidenceForAnUnknownCandidateIsIgnored() started.
+◇ Test theResultIsBounded() started.
+◇ Test aStrokeOverEmptyScreenBecomesARegionCandidate() started.
+◇ Test aSecureFieldIsNeverATarget() started.
+◇ Test anUnderlinePicksTheControlItPassesThrough() started.
+◇ Test recognisesPointingWordsIgnoringCaseAndPunctuation() started.
+◇ Test splitsATranscriptIntoUntimedWords() started.
+◇ Test extraWordsReuseTheLastEvidence() started.
+◇ Test untimedWordsTakeEvidenceInOrder() started.
+◇ Test noPointingWordsMeansNothingToResolve() started.
+◇ Test guidanceIsStubbedButTheTransitionsExist() started.
+◇ Test nonFiniteEvidenceTimeIsIgnored() started.
+◇ Test timedWordsTakeTheNearestEvidenceInsideTheWindow() started.
+◇ Test aLoopAroundAControlPicksThatControl() started.
+◇ Test bargeInStopsOutputThenListens() started.
+◇ Test idleIgnoresStrayEvents() started.
+◇ Test spoilCancelsWithoutAnyRequest() started.
+◇ Test drawingIsASubstateOfTheHold() started.
+◇ Test lateCallbacksFromAnOldGenerationAreDropped() started.
+◇ Test escapeWhileHoldingCancelsAndEscapeWhileSpeakingInterrupts() started.
+◇ Test smoothingRoundsAGentleBend() started.
+◇ Test shortPathsAreReturnedAsIs() started.
+◇ Test smoothingKeepsEndpointsAndSharpCorners() started.
+◇ Test keyDownStartsListeningAndBumpsTheGeneration() started.
+◇ Test nonFinitePointsAreRejected() started.
+◇ Test failureAndPermissionLossStopEverythingWithAVisibleReason() started.
+◇ Test hoveringBeginsAStrokeAndExtendsIt() started.
+◇ Test memoryIsBounded() started.
+◇ Test aPauseThenMovementStartsANewStroke() started.
+◇ Test endStrokeMakesTheNextPointBeginANewOne() started.
+◇ Test turnAngleMeasuresDeviation() started.
+◇ Test restingInsideTwelvePointsForThreeHundredFiftyMillisecondsIsOneDwell() started.
+◇ Test releaseGoesToProcessingAndFinishesListening() started.
+◇ Test emptyTranscriptCancels() started.
+◇ Test nearDuplicateSamplesAreDropped() started.
+◇ Test samplesAreCappedAndTheLossIsCounted() started.
+◇ Test nonFiniteSamplesAreRejectedAndCounted() started.
+◇ Test sampleAtAudioOffsetFindsTheNearestInTime() started.
+◇ Test dwellCountIsBounded() started.
+◇ Test strokesCollectOnlyWhileOpenAndAreBounded() started.
+◇ Test wireV3AxisKindMustMatchTheGeometry() started.
+◇ Test anOverlappingShowMeKeyIsFlagged() started.
+◇ Test wireV3AxisIsRejectedOutsideTheVersionThreeProfileAndNumber() started.
+◇ Test wireV3AdmittedAxisSurvivesSceneValidationAndAReducerRoundTrip() started.
+◇ Test wireV3GeometryRoundTripsAndOmitsAnAbsentAxis() started.
+◇ Test downsamplingKeepsTheEndpoints() started.
+◇ Test wireV3PartialLinesNeverEmitAtAnyByteBoundary() started.
+◇ Test theChatShortcutSharingTheModifiersIsExplained() started.
+◇ Test wireV3AxisRangesAreChecked() started.
+◇ Test thePresetRemembersAndRestoresTheDictationKey() started.
+◇ Test wireV3LiveDataNeedsAnISOAsOfAndOtherSourcesForbidIt() started.
+◇ Test wireV3AcceptsAChartAxisOnAVersionThreeEvent() started.
+◇ Test wireV3AcceptsATruncatedBarAxisAndTimelineSpacings() started.
+◇ Test aDictationChordThatExtendsThePointingKeyWarnsAboutTheFlash() started.
+◇ Test wireV3NonFiniteChartValuesNeverPassValidation() started.
+◇ Test wireV3AxisIsRejectedOnGeometryThatIsNotAChart() started.
+◇ Test wireV3UnknownAndMissingAxisFieldsAreRejected() started.
+◇ Test wireV3DuplicateAxisKeysAreRejected() started.
+◇ Test wireV3ChartWithoutAnAxisStillDecodesUnderEveryProfile() started.
+◇ Test wireV3ResolverKeepsTheAxisAndStillHandsBackAVersionOneEvent() started.
+◇ Test wireV3ChatInstructionsStayUnchangedAndPointingInstructionsCarryTheAxisRules() started.
+◇ Test wireV3TargetIDStillWorksOnAVersionThreeOrTwoPointingEvent() started.
+◇ Test shippedDefaultsDoNotWarn() started.
+◇ Test theSameKeyAsTalkIsOneTurnNotAConflict() started.
+◇ Test theFnControlPresetIsAValidModifierChord() started.
+◇ Test theSameKeyAsDictationIsStillFlagged() started.
+◇ Test doubleControlOverlapsAControlOnlyTalkKey() started.
+◇ Test voiceOverIsMentionedOnlyWhileItIsOn() started.
+◇ Test nonFiniteReadsCountAsStale() started.
+◇ Test driftBeyondTwoPointsHidesTheMarkAndReResolves() started.
+◇ Test aMoveNotificationAloneIsEnough() started.
+◇ Test aDestroyedTargetAsksAndStaysGone() started.
+◇ Test doubleControlWarnsAboutMacOSDictation() started.
+◇ Test aResizeBeyondToleranceIsReportedAsResizedDrift() started.
+◇ Test mapsAccessibilityNotificationNames() started.
+◇ Test driftWithinTwoPointsIsStillFresh() started.
+◇ Test eventsWhileResolvingDoNotRestartTheLookup() started.
+◇ Test aFailedReResolveAsksInsteadOfGuessing() started.
+◇ Test cardAnchorIsEmptyWhenNothingWasPointedAt() started.
+◇ Test cardAnchorPrefersAdmittedMarksAndProtectsBothMarksAndCandidates() started.
+◇ Test cardAnchorProtectsThePointerTrailBoundingBoxAndTheInputArea() started.
+◇ Test cardAnchorIgnoresMarksThatAreNotOnTheCapture() started.
+◇ Test cardAnchorClampsARectangleThatSpillsOffTheCapturedImageNeverStretchingIt() started.
+◇ Test aFailedHealthProbeSkipsThePath() started.
+◇ Test cardAnchorUsesTheCandidateRectangleConvertedToGlobalPointsOnANegativeDisplay() started.
+◇ Test cardAnchorFallsBackToAPointerSquareWhenThereIsNoCapture() started.
+◇ Test aSuccessClearsTheFailureMark() started.
+◇ Test latencyKeepsNumbersOnly() started.
+◇ Test voiceOverBlocksControlOption() started.
+◇ Test settingTitlesMapAndUnknownFallsBackToAuto() started.
+◇ Test autoPrefersTheLowestMeasuredLatency() started.
+◇ Test anExplicitChoiceIsUsedAloneAndNeverSilentlyReplaced() started.
+◇ Test escapeWithoutAHoldInterruptsSpeech() started.
+◇ Test autoTakesTheFirstPathWithCredentials() started.
+◇ Test aConfiguredSingleKeyShortcutWorks() started.
+◇ Test aRecentFailureMovesAPathToTheEndUntilTheCooldownPasses() started.
+◇ Test twoQuickControlTapsAreDetectedButAChordIsNot() started.
+◇ Test chatHotkeySpaceSpoilsAndCancelsWithoutSubmit() started.
+◇ Test commandJoiningCancels() started.
+◇ Test releasingAChordKeyEndsTheHold() started.
+◇ Test aSlowControlPressIsNotATap() started.
+◇ Test eachAxisKeepsItsOwnDeliveredRatio() started.
+◇ Test holdStartsImmediately() started.
+◇ Test withoutCaptureTheContextHasNoImageGeometry() started.
+◇ Test contextDropsPointsOutsideTheImageInsteadOfClamping() started.
+◇ Test degenerateAndNonFiniteFramesAreRejected() started.
+◇ Test imageToGlobalToImageRoundTripsOnEveryDisplayMix() started.
+◇ Test displayLeftOfMainWithNegativeOriginAndOneXScale() started.
+◇ Test retinaDisplayDownscaledToTheDeliveredImage() started.
+◇ Test secureFieldsNeverCarryALabel() started.
+◇ Test aFrameOnAnotherDisplayIsNotClampedOntoThisOne() started.
+◇ Test candidateLabelsAreTruncatedToOneHundredTwentyEightBytes() started.
+◇ Test twoXDisplayDeliveredAtHalfTheBackingPixels() started.
+◇ Test aFramePartlyPastTheEdgeIsCutAtTheImageEdge() started.
+◇ Test displayAboveTheMainOne() started.
+◇ Test oneXDisplayWithANegativeOrigin() started.
+◇ Test displayAboveMain() started.
+◇ Test aMarkWithNoTargetAndNoNearbyEvidenceIsDroppedWithItsFollowUps() started.
+◇ Test twoXDisplayDeliveredAtFullBackingPixels() started.
+◇ Test geometryEditsToAPlacedObjectAreIgnoredButStyleEditsKeep() started.
+◇ Test v1HistoryRoundTripsWithoutATargetIDKey() started.
+◇ Test speechIsNeverChangedByResolution() started.
+◇ Test aTargetedRingAndLabelUseTheCandidateRectNotModelGeometry() started.
+◇ Test aTargetWithoutARectOrWithAnotherCaptureIsDropped() started.
+◇ Test targetIDIsRejectedOutsideAV2PointingTurn() started.
+◇ Test aPartialLineIsNeverRenderedAtAnyByteBoundary() started.
+◇ Test malformedV2NeverReachesTheStreamConsumer() started.
+◇ Test aTargetOnANonCaptureObjectIsRejected() started.
+◇ Test unknownFieldsAreStillRejectedInV2() started.
+◇ Test v1StillDecodesUnderBothProfiles() started.
+◇ Test v2TargetIDIsAcceptedOnlyWithAMatchingCandidate() started.
+◇ Test anthropicToolUseAndErrorEventsAreRejected() started.
+◇ Test anthropicTextDeltasAssembleIntoOneValidatedEvent() started.
+◇ Test contextBlockIsLabelledUntrustedAndKeepsCandidateTextAsData() started.
+◇ Test marksAreClampedToTheClipDuration() started.
+◇ Test anthropicUnknownEventTypesAreIgnored() started.
+◇ Test anthropicBytesMaySplitAnywhere() started.
+◇ Test anthropicTruncationMissingStopAndRefusalAreRejected() started.
+◇ Test splitterFindsObjectsWhateverTheFraming() started.
+◇ Test elevenLabsChunkDecodesAudioAndCharacterTimes() started.
+◇ Test wordMarksFollowCharacterTimesAndPassTheExistingValidator() started.
+◇ Test invalidTimingYieldsNoMarksRatherThanAnEstimate() started.
+◇ Test failuresAreClassifiedWithSpecificCopy() started.
+◇ Test pointingInstructionsHaveNoEmDashAndNameVersionThree() started.
+✔ Test everyMarkAppearsOnce() passed after 0.029 seconds.
+✔ Test theFirstWriteOfAMarkWins() passed after 0.034 seconds.
+✔ Test pointerFillColourIgnoresTheDefaultWhiteAndBadValues() passed after 0.036 seconds.
+✔ Test nonFiniteTimesAreIgnoredAndEarlierThanKeyDownClampsToZero() passed after 0.036 seconds.
+✔ Test aNeverWrittenTraceIsEmpty() passed after 0.036 seconds.
+✔ Test theLineHasOffsetsInMillisecondsAndDashesForMissingMarks() passed after 0.036 seconds.
+✔ Test theLineCarriesNoFreeTextOnlyKnownTokens() passed after 0.036 seconds.
+✔ Test sleepOrADisplayChangeCancelsAHoldAndBlocksRestartUntilKeysAreUp() passed after 0.036 seconds.
+✔ Test sleepWakeAndDisplayChangesStopATurnInFlight() passed after 0.037 seconds.
+✔ Test theWatchdogDoesNothingWhenNoHoldIsActive() passed after 0.037 seconds.
+✔ Test aMissedReleaseIsCaughtWhenTheLiveKeysAreUp() passed after 0.041 seconds.
+✔ Test aHoldPastTheBoundEndsEvenWhenTheLiveKeysAreUnknown() passed after 0.041 seconds.
+✔ Test aTimedOutHoldProcessesTheTurnLikeARelease() passed after 0.045 seconds.
+✔ Test sleepWakeAndDisplayChangesCancelAHoldWithoutARequest() passed after 0.045 seconds.
+✔ Test systemEventsWhileIdleDoNothing() passed after 0.045 seconds.
+✔ Test afterATimeoutANewHoldNeedsEveryKeyUpFirst() passed after 0.045 seconds.
+✔ Test interruptingWithNoHoldReportsNothing() passed after 0.045 seconds.
+✔ Test aDotPicksTheControlUnderIt() passed after 0.045 seconds.
+✔ Test aRegionIsClippedToTheImageAndDroppedWhenOutside() passed after 0.045 seconds.
+✔ Test theCandidateListStaysBounded() passed after 0.045 seconds.
+✔ Test nonFinitePointsProduceNoBounds() passed after 0.045 seconds.
+✔ Test aLoopAroundSeveralControlsRanksTheTighterFitFirst() passed after 0.045 seconds.
+✔ Test aStrokeOverEmptyScreenBecomesARegionCandidate() passed after 0.045 seconds.
+✔ Test evidenceForAnUnknownCandidateIsIgnored() passed after 0.045 seconds.
+✔ Test aSecureFieldIsNeverATarget() passed after 0.045 seconds.
+✔ Test anUnderlinePicksTheControlItPassesThrough() passed after 0.045 seconds.
+✔ Test recognisesPointingWordsIgnoringCaseAndPunctuation() passed after 0.045 seconds.
+✔ Test splitsATranscriptIntoUntimedWords() passed after 0.045 seconds.
+✔ Test extraWordsReuseTheLastEvidence() passed after 0.045 seconds.
+✔ Test theResultIsBounded() passed after 0.045 seconds.
+✔ Test noPointingWordsMeansNothingToResolve() passed after 0.045 seconds.
+✔ Test guidanceIsStubbedButTheTransitionsExist() passed after 0.045 seconds.
+✔ Test untimedWordsTakeEvidenceInOrder() passed after 0.045 seconds.
+✔ Test timedWordsTakeTheNearestEvidenceInsideTheWindow() passed after 0.045 seconds.
+✔ Test aLoopAroundAControlPicksThatControl() passed after 0.045 seconds.
+✔ Test bargeInStopsOutputThenListens() passed after 0.045 seconds.
+✔ Test nonFiniteEvidenceTimeIsIgnored() passed after 0.045 seconds.
+✔ Test idleIgnoresStrayEvents() passed after 0.045 seconds.
+✔ Test drawingIsASubstateOfTheHold() passed after 0.045 seconds.
+✔ Test lateCallbacksFromAnOldGenerationAreDropped() passed after 0.045 seconds.
+✔ Test spoilCancelsWithoutAnyRequest() passed after 0.045 seconds.
+✔ Test escapeWhileHoldingCancelsAndEscapeWhileSpeakingInterrupts() passed after 0.045 seconds.
+✔ Test keyDownStartsListeningAndBumpsTheGeneration() passed after 0.045 seconds.
+✔ Test nonFinitePointsAreRejected() passed after 0.045 seconds.
+✔ Test failureAndPermissionLossStopEverythingWithAVisibleReason() passed after 0.045 seconds.
+✔ Test shortPathsAreReturnedAsIs() passed after 0.045 seconds.
+✔ Test hoveringBeginsAStrokeAndExtendsIt() passed after 0.045 seconds.
+✔ Test aPauseThenMovementStartsANewStroke() passed after 0.045 seconds.
+✔ Test smoothingRoundsAGentleBend() passed after 0.045 seconds.
+✔ Test endStrokeMakesTheNextPointBeginANewOne() passed after 0.045 seconds.
+✔ Test turnAngleMeasuresDeviation() passed after 0.045 seconds.
+✔ Test memoryIsBounded() passed after 0.045 seconds.
+✔ Test releaseGoesToProcessingAndFinishesListening() passed after 0.045 seconds.
+✔ Test smoothingKeepsEndpointsAndSharpCorners() passed after 0.045 seconds.
+✔ Test nearDuplicateSamplesAreDropped() passed after 0.045 seconds.
+✔ Test emptyTranscriptCancels() passed after 0.045 seconds.
+✔ Test restingInsideTwelvePointsForThreeHundredFiftyMillisecondsIsOneDwell() passed after 0.045 seconds.
+✔ Test nonFiniteSamplesAreRejectedAndCounted() passed after 0.045 seconds.
+✔ Test strokesCollectOnlyWhileOpenAndAreBounded() passed after 0.045 seconds.
+✔ Test sampleAtAudioOffsetFindsTheNearestInTime() passed after 0.045 seconds.
+✔ Test dwellCountIsBounded() passed after 0.045 seconds.
+✔ Test anOverlappingShowMeKeyIsFlagged() passed after 0.045 seconds.
+✔ Test samplesAreCappedAndTheLossIsCounted() passed after 0.045 seconds.
+✔ Test wireV3AdmittedAxisSurvivesSceneValidationAndAReducerRoundTrip() passed after 0.045 seconds.
+✔ Test wireV3GeometryRoundTripsAndOmitsAnAbsentAxis() passed after 0.045 seconds.
+✔ Test downsamplingKeepsTheEndpoints() passed after 0.045 seconds.
+✔ Test theChatShortcutSharingTheModifiersIsExplained() passed after 0.045 seconds.
+✔ Test wireV3AxisIsRejectedOutsideTheVersionThreeProfileAndNumber() passed after 0.045 seconds.
+✔ Test wireV3AxisKindMustMatchTheGeometry() passed after 0.045 seconds.
+✔ Test thePresetRemembersAndRestoresTheDictationKey() passed after 0.045 seconds.
+✔ Test wireV3AcceptsAChartAxisOnAVersionThreeEvent() passed after 0.044 seconds.
+✔ Test wireV3AxisRangesAreChecked() passed after 0.045 seconds.
+✔ Test wireV3AcceptsATruncatedBarAxisAndTimelineSpacings() passed after 0.044 seconds.
+✔ Test aDictationChordThatExtendsThePointingKeyWarnsAboutTheFlash() passed after 0.044 seconds.
+✔ Test wireV3AxisIsRejectedOnGeometryThatIsNotAChart() passed after 0.044 seconds.
+✔ Test wireV3UnknownAndMissingAxisFieldsAreRejected() passed after 0.044 seconds.
+✔ Test wireV3LiveDataNeedsAnISOAsOfAndOtherSourcesForbidIt() passed after 0.045 seconds.
+✔ Test wireV3DuplicateAxisKeysAreRejected() passed after 0.045 seconds.
+✔ Test wireV3ResolverKeepsTheAxisAndStillHandsBackAVersionOneEvent() passed after 0.044 seconds.
+✔ Test wireV3ChatInstructionsStayUnchangedAndPointingInstructionsCarryTheAxisRules() passed after 0.044 seconds.
+✔ Test wireV3ChartWithoutAnAxisStillDecodesUnderEveryProfile() passed after 0.045 seconds.
+✔ Test shippedDefaultsDoNotWarn() passed after 0.044 seconds.
+✔ Test wireV3NonFiniteChartValuesNeverPassValidation() passed after 0.045 seconds.
+✔ Test theSameKeyAsTalkIsOneTurnNotAConflict() passed after 0.044 seconds.
+✔ Test theFnControlPresetIsAValidModifierChord() passed after 0.044 seconds.
+✔ Test theSameKeyAsDictationIsStillFlagged() passed after 0.044 seconds.
+✔ Test doubleControlOverlapsAControlOnlyTalkKey() passed after 0.044 seconds.
+✔ Test voiceOverIsMentionedOnlyWhileItIsOn() passed after 0.044 seconds.
+✔ Test nonFiniteReadsCountAsStale() passed after 0.044 seconds.
+✔ Test driftBeyondTwoPointsHidesTheMarkAndReResolves() passed after 0.044 seconds.
+✔ Test aMoveNotificationAloneIsEnough() passed after 0.044 seconds.
+✔ Test aDestroyedTargetAsksAndStaysGone() passed after 0.044 seconds.
+✔ Test doubleControlWarnsAboutMacOSDictation() passed after 0.045 seconds.
+✔ Test aResizeBeyondToleranceIsReportedAsResizedDrift() passed after 0.044 seconds.
+✔ Test mapsAccessibilityNotificationNames() passed after 0.044 seconds.
+✔ Test driftWithinTwoPointsIsStillFresh() passed after 0.044 seconds.
+✔ Test eventsWhileResolvingDoNotRestartTheLookup() passed after 0.044 seconds.
+✔ Test aFailedReResolveAsksInsteadOfGuessing() passed after 0.044 seconds.
+✔ Test cardAnchorIsEmptyWhenNothingWasPointedAt() passed after 0.044 seconds.
+✔ Test cardAnchorPrefersAdmittedMarksAndProtectsBothMarksAndCandidates() passed after 0.044 seconds.
+✔ Test cardAnchorProtectsThePointerTrailBoundingBoxAndTheInputArea() passed after 0.044 seconds.
+✔ Test cardAnchorIgnoresMarksThatAreNotOnTheCapture() passed after 0.044 seconds.
+✔ Test aFailedHealthProbeSkipsThePath() passed after 0.044 seconds.
+✔ Test cardAnchorClampsARectangleThatSpillsOffTheCapturedImageNeverStretchingIt() passed after 0.044 seconds.
+✔ Test cardAnchorFallsBackToAPointerSquareWhenThereIsNoCapture() passed after 0.044 seconds.
+✔ Test cardAnchorUsesTheCandidateRectangleConvertedToGlobalPointsOnANegativeDisplay() passed after 0.044 seconds.
+✔ Test aSuccessClearsTheFailureMark() passed after 0.044 seconds.
+✔ Test latencyKeepsNumbersOnly() passed after 0.044 seconds.
+✔ Test voiceOverBlocksControlOption() passed after 0.044 seconds.
+✔ Test settingTitlesMapAndUnknownFallsBackToAuto() passed after 0.044 seconds.
+✔ Test autoPrefersTheLowestMeasuredLatency() passed after 0.044 seconds.
+✔ Test escapeWithoutAHoldInterruptsSpeech() passed after 0.044 seconds.
+✔ Test anExplicitChoiceIsUsedAloneAndNeverSilentlyReplaced() passed after 0.044 seconds.
+✔ Test autoTakesTheFirstPathWithCredentials() passed after 0.044 seconds.
+✔ Test aConfiguredSingleKeyShortcutWorks() passed after 0.044 seconds.
+✔ Test wireV3TargetIDStillWorksOnAVersionThreeOrTwoPointingEvent() passed after 0.045 seconds.
+✔ Test twoQuickControlTapsAreDetectedButAChordIsNot() passed after 0.044 seconds.
+✔ Test aRecentFailureMovesAPathToTheEndUntilTheCooldownPasses() passed after 0.044 seconds.
+✔ Test commandJ✔ Test aPartialLineIsNeverRenderedAtAnyByteBoundary() passed after 0.053 seconds.
+✔ Suite "Explanation protocol v2 (pointing targetID) and the scene resolver" passed after 0.059 seconds.
+✔ Test run with 166 tests in 17 suites passed after 0.060 seconds.

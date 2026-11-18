@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -308,6 +309,106 @@ def swift_log_complete(log):
     """
     summaries = re.findall(r"Test run with (\d+) tests? in ", log)
     return len(summaries) == 1 and len(SWIFT_OUTCOME_LINE.findall(log)) == int(summaries[0])
+
+
+def swift_testing_xunit_path(requested):
+    """`swift test --xunit-output results.xml` writes Swift Testing cases beside it."""
+    requested = Path(requested)
+    return requested.with_name(f"{requested.stem}-swift-testing{requested.suffix}")
+
+
+XUNIT_MAX_BYTES = 32 * 1024 * 1024
+
+
+def read_swift_testing_xunit(path, limit=XUNIT_MAX_BYTES):
+    """Read at most `limit` bytes. A larger file is rejected before the rest is loaded."""
+    path = Path(path)
+    require(path.is_file() and not path.is_symlink(), "Swift Testing xUnit is missing or redirected")
+    require(path.stat().st_size <= limit, "Swift Testing xUnit exceeds 32 MiB")
+    with path.open("rb") as handle:
+        data = handle.read(limit + 1)
+    require(len(data) <= limit, "Swift Testing xUnit exceeds 32 MiB")
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        raise Invalid("Swift Testing xUnit is not UTF-8")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise Invalid(f"Swift Testing xUnit is not UTF-8: {error}") from error
+
+
+def _xunit_integer(element, attr, required):
+    raw = element.get(attr)
+    if raw is None:
+        require(not required, f"Swift Testing xUnit {element.tag} {attr} is missing")
+        return None
+    require(re.fullmatch(r"[0-9]+", raw) is not None,
+            f"Swift Testing xUnit {element.tag} {attr} is not an integer")
+    return int(raw)
+
+
+def _xunit_zero(element, attr, required):
+    value = _xunit_integer(element, attr, required)
+    if value is not None:
+        require(value == 0, f"Swift Testing xUnit {element.tag} {attr} is {value}")
+
+
+def swift_structured_results(text, returncode, log=""):
+    """Per-test Swift Testing xUnit. Identity comes from each testcase, not the summary line.
+
+    The process exit code and the text log are separate signals. Either one can
+    reject a document whose testcases look clean.
+    """
+    require(type(returncode) is int and returncode == 0, f"command exited {returncode}")
+    require(not re.search(r"(?:✘|Test run .* failed|[1-9]\d* failures?)", log),
+            "failure diagnostic in otherwise passing log")
+    encoded = text.encode("utf-8")
+    require(len(encoded) <= XUNIT_MAX_BYTES, "Swift Testing xUnit exceeds 32 MiB")
+    require(not re.search(r"<!DOCTYPE|<!ENTITY", text, re.IGNORECASE),
+            "Swift Testing xUnit contains a doctype or entity")
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as error:
+        raise Invalid(f"Swift Testing xUnit is not XML: {error}") from error
+    declared_total = None
+    if root.tag == "testsuites":
+        for attr in ("failures", "errors", "skipped"):
+            _xunit_zero(root, attr, required=False)
+        declared_total = _xunit_integer(root, "tests", required=False)
+    for suite in root.iter("testsuite"):
+        for attr in ("failures", "errors", "skipped"):
+            _xunit_zero(suite, attr, required=True)
+        direct = sum(1 for child in suite if child.tag == "testcase")
+        declared = _xunit_integer(suite, "tests", required=True)
+        require(declared == direct, f"Swift Testing xUnit testsuite tests is {declared}, not {direct}")
+    declared_sum = 0
+    for suite in root.iter("testsuite"):
+        declared_sum += _xunit_integer(suite, "tests", required=True)
+    def parent_is_suite(element, parent):
+        if element.tag == "testcase":
+            require(parent is not None and parent.tag == "testsuite",
+                    "Swift Testing xUnit testcase is not inside a testsuite")
+        for child in element:
+            parent_is_suite(child, element)
+    parent_is_suite(root, None)
+    cases = list(root.iter("testcase"))
+    require(cases, "Swift Testing xUnit has no test cases")
+    require(declared_sum == len(cases),
+            f"Swift Testing xUnit suite totals are {declared_sum}, not {len(cases)}")
+    failed = []
+    functions = []
+    for case in cases:
+        name = case.get("name") or ""
+        match = re.match(r"([A-Za-z_][A-Za-z_0-9]*)\(", name)
+        require(match, "Swift Testing xUnit testcase has no function name")
+        if any(child.tag in {"failure", "error", "skipped"} for child in case):
+            failed.append(match.group(1))
+        functions.append(match.group(1))
+    require(not failed, "Swift Testing xUnit has a failed or skipped test: " + ", ".join(sorted(set(failed))))
+    if declared_total is not None:
+        require(declared_total == len(cases), f"Swift Testing xUnit testsuites tests is {declared_total}, not {len(cases)}")
+    suite_count = sum(1 for suite in root.iter("testsuite") if any(child.tag == "testcase" for child in suite))
+    require(suite_count > 0, "Swift Testing xUnit has no test suite")
+    return len(cases), suite_count, sorted(set(functions))
 
 
 def manifest_matches(actual_root, expected_root):
