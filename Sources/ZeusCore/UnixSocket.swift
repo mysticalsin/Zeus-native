@@ -244,12 +244,25 @@ public final class UnixSocketServer: @unchecked Sendable {
         try lock.withLock {
             guard listener == nil else { throw POSIXError(.EALREADY) }
             guard var address = UnixSocket.address(for: path) else { throw POSIXError(.ENAMETOOLONG) }
-            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            let directory = (path as NSString).deletingLastPathComponent
+            try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            // Open the directory itself. O_NOFOLLOW refuses a symlink planted in place of the support folder.
+            let directoryFD = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+            guard directoryFD >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            defer { close(directoryFD) }
+            guard fchmod(directoryFD, 0o700) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            var directoryInfo = stat()
+            guard lstat(directory, &directoryInfo) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            let directoryType = directoryInfo.st_mode & mode_t(S_IFMT)
+            guard directoryType == mode_t(S_IFDIR), directoryInfo.st_uid == geteuid(),
+                  (directoryInfo.st_mode & mode_t(0o777)) == mode_t(0o700) else { throw POSIXError(.EPERM) }
             var existing = stat()
             if lstat(path, &existing) == 0 {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }
                 guard unlink(path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             } else if errno != ENOENT { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            let previousMask = umask(0o177)
+            defer { _ = umask(previousMask) }
             let fd = UnixSocket.makeSocket()
             guard fd >= 0 else { throw POSIXError(.EIO) }
             var started = false
@@ -259,7 +272,8 @@ public final class UnixSocketServer: @unchecked Sendable {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
             }
             guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            guard chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
+            // Mode comes from the umask above and from this descriptor. Never chmod the path after bind.
+            guard fchmod(fd, 0o600) == 0, listen(fd, 16) == 0 else {
                 unlink(path)
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
