@@ -5,7 +5,13 @@ import Foundation
 public struct LyricLine: Equatable, Codable, Sendable {
     public var time: Double
     public var text: String
-    public init(time: Double, text: String) { self.time = time; self.text = text }
+    /// Per-word times from the lyric file, when it has them. Nil means the line only has a start time.
+    public var wordStamps: [LyricWord]?
+    public init(time: Double, text: String, wordStamps: [LyricWord]? = nil) {
+        self.time = time
+        self.text = text
+        self.wordStamps = wordStamps
+    }
 }
 
 /// What LRCLIB knew about a track.
@@ -34,12 +40,52 @@ public enum LRC {
                     offset = ms / 1000
                 } // other metadata tags (ar, ti, al, by...) are ignored
             }
+            let stampsOnWords = wordStamps(in: rest)
             let words = LyricsLimits.clipped(strippingWordTags(rest).trimmingCharacters(in: .whitespaces))
-            for time in stamps where lines.count < LyricsLimits.maxLines { lines.append(LyricLine(time: time, text: words)) }
+            for time in stamps where lines.count < LyricsLimits.maxLines {
+                lines.append(LyricLine(time: time, text: words, wordStamps: stampsOnWords))
+            }
         }
         // A positive offset makes the lyrics appear sooner.
-        let shifted = lines.map { LyricLine(time: max(0, $0.time - offset), text: $0.text) }
+        let shifted = lines.map { line in
+            let time = max(0, line.time - offset)
+            let stamps = line.wordStamps?.map { word in
+                LyricWord(text: word.text, start: max(0, word.start - offset), end: max(0, word.end - offset))
+            }
+            return LyricLine(time: time, text: line.text, wordStamps: stamps)
+        }
         return shifted.enumerated().sorted { ($0.element.time, $0.offset) < ($1.element.time, $1.offset) }.map(\.element)
+    }
+
+    /// Word start times from inline `<mm:ss.xx>` tags. Nil when the line has none. The last word's end is its start
+    /// until the line end is known.
+    static func wordStamps(in text: Substring) -> [LyricWord]? {
+        var words: [LyricWord] = []
+        var rest = text
+        var start: Double?
+        var body = ""
+        func flush() {
+            guard let start else { return }
+            if !body.isEmpty { words.append(LyricWord(text: body, start: start, end: start)) }
+            body = ""
+        }
+        while let open = rest.firstIndex(of: "<") {
+            body += rest[..<open]
+            let inside = rest.index(after: open)
+            let window = rest[inside...].prefix(LyricsLimits.maxWordTagCharacters + 1)
+            if let close = window.firstIndex(of: ">"), let seconds = stamp(String(window[..<close])) {
+                flush()
+                if let previous = words.indices.last { words[previous].end = seconds }
+                start = seconds
+                rest = rest[rest.index(after: close)...]
+            } else {
+                body.append("<")
+                rest = rest[inside...]
+            }
+        }
+        body += rest
+        flush()
+        return words.isEmpty ? nil : words
     }
 
     /// Drops inline word tags (`<mm:ss.xx>`, as in enhanced `.lrc` files) so they never show as text.

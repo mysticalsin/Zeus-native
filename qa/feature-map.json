@@ -763,6 +763,14 @@
       "scope": "Actual NowPlayingHub and TopBarModel with recording closures for every effect: no player, browser, Apple Event, artwork fetch or permission, and no device acceptance."
     },
     {
+      "id": "native-LyricTimingWiringTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "LyricTimingWiringTests",
+      "file": "Tests/ZeusAppTests/LyricTimingWiringTests.swift",
+      "scope": "The function the lyric view calls, fed a stamped line and a plain line. No network and no lyric file."
+    },
+    {
       "id": "native-OutputDeviceIconTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8025,6 +8033,17 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.lyric-word-times",
+          "check": "native-LyricTimingWiringTests",
+          "acceptance": "The lyric view's timing function keeps per-word times when the line has them and splits a plain line into equal slices.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/LyricTimingWiringTests.swift",
+              "function": "theLyricViewUsesStampedWordsWhenTheLineHasThem"
             }
           ]
         },

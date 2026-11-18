@@ -176,7 +176,9 @@ import Testing
 
     @Test func inlineWordTagsAreStrippedFromTheText() {
         let lines = LRC.parse("[00:12.00]<00:12.00>Hello <00:12.50>world")
-        #expect(lines == [LyricLine(time: 12, text: "Hello world")])
+        #expect(lines.map(\.time) == [12])
+        #expect(lines.map(\.text) == ["Hello world"])
+        #expect(lines.first?.wordStamps?.map(\.start) == [12, 12.5])
     }
 
     @Test func aTrailingTagAndSeveralLinesAreHandled() {
