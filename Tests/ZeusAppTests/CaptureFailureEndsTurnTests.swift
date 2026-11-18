@@ -117,11 +117,22 @@ struct CaptureFailureEndsTurnTests {
         #expect(controller.talkSessionForTesting == nil)
     }
 
-    @Test func aPressWhileAlreadyListeningNeitherRestartsTheTurnNorDropsItsHandler() {
+    /// A key press during a live turn (a hands-free or wake turn) still cuts in and restarts the capture.
+    @Test func aPressDuringALiveTurnStillCutsInWithAHandler() {
         let mic = Mic()
         let (controller, _) = talk(mic)
         #expect(controller.press())
-        // A second start that would throw must never reach the live turn's handler or session.
+        #expect(controller.press())
+        #expect(mic.starts == 2)
+        #expect(controller.isListeningForTesting)
+        #expect(controller.captureHandlerInstalledForTesting)
+    }
+
+    /// A cut-in whose start throws leaves the live turn running with its handler and session.
+    @Test func aFailedCutInKeepsTheLiveTurnsHandlerAndSession() {
+        let mic = Mic()
+        let (controller, _) = talk(mic)
+        #expect(controller.press())
         mic.failsToStart = true
         #expect(!controller.press())
         #expect(mic.starts == 1)

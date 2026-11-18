@@ -5721,7 +5721,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
-              "function": "aPressWhileAlreadyListeningNeitherRestartsTheTurnNorDropsItsHandler"
+              "function": "aFailedCutInKeepsTheLiveTurnsHandlerAndSession"
             },
             {
               "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
@@ -5774,6 +5774,10 @@
             {
               "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
               "function": "aStaleFailureLeavesTheCurrentDictationRunning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureFailureEndsTurnTests.swift",
+              "function": "aPressDuringALiveTurnStillCutsInWithAHandler"
             }
           ]
         },

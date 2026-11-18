@@ -207,9 +207,7 @@ final class VoiceTurnController {
 
     @discardableResult
     func press() -> Bool {
-        // A press while a turn is live (`zeus listen`, a second key) must not start a second capture:
-        // a failed start would strip the live turn of its capture-failure handler and session.
-        guard !listening else { return false }
+        // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
@@ -242,7 +240,8 @@ final class VoiceTurnController {
         do {
             talkSession = try seams.speechStart(speech)
         } catch {
-            speech.onCaptureFailure = nil
+            // A start throws before it touches a running capture, so a live turn keeps its handler and session.
+            if !listening { speech.onCaptureFailure = nil }
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
