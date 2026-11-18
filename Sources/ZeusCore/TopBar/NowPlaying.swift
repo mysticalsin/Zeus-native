@@ -167,14 +167,47 @@ public struct NowPlaying: Equatable, Sendable {
 public enum MeetingLink {
     private static let hosts = ["zoom.us", "meet.google.com", "teams.microsoft.com", "teams.live.com", "webex.com", "whereby.com", "around.co"]
 
+    /// How many wrapper layers (Safe Links, Google redirect) are peeled before giving up.
+    private static let wrapperDepthLimit = 2
+
+    private static func matches(_ host: String, _ domain: String) -> Bool { host == domain || host.hasSuffix("." + domain) }
+
+    private static func isMeetingHost(_ host: String) -> Bool { hosts.contains { matches(host, $0) } }
+
+    /// The real URL behind a Safe Links or Google redirect wrapper; nil when `url` is not a wrapper.
+    private static func unwrapped(_ url: URL) -> URL? {
+        guard let host = url.host?.lowercased(), let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return nil }
+        let keys: [String]
+        if matches(host, "safelinks.protection.outlook.com") {
+            keys = ["url"]
+        } else if matches(host, "google.com"), url.path == "/url" {
+            keys = ["q", "url"]
+        } else {
+            return nil
+        }
+        for key in keys {
+            if let value = items.first(where: { $0.name == key })?.value, let inner = URL(string: value), inner.host != nil { return inner }
+        }
+        return nil
+    }
+
+    /// The meeting URL for `url`: itself when its host is allowed, else the unwrapped inner URL (a couple of levels at most).
+    private static func meetingURL(_ url: URL) -> URL? {
+        var current = url
+        for _ in 0...wrapperDepthLimit {
+            if let host = current.host?.lowercased(), isMeetingHost(host) { return current }
+            guard let inner = unwrapped(current) else { return nil }
+            current = inner
+        }
+        return nil
+    }
+
     public static func find(in texts: [String?]) -> URL? {
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }
         for text in texts.compactMap({ $0 }) {
             let matches = detector.matches(in: text, range: NSRange(text.startIndex..., in: text))
             for match in matches {
-                if let url = match.url, let host = url.host?.lowercased(), hosts.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
-                    return url
-                }
+                if let url = match.url, let meeting = meetingURL(url) { return meeting }
             }
         }
         return nil

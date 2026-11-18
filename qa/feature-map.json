@@ -1907,6 +1907,49 @@
           "acceptance": "Automated disposable calendar permission denial/grant, display changes, focus restoration and one-tap launch trace.",
           "cases": [],
           "id": "F04.3"
+        },
+        {
+          "check": "native-ZeusCoreTests",
+          "id": "F04.wrapped-meeting-links",
+          "acceptance": "A meeting link wrapped by Microsoft Safe Links or a Google redirect is unwrapped to the real Teams, Zoom or Meet link, so the calendar slot counts as a call and the call app is read from the real host; a wrapper around a non-meeting URL, a look-alike host or a wrapper loop is not a meeting link.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "safeLinksTeamsMeetupJoinIsUnwrapped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "safeLinksTeamsMeetFormIsUnwrapped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "safeLinksZoomIsUnwrapped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "googleRedirectMeetIsUnwrapped"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "wrapperAroundANonMeetingUrlIsNotAMeetingLink"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "aDirectLinkIsStillFoundUnchanged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "aWrappedLinkInsideNotesWithProseIsFound"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "aWrapperLoopIsGivenUpOn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingLinkUnwrapTests.swift",
+              "function": "callAppFollowsTheUnwrappedLink"
+            }
+          ]
         }
       ]
     },
