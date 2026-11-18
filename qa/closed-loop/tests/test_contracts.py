@@ -214,6 +214,44 @@ class EvidenceContractTests(unittest.TestCase):
             c.case_passed({"file": "Tests/ZeusCoreTests/PointingOverlayGeometryTests.swift", "function": "oneXDisplayWithANegativeOrigin"}, check, Path("/unused"))
         self.assertIn("required case did not run: oneXDisplayWithANegativeOrigin", str(caught.exception))
 
+    def test_structured_results_reject_unsafe_xml_and_nonzero_signals(self):
+        passing = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="TestResults" errors="0" tests="1" failures="0" skipped="0" time="0.001">
+    <testcase classname="S" name="holdStartsImmediately()" time="0.001" />
+  </testsuite>
+</testsuites>
+"""
+        clean_log = "✔ Test holdStartsImmediately() passed after 0.001 seconds.\n"
+        count, suites, functions = c.swift_structured_results(passing, 0, clean_log)
+        self.assertEqual((count, suites, functions), (1, 1, ["holdStartsImmediately"]))
+        rejected = {
+            "empty": ("", 0, ""),
+            "truncated": ("<testsuites><testsuite>", 0, ""),
+            "doctype": ('<!DOCTYPE testsuites [<!ENTITY x "holdStartsImmediately">]>'
+                        '<testsuites><testsuite name="T" tests="1" failures="0" errors="0" skipped="0">'
+                        '<testcase name="&x;()" classname="S" time="0.001"/></testsuite></testsuites>', 0, ""),
+            "entity": (passing.replace(
+                "<testcase",
+                "<!ENTITY x \"a\"><testcase",
+            ), 0, ""),
+            "duplicate pass and fail": (passing.replace(
+                "</testsuite>",
+                '<testcase classname="S" name="holdStartsImmediately()" time="0.001"><failure message="no">x</failure></testcase></testsuite>',
+            ), 0, ""),
+            "nonzero exit": (passing, 1, clean_log),
+            "failure diagnostic": (passing, 0, clean_log + "✘ Test bad() failed\n"),
+            "nonzero failures": (passing.replace('failures="0"', 'failures="1"'), 0, clean_log),
+            "nonzero errors": (passing.replace('errors="0"', 'errors="2"'), 0, clean_log),
+            "nonzero skipped": (passing.replace('skipped="0"', 'skipped="1"'), 0, clean_log),
+            "non-integer failures": (passing.replace('failures="0"', 'failures="no"'), 0, clean_log),
+            "oversized": (passing + "<!--" + ("x" * (32 * 1024 * 1024)) + "-->", 0, clean_log),
+        }
+        for name, (text, code, log) in rejected.items():
+            with self.subTest(name):
+                with self.assertRaises(c.Invalid):
+                    c.swift_structured_results(text, code, log)
+
     def test_python_skips_and_zero_cases_do_not_pass(self):
         passed = "test_one (Suite.test_one) ... ok\nRan 1 test in 0.1s\nOK\n"
         self.assertEqual(runner.python_summary(passed, 0), (1, 1, ["test_one"]))
