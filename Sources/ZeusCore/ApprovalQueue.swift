@@ -61,7 +61,7 @@ public struct ApprovalQueueState: Equatable, Sendable {
 public actor ApprovalGate {
     public static let shared = ApprovalGate()
     private var state = ApprovalQueueState()
-    private var waiters: [String: CheckedContinuation<Void, Never>] = []
+    private var waiters: [String: CheckedContinuation<Void, Never>] = [:]
 
     public init() {}
 
@@ -188,10 +188,11 @@ public struct ApprovalAudit: Equatable, Sendable {
     }
 }
 
-public enum ApprovalAuditLog {
-    public static var entries: [String] = []
+public actor ApprovalAuditLog {
+    public static let shared = ApprovalAuditLog()
+    public private(set) var entries: [String] = []
 
-    public static func recordTrustedApproval(session: String, command: String) {
+    public func recordTrustedApproval(session: String, command: String) {
         entries.append("trusted approval \(session): \(command)")
     }
 }

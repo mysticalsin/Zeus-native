@@ -293,7 +293,9 @@ final class NotchController {
             if let onTrust = trust?.onTrust, let session = trust?.session {
                 trustChat = {
                     guard ApprovalPolicy.canApprove(risk: risk, by: .trustChat) else { return }
-                    ApprovalAuditLog.recordTrustedApproval(session: session, command: command)
+                    let trustedSession = session
+                    let trustedCommand = command
+                    Task { await ApprovalAuditLog.shared.recordTrustedApproval(session: trustedSession, command: trustedCommand) }
                     onTrust()
                     finish(.allow)
                 }
