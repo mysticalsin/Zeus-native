@@ -15,13 +15,43 @@ struct OpenAISpeechRetirementTests {
     }
 
     @Test func deprecatedSpeechModelsAreRetiredFromTheShutdownInstant() {
-        let models = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15",
-                      "tts-1-hd-2030-01-01", "gpt-4o-mini-tts-2026-06-01"]
+        let models = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15"]
         for model in models {
             #expect(!OpenAISpeechRetirement.isRetired(model: model, at: before), "\(model) still works before")
             #expect(OpenAISpeechRetirement.isRetired(model: model, at: at), "\(model) retired at the instant")
             #expect(OpenAISpeechRetirement.isRetired(model: model, at: after), "\(model) retired after")
         }
+    }
+
+    @Test func onlyTheFiveListedIdsAreRetiredNotPrefixes() {
+        for model in ["gpt-4o-mini-tts-2026-06-01", "tts-1-hd-2030-01-01", "tts-12", "gpt-4o-mini-tts2"] {
+            #expect(!OpenAISpeechRetirement.isRetired(model: model, at: after), "\(model) is not on the list")
+            #expect(OpenAISpeechRetirement.settingsNote(model: model, at: before) == nil)
+        }
+    }
+
+    @Test func onlyTheOpenAIHostIsRetiredACustomBaseURLKeepsWorking() {
+        let ours = [nil, "", "https://api.openai.com/v1", "HTTPS://API.OPENAI.COM/v1"]
+        for base in ours {
+            #expect(OpenAISpeechRetirement.isRetired(model: "tts-1", baseURL: base, at: after), "\(base ?? "default")")
+            #expect(OpenAISpeechRetirement.settingsNote(model: "tts-1", baseURL: base, at: before) == OpenAISpeechRetirement.upcomingNote)
+        }
+        for base in ["http://localhost:8000/v1", "https://tts.example.com/v1", "not a url"] {
+            #expect(!OpenAISpeechRetirement.isRetired(model: "tts-1", baseURL: base, at: after), base)
+            #expect(OpenAISpeechRetirement.settingsNote(model: "tts-1", baseURL: base, at: before) == nil)
+            #expect(OpenAISpeechRetirement.settingsNote(model: "tts-1", baseURL: base, at: after) == nil)
+            #expect(OpenAIVoiceCatalog.voices(forModel: "tts-1", baseURL: base, at: after).count == 9)
+        }
+        #expect(OpenAIVoiceCatalog.voices(forModel: "tts-1", baseURL: nil, at: after).isEmpty)
+    }
+
+    @Test func aSavedOpenAIChoiceAfterShutdownShowsTheFallbackEngine() {
+        let line = OpenAISpeechRetirement.endedChoiceLine(choice: .fixed(.openAI), retired: true, effective: "Kokoro")
+        #expect(line == "OpenAI voices ended. Zeus uses Kokoro.")
+        #expect(OpenAISpeechRetirement.endedChoiceLine(choice: .fixed(.openAI), retired: false, effective: "Kokoro") == nil)
+        #expect(OpenAISpeechRetirement.endedChoiceLine(choice: .auto, retired: true, effective: "Kokoro") == nil)
+        #expect(OpenAISpeechRetirement.endedChoiceLine(choice: .fixed(.elevenLabs), retired: true, effective: "Kokoro") == nil)
+        #expect(!(line ?? "").contains("\u{2014}"))
     }
 
     @Test func otherModelsAreNeverRetiredByThisPolicy() {
