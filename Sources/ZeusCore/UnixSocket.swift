@@ -221,6 +221,8 @@ public final class UnixSocketServer: @unchecked Sendable {
     private var connections: [UUID: Connection] = [:]
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
+    /// `umask` is process-wide. One bind at a time, and the previous mask is restored before the lock is released.
+    private static let bindLock = NSLock()
 
     public init(path: String, peerPolicy: PeerPolicy = .sameUser, peerVerifier: @escaping PeerVerifier = PeerSigning.defaultVerifier,
                 handler: @escaping Handler) {
@@ -250,7 +252,9 @@ public final class UnixSocketServer: @unchecked Sendable {
             let directoryFD = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
             guard directoryFD >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             defer { close(directoryFD) }
-            guard fchmod(directoryFD, 0o700) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            if fchmod(directoryFD, 0o700) != 0, fchmodat(directoryFD, ".", 0o700, 0) != 0 {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
             var directoryInfo = stat()
             guard lstat(directory, &directoryInfo) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             let directoryType = directoryInfo.st_mode & mode_t(S_IFMT)
@@ -261,19 +265,30 @@ public final class UnixSocketServer: @unchecked Sendable {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }
                 guard unlink(path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             } else if errno != ENOENT { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            let previousMask = umask(0o177)
-            defer { _ = umask(previousMask) }
             let fd = UnixSocket.makeSocket()
             guard fd >= 0 else { throw POSIXError(.EIO) }
             var started = false
             defer { if !started { close(fd) } }
             guard UnixSocket.prepare(fd) else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            // The listener mode is the umask at bind. macOS returns EINVAL from fchmod on a socket descriptor,
+            // so a 0600 result from fstat is the mode check. The path is never chmod'd after bind.
+            Self.bindLock.lock()
+            let previousMask = umask(0o177)
             let bound = withUnsafePointer(to: &address) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
             }
-            guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            // Mode comes from the umask above and from this descriptor. Never chmod the path after bind.
-            guard fchmod(fd, 0o600) == 0, listen(fd, 16) == 0 else {
+            let bindError = errno
+            _ = umask(previousMask)
+            Self.bindLock.unlock()
+            guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: bindError) ?? .EIO) }
+            if fchmod(fd, 0o600) != 0 {
+                var modeInfo = stat()
+                guard fstat(fd, &modeInfo) == 0, (modeInfo.st_mode & mode_t(0o777)) == mode_t(0o600) else {
+                    unlink(path)
+                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                }
+            }
+            guard listen(fd, 16) == 0 else {
                 unlink(path)
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
