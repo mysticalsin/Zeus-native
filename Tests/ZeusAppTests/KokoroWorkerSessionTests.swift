@@ -597,9 +597,7 @@ struct KokoroWorkerSessionTests {
         enum Failure: Error { case afterSpawn }
         private let lock = NSLock()
         private let gate = DispatchSemaphore(value: 0)
-        private let enteredSignal = DispatchSemaphore(value: 0)
         private var didEnter = false
-        private var didSignalEntered = false
         private var didLeave = false
         private var runCalls = 0
         private var launchedPID: Int32?
@@ -616,24 +614,18 @@ struct KokoroWorkerSessionTests {
         var skipped: Bool { lock.withLock { events.contains(.skipped) } }
 
         func hold(limit: TimeInterval = 1) {
-            let signal = lock.withLock { () -> Bool in
-                let first = !didEnter
-                didEnter = true
-                if first && !didSignalEntered {
-                    didSignalEntered = true
-                    return true
-                }
-                return false
-            }
-            if signal { enteredSignal.signal() }
+            lock.withLock { didEnter = true }
             _ = gate.wait(timeout: .now() + limit)
             lock.withLock { didLeave = true }
         }
-        /// Blocks on the entry signal. The shared `wait` helper polls for 2s and
-        /// reports a miss when the deadline rejects the launch before `run`.
-        func waitUntilEntered(seconds: TimeInterval = 10) -> Bool {
-            if entered { return true }
-            return enteredSignal.wait(timeout: .now() + seconds) == .success
+        /// Polls like `wait(for:)`. A semaphore wait here would occupy the
+        /// cooperative thread and keep configuration from entering.
+        func waitUntilEntered(seconds: TimeInterval = 10) async -> Bool {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+            while !entered, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+            return entered
         }
         func release() { gate.signal() }
         func observe(_ event: KokoroWorkerSession.LaunchPhase) {
@@ -670,7 +662,7 @@ struct KokoroWorkerSessionTests {
         }
         // The failing tests call this from the async test. A semaphore wait
         // occupies the cooperative thread, so this detached configuration never enters.
-        let entered = probe.waitUntilEntered(seconds: 1)
+        let entered = await probe.waitUntilEntered(seconds: 1)
         #expect(entered)
         #expect(started.duration(to: .now) < .milliseconds(500))
         probe.release()
@@ -692,7 +684,7 @@ struct KokoroWorkerSessionTests {
                 return launch
             }, launchQueue: queue, launchProcess: { try probe.run($0, held: true, holdLimit: 30) })
             let request = fixture.render(session, "slow-config")
-            try #require(probe.waitUntilEntered())
+            try #require(await probe.waitUntilEntered())
             #expect(await request.value == nil)
             #expect(!probe.leftGate)
             probe.release()
@@ -710,7 +702,7 @@ struct KokoroWorkerSessionTests {
             let session = fixture.session(timeout: 5, configuration: { launch }, launchQueue: queue,
                                           launchProcess: { try probe.run($0, held: true, holdLimit: 30) })
             let request = fixture.render(session, "deadline")
-            try #require(probe.waitUntilEntered())
+            try #require(await probe.waitUntilEntered())
             #expect(await request.value == nil)
             #expect(!probe.leftGate)
             #expect(await session.render("replacement", voice: "synthetic", speed: 1) == nil)
@@ -733,7 +725,7 @@ struct KokoroWorkerSessionTests {
             let session = fixture.session(timeout: 30, configuration: { launch }, launchQueue: queue,
                                           launchProcess: { try probe.run($0, held: true, holdLimit: 30) })
             let request = fixture.render(session, "cancel")
-            try #require(probe.waitUntilEntered())
+            try #require(await probe.waitUntilEntered())
             request.cancel()
             #expect(await request.value == nil)
             #expect(!probe.leftGate)
