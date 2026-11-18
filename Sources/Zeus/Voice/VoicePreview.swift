@@ -24,11 +24,15 @@ final class VoicePreviewModel {
 
     func isActive(_ provider: VoiceTTSProvider, _ voice: String) -> Bool { activeID == Self.id(provider, voice) }
 
-    func toggle(_ provider: VoiceTTSProvider, voice: String) {
+    func toggle(_ provider: VoiceTTSProvider, voice: String, now: Date = Date()) {
         let id = Self.id(provider, voice)
         let wasActive = activeID == id
         stop()
         if wasActive { return }
+        if provider == .openAICompatible, OpenAITTSVoice.isRetired(now: now) {
+            message = OpenAISpeechRetirement.endedNote
+            return
+        }
         let env = ProcessInfo.processInfo.environment
         let audibleOK = (env["AUDIBLE-OK"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if env["ZEUS_SILENT_TESTS"] == "1" || audibleOK == "0" || audibleOK == "false" {

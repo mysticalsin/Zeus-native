@@ -150,12 +150,15 @@ final class VoiceSettings {
         }
     }
 
-    func ttsAvailability(elevenLabsPaused: Bool) -> VoiceProviderFallback.Availability {
+    /// OpenAI speech has shut down for the configured model (`OpenAISpeechRetirement`). A saved key and choice stay.
+    func openAIRetired(now: Date = Date()) -> Bool { OpenAISpeechRetirement.isRetired(model: openAIModel, at: now) }
+
+    func ttsAvailability(elevenLabsPaused: Bool, now: Date = Date()) -> VoiceProviderFallback.Availability {
         VoiceProviderFallback.Availability(
             kokoroReady: kokoroReady,
             chatterboxReady: ChatterboxVoice.isReady,
             elevenLabsConfigured: elevenKeySaved && !elevenLabsPaused,
-            openAIConfigured: openAIKeySaved,
+            openAIConfigured: openAIKeySaved && !openAIRetired(now: now),
             geminiConfigured: geminiKeySaved
         )
     }
@@ -178,7 +181,8 @@ final class VoiceSettings {
             openAIConfigured: openAIKeySaved, openAIPaused: isProviderPaused(.openAICompatible, now: now),
             geminiConfigured: geminiKeySaved, geminiPaused: isProviderPaused(.gemini, now: now),
             kokoroReady: kokoroReady, kokoroPaused: isProviderPaused(.kokoro, now: now),
-            chatterboxReady: ChatterboxVoice.isReady, chatterboxPaused: isProviderPaused(.chatterbox, now: now))
+            chatterboxReady: ChatterboxVoice.isReady, chatterboxPaused: isProviderPaused(.chatterbox, now: now),
+            openAIRetired: openAIRetired(now: now))
     }
 
     var engineChoice: UltronEngineChoice { engineAuto ? .auto : .fixed(Self.engine(for: ttsProvider)) }

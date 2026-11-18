@@ -386,7 +386,17 @@ final class PointingElevenLabsSpeech: SpeechOutputProvider {
 @MainActor
 final class PointingOpenAISpeech: SpeechOutputProvider {
     private let key: () -> String?
-    init(key: @escaping () -> String? = { PointingCredentials.openAIKey }) { self.key = key }
+    private let now: () -> Date
+    private let defaults: UserDefaults
+    init(key: @escaping () -> String? = { PointingCredentials.openAIKey }, now: @escaping () -> Date = { Date() },
+         defaults: UserDefaults = .standard) {
+        self.key = key; self.now = now; self.defaults = defaults
+    }
+
+    /// OpenAI shuts the speech model down on 2027-01-06; from then on no request is built (`OpenAISpeechRetirement`).
+    static func isRetired(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
+        OpenAISpeechRetirement.isRetired(model: defaults.string(forKey: "pointing.openai.ttsModel") ?? "gpt-4o-mini-tts", at: now)
+    }
 
     static func request(text: String, key: String, defaults: UserDefaults = .standard) throws -> URLRequest {
         guard !text.isEmpty, text.utf8.count <= ExplanationLimits.speech, !key.isEmpty else { throw ExplanationAudioError.invalidSpeech }
@@ -404,8 +414,9 @@ final class PointingOpenAISpeech: SpeechOutputProvider {
 
     func render(_ request: ExplanationSpeechRequest) async throws -> ExplanationPreparedAudio {
         try Task.checkCancellation()
+        guard !Self.isRetired(defaults: defaults, now: now()) else { throw ExplanationAudioError.unavailable }
         guard let key = key() else { throw ExplanationAudioError.unavailable }
-        let urlRequest = try Self.request(text: request.speech.text, key: key)
+        let urlRequest = try Self.request(text: request.speech.text, key: key, defaults: defaults)
         let pcm = try await Self.fetch(urlRequest)
         try Task.checkCancellation()
         return try await PointingPCM.prepare(request, pcm16: pcm, sampleRate: 24_000)

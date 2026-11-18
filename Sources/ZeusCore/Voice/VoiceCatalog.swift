@@ -27,6 +27,11 @@ public enum OpenAIVoiceCatalog {
     public static func voices(forModel model: String) -> [CatalogVoice] {
         model.hasPrefix("tts-1") ? voices.filter { legacyIDs.contains($0.id) } : voices
     }
+
+    /// The picker list at `now`: empty once OpenAI has shut the model down, so retired voices are not offered.
+    public static func voices(forModel model: String, at now: Date) -> [CatalogVoice] {
+        OpenAISpeechRetirement.isRetired(model: model, at: now) ? [] : voices(forModel: model)
+    }
 }
 
 /// The 30 prebuilt Gemini TTS voices (writes `voice.gemini.voice`).

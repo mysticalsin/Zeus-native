@@ -131,9 +131,16 @@ struct ZeusVoiceCards: View {
             }
             if voice.openAIKeySaved {
                 GSDivider()
-                GSRow(symbol: "person.wave.2", title: "OpenAI voice", text: "Used when OpenAI speaks. Marin and Cedar need the gpt-4o-mini-tts model.") {
-                    voicePicker(provider: .openAICompatible, voices: OpenAIVoiceCatalog.voices(forModel: voice.openAIModel),
-                                selected: voice.openAIVoice, label: "OpenAI voice") { voice.openAIVoice = $0 }
+                GSRow(symbol: "person.wave.2", title: "OpenAI voice",
+                      text: OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, at: Date())
+                          ?? "Used when OpenAI speaks. Marin and Cedar need the gpt-4o-mini-tts model.") {
+                    if voice.openAIRetired() {
+                        Text(OpenAISpeechRetirement.endedNote).font(OB.font(13.5)).foregroundStyle(GS.text.opacity(0.5))
+                            .accessibilityLabel("OpenAI voice, ended")
+                    } else {
+                        voicePicker(provider: .openAICompatible, voices: OpenAIVoiceCatalog.voices(forModel: voice.openAIModel, at: Date()),
+                                    selected: voice.openAIVoice, label: "OpenAI voice") { voice.openAIVoice = $0 }
+                    }
                 }
             }
             GSDivider()

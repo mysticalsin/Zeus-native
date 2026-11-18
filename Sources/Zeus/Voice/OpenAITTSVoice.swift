@@ -2,7 +2,14 @@ import Foundation
 import ZeusCore
 
 enum OpenAITTSVoice {
-    static func config(defaults: UserDefaults = .standard, streaming: Bool = false) -> OpenAITTSRequest.Config? {
+    /// True once OpenAI has shut down the configured speech model. Nothing is built or sent from then on.
+    static func isRetired(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
+        let model = defaults.string(forKey: "voice.openai.model") ?? UltronCloudVoice.openAIModel
+        return OpenAISpeechRetirement.isRetired(model: model, at: now)
+    }
+
+    static func config(defaults: UserDefaults = .standard, streaming: Bool = false, now: Date = Date()) -> OpenAITTSRequest.Config? {
+        guard !isRetired(defaults: defaults, now: now) else { return nil }
         guard let key = Keychain.get("openai-tts.api-key"), !key.isEmpty else { return nil }
         let baseString = defaults.string(forKey: "voice.openai.baseURL") ?? "https://api.openai.com/v1"
         guard let base = URL(string: baseString) else { return nil }

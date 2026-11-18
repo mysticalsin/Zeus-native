@@ -10,7 +10,7 @@ struct OpenAISpeechRetirementAppTests {
     private let after = Date(timeIntervalSince1970: 1_799_193_600)
 
     private func defaults(_ model: String? = nil) -> UserDefaults {
-        let suite = UserDefaults(suiteName: "zeus-openai-retire-" + UUID().uuidString)!
+        let suite = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus-openai-retire-" + UUID().uuidString)!
         if let model { suite.set(model, forKey: "pointing.openai.ttsModel") }
         return suite
     }
@@ -55,7 +55,7 @@ struct OpenAISpeechRetirementAppTests {
 
     @Test func openAIConfigIsNilAfterShutdownEvenWithASavedModel() {
         #expect(OpenAITTSVoice.isRetired(defaults: defaults(), now: before) == false)
-        let suite = UserDefaults(suiteName: "zeus-openai-retire-" + UUID().uuidString)!
+        let suite = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus-openai-retire-" + UUID().uuidString)!
         #expect(OpenAITTSVoice.isRetired(defaults: suite, now: after))
         suite.set("my-local-tts", forKey: "voice.openai.model")
         #expect(!OpenAITTSVoice.isRetired(defaults: suite, now: after))
