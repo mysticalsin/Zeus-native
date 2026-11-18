@@ -161,6 +161,17 @@ class EvidenceContractTests(unittest.TestCase):
             with self.assertRaises(c.Invalid):
                 c.swift_summary(text, code)
 
+    def test_torn_portable_pointing_log_marks_required_cases_not_run(self):
+        # Exact portable-pointing test.log from artifact 14448317026 (run 44344835181).
+        # Stdout lines were torn, so the text parser never sees these pass lines.
+        log = (Path(__file__).resolve().parent / "fixtures" / "portable-pointing-44344835181.log").read_text()
+        _, _, functions = c.swift_summary(log, 0)
+        check = {"status": "passed", "passed_functions": functions}
+        for name in ("holdStartsImmediately", "oneXDisplayWithANegativeOrigin"):
+            with self.assertRaises(c.Invalid) as caught:
+                c.case_passed({"file": "Tests/ZeusCoreTests/PointingKeyGestureTests.swift", "function": name}, check, Path("/unused"))
+            self.assertIn(f"required case did not run: {name}", str(caught.exception))
+
     def test_python_skips_and_zero_cases_do_not_pass(self):
         passed = "test_one (Suite.test_one) ... ok\nRan 1 test in 0.1s\nOK\n"
         self.assertEqual(runner.python_summary(passed, 0), (1, 1, ["test_one"]))
