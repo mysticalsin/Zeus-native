@@ -7768,6 +7768,26 @@
             {
               "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
               "function": "aBarOnlyPeekFollowsTheClosedRuleSoTheMenuBarStaysClickable"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+              "function": "aLongSelectionEditCardKeepsItsAcceptRowInsideTheNotchWindow"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+              "function": "aLongSelectionEditCardLayoutFitsTheBudgetAndCountsWhatItHides"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+              "function": "aShortSelectionEditCardIsUnchangedAndHidesNothing"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+              "function": "aLongSelectionEditCardPinsEachRowToTheHeightTheSizeUses"
+            },
+            {
+              "file": "Tests/ZeusAppTests/NotchPeekClickThroughTests.swift",
+              "function": "aCappedSelectionEditCardTakesTheMouseOverItsAcceptRow"
             }
           ]
         },

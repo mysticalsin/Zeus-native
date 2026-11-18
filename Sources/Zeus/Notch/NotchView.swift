@@ -148,10 +148,46 @@ struct NotchView: View {
             || model.selectionEdit != nil || model.workBehind?.streaming == true || model.recap != nil
     }
 
-    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt Accept row.
-    static func selectionEditHeight(_ edit: SelectionEdit) -> CGFloat {
-        let lines = edit.diff.reduce(CGFloat(0)) { $0 + 15 * CGFloat(min(2, max(1, ($1.text.count + 2 + 53) / 54))) }
-        return lines + 4 * CGFloat(edit.diff.count) + 28
+    /// One diff row of the edit card and how many 15 pt text lines it takes.
+    struct SelectionEditRow: Identifiable {
+        var line: TextDiffLine
+        var textLines: Int
+        var id: Int { line.id }
+        var height: CGFloat { 15 * CGFloat(textLines) }
+    }
+
+    /// The edit card body: the visible rows, how many were left out, and the whole height.
+    struct SelectionEditLayout {
+        var rows: [SelectionEditRow]
+        var hidden: Int
+        var height: CGFloat
+        /// The plain line shown under a capped list, nil when every row is visible.
+        var moreText: String? { hidden > 0 ? "+\(hidden) more lines" : nil }
+    }
+
+    /// Room for the edit card body (rows, the more-lines line and the Accept row): the notch window below the lowest
+    /// bar position, the bar and the 10 pt gap. The card never grows past it, so Accept stays drawn and clickable.
+    static func selectionEditBudget(barHeight: CGFloat) -> CGFloat {
+        GlanceTopBar.windowHeight - CGFloat(TopBarPosition.maximum) - barHeight - 10
+    }
+
+    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt
+    /// Accept row. Rows that would not fit the budget are left out and counted in `hidden`, with a 15 pt line saying so.
+    /// The view pins every row to `SelectionEditRow.height`, so what is drawn is what is measured here.
+    static func selectionEditLayout(_ edit: SelectionEdit, barHeight: CGFloat) -> SelectionEditLayout {
+        let budget = selectionEditBudget(barHeight: barHeight)
+        let moreLine: CGFloat = 15 + 4
+        var rows: [SelectionEditRow] = []
+        var height: CGFloat = 28
+        for (index, line) in edit.diff.enumerated() {
+            let row = SelectionEditRow(line: line, textLines: min(2, max(1, (line.text.count + 2 + 53) / 54)))
+            let reserve = index < edit.diff.count - 1 ? moreLine : 0
+            if height + row.height + 4 + reserve > budget { break }
+            rows.append(row)
+            height += row.height + 4
+        }
+        let hidden = edit.diff.count - rows.count
+        return SelectionEditLayout(rows: rows, hidden: hidden, height: height + (hidden > 0 ? moreLine : 0))
     }
 
     /// The peek card as drawn (the peek always has the 8 pt shoulders). The window's click-through rule reads it too.
@@ -171,7 +207,7 @@ struct NotchView: View {
             return CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
         }
         if let edit = model.selectionEdit {
-            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 10 + selectionEditHeight(edit))
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 10 + selectionEditLayout(edit, barHeight: barHeight).height)
         }
         if let preview = model.workBehind, preview.streaming {
             return CGSize(width: max(notch.width + 2 * shoulder + 240, 440), height: barHeight + 10 + 24)
@@ -431,7 +467,7 @@ struct NotchView: View {
                     }
                     .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let edit = model.selectionEdit {
-                    SelectionEditBody(edit: edit)
+                    SelectionEditBody(layout: Self.selectionEditLayout(edit, barHeight: barHeight))
                         .padding(.horizontal, 16)
                 } else if let preview = model.workBehind, preview.streaming {
                     WorkBehindBody(preview: preview)
@@ -503,20 +539,28 @@ struct NotchView: View {
 }
 
 private struct SelectionEditBody: View {
-    let edit: SelectionEdit
+    let layout: NotchView.SelectionEditLayout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(edit.diff) { line in
-                Text(prefix(line.kind) + line.text)
+            ForEach(layout.rows) { row in
+                Text(prefix(row.line.kind) + row.line.text)
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(color(line.kind))
+                    .foregroundStyle(color(row.line.kind))
                     .lineLimit(2)
+                    .frame(maxWidth: .infinity, minHeight: row.height, maxHeight: row.height, alignment: .topLeading)
+            }
+            if let more = layout.moreText {
+                Text(more)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 15, maxHeight: 15, alignment: .topLeading)
             }
             HStack {
                 Spacer()
                 NotchButton(title: "Accept", tint: Theme.leaf, filled: true) { HandsHUD.shared.accept() }
             }
+            .frame(height: 28)
         }
     }
 
