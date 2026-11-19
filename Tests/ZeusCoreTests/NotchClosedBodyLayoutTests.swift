@@ -50,15 +50,20 @@ import ZeusCore
         }
     }
 
-    /// The frames `ClosedWingsRow` lays out. A music tile 14 pt wider than the box must not make one wing 14 pt wider.
+    /// The frames `ClosedWingsRow` lays out, from the art and bars widths the view passes in. Art is 14 pt wider.
     @Test func theMusicWingFramesStayInsideTheSymmetricContentBox() {
         let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset
-        let music = NotchClosedBodyLayout.rowLayout(
-            notchWidth: 220, extra: 0, leftProposal: 18, rightProposal: 18 + 14, clipsMusic: true)
-        #expect(music.leftWidth == music.rightWidth)
-        #expect(music.leftWidth == box)
-        #expect(music.gapWidth == 220)
-        #expect(music.outwardInset == 0)
+        for scale in [CGFloat(1), 2, 3] {
+            let (art, bars) = NotchClosedBodyLayout.musicContent(scale: scale)
+            #expect(art - bars == NotchClosedBodyLayout.contentInset * scale)
+            let music = NotchClosedBodyLayout.rowLayout(
+                notchWidth: 220, extra: 0, leftProposal: art, rightProposal: bars, clipsMusic: true)
+            #expect(music.leftWidth == music.rightWidth)
+            #expect(music.leftWidth == box)
+            #expect(music.clipWidth == box)
+            #expect(music.gapWidth == 220)
+            #expect(music.outwardInset == 0)
+        }
     }
 
     /// Art and bars wider than the box stay inside it. The wings stay matched, so the test cannot pass by clipping one side only.

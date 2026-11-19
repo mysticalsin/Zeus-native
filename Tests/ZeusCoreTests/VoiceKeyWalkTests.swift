@@ -1559,7 +1559,7 @@ private struct Sim {
     private static func effects(of output: PointingKeyGesture.Output?, _ gesture: PointingKeyGesture) -> [VoiceKeyMachine.Effect] {
         switch output {
         case .armed?: [.wake(after: gesture.confirm)]
-        case .began?: [.start, .wake(after: timing.pointingWatchdog)]
+        case .began?: [.start, .wake(after: VoiceKeyMachine.Timing.pointingWatchdog)]
         case .ended?, .holdTimedOut?: [.send]
         case .cancelled?: [.cancel]
         case .escape?, .doubleTapControl?, nil: []

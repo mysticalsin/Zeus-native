@@ -59,12 +59,15 @@ public enum NotchClosedBodyLayout {
         public var rightWidth: CGFloat
         /// Extra paintable width outside the content box, outward only. Zero when the music content is clipped.
         public var outwardInset: CGFloat
+        /// Width of the container that clips music. Zero when the wing is not clipped. A child `.clipped()` is not this.
+        public var clipWidth: CGFloat
 
-        public init(gapWidth: CGFloat, leftWidth: CGFloat, rightWidth: CGFloat, outwardInset: CGFloat) {
+        public init(gapWidth: CGFloat, leftWidth: CGFloat, rightWidth: CGFloat, outwardInset: CGFloat, clipWidth: CGFloat) {
             self.gapWidth = gapWidth
             self.leftWidth = leftWidth
             self.rightWidth = rightWidth
             self.outwardInset = outwardInset
+            self.clipWidth = clipWidth
         }
     }
 
@@ -78,14 +81,18 @@ public enum NotchClosedBodyLayout {
         clipsMusic: Bool
     ) -> ClosedWingRowLayout {
         let box = max(0, wingWidth - contentInset + extra)
-        if clipsMusic {
-            return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: box, rightWidth: box, outwardInset: 0)
-        }
-        // Both wings take one width, at most the box plus the outer inset. A 14 pt proposal cannot skew the pair,
-        // and the glow still has the inset to paint into.
-        let cap = box + contentInset
-        let wanted = max(box, min(cap, max(leftProposal, rightProposal)))
-        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: wanted, rightWidth: wanted, outwardInset: contentInset)
+        // Each wing keeps the width its content asked for. Art 14 pt wider than the bars makes the wings differ by 14.
+        let left = max(box, leftProposal)
+        let right = max(box, rightProposal)
+        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: left, rightWidth: right,
+                                   outwardInset: clipsMusic ? 0 : contentInset,
+                                   clipWidth: clipsMusic ? leftProposal : 0)
+    }
+
+    /// The widths the music wing actually offers: the bars fill the box, and the art is 14 pt wider at every scale.
+    public static func musicContent(scale: CGFloat = 1) -> (art: CGFloat, bars: CGFloat) {
+        let bars = max(0, wingWidth - contentInset) * scale
+        return (bars + contentInset * scale, bars)
     }
 
     /// Extra width on each wing for a cue kind (mirrors `ClosedWings.extraWidth` in the app target).
