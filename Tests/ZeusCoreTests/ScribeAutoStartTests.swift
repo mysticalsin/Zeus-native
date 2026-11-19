@@ -1123,6 +1123,52 @@ struct ScribeAutoStartTests {
                                                            previousSession: nil, session: nil)))
     }
 
+    @Test func theProductionAskTimeoutIsTwentySeconds() {
+        #expect(ScribeAutoStartTiming().askTimeout == 20)
+        #expect(ScribeAutoStartTiming.standard.askTimeout == 20)
+    }
+
+    /// The default machine, not a fixture timeout. The offer's own deadline has passed and the pointer is off the card.
+    @Test func aLateTapOnTheProductionAskTimeoutDoesNotStart() {
+        var machine = asPrompting()
+        #expect(machine.timing.askTimeout == 20)
+        machine.handle(asTick(23))
+        let start = machine.handle(asTap(asOffer(), 23.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func aPointerInsidePastTheHoverCapDoesNotStart() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        let start = machine.handle(asTap(asOffer(), 27))
+        #expect(start.isEmpty, "a pointer left on the card past deadline + hover grace started a recording")
+    }
+
+    @Test func aPointerInsideWithinTheHoverCapStarts() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        let start = machine.handle(asTap(asOffer(), 26))
+        #expect(start == [.start(asTeams)])
+    }
+
+    @Test func aPointerInsideOnAReplacedOfferDoesNotStart() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 4))
+        machine.handle(asEvidence(4, mic: [.zoom]))
+        machine.handle(asEvidence(7, mic: [.zoom]))
+        let start = machine.handle(asTap(asOffer(), 8))
+        #expect(start.isEmpty, "a tap on the offer a newer one replaced started a recording")
+    }
+
+    @Test func aPointerThatLeavesEndsTheHoverGrace() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        machine.handle(.pointer(inside: false, now: 24))
+        let start = machine.handle(asTap(asOffer(), 25))
+        #expect(start.isEmpty, "a tap after the pointer left past the deadline started a recording")
+    }
+
     /// No tick between the deadline and the tap. The heads-up is still `.upcoming`, so only `now < deadline` can refuse.
     @Test func aTapPastTheUpcomingDeadlineWithoutATickDoesNotStart() {
         let slot = asSlot(start: 120)
