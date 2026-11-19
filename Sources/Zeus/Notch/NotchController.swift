@@ -318,6 +318,10 @@ final class NotchController {
             }
             let count = Int(position.split(separator: " ").last.map(String.init) ?? "") ?? 1
             let helperDeadline = ticket.helperDeadline
+            let jump: (@MainActor () -> Void)? = trust.map { pair in
+                let session = pair.session
+                return { _ = AgentTerminals.shared.jump(to: session) }
+            }
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
                 deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
@@ -325,10 +329,11 @@ final class NotchController {
                 position: position,
                 appearedAt: Date(),
                 queueCount: max(count, 1),
+                onJump: jump,
+                onDenyAll: { [weak self] in self?.denyEveryApproval() },
                 helperDeadline: helperDeadline,
                 allowGate: ApprovalAllowGate(risk: risk, reduceMotion: Motion.reduced, voiceOver: NSWorkspace.shared.isVoiceOverEnabled),
                 trustChat: trustChat,
-                onJump: trust?.session.map { session in { AgentTerminals.shared.jump(to: session) } },
                 beginHold: { [weak self] in self?.beginApprovalHold() },
                 endHold: { [weak self] in self?.endApprovalHold() },
                 activateAllow: { [weak self] in self?.activateApproval(kind: .card) },
@@ -337,7 +342,6 @@ final class NotchController {
                     self?.model.approval?.resolve(.deny)
                 },
                 denyAll: { [weak self] in self?.denyEveryApproval() },
-                onDenyAll: { [weak self] in self?.denyEveryApproval() },
                 resolve: finish
             )
             presentApprovalArrival(risk: risk)
