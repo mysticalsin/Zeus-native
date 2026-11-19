@@ -1089,6 +1089,43 @@ struct ScribeAutoStartTests {
         }
     }
 
+    /// The offer leaves on its own after 10 s. A tap that names that offer, or an offer a newer one has replaced,
+    /// must not start a recording. A tap on the offer that is still up does.
+    @Test func aLateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording() {
+        var timing = ScribeAutoStartTiming()
+        timing.askTimeout = 10
+        let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
+
+        var expired = ScribeAutoStartMachine(timing: timing)
+        expired.handle(asEvidence(0, mic: [.teams]))
+        expired.handle(asEvidence(3, mic: [.teams]))
+        #expect(expired.state == .prompting(meeting: asTeams, deadline: 13, blocked: .notChosen))
+        expired.handle(asTick(13))
+        #expect(expired.state == .idle)
+        let afterExpiry = expired.handle(asTap(asOffer(), 13.1))
+        #expect(afterExpiry.isEmpty, "a tap after the 10 s offer left started a recording")
+        #expect(expired.state == .idle)
+
+        var replaced = ScribeAutoStartMachine(timing: timing)
+        replaced.handle(asEvidence(0, mic: [.teams]))
+        replaced.handle(asEvidence(3, mic: [.teams]))
+        replaced.handle(asTick(13))
+        replaced.handle(asEvidence(14, mic: [.zoom]))
+        replaced.handle(asEvidence(17, mic: [.zoom]))
+        #expect(replaced.card(now: 17) == .offer(zoom, blocked: .notChosen))
+        let stale = replaced.handle(asTap(asOffer(), 18))
+        #expect(stale.isEmpty, "a tap on the offer Zoom replaced started a recording")
+        #expect(replaced.state == .prompting(meeting: zoom, deadline: 27, blocked: .notChosen))
+
+        var live = ScribeAutoStartMachine(timing: timing)
+        live.handle(asEvidence(0, mic: [.teams]))
+        live.handle(asEvidence(3, mic: [.teams]))
+        let current = live.handle(asTap(asOffer(), 4))
+        #expect(current == [.start(asTeams)])
+        #expect(live.state == .starting(ScribeStartAttempt(meeting: asTeams, since: 4, origin: .tap,
+                                                           previousSession: nil, session: nil)))
+    }
+
     @Test func aTapNeverStartsASecondRecording() {
         var machine = asRecordingTeams()
         let effects = machine.handle(asTap(asOffer(), 12, activity: .recording))
