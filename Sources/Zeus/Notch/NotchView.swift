@@ -522,7 +522,7 @@ private struct ApprovalBody: View {
                         .foregroundStyle(Theme.cloudSecondary)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
+                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
                         .accessibilityHint("Stops \(approval.agent) from running this.")
                 }
             } else if let detail = approval.detail, !MeetingState.hideDetails {
@@ -554,10 +554,18 @@ private struct ApprovalBody: View {
                             .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     // Neither button is the default: approving shouldn't be one reflexive keypress.
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
+                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
                         .accessibilityHint("Stops \(approval.agent) from running this.")
-                    NotchButton(title: "Approve", tint: Theme.ember, filled: true) { approval.resolve(.allow) }
-                        .accessibilityHint("Lets \(approval.agent) run this once.")
+                    ApprovalAllowButton(title: "Approve", tint: Theme.ember, fraction: approval.allowGate.holdFraction(now: Date())) {
+                        approval.beginHold()
+                    } release: {
+                        if case .hold = approval.allowGate.gesture { approval.endHold() }
+                        else { approval.activateAllow() }
+                    } accessibility: {
+                        approval.activateAllow()
+                    }
+                    NotchButton(title: "Deny all", tint: Theme.cloudSecondary, filled: false) { approval.denyAll() }
+                        .accessibilityHint("Denies this request and every request waiting behind it. Nothing is allowed.")
                 }
             }
             HStack(spacing: 6) {
@@ -583,6 +591,32 @@ private struct ApprovalBody: View {
             .font(.system(size: 10.5, design: .rounded))
             .foregroundStyle(Theme.cloudQuiet)
         }
+    }
+}
+
+/// Pointer presses begin and end a hold. A click, a key, or VoiceOver uses the plain activation,
+/// which cannot finish a high-risk hold.
+private struct ApprovalAllowButton: View {
+    let title: String
+    let tint: Color
+    let fraction: Double
+    let press: () -> Void
+    let release: () -> Void
+    let accessibility: () -> Void
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.storm)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 28)
+            .background(Capsule().fill(tint.opacity(0.35 + 0.65 * fraction)))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(title)
+            .accessibilityAction(.default, accessibility)
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in press() }
+                .onEnded { _ in release() })
     }
 }
 

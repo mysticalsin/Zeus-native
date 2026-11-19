@@ -27,7 +27,7 @@ struct ApprovalQueueTests {
         let turns = await [first, second]
         #expect(turns[0] == .show(position: "1 of 1") || turns[0] == .show(position: "1 of 2"))
         #expect(await queue.front?.id == "a")
-        #expect(await queue.clearFront()?.id == "a")
+        #expect(await queue.clearFront(id: "a")?.id == "a")
         #expect(await queue.front?.id == "b")
     }
 

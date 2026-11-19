@@ -986,7 +986,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         func answer(_ verdict: HookDecision.Verdict) -> () -> Void {
             { [weak self] in
                 guard let approval = self?.notch.model.approval else { return }
-                if verdict == .allow, !ApprovalPolicy.canApprove(risk: approval.risk, by: .shortcut) { return }
+                if verdict == .allow {
+                    self?.notch.activateApproval(kind: .shortcut)
+                    return
+                }
+                self?.notch.noteApproval(.shortcut, verdict: verdict)
                 approval.resolve(verdict)
             }
         }
