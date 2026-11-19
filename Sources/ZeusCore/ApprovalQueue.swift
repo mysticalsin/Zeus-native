@@ -52,6 +52,16 @@ public struct ApprovalQueueState: Equatable, Sendable {
         return index == 0 ? .show(position: place) : .waiting(position: place)
     }
 
+    /// Puts `id` at the front and leaves the others queued behind it, in their previous order.
+    @discardableResult
+    public mutating func moveToFront(id: String) -> Bool {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return false }
+        guard index > 0 else { return true }
+        let ticket = items.remove(at: index)
+        items.insert(ticket, at: 0)
+        return true
+    }
+
     @discardableResult
     public mutating func clearFront() -> ApprovalTicket? {
         guard !items.isEmpty else { return nil }
@@ -107,6 +117,11 @@ public actor ApprovalGate {
             }
             waiters[id] = continuation
         }
+    }
+
+    /// The displayed request becomes the one Allow and Deny resolve.
+    public func focus(_ id: String) {
+        _ = state.moveToFront(id: id)
     }
 
     /// Removes the front card only when it is still this request.
@@ -355,7 +370,7 @@ public struct ApprovalHoldTracking: Equatable {
 /// Approve Plan and Send Answers. An inside release is still treated as the end of a hold.
 public enum ApprovalDetailPress: Equatable, Sendable {
     public static func planRelease(inside: Bool, gesture: ApprovalGesture) -> ApprovalPress {
-        inside ? .endHold : .cancel
+        ApprovalPress.outcome(inside: inside, gesture: gesture)
     }
 }
 

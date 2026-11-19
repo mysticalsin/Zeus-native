@@ -245,6 +245,7 @@ struct ApprovalDetailView: View {
     var endHold: () -> Void
     var plainAllow: () -> Void
     var cancelHold: () -> Void
+    var gesture: () -> ApprovalGesture
 
     var body: some View {
         switch detail.kind {
@@ -275,9 +276,9 @@ struct ApprovalDetailView: View {
                 ApprovalAllowButton(title: "Approve Plan", tint: Theme.leaf, fraction: 0) {
                     beginHold()
                 } release: { inside in
-                    if inside { endHold() } else { cancelHold() }
+                    releasePlan(inside)
                 } accessibility: {
-                    plainAllow()
+                    releasePlan(true)
                 } onCancel: {
                     cancelHold()
                 }
@@ -307,10 +308,18 @@ struct ApprovalDetailView: View {
             HStack(spacing: 8) {
                 terminalButton(title: "Answer in Terminal")
                 Spacer()
-                if questions.count > 1 || questions.contains(where: \.multiSelect) {
-                    CardButton(title: "Send Answers", tint: Theme.accent, filled: true) { detail.answer(); plainAllow() }
-                        .disabled(!detail.isComplete(questions))
-                        .opacity(detail.isComplete(questions) ? 1 : 0.5)
+                if questions.count > 1 || questions.contains(where: \.multiSelect) || !isTap {
+                    ApprovalAllowButton(title: "Send Answers", tint: Theme.accent, fraction: 0) {
+                        beginHold()
+                    } release: { inside in
+                        sendAnswers(inside)
+                    } accessibility: {
+                        sendAnswers(true)
+                    } onCancel: {
+                        cancelHold()
+                    }
+                    .disabled(!detail.isComplete(questions))
+                    .opacity(detail.isComplete(questions) ? 1 : 0.5)
                 }
             }
         }
@@ -320,8 +329,8 @@ struct ApprovalDetailView: View {
         let picked = detail.choices[question.question]?.contains(option.label) == true
         return Button {
             detail.toggle(option.label, in: question)
-            // One question, one choice: picking it is the answer.
-            if single { detail.answer(); plainAllow() }
+            // One question, one choice, and a tap is enough: picking it sends the answer.
+            if single, isTap { sendAnswers(true) }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: question.multiSelect ? (picked ? "checkmark.square.fill" : "square") : (picked ? "largecircle.fill.circle" : "circle"))
@@ -343,6 +352,25 @@ struct ApprovalDetailView: View {
         .buttonStyle(PressableStyle())
         .accessibilityLabel(option.detail.map { "\(option.label), \($0)" } ?? option.label)
         .accessibilityAddTraits(picked ? .isSelected : [])
+    }
+
+    private var isTap: Bool {
+        if case .tap = gesture() { return true }
+        return false
+    }
+
+    /// Records the choice, then uses the same release as Allow so a high gate can finish and send it.
+    private func sendAnswers(_ inside: Bool) {
+        detail.answer()
+        releasePlan(inside)
+    }
+
+    private func releasePlan(_ inside: Bool) {
+        switch ApprovalDetailPress.planRelease(inside: inside, gesture: gesture()) {
+        case .cancel: cancelHold()
+        case .endHold: endHold()
+        case .activate: plainAllow()
+        }
     }
 
     @ViewBuilder

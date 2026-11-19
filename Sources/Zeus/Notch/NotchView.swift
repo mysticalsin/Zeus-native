@@ -683,7 +683,8 @@ private struct ApprovalBody: View {
                                     beginHold: { approval.beginHold() },
                                     endHold: { approval.endHold(true) },
                                     plainAllow: { approval.activateAllow() },
-                                    cancelHold: { approval.cancelHold() })
+                                    cancelHold: { approval.cancelHold() },
+                                    gesture: { approval.allowGate.gesture })
             }
             if approval.detail?.hasOwnActions != true {
                 let preview = NotchModel.Approval.isChangePreview(approval.command) && !MeetingState.hideDetails
