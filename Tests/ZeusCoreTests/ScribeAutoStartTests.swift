@@ -1123,6 +1123,41 @@ struct ScribeAutoStartTests {
                                                            previousSession: nil, session: nil)))
     }
 
+    /// No tick between the deadline and the tap. The heads-up is still `.upcoming`, so only `now < deadline` can refuse.
+    @Test func aTapPastTheUpcomingDeadlineWithoutATickDoesNotStart() {
+        let slot = asSlot(start: 120)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+        #expect(!machine.pointerInside)
+        let start = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 20.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+    }
+
+    /// No tick between the deadline and the tap. The offer is still `.prompting`, so only `now < deadline` can refuse.
+    @Test func aTapPastThePromptingDeadlineWithoutATickDoesNotStart() {
+        var machine = asPrompting()
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
+        #expect(!machine.pointerInside)
+        let start = machine.handle(asTap(asOffer(), 23.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
+    }
+
+    /// No tick between `offerUntil` and the tap. The heads-up is still armed, so only `now < offerUntil` can refuse.
+    @Test func aTapPastTheHeadsUpOfferUntilWithoutATickDoesNotStart() {
+        let slot = asSlot(start: 12, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(12, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 12, offerUntil: 20))
+        #expect(!machine.pointerInside)
+        let start = machine.handle(asTap(.offer(asLive(slot), blocked: nil), 20.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 12, offerUntil: 20))
+    }
+
     @Test func aTapNeverStartsASecondRecording() {
         var machine = asRecordingTeams()
         let effects = machine.handle(asTap(asOffer(), 12, activity: .recording))
