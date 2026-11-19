@@ -990,7 +990,7 @@ class ScribeMeetingCardTests(unittest.TestCase):
         core = (ROOT / "Sources/ZeusCore/Scribe/ScribeAutoStart.swift").read_text()
         self.assertIn("case primary(on: ScribeMeetingCard", core)
         late = mic_body(core, "    private mutating func primary(", "    private mutating func cancel(")
-        self.assertIn("The offer ended in the same instant", late)
+        self.assertIn("A tap starts only when this offer is still the one on screen", late)
 
     def test_scribe_meeting_card_taps_are_logged(self):
         # The meeting card's own machine logs each state change once, and the taps that were ignored.

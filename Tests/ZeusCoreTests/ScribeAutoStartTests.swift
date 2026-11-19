@@ -1077,16 +1077,13 @@ struct ScribeAutoStartTests {
         #expect(machine.state == .idle)
     }
 
-    @Test func aTapThatArrivesJustAfterTheTimeoutStillStarts() {
+    @Test func aTapThatArrivesJustAfterTheTimeoutDoesNotStart() {
         var machine = asPrompting()
         machine.handle(asTick(23))
         #expect(machine.state == .idle)
         let start = machine.handle(asTap(asOffer(), 23.1))
-        #expect(start == [.start(asTeams)])
-        guard case .starting = machine.state else {
-            Issue.record("expected starting, got \(machine.state)")
-            return
-        }
+        #expect(start.isEmpty)
+        #expect(machine.state == .idle)
     }
 
     /// The offer leaves on its own after 10 s. A tap that names that offer, or an offer a newer one has replaced,
@@ -1467,14 +1464,15 @@ struct ScribeAutoStartTests {
         #expect(effects == [.start(asLive(slot))])
     }
 
-    @Test func aTapOnTheHeadsUpThatLeftInTheSameInstantStillStarts() {
+    @Test func aTapOnTheHeadsUpThatHasLeftDoesNotStart() {
         let slot = asSlot(start: 100, app: .teams)
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, slots: [slot]))
         machine.handle(asTick(20))
         #expect(machine.state == .idle)
         let effects = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 20.1))
-        #expect(effects == [.start(asHeadsUp(slot))])
+        #expect(effects.isEmpty)
+        #expect(machine.state == .idle)
     }
 
     @Test func nothingIsShownWhileScribeIsSaving() {
