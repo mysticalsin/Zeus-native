@@ -797,62 +797,55 @@ private struct TopBarPanelBody: View {
 private struct AgentCard: View {
     let session: NotchModel.Session
     var onStop: (@MainActor () -> Void)? = nil
-    /// The keyboard picker's highlighted row.
     var picked = false
-
-    /// Working sessions work, stalled ones nod off, everything else idles. The session model has no
-    /// idle clock, so a stalled status stands in for "idle past the sleep threshold".
-    private var avatarState: BotAvatarState {
-        .forActivity(running: session.status == .working, idleFor: session.status == .stalled ? 600 : 0)
-    }
+    @State private var expanded = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            BotAvatarView(type: BotAvatarSpec.type(forAgent: session.agent), state: avatarState, size: 28,
-                          seed: BotAvatarSpec.seed(forAgent: session.agent), interactive: true, agentName: session.agent)
-            Circle()
-                .fill(session.status.color)
-                .frame(width: 8, height: 8)
-                .shadow(color: session.status.color, radius: 4)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(session.agent)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Theme.cloudPrimary)
-                    if !MeetingState.hideDetails {
-                        Text(session.project)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Theme.cloudQuiet)
-                            .lineLimit(1)
+        VStack(alignment: .leading, spacing: 6) {
+            Button { expanded.toggle() } label: { row }
+                .buttonStyle(.plain)
+                .focusable()
+                .accessibilityLabel(AgentList.voice(session.agent, project: session.project, status: session.status, activity: session.task))
+                .accessibilityHint("Shows this session's detail here.")
+            if expanded {
+                Text(session.task)
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack {
+                    if let onStop, session.status == .working || session.status == .needsYou {
+                        Button("Stop") { onStop() }.buttonStyle(.plain).font(.system(size: 11, weight: .semibold))
                     }
-                }
-                if !MeetingState.hideDetails {
-                    Text(session.task)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Theme.cloudSecondary)
-                        .lineLimit(1)
+                    Spacer()
+                    JumpToTerminalButton(session: session.id, agent: session.agent)
                 }
             }
-            Spacer()
-            // Running card: Wave (Glance's default) shows a live wave beside the timer.
-            if session.status == .working, SettingsStore.shared.string("appearance.runningCard") != "Essentials" {
-                LevelBars(count: 5, color: session.status.color, active: true, height: 16)
-            }
-            if session.status == .working {
-                ElapsedText(since: session.startedAt)
-            } else if let kind = AgentCardKind.kind(for: session.status) {
-                AgentStatusChip(kind: kind)
-            }
-            if let onStop, session.status == .working || session.status == .needsYou {
-                GlyphButton(symbol: "stop.fill", size: 11, tint: Theme.cloudSecondary, label: "Stop \(session.agent)") { onStop() }
-            }
-            JumpToTerminalButton(session: session.id, agent: session.agent)
         }
-        .padding(.horizontal, 14)
-        .frame(height: 58)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .notchCard(CardFinish.current)
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.accent.opacity(picked ? 0.9 : 0), lineWidth: 2))
-        .accessibilityAddTraits(picked ? .isSelected : [])
+        .animation(Motion.reduced ? nil : .spring(response: 0.28, dampingFraction: 1), value: expanded)
+    }
+
+    private var row: some View {
+        HStack(spacing: 8) {
+            Circle().fill(session.status.color).frame(width: 7, height: 7).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.agent).font(.system(size: 12.5, weight: .semibold, design: .rounded)).lineLimit(1)
+                Text(session.project).font(.system(size: 11, design: .rounded)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
+                Text(session.task).font(.system(size: 11, design: .rounded)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Text(AgentList.word(session.status))
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(session.status.color)
+            if session.status == .working {
+                Capsule().fill(session.status.color.opacity(0.35)).frame(width: 28, height: 3)
+                ElapsedText(since: session.startedAt)
+            }
+        }
     }
 }
 
