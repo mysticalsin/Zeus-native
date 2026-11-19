@@ -193,10 +193,13 @@ struct FillerTimingTests {
 
 @Suite("Voice quality, answer model pin, language and joins")
 struct VoiceQualityTests {
-    @Test func defaultIsFastestAndModelsAreTheNamedConstants() {
-        #expect(ElevenLabsQuality.resolve(stored: nil) == .fastest)
-        #expect(ElevenLabsQuality.resolve(stored: "junk") == .fastest)
+    @Test func defaultIsStudioAndModelsAreTheNamedConstants() {
+        #expect(ElevenLabsQuality.resolve(stored: nil) == .studio)
+        #expect(ElevenLabsQuality.resolve(stored: "junk") == .studio)
         #expect(ElevenLabsQuality.resolve(stored: "studio") == .studio)
+        #expect(ElevenLabsQuality.resolve(stored: "fastest") == .fastest)
+        #expect(ElevenLabsQuality.studio.detail.contains("default"))
+        #expect(!ElevenLabsQuality.fastest.detail.contains("The default"))
         #expect(ElevenLabsQuality.fastest.modelID == "eleven_flash_v2_5")
         #expect(ElevenLabsQuality.studio.modelID == ElevenLabsQuality.studioModel)
     }

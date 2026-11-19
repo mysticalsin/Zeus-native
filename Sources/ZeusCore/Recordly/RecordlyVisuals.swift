@@ -96,6 +96,12 @@ public enum RecordlyCountdownVisual {
     }
 }
 
+/// Which rows the live capsule's level meters show.
+public enum RecordlyLiveMeterRows {
+    /// The Mic row appears only while microphone capture is actually on.
+    public static func showsMic(_ audio: RecordlyAudioOptions) -> Bool { audio.microphone }
+}
+
 /// One level meter: 0...1 in, smoothed 0...1 out. Fast attack, slow release, so bars rise quickly and fall gently.
 public struct RecordlyLevelMeter: Equatable, Sendable {
     public static let attackPerSecond = 18.0

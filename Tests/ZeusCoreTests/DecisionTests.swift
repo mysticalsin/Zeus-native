@@ -127,13 +127,13 @@ private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T
 
     @Test func storedLayaOrAutoPreferenceMigratesToJev() {
         for old in ["laya", "auto", "garbage"] {
-            let defaults = UserDefaults(suiteName: "zeus.test.engine.\(UUID().uuidString)")!
+            let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.test.engine.\(UUID().uuidString)")!
             defaults.set(old, forKey: IntelligenceEngine.settingsKey)
             #expect(IntelligenceEngine.migrateStoredChoice(in: defaults))
             #expect(defaults.string(forKey: IntelligenceEngine.settingsKey) == "jev")
             #expect(!IntelligenceEngine.migrateStoredChoice(in: defaults))
         }
-        let fresh = UserDefaults(suiteName: "zeus.test.engine.\(UUID().uuidString)")!
+        let fresh = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.test.engine.\(UUID().uuidString)")!
         #expect(!IntelligenceEngine.migrateStoredChoice(in: fresh))
         #expect(fresh.object(forKey: IntelligenceEngine.settingsKey) == nil)
     }
@@ -144,7 +144,7 @@ private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T
     }
 
     @Test func jevGuardRefusesWithoutKeyAndCountsSpend() async throws {
-        let suite = "zeus.test.jev.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jev.\(UUID().uuidString)"
         let store = JevBudgetStore(suite: suite)
         let none = JevGuard(key: nil, store: store)
         await #expect(throws: DecisionError.noKey) { try await none.decide(sample()) }
@@ -162,10 +162,10 @@ private func day(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T
     }
 
     @Test func keyComesFromKeychainThenEnv() {
-        let empty = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: "zeus.test.jk.\(UUID().uuidString)")!)
+        let empty = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.test.jk.\(UUID().uuidString)")!)
         #expect(JevKey.load(from: empty, env: [:]) == nil)
         #expect(JevKey.load(from: empty, env: ["JEV_API_KEY": "e"]) == "e")
-        let stored = KeychainStore(backend: MemoryKeychain(["com.zeus.app|jev-api-key": "k"]), defaults: UserDefaults(suiteName: "zeus.test.jk.\(UUID().uuidString)")!)
+        let stored = KeychainStore(backend: MemoryKeychain(["com.zeus.app|jev-api-key": "k"]), defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.test.jk.\(UUID().uuidString)")!)
         #expect(JevKey.load(from: stored, env: ["JEV_API_KEY": "e"]) == "k")
     }
 }

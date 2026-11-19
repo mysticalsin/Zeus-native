@@ -141,9 +141,6 @@ public enum DisplaySelection {
 
     /// Whether the windows must be rebuilt: the set of target screens or any frame changed.
     public static func needsRebuild(current: [DisplayDescriptor], next: [DisplayDescriptor]) -> Bool { current != next }
-
-    /// Screens without a notch get a slim pill when closed and idle.
-    public static func showsPill(_ display: DisplayDescriptor) -> Bool { !display.hasNotch }
 }
 
 // MARK: Trusted chats

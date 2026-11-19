@@ -27,8 +27,22 @@ final class ExplanationOverlay {
     func present(scene: ExplanationScene, context: ExplanationScreenContext,
                  registry: ExplanationRegistry = .empty, reduceMotion: Bool = true) -> Bool {
         context.recheckLease()
-        guard let capture = context.annotationContext,
-              capture.isCurrent(captureID: scene.captureID),
+        guard let capture = context.annotationContext else { hide(); return false }
+        return show(scene: scene, capture: capture, registry: registry, reduceMotion: reduceMotion) { [weak self] in
+            context.observeInvalidation { _ in self?.hide() }
+        }
+    }
+
+    /// Draws a scene on the display of a capture the app itself holds (the talk turn's screenshot), with no lease:
+    /// the caller hides it when the screen or the frontmost app changes.
+    @discardableResult
+    func present(scene: ExplanationScene, capture: ExplanationCaptureContext, reduceMotion: Bool = true) -> Bool {
+        show(scene: scene, capture: capture, registry: .empty, reduceMotion: reduceMotion) { nil }
+    }
+
+    private func show(scene: ExplanationScene, capture: ExplanationCaptureContext, registry: ExplanationRegistry,
+                      reduceMotion: Bool, observe: () -> ExplanationScreenObservation?) -> Bool {
+        guard capture.isCurrent(captureID: scene.captureID),
               let mapping = Self.panelTransform(capture) else { hide(); return false }
         let display = capture.currentDisplay
         let size = CGSize(width: display.frame.width, height: display.frame.height)
@@ -67,7 +81,7 @@ final class ExplanationOverlay {
         panel.setFrame(frame, display: false)
         panels[display.displayID] = panel
         captureID = capture.geometry.captureID
-        invalidationObservation = context.observeInvalidation { [weak self] _ in self?.hide() }
+        invalidationObservation = observe()
         panel.orderFrontRegardless() // Nonactivating panel; never makeKey or activate another app.
         return true
     }

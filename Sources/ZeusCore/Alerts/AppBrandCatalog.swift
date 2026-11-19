@@ -12,6 +12,8 @@ public enum AppBrandCatalog {
         public var paths: [String]
         /// An SF Symbol, never a brand mark.
         public var glyph: String
+        /// Hosts of the meeting links this app opens, for a call app. Empty for every other app.
+        public var linkHosts: [String] = []
     }
 
     public static let brands: [Brand] = [
@@ -30,12 +32,15 @@ public enum AppBrandCatalog {
         Brand(name: "Alacritty", bundleIDs: ["org.alacritty"], paths: ["/Applications/Alacritty.app"], glyph: "terminal"),
         Brand(name: "kitty", bundleIDs: ["net.kovidgoyal.kitty"], paths: ["/Applications/kitty.app"], glyph: "terminal"),
         Brand(name: "WezTerm", bundleIDs: ["com.github.wez.wezterm"], paths: ["/Applications/WezTerm.app"], glyph: "terminal"),
-        Brand(name: "Zoom", bundleIDs: ["us.zoom.xos"], paths: ["/Applications/zoom.us.app"], glyph: "video"),
+        Brand(name: "Zoom", bundleIDs: ["us.zoom.xos"], paths: ["/Applications/zoom.us.app"], glyph: "video",
+              linkHosts: ["zoom.us"]),
         Brand(name: "Microsoft Teams", bundleIDs: ["com.microsoft.teams2", "com.microsoft.teams"],
-              paths: ["/Applications/Microsoft Teams.app"], glyph: "person.2"),
+              paths: ["/Applications/Microsoft Teams.app"], glyph: "person.2",
+              linkHosts: ["teams.microsoft.com", "teams.live.com"]),
         Brand(name: "Webex", bundleIDs: ["Cisco-Systems.Spark", "com.cisco.webexmeetingsapp", "com.webex.meetingmanager"],
-              paths: ["/Applications/Webex.app"], glyph: "video"),
-        Brand(name: "Google Meet", bundleIDs: ["com.google.meet"], paths: ["/Applications/Google Meet.app"], glyph: "video"),
+              paths: ["/Applications/Webex.app"], glyph: "video", linkHosts: ["webex.com"]),
+        Brand(name: "Google Meet", bundleIDs: ["com.google.meet"], paths: ["/Applications/Google Meet.app"], glyph: "video",
+              linkHosts: ["meet.google.com"]),
     ]
 
     public static func brand(for bundleID: String) -> Brand? {

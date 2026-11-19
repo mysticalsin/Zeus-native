@@ -213,7 +213,7 @@ public enum VocabularyCapture {
 
 /// `zeus://` links, so Shortcuts, Raycast, Stream Deck or a script can drive ZEUS:
 /// `zeus://dictation/start`, `/stop`, `/toggle`, `/cancel`, `zeus://dictation/mode?key=email`,
-/// `zeus://chat/open?text=…`, `zeus://chat/new`.
+/// `zeus://chat/open?text=…`, `zeus://chat/new`, `zeus://settings`, `zeus://settings/<section>`.
 public enum ZeusDeepLink: Equatable, Sendable {
     case dictationStart
     case dictationStop
@@ -226,6 +226,10 @@ public enum ZeusDeepLink: Equatable, Sendable {
     case prompter
     /// `zeus://sticky/new?text=…`: a new sticky note.
     case stickyNew(text: String?)
+    /// `zeus://settings` or `zeus://settings/<section>`: opens the Settings window, nothing else. Zeus has no Dock icon,
+    /// so this is the way in when the menu bar icon is hidden. The section is the lowercased first path segment; the app
+    /// matches it to a Settings page and just opens Settings when it matches none.
+    case settings(section: String?)
 
     public static let scheme = "zeus"
 
@@ -246,6 +250,7 @@ public enum ZeusDeepLink: Equatable, Sendable {
             return key.isEmpty ? nil : .dictationMode(key)
         case ("chat", "new"): return .chatNew
         case ("prompter", _), ("teleprompter", _): return .prompter
+        case ("settings", _): return .settings(section: parts.dropFirst().first)
         case ("sticky", nil), ("sticky", "new"), ("note", "new"):
             let text = query["text"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             return .stickyNew(text: text?.isEmpty == false ? text : nil)

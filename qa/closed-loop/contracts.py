@@ -3,6 +3,7 @@
 This validates our versioned schema and semantic cross-references, not arbitrary
 JSON Schema. The adjacent *.schema.json files document the wire format.
 """
+import functools
 import hashlib
 import json
 import os
@@ -12,7 +13,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
-FEATURE_IDS = {f"F{i:02}" for i in range(1, 14)} | {f"S{i:02}" for i in range(1, 7)}
+FEATURE_IDS = {f"F{i:02}" for i in range(1, 16)} | {f"S{i:02}" for i in range(1, 7)}
 TIERS = {"contract", "native-integration", "device-proof"}
 STATUSES = {"passed", "failed", "blocked", "not-run", "unimplemented"}
 
@@ -142,6 +143,18 @@ def runnable_functions(text, python=False):
     return re.findall(r"(?m)^[ \t]*(?:@MainActor[ \t]+)?@Test\b(?:(?!\bfunc\b)[\s\S])*?\bfunc\s+([A-Za-z_][A-Za-z_0-9]*)\s*\(", text)
 
 
+@functools.lru_cache(maxsize=None)
+def _declared_in_version(path, python, version):
+    return tuple(runnable_functions(Path(path).read_text(), python))
+
+
+def declared_tests(path):
+    """Runnable test names in one file, scanned once per file version (path, size, mtime, inode)."""
+    path = Path(path)
+    status = path.stat()
+    return _declared_in_version(str(path), path.suffix == ".py", (status.st_size, status.st_mtime_ns, status.st_ino))
+
+
 def validate_case(case, root=ROOT):
     fields(case, {"file", "function"})
     file = relative_file(case["file"], root)
@@ -152,8 +165,19 @@ def validate_case(case, root=ROOT):
         "qa/closed-loop/tests/test_execution_cleanup.py", "qa/closed-loop/tests/test_ax_crash_report.py",
         "qa/closed-loop/tests/test_settings_catalog.py", "qa/closed-loop/tests/test_source_lint.py"}, "case must be a repository test")
     require(type(case["function"]) is str and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", case["function"]), "invalid test function")
-    require(runnable_functions(file.read_text(), file.suffix == ".py").count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
+    require(declared_tests(file).count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
 
+
+
+def native_suite_declared(suite, text):
+    """A suite is `NameTests`, or `Parent/NameTests` when it is nested in a serialized parent: Swift Testing reports
+    a nested suite as Module.Parent/NameTests/test(), so the selector carries the parent. The file must declare the
+    suite and extend (or declare) the parent."""
+    require(re.fullmatch(r"(?:[A-Za-z][A-Za-z0-9]*/)?[A-Za-z][A-Za-z0-9]*Tests", suite), "invalid suite selector")
+    parent, _, name = suite.rpartition("/")
+    if not re.search(r"\b(?:struct|class)\s+" + name + r"\b", text):
+        return False
+    return not parent or re.search(r"\b(?:extension|enum|struct|class)\s+" + parent + r"\b", text) is not None
 
 def validate_map(data, portable, root=ROOT):
     fields(data, {"schema_version", "scope", "checks", "features"})
@@ -177,8 +201,7 @@ def validate_map(data, portable, root=ROOT):
             file = relative_file(check["file"], root)
             require(check["file"].startswith(("Tests/ZeusAppTests/", "Tests/ZeusCoreTests/")), "native fixture must be a test")
             nonempty(check["suite"])
-            require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
-            require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing native suite")
+            require(native_suite_declared(check["suite"], file.read_text()), "missing native suite")
         elif check["kind"] == "trusted-native-fixture":
             # Same shape as a native fixture, but only a trusted Mac can execute it: SwiftUI exposes no
             # in-process accessibility tree, so the CI app job never selects it.
@@ -187,8 +210,7 @@ def validate_map(data, portable, root=ROOT):
             file = relative_file(check["file"], root)
             require(check["file"].startswith("Tests/ZeusAppTests/"), "trusted native fixture must be an app test")
             nonempty(check["suite"])
-            require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
-            require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing trusted native suite")
+            require(native_suite_declared(check["suite"], file.read_text()), "missing trusted native suite")
         elif check["kind"] == "native-module":
             require(set(check) == {"id", "kind", "tier", "scope", "module"}, "invalid native module fields")
             require(check["tier"] == "native-integration" and check["module"] == "ZeusCoreTests",
@@ -204,7 +226,7 @@ def validate_map(data, portable, root=ROOT):
     require(len(groups) == len(set(groups)), "duplicate portable group")
     require(set(groups) == set(portable.GROUPS) - {"wiki"}, "every default portable group must execute")
     unique(data["features"], "id")
-    require({f["id"] for f in data["features"]} == FEATURE_IDS, "all 13 Friday and 6 Sunday items are mandatory")
+    require({f["id"] for f in data["features"]} == FEATURE_IDS, "all 15 Friday and 6 Sunday items are mandatory")
     used_checks, obligation_ids = set(), set()
     for feature in data["features"]:
         fields(feature, {"id", "title", "obligations"})
@@ -273,6 +295,20 @@ def swift_summary(log, returncode):
     functions = sorted(set(re.findall(r"✔ Test ([A-Za-z_][A-Za-z_0-9]*)\([^\n]*\) passed after", log)))
     require(functions, "no passed test cases")
     return int(count), int(suites), functions
+
+
+SWIFT_OUTCOME_LINE = re.compile(
+    r'^(?:✔|➜|✘) Test (?:[A-Za-z_]\w*\([^\n]*?\)|"[^\n]*?") (?:passed after|skipped|failed after)\b', re.MULTILINE)
+
+
+def swift_log_complete(log):
+    """True when the log holds one outcome line for every test its summary counts.
+
+    swift test can drop or cut console lines when the machine is loaded, even though the run
+    itself passed. A log that lost lines cannot show which cases ran, so the caller reruns it.
+    """
+    summaries = re.findall(r"Test run with (\d+) tests? in ", log)
+    return len(summaries) == 1 and len(SWIFT_OUTCOME_LINE.findall(log)) == int(summaries[0])
 
 
 def swift_testing_xunit_path(requested):
@@ -426,7 +462,7 @@ def case_passed(case, check, output, root=ROOT):
         selected = list((root / "qa/closed-loop/tests").glob("test_*.py"))
     else:
         selected = [root / case["file"]]
-    count = sum(runnable_functions(p.read_text(), p.suffix == ".py").count(case["function"]) for p in selected)
+    count = sum(declared_tests(p).count(case["function"]) for p in selected)
     require(count == 1, f"passed log identity is ambiguous or not runnable in selected sources: {case['function']}")
 
 

@@ -41,13 +41,8 @@ struct GlanceCard<Content: View>: View {
                 // The look measured from Glance's Home cards.
                 padded
                     .background {
-                        ZStack {
-                            if scrim > 0 { shape.fill(Color.black.opacity(scrim)) }
-                            shape.fill(tint.opacity(0.08))
-                            // About +9 over the body at the top, about -4 at the bottom (parity/N4).
-                            shape.fill(LinearGradient(colors: [Color.white.opacity(0.035), .clear, Color.black.opacity(0.07)],
-                                                      startPoint: .top, endPoint: .bottom))
-                        }
+                        // Absolute black, like the body: the card reads by its edge alone.
+                        shape.fill(Color.black)
                     }
                     .overlay(shape.strokeBorder(LinearGradient(colors: [Color.white.opacity(home.finish == .liquidGlass ? 0.2 : 0.15), Color.white.opacity(0.06)],
                                                                startPoint: .top, endPoint: .bottom), lineWidth: 1))
@@ -73,13 +68,13 @@ enum GlanceTint {
 
     // Tab row, from the live pair (parity/N4).
     /// Capsule fill (19,19,21) and its 1 pt rim, lit at the top (56) and dim at the bottom (37).
-    static let capsule = Color(red: 19 / 255, green: 19 / 255, blue: 21 / 255)
+    static let capsule = Color.black
     static let capsuleRim = LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.075)], startPoint: .top, endPoint: .bottom)
     /// Selected pill (53,53,55) with a highlight along its top edge (96).
     static let pill = Color(red: 53 / 255, green: 53 / 255, blue: 55 / 255)
     static let pillRim = LinearGradient(colors: [.white.opacity(0.21), .clear], startPoint: .top, endPoint: .center)
     /// The 30 pt "more" circle (24).
-    static let more = Color(red: 24 / 255, green: 24 / 255, blue: 25 / 255)
+    static let more = Color.black
 }
 
 /// Glance type scale for cards.
@@ -212,7 +207,7 @@ private struct Wiggle: ViewModifier {
 
     func body(content: Content) -> some View {
         if active && !Motion.reduced && !TopBarStyle.isSnapshot {
-            TickingView(interval: 1.0 / 24.0) { context in
+            DisplaySynchronizedView(preferredFramesPerSecond: Motion.ambientFPS) { context in
                 content.rotationEffect(.degrees(sin(context.date.timeIntervalSinceReferenceDate * 13 + seed * 1.7) * 0.9))
             }
         } else {

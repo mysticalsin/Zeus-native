@@ -96,4 +96,22 @@ import Testing
         #expect(NowPlaying.parseProbe(["stopped", "x", "", "", "1", "1"].joined(separator: sep), player: .music) == nil)
         #expect(NowPlaying.parseProbe(["playing", "", "", "", "1", "1"].joined(separator: sep), player: .music) == nil)
     }
+
+    @Test func parsedItemsCarryTheirSource() {
+        let info: [AnyHashable: Any] = ["Player State": "Playing", "Name": "Song", "Total Time": 1000, "Duration": 2000]
+        let music = NowPlaying.parse(info, player: .music)
+        let spotify = NowPlaying.parse(info, player: .spotify)
+        #expect(music?.source == .player(.music))
+        #expect(spotify?.source == .player(.spotify))
+        // Each player still reads its own duration key first.
+        #expect(music?.duration == 1)
+        #expect(spotify?.duration == 2)
+        let out = ["playing", "Tune", "Duo", "LP", "180", "4"].joined(separator: sep)
+        #expect(NowPlaying.parseProbe(out, player: .music)?.source == .player(.music))
+        #expect(NowPlaying.parseProbe(out, player: .spotify)?.source == .player(.spotify))
+        for item in [music, spotify].compactMap({ $0 }) {
+            #expect(item.rate == 1)
+            #expect(item.artworkURL == nil)
+        }
+    }
 }

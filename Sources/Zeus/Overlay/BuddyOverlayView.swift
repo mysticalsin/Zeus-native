@@ -99,7 +99,7 @@ struct WaveformView: View {
 
     var body: some View {
         if active {
-            TickingView(interval: 1.0 / 30) { context in
+            DisplaySynchronizedView(preferredFramesPerSecond: Motion.ambientFPS) { context in
                 bars(at: context.date)
             }
         }
@@ -126,7 +126,7 @@ struct SpinnerView: View {
 
     var body: some View {
         if active {
-            TickingView(interval: 1.0 / 30) { context in
+            DisplaySynchronizedView(preferredFramesPerSecond: Motion.spinnerFPS) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 Circle()
                     .trim(from: 0.15, to: 0.85)

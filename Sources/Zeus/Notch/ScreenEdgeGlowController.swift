@@ -90,6 +90,8 @@ final class ScreenEdgeGlowController {
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.level = .statusBar
+        // No system window animation: a stuck zoom left a ghost island 4 pt below the screen edge.
+        panel.animationBehavior = .none
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]

@@ -22,6 +22,7 @@ public enum LRC {
         var offset = 0.0
         var lines: [LyricLine] = []
         for raw in text.split(whereSeparator: \.isNewline) {
+            if lines.count >= LyricsLimits.maxLines { break }
             var rest = Substring(raw).trimmingCharacters(in: .whitespaces)[...]
             var stamps: [Double] = []
             while rest.hasPrefix("["), let close = rest.firstIndex(of: "]") {
@@ -33,12 +34,34 @@ public enum LRC {
                     offset = ms / 1000
                 } // other metadata tags (ar, ti, al, by...) are ignored
             }
-            let words = rest.trimmingCharacters(in: .whitespaces)
-            for time in stamps { lines.append(LyricLine(time: time, text: words)) }
+            let words = LyricsLimits.clipped(strippingWordTags(rest).trimmingCharacters(in: .whitespaces))
+            for time in stamps where lines.count < LyricsLimits.maxLines { lines.append(LyricLine(time: time, text: words)) }
         }
         // A positive offset makes the lyrics appear sooner.
         let shifted = lines.map { LyricLine(time: max(0, $0.time - offset), text: $0.text) }
         return shifted.enumerated().sorted { ($0.element.time, $0.offset) < ($1.element.time, $1.offset) }.map(\.element)
+    }
+
+    /// Drops inline word tags (`<mm:ss.xx>`, as in enhanced `.lrc` files) so they never show as text.
+    /// Angle brackets that do not hold a timestamp stay. A tag with spaces on both sides leaves one space.
+    /// A tag closes within `LyricsLimits.maxWordTagCharacters`, so every `<` looks at a fixed window and the
+    /// scan is linear however many brackets the text holds.
+    static func strippingWordTags(_ text: Substring) -> String {
+        var kept = ""
+        var rest = text
+        while let open = rest.firstIndex(of: "<") {
+            kept += rest[..<open]
+            let inside = rest.index(after: open)
+            let window = rest[inside...].prefix(LyricsLimits.maxWordTagCharacters + 1)
+            if let close = window.firstIndex(of: ">"), stamp(String(window[..<close])) != nil {
+                rest = rest[rest.index(after: close)...]
+                if kept.last?.isWhitespace == true { rest = rest.drop(while: \.isWhitespace) }
+            } else {
+                kept.append("<")
+                rest = rest[inside...]
+            }
+        }
+        return kept + rest
     }
 
     /// "01:02.34", "1:02", "00:12.5" in seconds; nil for anything else (a metadata tag).
@@ -64,13 +87,12 @@ public extension Array where Element == LyricLine {
     /// How far through the current line (0...1), for a soft fill. Lines last until the next one starts.
     func lineProgress(at time: Double, trackEnd: Double = 0) -> Double {
         guard let index = currentIndex(at: time) else { return 0 }
-        let end = index + 1 < count ? self[index + 1].time : Swift.max(trackEnd, self[index].time + 4)
-        let span = Swift.max(end - self[index].time, 0.001)
+        let span = Swift.max(lineEnd(at: index, trackEnd: trackEnd) - self[index].time, 0.001)
         return Swift.min(Swift.max((time - self[index].time) / span, 0), 1)
     }
 }
 
-/// The LRCLIB request (https://lrclib.net/api/get): free, no key.
+/// The LRCLIB lookup (https://lrclib.net/api): free, no key. The requests built from it are in LyricsMatching.swift.
 public struct LRCLIBQuery: Equatable, Sendable {
     public var artist: String
     public var title: String
@@ -87,21 +109,6 @@ public struct LRCLIBQuery: Equatable, Sendable {
 
     /// Needs at least a title; LRCLIB matches on artist too, so a track with neither is not asked about.
     public var isAskable: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty && !artist.trimmingCharacters(in: .whitespaces).isEmpty }
-
-    public var url: URL? { build(withAlbumAndDuration: true) }
-    /// For a 404: the same track without album and duration, which LRCLIB then matches loosely.
-    public var looseURL: URL? { build(withAlbumAndDuration: false) }
-
-    private func build(withAlbumAndDuration: Bool) -> URL? {
-        var parts = URLComponents(string: "https://lrclib.net/api/get")
-        var items = [URLQueryItem(name: "artist_name", value: artist), URLQueryItem(name: "track_name", value: title)]
-        if withAlbumAndDuration {
-            items.append(URLQueryItem(name: "album_name", value: album))
-            if duration > 0 { items.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded())))) }
-        }
-        parts?.queryItems = items
-        return parts?.url
-    }
 
     /// A stable file name for the cache.
     public var cacheKey: String {
@@ -126,7 +133,8 @@ public enum LRCLIBResponse {
 }
 
 /// Lyrics kept on disk (~/Library/Caches/Zeus/lyrics), one small JSON file per track. Misses are kept too,
-/// for `missLifetime`, so a track LRCLIB does not know is not asked about again on every play.
+/// for `missLifetime`, so a track LRCLIB does not know is not asked about again on every play. An answer over
+/// `LyricsLimits.maxCachedEntryBytes` is not kept.
 public struct LyricsCache: Sendable {
     public let directory: URL
     public var missLifetime: TimeInterval = 3 * 24 * 3600
@@ -136,26 +144,34 @@ public struct LyricsCache: Sendable {
             .appendingPathComponent("Zeus/lyrics", isDirectory: true)
     }
 
+    /// The version of the lookup rules that wrote a miss. Raise it when the lookup learns to find more, so misses
+    /// the older rules cached are ignored once instead of hiding the new matching until they expire.
+    static let missRulesVersion = 2
+
     struct Entry: Codable {
         var kind: String
         var lines: [LyricLine]?
         var plain: String?
         var fetchedAt: Date
+        /// `missRulesVersion` at the time of writing. Absent in entries from before it existed.
+        var rules: Int?
     }
 
     public func load(_ query: LRCLIBQuery, now: Date = Date()) -> LyricsResult? {
         let url = directory.appendingPathComponent(query.cacheKey + ".json")
         guard let data = try? Data(contentsOf: url), let entry = try? JSONDecoder().decode(Entry.self, from: data) else { return nil }
         switch entry.kind {
-        case "synced": return entry.lines.map { .synced($0) }
+        case "synced": return entry.lines.map { .synced(LyricsLimits.clamped($0)) }
         case "plain": return entry.plain.map { .plain($0) }
         case "instrumental": return .instrumental
-        default: return now.timeIntervalSince(entry.fetchedAt) < missLifetime ? LyricsResult.none : nil
+        default:
+            guard (entry.rules ?? 0) >= Self.missRulesVersion else { return nil }
+            return now.timeIntervalSince(entry.fetchedAt) < missLifetime ? LyricsResult.none : nil
         }
     }
 
     public func save(_ result: LyricsResult, for query: LRCLIBQuery, now: Date = Date()) {
-        var entry = Entry(kind: "none", lines: nil, plain: nil, fetchedAt: now)
+        var entry = Entry(kind: "none", lines: nil, plain: nil, fetchedAt: now, rules: Self.missRulesVersion)
         switch result {
         case .synced(let lines): entry.kind = "synced"; entry.lines = lines
         case .plain(let text): entry.kind = "plain"; entry.plain = text
@@ -163,7 +179,7 @@ public struct LyricsCache: Sendable {
         case .none: break
         }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(entry) {
+        if let data = try? JSONEncoder().encode(entry), data.count <= LyricsLimits.maxCachedEntryBytes {
             try? data.write(to: directory.appendingPathComponent(query.cacheKey + ".json"), options: .atomic)
         }
     }

@@ -9,7 +9,7 @@ import Testing
     // MARK: Engines and arguments
 
     @Test func claudeGetsTheWebToolsAndTheCappedModel() throws {
-        let defaults = UserDefaults(suiteName: "zeus.tests.research.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.tests.research.\(UUID().uuidString)")!
         let quick = try #require(ResearchReport.arguments(engine: .claude, prompt: "P", depth: .quick, defaults: defaults))
         #expect(quick.starts(with: ["-p", "P"]))
         #expect(quick.contains("--allowedTools"))
@@ -28,7 +28,7 @@ import Testing
     }
 
     @Test func geminiUsesItsOwnSearchAndEnginesWithoutAWebToolAreSkipped() {
-        let defaults = UserDefaults(suiteName: "zeus.tests.research.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.tests.research.\(UUID().uuidString)")!
         let gemini = ResearchReport.arguments(engine: .gemini, prompt: "P", depth: .quick, defaults: defaults)
         #expect(gemini == ["-m", "gemini-3.7-flash", "-p", "P"])
         for engine in [RouterEngine.codex, .cursorAgent, .grok, .ollama] {
