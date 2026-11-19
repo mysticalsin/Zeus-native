@@ -51,6 +51,10 @@ struct PeerCredentialsTests {
         #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"], release: true) == strict)
         let released = ZeusPaths.supportDirectory(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"], release: true)
         #expect(released.path.hasSuffix("Library/Application Support/Zeus"))
+        let moved = ZeusPaths.socket(environment: ["ZEUS_SOCKET": "/tmp/zeus-test/zeus.sock"], release: false)
+        #expect(moved.path == "/tmp/zeus-test/zeus.sock")
+        let kept = ZeusPaths.socket(environment: ["ZEUS_SOCKET": "/tmp/zeus-test/zeus.sock"], release: true)
+        #expect(kept.path.hasSuffix("Library/Application Support/Zeus/zeus.sock"))
     }
 
     @Test func theHookTrustsOnlyTheSameUserAndASignedServer() {

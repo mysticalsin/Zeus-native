@@ -56,7 +56,7 @@ enum ChromeBridge {
         let payload = try JSONEncoder().encode(request)
         let path = ZeusPaths.chromeSocket.path
         let reply = await Task.detached {
-            UnixSocket.request(path: path, payload: payload, expectReply: true, timeout: timeout)
+            UnixSocket.request(path: path, payload: payload, expectReply: true, timeout: timeout, requireSignedServer: true)
         }.value
         guard let reply, let response = try? JSONDecoder().decode(BridgeResponse.self, from: reply) else {
             throw BridgeFailure.notConnected
@@ -83,7 +83,7 @@ enum ChromeBridge {
         }
         let path = ZeusPaths.chromeSocket.path
         let outcome = await Task.detached {
-            UnixSocket.exchange(path: path, payload: payload, timeout: timeout)
+            UnixSocket.exchange(path: path, payload: payload, timeout: timeout, requireSignedServer: true)
         }.value
         switch outcome {
         case .notConnected, .closedEarly: return .notConnected

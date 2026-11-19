@@ -149,7 +149,11 @@ import Testing
 
 @Suite struct SocketTests {
     @Test func requestAndReplyOverUnixSocket() throws {
-        let path = NSTemporaryDirectory() + "zeus-test-\(UUID().uuidString.prefix(8)).sock"
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-tag-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("echo.sock").path
         let server = UnixSocketServer(path: path) { line, reply in
             reply(Data("echo:".utf8) + line)
         }

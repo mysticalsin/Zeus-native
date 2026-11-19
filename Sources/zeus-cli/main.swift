@@ -37,7 +37,8 @@ guard let command = invocation.command else {
 guard let payload = try? JSONEncoder().encode(command) else { fail("zeus: could not encode the request", code: 1) }
 
 let socket = ZeusPaths.socket.path
-guard let data = UnixSocket.request(path: socket, payload: payload, expectReply: true, timeout: invocation.timeout),
+guard let data = UnixSocket.request(path: socket, payload: payload, expectReply: true, timeout: invocation.timeout,
+                                 requireSignedServer: true),
       !data.isEmpty else {
     fail("zeus: ZEUS isn't answering on \(socket). Open ZEUS and try again.", code: 3)
 }

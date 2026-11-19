@@ -10,7 +10,10 @@ import Security
 /// Nothing here logs a path, a token or any signing material beyond the refusal reason.
 public enum PeerSigning {
     /// The verifier a server uses unless a test injects another.
-    public static let defaultVerifier: PeerVerifier = { PeerSigning.verifyApp(auditToken: $0) }
+    /// Pins the app's signing identifier and asks for strict validation. A CLI or bridge talking to the app uses this.
+    public static let defaultVerifier: PeerVerifier = {
+        PeerSigning.verifyApp(auditToken: $0, expectedPeerIdentifier: ZeusPaths.bundleIdentifier)
+    }
 
     #if canImport(Darwin)
     /// True when the process behind `auditToken` is this app's own program.
@@ -142,9 +145,7 @@ public enum PeerSigning {
         var compiled: SecRequirement?
         if let requirement, SecRequirementCreateWithString(requirement as CFString, SecCSFlags(), &compiled) == errSecSuccess,
            let compiled {
-            let flags = requirement.contains("identifier ")
-                ? SecCSFlags(rawValue: UInt32(kSecCSStrictValidate))
-                : SecCSFlags()
+            let flags = SecCSFlags(rawValue: UInt32(kSecCSStrictValidate))
             satisfied = SecCodeCheckValidity(code, flags, compiled) == errSecSuccess
         }
         let valid = satisfied || SecCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess

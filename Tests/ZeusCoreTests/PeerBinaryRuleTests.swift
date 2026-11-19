@@ -433,6 +433,7 @@ struct PeerVerificationWiringTests {
     private func socketPath(_ name: String) throws -> (URL, String) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-peerv-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         return (root, root.appendingPathComponent(name).path)
     }
 

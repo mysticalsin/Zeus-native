@@ -34,7 +34,8 @@ enum DebugForward {
             print(ZeusCLI.usage)
             exit(0)
         }
-        guard let data = UnixSocket.request(path: socketPath, payload: payload, expectReply: true, timeout: timeout),
+        guard let data = UnixSocket.request(path: socketPath, payload: payload, expectReply: true, timeout: timeout,
+                                             requireSignedServer: true),
               !data.isEmpty else {
             FileHandle.standardError.write(Data("Zeus isn't running.\n".utf8))
             exit(3)
