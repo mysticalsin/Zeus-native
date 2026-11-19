@@ -1570,7 +1570,7 @@ struct ClosedWings: View {
         // Width springs via `NotchView.wingsSpring`; scale insertion caused a one-frame full-size jump (R24 C1).
         let music = if case .music = Self.kind(of: topBar) { true } else { false }
         let proposals = NotchClosedBodyLayout.musicContent()
-        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar),
+        return ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar),
                        leftProposal: music ? proposals.art : NotchClosedBodyLayout.miniMascotSize,
                        rightProposal: music ? proposals.bars : NotchClosedBodyLayout.miniMascotSize,
                        clipMusic: music, left: left(), right: right())
