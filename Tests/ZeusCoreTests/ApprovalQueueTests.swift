@@ -113,4 +113,87 @@ struct ApprovalDecisionTests {
         log.recordTrustedApproval(session: "chat-1", command: "ls")
         #expect(log.entries == ["trusted approval chat-1: ls"])
     }
+
+    @Test func aPlainActivationDoesNotAllowHigh() {
+        let start = Date(timeIntervalSince1970: 4_000)
+        var high = ApprovalAllowGate(risk: .high)
+        #expect(high.activate(now: start) == nil)
+        #expect(high.releaseHold(now: start.addingTimeInterval(0.2)) == nil)
+        var again = ApprovalAllowGate(risk: .high)
+        #expect(again.activate(now: start) == nil)
+        #expect(again.releaseHold(now: start.addingTimeInterval(0.8)) == .allow)
+        var reduced = ApprovalAllowGate(risk: .high, reduceMotion: true)
+        #expect(reduced.activate(now: start) == nil)
+        #expect(reduced.activate(now: start) == .allow)
+        var spoken = ApprovalAllowGate(risk: .high, voiceOver: true)
+        #expect(spoken.activate(now: start) == nil)
+        #expect(spoken.activate(now: start) == .allow)
+        #expect(ApprovalAllowGate(risk: .low).activate(now: start) == .allow)
+        #expect(ApprovalAllowGate(risk: .medium).activate(now: start) == .allow)
+    }
+
+    @Test func shellHighBeatsANormalSubstringAndBlocksTheShortcut() {
+        let command = "echo hi > /tmp/out"
+        let input = JSONValue.object(["command": .string(command)])
+        #expect(CommandRisk.assess(tool: "Bash", input: input) != .high)
+        #expect(ShellRiskClassifier.assess(command).cardRisk == .high)
+        let card = ApprovalRisk.effective(tool: "Bash", input: input, command: command)
+        #expect(card.risk == .high)
+        #expect(HookClientInput.effectiveRisk(claimed: .low, tool: "Bash", input: input) == .high)
+        #expect(!ApprovalPolicy.canApprove(risk: card.risk, by: .shortcut))
+        #expect(!ApprovalPolicy.canApprove(risk: card.risk, by: .spokenYes))
+        #expect(!ApprovalPolicy.canApprove(risk: card.risk, by: .trustChat))
+    }
+}
+
+@Suite("Approval expiry")
+struct ApprovalExpiryTests {
+    @Test func aRequestOlderThanTheHelperDeadlineCannotBeApproved() async {
+        let start = Date(timeIntervalSince1970: 8_000)
+        let clock = ApprovalClock(start)
+        let gate = ApprovalGate(now: { clock.date })
+        let stale = ApprovalTicket(id: "old", arrived: start, helperDeadline: start.addingTimeInterval(115), risk: .low)
+        clock.date = start.addingTimeInterval(116)
+        #expect(await gate.enqueue(stale) == .expired)
+        #expect(await gate.front == nil)
+        #expect(await gate.permits("old") == false)
+    }
+
+    @Test func clearFrontIgnoresADifferentIdAndADuplicateIdIsRejected() async {
+        let start = Date(timeIntervalSince1970: 2_000)
+        let gate = ApprovalGate(now: { start })
+        let first = ApprovalTicket(id: "a", arrived: start, helperDeadline: start.addingTimeInterval(115), risk: .low)
+        let second = ApprovalTicket(id: "b", arrived: start.addingTimeInterval(1), helperDeadline: start.addingTimeInterval(115), risk: .low)
+        #expect(await gate.enqueue(first) == .show(position: "1 of 1"))
+        #expect(await gate.enqueue(second) == .waiting(position: "2 of 2"))
+        #expect(await gate.enqueue(first) == .duplicate)
+        #expect(await gate.clearFront(id: "b") == nil)
+        #expect(await gate.front?.id == "a")
+        #expect(await gate.clearFront(id: "a")?.id == "a")
+        #expect(await gate.front?.id == "b")
+    }
+}
+
+@Suite("Approval audit")
+struct ApprovalAuditTests {
+    @Test func theLogDropsTheOldestAndStripsControlsFromEveryDecision() {
+        var log = ApprovalAudit()
+        log.record(kind: .card, session: "s\n1", command: "ls\u{0007}", verdict: "deny")
+        log.record(kind: .shortcut, session: "s", command: "ls", verdict: "allow")
+        log.record(kind: .voice, session: "s", command: "ls", verdict: "deny")
+        log.record(kind: .timeout, session: "s", command: "ls", verdict: "deny")
+        #expect(log.entries[0] == "card s1: ls deny")
+        #expect(log.entries.map { $0.split(separator: " ").first.map(String.init) } == ["card", "shortcut", "voice", "timeout"])
+        for index in 0..<ApprovalAudit.capacity {
+            log.record(kind: .card, session: "s", command: "c\(index)", verdict: "deny")
+        }
+        #expect(log.entries.count == ApprovalAudit.capacity)
+        #expect(log.entries.first?.contains("c0") == true)
+        #expect(log.entries.contains { $0.contains("ls") } == false)
+    }
+}
+
+private final class ApprovalClock: @unchecked Sendable {
+    var date: Date
+    init(_ date: Date) { self.date = date }
 }
