@@ -15,8 +15,10 @@ struct MediaIslandFeatureTests {
                                 duration: 100, position: 1, positionAt: now)
         let system = NowPlaying(source: .system, title: "Helper", artist: "", album: "", isPlaying: true,
                                 duration: 100, position: 1, positionAt: now)
-        #expect(arbiter.update(.system, system, now: now))
-        #expect(arbiter.update(.player(.music), player, now: now.addingTimeInterval(1)))
+        let tookSystem = arbiter.update(.system, system, now: now)
+        let tookPlayer = arbiter.update(.player(.music), player, now: now.addingTimeInterval(1))
+        #expect(tookSystem)
+        #expect(tookPlayer)
         #expect(arbiter.shown(follow: .any)?.playing.source == .player(.music))
     }
 
