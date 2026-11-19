@@ -85,9 +85,18 @@ Camera face verification is the primary identity check for a Zeus approval, so T
 
 **Capture.** `AVFoundation` for the camera. Vision for face rectangles and landmarks, which `FaceVision.analyze` already requests.
 
-**Identity model.** The match needs an on-device face embedding. This repo contains no `.mlmodel`, `.mlpackage`, or other weight file. The only embedding Zeus computes today is Apple's image feature print from `VNGenerateImageFeaturePrintRequest` (`FaceVision.featurePrint`, revision `VNGenerateImageFeaturePrintRequest.currentRevision`). That call uses the operating system. It does not bundle weights, and Apple's SDK terms are what allow the call. It is not a face-verification model with a published false-accept rate.
+**Identity model.** The embedder is a protocol: a name, a model identifier, an embedding dimension, whether alignment is required, and a function from an aligned face to a vector. The selected implementation is OpenCV Zoo SFace, with YuNet for detection and five-point alignment. SFace returns the embedding. The score is cosine distance. This commit does not vendor the weights.
 
-A separate face-recognition weight file is not bundled. The plan that introduced presence rejected one such file because its terms were research-only and do not allow redistribution. No other model with a licence that allows redistribution has been identified. Until one is identified and the licence is checked, Zeus must not download or vendor weights. The match, if it ships before that, may use only the public Vision feature print already in the tree. A claimed false-accept rate for a bundled model is blocked.
+Both licence files were read on 19 Nov 2026:
+
+- `opencv/opencv_zoo` `models/face_recognition_sface/LICENSE` is the Apache License, Version 2.0. The directory README says every file in that directory is under that licence. The LICENSE file has no filled copyright line. The README names Yaoyao Zhong as the contributor and Chengrui Wang for the ONNX conversion.
+- `opencv/opencv_zoo` `models/face_detection_yunet/LICENSE` is the MIT License, Copyright (c) 2020 Shiqi Yu.
+
+The only embedding Zeus computes today is Apple's image feature print from `VNGenerateImageFeaturePrintRequest`. That stays a presence cue. It is not the verification embedding.
+
+**Risk.** high. SFace was trained on celebrity datasets and needs legal sign-off. The SFace paper's experiments use CASIA-WebFace, VGGFace2, and MS-Celeb-1M. The Zoo licence file does not say which of those produced the shipped ONNX. Do not vendor or release the weights before that sign-off. InsightFace weights, including w600k_mbf and any ArcFace package, stay out. No false-accept rate is claimed for the feature print or for SFace.
+
+**Unlock code.** Adapt [jonnyoo/glance](https://github.com/jonnyoo/glance) at `b97f5213`. Its `LICENSE` was read on 19 Nov 2026: MIT, Copyright (c) 2026 Jonathan Zhou. Take the enrolment flow, the AES-GCM template, and the Keychain key behind user presence. Do not use its notch animation. The glance README credits The Boring Notch for the notch window physics, and that project is GPL-3.0. Do not copy that animation. Do not bundle glance's ArcFace model.
 
 **Enrolment.** Several poses. Store only an encrypted template in the Keychain with an access-control flag that requires biometric or user presence. Never store a raw image, a crop, or a thumbnail. Never send a frame, a landmark, or a template off the device. Never log them.
 
@@ -103,7 +112,7 @@ A separate face-recognition weight file is not bundled. The plan that introduced
 
 **Onboarding.** Say plainly that macOS has no Face ID and that an app cannot unlock the Mac login screen by itself. Offer Touch ID or Apple Watch for approvals. Offer optional camera presence (lock when away, wake when back) with the default off and a plain explanation of the camera permission. The 13:16 fuller unlock, if built, stores the login password only in the Keychain behind biometric or user-presence access control, never in the repo and never in a log. Onboarding states that risk in words. Presence without that password remains the default.
 
-**Clean-room.** New face-approval code does not copy another product's files. The presence code already in the tree stays. New tests do not import another product's sources.
+**Clean-room.** New face-approval code may adapt the MIT files named above and must keep their notices. It does not copy the GPL-3.0 notch animation, and it does not import InsightFace weights. The presence code already in the tree stays.
 
 **Live check.** A native script, `qa/face-approval-live.md`, is the list Tony runs later with his own face. This spec does not record a result for that run.
 
@@ -114,11 +123,24 @@ A separate face-recognition weight file is not bundled. The plan that introduced
 - **R-017.** Try the public Focus Filter. The Full Disk Access file is a second path behind its own opt-in, with a plain label. Off shows nothing and reads nothing.
 - **R-019.** Bonjour names for AirPlay speakers. Local Network usage string. Off does not browse.
 - **R-020.** Stage 1 is the QR page. Shared Wi-Fi requires a one-time token and TLS, or the listener is local-only. Stage 2 is this paragraph only.
-- **R-022.** Sparkle 2 may be added later, EdDSA, with rollback and downgrade checks. Placeholders for the feed URL and the key. No private key in git. Nothing is published from this spec.
+- **R-022.** Sparkle 2 is the updater. Its `LICENSE` was read on 19 Nov 2026: MIT, plus the BSD notices and the ed25519 notice bundled in that file. EdDSA, with rollback and downgrade checks. Placeholders for the feed URL and the key. No private key in git. Nothing is published from this spec. The notices are in `THIRD_PARTY_NOTICES`.
 
 ## Held
 
 R-014, R-024, and R-025 stay held. Settings shows them as "not available yet". R-014 is not implemented with the private now-playing framework.
+
+## Prior art
+
+Selected from the 19 Nov 2026 prior-art page. Each licence file below was read that day. Notices are in `THIRD_PARTY_NOTICES`. GPL, AGPL, MPL, and unlicensed code are not copied.
+
+- **Notch (R-009).** [MrKai77/DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit). MIT, Copyright (c) 2025 Kai Azim. Notch-adaptive windows, including a floating style on a notchless Mac.
+- **Every display.** [coalsi/Notcher](https://github.com/coalsi/Notcher). MIT, Copyright (c) 2026 Corey Silvia. One window lifecycle per display. Zeus still has one controller. The other displays mirror.
+- **Rounded corners (R-006).** [niklasravnsborg/HideNotch](https://github.com/niklasravnsborg/HideNotch). MIT, Copyright (c) 2026 Niklas Ravnsborg and Copyright (c) 2026 leither. Click-through corner windows.
+- **Per-app volume (R-013).** [lishuangqiang/mixbar](https://github.com/lishuangqiang/mixbar). MIT. The copyright line in its LICENSE is "Copyright (c) 2026 Murmur contributors". Adapt the rebuild-on-device-change path. No orphan mute.
+- **Browser media (R-011).** [JosephusPaye/chrome-media-controller](https://github.com/JosephusPaye/chrome-media-controller). The file is named `LICENCE`. MIT, Copyright (c) 2020 Josephus Paye II. Adapt the MediaSession play, pause, and seek path into the extension Zeus already ships.
+- **Lyrics (R-002, R-012).** [tranxuanthang/lrclib](https://github.com/tranxuanthang/lrclib). MIT, Copyright (c) 2024 tranxuanthang. Follow its API rules. LyricsX is MPL-2.0 and is not copied.
+- **Updater (R-022).** [sparkle-project/Sparkle](https://github.com/sparkle-project/Sparkle) 2. MIT, plus the BSD and ed25519 notices in its LICENSE. Keys never go in the repo.
+- **Face (R-023).** SFace, YuNet, and glance, as written above. Boring Notch (GPL-3.0) is not used.
 
 ## Requirements
 
@@ -129,7 +151,7 @@ R-014, R-024, and R-025 stay held. Settings shows them as "not available yet". R
 - **FR-005**: Shuffle and repeat keep Spotify on off/all only, script only with consent, and time out at 3 s.
 - **FR-006**: Lyrics stay on the strict, cleaned, then search ladder. A failure is `.unavailable`, never a cached `.none`. The wait honours Retry-After and adds jitter.
 - **FR-007**: Wave 2 settings default off and fail closed.
-- **FR-008**: Face approval uses the camera and Vision, stores only an encrypted template, and falls back to Touch ID or `LocalAuthentication`. No bundled weights of unknown licence.
+- **FR-008**: Face approval uses the camera and Vision, stores only an encrypted template, and falls back to Touch ID or `LocalAuthentication`. The embedder protocol's selected weights are SFace (Apache-2.0) with YuNet (MIT). They stay out of the tree until the celebrity-dataset sign-off. InsightFace weights are not bundled.
 - **FR-009**: False-accept and false-reject figures are reported only from a real run. This spec states none.
 - **FR-010**: No private API outside the Wave 2 contracts listed above.
 

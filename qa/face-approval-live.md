@@ -1,6 +1,6 @@
 # Live face-approval check
 
-Tony runs this on his Mac, with his own face, after the Wave 2 face tests exist. An agent does not run it and does not fill the result lines.
+Tony runs this on his Mac, with his own face, after the Wave 2 face tests exist and after the SFace celebrity-dataset sign-off. The embedder under test is SFace with YuNet, not a feature print and not an InsightFace weight. An agent does not run it and does not fill the result lines.
 
 The camera permission must already be Tony's own choice. This script does not click a permission prompt.
 

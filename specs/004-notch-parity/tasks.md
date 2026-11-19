@@ -55,7 +55,7 @@ Write these red, against synthetic vectors and cue readings, not against Tony's 
 
 ### Implementation
 
-- [ ] T019 Make T012 through T018 pass using `VNDetectFaceLandmarksRequest` and, only if still licensed as an OS call, `VNGenerateImageFeaturePrintRequest`. Do not add a weight file. Do not add an entitlement. Camera permission only.
+- [ ] T019 Make T012 through T018 pass behind the embedder protocol. The selected implementation is SFace with YuNet, and it is not vendored until the celebrity-dataset sign-off in spec.md. Do not add an InsightFace weight. Do not add an entitlement. Camera permission only. Active liveness uses Vision landmarks.
 - [ ] T020 Measure false-accept and false-reject on synthetic or licensed public fixtures and write the counts into `checklist.md`. If the fixtures are not licensed, leave the cells blank and stop. Do not invent the rates.
 - [ ] T021 Leave `qa/face-approval-live.md` for Tony. Do not fill its result fields in an agent run.
 

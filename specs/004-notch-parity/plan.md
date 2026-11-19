@@ -8,7 +8,7 @@
 
 ## Summary
 
-Wave 1 puts the existing top bar on every display, keeps one controller, and closes the public gaps in shuffle, lyrics, collapse, icons, and Settings labels. Wave 2 turns on, one setting at a time and off by default, the contracts Tony released on 13:16 and 13:17. Face verification for approvals uses the camera and Vision. No face-model weights are added, because none with a redistribution licence are in the tree.
+Wave 1 puts the existing top bar on every display, keeps one controller, and closes the public gaps in shuffle, lyrics, collapse, icons, and Settings labels. Wave 2 turns on, one setting at a time and off by default, the contracts Tony released on 13:16 and 13:17. Face verification uses a protocol embedder. The selected weights are OpenCV Zoo SFace (Apache-2.0) with YuNet (MIT). They are not added in this commit. SFace was trained on celebrity datasets and needs legal sign-off.
 
 ## Technical Context
 
@@ -34,7 +34,7 @@ Wave 1 puts the existing top bar on every display, keeps one controller, and clo
 
 - **I. Simplicity**: One row per feature, plain words, held rows say "not available yet". Pass.
 - **II. Red-first**: tasks.md names the failing test. The checklist stays empty until a run. Pass.
-- **III. Clean-room**: The reference product is not named. New face-approval text does not copy another product's sources. Music, Spotify, and Chromium are the apps Zeus already scripts. Pass.
+- **III. Clean-room**: Prior-art names are in spec.md and `THIRD_PARTY_NOTICES` because the MIT, BSD, and Apache notices have to be kept. GPL, AGPL, and MPL sources are not copied. The glance notch animation is excluded. Music, Spotify, and Chromium are the apps Zeus already scripts. Pass.
 - **IV. Privacy**: No image stored or logged. No password in the repo. Camera stays off until the setting is on. Pass.
 - **V. Motion and accessibility**: Existing top bar motion stays. New state changes follow Reduce Motion. VoiceOver hears the face failure sentences. Pass.
 
@@ -54,7 +54,7 @@ Wave 1 code, when it starts, touches `DisplaySelection`, `NotchController`, `Mus
 
 ## Blocker
 
-No weight file is in the repository. `VNGenerateImageFeaturePrintRequest` is an operating-system call, not a bundled model, and it has no published false-accept rate for face verification. A research-only weight file was already rejected for redistribution. No replacement with a licence that allows redistribution has been identified. Do not add weights. Do not report a false-accept or false-reject rate until a run on licensed or synthetic fixtures produces one.
+No weight file is in the repository. The selected embedder is SFace with YuNet, behind the protocol in spec.md. Both licence files were read on 19 Nov 2026 and are permissive. **Risk: high.** SFace was trained on celebrity datasets and needs legal sign-off. Do not vendor the weights before that sign-off. InsightFace weights stay out. `VNGenerateImageFeaturePrintRequest` is not the verification model. Do not report a false-accept or false-reject rate until a run on licensed or synthetic fixtures produces one.
 
 ## Complexity Tracking
 
