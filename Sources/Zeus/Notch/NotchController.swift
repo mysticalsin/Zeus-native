@@ -282,7 +282,8 @@ final class NotchController {
             if await ApprovalGate.shared.wasCancelled(id) { return .deny }
             position = await ApprovalGate.shared.position(of: id) ?? ""
         }
-        if Task.isCancelled || await ApprovalGate.shared.wasCancelled(id) {
+        let cancelled = await ApprovalGate.shared.wasCancelled(id)
+        if Task.isCancelled || cancelled {
             _ = await ApprovalGate.shared.clearFront(id: id)
             return .deny
         }
@@ -430,9 +431,9 @@ final class NotchController {
         if play { NSSound(named: NSSound.Name("Glass"))?.play() }
         guard let notice, notice.informational, notice.offersAllow == false else { return }
         Task {
-            await SystemNotificationService.shared.deliver(SystemNotificationPayload(
+            await SystemNotificationService.shared.deliverInformational(
                 title: "Zeus needs you",
-                body: "A request is waiting in Zeus. This notice cannot approve it."))
+                body: "A request is waiting in Zeus. This notice cannot approve it.")
         }
     }
 
