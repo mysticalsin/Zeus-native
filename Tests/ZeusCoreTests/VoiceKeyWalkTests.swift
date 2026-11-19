@@ -1701,15 +1701,28 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 }
 
 @Suite struct VoiceKeyWalkTests {
-    @Test(arguments: WalkRun.all.filter { run in
+    /// Every run is searched. The runs do not share state, so they proceed together; one after another does not
+    /// finish inside the suite.
+    @Test func everyOrderOfPressesKeepsTheRules() {
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
-        return only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
-    })
-    fileprivate func everyOrderOfPressesKeepsTheRules(run: WalkRun) {
-        let report = search(run)
-        print("voice key walk \(run.name): \(report.states) states, \(report.moves) moves, \(String(format: "%.2f", report.seconds)) s")
-        #expect(report.violations.isEmpty, "\(run.name): \(report.violations.joined(separator: "\n"))")
-        #expect(report.states > 100, "the search found too few states to be a search")
+        let runs = WalkRun.all.filter { run in
+            only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
+        }
+        let lock = NSLock()
+        var problems: [String] = []
+        DispatchQueue.concurrentPerform(iterations: runs.count) { index in
+            let run = runs[index]
+            let report = search(run)
+            print("voice key walk \(run.name): \(report.states) states, \(report.moves) moves, \(String(format: "%.2f", report.seconds)) s")
+            var found: [String] = []
+            if !report.violations.isEmpty { found.append("\(run.name): \(report.violations.joined(separator: "\n"))") }
+            if report.states <= 100 { found.append("\(run.name): the search found too few states to be a search") }
+            guard !found.isEmpty else { return }
+            lock.lock()
+            problems.append(contentsOf: found)
+            lock.unlock()
+        }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
     /// The mistake the search was blind to: an adapter that stamps a key with the time it handles it. A Command pressed

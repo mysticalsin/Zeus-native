@@ -1639,7 +1639,7 @@ class UsageStringTests(unittest.TestCase):
         )
         self.assertEqual(
             plist["NSAppleEventsUsageDescription"],
-            "ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch.",
+            "ZEUS brings Chrome to the front when you ask it to do something there, plays or skips tracks in Music or Spotify from the notch, types into Terminal and iTerm, and drives Keynote, PowerPoint, and the Beamer menu through System Events.",
         )
         self.assertIn("Face presence", plist["NSCameraUsageDescription"])
 
