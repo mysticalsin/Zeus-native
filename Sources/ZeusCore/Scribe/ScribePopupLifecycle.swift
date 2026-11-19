@@ -77,17 +77,14 @@ public struct ScribePopupTiming: Equatable, Sendable {
     public var confirmFor: TimeInterval
     /// How long a failure stays when the pointer is not over it.
     public var failureLifetime: TimeInterval
-    /// Longest a hover may pause dismissal. After this, the timer resumes even if the pointer is still inside.
-    public var hoverCap: TimeInterval
 
     public init(hoverGrace: TimeInterval = 4, startTimeout: TimeInterval = 5, slowStartTimeout: TimeInterval = 45,
-                confirmFor: TimeInterval = 1.5, failureLifetime: TimeInterval = 60, hoverCap: TimeInterval = 30) {
+                confirmFor: TimeInterval = 1.5, failureLifetime: TimeInterval = 60) {
         self.hoverGrace = hoverGrace
         self.startTimeout = startTimeout
         self.slowStartTimeout = slowStartTimeout
         self.confirmFor = confirmFor
         self.failureLifetime = failureLifetime
-        self.hoverCap = hoverCap
     }
 
     public static let standard = ScribePopupTiming()
@@ -128,10 +125,6 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
     private var startedAt: TimeInterval = 0
     /// Scribe's session at the moment of the tap. A phase from it is the previous meeting, never this start.
     private var previousSession: ScribeSessionID?
-    /// When this hover began pausing the dismiss timer.
-    private var hoverSince: TimeInterval?
-    /// Time still left on the deadline when the hover began.
-    private var pausedRemaining: TimeInterval?
 
     public init(timing: ScribePopupTiming = .standard) {
         self.timing = timing
@@ -159,12 +152,6 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
             session = nil
             previousSession = nil
             deadline = lifetime.map { now + $0 }
-            hoverSince = nil
-            pausedRemaining = nil
-            if pointerInside, let lifetime {
-                hoverSince = now
-                pausedRemaining = lifetime
-            }
             return []
 
         case .click(let now, let scribe, let blocked):
@@ -174,18 +161,8 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
             return observe(scribe, now: now)
 
         case .pointer(let inside, let now):
-            let wasInside = pointerInside
             pointerInside = inside
-            if inside {
-                if !wasInside {
-                    hoverSince = now
-                    if let deadline { pausedRemaining = max(0, deadline - now) }
-                }
-                return []
-            }
-            hoverSince = nil
-            pausedRemaining = nil
-            if let current = deadline, phase == .shown || isFailure {
+            if !inside, let current = deadline, phase == .shown || isFailure {
                 deadline = max(current, now + timing.hoverGrace)
             }
             return []
@@ -277,9 +254,7 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
     private mutating func tick(now: TimeInterval) -> [Effect] {
         switch phase {
         case .shown:
-            resumeDismissTimerIfHoverCapped(now: now)
-            if hoverHolds(now) { return [] }
-            guard let deadline, now >= deadline else { return [] }
+            guard !pointerInside, let deadline, now >= deadline else { return [] }
             phase = .expired
             self.deadline = nil
             return [.hide, .timedOut]
@@ -293,30 +268,13 @@ public struct ScribePopupLifecycle: Equatable, Sendable {
             self.deadline = nil
             return [.hide]
         case .failed:
-            resumeDismissTimerIfHoverCapped(now: now)
-            if hoverHolds(now) { return [] }
-            guard let deadline, now >= deadline else { return [] }
+            guard !pointerInside, let deadline, now >= deadline else { return [] }
             phase = .expired
             self.deadline = nil
             return [.hide]
         case .hidden, .expired, .dismissed:
             return []
         }
-    }
-
-    private func hoverHolds(_ now: TimeInterval) -> Bool {
-        guard pointerInside, let hoverSince else { return false }
-        return now - hoverSince < timing.hoverCap
-    }
-
-    /// The hover has lasted long enough. The paused countdown runs again from now.
-    private mutating func resumeDismissTimerIfHoverCapped(now: TimeInterval) {
-        guard pointerInside, let hoverSince, now - hoverSince >= timing.hoverCap else { return }
-        if let remaining = pausedRemaining, let current = deadline {
-            deadline = max(current, now + remaining)
-        }
-        self.hoverSince = nil
-        pausedRemaining = nil
     }
 
     private mutating func succeed(_ id: ScribeSessionID, now: TimeInterval) {

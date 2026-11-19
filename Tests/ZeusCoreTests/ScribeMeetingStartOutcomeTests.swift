@@ -451,7 +451,7 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(machine.card(now: 49) == .failed(moTeams, .noResponse))
     }
 
-    @Test func theCardNeverExpiresUnderThePointer() {
+    @Test func theOfferStaysUpUnderThePointerUntilThePointerLeaves() {
         var machine = moPrompting()
         machine.handle(.pointer(inside: true, now: 15))
         machine.handle(moTick(40))
