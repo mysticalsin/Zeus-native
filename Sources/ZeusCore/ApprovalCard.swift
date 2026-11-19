@@ -183,6 +183,36 @@ public enum ApprovalCard {
         return step == .confirm ? .done : .confirm
     }
 
+    /// Allow and Deny stay on the card for every arrival. A high-risk Allow is still a hold, and it is still labelled Allow.
+    public struct Buttons: Equatable, Sendable {
+        public var allow: String
+        public var deny: String
+        public var allowHolds: Bool
+    }
+
+    public static func buttons(risk: HookEvent.Risk, detailsHidden: Bool, detailHasOwnActions: Bool) -> Buttons {
+        _ = detailsHidden
+        _ = detailHasOwnActions
+        return Buttons(allow: "Allow", deny: "Deny", allowHolds: risk == .high)
+    }
+
+    /// The command, tool and file stay visible unless the Mac is locked or the screen is being shared.
+    public static func showsCommand(locked: Bool, screenShared: Bool) -> Bool {
+        !locked && !screenShared
+    }
+
+    public static func hiddenReason(locked: Bool, screenShared: Bool) -> String? {
+        if locked { return "Hidden while the Mac is locked." }
+        if screenShared { return "Hidden while the screen is shared." }
+        return nil
+    }
+
+    /// Once the countdown has ended, the card is no longer on the notch.
+    public static func stillShown(now: Date, deadline: Date?) -> Bool {
+        guard let deadline else { return true }
+        return now < deadline
+    }
+
     public static func announcement(risk: HookEvent.Risk, position: String, outcome: String?) -> String {
         var parts = [risk == .high ? "High risk" : "Request"]
         if !position.isEmpty { parts.append(position) }

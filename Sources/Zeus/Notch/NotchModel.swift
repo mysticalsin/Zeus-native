@@ -116,6 +116,10 @@ final class NotchModel {
     var openedAt: Date?
     var sessions: [Session] = []
     var approval: Approval?
+    /// The Mac is locked. The approval command stays hidden and the card says why.
+    var macLocked = false
+    /// The display is mirrored or captured. The approval command stays hidden and the card says why.
+    var screenShared = false
     /// Covered window frames while Zeus works behind. Nil when nothing is streaming.
     var workBehind: WorkBehindPreview?
     /// Before/after for a selection edit. Return accepts it.

@@ -311,7 +311,7 @@ struct NotchView: View {
             VStack(spacing: 10) {
                 peekBar
                 if let approval = model.approval {
-                    ApprovalBody(approval: approval, compact: true)
+                    ApprovalBody(approval: approval, compact: true, macLocked: model.macLocked, screenShared: model.screenShared)
                         .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
                 } else if let completion = model.completion {
                     CompletionCardView(completion: completion) { model.completion = nil }
@@ -464,6 +464,8 @@ private struct ElapsedText: View {
 private struct ApprovalBody: View {
     let approval: NotchModel.Approval
     let compact: Bool
+    var macLocked = false
+    var screenShared = false
     @State private var expanded = false
     @State private var allowStep: ApprovalAllowStep = .idle
 
@@ -529,26 +531,37 @@ private struct ApprovalBody: View {
                 }
                 .accessibilityLabel(ApprovalCard.announcement(risk: approval.risk, position: facts.position, outcome: facts.phase == .asking ? nil : ApprovalCard.timeout(risk: approval.risk)))
             }
-            if MeetingState.hideDetails, approval.detail?.hasOwnActions == true {
-                // The rich detail (questions, plans) is the content itself, so it stays out of view; Deny remains.
-                HStack(spacing: 8) {
-                    Text("Details hidden (Settings > Privacy). Answer in the terminal.")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Theme.cloudSecondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
-                        .accessibilityHint("Stops \(approval.agent) from running this.")
+            if let reason = ApprovalCard.hiddenReason(locked: macLocked, screenShared: screenShared) {
+                Text(reason)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                if let detail = approval.detail {
+                    ApprovalDetailView(detail: detail, agent: approval.agent, resolve: { verdict in
+                        if verdict == .deny { approval.deny() } else if verdict != .allow { approval.resolve(verdict) }
+                    }, beginHold: { approval.beginHold() }, endHold: {
+                        if case .hold = approval.allowGate.gesture { approval.endHold() } else { approval.activateAllow() }
+                    }, plainAllow: { approval.activateAllow() })
                 }
-            } else if let detail = approval.detail, !MeetingState.hideDetails {
-                // Never built while details are hidden: a diff's file name and source text are the content too.
-                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: { verdict in
-                    if verdict == .deny { approval.deny() } else if verdict != .allow { approval.resolve(verdict) }
-                }, beginHold: { approval.beginHold() }, endHold: {
-                    if case .hold = approval.allowGate.gesture { approval.endHold() } else { approval.activateAllow() }
-                }, plainAllow: { approval.activateAllow() })
+                if let file = approval.changedFile, !file.isEmpty {
+                    Text(file)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.cloudSecondary)
+                        .lineLimit(1)
+                }
+                Text(CommandDisplay.plain(facts.command))
+                    .textSelection(.enabled)
+                    .accessibilityLabel(approval.command)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit((expanded || approval.expandedCommand) ? nil : ApprovalCard.collapsedLines)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            if approval.detail?.hasOwnActions != true {
+            if ApprovalCard.showsCommand(locked: macLocked, screenShared: screenShared) {
                 if let why = facts.why {
                     Text(why)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
@@ -563,16 +576,6 @@ private struct ApprovalBody: View {
                             .lineLimit(2)
                     }
                 }
-                Text(CommandDisplay.plain(facts.command))
-                    .textSelection(.enabled)
-                    .accessibilityLabel(approval.command)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Theme.cloudPrimary)
-                    .lineLimit((expanded || approval.expandedCommand) ? nil : ApprovalCard.collapsedLines)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10).padding(.vertical, 7)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 if facts.canExpand {
                     Button(expanded || approval.expandedCommand ? "Show less" : "Show the rest") {
                         expanded.toggle()
@@ -581,34 +584,31 @@ private struct ApprovalBody: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cloudSecondary)
                 }
-                if facts.phase == .timedOut {
-                    Text(ApprovalCard.timeout(risk: approval.risk))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+            }
+            if let deadline = approval.deadline {
+                TickingView(interval: 1) { context in
+                    let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
+                    Text("\(left) s left, \(approval.timeoutNote)")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.cloudSecondary)
-                } else if facts.phase == .allowed || facts.phase == .denied {
-                    Text(ApprovalCard.flash(allowed: facts.phase == .allowed))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(facts.phase == .allowed ? Theme.leaf : Theme.danger)
                 }
-                HStack(spacing: 8) {
-                    NotchButton(title: facts.keycaps ? (ApprovalCard.keycap(.deny, risk: approval.risk, modifiersHeld: true) ?? "") : "", tint: Theme.cloudSecondary, filled: false) {
-                        guarded { approval.deny() }
-                    }
-                    .accessibilityLabel("Deny")
-                    ApprovalAllowButton(title: facts.keycaps ? (ApprovalCard.keycap(.allow, risk: approval.risk, modifiersHeld: true) ?? "") : "", tint: Theme.ember, fraction: max(facts.holdFraction, approval.allowGate.holdFraction(now: Date()))) {
-                        guarded { approval.beginHold() }
-                    } release: {
-                        if case .hold = approval.allowGate.gesture { approval.endHold() }
-                        else { guarded { approval.activateAllow() } }
-                    } accessibility: {
-                        guarded { approval.activateAllow() }
-                    }
-                    .accessibilityLabel(facts.twoStep && approval.allowStep == .confirm ? "Confirm allow" : "Allow")
-                    NotchButton(title: facts.keycaps ? "" : ApprovalCard.denyAllTitle, tint: Theme.cloudSecondary, filled: false) {
-                        guarded { approval.denyAll() }
-                    }
-                    .accessibilityLabel(ApprovalCard.denyAllTitle)
+            }
+            let buttons = ApprovalCard.buttons(risk: approval.risk, detailsHidden: !ApprovalCard.showsCommand(locked: macLocked, screenShared: screenShared), detailHasOwnActions: approval.detail?.hasOwnActions == true)
+            HStack(spacing: 8) {
+                NotchButton(title: buttons.deny, tint: Theme.cloudSecondary, filled: false) {
+                    guarded { approval.deny() }
                 }
+                .accessibilityLabel(buttons.deny)
+                ApprovalAllowButton(title: buttons.allow, tint: Theme.ember, fraction: buttons.allowHolds ? max(facts.holdFraction, approval.allowGate.holdFraction(now: Date())) : 1) {
+                    guarded { approval.beginHold() }
+                } release: {
+                    if buttons.allowHolds { approval.endHold() }
+                    else { guarded { approval.activateAllow() } }
+                } accessibility: {
+                    guarded { approval.activateAllow() }
+                }
+                .accessibilityLabel(buttons.allowHolds ? "Allow. Press and hold." : buttons.allow)
+                .accessibilityHint(buttons.allowHolds ? "Hold the button until it fills." : "Lets \(approval.agent) run this once.")
             }
             if let trust = approval.trustChat, facts.allowChat, approval.detail?.hasOwnActions != true {
                 Button(action: { guarded { trust() } }) {
@@ -702,7 +702,7 @@ private struct PanelBody: View {
             .frame(height: barHeight)
 
             if let approval = model.approval {
-                ApprovalBody(approval: approval, compact: false)
+                ApprovalBody(approval: approval, compact: false, macLocked: model.macLocked, screenShared: model.screenShared)
                     .padding(12)
                     .background(Theme.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder((approval.risk == .high ? Theme.danger : Theme.ember).opacity(0.55), lineWidth: approval.risk == .high ? 2 : 1))
@@ -743,7 +743,7 @@ private struct TopBarPanelBody: View {
                 Color.clear.frame(height: GlanceTopBar.cardTop - GlanceTopBar.tabRowTop - GlanceTopBar.tabRowHeight)
                 VStack(alignment: .leading, spacing: 8) {
                     if let approval = model.approval {
-                        ApprovalBody(approval: approval, compact: false)
+                        ApprovalBody(approval: approval, compact: false, macLocked: model.macLocked, screenShared: model.screenShared)
                             .padding(12)
                             .background(Theme.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder((approval.risk == .high ? Theme.danger : Theme.ember).opacity(0.55), lineWidth: approval.risk == .high ? 2 : 1))

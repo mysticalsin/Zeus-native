@@ -6,6 +6,35 @@ import Testing
 struct ApprovalCardTests {
     private let now = Date(timeIntervalSince1970: 1_000)
 
+    @Test func everyArrivalShowsAllowAndDeny() {
+        for risk in [HookEvent.Risk.low, .medium, .high] {
+            for hidden in [false, true] {
+                for ownActions in [false, true] {
+                    let buttons = ApprovalCard.buttons(risk: risk, detailsHidden: hidden, detailHasOwnActions: ownActions)
+                    #expect(buttons.allow == "Allow", "\(risk) hidden \(hidden) own \(ownActions)")
+                    #expect(buttons.deny == "Deny")
+                    #expect(buttons.allowHolds == (risk == .high))
+                }
+            }
+        }
+    }
+
+    @Test func theCommandStaysVisibleUnlessTheMacIsLockedOrTheScreenIsShared() {
+        #expect(ApprovalCard.showsCommand(locked: false, screenShared: false))
+        #expect(!ApprovalCard.showsCommand(locked: true, screenShared: false))
+        #expect(!ApprovalCard.showsCommand(locked: false, screenShared: true))
+        #expect(ApprovalCard.hiddenReason(locked: true, screenShared: false) == "Hidden while the Mac is locked.")
+        #expect(ApprovalCard.hiddenReason(locked: false, screenShared: true) == "Hidden while the screen is shared.")
+        #expect(ApprovalCard.hiddenReason(locked: false, screenShared: false) == nil)
+    }
+
+    @Test func theCardLeavesWhenTheCountdownEnds() {
+        let deadline = now.addingTimeInterval(30)
+        #expect(ApprovalCard.stillShown(now: deadline.addingTimeInterval(-1), deadline: deadline))
+        #expect(!ApprovalCard.stillShown(now: deadline, deadline: deadline))
+        #expect(!ApprovalCard.stillShown(now: deadline.addingTimeInterval(1), deadline: deadline))
+    }
+
     @Test func inputIsIgnoredUntilTheQuietIntervalEnds() {
         let appeared = now
         #expect(!ApprovalCard.inputOpen(now: appeared.addingTimeInterval(0.399), appearedAt: appeared))

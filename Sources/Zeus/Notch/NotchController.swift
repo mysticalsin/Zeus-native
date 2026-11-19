@@ -87,6 +87,7 @@ final class NotchController {
                 let locked = note.name.rawValue == "com.apple.screenIsLocked"
                 MainActor.assumeIsolated {
                     self?.screenLocked = locked
+                    self?.model.macLocked = locked
                     self?.refreshDisplays(force: false)
                 }
             }
@@ -318,15 +319,18 @@ final class NotchController {
                     finish(.allow)
                 }
             }
+            let deadline = Date().addingTimeInterval(seconds)
             let count = Int(position.split(separator: " ").last.map(String.init) ?? "") ?? 1
             let helperDeadline = ticket.helperDeadline
             let jump: (@MainActor () -> Void)? = trust.map { pair in
                 let session = pair.session
                 return { _ = AgentTerminals.shared.jump(to: session) }
             }
+            model.macLocked = screenLocked
+            model.screenShared = Self.displayIsShared()
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
-                deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
+                deadline: deadline, timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
                 position: position,
                 appearedAt: Date(),
@@ -361,7 +365,19 @@ final class NotchController {
                 let verdict = ApprovalPolicy.timeoutVerdict(risk: risk, requested: onTimeout)
                 self.recordApproval(.timeout, verdict: verdict, session: trust?.session ?? "", command: command)
                 finish(verdict)
+                // The countdown and the terminal move together. Nothing of this card stays up.
+                if !ApprovalCard.stillShown(now: Date(), deadline: deadline), self.model.approval?.id == id {
+                    self.model.approval = nil
+                }
             }
+        }
+    }
+
+    /// Mirrored or captured displays hide the command. A normal desktop does not.
+    private static func displayIsShared() -> Bool {
+        NSScreen.screens.contains { screen in
+            guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return false }
+            return CGDisplayIsInMirrorSet(id) != 0 || CGDisplayIsCaptured(id) != 0
         }
     }
 
