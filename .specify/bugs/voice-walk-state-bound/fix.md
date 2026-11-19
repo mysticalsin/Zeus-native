@@ -7,13 +7,13 @@
 
 ## Summary
 
-Run A declares `stateBound` 200,000. `search` stops when that many states are recorded and does not add a fake pass. The replay tests are unchanged.
+A bound no longer lets the walk pass. If a bound or `WALK_LIMIT` stops the search, the run is marked truncated and fails. The shipped talk walk has no bound. Ages fold onto the rule thresholds, and only-Option-down is the same state as only-Control-down when the own set is exactly that pair. The canonical graph has 864,682 states. The replay tests are unchanged.
 
 ## Changes
 
 | File | Change | Notes |
 |------|--------|-------|
-| `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift` | `WalkRun.stateBound` and the stop in `search` | Only run A sets it. |
+| `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift` | Canonical ages and the Control/Option mirror. A bound sets `truncated` and fails. | Run A has no bound. The count is 864,682. |
 
 ## Tests Added or Updated
 
@@ -21,8 +21,8 @@ Run A declares `stateBound` 200,000. `search` stops when that many states are re
 
 ## Local Verification
 
-- Commands run: none. The walk is too large to run here, and the app target does not build on Linux.
-- Manual checks: the ceiling is read only when `run.stateBound` is set. The replay functions are not edited.
+- A throwaway optimized build of this harness, not `swift test`, reported 864,682 states, depth 33, no violations. The plain walk was 66,429 sequences with no stranger and no rule break. The processing-time, I6s, and I9 searches still stop on those rules.
+- The replay functions are not edited. The macOS package was not built.
 
 ## Deviations from Assessment
 
@@ -30,4 +30,4 @@ None.
 
 ## Follow-ups
 
-- Read the hosted ZeusCoreTests log. Run A should print a state count at or under 200,000, and the suite should finish inside 3600 s.
+- Read the hosted ZeusCoreTests log. Run A should print 864682 states and the run must not be truncated.

@@ -5475,6 +5475,10 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theShippedTalkHoldWalkFinishesUnderItsStateBound"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theCanonicalStepCollapsesAgesInsideOneThreshold"
             }
           ]
         },

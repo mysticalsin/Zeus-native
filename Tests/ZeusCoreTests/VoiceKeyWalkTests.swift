@@ -5,11 +5,15 @@ import Testing
 // The search over every press order (docs/VOICE-KEY-MACHINE-PLAN.md, part 5).
 //
 // It walks the whole graph of reachable states of one hold key: each state is expanded once with every move and a
-// visited set ends the search, so every order of presses and releases at every length is covered with no cut-off on
-// length. Time moves in whole steps of 0.05 s, of which every threshold is a multiple, and the state key keeps ages
-// (capped at 0.45 s, past every window) in place of times, so the graph is finite. After every move a checker reads
+// visited set ends the search, so every order of presses and releases at every length is covered. Time moves in whole
+// steps of 0.05 s. The state key stores an age as the threshold it has reached (0, 0.15, 0.25, 0.30, 0.35, 0.40, 0.45),
+// so two moments inside the same gap are one state, and a wake that is already overdue stays distinct down to two steps
+// late. When the own set is exactly Control and Option and the run has no Right Option, only-Option-down is the same
+// state as only-Control-down: the shortcut and the tiling chord need both, so the two orders are one. A bound or
+// `WALK_LIMIT` stops the search and the run fails; it never passes on a partial graph. After every move a checker reads
 // rules I1 to I7 from the effects, the keys the machine has been told are down and `isLatched`; at every state the
 // walk also lets go of everything, waits 0.5 s and presses the own set, and reads I8 and the last clause of I4.
+// The shipped talk walk (Control-Option, confirm 0.15, the chord) has 864,682 of these states.
 //
 // What reaches the machine, and when. A modifier key and a key the tiling matcher passes on send a monitor event; a key
 // the real `TileKeyMatcher` consumes is forwarded as the event a monitor would have seen. The forwarded key reaches the
@@ -40,7 +44,7 @@ import Testing
 //
 // The whole search takes minutes under load. `WALK_ONLY=A,B2` runs only the runs whose names start with one of those.
 // Both of these are off by default: `WALK_PROGRESS=path` appends the size of each search to that file as it grows (the runner holds
-// its output until it ends), `WALK_LIMIT=n` stops a search past n states, for measuring a run before it is put in the list.
+// its output until it ends), `WALK_LIMIT=n` stops a search past n states and the run fails. It is for measuring a run, not for a pass.
 //
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
@@ -121,7 +125,7 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let inOrder: Bool
     /// A mouse button may go down while the second key is held (it cancels that key's turn, never the primary key's).
     let mouse: Bool
-    /// Stop this run's search once this many states are recorded. Nil walks the whole graph.
+    /// Stop this run once this many states are recorded. The search then fails. Nil walks the whole graph.
     let stateBound: Int?
 
     struct PressSet: Sendable { var slot: Int; var codes: [UInt16] }
@@ -215,8 +219,7 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true,
-                stateBound: 200_000),
+                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true),
         WalkRun("A0 talk hold Control-Option confirm 0", keys: basic, own: controlOption,
                 configs: [hold(.talk, .controlOption, confirm: 0, chord: 49)], late: true, refusal: true, chord: true),
         // B: shipped dictation, with Left Command as a sixth key and a config that flips hold, toggle and off.
@@ -281,7 +284,80 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 /// Steps of 0.05 s, folded onto the thresholds the rules actually read.
 enum VoiceWalkClock {
     /// Confirm 0.15, hold check 0.25, tap max 0.30, shared gap 0.35, hold gap 0.40, cap 0.45.
-    static func canonical(_ steps: Int) -> Int { min(9, max(0, steps)) }
+    /// A negative offset is a wake that is already late, and it stays distinct down to two steps.
+    static func canonical(_ steps: Int) -> Int {
+        if steps < 0 { return max(steps, -2) }
+        let clamped = min(9, max(0, steps))
+        let cuts = [0, 3, 5, 6, 7, 8, 9]
+        return cuts.last { $0 <= clamped } ?? 0
+    }
+}
+
+/// Control and Option are one unordered pair when the own set is exactly those two and the run has no Right Option.
+/// Only-Option-down is recorded as only-Control-down, and every other field is relabelled the same way.
+private struct CanonicalControlOption {
+    var down: UInt16
+    var seen: UInt16
+    var consumed: UInt16
+    var held: Held?
+    var flags: ShortcutModifiers
+    var deviceKeys: Set<UInt16>
+    var keysDown: Set<UInt16>
+    var spoilers: Set<UInt16>
+
+    init(_ run: WalkRun, down: UInt16, seen: UInt16, consumed: UInt16, held: Held?, flags: ShortcutModifiers,
+         deviceKeys: Set<UInt16>, keysDown: Set<UInt16>, spoilers: Set<UInt16>) {
+        self.down = down
+        self.seen = seen
+        self.consumed = consumed
+        self.held = held
+        self.flags = flags
+        self.deviceKeys = deviceKeys
+        self.keysDown = keysDown
+        self.spoilers = spoilers
+        guard Set(run.ownCodes) == [59, 58], !run.keys.contains(where: { $0.code == 61 }),
+              let control = run.keys.firstIndex(where: { $0.code == 59 }),
+              let option = run.keys.firstIndex(where: { $0.code == 58 }) else { return }
+        let controlBit = UInt16(1) << UInt16(control)
+        let optionBit = UInt16(1) << UInt16(option)
+        guard down & controlBit == 0, down & optionBit != 0 else { return }
+        func swapBits(_ bits: UInt16) -> UInt16 {
+            let hasControl = bits & controlBit != 0
+            let hasOption = bits & optionBit != 0
+            var out = bits & ~controlBit & ~optionBit
+            if hasControl { out |= optionBit }
+            if hasOption { out |= controlBit }
+            return out
+        }
+        self.down = swapBits(down)
+        self.seen = swapBits(seen)
+        self.consumed = swapBits(consumed)
+        if flags.contains(.option) {
+            self.flags.remove(.option)
+            self.flags.insert(.control)
+        } else if flags.contains(.control) {
+            self.flags.remove(.control)
+            self.flags.insert(.option)
+        }
+        func swapCodes(_ codes: Set<UInt16>) -> Set<UInt16> {
+            var out = codes
+            let hasControl = out.contains(59)
+            let hasOption = out.contains(58)
+            if hasControl { out.remove(59) }
+            if hasOption { out.remove(58) }
+            if hasControl { out.insert(58) }
+            if hasOption { out.insert(59) }
+            return out
+        }
+        self.deviceKeys = swapCodes(deviceKeys)
+        self.keysDown = swapCodes(keysDown)
+        self.spoilers = swapCodes(spoilers)
+        if var event = held, event.index == UInt8(control) || event.index == UInt8(option) {
+            event.index = event.index == UInt8(control) ? UInt8(option) : UInt8(control)
+            if event.code == 59 { event.code = 58 } else if event.code == 58 { event.code = 59 }
+            self.held = event
+        }
+    }
 }
 
 /// How long a held monitor event may wait, in steps of 0.05 s: the main thread is busy for up to this long. It is as long
@@ -492,7 +568,7 @@ private struct PointingNorm: Hashable {
     var armedAge: Int?
 
     init(_ gesture: PointingKeyGesture, now: TimeInterval) {
-        func age(_ time: TimeInterval?) -> Int? { time.map { min(9, max(0, Int(((now - $0) / 0.05).rounded()))) } }
+        func age(_ time: TimeInterval?) -> Int? { time.map { VoiceWalkClock.canonical(max(0, Int(((now - $0) / 0.05).rounded()))) } }
         state = gesture.state
         active = gesture.isActive
         blocked = gesture.blockedByVoiceOver
@@ -507,8 +583,8 @@ private extension VoiceKeyMachine {
     /// phase whenever it was reached. A key heard late is read at its own time inside one move, before any state is
     /// recorded, and every key after it is stamped no earlier than the state, so the cap holds.
     func normalizedPhase(at now: TimeInterval) -> Phase {
-        func age(_ time: TimeInterval) -> TimeInterval { Double(min(9, max(0, Int(((now - time) / 0.05).rounded())))) * 0.05 }
-        func ahead(_ time: TimeInterval) -> TimeInterval { Double(min(9, max(0, Int(((time - now) / 0.05).rounded())))) * 0.05 }
+        func age(_ time: TimeInterval) -> TimeInterval { Double(VoiceWalkClock.canonical(max(0, Int(((now - time) / 0.05).rounded())))) * 0.05 }
+        func ahead(_ time: TimeInterval) -> TimeInterval { Double(VoiceWalkClock.canonical(max(0, Int(((time - now) / 0.05).rounded())))) * 0.05 }
         switch phase {
         case .idle, .latched, .spent: return phase
         case .armed(let since, let press): return .armed(since: age(since), press: press)
@@ -629,12 +705,17 @@ private struct Sim {
         case .tapped(_, true): gapOpen = true
         default: break
         }
-        var out = StateKey(down: down, seen: seen, consumed: consumed, held: held, wakes: wakes.map { max($0 - step, -2) }.sorted(), cfg: cfg,
-                 config: machine.config, flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
-                 keysDown: machine.keys.keysDown, spoilers: machine.keys.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
+        let canon = CanonicalControlOption(run, down: down, seen: seen, consumed: consumed, held: held,
+                                           flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
+                                           keysDown: machine.keys.keysDown, spoilers: machine.keys.spoilers)
+        var out = StateKey(down: canon.down, seen: canon.seen, consumed: canon.consumed, held: canon.held,
+                 wakes: wakes.map { VoiceWalkClock.canonical($0 - step) }.sorted(), cfg: cfg,
+                 config: machine.config, flags: canon.flags, deviceKeys: canon.deviceKeys,
+                 keysDown: canon.keysDown, spoilers: canon.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
                  phase: machine.normalizedPhase(at: now), pointing: pointing.map { PointingNorm($0, now: now) },
                  refusing: refusing, checker: checker,
-                 aloneAge: armed ? aloneSince.map { min(9, step - $0) } : nil, upAge: gapOpen ? ownUpSince.map { min(9, step - $0) } : nil)
+                 aloneAge: armed ? aloneSince.map { VoiceWalkClock.canonical(max(0, step - $0)) } : nil,
+                 upAge: gapOpen ? ownUpSince.map { VoiceWalkClock.canonical(max(0, step - $0)) } : nil)
         if let pair {
             var theirs = self
             theirs.select(1)
@@ -654,12 +735,12 @@ private struct Sim {
         case .tapped(_, true): gapOpen = true
         default: break
         }
-        return SlotKey(seen: seen, wakes: wakes.map { max($0 - step, -2) }.sorted(), config: machine.config,
+        return SlotKey(seen: seen, wakes: wakes.map { VoiceWalkClock.canonical($0 - step) }.sorted(), config: machine.config,
                        flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys, keysDown: machine.keys.keysDown,
                        spoilers: machine.keys.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
                        phase: machine.normalizedPhase(at: now), checker: checker,
-                       aloneAge: armed ? aloneSince.map { min(9, step - $0) } : nil,
-                       upAge: gapOpen ? ownUpSince.map { min(9, step - $0) } : nil)
+                       aloneAge: armed ? aloneSince.map { VoiceWalkClock.canonical(max(0, step - $0)) } : nil,
+                       upAge: gapOpen ? ownUpSince.map { VoiceWalkClock.canonical(max(0, step - $0)) } : nil)
     }
 
     func liveModifiers(_ run: WalkRun) -> ShortcutModifiers {
@@ -1494,7 +1575,14 @@ private struct Report {
     var seconds = 0.0
     var violations: [String] = []
     var visited: Set<Int> = []
+    /// The search stopped because of a bound. The run fails.
+    var truncated = false
+    /// Moves from the root to the deepest state that was recorded.
+    var depth = 0
 }
+
+/// Full searches, so the shipped walk is not repeated by the count test and the plain walk.
+private var fullWalkCache: [String: Report] = [:]
 
 private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) -> String {
     var steps: [String] = []
@@ -1591,10 +1679,13 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
 
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
+    let cacheable = !stopAtFirst && until == nil
+    if cacheable, let cached = fullWalkCache[run.name], !cached.truncated { return cached }
     let start = Date()
     var report = Report()
     var seen: [Int: Int] = [:]
     var parents = [0], via: [Move] = [.wait]
+    var depthOf = [0]
     var frontier: [Sim?] = []
     let root = Sim(run)
     seen[root.key(run).hashValue] = 0
@@ -1626,13 +1717,12 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
                 try? handle.close()
             }
         }
-        if seen.count > limit {
-            report.violations.append("the search passed the limit of \(limit) states")
+        // Checked between states, once the previous state has been fully expanded. Stopping here fails the run.
+        if seen.count > limit || (run.stateBound.map { seen.count >= $0 } ?? false) {
+            report.truncated = true
+            report.violations.append("the search stopped at \(seen.count) states before every reachable state")
             break
         }
-        // One run names a ceiling. Stop before recording another state past it. States expanded before the
-        // stop are still checked. The replay tests do not use this ceiling.
-        if let bound = run.stateBound, seen.count >= bound { break }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
         guard let sim = frontier[cursor] else { cursor += 1; continue }
@@ -1646,8 +1736,10 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
             record(next.found, at: cursor, move: move)
             let key = next.key(run).hashValue
             if seen[key] == nil {
-                if let bound = run.stateBound, seen.count >= bound { break }
                 seen[key] = frontier.count
+                let childDepth = depthOf[cursor] + 1
+                if childDepth > report.depth { report.depth = childDepth }
+                depthOf.append(childDepth)
                 parents.append(cursor)
                 via.append(move)
                 frontier.append(next)
@@ -1663,6 +1755,9 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         try? handle.close()
     }
     report.visited = Set(seen.keys)
+    if cacheable, !report.truncated, limit == Int.max, run.stateBound == nil {
+        fullWalkCache[run.name] = report
+    }
     return report
 }
 
@@ -1716,11 +1811,16 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         #expect(VoiceWalkClock.canonical(-3) == -2)
     }
 
-    /// The shipped talk walk has no silent ceiling. A bound would fail the run.
+    /// The shipped talk walk finishes the canonical graph. 864,682 is that count. A bound fails the run.
     @Test func theShippedTalkHoldWalkFinishesUnderItsStateBound() {
         let run = WalkRun.all[0]
         #expect(run.name == "A talk hold Control-Option confirm 0.15")
         #expect(run.stateBound == nil)
+        let report = search(run)
+        #expect(!report.truncated)
+        #expect(report.depth >= 5)
+        #expect(report.violations.isEmpty, "\(report.violations.joined(separator: "\n"))")
+        #expect(report.states == 864_682)
     }
 
     @Test(.serialized, arguments: WalkRun.all.filter { run in
@@ -1730,6 +1830,7 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     fileprivate func everyOrderOfPressesKeepsTheRules(run: WalkRun) {
         let report = search(run)
         print("voice key walk \(run.name): \(report.states) states, \(report.moves) moves, \(String(format: "%.2f", report.seconds)) s")
+        #expect(!report.truncated, "\(run.name) stopped at \(report.states) states")
         #expect(report.violations.isEmpty, "\(run.name): \(report.violations.joined(separator: "\n"))")
         #expect(report.states > 100, "the search found too few states to be a search")
     }
@@ -1996,7 +2097,10 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     /// It must meet no state the search did not, and break no rule.
     @Test func aPlainWalkOfRunAMeetsNoStateTheSearchDidNotAndBreaksNoRule() {
         let run = WalkRun.all[0]
-        let visited = search(run).visited
+        let report = search(run)
+        #expect(!report.truncated)
+        #expect(report.depth >= 5)
+        let visited = report.visited
         var sequences = 0
         var strangers = 0
         var problems: [String] = []
