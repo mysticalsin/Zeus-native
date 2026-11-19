@@ -266,9 +266,9 @@ public struct ApprovalAllowGate: Equatable, Sendable {
     /// Ends a press. Allows only when the hold has run for the full gesture.
     public mutating func releaseHold(now: Date) -> HookDecision.Verdict? {
         guard case .hold(let seconds) = gesture, let start = holdingSince else { return nil }
-        let elapsed = now.timeIntervalSince(start)
         holdingSince = nil
-        return elapsed >= seconds ? .allow : nil
+        // Compare the dates. Subtracting them can land a hair under the 0.8 s hold.
+        return now >= start.addingTimeInterval(seconds) ? .allow : nil
     }
 
     public func holdFraction(now: Date) -> Double {

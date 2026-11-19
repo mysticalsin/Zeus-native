@@ -90,7 +90,8 @@ public enum ApprovalCard {
     }
 
     public static func inputOpen(now: Date, appearedAt: Date) -> Bool {
-        now.timeIntervalSince(appearedAt) >= quietInterval
+        // Compare the dates. Subtracting them can land a hair under the 0.4 s quiet interval.
+        now >= appearedAt.addingTimeInterval(quietInterval)
     }
 
     public static func key(letter: String, risk: HookEvent.Risk) -> ApprovalCardKey? {

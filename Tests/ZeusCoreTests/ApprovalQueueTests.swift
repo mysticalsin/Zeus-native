@@ -20,8 +20,9 @@ struct ApprovalQueueTests {
     }
 
     @Test func concurrentArrivalsKeepArrivalOrder() async {
-        let queue = ApprovalGate()
         let start = Date(timeIntervalSince1970: 5_000)
+        // The tickets are dated from this instant. The live clock would expire both of them.
+        let queue = ApprovalGate(now: { start })
         async let first = queue.enqueue(ApprovalTicket(id: "a", arrived: start, helperDeadline: start.addingTimeInterval(115), risk: .low))
         async let second = queue.enqueue(ApprovalTicket(id: "b", arrived: start.addingTimeInterval(0.01), helperDeadline: start.addingTimeInterval(115), risk: .medium))
         let turns = await [first, second]
