@@ -1558,10 +1558,8 @@ struct ClosedWings: View {
                 AlbumTile(playing: topBar.nowPlaying, size: 18)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
-                    .clipped()
             } right: {
                 LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
-                    .clipped()
             }
         case .none:
             EmptyView()
@@ -1571,7 +1569,11 @@ struct ClosedWings: View {
     private func wings<L: View, R: View>(@ViewBuilder left: () -> L, @ViewBuilder right: () -> R) -> some View {
         // Width springs via `NotchView.wingsSpring`; scale insertion caused a one-frame full-size jump (R24 C1).
         let music = if case .music = Self.kind(of: topBar) { true } else { false }
-        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar), clipMusic: music, left: left(), right: right())
+        let proposals = NotchClosedBodyLayout.musicContent()
+        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar),
+                       leftProposal: music ? proposals.art : NotchClosedBodyLayout.miniMascotSize,
+                       rightProposal: music ? proposals.bars : NotchClosedBodyLayout.miniMascotSize,
+                       clipMusic: music, left: left(), right: right())
     }
 
     static let wingWidth: CGFloat = NotchClosedBodyLayout.wingWidth
@@ -1878,12 +1880,15 @@ struct DictationWave: View {
 struct ClosedWingsRow<L: View, R: View>: View {
     let notchGap: CGFloat
     let extra: CGFloat
+    var leftProposal: CGFloat = 0
+    var rightProposal: CGFloat = 0
     var clipMusic = false
     let left: L
     let right: R
 
     var body: some View {
-        let layout = NotchClosedBodyLayout.rowLayout(notchWidth: notchGap, extra: extra, clipsMusic: clipMusic)
+        let layout = NotchClosedBodyLayout.rowLayout(
+            notchWidth: notchGap, extra: extra, leftProposal: leftProposal, rightProposal: rightProposal, clipsMusic: clipMusic)
         // Each wing is a fixed-width clear box with its content overlaid: a wing with nothing in it (the resting
         // mascot's right side) still takes its width, so the gap cannot slide off the notch. Only music is clipped
         // to the box. A cue-icon shadow and the mascot glow paint into the outer inset.
@@ -1894,13 +1899,16 @@ struct ClosedWingsRow<L: View, R: View>: View {
         }
     }
 
+    @ViewBuilder
     private func wingBox<V: View>(_ width: CGFloat, alignment: Alignment, content: V, id: String) -> some View {
-        Color.clear.frame(width: width).frame(maxHeight: .infinity)
+        let framed = Color.clear.frame(width: width).frame(maxHeight: .infinity)
             .overlay(alignment: alignment) {
                 content.frame(width: width, alignment: alignment)
                     .ownedJourneyControl("closed-wings.\(id).content")
             }
             .ownedJourneyControl("closed-wings.\(id)")
+        // Clip the music container to the box. A clip on the art or the bars alone only cuts that view's own bounds.
+        if clipMusic { framed.clipped() } else { framed }
     }
 }
 

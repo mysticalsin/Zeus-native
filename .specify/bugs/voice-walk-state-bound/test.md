@@ -8,24 +8,16 @@
 
 ## Summary
 
-The silent 200,000 ceiling is gone. The search prints its state count and fails if it is truncated. That count is not pinned. 864,682 and 906,972 were both written down, and no single `swift test` log of this head records one of them as the count, so neither number is the canonical graph. The agreement walks use the late, held and chord moves as well as the reference pair. Linux did not run the Swift suite.
+The state count is not pinned. Run 44445566167 at SHA 48add1d1 printed `voice key walk A talk hold Control-Option confirm 0.15: 1883647 states`. That is evidence of the unfolded bug, not a red run of this pull request and not a count for this head. The test requires the folded search to be larger than the cuts-and-keys floor and smaller than that unfolded bug size.
 
 ## Checks Performed
 
-| Check | Command / Action | Result | Notes |
-|-------|------------------|--------|-------|
-| State count | `theShippedTalkHoldWalkFinishesUnderItsStateBound` | not-run | Unpinned. The run must finish, stay untruncated, and report more than 100 states. |
-| Agreement | `theExactAndFoldedWalksAgreePastTheFirstCut`, `theControlOptionMergeAgreesWithTheUnmergedWalk` | not-run | Late, held and chord moves are in the set. `reference: true` is not used. |
-| Hosted log | runs 44445557994 and 44445566167 | read | Both are SHA 48add1d1. The walk line there is `1883647 states`, from before this fold. |
-
-## Output Excerpts
-
-`voice key walk A talk hold Control-Option confirm 0.15: 1883647 states, 28473473 moves, 1067.94 s` in run 44445557994. That is the unfolded graph, not a count for this head.
+| Check | Result | Notes |
+|-------|--------|-------|
+| Hosted log 44445557994 | read | `native-ClosedWingsNotchTests` passed. No 14 pt music failure. |
+| Hosted log 44445566167 | read | The 14 pt failure is `theMusicWingsStayClearOfTheNotch`: wing frames differ by 14.0. Bug evidence at 48add1d1. |
+| Swift walk and wing layout | not-run | Linux cannot compile the macOS target. |
 
 ## Residual Risks
 
-- The canonical count is the next hosted line for run A. Until that line exists, the two earlier numbers stay unpinned.
-
-## Recommendation
-
-Hold the exact count until a hosted `swift test` log of this head prints it.
+The exact state count of this head is whatever the next hosted run A line prints.

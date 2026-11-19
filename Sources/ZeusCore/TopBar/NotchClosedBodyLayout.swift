@@ -81,12 +81,15 @@ public enum NotchClosedBodyLayout {
         clipsMusic: Bool
     ) -> ClosedWingRowLayout {
         let box = max(0, wingWidth - contentInset + extra)
-        // Each wing keeps the width its content asked for. Art 14 pt wider than the bars makes the wings differ by 14.
-        let left = max(box, leftProposal)
-        let right = max(box, rightProposal)
-        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: left, rightWidth: right,
-                                   outwardInset: clipsMusic ? 0 : contentInset,
-                                   clipWidth: clipsMusic ? leftProposal : 0)
+        if clipsMusic {
+            // The container is the box. Art wider than the bars does not widen either wing.
+            return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: box, rightWidth: box,
+                                       outwardInset: 0, clipWidth: box)
+        }
+        let cap = box + contentInset
+        let wanted = max(box, min(cap, max(leftProposal, rightProposal)))
+        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: wanted, rightWidth: wanted,
+                                   outwardInset: contentInset, clipWidth: 0)
     }
 
     /// The widths the music wing actually offers: the bars fill the box, and the art is 14 pt wider at every scale.
