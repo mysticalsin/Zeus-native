@@ -387,8 +387,8 @@ private struct Arrival: Hashable {
 }
 
 /// A monitor event held back for one event: the machine hears the next forwarded key first.
-private struct Held: Hashable {
-    enum Kind: UInt8 { case flags, down, up }
+private struct Held: Hashable, Sendable {
+    enum Kind: UInt8, Sendable { case flags, down, up }
     var kind: Kind
     var code: UInt16
     var mods: UInt8
@@ -475,7 +475,7 @@ private struct Phys {
 }
 
 /// What the rules remember between steps. Part of the state key, so two paths that differ here are two states.
-private struct Checker: Hashable {
+private struct Checker: Hashable, Sendable {
     /// A turn (not a toggle) is open: from its `start` to its `send`, `cancel` or `abandon`.
     var turnOpen = false
     /// Something foreign was down since that start. Shift does not count for a dictation key.
@@ -518,7 +518,7 @@ private struct Edge {
 /// The state of one search node. The machine is held as the four things it reads: the config, the flags-only modifier
 /// set, the physical keys and the spoilers of its keyboard picture, `barred`, `chordSpoiled` and the phase with ages in place of
 /// times. `ShortcutState.modifiers` is left out because nothing in the machine reads it.
-private struct StateKey: Hashable {
+private struct StateKey: Hashable, Sendable {
     var down: UInt16
     var seen: UInt16
     var consumed: UInt16
@@ -549,13 +549,13 @@ private struct StateKey: Hashable {
 }
 
 /// What the pair's rules remember between steps: which key's turn is open, and which key's turn ended while a key was still down.
-private struct PairCheck: Hashable {
+private struct PairCheck: Hashable, Sendable {
     var open: Int?
     var ended: Int?
 }
 
 /// The second slot of a pair as the state key holds it.
-private struct SlotKey: Hashable {
+private struct SlotKey: Hashable, Sendable {
     var seen: UInt16
     var wakes: [Int]
     var config: VoiceKeyMachine.Config?
@@ -574,7 +574,7 @@ private struct SlotKey: Hashable {
 /// A pointing gesture with ages in place of times, capped at 0.45 s like the machine's phase: the confirm and the 0.25 s
 /// watchdog are inside it. The double Control tap (three timers in the gesture) is left out of the key: it only ever
 /// returns `doubleTapControl`, which no rule reads, and it never changes what `feed` decides about a hold.
-private struct PointingNorm: Hashable {
+private struct PointingNorm: Hashable, Sendable {
     var state: ShortcutState
     var active: Bool
     var blocked: Bool
@@ -1700,7 +1700,7 @@ private struct Sim {
 
 // MARK: - The search
 
-private struct Report {
+private struct Report: Sendable {
     var states = 0
     var moves = 0
     var seconds = 0.0
@@ -1713,7 +1713,21 @@ private struct Report {
 }
 
 /// Full searches, so the shipped walk is not repeated by the count test and the plain walk.
-private var fullWalkCache: [String: Report] = [:]
+/// The suite runs in parallel under Swift 6, so the shared map is a lock, not a global `var`.
+private let fullWalkCache = FullWalkCache()
+
+private final class FullWalkCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: Report] = [:]
+
+    func report(named name: String) -> Report? {
+        lock.withLock { storage[name] }
+    }
+
+    func store(_ report: Report, named name: String) {
+        lock.withLock { storage[name] = report }
+    }
+}
 
 private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) -> String {
     var steps: [String] = []
@@ -1811,7 +1825,7 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
     let cacheable = !stopAtFirst && until == nil
-    if cacheable, let cached = fullWalkCache[run.name], !cached.truncated { return cached }
+    if cacheable, let cached = fullWalkCache.report(named: run.name), !cached.truncated { return cached }
     let start = Date()
     var report = Report()
     var seen: [StateKey: Int] = [:]
@@ -1887,7 +1901,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     }
     report.visited = Set(seen.keys)
     if cacheable, !report.truncated, limit == Int.max, run.stateBound == nil {
-        fullWalkCache[run.name] = report
+        fullWalkCache.store(report, named: run.name)
     }
     return report
 }
