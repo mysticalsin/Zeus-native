@@ -708,10 +708,14 @@ private struct ApprovalBody: View {
                     // Neither button is the default: approving shouldn't be one reflexive keypress.
                     NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
                         .accessibilityHint("Stops \(approval.agent) from running this.")
-                    ApprovalAllowButton(title: "Approve", tint: Theme.ember, fraction: approval.allowGate.holdFraction(now: Date())) {
+                    ApprovalAllowButton(
+                        title: approval.allowGate.confirmVisible ? "Confirm" : "Approve",
+                        tint: Theme.ember,
+                        fraction: approval.allowGate.holdFraction(now: ProcessInfo.processInfo.systemUptime)
+                    ) {
                         approval.beginHold()
-                    } release: {
-                        if case .hold = approval.allowGate.gesture { approval.endHold() }
+                    } release: { inside in
+                        if case .hold = approval.allowGate.gesture { approval.endHold(inside) }
                         else { approval.activateAllow() }
                     } accessibility: {
                         approval.activateAllow()
@@ -753,7 +757,7 @@ private struct ApprovalAllowButton: View {
     let tint: Color
     let fraction: Double
     let press: () -> Void
-    let release: () -> Void
+    let release: (Bool) -> Void
     let accessibility: () -> Void
 
     var body: some View {
@@ -762,13 +766,19 @@ private struct ApprovalAllowButton: View {
             .foregroundStyle(Theme.storm)
             .padding(.horizontal, 14)
             .frame(minHeight: 28)
-            .background(Capsule().fill(tint.opacity(0.35 + 0.65 * fraction)))
+            .background {
+                GeometryReader { proxy in
+                    Capsule().fill(tint.opacity(0.35 + 0.65 * fraction))
+                        .gesture(DragGesture(minimumDistance: 0)
+                            .onChanged { _ in press() }
+                            .onEnded { value in
+                                release(CGRect(origin: .zero, size: proxy.size).contains(value.location))
+                            })
+                }
+            }
             .accessibilityAddTraits(.isButton)
-            .accessibilityLabel(title)
+            .accessibilityLabel(title == "Confirm" ? "Confirm. Press again after a short wait." : title)
             .accessibilityAction(.default, accessibility)
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in press() }
-                .onEnded { _ in release() })
     }
 }
 

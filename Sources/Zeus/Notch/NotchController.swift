@@ -36,6 +36,11 @@ final class NotchController {
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
+    /// Monotonic seconds for the approval hold and its deadline. Tests replace it.
+    var monotonicNow: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    /// Tests replace these so a high-risk confirm is not tied to the machine's settings.
+    var approvalReduceMotion: () -> Bool = { Motion.reduced }
+    var approvalVoiceOver: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
     /// Set from the lock and unlock notices. A locked Mac gets an informational notice and no chime.
     private var screenLocked = false
     /// Where the pointer is; tests replace it.
@@ -368,18 +373,22 @@ final class NotchController {
                 }
             }
             let helperDeadline = ticket.helperDeadline
+            let opened = monotonicNow()
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
                 deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
                 position: position,
                 helperDeadline: helperDeadline,
-                allowGate: ApprovalAllowGate(risk: risk),
+                helperDeadlineMono: opened + helperDeadline.timeIntervalSince(now()),
+                allowGate: ApprovalAllowGate(risk: risk, itemID: id),
                 trustChat: trustChat,
                 beginHold: { [weak self] in self?.beginApprovalHold() },
-                endHold: { [weak self] in self?.endApprovalHold() },
+                endHold: { [weak self] inside in self?.endApprovalHold(inside: inside) },
+                cancelHold: { [weak self] in self?.cancelApprovalHold() },
                 activateAllow: { [weak self] in self?.activateApproval(kind: .card) },
                 deny: { [weak self] in
+                    self?.cancelApprovalHold()
                     self?.noteApproval(.card, verdict: .deny)
                     self?.model.approval?.resolve(.deny)
                 },
@@ -405,27 +414,23 @@ final class NotchController {
         }
     }
 
-    /// A click, Control-Option-Y, Return, or VoiceOver. High risk allows only after the gesture completes.
+    /// A click or the button's VoiceOver action. Control-Option-Y and a spoken yes never allow a high-risk request.
     func activateApproval(kind: ApprovalAudit.Kind) {
         guard var card = model.approval else { return }
-        let moment = now()
-        if moment >= card.helperDeadline {
+        let moment = monotonicNow()
+        if moment >= card.helperDeadlineMono {
             recordApproval(.timeout, verdict: .deny, session: card.sessionID ?? "", command: card.command)
             card.resolve(.deny)
             return
         }
-        card.allowGate.reduceMotion = Motion.reduced
-        card.allowGate.voiceOver = NSWorkspace.shared.isVoiceOverEnabled
-        let verdict = card.allowGate.activate(now: moment)
-        if case .hold = card.allowGate.gesture {
-            let released = card.allowGate.releaseHold(now: moment)
-            model.approval = card
-            if released == .allow {
-                recordApproval(kind, verdict: .allow, session: card.sessionID ?? "", command: card.command)
-                card.resolve(.allow)
-            }
-            return
+        card.allowGate.reduceMotion = approvalReduceMotion()
+        card.allowGate.voiceOver = approvalVoiceOver()
+        let channel: ApprovalAllowGate.Channel = switch kind {
+        case .shortcut: .shortcut
+        case .voice: .voice
+        default: .onScreen
         }
+        let verdict = card.allowGate.activate(now: moment, channel: channel)
         model.approval = card
         if verdict == .allow {
             recordApproval(kind, verdict: .allow, session: card.sessionID ?? "", command: card.command)
@@ -435,28 +440,33 @@ final class NotchController {
 
     func beginApprovalHold() {
         guard var card = model.approval else { return }
-        card.allowGate.reduceMotion = Motion.reduced
-        card.allowGate.voiceOver = NSWorkspace.shared.isVoiceOverEnabled
-        if case .hold = card.allowGate.gesture, card.allowGate.holdingSince == nil {
-            _ = card.allowGate.activate(now: now())
-        }
+        card.allowGate.reduceMotion = approvalReduceMotion()
+        card.allowGate.voiceOver = approvalVoiceOver()
+        card.allowGate.beginHold(now: monotonicNow())
         model.approval = card
     }
 
-    func endApprovalHold() {
+    func endApprovalHold(inside: Bool) {
         guard var card = model.approval else { return }
-        let moment = now()
-        if moment >= card.helperDeadline {
+        let moment = monotonicNow()
+        if moment >= card.helperDeadlineMono {
+            cancelApprovalHold()
             recordApproval(.timeout, verdict: .deny, session: card.sessionID ?? "", command: card.command)
             card.resolve(.deny)
             return
         }
-        let verdict = card.allowGate.releaseHold(now: moment)
+        let verdict = card.allowGate.releaseHold(now: moment, inside: inside)
         model.approval = card
         if verdict == .allow {
             recordApproval(.card, verdict: .allow, session: card.sessionID ?? "", command: card.command)
             card.resolve(.allow)
         }
+    }
+
+    func cancelApprovalHold() {
+        guard var card = model.approval else { return }
+        card.allowGate.cancelHold()
+        model.approval = card
     }
 
     func denyEveryApproval() {

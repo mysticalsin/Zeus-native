@@ -59,12 +59,15 @@ final class NotchModel {
         var position: String = ""
         /// When the helper gives up. An allow after this is a denial.
         var helperDeadline = Date.distantFuture
+        /// The same deadline on the monotonic clock used for the hold. Wall-clock jumps do not move it.
+        var helperDeadlineMono: TimeInterval = .greatestFiniteMagnitude
         /// The only allow path: a tap, a finished hold, or the second confirm.
         var allowGate = ApprovalAllowGate(risk: .low)
         /// Trusts the session, then approves (set only when the request is safe enough to offer it).
         var trustChat: (@MainActor () -> Void)?
         var beginHold: @MainActor () -> Void = {}
-        var endHold: @MainActor () -> Void = {}
+        var endHold: @MainActor (Bool) -> Void = { _ in }
+        var cancelHold: @MainActor () -> Void = {}
         var activateAllow: @MainActor () -> Void = {}
         var deny: @MainActor () -> Void = {}
         var denyAll: @MainActor () -> Void = {}

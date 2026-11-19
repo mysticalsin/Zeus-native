@@ -184,13 +184,14 @@ public enum ApprovalRisk {
 }
 
 public enum ApprovalMethod: Equatable, Sendable {
-    case shortcut, spokenYes, trustChat, tap, hold, secondConfirm
+    case shortcut, spokenYes, trustChat, tap, hold, onScreenConfirm
 }
 
 public enum ApprovalGesture: Equatable, Sendable {
     case tap
     case hold(seconds: Double)
-    case secondConfirm
+    /// A second press of the on-screen button, after a wait and before it expires. Shortcut and voice never count.
+    case onScreenConfirm(readyAfter: Double, expiresAfter: Double)
 }
 
 public struct AwayNotice: Equatable, Sendable {
@@ -200,19 +201,25 @@ public struct AwayNotice: Equatable, Sendable {
 
 public enum ApprovalPolicy {
     public static let holdDuration = 0.8
+    /// The on-screen confirm cannot be the same instant as the first press.
+    public static let confirmReadyAfter = 0.4
+    /// The confirm step goes away if the button is not pressed again in time.
+    public static let confirmExpiresAfter = 8.0
 
     public static func canApprove(risk: HookEvent.Risk, by method: ApprovalMethod) -> Bool {
         switch method {
         case .shortcut, .spokenYes, .trustChat, .tap:
             return risk != .high
-        case .hold, .secondConfirm:
+        case .hold, .onScreenConfirm:
             return true
         }
     }
 
     public static func allowGesture(risk: HookEvent.Risk, reduceMotion: Bool, voiceOver: Bool) -> ApprovalGesture {
         guard risk == .high else { return .tap }
-        if reduceMotion || voiceOver { return .secondConfirm }
+        if reduceMotion || voiceOver {
+            return .onScreenConfirm(readyAfter: confirmReadyAfter, expiresAfter: confirmExpiresAfter)
+        }
         return .hold(seconds: holdDuration)
     }
 
@@ -232,48 +239,82 @@ public enum ApprovalPolicy {
 }
 
 public struct ApprovalAllowGate: Equatable, Sendable {
+    public enum Channel: Equatable, Sendable {
+        /// The on-screen Allow button, including its VoiceOver action.
+        case onScreen
+        case shortcut
+        case voice
+    }
+
     public var risk: HookEvent.Risk
     public var reduceMotion: Bool
     public var voiceOver: Bool
-    public private(set) var armed = false
-    public private(set) var holdingSince: Date?
+    /// The request this hold belongs to. A release for another id does not allow.
+    public var itemID: String
+    /// Monotonic seconds (`ProcessInfo.processInfo.systemUptime`), not a wall clock.
+    public private(set) var holdingSince: TimeInterval?
+    public private(set) var holdingItem: String?
+    /// When the on-screen confirm step was armed, in the same monotonic clock.
+    public private(set) var confirmArmedAt: TimeInterval?
 
-    public init(risk: HookEvent.Risk, reduceMotion: Bool = false, voiceOver: Bool = false) {
+    public init(risk: HookEvent.Risk, reduceMotion: Bool = false, voiceOver: Bool = false, itemID: String = "") {
         self.risk = risk
         self.reduceMotion = reduceMotion
         self.voiceOver = voiceOver
+        self.itemID = itemID
     }
 
     public var gesture: ApprovalGesture {
         ApprovalPolicy.allowGesture(risk: risk, reduceMotion: reduceMotion, voiceOver: voiceOver)
     }
 
-    /// One click, key, or VoiceOver activation. A high-risk hold or the first confirm step does not allow.
-    public mutating func activate(now: Date) -> HookDecision.Verdict? {
+    public var confirmVisible: Bool { confirmArmedAt != nil }
+
+    /// Shortcut and voice never allow a high-risk request. The on-screen confirm allows only inside its window.
+    public mutating func activate(now: TimeInterval, channel: Channel = .onScreen) -> HookDecision.Verdict? {
+        if risk == .high, channel != .onScreen { return nil }
         switch gesture {
         case .tap:
             return .allow
         case .hold:
-            if holdingSince == nil { holdingSince = now }
             return nil
-        case .secondConfirm:
-            if armed { return .allow }
-            armed = true
-            return nil
+        case .onScreenConfirm(let ready, let expires):
+            guard channel == .onScreen else { return nil }
+            guard let armed = confirmArmedAt else {
+                confirmArmedAt = now
+                return nil
+            }
+            if now > armed + expires {
+                confirmArmedAt = nil
+                return nil
+            }
+            if now < armed + ready { return nil }
+            confirmArmedAt = nil
+            return .allow
         }
     }
 
-    /// Ends a press. Allows only when the hold has run for the full gesture.
-    public mutating func releaseHold(now: Date) -> HookDecision.Verdict? {
-        guard case .hold(let seconds) = gesture, let start = holdingSince else { return nil }
-        holdingSince = nil
-        // Compare the dates. Subtracting them can land a hair under the 0.8 s hold.
-        return now >= start.addingTimeInterval(seconds) ? .allow : nil
+    public mutating func beginHold(now: TimeInterval) {
+        guard case .hold = gesture, holdingSince == nil else { return }
+        holdingSince = now
+        holdingItem = itemID
     }
 
-    public func holdFraction(now: Date) -> Double {
+    /// Ends a press. A release outside the button, or for another item, clears the hold and does not allow.
+    public mutating func releaseHold(now: TimeInterval, inside: Bool) -> HookDecision.Verdict? {
+        defer { cancelHold() }
+        guard inside, holdingItem == itemID, let start = holdingSince, case .hold(let seconds) = gesture else { return nil }
+        return now >= start + seconds ? .allow : nil
+    }
+
+    public mutating func cancelHold() {
+        holdingSince = nil
+        holdingItem = nil
+    }
+
+    public func holdFraction(now: TimeInterval) -> Double {
         guard case .hold(let seconds) = gesture, let start = holdingSince, seconds > 0 else { return 0 }
-        return min(max(now.timeIntervalSince(start) / seconds, 0), 1)
+        return min(max((now - start) / seconds, 0), 1)
     }
 }
 
@@ -289,7 +330,9 @@ public struct ApprovalAudit: Equatable, Sendable {
 
     public static func plain(_ text: String) -> String {
         String(text.unicodeScalars.filter { scalar in
-            scalar.value >= 32 && scalar.value != 127 && scalar.properties.generalCategory != .control
+            let category = scalar.properties.generalCategory
+            return scalar.value >= 32 && scalar.value != 127 && scalar.value != 0x2028 && scalar.value != 0x2029
+                && category != .control && category != .lineSeparator && category != .paragraphSeparator
         }.map(Character.init))
     }
 
