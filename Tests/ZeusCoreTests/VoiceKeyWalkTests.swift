@@ -1897,6 +1897,7 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 private struct AgeSample: Equatable {
     var verdicts: Set<String> = []
     var outcomes: Set<String> = []
+    var steps: Set<Int> = []
     var furthest = 0
 }
 
@@ -1921,6 +1922,7 @@ private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool
     func walk(_ sim: Sim, depth: Int) {
         if let notPast, sim.step > notPast { return }
         guard seen.insert(sim.key(run)).inserted else { return }
+        sample.steps.insert(sim.step)
         sample.furthest = max(sample.furthest, sim.step)
         sample.outcomes.insert(outcome(sim))
         for message in sim.found {
@@ -2035,21 +2037,29 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
         #expect(sim.step - start == confirm)
     }
 
-    /// Past the confirm cut, the one-step walk and the jump walk must agree on verdicts and on the phases they can reach.
+    /// The one-step walk keeps every exact age, past the tap, the check and the gaps, and agrees with the jump walk.
     @Test func theExactAndFoldedWalksAgreePastTheFirstCut() {
         let run = WalkRun.all[0]
+        let past = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
         let exact = ageSample(run, depth: 4, fold: false, merge: true)
-        #expect(exact.furthest > VoiceKeyMachine.Timing.steps(run.configs[0].confirm))
+        #expect(exact.steps.contains(1))
+        #expect(exact.steps.contains(2))
+        #expect(exact.furthest > VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.checkEvery))
+        #expect(exact.furthest > VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdTapMax))
+        #expect(exact.furthest > past)
         let folded = ageSample(run, depth: 4, fold: true, merge: true, notPast: exact.furthest)
         #expect(exact.verdicts == folded.verdicts)
         #expect(exact.outcomes == folded.outcomes)
     }
 
-    /// Turning the Control/Option mirror off must not change those verdicts or phases.
+    /// Turning the Control/Option mirror off must not change those verdicts or phases, past the same windows.
     @Test func theControlOptionMergeAgreesWithTheUnmergedWalk() {
         let run = WalkRun.all[0]
+        let past = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
         let split = ageSample(run, depth: 3, fold: true, merge: false)
         let merged = ageSample(run, depth: 3, fold: true, merge: true)
+        #expect(split.furthest > past)
+        #expect(merged.furthest > past)
         #expect(split.verdicts == merged.verdicts)
         #expect(split.outcomes == merged.outcomes)
     }
