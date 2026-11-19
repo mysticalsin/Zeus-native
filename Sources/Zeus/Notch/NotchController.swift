@@ -84,8 +84,9 @@ final class NotchController {
         }
         for name in ["com.apple.screenIsUnlocked", "com.apple.screenIsLocked"] {
             DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] note in
+                let locked = note.name.rawValue == "com.apple.screenIsLocked"
                 MainActor.assumeIsolated {
-                    self?.screenLocked = note.name.rawValue == "com.apple.screenIsLocked"
+                    self?.screenLocked = locked
                     self?.refreshDisplays(force: false)
                 }
             }
