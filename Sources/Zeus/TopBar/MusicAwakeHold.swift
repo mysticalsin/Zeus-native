@@ -85,10 +85,11 @@ final class MusicAwakeHold {
         let verdict = rule.decide(enabled: enabled, isPlaying: playing, lastPlayedAt: lastPlayedAt, now: now,
                                   power: readPower(), rules: rules)
         if verdict.holds {
-            if assertion == nil {
-                acquire()
-            } else if renewLease {
+            if renewLease {
+                // A renewal with nothing held must not create the first assertion.
                 renew()
+            } else if assertion == nil {
+                acquire()
             }
             // No assertion means there is nothing to renew. Do not leave the timer retrying.
             if assertion != nil {

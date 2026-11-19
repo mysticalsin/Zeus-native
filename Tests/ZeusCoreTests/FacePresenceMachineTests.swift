@@ -872,7 +872,7 @@ struct FacePresenceMachineTests {
 
     @Test func canEnrollOnlyWhileWatchingPresentOrAway() {
         for (label, machine) in Self.everyState() {
-            let expected = ["watching", "present", "away"].contains(label)
+            let expected = ["needsEnrollmentConfirm", "watching", "present", "away"].contains(label)
             #expect(machine.canEnroll == expected, "\(label)")
         }
     }
@@ -906,7 +906,7 @@ struct FacePresenceMachineTests {
             #expect(!hasNumber, "\(label): \(name)")
             names.insert(name)
         }
-        #expect(names == ["off", "needsCameraConsent", "enrolling", "watching", "present", "away", "unavailable(lock)",
+        #expect(names == ["off", "needsCameraConsent", "needsEnrollmentConfirm", "enrolling", "watching", "present", "away", "unavailable(lock)",
                           "paused(launch)", "paused(screenLocked)", "paused(asleep)", "paused(lockedByZeus)",
                           "paused(noFace)", "paused(zeusCapture)"])
     }

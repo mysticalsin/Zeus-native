@@ -323,10 +323,11 @@ struct ScribeDetectorTests {
     }
 
     @Test func theExitObserverWatchesWhileOffAndBusyAndIsRemovedByHalt() async throws {
-        // The observer reads a real app's pid, bundle id and launch date; any app of this login session has them.
-        let app = try #require(NSWorkspace.shared.runningApplications.first {
-            $0.processIdentifier > 0 && $0.bundleIdentifier != nil && $0.launchDate != nil
-        })
+        // The observer reads a real app's pid, bundle id and launch date. The list is an AppKit
+        // object, so it is read on the main actor. A hosted run can have no Launch Services app
+        // yet; opening TextEdit supplies one. An app that was already running is left alone.
+        let (app, opened) = try await loginApplication()
+        defer { if opened { app.terminate() } }
         let exit = { (harness: Harness) in
             harness.workspace.post(name: NSWorkspace.didTerminateApplicationNotification, object: nil,
                                    userInfo: [NSWorkspace.applicationUserInfoKey: app])
@@ -347,6 +348,24 @@ struct ScribeDetectorTests {
         exit(harness)
         await harness.settle()
         #expect(harness.exits.count == 1, "halt removed the observer")
+    }
+
+    /// A process the exit observer will accept. `opened` is true when this call launched TextEdit.
+    private func loginApplication() async throws -> (NSRunningApplication, Bool) {
+        func ready(_ app: NSRunningApplication) -> Bool {
+            app.processIdentifier > 0 && app.bundleIdentifier != nil && app.launchDate != nil
+        }
+        if let existing = NSWorkspace.shared.runningApplications.first(where: ready) {
+            return (existing, false)
+        }
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+        let opened = try await NSWorkspace.shared.openApplication(
+            at: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
+            configuration: config)
+        if ready(opened) { return (opened, true) }
+        let app = try #require(NSWorkspace.shared.runningApplications.first(where: ready))
+        return (app, app.processIdentifier == opened.processIdentifier)
     }
 
     @Test func offThenAskInsideTheMeetingWindowShowsNoCardForAMeetingAlreadyDismissed() async throws {
