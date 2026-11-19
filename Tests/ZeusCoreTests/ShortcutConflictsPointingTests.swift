@@ -37,7 +37,7 @@ struct ShortcutConflictsPointingTests {
     }
 
     @Test func anOverlappingShowMeKeyIsFlagged() {
-        let result = warnings(pointing: Shortcut(modifiers: .command))
+        let result = warnings(pointing: Shortcut(modifiers: .control))
         #expect(result.contains { $0.contains("Overlaps Show me") })
     }
 

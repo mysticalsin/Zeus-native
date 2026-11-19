@@ -783,3 +783,39 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Glance: face presence (MIT)
+
+Face presence is adapted from Glance, https://github.com/jonnyoo/glance, commit
+b97f521397ec1197ba17768ba797cae1e628848d, MIT License.
+
+Adapted: FaceDetector, FaceAligner, LandmarkGeometry (similarity transform and centroid only), the gloss
+glare and device bezel cues of Liveness, the Vision feature print and vector maths of FaceEmbedder, the
+identity idea of FaceLabController, FaceEnrollmentStore and SecureFaceStore (embeddings only), CameraManager,
+CameraDeviceCatalog, LockMonitor and SessionAutoLocker.
+
+Not taken: the ArcFace model and its embedder (separate research-only terms), the stored login password,
+keystroke injection, space key monitor and unlock code, the lock screen windows, and the Keychain wrapper.
+Zeus uses the feature only to notice that the owner is away and lock the Mac; it never unlocks it.
+
+MIT License
+
+Copyright (c) 2026 Jonathan Zhou
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -8,10 +8,9 @@ public enum ElevenLabsQuality: String, CaseIterable, Sendable {
 
     /// Verified in the ElevenLabs models page (2026-11-11): the fastest v2.5 model, about 100 ms, 32 languages.
     public static let fastModel = "eleven_flash_v2_5"
-    /// The models page lists `eleven_v4` as the highest quality and most expressive model. The page does not
-    /// say whether it streams on `/v1/text-to-speech/{voice}/stream`, so this is UNVERIFIED: the app falls
-    /// back to `fastModel` for the answer (and the rest of the launch) when ElevenLabs rejects it.
-    public static let studioModel = "eleven_v4"
+    /// The default: a known, streaming ElevenLabs model with style and speed support. Take C was auditioned on it
+    /// and approved by ear. The app falls back to `fastModel` if ElevenLabs rejects it.
+    public static let studioModel = "eleven_multilingual_v2"
 
     public static let defaultsKey = "voice.elevenlabs.quality"
 
@@ -19,14 +18,14 @@ public enum ElevenLabsQuality: String, CaseIterable, Sendable {
 
     public var detail: String {
         self == .fastest
-            ? "Lowest delay (about 100 ms to start). The default for talking to Zeus."
-            : "The most expressive ElevenLabs model. Richer, a little slower to start."
+            ? "Lowest delay, about 0.25 s quicker to start than Studio."
+            : "A richer ElevenLabs model (multilingual v2). The default for talking to Zeus."
     }
 
     public var modelID: String { self == .fastest ? Self.fastModel : Self.studioModel }
 
     public static func resolve(stored: String?) -> ElevenLabsQuality {
-        stored.flatMap(ElevenLabsQuality.init(rawValue:)) ?? .fastest
+        stored.flatMap(ElevenLabsQuality.init(rawValue:)) ?? .studio
     }
 }
 

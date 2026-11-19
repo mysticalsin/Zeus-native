@@ -5,7 +5,7 @@ import Foundation
 /// numbers are testable without audio hardware. Intelligibility comes first: every wet amount is
 /// small, and intensity 0 is fully neutral.
 public struct UltronEffectParameters: Equatable, Sendable {
-    public static let defaultPercent = 60
+    public static let defaultPercent = 75
     public static let percentRange = 0...100
 
     /// Pitch shift in cents, always at or below zero (deeper).
@@ -33,7 +33,7 @@ public struct UltronEffectParameters: Equatable, Sendable {
         pitchCents: 0, lowShelfGainDB: 0, highShelfGainDB: 0, combDelaySeconds: 0.010,
         combFeedbackPercent: 0, combWetPercent: 0, distortionWetPercent: 0, reverbWetPercent: 0, outputGainDB: 0)
 
-    /// `percent` is the Settings slider, 0 to 100 (60 is the designed voice).
+    /// `percent` is the Settings slider, 0 to 100 (75 is the designed voice).
     public static func make(percent: Double) -> UltronEffectParameters {
         guard percent.isFinite else { return .neutral }
         let t = Float(min(max(percent, 0), 100) / 100)
@@ -46,8 +46,8 @@ public struct UltronEffectParameters: Equatable, Sendable {
             highShelfGainDB: 5 * t,
             combDelaySeconds: 0.010,
             combFeedbackPercent: 35 * t,
-            combWetPercent: 14 * t,
-            distortionWetPercent: 8 * t,
+            combWetPercent: 17 * t,
+            distortionWetPercent: 10 * t,
             reverbWetPercent: 10 * t,
             outputGainDB: -2 * t)
     }

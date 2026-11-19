@@ -166,9 +166,8 @@ private struct ScribeUpNextContent: View {
     }
 
     private func startWith(_ meeting: ScribeUpNextMeeting) {
-        scribe.meetingTitleHint = meeting.slot.title
-        scribe.meetingAttendeeHint = meeting.slot.attendeeNames
-        scribe.start()
+        let upNext = ScribeMeeting(key: meeting.slot.id, title: meeting.slot.title, callApp: meeting.app, slot: meeting.slot)
+        scribe.start(context: upNext.context(callIdentity: nil))
     }
 }
 
@@ -227,9 +226,12 @@ struct ScribeInitialStack: View {
     var limit = 4
     var size: CGFloat = 18
 
+    /// How far the next disc covers this one. Small enough that two capital initials stay fully visible.
+    static func overlap(size: CGFloat) -> CGFloat { size * 0.1 }
+
     var body: some View {
         let shown = Array(names.prefix(limit))
-        HStack(spacing: -5) {
+        HStack(spacing: -Self.overlap(size: size)) {
             ForEach(Array(shown.enumerated()), id: \.offset) { _, name in
                 ScribeInitialDisc(name: name, size: size)
             }
@@ -248,10 +250,17 @@ struct ScribeInitialDisc: View {
     let name: String
     var size: CGFloat = 18
 
+    static func fontSize(size: CGFloat) -> CGFloat { size * 0.45 }
+    /// The centred text box: clear of the next disc's overlap on the right, symmetric on the left.
+    static func textWidth(size: CGFloat) -> CGFloat { size - 2 * ScribeInitialStack.overlap(size: size) }
+
     var body: some View {
         let tint = scribeColor(ScribeSpeakerPalette.color(for: .participant(name)))
         Text(ScribeInitials.of(name))
-            .font(TopBarStyle.label(size * 0.45, .bold)).foregroundStyle(tint)
+            .font(TopBarStyle.label(Self.fontSize(size: size), .bold)).foregroundStyle(tint)
+            // Kept inside the part of the disc the next one does not cover; wide pairs ("MM") shrink to fit.
+            .lineLimit(1).minimumScaleFactor(0.6)
+            .frame(width: Self.textWidth(size: size))
             .frame(width: size, height: size)
             .background(Circle().fill(Theme.storm))
             .overlay(Circle().fill(tint.opacity(0.22)))

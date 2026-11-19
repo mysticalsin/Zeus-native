@@ -88,6 +88,19 @@ struct DictationExtrasTests {
         #expect(link("zeus://weather") == nil)
     }
 
+    @Test func settingsDeepLinkParses() {
+        func link(_ string: String) -> ZeusDeepLink? { ZeusDeepLink.parse(URL(string: string)!) }
+        #expect(link("zeus://settings") == .settings(section: nil))
+        #expect(link("zeus://settings/") == .settings(section: nil))
+        #expect(link("ZEUS://Settings") == .settings(section: nil))
+        #expect(link("zeus:settings") == .settings(section: nil))
+        #expect(link("zeus://settings/permissions") == .settings(section: "permissions"))
+        #expect(link("zeus://settings/Shortcuts") == .settings(section: "shortcuts"))
+        // Only the first segment names a section; the app resolves it and falls back to just opening Settings.
+        #expect(link("zeus://settings/appearance/extra") == .settings(section: "appearance"))
+        #expect(link("https://settings") == nil)
+    }
+
     @Test func typingSplitsIntoSafeChunks() {
         #expect(KeystrokeTyping.pieces("hello\nworld") == [.text("hello"), .newline, .text("world")])
         let long = String(repeating: "a", count: 45)

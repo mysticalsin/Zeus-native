@@ -21,6 +21,10 @@ final class GSContext {
     @ObservationIgnored var topBar: TopBarModel?
     /// "Allow all" on the Permissions page; nil in parity captures, which then show the rows only.
     @ObservationIgnored var sweep: PermissionSweepRunner?
+    /// The drawn notch's model. Nil until the app sets it, and then the Appearance card is not placed.
+    @ObservationIgnored var drawnNotch: (any DrawnNotchControlling)?
+    /// The per-app equaliser behind the Sounds card. The app delegate builds it; Settings only asks it.
+    @ObservationIgnored var equaliser: () -> (any EqualiserControlling)? = { nil }
 
     init(services: OnboardingServices) {
         self.services = services
@@ -44,8 +48,8 @@ struct GSPageView: View {
             SettingsUpdateBadgeRow()
             switch section {
             case .general: GeneralPage(navigation: navigation, openGuide: context.openGuide)
-            case .appearance: AppearancePage(context: context)
-            case .sounds: SoundsPage()
+            case .appearance: AppearancePage(context: context, navigation: navigation)
+            case .sounds: SoundsPage(context: context)
             case .notifications: GSNotificationsPage()
             case .shortcuts: ShortcutsPage()
             case .insomnia: InsomniaSettingsPage()
@@ -58,6 +62,8 @@ struct GSPageView: View {
             case .iPhone: IPhonePage()
             case .features: FeaturesSettingsPage()
             case .beamer: BeamerSettingsPage(context: context)
+            case .tiling: TilingSettingsPage()
+            case .shelf: ShelfSettingsPage()
             case .license: LicensePage(navigation: navigation)
             case .permissions: PermissionsPage(context: context)
             case .privacy: PrivacyPage(context: context)
@@ -88,7 +94,7 @@ private struct GeneralPage: View {
             .padding(.bottom, -GS.cardGap)
         // Window appearance and Language are not rows: the windows are drawn dark only and Zeus speaks English only.
         GSCard("Your defaults") {
-            GSRow(symbol: "display.2", title: "Show the notch on", text: "Displays without a notch get a slim pill.") {
+            GSRow(symbol: "display.2", title: "Show the notch on") {
                 GSPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue)).popupLabel("Show the notch on")
             }
             GSDivider()
@@ -103,6 +109,8 @@ private struct GeneralPage: View {
             GSToggleRow(symbol: "power", title: "Launch Zeus at login", text: "Ready as soon as you sign in to your Mac.", isOn: bool("general.launchAtLogin"))
             GSDivider()
             GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working. Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
+            GSDivider()
+            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while the source shown in the notch is playing. Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
             GSDivider()
             GSToggleRow(symbol: "person.2.wave.2", title: "Meeting mode", text: "Quiet sounds and private previews during calls and screen sharing.", isOn: bool("general.meetingMode"))
             GSDivider()
@@ -183,6 +191,7 @@ struct GSSetupCard: View {
 
 private struct AppearancePage: View {
     let context: GSContext
+    let navigation: GSNavigation
 
     /// The notch reads the model's own `topBar.musicWings` key, not the `opt.` copy a plain store write would make.
     private var musicWingsBinding: Binding<Bool> {
@@ -256,15 +265,24 @@ private struct AppearancePage: View {
                         text: "On: people you share your screen with, and screenshots, can see Zeus. Off keeps it out of them. Your choice applies during meetings too.",
                         isOn: bool(ZeusScreenSharePolicy.showInSharingKey))
         }
+        if let drawnNotchCard = DrawnNotchCardModel(context: context, navigation: navigation) { DrawnNotchCard(model: drawnNotchCard) }
         GSCard("Running card") {
             HStack(spacing: 12) {
                 runningTheme("Wave", "")
                 runningTheme("Essentials", "")
             }
             GSDivider()
-            GSRow(symbol: "hand.point.up.left", title: "Open the notch on hover", text: "How long the pointer rests before it opens.") {
-                GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Open the notch on hover")
+            GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens it after the delay. Click opens it only when you click the notch.") {
+                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
             }
+            GSDivider()
+            // The delay only applies to hover, so it is subdued while the trigger is Click.
+            let clickTrigger = SettingsStore.shared.string("notch.openTrigger") == "Click"
+            GSRow(symbol: "hand.point.up.left", title: "Hover delay", text: "How long the pointer rests before it opens. Used when the notch opens on hover.") {
+                GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Hover delay")
+            }
+            .disabled(clickTrigger)
+            .opacity(clickTrigger ? 0.5 : 1)
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
@@ -318,6 +336,11 @@ private struct AppearancePage: View {
                 GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
             }
             GSDivider()
+            GSRow(symbol: "rectangle.dashed", title: "Island background",
+                  text: "Transparent draws only the mascot and the text beside the notch, with no body, outline or glow. The notch itself stays black. The open panel is always black.") {
+                GSPopup(selection: SettingsStore.binding(NotchBackground.settingID), options: NotchBackground.allCases.map(\.rawValue)).popupLabel("Island background")
+            }
+            GSDivider()
             GSRow(symbol: "line.3.horizontal", title: "Light thickness") {
                 OBTickSlider(value: Binding(get: { max(100, store.double("halo.thickness")) }, set: { store.set("halo.thickness", String(Int($0))) }), range: 100...200, step: 5)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Light thickness")
@@ -344,6 +367,7 @@ private struct AppearancePage: View {
             GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
+            light("lyrics.wordByWord", "music.note.list", "Light lyrics word by word", "Each word lights as it is sung. Word timing is estimated from the line timing.")
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
             GSDivider()
             GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum. Add the tab under Top bar tabs, further down this page.") {
@@ -360,7 +384,30 @@ private struct AppearancePage: View {
         // One child, so the page body stays within ViewBuilder's ten-view limit.
         Group {
             hudCard
+            screenCard
+            musicSourceCard
             TopBarTabsCard(context: context)
+        }
+    }
+
+    private var screenCard: some View {
+        GSCard("Screen") {
+            GSToggleRow(symbol: "rectangle.roundedbottom", title: "Round the bottom screen corners",
+                        text: "Rounds the two bottom corners of a notched display to match the top. Click-through.",
+                        isOn: bool("screen.roundBottomCorners"))
+            GSDivider()
+            GSRow(symbol: "circle.bottomhalf.filled", title: "Corner size") {
+                GSPopup(selection: SettingsStore.binding("screen.cornerRadius"), options: SettingsCatalog.option("screen.cornerRadius")?.choices ?? []).popupLabel("Corner size")
+            }
+        }
+    }
+
+    private var musicSourceCard: some View {
+        GSCard("Music source") {
+            GSRow(symbol: "music.note.list", title: "Show music from") {
+                GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
+                        options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
+            }
         }
     }
 
@@ -528,6 +575,7 @@ private struct TopBarTabsCard: View {
 // MARK: Sounds
 
 private struct SoundsPage: View {
+    let context: GSContext
     var body: some View {
         GSPageHeading(section: .sounds, subtitle: "Choose your cues. Listen to each one before you begin.")
             .padding(.bottom, -GS.cardGap)
@@ -556,6 +604,8 @@ private struct SoundsPage: View {
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.octagon", title: "Failure sound", text: "A short sound when an agent turn fails.", isOn: bool("sound.failure"))
             GSDivider()
+            GSToggleRow(symbol: "play.circle", title: "Chime when an agent starts working", text: "Off by default; busy sessions start often.", isOn: bool("sound.agentStart"))
+            GSDivider()
             GSToggleRow(symbol: "waveform", title: "Ambient loop while an agent works", text: "A quiet loop under a running agent, at half volume.", isOn: bool("sound.runningLoop"))
         }
         // These switches still gate playback (ZeusSound.play), whatever style a cue above is set to.
@@ -581,6 +631,8 @@ private struct SoundsPage: View {
         }
         .disabled(!ExtraPreferences.shared.soundsOn)
         .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
+        // Shaping does not depend on Zeus's own sounds, so this card sits outside the dimmed cards above.
+        GSEqualiserCard(controller: context.equaliser(), isOn: bool("audio.equaliser"))
     }
 
     private func cue(_ symbol: String, _ title: String, _ text: String, _ id: String, _ options: [String], _ event: ZeusSound.Event) -> some View {
@@ -678,18 +730,146 @@ private struct GSNotificationsPage: View {
 // MARK: Shortcuts
 
 private struct ShortcutsPage: View {
+    /// Mirrors the Chat choice for SwiftUI: the monitor itself is not observable.
+    @State private var chat = ChatHotkeyMonitor.shared.hotkey
+    @State private var chatProblem = ChatHotkeyMonitor.shared.problem
+    /// Why the key the owner just recorded for the second talk key was not kept, and a count that redraws the page when it changes.
+    @State private var secondTalkRefusal: String?
+    @State private var secondTalkRevision = 0
+
+    /// The Chat choices as the catalog names them.
+    private static func title(_ key: ChatHotkey) -> String {
+        switch key {
+        case .off: "Off"
+        case .controlOptionSpace: "Control-Option-Space"
+        case .optionSpace: "Option-Space"
+        case .optionShiftSpace: "Option-Shift-Space"
+        case .commandShiftSpace: "Command-Shift-Space"
+        case .controlOptionC: "Control-Option-C"
+        }
+    }
+
+    /// What the page reads from the keys right now: the chord, the Chat clash and the sentences for the Talk row.
+    private struct Routing {
+        let chord: Shortcut?
+        let clash: VoiceKey.ChatClash?
+        let talkNotes: [String]
+        let secondTalk: Shortcut?
+        let secondTalkNotes: [String]
+        /// Plain sentences for the second key, without the warning style.
+        let secondTalkQuietNotes: [String]
+    }
+
+    /// The sentence under the second talk key when another key has it (`VoiceKey.secondTalkKey` named the key it gave way to).
+    private static func yieldNote(_ name: String) -> String {
+        switch name {
+        case "VoiceOver": "VoiceOver uses Control and Option, so this key is off."
+        case "Chat": "Chat uses Option-Space, so this key is off. Record another key or move Chat."
+        case "Talk to Zeus": "This is already your Talk to Zeus key, so this key is off. Record another key."
+        default: "\(name) uses this key, so it is off. Record another key or change \(name.lowercased())."
+        }
+    }
+
+    private func routing() -> Routing {
+        let talk = Preferences.shared.pushToTalk
+        let dictation = DictationSettings.shared
+        let voiceOverOn = NSWorkspace.shared.isVoiceOverEnabled
+        let heard = VoiceKey.effectiveTalkKey(chosen: talk, dictation: dictation.enabled ? dictation.key : nil,
+                                              pointing: PointingSettings.enabled ? PointingSettings.shortcut : nil,
+                                              voiceOverOn: voiceOverOn)
+        let shared = dictation.enabled && talk == dictation.key
+        let routing = TalkChordRouting.current(heard: heard, shared: shared)
+        let clash = VoiceKey.chatClash(talk: talk, heard: heard, chat: chat, shared: shared, voiceOverOn: voiceOverOn, holders: [])
+        var notes: [String] = []
+        if let clash { notes.append(clash.sentence) }
+        if let holder = routing.heldBy, holder != "Chat" {
+            notes.append("\(holder) uses Control-Option-Space, so it does not talk. Hold Control + Option alone to talk.")
+        }
+        if let problem = TalkChordHotkey.shared.problem { notes.append(problem) }
+        let second = SecondTalkRouting.current()
+        var secondNotes: [String] = []
+        if let refusal = secondTalkRefusal { secondNotes.append(refusal) }
+        var quietNotes: [String] = []
+        if let name = second.yieldsTo {
+            if VoiceKey.secondTalkNoteIsQuiet(yieldsTo: name, explicit: ShortcutStore.loadSecondTalk(.standard).explicit) {
+                quietNotes.append("Off: it is the same as your talk key.")
+            } else {
+                secondNotes.append(Self.yieldNote(name))
+            }
+        }
+        secondNotes += TilingKeyClash.notes(base: TileModifierBase(label: SettingsStore.shared.string("tiling.keyBase")))
+            .filter { $0.contains("Second talk") }
+        if second.key != nil { secondNotes.append("Hold it a quarter second before speaking.") }
+        return Routing(chord: routing.chord, clash: clash, talkNotes: notes, secondTalk: second.key, secondTalkNotes: secondNotes,
+                       secondTalkQuietNotes: quietNotes)
+    }
+
     var body: some View {
+        let _ = secondTalkRevision
+        let state = routing()
+        let clash = state.clash
         GSPageHeading(section: .shortcuts, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
             ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus",
-                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean.",
+                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean."
+                                    + (state.chord != nil ? " Control + Option + Space does the same." : ""),
                                 shortcut: Preferences.shared.pushToTalk, defaultValue: ShortcutStore.talkDefault,
                                 otherName: "Dictation", other: DictationSettings.shared.key,
                                 voiceOverFallback: VoiceKey.effectiveTalkKey(chosen: Preferences.shared.pushToTalk,
                                                                              dictation: DictationSettings.shared.key,
-                                                                             pointing: nil, voiceOverOn: true)) {
+                                                                             pointing: nil, voiceOverOn: true),
+                                notes: state.talkNotes) {
                 if let new = $0 { Preferences.shared.chooseTalkKey(new) }
+            }
+            GSDivider()
+            ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
+                                text: "Hold to talk, let go to send, double-tap to keep listening, like the talk key. Left Option and Right Option with a letter type as usual.",
+                                shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
+                                otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk,
+                                notes: state.secondTalkNotes, quietNotes: state.secondTalkQuietNotes) { new in
+                let dictation = DictationSettings.shared, polyglot = PolyglotSettings.shared
+                secondTalkRefusal = new.flatMap {
+                    VoiceKey.secondTalkRefusal($0, talk: Preferences.shared.pushToTalk, dictation: dictation.enabled ? dictation.key : nil,
+                                               polyglot: polyglot.enabled ? polyglot.hotkey : nil)
+                }
+                if secondTalkRefusal == nil { Preferences.shared.chooseSecondTalkKey(new) }
+                secondTalkRevision += 1
+            }
+            GSDivider()
+            GSRow(symbol: "bubble.left.and.bubble.right", title: "Open the chat window",
+                  text: "Opens the chat window from any app.") {
+                GSPopup(selection: Binding(get: { Self.title(chat) },
+                                           set: { value in
+                                               guard let new = ChatHotkey.allCases.first(where: { Self.title($0) == value }) else { return }
+                                               ChatHotkeyMonitor.shared.set(new)
+                                               chat = new
+                                               chatProblem = ChatHotkeyMonitor.shared.problem
+                                           }),
+                        options: ChatHotkey.allCases.map { Self.title($0) }, label: "Open the chat window shortcut")
+            }
+            if let clash {
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
+                    Text(clash.sentence).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button(clash.fix == .off ? "Turn Chat off" : "Move Chat to \(Self.title(clash.fix))") {
+                        ChatHotkeyMonitor.shared.set(clash.fix)
+                        chat = clash.fix
+                        chatProblem = ChatHotkeyMonitor.shared.problem
+                    }
+                    .buttonStyle(GSButtonStyle())
+                }
+                .foregroundStyle(Theme.ember)
+                .padding(.vertical, 6)
+            }
+            if let chatProblem {
+                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
+                    Text(chatProblem).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Theme.ember)
+                .padding(.vertical, 6)
             }
             GSDivider()
             ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "Hold to speak, let go to write it where your cursor is.",
@@ -832,6 +1012,8 @@ private struct VoicePage: View {
         GSCard("Talk to Zeus") {
             ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
             GSDivider()
+            TalkMicrophoneRow()
+            GSDivider()
             KeyAccessLinkRow(navigation: navigation)
         }
         WakeWordCard()
@@ -864,6 +1046,26 @@ private struct VoicePage: View {
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                 .accessibilityLabel("\(title) keywords")
         }
+    }
+}
+
+/// Which microphone talk turns use. Automatic follows the system input; This Mac's microphone keeps a Bluetooth headset out of
+/// the talk turn. The inputs are listed off the main thread when the page shows, like the Dictation page.
+private struct TalkMicrophoneRow: View {
+    private var devices: [MicrophoneDevice] { MicrophoneTester.shared.devices }
+    private var choice: TalkMicrophoneChoice { TalkMicrophoneChoice(stored: store.string(TalkMicrophoneChoice.settingID)) }
+
+    var body: some View {
+        GSRow(symbol: "mic.circle", title: "Microphone",
+              text: "What Zeus listens on when you talk. Automatic uses the system input, so a connected headset wins. This Mac\u{2019}s microphone keeps a Bluetooth headset from switching mode. Dictation has its own.") {
+            GSPopup(selection: Binding(get: { choice.title(devices: devices) },
+                                       set: { title in
+                                           guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
+                                           store.set(TalkMicrophoneChoice.settingID, new.stored)
+                                       }),
+                    options: choice.options(devices: devices), label: "Talk microphone")
+        }
+        .onAppear { Task { MicrophoneTester.shared.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } }
     }
 }
 
@@ -1100,7 +1302,7 @@ private struct PermissionsPage: View {
 private struct PrivacyPage: View {
     let context: GSContext
     @AppStorage(DriveAutonomy.settingsKey) private var driveAutonomy = DriveAutonomy.default.rawValue
-    @AppStorage(CLIAccess.defaultsKey) private var cliSensitive = false
+    private var cliAccess: CLIAccessModel { CLIAccessModel.shared }
 
     /// The pop-up shows titles; the setting stores the raw value.
     private var autonomyTitle: Binding<String> {
@@ -1119,7 +1321,18 @@ private struct PrivacyPage: View {
             GSToggleRow(symbol: "text.quote", title: "Synced lyrics",
                         text: "Sends the song title, artist, album and length to lrclib.net to fetch time-synced lyrics, which are kept on this Mac. Off until you turn it on.",
                         isOn: bool("privacy.lyrics"))
+            GSDivider()
+            GSToggleRow(symbol: "globe", title: "Show media playing in Chrome",
+                        text: "Reads title, artist and position from Chrome tabs through the Zeus extension. Covers load from the page's own image link and are not saved. Calls are never shown.",
+                        isOn: bool("music.browserMedia"))
+            if let reload = store.statusOverrides[BrowserMediaFeed.statusID] {
+                GSDivider()
+                GSRow(symbol: "arrow.clockwise", title: "Zeus extension", text: reload.1) {
+                    Button("Open extensions") { store.actions["music.openExtensions"]?() }.buttonStyle(GSButtonStyle())
+                }
+            }
         }
+        GSFacePresenceCardHost()
         GSCard("Control from the notch") {
             GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())
@@ -1131,9 +1344,18 @@ private struct PrivacyPage: View {
             }
         }
         GSCard("Command line") {
+            if cliAccess.noticePending {
+                GSRow(symbol: "info.circle", title: "Command-line control was reset",
+                      text: "This setting now lives in your Keychain, not in a preferences file, so editing preferences cannot switch it on. Zeus turned it off once; turn it on again below if you use the zeus command.") {
+                    Button("Got it") { cliAccess.dismissNotice() }.buttonStyle(GSButtonStyle())
+                }
+                GSDivider()
+            }
             GSToggleRow(symbol: "terminal", title: "Allow command-line control of sensitive actions",
-                        text: "Lets the zeus command (and any program on this Mac running as you) listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, and import keys. Off by default; read-only commands such as status always work.",
-                        isOn: $cliSensitive)
+                        text: cliAccess.failed
+                            ? "Zeus could not change this in your Keychain. Check Keychain access and try again."
+                            : "Lets the zeus command, and any program on this Mac running as you that runs it, listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, import keys, read folders you name, and open or capture Zeus's own panels. Off by default and kept in your Keychain; read-only commands such as status always work.",
+                        isOn: Binding(get: { cliAccess.enabled }, set: { cliAccess.set($0) }))
         }
     }
 }
@@ -1152,6 +1374,7 @@ private struct DiagnosticsPage: View {
                 GSStatus(ok: up, text: up ? "Connected" : "Offline")
             }
         }
+        LiveDiagnosticsCard(context: context)
         DiagnosticsLogsCard()
         GSCard("Restart the local connection") {
             GSRow(symbol: "arrow.clockwise", title: "Restart the connection", text: "Agents and running tasks keep going in their own apps.") {

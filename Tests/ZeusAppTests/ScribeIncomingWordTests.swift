@@ -38,7 +38,7 @@ struct ScribeIncomingWordTests {
     }
 
     @Test func realBatchRevisionsUseInjectedTimeWithoutRestartingEligibleWords() async throws {
-        let suite = "scribe-words-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "scribe-words-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let clock = Clock(), capture = Capture()
@@ -66,7 +66,7 @@ struct ScribeIncomingWordTests {
     }
 
     @Test func cancellationClearsRevealStateAndRejectsLateTranscriptBatches() async throws {
-        let suite = "scribe-words-cancel-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "scribe-words-cancel-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let clock = Clock(), capture = Capture()

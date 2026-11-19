@@ -71,11 +71,21 @@ final class VoiceSettings {
     /// fallback-brain reply and the next (51-57 s apart in that round). Persisted here so the
     /// pause survives both a new `Speaker` instance and a new app launch; cleared when the key
     /// changes or a stream actually succeeds.
-    private(set) var elevenLabsPausedUntil: Date? {
-        didSet { defaults.set(elevenLabsPausedUntil, forKey: "voice.elevenlabs.pausedUntil") }
+    /// A network error or first-audio timeout pauses it for a minute in memory only, so Kokoro takes the rest
+    /// of that reply and the next few; a refused request is persisted (`ElevenLabsPause`).
+    private var elevenLabsPause: ElevenLabsPause {
+        didSet { defaults.set(elevenLabsPause.persistedUntil, forKey: "voice.elevenlabs.pausedUntil") }
     }
+    var elevenLabsPausedUntil: Date? { elevenLabsPause.persistedUntil }
     var openAIKeyDraft = ""
     private(set) var openAIKeySaved: Bool
+    var geminiKeyDraft = ""
+    private(set) var geminiKeySaved: Bool
+    /// The voice names the OpenAI and Gemini pickers write (`voice.openai.voice`, `voice.gemini.voice`).
+    var openAIVoice: String { didSet { defaults.set(openAIVoice, forKey: "voice.openai.voice") } }
+    var geminiVoice: String { didSet { defaults.set(geminiVoice, forKey: "voice.gemini.voice") } }
+    var openAIBaseURL: String? { UserDefaults.standard.string(forKey: "voice.openai.baseURL") }
+    var openAIModel: String { UserDefaults.standard.string(forKey: "voice.openai.model") ?? UltronCloudVoice.openAIModel }
     private var fallbackMessage: String?
     /// The fallback notice stays only while the pause behind it lasts (and until a provider works again).
     private var fallbackMessageUntil: Date?
@@ -87,7 +97,7 @@ final class VoiceSettings {
     /// A key that could not be saved, or a preview that was written to a file instead of played.
     var keyMessage: String?
     var previewMessage: String?
-    /// "Fastest" (ElevenLabs flash, the default for talking to Zeus) or "Studio" (highest quality, expressive).
+    /// "Studio" (multilingual v2, the default, expressive) or "Fastest" (ElevenLabs flash, lowest delay).
     var elevenQuality: ElevenLabsQuality = .resolve(stored: UserDefaults.standard.string(forKey: ElevenLabsQuality.defaultsKey)) {
         didSet { defaults.set(elevenQuality.rawValue, forKey: ElevenLabsQuality.defaultsKey) }
     }
@@ -106,34 +116,30 @@ final class VoiceSettings {
         let kokoroSetUp = KokoroWorker.modelFilesPresent()
         let userSelected = UserDefaults.standard.bool(forKey: "voice.engine.userSelected")
         let pausedUntil = UserDefaults.standard.object(forKey: "voice.elevenlabs.pausedUntil") as? Date
-        let keyValid = Keychain.get("elevenlabs.api-key") != nil && (pausedUntil.map { $0 <= Date() } ?? true)
-        // Ultron is the local voice first. ElevenLabs is used only when its key is valid and Kokoro
-        // is not ready. A stored ElevenLabs choice that the person never confirmed follows that order,
-        // so a 401 key is not the voice that answers. An explicit choice still wins.
-        let preferred = Self.engine(UltronVoicePlan.preferred(kokoroReady: kokoroSetUp, elevenLabsKeyValid: keyValid))
-        if let stored, (userSelected || stored == .kokoro) {
-            engine = stored
-        } else {
-            engine = preferred
-        }
+        let keyValid = Keychain.get("elevenlabs.api-key") != nil && !UltronVoicePlan.isPaused(until: pausedUntil, now: Date())
+        // Ultron default: ElevenLabs when its key is usable and not paused, Kokoro as the failsafe, the
+        // Mac voice last. Only an explicit owner pick (`voice.engine.userSelected`) overrides that order.
+        engine = Self.engine(UltronVoicePlan.initialEngine(
+            stored: stored.map(Self.plan), userSelected: userSelected, kokoroReady: kokoroSetUp, elevenLabsKeyValid: keyValid))
         if let raw = UserDefaults.standard.string(forKey: "voice.ttsProvider"),
            let provider = VoiceTTSProvider(rawValue: raw) {
             ttsProvider = provider
-        } else if kokoroSetUp || !keyValid {
-            // Ultron default: the free local engine. ElevenLabs only when a key is present and not paused.
-            ttsProvider = .kokoro
         } else {
-            ttsProvider = .elevenLabs
+            ttsProvider = UltronVoicePlan.defaultProvider(kokoroReady: kokoroSetUp, elevenLabsKeyValid: keyValid)
         }
         personality = ZeusPersonality.current()
-        engineAuto = UserDefaults.standard.object(forKey: "voice.engine.auto") as? Bool
-            ?? (UserDefaults.standard.string(forKey: "voice.ttsProvider") == nil)
+        engineAuto = ElevenLabsFailsafe.defaultEngineAuto(
+            explicit: UserDefaults.standard.object(forKey: "voice.engine.auto") as? Bool,
+            storedProvider: UserDefaults.standard.string(forKey: "voice.ttsProvider"))
         kokoroVoice = UserDefaults.standard.string(forKey: "voice.kokoro.voice") ?? ElevenLabsVoice.offlineKokoroVoice
         kokoroSpeed = UserDefaults.standard.object(forKey: "voice.kokoro.speed") as? Double ?? ElevenLabsVoice.offlineKokoroSpeed
         elevenKeySaved = Keychain.get("elevenlabs.api-key") != nil
         openAIKeySaved = Keychain.get("openai-tts.api-key") != nil
+        geminiKeySaved = Keychain.get("gemini-tts.api-key") != nil
+        openAIVoice = UserDefaults.standard.string(forKey: "voice.openai.voice") ?? UltronCloudVoice.openAIVoice
+        geminiVoice = GeminiVoiceCatalog.resolve(stored: UserDefaults.standard.string(forKey: "voice.gemini.voice"))
         kokoroReady = kokoroSetUp
-        elevenLabsPausedUntil = UserDefaults.standard.object(forKey: "voice.elevenlabs.pausedUntil") as? Date
+        elevenLabsPause = ElevenLabsPause(persistedUntil: pausedUntil)
         if kokoroSetUp { verifyKokoro() }
     }
 
@@ -145,12 +151,16 @@ final class VoiceSettings {
         }
     }
 
-    func ttsAvailability(elevenLabsPaused: Bool) -> VoiceProviderFallback.Availability {
+    /// OpenAI speech has shut down for the configured model (`OpenAISpeechRetirement`). A saved key and choice stay.
+    func openAIRetired(now: Date = Date()) -> Bool { OpenAISpeechRetirement.isRetired(model: openAIModel, baseURL: openAIBaseURL, at: now) }
+
+    func ttsAvailability(elevenLabsPaused: Bool, now: Date = Date()) -> VoiceProviderFallback.Availability {
         VoiceProviderFallback.Availability(
             kokoroReady: kokoroReady,
             chatterboxReady: ChatterboxVoice.isReady,
             elevenLabsConfigured: elevenKeySaved && !elevenLabsPaused,
-            openAIConfigured: openAIKeySaved
+            openAIConfigured: openAIKeySaved && !openAIRetired(now: now),
+            geminiConfigured: geminiKeySaved
         )
     }
 
@@ -162,6 +172,7 @@ final class VoiceSettings {
         case .chatterbox: .chatterbox
         case .elevenLabs: .elevenLabs
         case .openAICompatible: .openAI
+        case .gemini: .gemini
         }
     }
 
@@ -169,8 +180,10 @@ final class VoiceSettings {
         UltronEngineAvailability(
             elevenLabsConfigured: ElevenLabsVoice.hasRoute, elevenLabsPaused: isProviderPaused(.elevenLabs, now: now),
             openAIConfigured: openAIKeySaved, openAIPaused: isProviderPaused(.openAICompatible, now: now),
+            geminiConfigured: geminiKeySaved, geminiPaused: isProviderPaused(.gemini, now: now),
             kokoroReady: kokoroReady, kokoroPaused: isProviderPaused(.kokoro, now: now),
-            chatterboxReady: ChatterboxVoice.isReady, chatterboxPaused: isProviderPaused(.chatterbox, now: now))
+            chatterboxReady: ChatterboxVoice.isReady, chatterboxPaused: isProviderPaused(.chatterbox, now: now),
+            openAIRetired: openAIRetired(now: now))
     }
 
     var engineChoice: UltronEngineChoice { engineAuto ? .auto : .fixed(Self.engine(for: ttsProvider)) }
@@ -196,25 +209,27 @@ final class VoiceSettings {
     }
 
     func isProviderPaused(_ provider: VoiceTTSProvider, now: Date = Date()) -> Bool {
-        if provider == .elevenLabs, let until = elevenLabsPausedUntil, until > now { return true }
+        if provider == .elevenLabs, elevenLabsPause.isPaused(now: now) { return true }
         let key = "voice.provider.pause.\(provider.rawValue)"
         guard let until = defaults.object(forKey: key) as? Date else { return false }
         return until > now
     }
 
     func noteProviderFailure(_ provider: VoiceTTSProvider, reason: VoiceTTSChain.FailureReason, now: Date = Date()) {
-        let until = now.addingTimeInterval(10 * 60)
+        var until = now.addingTimeInterval(10 * 60)
         if provider == .elevenLabs {
-            if reason == .http401 || reason == .quota {
-                elevenLabsPausedUntil = until
-            }
+            let failure: ElevenLabsFailure = (reason == .http401 || reason == .quota) ? .status(401) : .unreachable
+            elevenLabsPause.note(failure, now: now)
+            until = now.addingTimeInterval(UltronVoicePlan.pauseSeconds(status: failure == .unreachable ? nil : 401))
         } else {
             defaults.set(until, forKey: "voice.provider.pause.\(provider.rawValue)")
         }
         let label = provider.title
         switch reason {
-        case .http401, .quota:
-            fallbackMessage = "\(label): quota exceeded, using next voice"
+        case .http401:
+            fallbackMessage = ProviderFailureMessage.message(label: label, kind: .badKey)
+        case .quota:
+            fallbackMessage = ProviderFailureMessage.message(label: label, kind: .creditsUsedUp)
         case .timeout:
             fallbackMessage = "\(label): timed out, using next voice"
         case .missingModel:
@@ -255,6 +270,31 @@ final class VoiceSettings {
         openAIKeyDraft = ""
         keyMessage = nil
         defaults.removeObject(forKey: "voice.provider.pause.openAICompatible")
+    }
+
+    func saveGeminiKey() {
+        let key = geminiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if key.isEmpty { geminiKeyDraft = ""; return }
+        // A failed Keychain write keeps the draft, so the pasted key is never lost silently.
+        guard Keychain.set(key, for: "gemini-tts.api-key") else {
+            keyMessage = "Couldn't save the Gemini key to your Keychain. It is still in the field."
+            return
+        }
+        geminiKeyDraft = ""
+        keyMessage = nil
+        geminiKeySaved = true
+        clearProviderPause(.gemini)
+    }
+
+    func removeGeminiKey() {
+        guard Keychain.remove("gemini-tts.api-key") else {
+            keyMessage = "Couldn't remove the Gemini key. Check Keychain access and try again."
+            return
+        }
+        geminiKeySaved = false
+        geminiKeyDraft = ""
+        keyMessage = nil
+        defaults.removeObject(forKey: "voice.provider.pause.gemini")
     }
 
     // MARK: ElevenLabs
@@ -319,7 +359,7 @@ final class VoiceSettings {
         keyMessage = nil
         library = []
         elevenLabsStatusMessage = nil
-        elevenLabsPausedUntil = nil
+        elevenLabsPause.clear()
         if engine == .elevenLabs { engine = .system }
     }
 
@@ -328,8 +368,7 @@ final class VoiceSettings {
     func noteElevenLabsKeyRejected(status: Int, body: Data) {
         elevenLabsStatusMessage = ElevenLabsVoice.settingsMessage(status: status, body: body)
         ElevenLabsVoice.logKeyRejection(status: status, body: body)
-        let pause: TimeInterval = (status == 401 || status == 402) ? 15 * 60 : 60
-        elevenLabsPausedUntil = Date().addingTimeInterval(pause)
+        elevenLabsPause.note(.status(status), now: Date())
     }
 
     /// Called the moment ElevenLabs actually streams audio again, so a now-working key (or a
@@ -337,7 +376,7 @@ final class VoiceSettings {
     func clearElevenLabsPause() {
         fallbackMessage = nil
         fallbackMessageUntil = nil
-        elevenLabsPausedUntil = nil
+        elevenLabsPause.clear()
         elevenLabsStatusMessage = nil
     }
 
@@ -439,6 +478,14 @@ final class VoiceSettings {
             try? await Task.sleep(for: .seconds(1))
             while speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(300)) }
             testing = false
+        }
+    }
+
+    static func plan(_ engine: VoiceEngine) -> UltronVoicePlan.Engine {
+        switch engine {
+        case .kokoro: .kokoro
+        case .elevenLabs: .elevenLabs
+        case .system: .system
         }
     }
 

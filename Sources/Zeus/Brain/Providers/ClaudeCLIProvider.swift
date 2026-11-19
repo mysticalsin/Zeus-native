@@ -38,8 +38,13 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
         if let process, process.isRunning { process.interrupt() }
     }
 
-    func send(_ request: BrainRequest) -> AsyncThrowingStream<BrainEvent, Error> {
-        AsyncThrowingStream { continuation in
+    func send(_ original: BrainRequest) -> AsyncThrowingStream<BrainEvent, Error> {
+        // Screenshots go only to a launch that keeps them out of the saved session (`--no-session-persistence`, which
+        // comes with the `--safe-mode` the CLI is feature-detected for). An older claude gets text and an honest note.
+        let request = TalkSightPolicy.launchRequest(original, voice: original.firstTextBudget != nil,
+                                                    supportsNoSessionPersistence: ClaudeFlags.supportsSafeMode,
+                                                    drawInstructions: ZeusPrompt.drawInstructions())
+        return AsyncThrowingStream { continuation in
             guard let path = executable else {
                 continuation.finish(throwing: ProviderError.notInstalled)
                 return
@@ -55,7 +60,8 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
             // (chat, routines, a busy or dead session) takes the one-shot path below.
             if voice, let runner = PersistentClaudeSession.shared.runner(deep: request.deep, executable: path, arguments: arguments),
                runner.begin(turn: request.turn, message: Self.userMessage(for: request, context: split.context),
-                            continuation: continuation, firstByteBudget: request.firstTextBudget ?? 8) {
+                            continuation: continuation, firstByteBudget: request.firstTextBudget ?? 8,
+                            carriesImage: request.carriesDrawImage) {
                 VoiceLog.log("brain", "engine=claude persistent=yes turns=\(runner.turnsServed)")
                 continuation.onTermination = { termination in
                     if case .cancelled = termination { runner.cancel(turn: request.turn) }

@@ -16,6 +16,8 @@ enum DeepLinks {
     /// Wired by the app: opens the Dictation tab with a notice, so capture starts only from an in-app press.
     /// Unset means a link cannot start capture at all.
     static var requestDictationStart: (() -> Void)?
+    /// Wired by the app: opens the Settings window on a page (`GSSection` raw value, any case) or the last one.
+    static var openSettings: ((String?) -> Void)?
 
     static func perform(_ link: ZeusDeepLink) {
         let dictation = DictationHub.shared.controller
@@ -32,6 +34,8 @@ enum DeepLinks {
             ChatModel.shared.openWindow()
         case .prompter:
             PrompterHub.shared.toggle()
+        case .settings(let section):
+            openSettings?(section)
         case .stickyNew(let text):
             StickiesController.shared.new(text: text ?? "")
         case .chatOpen(let prefill):

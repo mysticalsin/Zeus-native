@@ -7,7 +7,7 @@ import Testing
 
 /// Actual production Setup-card and guide controls, using own-window pointer events and inert
 /// services. This is not full Settings/AppDelegate routing, keyboard, AX, OS-consent or motion proof.
-@MainActor @Suite("Onboarding native component journey", .serialized)
+@MainActor @Suite("Onboarding native component journey", .inNativeHost, .serialized)
 struct OnboardingComponentJourneyTests {
     @MainActor private final class Memory {
         var step = OnboardingStep.welcome.rawValue

@@ -8,6 +8,17 @@ public struct KeepAwakeRules: Equatable, Sendable {
     public enum Thermal: Int, Comparable, Sendable {
         case nominal, fair, serious, critical
         public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+
+        /// The one mapping from the system's state, shared by Keep Awake and Diagnostics.
+        public init(_ state: ProcessInfo.ThermalState) {
+            switch state {
+            case .nominal: self = .nominal
+            case .fair: self = .fair
+            case .serious: self = .serious
+            case .critical: self = .critical
+            @unknown default: self = .nominal
+            }
+        }
     }
 
     /// What the Mac reports right now.

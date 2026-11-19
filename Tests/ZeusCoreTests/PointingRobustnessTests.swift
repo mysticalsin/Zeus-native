@@ -49,6 +49,33 @@ struct PointingRobustnessTests {
         #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 2.05) == .began)
     }
 
+    @Test func afterAnInterruptOneModifierLetGoAndPressedAgainBeginsNothing() {
+        var gesture = holding()
+        #expect(gesture.interrupt(liveModifiers: [.control, .option]) == .cancelled)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control]), at: 1) == nil)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 1.1) == nil,
+                "the keys were never all up in between")
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: []), at: 1.2) == nil)
+        _ = gesture.feed(.flags(keyCode: 59, modifiers: [.control]), at: 2)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 2.05) == .began)
+    }
+
+    @Test func anInterruptThatFindsEveryKeyUpLetsTheNextPressBegin() {
+        var gesture = holding()
+        #expect(gesture.interrupt(liveModifiers: []) == .cancelled)
+        _ = gesture.feed(.flags(keyCode: 59, modifiers: [.control]), at: 1)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 1.05) == .began)
+    }
+
+    @Test func aTimeoutWithAKeyStillHeldKeepsTheWaitUntilItIsLetGo() {
+        var gesture = holding()
+        #expect(gesture.tick(at: 2, liveModifiers: [.control]) == .holdTimedOut)
+        // The picture took the live keys, so Control still down means the wait cannot clear on the next event.
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 3) == nil)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control]), at: 3.1) == nil)
+        #expect(gesture.feed(.flags(keyCode: 58, modifiers: [.control, .option]), at: 3.2) == nil)
+    }
+
     @Test func interruptingWithNoHoldReportsNothing() {
         var gesture = PointingKeyGesture()
         #expect(gesture.interrupt() == nil)
