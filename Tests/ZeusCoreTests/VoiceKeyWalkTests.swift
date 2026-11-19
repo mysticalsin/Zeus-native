@@ -1578,6 +1578,9 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
     return out
 }
 
+/// How many states one search may discover before it stops. `Int.max` is not a budget: the search runs until the graph ends.
+private let walkSearchStateBudget = Int.max
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
     let start = Date()
@@ -1604,7 +1607,8 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     // `WALK_PROGRESS=path` appends the size of the search to that file as it grows (the runner holds its output until it ends);
     // `WALK_LIMIT=n` stops it past n states (a violation), for measuring a run before it is put in the list.
     let progress = ProcessInfo.processInfo.environment["WALK_PROGRESS"]
-    let limit = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? Int.max
+    let requested = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? walkSearchStateBudget
+    let limit = min(requested, walkSearchStateBudget)
     var cursor = 0
     while cursor < frontier.count {
         if let progress, cursor % 100_000 == 0 {
@@ -1959,6 +1963,13 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         print("voice key walk, pair against machine: \(sequences) sequences")
         #expect(sequences == 66_429)
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    /// The plain walk calls the same full search as run A. That search has to have a finite state budget, or a second
+    /// walk of the same graph keeps running past the suite limit.
+    @Test func thePlainWalkSearchHasAFiniteBudget() {
+        #expect(walkSearchStateBudget < Int.max, "aPlainWalk's search has no finite state budget")
+        #expect(walkSearchStateBudget == 1_883_647)
     }
 
     /// As a check on the state key: run A walked plainly from rest, every order up to five steps over nine moves (the eight of before and Space).
