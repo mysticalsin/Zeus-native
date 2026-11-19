@@ -711,14 +711,19 @@ private struct ApprovalBody: View {
                     ApprovalAllowButton(
                         title: approval.allowGate.confirmVisible ? "Confirm" : "Approve",
                         tint: Theme.ember,
-                        fraction: approval.allowGate.holdFraction(now: ProcessInfo.processInfo.systemUptime)
+                        fraction: approval.allowGate.holdFraction(now: ApprovalMonotonic.now())
                     ) {
                         approval.beginHold()
                     } release: { inside in
-                        if case .hold = approval.allowGate.gesture { approval.endHold(inside) }
-                        else { approval.activateAllow() }
+                        switch ApprovalPress.outcome(inside: inside, gesture: approval.allowGate.gesture) {
+                        case .cancel: approval.cancelHold()
+                        case .endHold: approval.endHold(true)
+                        case .activate: approval.activateAllow()
+                        }
                     } accessibility: {
                         approval.activateAllow()
+                    } onDisappearAction: {
+                        approval.cancelHold()
                     }
                     NotchButton(title: "Deny all", tint: Theme.cloudSecondary, filled: false) { approval.denyAll() }
                         .accessibilityHint("Denies this request and every request waiting behind it. Nothing is allowed.")
@@ -759,6 +764,7 @@ private struct ApprovalAllowButton: View {
     let press: () -> Void
     let release: (Bool) -> Void
     let accessibility: () -> Void
+    var onDisappearAction: () -> Void = {}
 
     var body: some View {
         Text(title)
@@ -772,13 +778,16 @@ private struct ApprovalAllowButton: View {
                         .gesture(DragGesture(minimumDistance: 0)
                             .onChanged { _ in press() }
                             .onEnded { value in
-                                release(CGRect(origin: .zero, size: proxy.size).contains(value.location))
+                                release(ApprovalButtonHit.contains(
+                                    width: proxy.size.width, height: proxy.size.height,
+                                    x: value.location.x, y: value.location.y))
                             })
                 }
             }
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(title == "Confirm" ? "Confirm. Press again after a short wait." : title)
             .accessibilityAction { accessibility() }
+            .onDisappear { onDisappearAction() }
     }
 }
 

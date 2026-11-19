@@ -37,7 +37,7 @@ final class NotchController {
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
     /// Monotonic seconds for the approval hold and its deadline. Tests replace it.
-    var monotonicNow: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    var monotonicNow: () -> TimeInterval = { ApprovalMonotonic.now() }
     /// Tests replace these so a high-risk confirm is not tied to the machine's settings.
     var approvalReduceMotion: () -> Bool = { Motion.reduced }
     var approvalVoiceOver: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
@@ -425,10 +425,12 @@ final class NotchController {
         }
         card.allowGate.reduceMotion = approvalReduceMotion()
         card.allowGate.voiceOver = approvalVoiceOver()
-        let channel: ApprovalAllowGate.Channel = switch kind {
-        case .shortcut: .shortcut
-        case .voice: .voice
-        default: .onScreen
+        let channel: ApprovalAllowGate.Channel
+        switch kind {
+        case .card: channel = .onScreen
+        case .shortcut: channel = .shortcut
+        case .voice: channel = .voice
+        case .timeout, .trusted: return
         }
         let verdict = card.allowGate.activate(now: moment, channel: channel)
         model.approval = card

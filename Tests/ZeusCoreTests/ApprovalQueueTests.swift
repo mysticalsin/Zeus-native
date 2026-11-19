@@ -158,6 +158,30 @@ struct ApprovalDecisionTests {
         #expect(medium.activate(now: start) == .allow)
     }
 
+    @Test func anOutsideReleaseDoesNotConfirmAndANewItemDropsTheHold() {
+        let confirm = ApprovalGesture.onScreenConfirm(readyAfter: 0.4, expiresAfter: 8)
+        #expect(ApprovalPress.outcome(inside: false, gesture: confirm) == .cancel)
+        #expect(ApprovalPress.outcome(inside: true, gesture: confirm) == .activate)
+        #expect(ApprovalPress.outcome(inside: false, gesture: .hold(seconds: 0.8)) == .cancel)
+        #expect(ApprovalPress.outcome(inside: true, gesture: .hold(seconds: 0.8)) == .endHold)
+        #expect(ApprovalButtonHit.contains(width: 40, height: 28, x: 10, y: 10))
+        #expect(!ApprovalButtonHit.contains(width: 40, height: 28, x: 41, y: 4))
+        #expect(!ApprovalButtonHit.contains(width: 40, height: 28, x: -1, y: 0))
+        var held = ApprovalAllowGate(risk: .high, itemID: "item")
+        held.beginHold(now: 10)
+        held.cancelHold()
+        #expect(held.holdingSince == nil)
+        #expect(held.releaseHold(now: 11, inside: true) == nil)
+        var armed = ApprovalAllowGate(risk: .high, reduceMotion: true, itemID: "item")
+        #expect(armed.activate(now: 10, channel: .onScreen) == nil)
+        armed.retarget(item: "next")
+        #expect(!armed.confirmVisible)
+        #expect(armed.itemID == "next")
+        #expect(armed.activate(now: 11, channel: .onScreen) == nil)
+        #expect(ApprovalMonotonic.now().isFinite)
+        #expect(ApprovalMonotonic.now() >= 0)
+    }
+
     @Test func shellHighBeatsANormalSubstringAndBlocksTheShortcut() {
         let command = "echo hi > /tmp/out"
         let input = JSONValue.object(["command": .string(command)])

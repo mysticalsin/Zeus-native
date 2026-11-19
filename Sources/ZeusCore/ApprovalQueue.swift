@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 public struct ApprovalTicket: Equatable, Sendable, Identifiable {
     public var id: String
@@ -251,7 +256,7 @@ public struct ApprovalAllowGate: Equatable, Sendable {
     public var voiceOver: Bool
     /// The request this hold belongs to. A release for another id does not allow.
     public var itemID: String
-    /// Monotonic seconds (`ProcessInfo.processInfo.systemUptime`), not a wall clock.
+    /// Monotonic seconds from `ApprovalMonotonic.now`, which keeps moving while the Mac sleeps.
     public private(set) var holdingSince: TimeInterval?
     public private(set) var holdingItem: String?
     /// When the on-screen confirm step was armed, in the same monotonic clock.
@@ -294,6 +299,14 @@ public struct ApprovalAllowGate: Equatable, Sendable {
         }
     }
 
+    /// A different request cannot inherit this hold or an armed confirm.
+    public mutating func retarget(item id: String) {
+        guard id != itemID else { return }
+        itemID = id
+        cancelHold()
+        confirmArmedAt = nil
+    }
+
     public mutating func beginHold(now: TimeInterval) {
         guard case .hold = gesture, holdingSince == nil else { return }
         holdingSince = now
@@ -315,6 +328,36 @@ public struct ApprovalAllowGate: Equatable, Sendable {
     public func holdFraction(now: TimeInterval) -> Double {
         guard case .hold(let seconds) = gesture, let start = holdingSince, seconds > 0 else { return 0 }
         return min(max((now - start) / seconds, 0), 1)
+    }
+}
+
+/// What a pointer release on the Allow button does. A release outside the control never counts.
+public enum ApprovalPress: Equatable, Sendable {
+    case cancel
+    case endHold
+    case activate
+
+    public static func outcome(inside: Bool, gesture: ApprovalGesture) -> ApprovalPress {
+        guard inside else { return .cancel }
+        if case .hold = gesture { return .endHold }
+        return .activate
+    }
+}
+
+/// The Allow button's hit test, in the button's own coordinates.
+public enum ApprovalButtonHit {
+    public static func contains(width: Double, height: Double, x: Double, y: Double) -> Bool {
+        width.isFinite && height.isFinite && width >= 0 && height >= 0
+            && x.isFinite && y.isFinite && x >= 0 && y >= 0 && x <= width && y <= height
+    }
+}
+
+/// A clock that keeps advancing while the machine sleeps. `ProcessInfo.systemUptime` does not.
+public enum ApprovalMonotonic {
+    public static func now() -> TimeInterval {
+        var value = timespec()
+        guard clock_gettime(CLOCK_MONOTONIC, &value) == 0 else { return 0 }
+        return TimeInterval(value.tv_sec) + TimeInterval(value.tv_nsec) / 1_000_000_000
     }
 }
 

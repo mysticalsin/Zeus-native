@@ -42,6 +42,20 @@ import ZeusCore
         #expect(box.verdict == .allow)
     }
 
+    @Test func aTimeoutOrATrustedKindDoesNotAllow() {
+        let (controller, box) = controller(risk: .low)
+        controller.activateApproval(kind: .timeout)
+        controller.activateApproval(kind: .trusted)
+        #expect(box.verdict == nil)
+    }
+
+    @Test func anAllowAfterSleepPastTheDeadlineIsRefused() {
+        let (controller, box) = controller()
+        controller.monotonicNow = { 9_000 }
+        controller.activateApproval(kind: .card)
+        #expect(box.verdict == .deny)
+    }
+
     @Test func aReleaseOutsideTheButtonDoesNotAllow() {
         let (controller, box) = controller()
         controller.beginApprovalHold()
