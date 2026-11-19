@@ -850,7 +850,7 @@ private struct PanelBody: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Color.clear.frame(width: notchWidth + 8, height: 1)
-                Text("\(model.sessions.count) agent\(model.sessions.count == 1 ? "" : "s")")
+                Text(AgentSupervision.overview(model.sessions.map(\.status)))
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cloudSecondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -865,7 +865,10 @@ private struct PanelBody: View {
             }
 
             ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
-                AgentCard(session: session, onStop: model.stopHandlers[session.id], picked: model.picker?.index == index)
+                AgentCard(session: session, onStop: model.stopHandlers[session.id],
+                          onAllow: { model.approval?.resolve(.allow) },
+                          onDeny: { model.approval?.resolve(.deny) },
+                          picked: model.picker?.index == index)
             }
         }
         .padding(.bottom, 12)
@@ -925,7 +928,10 @@ private struct TopBarPanelBody: View {
                     .frame(maxWidth: .infinity).padding(.top, 34)
                 }
                 ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
-                    AgentCard(session: session, onStop: model.stopHandlers[session.id], picked: model.picker?.index == index)
+                    AgentCard(session: session, onStop: model.stopHandlers[session.id],
+                          onAllow: { model.approval?.resolve(.allow) },
+                          onDeny: { model.approval?.resolve(.deny) },
+                          picked: model.picker?.index == index)
                 }
                 if model.picker != nil {
                     Text("Up and Down pick  ·  Return opens the terminal  ·  Esc closes")
@@ -939,6 +945,8 @@ private struct TopBarPanelBody: View {
 private struct AgentCard: View {
     let session: NotchModel.Session
     var onStop: (@MainActor () -> Void)? = nil
+    var onAllow: (@MainActor () -> Void)? = nil
+    var onDeny: (@MainActor () -> Void)? = nil
     var picked = false
     @State private var expanded = false
 
@@ -955,6 +963,31 @@ private struct AgentCard: View {
                     .foregroundStyle(Theme.cloudSecondary)
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if let run = session.supervision {
+                    ForEach(Array(run.steps.enumerated()), id: \.offset) { _, step in
+                        HStack(spacing: 6) {
+                            Text(step.title).font(.system(size: 11, design: .rounded)).lineLimit(1)
+                            Spacer(minLength: 4)
+                            if !step.fileCount.isEmpty {
+                                Text(step.fileCount).font(.system(size: 11, design: .monospaced))
+                            }
+                            if let outcome = step.outcome {
+                                Text(outcome).font(.system(size: 11, weight: .semibold, design: .rounded))
+                            }
+                            Text("\(step.elapsedMs) ms").font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.cloudQuiet)
+                        }
+                    }
+                    if let usage = AgentSupervision.usage(tokens: run.tokens, costCents: run.costCents) {
+                        Text(usage).font(.system(size: 11, design: .rounded)).foregroundStyle(Theme.cloudQuiet)
+                    }
+                    if !run.allow.isEmpty {
+                        HStack {
+                            Button(run.deny) { onDeny?() }.buttonStyle(.plain).font(.system(size: 12, weight: .semibold))
+                            Button(run.allow) { onAllow?() }.buttonStyle(.plain).font(.system(size: 12, weight: .semibold))
+                                .accessibilityHint(run.allowHolds ? "Hold the button until it fills." : "")
+                        }
+                    }
+                }
                 HStack {
                     if let onStop, session.status == .working || session.status == .needsYou {
                         Button("Stop") { onStop() }.buttonStyle(.plain).font(.system(size: 11, weight: .semibold))

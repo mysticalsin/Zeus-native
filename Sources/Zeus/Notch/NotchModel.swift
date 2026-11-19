@@ -23,6 +23,8 @@ final class NotchModel {
         var lastEventAt = Date()
         /// Why it failed or stalled, for the card.
         var reason: String?
+        /// Steps, tool calls, and the inline approval. Nil until a timeline is supplied.
+        var supervision: AgentSupervision.Run?
     }
 
     /// The red card in the peek after an agent's turn ends in an error.
