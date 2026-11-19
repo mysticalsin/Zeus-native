@@ -313,6 +313,13 @@ final class NotchController {
         model.peekSessionID = sessionID
     }
 
+    /// Moves between requests waiting behind the card. The index stays inside the queue.
+    func browseApproval(by delta: Int) {
+        guard var approval = model.approval else { return }
+        approval.queueIndex = ApprovalCard.step(index: approval.queueIndex, count: approval.queueCount, by: delta)
+        model.approval = approval
+    }
+
     /// Shows an approval card and waits for Approve / Deny (click or voice). One card at a time:
     /// a second request waits for the first. On timeout it returns `onTimeout`.
     func requestApproval(agent: String, project: String, tool: String, command: String, risk: HookEvent.Risk,

@@ -19,6 +19,17 @@ import ZeusCore
         return (controller, box)
     }
 
+    @Test func browseApprovalMovesWithinTheQueue() {
+        let (controller, _) = controller()
+        controller.model.approval?.queueCount = 3
+        controller.browseApproval(by: 1)
+        #expect(controller.model.approval?.queueIndex == 1)
+        controller.browseApproval(by: 5)
+        #expect(controller.model.approval?.queueIndex == 2)
+        controller.browseApproval(by: -1)
+        #expect(controller.model.approval?.queueIndex == 1)
+    }
+
     @Test func aShortcutAndASpokenYesNeverAllowHigh() {
         let (controller, box) = controller(reduceMotion: true)
         controller.activateApproval(kind: .shortcut)
