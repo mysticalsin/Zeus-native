@@ -620,19 +620,31 @@ private func render(
             for _ in 0..<40 {
                 kernel.process(base, frames: frames, channels: 2, interleaved: false, sampleRate: rate)
             }
-            // blocks_in_use is the whole process. Another thread can free a block while these buffers run,
-            // so one sample can fall without the kernel retaining anything. A block the kernel keeps comes
-            // back on every pass. The smallest delta is that signal, and it must not be positive.
-            var smallest = Int.max
-            for _ in 0..<4 {
-                let before = Self.blocksInUse()
+            // blocks_in_use is the whole process. Other suites allocate while this one runs, so a raw
+            // delta stays positive even when the kernel retains nothing. Each pass is paired with an idle
+            // window of the same length. A block the kernel keeps is in the kernel window only, and the
+            // smallest excess over that idle window must not be positive.
+            let clock = ContinuousClock()
+            func pass() {
                 for index in 0..<1000 {
                     if index % 100 == 0 { kernel.mailbox.post(index % 200 == 0 ? loud : quiet) }
                     if index == 500 { base[10] = .nan }
                     kernel.process(base, frames: frames, channels: 2, interleaved: index % 2 == 0, sampleRate: rate)
                 }
-                smallest = min(smallest, Self.blocksInUse() - before)
             }
+            func excess() -> Int {
+                let before = Self.blocksInUse()
+                let began = clock.now
+                pass()
+                let kernelDelta = Self.blocksInUse() - before
+                let elapsed = clock.now - began
+                let idleBefore = Self.blocksInUse()
+                let end = clock.now.advanced(by: elapsed)
+                while clock.now < end {}
+                return kernelDelta - (Self.blocksInUse() - idleBefore)
+            }
+            var smallest = Int.max
+            for _ in 0..<4 { smallest = min(smallest, excess()) }
             #expect(smallest <= 0)
         }
     }

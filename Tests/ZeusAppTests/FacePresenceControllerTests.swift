@@ -99,6 +99,12 @@ struct FacePresenceControllerTests {
             controller.settingChanged("face.presence")
         }
 
+        /// No saved face waits for Enroll. Press it, which is what starts the camera and the token.
+        func confirmEnrollment() {
+            turnOn()
+            controller.enroll()
+        }
+
         func turnOff() {
             storedSwitch = false
             controller.settingChanged("face.presence")
@@ -483,7 +489,7 @@ struct FacePresenceControllerTests {
 
     @Test func tenDifferentSamplesSaveAFaceAndStartWatching() async {
         let rig = Rig(); defer { rig.cleanUp() }
-        rig.turnOn()
+        rig.confirmEnrollment()
         #expect(rig.controller.machine.state == .enrolling(token: 1))
         await rig.enrollTenSamples()
         #expect(rig.controller.faces.count == 1)
@@ -499,7 +505,7 @@ struct FacePresenceControllerTests {
 
     @Test func nineSamplesAndAClosedWindowSaveNothing() async {
         let rig = Rig(); defer { rig.cleanUp() }
-        rig.turnOn()
+        rig.confirmEnrollment()
         for index in 0..<9 {
             rig.clock += 0.5
             var vector = Rig.sample
@@ -517,7 +523,7 @@ struct FacePresenceControllerTests {
 
     @Test func aSilentCameraCannotKeepAnEnrollmentOpenPastItsWindow() {
         let rig = Rig(); defer { rig.cleanUp() }
-        rig.turnOn()
+        rig.confirmEnrollment()
         rig.clock += 10
         rig.controller.checkEnrollmentWindow()
         #expect(rig.controller.machine.state == .enrolling(token: 1))
@@ -529,7 +535,7 @@ struct FacePresenceControllerTests {
 
     @Test func lockingDuringEnrollmentSavesNothing() async {
         let rig = Rig(); defer { rig.cleanUp() }
-        rig.turnOn()
+        rig.confirmEnrollment()
         let run = rig.controller.cameraRun
         for index in 0..<6 {
             rig.clock += 0.5
@@ -554,7 +560,7 @@ struct FacePresenceControllerTests {
 
     @Test func aSampleWithASpoofCueIsRefusedSoNothingSavesFromAPhone() async {
         let rig = Rig(); defer { rig.cleanUp() }
-        rig.turnOn()
+        rig.confirmEnrollment()
         for index in 0..<14 {
             rig.clock += 0.5
             var vector = Rig.sample

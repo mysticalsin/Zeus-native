@@ -14,7 +14,7 @@ enum TopBarStyle {
     static let pageHeight: CGFloat = 236
     /// Glance-feel motion, from the token table: open has a touch of overshoot, close has none.
     @MainActor static var openSpring: Animation? { Motion.live(MotionTokens.panelOpen) }
-    @MainActor static var closeMotion: Animation? { Motion.reducible(.linear(duration: MotionTokens.closeDuration)) }
+    @MainActor static var closeMotion: Animation? { Motion.reducible(Motion.panelClose) }
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
     static var tabLabel: Font {
         GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)

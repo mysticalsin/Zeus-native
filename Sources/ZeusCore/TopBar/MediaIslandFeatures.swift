@@ -65,7 +65,7 @@ public enum SystemNowPlayingLaunch {
 }
 
 public enum SystemNowPlayingAdapter {
-    public static let command = ["perl", "scripts/now-playing.pl"]
+    public static let command = ["perl", "now-playing.pl"]
 
     public static func parse(_ text: String) -> SystemNowPlayingLine? {
         let fields = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
