@@ -321,9 +321,12 @@ final class NotchController {
     func stageApprovals(_ cards: [NotchModel.Approval]) {
         pendingApprovals = []
         for var card in cards {
+            let shownID = card.id
+            card.activateAllow = { [weak self] in self?.activateApproval(kind: .card) }
             card.commitAnswers = { [weak self] inside in self?.commitDisplayedAnswers(inside: inside) }
             card.releasePlan = { [weak self] inside in self?.releaseDisplayedPlan(inside: inside) }
             card.liveGesture = { [weak self] in self?.displayedGesture() ?? .tap }
+            _ = shownID
             pendingApprovals.append(card)
         }
         guard let first = pendingApprovals.first else { model.approval = nil; return }
