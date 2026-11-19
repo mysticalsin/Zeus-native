@@ -157,9 +157,11 @@ public enum UnixSocket {
     }
 
     /// Sends one line. Returns nil on connect/write/read failure. No capture or permission API runs.
-    public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval) -> Data? {
+    public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval,
+                               requireSignedServer: Bool = false) -> Data? {
         guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return nil }
         defer { close(fd) }
+        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer) else { return nil }
         guard writeAll(fd, payload + Data([0x0A])) else { return nil }
         guard expectReply else { return Data() }
         guard let reply = readLine(fd, timeout: timeout), boundedMessage(reply) else { return nil }
@@ -236,7 +238,21 @@ public final class UnixSocketServer: @unchecked Sendable {
         try lock.withLock {
             guard listener == nil else { throw POSIXError(.EALREADY) }
             guard var address = UnixSocket.address(for: path) else { throw POSIXError(.ENAMETOOLONG) }
-            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            let directory = (path as NSString).deletingLastPathComponent
+            let previousMask = umask(0o077)
+            defer { umask(previousMask) }
+            if mkdir(directory, 0o700) != 0, errno != EEXIST { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            var directoryInfo = stat()
+            guard lstat(directory, &directoryInfo) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            guard directoryInfo.st_uid == geteuid() else { throw POSIXError(.EPERM) }
+            guard (directoryInfo.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR) else { throw POSIXError(.EPERM) }
+            if directoryInfo.st_mode & 0o700 != 0o700 || directoryInfo.st_mode & 0o077 != 0 {
+                guard chmod(directory, 0o700) == 0 else { throw POSIXError(.EPERM) }
+                guard lstat(directory, &directoryInfo) == 0,
+                      directoryInfo.st_uid == geteuid(),
+                      (directoryInfo.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR),
+                      directoryInfo.st_mode & 0o777 == 0o700 else { throw POSIXError(.EPERM) }
+            }
             var existing = stat()
             if lstat(path, &existing) == 0 {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }

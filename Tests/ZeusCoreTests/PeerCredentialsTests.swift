@@ -47,6 +47,17 @@ struct PeerCredentialsTests {
         #expect(ChromeSocketPeers.policy(environment: [:]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
         #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": ""]) == .sameUserExecutable(ChromeSocketPeers.allowedExecutables))
         #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"]) == .sameUser)
+        let strict = PeerPolicy.sameUserExecutable(ChromeSocketPeers.allowedExecutables)
+        #expect(ChromeSocketPeers.policy(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"], release: true) == strict)
+        let released = ZeusPaths.supportDirectory(environment: ["ZEUS_SUPPORT_DIR": "/tmp/zeus-test"], release: true)
+        #expect(released.path.hasSuffix("Library/Application Support/Zeus"))
+    }
+
+    @Test func theHookTrustsOnlyTheSameUserAndASignedServer() {
+        #expect(!SocketClientTrust.accepts(uid: 0, ownUID: 501, signatureAllowed: true))
+        #expect(!SocketClientTrust.accepts(uid: 501, ownUID: 501, signatureAllowed: false))
+        #expect(SocketClientTrust.accepts(uid: 501, ownUID: 501, signatureAllowed: true))
+        #expect(SocketClientTrust.accepts(uid: 501, ownUID: 501, signatureAllowed: nil))
     }
 
     @Test func theKernelReportsThisProcessForAConnectedPair() throws {
@@ -66,6 +77,7 @@ struct PeerCredentialsTests {
     @Test func aServerRefusesAPeerThatTheDecisionRejects() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-peer-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        chmod(root.path, 0o700)
         defer { try? FileManager.default.removeItem(at: root) }
         let path = root.appendingPathComponent("p.sock").path
         let handled = Counter()
@@ -83,6 +95,7 @@ struct PeerCredentialsTests {
     @Test func aServerAcceptsTheOwnerUnderTheDefaultPolicy() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-peer-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        chmod(root.path, 0o700)
         defer { try? FileManager.default.removeItem(at: root) }
         let path = root.appendingPathComponent("q.sock").path
         let server = UnixSocketServer(path: path) { _, reply in reply(Data("{\"ok\":true}".utf8)) }

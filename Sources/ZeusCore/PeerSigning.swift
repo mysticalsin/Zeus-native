@@ -142,7 +142,10 @@ public enum PeerSigning {
         var compiled: SecRequirement?
         if let requirement, SecRequirementCreateWithString(requirement as CFString, SecCSFlags(), &compiled) == errSecSuccess,
            let compiled {
-            satisfied = SecCodeCheckValidity(code, SecCSFlags(), compiled) == errSecSuccess
+            let flags = requirement.contains("identifier ")
+                ? SecCSFlags(rawValue: UInt32(kSecCSStrictValidate))
+                : SecCSFlags()
+            satisfied = SecCodeCheckValidity(code, flags, compiled) == errSecSuccess
         }
         let valid = satisfied || SecCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess
         return describe(staticCode: staticCode, valid: valid, satisfiesRequirement: satisfied)
