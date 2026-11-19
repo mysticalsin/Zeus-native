@@ -128,8 +128,10 @@ struct ApprovalDecisionTests {
         var spoken = ApprovalAllowGate(risk: .high, voiceOver: true)
         #expect(spoken.activate(now: start) == nil)
         #expect(spoken.activate(now: start) == .allow)
-        #expect(ApprovalAllowGate(risk: .low).activate(now: start) == .allow)
-        #expect(ApprovalAllowGate(risk: .medium).activate(now: start) == .allow)
+        var low = ApprovalAllowGate(risk: .low)
+        var medium = ApprovalAllowGate(risk: .medium)
+        #expect(low.activate(now: start) == .allow)
+        #expect(medium.activate(now: start) == .allow)
     }
 
     @Test func shellHighBeatsANormalSubstringAndBlocksTheShortcut() {
