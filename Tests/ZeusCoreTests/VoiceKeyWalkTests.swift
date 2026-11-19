@@ -1692,6 +1692,15 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 // The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
 // socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
 @Suite(.serialized) struct VoiceKeyWalkTests {
+    /// This one walk grew to 1,883,647 states and the Core suite died at 3600 s. It has to name a ceiling and stay under it.
+    @Test func theShippedTalkHoldWalkFinishesUnderItsStateBound() {
+        let run = WalkRun.all[0]
+        #expect(run.name == "A talk hold Control-Option confirm 0.15")
+        let bound = try #require(run.stateBound)
+        #expect(bound > 100)
+        #expect(bound <= 200_000)
+    }
+
     @Test(.serialized, arguments: WalkRun.all.filter { run in
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
         return only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
