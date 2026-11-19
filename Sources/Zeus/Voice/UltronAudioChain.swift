@@ -11,13 +11,15 @@ final class UltronEffectGraph {
     let eq = AVAudioUnitEQ(numberOfBands: 2)
     let distortion = AVAudioUnitDistortion()
     let comb = AVAudioUnitDelay()
+    /// Mono in, stereo out: the reverb refuses a one-channel bus (-10868), so it and the limiter run in stereo.
+    let upmix = AVAudioMixerNode()
     let reverb = AVAudioUnitReverb()
     /// Peak limiter last in the chain, so the added warmth and edge can never clip the output.
     let limiter = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
         componentType: kAudioUnitType_Effect, componentSubType: kAudioUnitSubType_PeakLimiter,
         componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0))
 
-    var nodes: [AVAudioNode] { [timePitch, eq, distortion, comb, reverb, limiter] }
+    var nodes: [AVAudioNode] { [timePitch, eq, distortion, comb, upmix, reverb, limiter] }
 
     init() {
         distortion.loadFactoryPreset(.speechRadioTower)
@@ -72,13 +74,18 @@ final class UltronEffectGraph {
         // AVFAudio raises (not throws) when a unit refuses the format, for example -10868 on a Mac
         // whose output device vanished. Caught here, the partial wiring is undone and the caller
         // falls back to passthrough instead of the process ending.
+        // The voice stays in `format` up to the upmix; from there on the same rate in stereo.
+        guard let stereo = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: format.sampleRate, channels: 2,
+                                         interleaved: false) else { return "no stereo format at \(format.sampleRate) Hz" }
         let failure = ZeusCatchObjCException {
             var previous = source
+            var link = format
             for node in chain {
-                engine.connect(previous, to: node, format: format)
+                engine.connect(previous, to: node, format: link)
+                if node === upmix { link = stereo }
                 previous = node
             }
-            engine.connect(previous, to: destination, format: format)
+            engine.connect(previous, to: destination, format: link)
         }
         guard let failure else { return nil }
         for node in [source] + chain { engine.disconnectNodeOutput(node) }
@@ -117,6 +124,43 @@ final class PendingBuffers: @unchecked Sendable {
     func reset() { lock.withLock { generation += 1; count = 0 } }
 }
 
+/// Counts the buffers the chain was given and the buffers that have finished playing, in order, so the
+/// moment a line's own audio begins to play is known: it is when everything queued before it has played.
+/// A `reset` (stop, device change) drops waiting callbacks and ignores completions from before it.
+@MainActor
+final class PlaybackLedger {
+    private(set) var scheduled = 0
+    private(set) var completed = 0
+    private(set) var generation = 0
+    private var waiters: [(upTo: Int, run: @MainActor () -> Void)] = []
+
+    @discardableResult
+    func noteScheduled() -> Int {
+        scheduled += 1
+        return scheduled
+    }
+
+    func noteCompleted(generation made: Int) {
+        guard made == generation else { return }
+        completed += 1
+        let ready = waiters.filter { completed >= $0.upTo }
+        waiters.removeAll { completed >= $0.upTo }
+        for waiter in ready { waiter.run() }
+    }
+
+    /// Runs `run` once `upTo` buffers have played: now when that is already so.
+    func whenPlayed(upTo: Int, run: @escaping @MainActor () -> Void) {
+        if completed >= upTo { run() } else { waiters.append((upTo, run)) }
+    }
+
+    func reset() {
+        generation += 1
+        scheduled = 0
+        completed = 0
+        waiters = []
+    }
+}
+
 /// Every engine's audio goes through here: one player node into the Ultron effect graph into the
 /// speakers. Buffers of any format are converted to 24 kHz mono float first.
 @MainActor
@@ -127,6 +171,7 @@ final class UltronAudioChain {
     private let player = AVAudioPlayerNode()
     private let graph = UltronEffectGraph()
     private let pending = PendingBuffers()
+    let ledger = PlaybackLedger()
     private var carry: UInt8?
     private var wired = false
     private var configObserver: NSObjectProtocol?
@@ -134,6 +179,8 @@ final class UltronAudioChain {
     /// Silent runs (the owner's quiet mode, tests) go through the whole chain with the volume at zero.
     var muted = false { didSet { player.volume = muted ? 0 : 1 } }
     private(set) var firstScheduledAt: Date?
+    /// Times this chain started its output engine: only `prepare()` does, and `schedule` calls it.
+    private(set) var engineStarts = 0
 
     init() {
         engine.attach(player)
@@ -143,7 +190,7 @@ final class UltronAudioChain {
         // re-validates the output and restarts. The wiring uses the fixed chain format, so it stays.
         configObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.player.stop(); self?.pending.reset() }
+            MainActor.assumeIsolated { self?.player.stop(); self?.pending.reset(); self?.ledger.reset() }
         }
     }
 
@@ -174,6 +221,7 @@ final class UltronAudioChain {
         if !engine.isRunning {
             engine.prepare()
             do { try engine.start() } catch { return false }
+            engineStarts += 1
         }
         return true
     }
@@ -184,7 +232,12 @@ final class UltronAudioChain {
         if firstScheduledAt == nil { firstScheduledAt = Date() }
         let generation = pending.increment()
         let counter = pending
-        player.scheduleBuffer(converted) { counter.decrement(generation: generation) }
+        ledger.noteScheduled()
+        let ledger = ledger, ledgerGeneration = ledger.generation
+        player.scheduleBuffer(converted) {
+            counter.decrement(generation: generation)
+            Task { @MainActor in ledger.noteCompleted(generation: ledgerGeneration) }
+        }
         if !player.isPlaying { player.play() }
         return true
     }
@@ -226,6 +279,7 @@ final class UltronAudioChain {
     func stop() {
         player.stop()
         pending.reset()
+        ledger.reset()
         carry = nil
         firstScheduledAt = nil
     }

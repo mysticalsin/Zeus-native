@@ -544,39 +544,6 @@ public enum ScribeSystemStall {
     }
 }
 
-// MARK: - Popup wording
-
-public enum ScribeCallPromptText {
-    public static func headline(for decision: ScribePromptDecision, now: Date) -> String? {
-        switch decision {
-        case .none:
-            return nil
-        case .callDetected(let app):
-            return "Meeting detected: \(ScribeCallDetection.displayName(app))"
-        case .upcoming(let slot):
-            let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let name = title.isEmpty ? "Meeting" : title
-            let until = slot.start.timeIntervalSince(now)
-            if until <= 0 { return "Started: \(name)" }
-            let minutes = max(1, Int((until / 60).rounded(.up)))
-            return "Starts in \(minutes) min: \(name)"
-        }
-    }
-
-    /// Meeting title for the recap when recording starts from this prompt.
-    public static func meetingTitle(for decision: ScribePromptDecision) -> String? {
-        switch decision {
-        case .upcoming(let slot):
-            let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            return title.isEmpty ? nil : title
-        case .callDetected(let app):
-            return "\(ScribeCallDetection.displayName(app)) call"
-        case .none:
-            return nil
-        }
-    }
-}
-
 // MARK: - Mute evidence (fail closed)
 
 /// One mute reading and when its read began (`ProcessInfo.systemUptime`). Evidence is only good for

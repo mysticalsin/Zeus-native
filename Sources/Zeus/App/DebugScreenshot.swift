@@ -24,7 +24,8 @@ enum DebugScreenshot {
         for (name, window) in windows where matches(name: name, filter: filter) {
             guard let png = pngData(for: window) else { continue }
             let url = URL(fileURLWithPath: ScreenshotCapturePlan.outputPath(base: expanded, windowName: name, filter: filter))
-            if (try? png.write(to: url)) != nil { paths.append(url.path) }
+            // Atomic: a link already sitting at this name is replaced, never written through.
+            if (try? png.write(to: url, options: .atomic)) != nil { paths.append(url.path) }
         }
         return paths
     }
@@ -91,6 +92,20 @@ enum DebugScreenshot {
             scroll.reflectScrolledClipView(scroll.contentView)
         }
         for sub in view.subviews { scrollToTop(sub) }
+    }
+
+    /// A screenshot request that passed the output path rule: the symlink-resolved path to write and the window filter.
+    struct Plan: Equatable, Sendable {
+        var path: String
+        var filter: String?
+    }
+
+    /// Judges `zeus debug screenshot <path> [--window <name>]`. The path that comes back is the one the
+    /// rule accepted, and it travels as a value from here to the capture: it is never joined into text
+    /// and split again, which would cut a folder name that holds a space.
+    nonisolated static func plan(argument: String?, allowedFolders: [String], defaultBase: String) -> Result<Plan, DebugOutputPath.Rejection> {
+        let (requested, filter) = parseArgument(argument)
+        return DebugOutputPath.validate(requested ?? defaultBase, allowedFolders: allowedFolders).map { Plan(path: $0, filter: filter) }
     }
 
     /// Splits `zeus debug screenshot <path> [--window <name>]`'s text into the path and filter.

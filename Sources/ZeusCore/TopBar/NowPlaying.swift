@@ -1,9 +1,9 @@
 import Foundation
 
-/// What's playing in Music or Spotify, read from the players' own public change notifications
-/// (no private frameworks, no permission needed to read).
+/// What's playing in one source: Music or Spotify, read from the players' own public change notifications
+/// (no private frameworks, no permission needed to read), or a media element in a browser tab.
 public struct NowPlaying: Equatable, Sendable {
-    public enum Player: String, Sendable {
+    public enum Player: String, CaseIterable, Sendable {
         case music = "Music"
         case spotify = "Spotify"
 
@@ -31,7 +31,7 @@ public struct NowPlaying: Equatable, Sendable {
         }
     }
 
-    public var player: Player
+    public var source: NowPlayingSource
     public var title: String
     public var artist: String
     public var album: String
@@ -42,11 +42,16 @@ public struct NowPlaying: Equatable, Sendable {
     public var positionAt: Date
     /// Spotify's "spotify:track:<id>" from its notification; nil for Music.
     public var trackID: String?
+    /// How fast `position` advances while playing: 1 is normal speed, 0 holds it.
+    public var rate: Double
+    /// The cover's own link when the source names one (a browser page does); nil otherwise.
+    public var artworkURL: URL?
 
-    public init(player: Player, title: String, artist: String, album: String, isPlaying: Bool,
-                duration: Double, position: Double, positionAt: Date = Date(), trackID: String? = nil) {
+    public init(source: NowPlayingSource, title: String, artist: String, album: String, isPlaying: Bool,
+                duration: Double, position: Double, positionAt: Date = Date(), trackID: String? = nil,
+                rate: Double = 1, artworkURL: URL? = nil) {
         self.trackID = trackID
-        self.player = player
+        self.source = source
         self.title = title
         self.artist = artist
         self.album = album
@@ -54,6 +59,29 @@ public struct NowPlaying: Equatable, Sendable {
         self.duration = duration
         self.position = position
         self.positionAt = positionAt
+        self.rate = rate
+        self.artworkURL = artworkURL
+    }
+
+    public init(player: Player, title: String, artist: String, album: String, isPlaying: Bool,
+                duration: Double, position: Double, positionAt: Date = Date(), trackID: String? = nil) {
+        self.init(source: .player(player), title: title, artist: artist, album: album, isPlaying: isPlaying,
+                  duration: duration, position: position, positionAt: positionAt, trackID: trackID)
+    }
+
+    /// What this item can be asked to do: its source's base set, narrowed by what the item itself offers. A scrub
+    /// needs a length. Lyrics need an artist for the lookup, and a browser item also needs a length.
+    public var capabilities: SourceCapabilities {
+        var result = source.baseCapabilities
+        if duration <= 0 { result.remove(.seek) }
+        let askable = LRCLIBQuery(self).isAskable
+        let lyricsHold: Bool
+        switch source {
+        case .player: lyricsHold = askable
+        case .browser: lyricsHold = askable && duration > 0
+        }
+        if !lyricsHold { result.remove(.lyrics) }
+        return result
     }
 
     /// Returns nil for "Stopped" or a notification without a track.
@@ -67,13 +95,22 @@ public struct NowPlaying: Equatable, Sendable {
             return nil
         }
         // Music reports "Total Time" in ms; Spotify reports "Duration" in ms and position in s.
-        let milliseconds = player == .music ? (number("Total Time") ?? number("Duration")) : (number("Duration") ?? number("Total Time"))
+        let milliseconds: Double?
+        let trackID: String?
+        switch player {
+        case .music:
+            milliseconds = number("Total Time") ?? number("Duration")
+            trackID = nil
+        case .spotify:
+            milliseconds = number("Duration") ?? number("Total Time")
+            trackID = info["Track ID"] as? String
+        }
         // Spotify sends "Playback Position"; Music's notification has no position, so a lookalike key is read if present.
         let position = number("Playback Position") ?? number("Player Position") ?? number("Elapsed") ?? 0
         return NowPlaying(player: player, title: title, artist: (info["Artist"] as? String) ?? "",
                           album: (info["Album"] as? String) ?? "", isPlaying: state == "playing",
                           duration: max((milliseconds ?? 0) / 1000, 0), position: max(position, 0), positionAt: now,
-                          trackID: player == .spotify ? (info["Track ID"] as? String) : nil)
+                          trackID: trackID)
     }
 
     /// Separator between the fields of `probeScript`'s answer (ASCII unit separator: never in a title).
@@ -105,13 +142,17 @@ public struct NowPlaying: Equatable, Sendable {
         // AppleScript prints reals with the locale's decimal mark ("12,5").
         let number: (String) -> Double = { Double($0.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")) ?? 0 }
         let rawDuration = number(fields[4])
-        let duration = player == .spotify ? rawDuration / 1000 : rawDuration
+        let duration: Double
+        switch player {
+        case .music: duration = rawDuration
+        case .spotify: duration = rawDuration / 1000
+        }
         return NowPlaying(player: player, title: title, artist: fields[2], album: fields[3], isPlaying: state == "playing",
                           duration: max(duration, 0), position: max(number(fields[5]), 0), positionAt: now)
     }
 
     public func elapsed(at now: Date = Date()) -> Double {
-        let value = isPlaying ? position + now.timeIntervalSince(positionAt) : position
+        let value = isPlaying ? position + now.timeIntervalSince(positionAt) * max(rate, 0) : position
         return duration > 0 ? min(max(value, 0), duration) : max(value, 0)
     }
 
@@ -126,14 +167,47 @@ public struct NowPlaying: Equatable, Sendable {
 public enum MeetingLink {
     private static let hosts = ["zoom.us", "meet.google.com", "teams.microsoft.com", "teams.live.com", "webex.com", "whereby.com", "around.co"]
 
+    /// How many wrapper layers (Safe Links, Google redirect) are peeled before giving up.
+    private static let wrapperDepthLimit = 2
+
+    private static func matches(_ host: String, _ domain: String) -> Bool { host == domain || host.hasSuffix("." + domain) }
+
+    private static func isMeetingHost(_ host: String) -> Bool { hosts.contains { matches(host, $0) } }
+
+    /// The real URL behind a Safe Links or Google redirect wrapper; nil when `url` is not a wrapper.
+    private static func unwrapped(_ url: URL) -> URL? {
+        guard let host = url.host?.lowercased(), let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return nil }
+        let keys: [String]
+        if matches(host, "safelinks.protection.outlook.com") {
+            keys = ["url"]
+        } else if matches(host, "google.com"), url.path == "/url" {
+            keys = ["q", "url"]
+        } else {
+            return nil
+        }
+        for key in keys {
+            if let value = items.first(where: { $0.name == key })?.value, let inner = URL(string: value), inner.host != nil { return inner }
+        }
+        return nil
+    }
+
+    /// The meeting URL for `url`: itself when its host is allowed, else the unwrapped inner URL (a couple of levels at most).
+    private static func meetingURL(_ url: URL) -> URL? {
+        var current = url
+        for _ in 0...wrapperDepthLimit {
+            if let host = current.host?.lowercased(), isMeetingHost(host) { return current }
+            guard let inner = unwrapped(current) else { return nil }
+            current = inner
+        }
+        return nil
+    }
+
     public static func find(in texts: [String?]) -> URL? {
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }
         for text in texts.compactMap({ $0 }) {
             let matches = detector.matches(in: text, range: NSRange(text.startIndex..., in: text))
             for match in matches {
-                if let url = match.url, let host = url.host?.lowercased(), hosts.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
-                    return url
-                }
+                if let url = match.url, let meeting = meetingURL(url) { return meeting }
             }
         }
         return nil

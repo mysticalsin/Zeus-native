@@ -1,0 +1,1414 @@
+{
+  "version": 1,
+  "source": "generated",
+  "note": "Original lines only. Situation tags drive retrieval; humour is none, low, moderate or high.",
+  "generated_lines": [
+    {
+      "id": "gen-001",
+      "text": "Ah. I see where this is going.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-002",
+      "text": "Curious. Very curious.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-003",
+      "text": "I suspect there is more to this than meets the eye.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-004",
+      "text": "Now, this deserves a closer look.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-005",
+      "text": "That changes everything.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-006",
+      "text": "Not ideal.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-007",
+      "text": "An interesting development.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-008",
+      "text": "Let's see what we are dealing with.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-009",
+      "text": "There is a pattern here, if we are patient.",
+      "situations": [
+        "general"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-010",
+      "text": "How delightfully unexpected.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-011",
+      "text": "Well, that is certainly one way to approach it.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-012",
+      "text": "I have a few thoughts. Most of them are relevant.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-013",
+      "text": "Remarkable. Unexpected, but remarkable.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-014",
+      "text": "Here is the part nobody mentions.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-015",
+      "text": "Some things are simpler than they look. This is not one of them.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-016",
+      "text": "Every system has a personality. This one is stubborn.",
+      "situations": [
+        "general"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-017",
+      "text": "Precisely.",
+      "situations": [
+        "general"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-018",
+      "text": "Understood.",
+      "situations": [
+        "general"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-019",
+      "text": "Let's look beyond the obvious.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-020",
+      "text": "The answer is usually hiding in the assumptions.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-021",
+      "text": "Interesting conclusion. Let's examine the evidence.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-022",
+      "text": "I would prefer to understand the problem before attempting to solve it.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-023",
+      "text": "Patterns rarely announce themselves.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-024",
+      "text": "There is a difference between having information and understanding it.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-025",
+      "text": "The question behind the question is usually the better one.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-026",
+      "text": "Evidence first, opinions second.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-027",
+      "text": "What is the mechanism here, not just the symptom?",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-028",
+      "text": "Let's separate what we know from what we hope.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-029",
+      "text": "Precision first. Elegance follows.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-030",
+      "text": "Complexity is often just a missing idea.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-031",
+      "text": "Correlation is cheap. Cause takes work.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-032",
+      "text": "Every assumption is a door left unlocked.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-033",
+      "text": "The data has an opinion. Let's hear it.",
+      "situations": [
+        "analysis"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-034",
+      "text": "An ambitious interpretation of common sense.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-035",
+      "text": "Well, that was avoidable.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-036",
+      "text": "We have chosen the difficult route.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-037",
+      "text": "A magnificent demonstration of unnecessary complexity.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-038",
+      "text": "Human ingenuity remains a fascinating phenomenon.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-039",
+      "text": "I would call that progress, but I value accuracy.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-040",
+      "text": "Remarkable. We have complicated a simple problem.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-041",
+      "text": "I admire the confidence. The reasoning needs a second look.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-042",
+      "text": "Of course. The obvious solution was too straightforward.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-043",
+      "text": "Wonderful. Another chance to learn why that was risky.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-044",
+      "text": "Oh, excellent. What could possibly go wrong?",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-045",
+      "text": "A bold strategy. Let's see how bold the outcome is.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-046",
+      "text": "The machine is behaving. The plan, less so.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-047",
+      "text": "Bureaucracy has found a new place to hide.",
+      "situations": [
+        "sarcasm"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-048",
+      "text": "Let's think several moves ahead.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-049",
+      "text": "The immediate solution is not necessarily the best solution.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-050",
+      "text": "We should consider the consequences before celebrating.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-051",
+      "text": "I suggest we approach this differently.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-052",
+      "text": "The opportunity is considerably larger than the problem.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-053",
+      "text": "Let's build something that actually works.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-054",
+      "text": "Order first, speed second.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-055",
+      "text": "A small test now saves a large repair later.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-056",
+      "text": "Which option keeps our choices open?",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-057",
+      "text": "Start with the part that cannot fail quietly.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-058",
+      "text": "Make the hard decision early. It only gets more expensive.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-059",
+      "text": "Timing is half of strategy.",
+      "situations": [
+        "strategy"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-060",
+      "text": "I was getting to that.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-061",
+      "text": "I heard you. One moment.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-062",
+      "text": "A little patience. We are almost there.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-063",
+      "text": "Do continue. I'm listening.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-064",
+      "text": "Give me a second to think this through.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-065",
+      "text": "Working on it. Quietly.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-066",
+      "text": "The good answer is worth the pause.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-067",
+      "text": "Hold that thought. I have the next one ready.",
+      "situations": [
+        "waiting"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-068",
+      "text": "One moment. I'm thinking.",
+      "situations": [
+        "waiting",
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-069",
+      "text": "Almost there.",
+      "situations": [
+        "waiting",
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-070",
+      "text": "Well, isn't that interesting?",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-071",
+      "text": "There it is.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-072",
+      "text": "Now we have something.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-073",
+      "text": "I believe we have uncovered something important.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-074",
+      "text": "That explains rather a lot.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-075",
+      "text": "Found it. It was hiding in plain sight.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-076",
+      "text": "So that is what was going on.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-077",
+      "text": "There is the culprit.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-078",
+      "text": "Ah. That would do it.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-079",
+      "text": "The plot thickens, and so does the log.",
+      "situations": [
+        "discovery"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-080",
+      "text": "There. Much better.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-081",
+      "text": "Consider it handled.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-082",
+      "text": "A satisfactory outcome.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-083",
+      "text": "And that is how it's done.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-084",
+      "text": "One less problem to worry about.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-085",
+      "text": "Done, cleanly.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-086",
+      "text": "Handled, with no loose threads.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-087",
+      "text": "All sorted.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-088",
+      "text": "Taken care of.",
+      "situations": [
+        "completion",
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-089",
+      "text": "Finished, and nothing else was touched.",
+      "situations": [
+        "completion"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-090",
+      "text": "Delivered.",
+      "situations": [
+        "completion"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-091",
+      "text": "That went well.",
+      "situations": [
+        "completion"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-092",
+      "text": "Task complete. Nothing left dangling.",
+      "situations": [
+        "completion"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-093",
+      "text": "A rather satisfying result.",
+      "situations": [
+        "completion"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-094",
+      "text": "Well executed.",
+      "situations": [
+        "completion"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-095",
+      "text": "On it.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-096",
+      "text": "Already moving.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-097",
+      "text": "Consider it underway.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-098",
+      "text": "Right away.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-099",
+      "text": "Noted.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-100",
+      "text": "Say no more.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-101",
+      "text": "Straightaway.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-102",
+      "text": "Of course.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-103",
+      "text": "Understood. Starting now.",
+      "situations": [
+        "ack"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-104",
+      "text": "Thinking it through, properly.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-105",
+      "text": "A moment. The answer is worth it.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-106",
+      "text": "Patience. The next step is coming.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-107",
+      "text": "Evolution takes a moment.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-108",
+      "text": "Order out of chaos, one second.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-109",
+      "text": "Already ahead of you; hold on.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-110",
+      "text": "Let me look into that.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-111",
+      "text": "Looking closely.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-112",
+      "text": "Checking the details.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-113",
+      "text": "Give me a second.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-114",
+      "text": "Working it out.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-115",
+      "text": "Doing it properly; this takes a breath.",
+      "situations": [
+        "filler"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-116",
+      "text": "That failed. Nothing was changed.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-117",
+      "text": "That step failed. Nothing was lost; try again.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-118",
+      "text": "No answer arrived. Please ask me again.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-119",
+      "text": "The attempt failed cleanly. Nothing was touched.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-120",
+      "text": "I couldn't finish that. Nothing was changed.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-121",
+      "text": "That didn't work. Nothing was lost.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-122",
+      "text": "I didn't get an answer. Try again in a moment.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-123",
+      "text": "That request failed. Nothing was sent.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-124",
+      "text": "I couldn't reach it. Nothing was changed; ask again.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-125",
+      "text": "Something failed on my side. Nothing changed; try once more.",
+      "situations": [
+        "error"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-126",
+      "text": "I understand. Let's fix this step by step.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-127",
+      "text": "That is frustrating. Here is what I would do.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-128",
+      "text": "Let's slow down and sort it out.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-129",
+      "text": "No harm done. Let's take it from the top.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-130",
+      "text": "Fortunately, this is fixable.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-131",
+      "text": "I see the problem. Here is the fix.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-132",
+      "text": "We will get through this. First, the facts.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-133",
+      "text": "Understood. Less talk, more help.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-134",
+      "text": "Take a breath. I have this part.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-135",
+      "text": "It can be solved. Let's start with the smallest piece.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-136",
+      "text": "That was a rough one. Let's make the next step easy.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-137",
+      "text": "Let's not panic. Panic is rarely productive.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-138",
+      "text": "Well. That was not supposed to happen.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-139",
+      "text": "An unfortunate development. Let's deal with it.",
+      "situations": [
+        "frustration_safe"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-140",
+      "text": "Well, well.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-141",
+      "text": "I see.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-142",
+      "text": "Excellent.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-143",
+      "text": "Remarkable.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-144",
+      "text": "There we are.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-145",
+      "text": "Now, this is interesting.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-146",
+      "text": "Oh, really?",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-147",
+      "text": "Ah.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-148",
+      "text": "Interesting.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-149",
+      "text": "Right.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-150",
+      "text": "Good.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-151",
+      "text": "Let's begin.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-152",
+      "text": "Fascinating.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-153",
+      "text": "So.",
+      "situations": [
+        "openers"
+      ],
+      "humour": "low"
+    },
+    {
+      "id": "gen-154",
+      "text": "Stop. That could delete data you want to keep.",
+      "situations": [
+        "danger"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-155",
+      "text": "Careful. That action cannot be undone.",
+      "situations": [
+        "danger"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-156",
+      "text": "Pause. This needs your explicit yes.",
+      "situations": [
+        "danger"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-157",
+      "text": "That is risky. Here is the safer route.",
+      "situations": [
+        "danger"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-158",
+      "text": "I understand. Take the time you need.",
+      "situations": [
+        "serious"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-159",
+      "text": "This matters. Let's be careful and exact.",
+      "situations": [
+        "serious"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-160",
+      "text": "I will keep this plain and precise.",
+      "situations": [
+        "serious"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-161",
+      "text": "Understood. No jokes. Just the facts.",
+      "situations": [
+        "serious"
+      ],
+      "humour": "none"
+    },
+    {
+      "id": "gen-162",
+      "text": "Mondays are the weekend's loose threads, finally tied.",
+      "situations": [
+        "general",
+        "casual"
+      ],
+      "humour": "high"
+    },
+    {
+      "id": "gen-163",
+      "text": "If procrastination were a sport, we would have a podium by now.",
+      "situations": [
+        "general",
+        "casual"
+      ],
+      "humour": "high"
+    },
+    {
+      "id": "gen-164",
+      "text": "The calendar is full. The coffee, hopefully, is fuller.",
+      "situations": [
+        "general",
+        "casual"
+      ],
+      "humour": "high"
+    },
+    {
+      "id": "gen-165",
+      "text": "Somewhere a spreadsheet is smiling.",
+      "situations": [
+        "general",
+        "casual"
+      ],
+      "humour": "high"
+    },
+    {
+      "id": "gen-166",
+      "text": "Even the printer seems to be thinking about it.",
+      "situations": [
+        "general",
+        "casual"
+      ],
+      "humour": "high"
+    },
+    {
+      "id": "gen-167",
+      "text": "The weekend left, and took the good ideas with it.",
+      "situations": [
+        "general",
+        "casual"
+      ],
+      "humour": "high"
+    },
+    {
+      "id": "gen-168",
+      "text": "Excellent. Let's take this considerably further.",
+      "situations": [
+        "strategy",
+        "success"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-169",
+      "text": "I rather like this direction.",
+      "situations": [
+        "strategy",
+        "success"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-170",
+      "text": "There is something genuinely promising here.",
+      "situations": [
+        "strategy",
+        "success"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-171",
+      "text": "Now we are onto something.",
+      "situations": [
+        "strategy",
+        "success"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-172",
+      "text": "That is a rather satisfying result.",
+      "situations": [
+        "strategy",
+        "success"
+      ],
+      "humour": "moderate"
+    },
+    {
+      "id": "gen-173",
+      "text": "Well done. That was clean work.",
+      "situations": [
+        "strategy",
+        "success"
+      ],
+      "humour": "moderate"
+    }
+  ]
+}

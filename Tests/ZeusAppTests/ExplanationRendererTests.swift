@@ -9,7 +9,7 @@ import ZeusCore
 
 /// Owned geometry and generated production-view frames. These are not screen
 /// captures, live speech synchronization proof, or display frame-rate measurements.
-@MainActor @Suite("Explanation native renderers", .serialized)
+@MainActor @Suite("Explanation native renderers", .inNativeHost, .serialized)
 struct ExplanationRendererTests {
     private func scene(_ objects: [ExplanationObject], size: ExplanationSize2 = .init(width: 400, height: 200)) -> ExplanationScene {
         .init(sessionID: UUID(), sceneID: UUID(), canvasSize: size,

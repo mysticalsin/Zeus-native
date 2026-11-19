@@ -21,7 +21,7 @@ cache it, and fall back to a glyph tile when it is blank (`AppIconCache`, `Alert
 | --- | --- | --- |
 | Incoming alert (other apps) | `Notch/NotchView.swift` overlay, `Notch/NotchController.swift`, `Agents/AgentTroubleCard.swift` (`NotchNotificationLine`, `NotificationPeeker`) | Slim line becomes the liquid capsule, fed by `AlertPresenter` |
 | Alerts page | `TopBar/TodayPages.swift` (`NotificationsPage`) | Grouped stacks, real icons, actions, clear all, "All clear" |
-| Scribe call popup | `Scribe/ScribeCallPopup.swift` | Restyle only, via `AlertGlass`; logic untouched |
+| Scribe meeting card (heads-up, offer, countdown, result) | `Scribe/ScribeMeetingCardView.swift`, `Scribe/ScribeMeetingCardPanel.swift` | One card for the whole life of a meeting, drawn from the machine's state via `AlertGlass` |
 | Brief card | `Proactive/BriefCard.swift` | Restyle only, via `AlertGlass` |
 | Agent failure / finished cards | unchanged | Already use `AgentCardLayout`; they adopt `AlertGlass` later |
 

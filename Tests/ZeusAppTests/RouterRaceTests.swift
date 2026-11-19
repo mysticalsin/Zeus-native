@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ZeusCore
+@testable import Zeus
 
 @Suite("Brain race")
 struct RouterRaceTests {
@@ -55,6 +56,36 @@ struct RouterRaceTests {
         #expect(text.hasPrefix("C"))
         #expect(race.winner.milliseconds > 180)
         #expect(race.winner.milliseconds < 1_200)
+    }
+
+    // MARK: Talk drawing: the app's Claude provider and image-carrying runners
+
+    @Test func preferAppClaudeGivesTheAppProviderForClaudeEvenWhenTheCLIIsInstalled() {
+        #expect(RouterSettings.appClaudeServes(cliInstalled: false, preferAppClaude: false))
+        #expect(RouterSettings.appClaudeServes(cliInstalled: false, preferAppClaude: true))
+        #expect(RouterSettings.appClaudeServes(cliInstalled: true, preferAppClaude: true))
+        #expect(!RouterSettings.appClaudeServes(cliInstalled: true, preferAppClaude: false))
+    }
+
+    @MainActor
+    @Test func theCandidateListHandsTheAppProviderToTheClaudeEntryWhenPreferred() {
+        let app = ClaudeCLIProvider()
+        let candidates = RouterSettings.shared.brainEngineCandidates(
+            task: .quickAnswer, hasAnthropicKey: false, claude: app, preferAppClaude: true)
+        // The entry is absent only when this Mac's settings leave Claude out of the race (a choice or a quota mark).
+        if let entry = candidates.first(where: { $0.engine == .claude }) {
+            #expect(entry.id == "claude")
+            #expect(entry.provider as AnyObject === app)
+        }
+    }
+
+    @Test func aRunnerThatCarriedAnImageIsRetiredBeforeTheNextTurn() {
+        let now = Date()
+        let fresh = PersistentCLIPolicy.Slot(launchKey: "k", turnsServed: 1, startedAt: now, alive: true)
+        #expect(PersistentCLIPolicy.action(existing: fresh, wantedKey: "k", now: now) == .reuse)
+        var carried = fresh
+        carried.carriedImage = true
+        #expect(PersistentCLIPolicy.action(existing: carried, wantedKey: "k", now: now) == .respawn)
     }
 
     private final class CancelBox: @unchecked Sendable {

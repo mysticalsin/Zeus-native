@@ -40,7 +40,8 @@ public enum ResponseSanitizer: Sendable {
     /// Order matters: known tag names (real or invented) are removed whole before the looser
     /// leftover-control-code pass runs, so that pass never has to guess where a tag name ends.
     public static func stripArtifacts(_ text: String) -> String {
-        var result = text
+        // A draw tag (screen marks) is never speech, wherever it sits and however it ends.
+        var result = ZeusTagParser.removingDrawTags(text)
 
         // A real ESC-prefixed CSI sequence (ESC '[' params... final-byte), e.g. cursor movement
         // or erase codes a terminal-backed fallback model echoed verbatim. `\u{1B}` is written
