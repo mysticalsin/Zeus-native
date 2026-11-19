@@ -82,7 +82,7 @@ import Testing
     }
 
     @Test func personalityDefaultsToUltron() throws {
-        let suite = "zeus.personality.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.personality.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         #expect(ZeusPersonality.current(defaults) == .ultron)

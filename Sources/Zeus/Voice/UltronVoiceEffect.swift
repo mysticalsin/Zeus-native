@@ -7,11 +7,12 @@ enum UltronVoiceEffect {
     static let enabledKey = "voice.ultronEffect"
     static let intensityKey = "voice.ultronEffect.intensity"
 
+    /// Off on a fresh install: the approved base voice is the clean take C read. A saved choice wins.
     static func enabled(_ defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: enabledKey) as? Bool ?? true
+        defaults.object(forKey: enabledKey) as? Bool ?? false
     }
 
-    /// 0 to 1. Untouched installs get the designed 60 %.
+    /// 0 to 1. When the effect is turned on, untouched installs get the designed 75 %.
     static func intensity(_ defaults: UserDefaults = .standard) -> Float {
         defaults.object(forKey: intensityKey) as? Float ?? Float(UltronEffectParameters.defaultPercent) / 100
     }

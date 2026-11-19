@@ -39,7 +39,7 @@ struct LicenseSettings: View {
                 if license.status.payload != nil || license.deactivationError != nil {
                     GlassDivider()
                     // A partial cleanup still exposes its reason and retry after the key is gone.
-                    GlassRow(title: "Deactivate or move to another Mac", note: license.deactivationError ?? "Frees this Mac's seat and removes the key from its Keychain. Activate the same key on the new Mac.") {
+                    GlassRow(title: "Deactivate or move to another Mac", note: license.deactivationError ?? (license.serverNeedsReentry ? LicenseManager.reentryMessage : "Frees this Mac's seat and removes the key from its Keychain. Activate the same key on the new Mac.")) {
                         Button(drafts.confirmDeactivate ? "Press again" : license.deactivationError == nil ? "Deactivate" : "Try again") {
                             if drafts.confirmDeactivate {
                                 drafts.confirmDeactivate = false
@@ -54,7 +54,9 @@ struct LicenseSettings: View {
                 }
             }
             GlassCard(title: "License server") {
-                GlassRow(title: "Server", note: license.serverURL == nil
+                GlassRow(title: "Server", note: license.serverNeedsReentry
+                         ? "The saved address was not set here, so Zeus does not use it and sends nothing to it. Press Save to use it."
+                         : license.serverURL == nil
                          ? "Not set: keys are checked on this Mac only and nothing goes over the network."
                          : "Claims a seat when you activate and checks once a day for keys that were turned off.") {
                     HStack(spacing: 6) {

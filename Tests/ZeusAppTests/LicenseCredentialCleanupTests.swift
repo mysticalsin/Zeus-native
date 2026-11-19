@@ -43,7 +43,9 @@ struct LicenseCredentialCleanupTests {
         let proof = try SignedBlob.encode(ActivationPayload(license: "synthetic-license", device: "synthetic-device",
                                                             issued: 1, seat: 1, seats: 1),
                                          prefix: ActivationPayload.prefix, signingKey: signer)
-        let backend = MemoryKeychain(["com.zeus.app|license.key": key])
+        // The server address is only trusted with a Keychain binding the owner saved in Settings.
+        let backend = MemoryKeychain(["com.zeus.app|license.key": key,
+                                      "com.zeus.app|\(LicenseManager.serverOriginAccount)": "https://synthetic-license.invalid:443"])
         let server = serverResponse(proof)
         let manager = LicenseManager(defaults: defaults, credentials: KeychainStore(backend: backend, defaults: defaults),
                                      deviceID: "synthetic-device", trustedKeys: [signer.publicKey], synchronizeAtLaunch: false,
@@ -52,7 +54,7 @@ struct LicenseCredentialCleanupTests {
     }
 
     @Test func partialDeletionKeepsRetryAcrossRelaunchAndDoesNotReactivateRetainedCredentials() async throws {
-        let name = "zeus.license-cleanup.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.license-cleanup.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let backend = MemoryKeychain(["com.zeus.app|license.key": "synthetic-key",
@@ -83,7 +85,7 @@ struct LicenseCredentialCleanupTests {
     }
 
     @Test func deniedKeyDeletionRemainsInactiveAndRetryableUntilConfirmedRemoval() async throws {
-        let name = "zeus.license-cleanup.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.license-cleanup.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let backend = MemoryKeychain(["com.zeus.app|license.key": "synthetic-key"])
@@ -103,7 +105,7 @@ struct LicenseCredentialCleanupTests {
     }
 
     @Test func delayedBackgroundActivationCannotRestoreCredentialsAfterExplicitDeactivation() async throws {
-        let name = "zeus.license-cleanup.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.license-cleanup.\(UUID().uuidString)"
         let (defaults, backend, manager, _, server) = try signedFixture(name) { Server(response: .success($0), delayed: true) }
         defer { defaults.removePersistentDomain(forName: name) }
         #expect(manager.isLicensed && manager.activationPending)
@@ -123,7 +125,7 @@ struct LicenseCredentialCleanupTests {
     }
 
     @Test func offlineRetryOfRefusedKeyNeverReportsSuccessfulReactivation() async throws {
-        let name = "zeus.license-cleanup.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.license-cleanup.\(UUID().uuidString)"
         let (defaults, _, manager, key, _) = try signedFixture(name) { _ in
             Server(response: .failure(.server("Can't reach the synthetic license server.")))
         }

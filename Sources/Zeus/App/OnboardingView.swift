@@ -118,7 +118,7 @@ struct OnboardingView: View {
     }
 
     private var purpleSweep: some View {
-        TimelineView(.animation(minimumInterval: Motion.reduced ? 1 : 1 / 30, paused: Motion.reduced)) { context in
+        DisplaySynchronizedView(paused: Motion.reduced, preferredFramesPerSecond: Motion.ambientFPS) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             LinearGradient(
                 colors: [Theme.accentDeep.opacity(0.0), Theme.glow.opacity(0.18), Theme.accent.opacity(0.0)],

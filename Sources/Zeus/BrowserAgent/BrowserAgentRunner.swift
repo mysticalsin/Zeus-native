@@ -297,7 +297,7 @@ final class BrowserAgentRunner {
         let config = connections.anyLLM
         if task != .privateLocal, config.isComplete, AIConnectFlow.endpointModelProblem(config.model) == nil,
            UserDefaults.standard.bool(forKey: connections.enabledKey(.anyLLM)) {
-            let key = Keychain.get(AnyLLMConfig.keyAccount)
+            let key = connections.anyLLMCredential()
             brains.append(Brain(name: "Any LLM") { prompt in
                 guard let request = config.request(prompt: prompt.user, key: key, system: prompt.system) else {
                     throw BridgeError(code: "failed", message: "The Any LLM endpoint isn't set up.")

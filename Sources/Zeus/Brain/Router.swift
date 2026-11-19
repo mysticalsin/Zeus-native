@@ -49,7 +49,7 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
     /// not" list, removes that cue; `ResponseSanitizer` stays as the floor underneath this, for
     /// whatever still slips through.
     static func prompt(for request: BrainRequest) -> String {
-        var parts = [request.systemPrompt]
+        var parts = [ScreenSightNote.textOnlySystemPrompt(for: request)]
         let history = request.history.suffix(6)
         if !history.isEmpty {
             var lines = ["Earlier in this same conversation, for context only -- do not repeat or continue any of it:"]
@@ -119,7 +119,8 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
             process.arguments = Self.stdinArguments(engine: engine,
                                                     localModel: UserDefaults.standard.string(forKey: "router.ollamaModel") ?? "llama3.2",
                                                     tier: request.deep ? .deep : .fast,
-                                                    lean: request.firstTextBudget != nil)
+                                                    lean: request.firstTextBudget != nil,
+                                                    claudeLean: engine == .claude ? Self.claudeLeanArguments(voice: true) : [])
             var environment = ProcessInfo.processInfo.environment
             environment["PATH"] = CLILocator.searchDirectories.joined(separator: ":")
             environment["ZEUS_INTERNAL"] = "1"
@@ -205,7 +206,12 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
     ///
     /// `lean` is a spoken turn. Codex then runs ephemeral (no session files) on the small voice model:
     /// without `-m` it used the account default, a large model on priority tier, at "low" effort only.
-    static func stdinArguments(engine: RouterEngine, localModel: String, tier: ModelTier, lean: Bool = false) -> [String] {
+    /// A spoken Claude turn runs as lean as the dedicated Claude path (`--safe-mode`, no MCP servers, hooks, plugins
+    /// or tools). Without it the race launched the owner's whole setup and never met the first-text budget.
+    static func claudeLeanArguments(voice: Bool) -> [String] { ClaudeCLIProvider.leanArguments(voice: voice) }
+
+    static func stdinArguments(engine: RouterEngine, localModel: String, tier: ModelTier, lean: Bool = false,
+                               claudeLean: [String] = []) -> [String] {
         let cap = ModelCap.arguments(for: engine, tier: tier)
         let stub = "Answer the message provided on standard input."
         var codexLean: [String] = []
@@ -214,7 +220,7 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
             if !cap.contains("-m") { codexLean += ["-m", ModelCap.codexVoiceModel] }
         }
         return switch engine {
-        case .claude: cap + ["-p"]
+        case .claude: cap + ["-p"] + (lean ? claudeLean : [])
         case .codex: ["exec", "--skip-git-repo-check"] + codexLean + cap + ["-"]
         case .gemini: cap + ["-p", stub]
         case .cursorAgent: cap + ["--trust", "-p", stub, "--output-format", "text"]
@@ -352,13 +358,18 @@ final class RouterSettings {
     /// Fastest healthy brains for one voice turn, restricted by the task's privacy and provider
     /// choice before any provider (and so any request) exists. The first two are raced.
     /// `claude` is the app's own Claude provider, offered when the `claude` CLI isn't otherwise listed.
-    func brainCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil) -> [(id: String, provider: BrainProvider)] {
-        brainEngineCandidates(task: task, hasAnthropicKey: hasAnthropicKey, claude: claude).map { ($0.id, $0.provider) }
+    func brainCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil,
+                         preferAppClaude: Bool = false) -> [(id: String, provider: BrainProvider)] {
+        brainEngineCandidates(task: task, hasAnthropicKey: hasAnthropicKey, claude: claude,
+                              preferAppClaude: preferAppClaude).map { ($0.id, $0.provider) }
     }
 
     /// Same list with each entry's engine, so a spoken turn can pick its fast tier by engine and not by display id
     /// (`"ollama"` names both the local HTTP server and the CLI).
-    func brainEngineCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil)
+    /// `preferAppClaude` hands the `claude` entry to the app's own provider even when the CLI is installed:
+    /// the app provider sends screenshots, the plain CLI engine feeds text on stdin only.
+    func brainEngineCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil,
+                               preferAppClaude: Bool = false)
         -> [(engine: BrainEngineID, id: String, provider: BrainProvider)] {
         let openAI = Keychain.get("assistant.key.openai").map { !$0.isEmpty } ?? false
         var ordered = BrainRoute.order(hasAnthropicKey: hasAnthropicKey, hasOpenAIKey: openAI,
@@ -366,9 +377,14 @@ final class RouterSettings {
         if claude != nil, !exhaustedEngines().contains(.claude), !ordered.contains(.claude) { ordered.append(.claude) }
         let ids = Self.allowedEngines(ordered, task: task, choice: choices[task] ?? .auto)
         return ids.compactMap { id -> (engine: BrainEngineID, id: String, provider: BrainProvider)? in
-            if id == .claude, installed[.claude] == nil, let claude { return (id, "claude", claude) }
+            if id == .claude, Self.appClaudeServes(cliInstalled: installed[.claude] != nil, preferAppClaude: preferAppClaude),
+               let claude { return (id, "claude", claude) }
             return candidate(for: id).map { (id, $0.id, $0.provider) }
         }
+    }
+
+    nonisolated static func appClaudeServes(cliInstalled: Bool, preferAppClaude: Bool) -> Bool {
+        !cliInstalled || preferAppClaude
     }
 
     /// Auto routing for callers with no prompt yet (nothing is sent). Prefer the task-aware form.

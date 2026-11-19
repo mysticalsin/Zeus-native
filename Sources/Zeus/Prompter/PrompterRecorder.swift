@@ -40,6 +40,10 @@ final class PrompterRecorder: NSObject {
         isStarting = true
         cancelRequested = false
         defer { isStarting = false }
+        // Face presence gives the camera up while this holds it, and takes it back when it is let go.
+        FacePresenceController.shared.teleprompterCapture(active: true)
+        var recording = false
+        defer { if !recording { FacePresenceController.shared.teleprompterCapture(active: false) } }
         guard await Self.access(.video) else { throw RecorderError.cameraDenied }
         guard await Self.access(.audio) else { throw RecorderError.micDenied }
         guard let camera = AVCaptureDevice.default(for: .video) else { throw RecorderError.noCamera }
@@ -79,6 +83,7 @@ final class PrompterRecorder: NSObject {
         self.output = output
         fileURL = url
         startedAt = Date()
+        recording = true
         return true
     }
 
@@ -98,6 +103,7 @@ final class PrompterRecorder: NSObject {
         output = nil
         startedAt = nil
         Self.queue.async { box?.session.stopRunning() }
+        FacePresenceController.shared.teleprompterCapture(active: false)
     }
 
     private static let queue = DispatchQueue(label: "zeus.prompter.capture")

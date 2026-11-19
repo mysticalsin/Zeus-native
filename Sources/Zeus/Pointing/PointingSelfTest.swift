@@ -105,7 +105,7 @@ final class PointingSelfTestRunner {
         let model: any ExplanationModelProviding, speech: any SpeechOutputProvider
         var prepare: () async -> [PointingProviderPath] = { [.zeusSetup] }
         if live {
-            let built = PointingProviders(anyLLM: { (AIConnections.shared.anyLLM, Keychain.get(AnyLLMConfig.keyAccount)) },
+            let built = PointingProviders(anyLLM: { (AIConnections.shared.anyLLM, AIConnections.shared.anyLLMCredential()) },
                                           localOnly: { false }, anyLLMComplete: { AIConnections.shared.anyLLM.isComplete })
             providers = built; model = built.model; speech = built.speech
             prepare = { await built.prepareTurn() }

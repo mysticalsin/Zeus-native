@@ -10,7 +10,7 @@ struct LanguagesStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StepHeading(title: "Your languages", subtitle: "")
-                .frame(width: 520, alignment: .leading)
+                .frame(width: 420, alignment: .leading)
             VStack(spacing: 0) {
                 ForEach(LanguagePackID.allCases, id: \.self) { pack in
                     OBRow(symbol: "globe", title: pack.title, text: "") {

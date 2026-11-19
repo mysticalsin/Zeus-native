@@ -102,7 +102,7 @@ struct LivingMascot: View {
     @StateObject private var model = LivingMascotModel()
 
     var body: some View {
-        TickingView(interval: Motion.reduced ? 1 : 1 / 30, paused: Motion.reduced) { context in
+        DisplaySynchronizedView(paused: Motion.reduced, preferredFramesPerSecond: Motion.ambientFPS) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             let breathScale: CGFloat = Motion.reduced ? 1 : 1 + 0.018 * CGFloat(sin(t * 2.1))
             let bob: CGFloat = Motion.reduced ? 0 : 2.2 * CGFloat(sin(t * 1.4))

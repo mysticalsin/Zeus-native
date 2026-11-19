@@ -2,12 +2,25 @@ import AVFoundation
 import Foundation
 import ZeusCore
 
+/// What a talk turn needs from the voice: speak a line, tell the turn when its audio starts, stop.
+@MainActor
+protocol LineSpeaking: AnyObject {
+    var isSpeaking: Bool { get }
+    var engineDescription: String { get }
+    func speak(_ text: String, onStart: (@MainActor () -> Void)?)
+    func stop()
+}
+
+extension LineSpeaking {
+    func speak(_ text: String) { speak(text, onStart: nil) }
+}
+
 /// Speaks reply sentences. `UltronEngineRouter` picks the engine (ElevenLabs, OpenAI, Kokoro, then the
 /// deepest Mac voice) with a logged reason, and every engine's audio, the Mac voice included, runs
 /// through the Ultron effect chain (`UltronAudioChain`). Each sentence is scheduled for playback as soon
 /// as its first audio arrives, so the next sentence is requested while the previous one plays.
 @MainActor
-final class Speaker: SentenceSpeaking {
+final class Speaker: SentenceSpeaking, LineSpeaking {
     nonisolated(unsafe) static var urlSession: URLSession = .shared
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
@@ -24,7 +37,17 @@ final class Speaker: SentenceSpeaking {
     private let synthesizer = AVSpeechSynthesizer()
     private let voice: AVSpeechSynthesisVoice?
     private let chain = UltronAudioChain()
-    private var queue: [String] = []
+    private var queue: [(text: String, onStart: (@MainActor () -> Void)?)] = []
+    /// Fires when the line now being spoken starts to play; cleared after it fires, so it runs once per line.
+    private var lineOnStart: (@MainActor () -> Void)?
+    /// How many buffers the chain had been given when the line now being spoken began: its own audio plays after them.
+    private var lineBase = 0
+    /// Test seam: stands in for every voice engine, so no audio is made. Nil in the app.
+    /// Where the chain counts queued and played buffers (the tests stand in for an engine through it).
+    var playbackLedger: PlaybackLedger { chain.ledger }
+    /// How many times the shared output engine has been started (the tests check a key press starts none).
+    var outputEngineStarts: Int { chain.engineStarts }
+    var attemptOverride: (@MainActor (String) async -> String?)?
     private var pump: Task<Void, Never>?
     private var pumpToken: UUID?
     private var systemRendering = false
@@ -68,22 +91,31 @@ final class Speaker: SentenceSpeaking {
     var isSpeaking: Bool { synthesizer.isSpeaking || pump != nil || chain.isPlaying || systemRendering }
 
     var engineDescription: String {
-        guard let first = VoiceSettings.shared.routeDecisions().first else { return "Mac voice \(systemVoiceName) with the Ultron effect" }
-        return first.engine == .system ? "Mac voice \(systemVoiceName) with the Ultron effect" : "\(first.engine.label) with the Ultron effect"
+        let first = VoiceSettings.shared.routeDecisions().first
+        let name = first == nil || first?.engine == .system ? "Mac voice \(systemVoiceName)" : first!.engine.label
+        return Self.describe(engine: name, effectOn: UltronVoiceEffect.enabled())
+    }
+
+    /// The route line shown in Settings. It names the Ultron effect only when the effect is on, so a
+    /// clean take C voice is not described as processed.
+    nonisolated static func describe(engine: String, effectOn: Bool) -> String {
+        effectOn ? "\(engine) with the Ultron effect" : engine
     }
 
     // MARK: Entry points
 
-    func speak(_ text: String) {
+    /// `onStart` runs once, on the main actor, when this line's audio starts, before the next line begins.
+    func speak(_ text: String, onStart: (@MainActor () -> Void)? = nil) {
         ExplanationAudioArbitration.yieldToNewCapture()
-        queue.append(text)
+        queue.append((text, onStart))
         guard pump == nil else { return }
         let token = UUID()
         pumpToken = token
         pump = Task { [weak self] in
             while let self, !Task.isCancelled {
                 if !self.queue.isEmpty {
-                    _ = await self.speakLine(self.queue.removeFirst())
+                    let line = self.queue.removeFirst()
+                    _ = await self.speakLine(line.text, onStart: line.onStart)
                 } else if self.chain.isPlaying || self.systemRendering {
                     try? await Task.sleep(for: .milliseconds(40))
                 } else {
@@ -119,7 +151,7 @@ final class Speaker: SentenceSpeaking {
     }
 
     /// Warms the engine the next reply will use. Called on every talk-key press, never at launch. Cloud voices
-    /// re-open their connection (throttled in `TTSHTTP`); local engines warm once.
+    /// re-open their connection (throttled in `TTSHTTP`); local engines warm once. Never starts audio output.
     func prewarm() {
         let settings = VoiceSettings.shared
         guard let decision = settings.routeDecisions().first else { return }
@@ -135,7 +167,9 @@ final class Speaker: SentenceSpeaking {
         default:
             break
         }
-        chain.prepare()
+        // The output engine is not started here: opening playback at key-down pulls a Bluetooth headset
+        // out of its listening profile just as capture opens. `UltronAudioChain.schedule` starts it when
+        // the first audio is ready.
         if prewarmed != decision.engine {
             prewarmed = decision.engine
             VoiceLog.log("prewarm", "engine=\(decision.engine.logName) reason=\(decision.reason)")
@@ -156,12 +190,16 @@ final class Speaker: SentenceSpeaking {
     // MARK: Choosing and playing
 
     /// Tries each engine in router order until one produces audio. Returns nil only when nothing could speak.
-    private func speakLine(_ text: String, began: Date = Date()) async -> Played? {
+    private func speakLine(_ text: String, began: Date = Date(), onStart: (@MainActor () -> Void)? = nil) async -> Played? {
         let settings = VoiceSettings.shared
+        lineOnStart = onStart
+        lineBase = chain.ledger.scheduled
+        defer { lineOnStart = nil }
         for decision in settings.routeDecisions() {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
             guard let voiceName = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
+            armLineStart() // Engines that never reported a first buffer have still queued their audio by now.
             let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
             if let ms { settings.recordFirstAudio(decision.engine, ms: ms) }
             logSpoken(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
@@ -172,6 +210,7 @@ final class Speaker: SentenceSpeaking {
 
     /// One engine, one sentence. The voice name on success, nil when this engine could not speak it.
     private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> String? {
+        if let attemptOverride { return await attemptOverride(text) }
         VoiceLatency.shared.mark(.ttsRequest)
         switch engine {
         case .elevenLabs:
@@ -187,6 +226,13 @@ final class Speaker: SentenceSpeaking {
                 return voice
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.openAICompatible, reason: .offline) }
+            return nil
+        case .gemini:
+            if let voice = await speakGemini(text, began: began) {
+                settings.clearProviderPause(.gemini)
+                return voice
+            }
+            if Self.countsAsFailure() { settings.noteProviderFailure(.gemini, reason: .offline) }
             return nil
         case .kokoro:
             if await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) {
@@ -212,7 +258,16 @@ final class Speaker: SentenceSpeaking {
         SpeechAttemptPolicy.shouldRecordFailure(producedAudio: false, cancelled: Task.isCancelled)
     }
 
-    private func markAudioReady() {
+    /// The line's start callback runs when its audio plays. Engines queue a line behind the earlier one (the
+    /// next sentence is requested while this one plays), so that is when everything queued before it has played.
+    private func armLineStart() {
+        guard let start = lineOnStart else { return }
+        lineOnStart = nil
+        chain.ledger.whenPlayed(upTo: lineBase, run: start)
+    }
+
+    func markAudioReady() {
+        armLineStart()
         if audioReadyAt == nil { audioReadyAt = Date() }
         VoiceLatency.shared.mark(.firstAudio)
     }
@@ -229,6 +284,7 @@ final class Speaker: SentenceSpeaking {
         let model: String? = switch engine {
         case .elevenLabs: lastElevenModel
         case .openAI: OpenAITTSVoice.config()?.model
+        case .gemini: GeminiTTSVoice.config()?.model
         default: nil
         }
         VoiceLatency.shared.setSpeech(engine: engine.logName, voice: voice, model: model, reason: reason,
@@ -243,7 +299,11 @@ final class Speaker: SentenceSpeaking {
         let model = answerPin.resolve(quality: VoiceSettings.shared.elevenQuality, studioUnsupported: studioUnsupported)
         lastElevenStatus = nil
         var result = await speakElevenLabs(text, began: began, model: model)
-        if result == nil, model == ElevenLabsQuality.studioModel, !answerHadAudio, !Task.isCancelled {
+        // No second try when ElevenLabs is paused (bad key, no credits) or the first-audio deadline passed.
+        if result == nil, model == ElevenLabsQuality.studioModel, !Task.isCancelled,
+           ElevenLabsFailsafe.shouldRetryOnFastModel(
+               paused: VoiceSettings.shared.isProviderPaused(.elevenLabs),
+               remaining: ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()), answerHadAudio: answerHadAudio) {
             if let status = lastElevenStatus, AnswerModelPin.isModelRejection(status: status) { studioUnsupported = true }
             answerPin.fallBackToFast()
             VoiceLog.log("voice", "studio model not available; this answer uses \(ElevenLabsQuality.fastModel)")
@@ -256,46 +316,66 @@ final class Speaker: SentenceSpeaking {
         return result
     }
 
+    /// Headers and first audio together must arrive before `began + firstAudioTimeout`. A timer cancels the
+    /// route's task at that moment, which also cancels its URLSession request, so nothing keeps streaming
+    /// (or billing) after the same sentence moves on to Kokoro. Past the deadline no other route is tried.
     private func speakElevenLabs(_ text: String, began: Date, model: String) async -> String? {
         for route in ElevenLabsVoice.loadRoutes() {
+            guard let remaining = ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()),
+                  ElevenLabsFailsafe.shouldTryNextRoute(remaining: remaining) else { return nil }
             let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
-            let deadline = began.addingTimeInterval(VoiceTTSChain.firstAudioTimeout)
-            do {
-                let (bytes, response) = try await Self.elevenLabsSession.bytes(for: route.request(for: text, model: model))
-                if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                    lastElevenStatus = http.statusCode
-                    var body = Data()
-                    for try await byte in bytes { body.append(byte); if body.count > 8_192 { break } }
-                    if ElevenLabsVoice.isKeyRejection(http.statusCode) {
-                        VoiceSettings.shared.noteElevenLabsKeyRejected(status: http.statusCode, body: body)
-                    }
-                    continue
-                }
-                var chunk = Data()
-                chunk.reserveCapacity(Self.pcmChunkBytes)
-                for try await byte in bytes {
-                    if Task.isCancelled { feeder.discard(); return feeder.scheduledAny ? Self.routeVoice(route) : nil }
-                    if !feeder.receivedAny, Date() > deadline { break }
-                    chunk.append(byte)
-                    if chunk.count >= Self.pcmChunkBytes {
-                        feeder.push(chunk)
-                        chunk.removeAll(keepingCapacity: true)
-                    }
-                }
-                if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
-                    feeder.push(chunk)
-                    feeder.finish()
-                } else {
-                    feeder.discard()
-                }
-            } catch {
-                if Task.isCancelled { feeder.discard() } else { feeder.finish() }
-                if feeder.scheduledAny { return Self.routeVoice(route) }
-                continue
+            let attempt = Task { await self.streamElevenLabs(route, text: text, began: began, model: model, feeder: feeder) }
+            let timer = Task {
+                try? await Task.sleep(for: .seconds(remaining))
+                if !Task.isCancelled, !feeder.receivedAny { attempt.cancel() }
             }
-            if feeder.scheduledAny { return Self.routeVoice(route) }
+            let voice = await withTaskCancellationHandler { await attempt.value } onCancel: { attempt.cancel() }
+            timer.cancel()
+            if let voice { return voice }
+            if Task.isCancelled { return nil }
         }
         return nil
+    }
+
+    /// One ElevenLabs route. Nil when it produced no audio: refused, unreachable, cancelled or past the deadline.
+    private func streamElevenLabs(_ route: ElevenLabsVoice, text: String, began: Date, model: String, feeder: PCMStreamFeeder) async -> String? {
+        do {
+            let (bytes, response) = try await Self.elevenLabsSession.bytes(for: route.request(for: text, model: model))
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                lastElevenStatus = http.statusCode
+                var body = Data()
+                for try await byte in bytes { body.append(byte); if body.count > 8_192 { break } }
+                if ElevenLabsVoice.isKeyRejection(http.statusCode) {
+                    VoiceSettings.shared.noteElevenLabsKeyRejected(status: http.statusCode, body: body)
+                }
+                return nil
+            }
+            var chunk = Data()
+            chunk.reserveCapacity(Self.pcmChunkBytes)
+            for try await byte in bytes {
+                if Task.isCancelled { feeder.discard(); return feeder.scheduledAny ? Self.routeVoice(route) : nil }
+                if !feeder.receivedAny,
+                   !ElevenLabsFailsafe.shouldPushPartialChunk(remaining: ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date())) {
+                    // Too late: a fragment is not a reply. Drop it so Kokoro speaks the whole sentence.
+                    feeder.discard()
+                    return nil
+                }
+                chunk.append(byte)
+                if chunk.count >= Self.pcmChunkBytes {
+                    feeder.push(chunk)
+                    chunk.removeAll(keepingCapacity: true)
+                }
+            }
+            if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
+                feeder.push(chunk)
+                feeder.finish()
+            } else {
+                feeder.discard()
+            }
+        } catch {
+            if Task.isCancelled { feeder.discard() } else { feeder.finish() }
+        }
+        return feeder.scheduledAny ? Self.routeVoice(route) : nil
     }
 
     /// 50 ms of 24 kHz 16-bit mono PCM: small enough to start fast, with a one-buffer look-ahead for the tail fade.
@@ -340,6 +420,24 @@ final class Speaker: SentenceSpeaking {
             guard chain.scheduleFile(url) else { return nil }
             markAudioReady()
             return prepared.voice
+        } catch {
+            feeder.discard()
+            return nil
+        }
+    }
+
+    /// Gemini returns the whole sentence as base64 PCM, so it is decoded and scheduled in one piece.
+    private func speakGemini(_ text: String, began: Date) async -> String? {
+        guard let config = GeminiTTSVoice.config(),
+              let request = GeminiTTSRequest.makeRequest(text: text, config: config, timeout: 20) else { return nil }
+        let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
+        do {
+            let (data, response) = try await Self.urlSession.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200, let pcm = GeminiTTSRequest.pcm(fromResponse: data) else { return nil }
+            guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { return nil }
+            feeder.push(pcm)
+            feeder.finish()
+            return feeder.scheduledAny ? config.voice : nil
         } catch {
             feeder.discard()
             return nil
@@ -436,6 +534,11 @@ final class Speaker: SentenceSpeaking {
                 }
             case .openAI:
                 if let url = await OpenAITTSVoice.render(text, session: Self.urlSession), (try? VoiceWAVPlayback.writeProcessedCopy(from: url, to: destination)) != nil {
+                    try? FileManager.default.removeItem(at: url)
+                    return true
+                }
+            case .gemini:
+                if let url = await GeminiTTSVoice.render(text, session: Self.urlSession), (try? VoiceWAVPlayback.writeProcessedCopy(from: url, to: destination)) != nil {
                     try? FileManager.default.removeItem(at: url)
                     return true
                 }

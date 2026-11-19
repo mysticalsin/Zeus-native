@@ -31,7 +31,7 @@ struct CommandModeSettingsPage: View {
                 }
             }
             GlassCard(title: "Show me") {
-                GlassRow(title: "Hold left Command and circle", note: "Marks a spot; Zeus answers about what you circled.") {
+                GlassRow(title: "Hold left Control and circle", note: "Marks a spot; Zeus answers about what you circled.") {
                     GlassStatus(ok: true, text: "Annotation live")
                 }
             }

@@ -79,6 +79,7 @@ private enum NativeAppTestHost {
                 "^ZeusAppTests\\.OwnedWindowEventDriverTests/",
                 "^ZeusAppTests\\.ScribeComponentJourneyTests/",
                 "^ZeusAppTests\\.ScribeAccessibilityJourneyTests/",
+                "^ZeusAppTests\\.ScribeMeetingCardJourneyTests/",
                 "^ZeusAppTests\\.OnboardingComponentJourneyTests/",
                 "^ZeusAppTests\\.OnboardingFilmLifecycleTests/",
                 "^ZeusAppTests\\.ExplanationRendererTests/",
@@ -86,7 +87,12 @@ private enum NativeAppTestHost {
                 "^ZeusAppTests\\.ExplanationScreenContextTests/",
                 "^ZeusAppTests\\.ExplanationChatLifecycleTests/",
                 // Local trusted-Mac journey only (scripts/trusted-ax-journey.sh); CI never selects it.
-                "^ZeusAppTests\\.ScribeTrustedAccessibilityJourneyTests/"
+                "^ZeusAppTests\\.ScribeTrustedAccessibilityJourneyTests/",
+                // Local trusted-Mac AXPress on the notch tabs and body; CI never selects it either.
+                "^ZeusAppTests\\.NotchTrustedAccessibilityTests/",
+                "^ZeusAppTests\\.ClosedWingsNotchTests/",
+                "^ZeusAppTests\\.FlingShelfJourneyTests/",
+                "^ZeusAppTests\\.FlingTwoProcessTests/"
             ]
             guard args.count == 9,
                   args[1] == "--test-bundle-path",

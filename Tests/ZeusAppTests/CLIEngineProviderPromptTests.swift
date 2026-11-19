@@ -55,4 +55,14 @@ struct CLIEngineProviderPromptTests {
         #expect(prompt.contains("q3"))
         #expect(prompt.contains("q8"))
     }
+
+    @Test func aCliEngineNeverListsScreenshotsItCannotReceive() {
+        let shot = ScreenShot(jpegData: Data([1]), label: "screen 1 of 1", pixelWidth: 10, pixelHeight: 10, displayFrame: .zero)
+        let request = BrainRequest(transcript: "what is on my screen", screenshots: [shot], systemPrompt: "You are ZEUS.",
+                                   firstTextBudget: 8)
+        let prompt = CLIEngineProvider.prompt(for: request)
+        #expect(prompt.contains("you cannot see the screen"))
+        #expect(!prompt.contains("Screenshots attached"))
+        #expect(!prompt.contains("screen 1 of 1"))
+    }
 }
