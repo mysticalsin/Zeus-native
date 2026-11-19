@@ -1156,6 +1156,7 @@ private struct PermissionsPage: View {
     var body: some View {
         GSPageHeading(section: .permissions, subtitle: "Each access is optional. Zeus asks only when you turn a feature on.")
             .padding(.bottom, -GS.cardGap)
+        PermissionDeskView(status: deskStatus, allow: deskAllow, grantRemaining: grantEverything)
             .task {
                 while !Task.isCancelled {
                     context.refresh()
@@ -1169,7 +1170,7 @@ private struct PermissionsPage: View {
             GSDivider()
             perm("location", "Location", "Local weather and rain alerts", context.services.locationAllowed) { context.services.allowLocation() }
             GSDivider()
-            perm("calendar", "Calendar", "Events and video calls", context.services.granted(.calendar)) { context.permissions.request(.calendar) }
+            perm("calendar", "Calendar", "Events and video calls", context.services.granted(.calendar)) { deskAllow(.calendar) }
             GSDivider()
             perm("checklist", "Reminders", "Read, create and complete tasks", context.services.granted(.reminders)) { context.permissions.request(.reminders) }
             GSDivider()
@@ -1293,6 +1294,53 @@ private struct PermissionsPage: View {
             if granted { GSStatus(ok: true, text: "Allowed") } else {
                 Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
             }
+        }
+    }
+
+    /// The desk's picture of each capability. Reading the calendar flag does not prompt and does not list events.
+    private var deskStatus: [PermissionDesk.Kind: PermissionDesk.Status] {
+        var status: [PermissionDesk.Kind: PermissionDesk.Status] = [:]
+        func granted(_ kind: PermissionsModel.Kind) -> PermissionDesk.Status {
+            context.services.granted(kind) ? .allowed : .unknown
+        }
+        status[.accessibility] = granted(.accessibility)
+        status[.automation] = granted(.automation)
+        status[.fullDisk] = context.services.fullDiskAccess ? .allowed : .unknown
+        status[.camera] = context.permissions.cameraPermissionState == .authorized ? .allowed : .unknown
+        status[.screen] = context.permissions.screenPermissionState == .authorized ? .allowed : .unknown
+        status[.microphone] = VoicePermissions.mic == .authorized ? .allowed : .unknown
+        status[.speech] = VoicePermissions.speech == .authorized ? .allowed : .unknown
+        switch LocalCalendarReader.status {
+        case .allowed: status[.calendar] = .allowed
+        case .denied, .restricted: status[.calendar] = .denied
+        case .notAsked: status[.calendar] = .unknown
+        }
+        return status
+    }
+
+    /// A tap. The calendar reader runs only for the Calendars row.
+    private func deskAllow(_ kind: PermissionDesk.Kind) {
+        if PermissionDesk.readsCalendar(kind: kind, tapped: true) {
+            Task { _ = await LocalCalendarReader.ensureAccess(); context.refresh() }
+            return
+        }
+        switch kind {
+        case .microphone, .speech:
+            Task { await VoicePermissions.ensure(explicit: true); context.refresh() }
+        case .camera: context.permissions.request(.camera)
+        case .screen: context.permissions.request(.screen)
+        case .accessibility: context.permissions.request(.accessibility)
+        case .automation: context.permissions.request(.automation)
+        case .fullDisk: context.services.allowFullDiskAccess()
+        case .bluetooth, .localNetwork:
+            if let url = URL(string: PermissionDesk.url(for: kind)) { NSWorkspace.shared.open(url) }
+        }
+    }
+
+    private func grantEverything() {
+        let status = deskStatus
+        for row in PermissionDesk.rows where PermissionDesk.can(resource: row.kind, action: .advance, status: status[row.kind] ?? .unknown).can {
+            deskAllow(row.kind)
         }
     }
 }

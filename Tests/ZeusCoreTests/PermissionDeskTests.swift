@@ -46,5 +46,6 @@ struct PermissionDeskTests {
         #expect(PermissionDesk.readsCalendar(kind: .calendar, tapped: true))
         #expect(PermissionDesk.readsCalendar(kind: .calendar, tapped: false) == false)
         #expect(PermissionDesk.readsCalendar(kind: .microphone, tapped: true) == false)
+        #expect(PermissionDesk.settingsSection == "permissions")
     }
 }

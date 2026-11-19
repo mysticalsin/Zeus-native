@@ -53,6 +53,7 @@ The row asks `can(resource, action)`. The answer is whether the button is enable
 - **SC-001**: The desk tests pass, including the single check.
 - **SC-002**: The view has no status switch and no `canPrompt` title branch.
 
-## Open questions
+## Decisions
 
-- The desk view is not yet the destination of the settings catalog. That navigation is a later slice.
+- Settings > Permissions shows this desk, so every capability can be granted from that page.
+- The Calendars row calls the local reader only when it is tapped. The reader does not write events and does not run for any other row.

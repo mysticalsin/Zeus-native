@@ -46,6 +46,14 @@ public enum PermissionDesk {
     /// A grant is recorded only when the probe says it is allowed.
     public static func record(probe: Status) -> Status { probe }
 
+    /// The calendar reader runs only for the Calendars row, and only because that row was tapped.
+    public static func readsCalendar(kind: Kind, tapped: Bool) -> Bool {
+        kind == .calendar && tapped
+    }
+
+    /// The settings section that shows this desk.
+    public static let settingsSection = "permissions"
+
     public enum Action: String, Sendable {
         /// The status line.
         case describe

@@ -7,4 +7,5 @@
 - [x] Grant everything skips allowed and unavailable rows.
 - [x] The view does not switch on status or `canPrompt`.
 - [x] Agent actions are not decided here.
-- [ ] The desk is not yet linked from the settings catalog.
+- [x] Settings > Permissions shows the desk.
+- [x] The Calendars row calls the local reader only when that row is tapped. Other rows do not.

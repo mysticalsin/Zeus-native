@@ -5,4 +5,4 @@
 - [x] A missing source says Zeus does not connect to Outlook itself.
 - [x] `OutlookCalendarBridge.usesAppleScript` is false.
 - [x] The permission note says the read is local and on demand.
-- [ ] The Calendars permission row does not yet call the reader.
+- [x] The Calendars permission row calls the reader only when tapped.
