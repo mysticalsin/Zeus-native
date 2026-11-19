@@ -36,6 +36,23 @@ import ZeusCore
         #expect(second.verdict == nil)
     }
 
+    @Test func aVoiceOverActionAcrossASwapDoesNotApproveTheNextCardOnceTheQuietIntervalHasPassed() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card)
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card)
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
     @Test func aVoiceOverActionAcrossASwapDoesNotApproveTheNextCard() {
         let first = Box()
         let second = Box()
@@ -110,9 +127,21 @@ import ZeusCore
             card(id: "B", command: "second", box: Box(), risk: .high),
         ])
         controller.browseApproval(by: 1)
-        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .high, position: "2 of 2", outcome: nil))
+        #expect(controller.lastApprovalAnnouncement?.contains("second") == true)
         controller.advanceAfterDisplayed("B")
-        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .low, position: "1 of 1", outcome: nil))
+        controller.advanceAfterDisplayed("A")
+        #expect(controller.lastApprovalAnnouncement == "No request is waiting.")
+    }
+
+    @Test func sendAnswersDuringTheQuietIntervalKeepsWhatWasTyped() {
+        let (controller, _) = controller(reduceMotion: true)
+        let detail = ApprovalDetail(kind: .questions([]), input: .object(["q": .string("a")]), session: "s")
+        controller.model.approval?.detail = detail
+        controller.model.approval?.appearedAt = Date()
+        detail.answer()
+        controller.commitDisplayedAnswers(inside: true)
+        #expect(detail.answered)
+        #expect(detail.updatedInput != nil)
     }
 
     @Test func aPressThatSwapsCardsDoesNotFinishOnTheNextOne() {

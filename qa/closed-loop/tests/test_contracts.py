@@ -789,5 +789,13 @@ class DeclaredTestCacheTests(unittest.TestCase):
             self.assertEqual(c.declared_tests(path), ("test_one",))
 
 
+class ApprovalQueueGuardTests(unittest.TestCase):
+    def test_a_spoken_yes_names_the_card_and_the_calendar_reader_does_not_ask(self):
+        voice = (c.ROOT / "Sources/Zeus/App/VoiceTurnController.swift").read_text()
+        self.assertIn("activateApproval(kind: .voice, cardID:", voice)
+        reader = (c.ROOT / "Sources/Zeus/Calendar/LocalCalendarReader.swift").read_text()
+        self.assertNotIn("requestFullAccessToEvents", reader)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

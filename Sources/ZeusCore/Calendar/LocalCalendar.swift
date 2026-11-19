@@ -22,6 +22,16 @@ public enum LocalCalendarAccess {
         }
     }
 
+    public enum SourceKind: Equatable, Sendable {
+        case exchange
+        case other
+    }
+
+    /// Still the title report. Denied and not-asked are not their own sentences yet.
+    public static func outlookReport(status: Status, sources: [SourceKind]) -> String {
+        outlookReport(calendarSources: [])
+    }
+
     public static func outlookReport(calendarSources: [String]) -> String {
         if outlookVisible(calendarSources: calendarSources) {
             return "Outlook is visible through the Mac's calendars."

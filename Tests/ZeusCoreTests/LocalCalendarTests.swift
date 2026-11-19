@@ -10,6 +10,13 @@ struct LocalCalendarTests {
         #expect(LocalCalendarAccess.map(fullAccess: false, denied: false, restricted: false, asked: false) == .notAsked)
     }
 
+    @Test func aTitleThatSaysExchangeIsNotTheAccountType() {
+        #expect(!LocalCalendarAccess.outlookVisible(calendarSources: ["Exchange Work"]))
+        #expect(LocalCalendarAccess.outlookReport(status: .denied, sources: []).contains("denied"))
+        #expect(!LocalCalendarAccess.outlookReport(status: .denied, sources: []).contains("not in the Mac's calendars"))
+        #expect(LocalCalendarAccess.outlookReport(status: .notAsked, sources: []).contains("not been asked"))
+    }
+
     @Test func outlookIsVisibleOnlyWhenEventKitListsThatAccount() {
         #expect(LocalCalendarAccess.outlookVisible(calendarSources: ["iCloud", "Exchange Work"]))
         #expect(!LocalCalendarAccess.outlookVisible(calendarSources: ["iCloud", "On My Mac"]))
