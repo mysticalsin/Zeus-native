@@ -168,6 +168,17 @@ def validate_case(case, root=ROOT):
     require(declared_tests(file).count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
 
 
+
+def native_suite_declared(suite, text):
+    """A suite is `NameTests`, or `Parent/NameTests` when it is nested in a serialized parent: Swift Testing reports
+    a nested suite as Module.Parent/NameTests/test(), so the selector carries the parent. The file must declare the
+    suite and extend (or declare) the parent."""
+    require(re.fullmatch(r"(?:[A-Za-z][A-Za-z0-9]*/)?[A-Za-z][A-Za-z0-9]*Tests", suite), "invalid suite selector")
+    parent, _, name = suite.rpartition("/")
+    if not re.search(r"\b(?:struct|class)\s+" + name + r"\b", text):
+        return False
+    return not parent or re.search(r"\b(?:extension|enum|struct|class)\s+" + parent + r"\b", text) is not None
+
 def validate_map(data, portable, root=ROOT):
     fields(data, {"schema_version", "scope", "checks", "features"})
     require(type(data["schema_version"]) is int and data["schema_version"] == 1, "unsupported map version")
@@ -190,8 +201,7 @@ def validate_map(data, portable, root=ROOT):
             file = relative_file(check["file"], root)
             require(check["file"].startswith(("Tests/ZeusAppTests/", "Tests/ZeusCoreTests/")), "native fixture must be a test")
             nonempty(check["suite"])
-            require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
-            require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing native suite")
+            require(native_suite_declared(check["suite"], file.read_text()), "missing native suite")
         elif check["kind"] == "trusted-native-fixture":
             # Same shape as a native fixture, but only a trusted Mac can execute it: SwiftUI exposes no
             # in-process accessibility tree, so the CI app job never selects it.
@@ -200,8 +210,7 @@ def validate_map(data, portable, root=ROOT):
             file = relative_file(check["file"], root)
             require(check["file"].startswith("Tests/ZeusAppTests/"), "trusted native fixture must be an app test")
             nonempty(check["suite"])
-            require(re.fullmatch(r"[A-Za-z][A-Za-z0-9]*Tests", check["suite"]), "invalid suite selector")
-            require(re.search(r"\b(?:struct|class)\s+" + check["suite"] + r"\b", file.read_text()), "missing trusted native suite")
+            require(native_suite_declared(check["suite"], file.read_text()), "missing trusted native suite")
         elif check["kind"] == "native-module":
             require(set(check) == {"id", "kind", "tier", "scope", "module"}, "invalid native module fields")
             require(check["tier"] == "native-integration" and check["module"] == "ZeusCoreTests",
