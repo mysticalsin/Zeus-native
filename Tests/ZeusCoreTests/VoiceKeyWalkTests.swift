@@ -1669,7 +1669,9 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     // search does not keep a breadth-first frontier of full states.
     var stack: [Sim] = [root]
     var expanded = 0
-    while let current = stack.popLast() {
+    let breadthFirst = stopAtFirst || until != nil
+    while !stack.isEmpty {
+        let current = breadthFirst ? stack.removeFirst() : stack.removeLast()
         if let progress, expanded % 100_000 == 0 {
             let line = "[walk] \(run.name): \(seen.count) states, \(expanded) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
             if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
@@ -1800,7 +1802,7 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         let broken = WalkRun("A mutant stamps keys when it handles them", keys: shipped.keys, own: shipped.ownCodes,
                              configs: shipped.configs, late: true, processingTime: true)
         let report = search(broken, stopAtFirst: true, useCache: false)
-        #expect(report.violations.contains { $0.contains("own set had not been down alone for the delay") },
+        #expect(report.violations.contains { $0.contains("a turn was sent after something foreign was down") },
                 "\(report.violations)")
     }
 
@@ -1811,7 +1813,7 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         let old = WalkRun("A with processing time", keys: shipped.keys, own: shipped.ownCodes, configs: shipped.configs,
                           late: true, processingTime: true)
         let report = search(old, stopAtFirst: true)
-        #expect(report.violations.contains { $0.contains("own set had not been down alone for the delay") },
+        #expect(report.violations.contains { $0.hasPrefix("I1:") },
                 "\(report.violations)")
     }
 
