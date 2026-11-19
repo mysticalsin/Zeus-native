@@ -100,18 +100,35 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
     /// The windows the walk's age fold is derived from. One source for the machine and the search.
     public enum Timing {
-        public static let step: TimeInterval = 0.05
-        public static let checkEvery: TimeInterval = 0.25
-        public static let holdTapMax: TimeInterval = 0.30
-        public static let sharedTapMax: TimeInterval = 0.25
-        public static let holdGap: TimeInterval = 0.40
-        public static let sharedGap: TimeInterval = 0.35
+        public static var step: TimeInterval = 0.05
+        public static var checkEvery: TimeInterval = 0.25
+        public static var holdTapMax: TimeInterval = 0.30
+        public static var sharedTapMax: TimeInterval = 0.25
+        public static var holdGap: TimeInterval = 0.40
+        public static var sharedGap: TimeInterval = 0.35
+        /// The pointing hold's watchdog, and the shared dictation delay.
+        public static var pointingWatchdog: TimeInterval = 0.25
+        public static var sharedDictationDelay: TimeInterval = 0.25
         /// One step past the longest gap, so the cap is past every window.
         public static var cap: TimeInterval { holdGap + step }
 
+        public static func steps(_ seconds: TimeInterval) -> Int { Int((seconds / step).rounded()) }
+
+        public static func restoreDefaults() {
+            step = 0.05
+            checkEvery = 0.25
+            holdTapMax = 0.30
+            sharedTapMax = 0.25
+            holdGap = 0.40
+            sharedGap = 0.35
+            pointingWatchdog = 0.25
+            sharedDictationDelay = 0.25
+        }
+
         /// Step counts of the windows, including `confirm` and the cap. Sorted, with duplicates removed.
         public static func cuts(confirm: TimeInterval) -> [Int] {
-            let seconds = [0, confirm, checkEvery, holdTapMax, sharedTapMax, holdGap, sharedGap, cap]
+            let seconds = [0, confirm, checkEvery, holdTapMax, sharedTapMax, holdGap, sharedGap,
+                           pointingWatchdog, sharedDictationDelay, cap]
             return Array(Set(seconds.map { Int(($0 / step).rounded()) })).sorted()
         }
     }
@@ -123,7 +140,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     }
     private static func gap(_ config: Config) -> TimeInterval { config.mode == .hold ? Timing.holdGap : Timing.sharedGap }
     /// How often a running hold looks at the live modifiers, to find a release no event reported.
-    private static let checkEvery: TimeInterval = Timing.checkEvery
+    private static var checkEvery: TimeInterval { Timing.checkEvery }
     /// A wake may arrive this much early: the clock that schedules it and the clock that stamps events differ.
     private static let slack: TimeInterval = 0.001
 
@@ -133,7 +150,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     private static func delay(_ config: Config, _ press: Press) -> TimeInterval? {
         switch config.mode {
         case .hold: config.confirm
-        case .shared where config.role == .dictation: 0.25
+        case .shared where config.role == .dictation: Timing.sharedDictationDelay
         case .shared: press == .ending && config.confirm > 0 ? config.confirm : nil
         case .shared, .toggle: nil
         }
@@ -460,7 +477,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
             out.append(.wake(after: config.confirm))
         case .shared:
             phase = .armed(since: t, press: .first)
-            if config.role == .dictation { out.append(.wake(after: 0.25)) }
+            if config.role == .dictation { out.append(.wake(after: Timing.sharedDictationDelay)) }
         }
     }
 

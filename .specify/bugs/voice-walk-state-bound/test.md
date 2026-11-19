@@ -8,7 +8,7 @@
 
 ## Summary
 
-The silent 200,000 ceiling is gone. A local optimized run of the jump walk reported 906,908 states, depth 33, no violations. Exact ages at depth 2 are covered by the folded keys, and shifting each window by one step changes the landings. The hosted suite has not been re-run. This is not a verified verdict.
+The silent 200,000 ceiling is gone. A local optimized run of the jump walk reported 906,972 states, depth 33, no violations. The exact and folded walks are compared past the first cut, and each Timing window has its own one-step probe. The hosted suite has not been re-run. This is not a verified verdict.
 
 ## Checks Performed
 

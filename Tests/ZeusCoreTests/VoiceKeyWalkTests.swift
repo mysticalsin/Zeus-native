@@ -6,8 +6,9 @@ import Testing
 //
 // It walks the whole graph of reachable states of one hold key: each state is expanded once with every move and a
 // visited set ends the search, so every order of presses and releases at every length is covered. Time moves in whole
-// steps of 0.05 s. A search wait jumps to the next window named by `VoiceKeyMachine.Timing` (confirm, the 0.25 s check,
-// the tap max, the gaps, and one step past the longest gap), so the successor lands on that cut and the key records it.
+// steps of 0.05 s. A search wait jumps to the soonest timer `VoiceKeyMachine.Timing` names (the confirm, the check,
+// confirm plus the check, the tap max, the gaps, the pointing watchdog, the shared dictation delay, and one step past
+// the longest gap), so the successor lands on that deadline and the key records it.
 // Ages still inside a gap fold onto the cut they have reached, and a wake that is already overdue stays distinct down to
 // two steps late. Visited states are the whole key, compared with `Hashable` equality. When the own set is exactly
 // Control and Option and the run has no Right Option, only-Option-down is the same
@@ -15,7 +16,7 @@ import Testing
 // `WALK_LIMIT` stops the search and the run fails; it never passes on a partial graph. After every move a checker reads
 // rules I1 to I7 from the effects, the keys the machine has been told are down and `isLatched`; at every state the
 // walk also lets go of everything, waits 0.5 s and presses the own set, and reads I8 and the last clause of I4.
-// The shipped talk walk (Control-Option, confirm 0.15, the chord) has 906,908 of these states.
+// The shipped talk walk (Control-Option, confirm 0.15, the chord) has 906,972 of these states.
 //
 // What reaches the machine, and when. A modifier key and a key the tiling matcher passes on send a monitor event; a key
 // the real `TileKeyMatcher` consumes is forwarded as the event a monitor would have seen. The forwarded key reaches the
@@ -287,6 +288,8 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
 enum VoiceWalkClock {
     /// A test shifts one window. Nil reads the machine.
     static var cutOverride: [Int]?
+    /// The Control/Option mirror. A differential turns it off.
+    static var mergeControlOption = true
 
     static func cuts(confirm: TimeInterval) -> [Int] {
         cutOverride ?? VoiceKeyMachine.Timing.cuts(confirm: confirm)
@@ -327,7 +330,8 @@ private struct CanonicalControlOption {
         self.deviceKeys = deviceKeys
         self.keysDown = keysDown
         self.spoilers = spoilers
-        guard Set(run.ownCodes) == [59, 58], !run.keys.contains(where: { $0.code == 61 }),
+        guard VoiceWalkClock.mergeControlOption,
+              Set(run.ownCodes) == [59, 58], !run.keys.contains(where: { $0.code == 61 }),
               let control = run.keys.firstIndex(where: { $0.code == 59 }),
               let option = run.keys.firstIndex(where: { $0.code == 58 }) else { return }
         let controlBit = UInt16(1) << UInt16(control)
@@ -835,6 +839,59 @@ private struct Sim {
         return max(1, next - age)
     }
 
+    /// The soonest step strictly ahead of now, across every timer the machine or the gesture can owe.
+    mutating func stepsUntilNextDeadline(_ run: WalkRun) -> Int {
+        var soonest = Int.max
+        func note(step when: Int) {
+            if when > step { soonest = min(soonest, when - step) }
+        }
+        func note(time: TimeInterval) { note(step: VoiceKeyMachine.Timing.steps(time)) }
+        func wait(of config: VoiceKeyMachine.Config, press: VoiceKeyMachine.Press) -> TimeInterval? {
+            switch config.mode {
+            case .hold: return config.confirm
+            case .shared where config.role == .dictation: return VoiceKeyMachine.Timing.sharedDictationDelay
+            case .shared: return press == .ending && config.confirm > 0 ? config.confirm : nil
+            case .toggle: return nil
+            }
+        }
+        func collect(_ slot: WalkRun) {
+            for wake in wakes { note(step: wake) }
+            let config = machine.config ?? slot.configs[min(cfg, max(slot.configs.count - 1, 0))]
+            let gap = config.mode == .hold ? VoiceKeyMachine.Timing.holdGap : VoiceKeyMachine.Timing.sharedGap
+            switch machine.phase {
+            case .armed(let since, let press):
+                if let due = wait(of: config, press: press) {
+                    note(time: since + due)
+                    note(time: since + due + VoiceKeyMachine.Timing.checkEvery)
+                }
+            case .holding(_, _, let check, _):
+                note(time: check)
+                note(time: check + VoiceKeyMachine.Timing.checkEvery)
+            case .tapped(let at, true):
+                note(time: at + gap)
+            default:
+                break
+            }
+            if let since = aloneSince, let due = wait(of: config, press: .first), due > 0 {
+                note(step: since + VoiceKeyMachine.Timing.steps(due))
+            }
+            if let up = ownUpSince { note(step: up + VoiceKeyMachine.Timing.steps(gap)) }
+            if let gesture = pointing {
+                if let armed = gesture.armedSince { note(time: armed + gesture.confirm) }
+                if let active = gesture.activeSince { note(time: active + VoiceKeyMachine.Timing.pointingWatchdog) }
+            }
+        }
+        collect(run)
+        if pair != nil, let view = run.secondViews.first {
+            select(1)
+            collect(view)
+            select(0)
+        }
+        let cut = stepsUntilNextCut(run)
+        if soonest == Int.max { return cut }
+        return max(1, min(soonest, cut))
+    }
+
     /// The moves of the plain walk: the keys, a short and a long wait, and an abandon.
     func plainMoves(_ run: WalkRun) -> [Move] {
         run.keys.indices.map { Move.toggle($0) } + [.wait, .waitHalfSecond, .abandon]
@@ -849,7 +906,7 @@ private struct Sim {
         case .swallowed(let index): swallow(index, run)
         case .wait: advance(run)
         case .waitToCut:
-            let jumps = stepsUntilNextCut(run)
+            let jumps = stepsUntilNextDeadline(run)
             for _ in 0..<jumps { advance(run) }
         case .waitHalfSecond: for _ in 0..<10 { advance(run) }
         case .deliver: flushHeld(run)
@@ -1341,13 +1398,13 @@ private struct Sim {
         let slack = 0.001
         switch machine.phase {
         case .tapped(let at, true):
-            let gap = config.mode == .hold ? 0.4 : 0.35
+            let gap = config.mode == .hold ? VoiceKeyMachine.Timing.holdGap : VoiceKeyMachine.Timing.sharedGap
             return time - at >= gap - slack ? Overdue(effects: [.send], steps: Int((gap / 0.05).rounded()), gap: true) : nil
         case .armed(let since, let press):
             let delay: TimeInterval?
             switch config.mode {
             case .hold: delay = config.confirm
-            case .shared: delay = config.role == .dictation ? 0.25 : press == .ending && config.confirm > 0 ? config.confirm : nil
+            case .shared: delay = config.role == .dictation ? VoiceKeyMachine.Timing.sharedDictationDelay : press == .ending && config.confirm > 0 ? config.confirm : nil
             case .toggle: delay = nil
             }
             guard let delay, time - since >= delay - slack else { return nil }
@@ -1357,7 +1414,7 @@ private struct Sim {
                !modifiers.subtracting(.function).subtracting(machine.keys.flagModifiers).subtracting(key.modifiers).isEmpty {
                 return nil
             }
-            return Overdue(effects: press == .ending ? [.send] : [.start, .wake(after: 0.25)], steps: Int((delay / 0.05).rounded()), gap: false)
+            return Overdue(effects: press == .ending ? [.send] : [.start, .wake(after: VoiceKeyMachine.Timing.checkEvery)], steps: VoiceKeyMachine.Timing.steps(delay), gap: false)
         default:
             return nil
         }
@@ -1447,7 +1504,7 @@ private struct Sim {
                 effects = Self.effects(of: gesture.confirmElapsed(at: time, liveModifiers: live), gesture)
             } else if gesture.isActive {
                 let output = gesture.tick(at: time, liveModifiers: live)
-                effects = output == nil ? [.wake(after: 0.25)] : Self.effects(of: output, gesture)
+                effects = output == nil ? [.wake(after: VoiceKeyMachine.Timing.pointingWatchdog)] : Self.effects(of: output, gesture)
             } else {
                 effects = []
             }
@@ -1466,7 +1523,7 @@ private struct Sim {
     private static func effects(of output: PointingKeyGesture.Output?, _ gesture: PointingKeyGesture) -> [VoiceKeyMachine.Effect] {
         switch output {
         case .armed?: [.wake(after: gesture.confirm)]
-        case .began?: [.start, .wake(after: 0.25)]
+        case .began?: [.start, .wake(after: VoiceKeyMachine.Timing.pointingWatchdog)]
         case .ended?, .holdTimedOut?: [.send]
         case .cancelled?: [.cancel]
         case .escape?, .doubleTapControl?, nil: []
@@ -1836,14 +1893,38 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     return (out + restCheck(sim, run), effects)
 }
 
-/// The same moves as the search. Exact mode takes one step per wait and does not fold the successor.
-private func ageProbe(_ run: WalkRun, depth limit: Int, fold: Bool) -> (keys: Set<StateKey>, violations: Set<String>) {
-    var keys: Set<StateKey> = []
-    var violations: Set<String> = []
+/// Exact one-step waits against the folded jump, far enough to pass the confirm cut.
+private struct AgeSample: Equatable {
+    var verdicts: Set<String> = []
+    var outcomes: Set<String> = []
+    var furthest = 0
+}
+
+private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool, notPast: Int? = nil) -> AgeSample {
+    let savedMerge = VoiceWalkClock.mergeControlOption
+    VoiceWalkClock.mergeControlOption = merge
+    defer { VoiceWalkClock.mergeControlOption = savedMerge }
+    var sample = AgeSample()
+    var seen: Set<StateKey> = []
+    func outcome(_ sim: Sim) -> String {
+        let phase: String
+        switch sim.machine.phase {
+        case .idle: phase = "idle"
+        case .armed: phase = "armed"
+        case .holding: phase = "holding"
+        case .tapped: phase = "tapped"
+        case .latched: phase = "latched"
+        case .spent: phase = "spent"
+        }
+        return "\(phase) latched=\(sim.isLatchedNow) open=\(sim.turnOpenNow) barred=\(sim.machine.barred)"
+    }
     func walk(_ sim: Sim, depth: Int) {
-        guard keys.insert(sim.key(run)).inserted else { return }
+        if let notPast, sim.step > notPast { return }
+        guard seen.insert(sim.key(run)).inserted else { return }
+        sample.furthest = max(sample.furthest, sim.step)
+        sample.outcomes.insert(outcome(sim))
         for message in sim.found {
-            violations.insert(String(message.prefix(while: { $0 != ":" })))
+            sample.verdicts.insert(String(message.prefix(while: { $0 != ":" })))
         }
         if depth == limit { return }
         for move in sim.moves(run) {
@@ -1856,7 +1937,59 @@ private func ageProbe(_ run: WalkRun, depth limit: Int, fold: Bool) -> (keys: Se
         }
     }
     walk(Sim(run), depth: 0)
-    return (keys, violations)
+    return sample
+}
+
+/// One search jump with the age cuts held far away, so the soonest real timer decides the landing.
+private func timerJump(_ run: WalkRun, prepare: (inout Sim) -> Void) -> Int {
+    let saved = VoiceWalkClock.cutOverride
+    VoiceWalkClock.cutOverride = [0, 10_000]
+    defer { VoiceWalkClock.cutOverride = saved }
+    var sim = Sim(run)
+    prepare(&sim)
+    let start = sim.step
+    sim.apply(.waitToCut, run)
+    return sim.step - start
+}
+
+/// Press the own pair, wait a whole number of steps, and let go. The phase is what the walk reached.
+private func releasePhase(_ run: WalkRun, waits: Int) -> String {
+    var sim = Sim(run)
+    sim.apply(.toggle(0), run)
+    sim.apply(.toggle(1), run)
+    for _ in 0..<waits { sim.apply(.wait, run) }
+    sim.apply(.toggle(0), run)
+    sim.apply(.toggle(1), run)
+    return phaseLabel(sim.machine.phase)
+}
+
+/// Press, release, wait, and press again. The label names a second tap when the gap still covers the wait.
+private func secondPress(_ run: WalkRun, waits: Int) -> String {
+    var sim = Sim(run)
+    sim.apply(.toggle(0), run)
+    sim.apply(.toggle(1), run)
+    sim.apply(.toggle(0), run)
+    sim.apply(.toggle(1), run)
+    for _ in 0..<waits { sim.apply(.wait, run) }
+    sim.apply(.toggle(0), run)
+    sim.apply(.toggle(1), run)
+    return phaseLabel(sim.machine.phase)
+}
+
+private func phaseLabel(_ phase: VoiceKeyMachine.Phase) -> String {
+    switch phase {
+    case .idle: return "idle"
+    case .armed(_, let press):
+        switch press {
+        case .first: return "armed-first"
+        case .second: return "armed-second"
+        case .ending: return "armed-ending"
+        }
+    case .holding: return "holding"
+    case .tapped: return "tapped"
+    case .latched: return "latched"
+    case .spent: return "spent"
+    }
 }
 
 /// Where a held Control-Option pair lands after each jump, under `cuts`.
@@ -1902,26 +2035,83 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
         #expect(sim.step - start == confirm)
     }
 
-    /// Exact one-step ages and the folded walk, at a depth small enough to finish here. The folded keys have to cover the exact ones.
-    @Test func theFoldedWalkCoversExactAgesAtDepthTwo() {
+    /// Past the confirm cut, the one-step walk and the jump walk must agree on verdicts and on the phases they can reach.
+    @Test func theExactAndFoldedWalksAgreePastTheFirstCut() {
         let run = WalkRun.all[0]
-        let exact = ageProbe(run, depth: 2, fold: false)
-        let folded = ageProbe(run, depth: 2, fold: true)
-        #expect(exact.violations == folded.violations)
-        #expect(exact.keys.isSubset(of: folded.keys))
+        let exact = ageSample(run, depth: 4, fold: false, merge: true)
+        #expect(exact.furthest > VoiceKeyMachine.Timing.steps(run.configs[0].confirm))
+        let folded = ageSample(run, depth: 4, fold: true, merge: true, notPast: exact.furthest)
+        #expect(exact.verdicts == folded.verdicts)
+        #expect(exact.outcomes == folded.outcomes)
     }
 
-    /// Moving any window by one step has to change where the walk lands. The cuts come from the machine.
-    @Test func shiftingEachWindowByOneStepChangesTheWalk() {
+    /// Turning the Control/Option mirror off must not change those verdicts or phases.
+    @Test func theControlOptionMergeAgreesWithTheUnmergedWalk() {
         let run = WalkRun.all[0]
-        let base = VoiceKeyMachine.Timing.cuts(confirm: run.configs[0].confirm)
-        #expect(base == VoiceWalkClock.cuts(confirm: run.configs[0].confirm))
-        let original = jumpTrace(run, cuts: base)
-        for index in base.indices where base[index] != 0 {
-            var shifted = base
-            shifted[index] += 1
-            shifted = Array(Set(shifted)).sorted()
-            #expect(jumpTrace(run, cuts: shifted) != original, "the walk ignored a one-step shift of \(base[index])")
+        let split = ageSample(run, depth: 3, fold: true, merge: false)
+        let merged = ageSample(run, depth: 3, fold: true, merge: true)
+        #expect(split.verdicts == merged.verdicts)
+        #expect(split.outcomes == merged.outcomes)
+    }
+
+    /// Each machine window, moved by one step, has to change the walk. The cut set merges equal windows, so each probe
+    /// isolates that one timer instead of comparing the merged cuts.
+    @Test func shiftingEachMachineWindowChangesTheWalk() {
+        defer { VoiceKeyMachine.Timing.restoreDefaults() }
+        let talk = WalkRun.all[0]
+        let originalTrace = jumpTrace(talk, cuts: VoiceKeyMachine.Timing.cuts(confirm: talk.configs[0].confirm))
+        VoiceKeyMachine.Timing.step += 0.05
+        #expect(jumpTrace(talk, cuts: VoiceKeyMachine.Timing.cuts(confirm: talk.configs[0].confirm)) != originalTrace,
+                "the walk ignored a one-step shift of step")
+        VoiceKeyMachine.Timing.restoreDefaults()
+
+        func changed<Value: Equatable>(_ name: String, _ shift: () -> Void, _ probe: () -> Value) {
+            let before = probe()
+            shift()
+            let after = probe()
+            VoiceKeyMachine.Timing.restoreDefaults()
+            #expect(before != after, "the walk ignored a one-step shift of \(name)")
+        }
+        let hold = WalkRun.all.first { $0.name.hasPrefix("A0 ") }!
+        changed("checkEvery", { VoiceKeyMachine.Timing.checkEvery += VoiceKeyMachine.Timing.step }) {
+            timerJump(hold) { sim in
+                sim.apply(.toggle(0), hold)
+                sim.apply(.toggle(1), hold)
+            }
+        }
+        changed("holdGap", { VoiceKeyMachine.Timing.holdGap += VoiceKeyMachine.Timing.step }) {
+            timerJump(hold) { sim in
+                sim.apply(.toggle(0), hold)
+                sim.apply(.toggle(1), hold)
+                sim.apply(.toggle(0), hold)
+                sim.apply(.toggle(1), hold)
+            }
+        }
+        changed("holdTapMax", { VoiceKeyMachine.Timing.holdTapMax += VoiceKeyMachine.Timing.step }) {
+            releasePhase(talk, waits: VoiceKeyMachine.Timing.steps(0.30) + 1)
+        }
+        let shared = WalkRun.all.first { $0.name.hasPrefix("E ") }!
+        changed("sharedTapMax", { VoiceKeyMachine.Timing.sharedTapMax += VoiceKeyMachine.Timing.step }) {
+            releasePhase(shared, waits: VoiceKeyMachine.Timing.steps(0.25) + 1)
+        }
+        let dictation = WalkRun.all.first { $0.name.hasPrefix("D ") }!
+        changed("sharedGap", { VoiceKeyMachine.Timing.sharedGap += VoiceKeyMachine.Timing.step }) {
+            // A second press one step past the shipped gap is a new tap. One step more gap makes it the second tap.
+            secondPress(shared, waits: VoiceKeyMachine.Timing.steps(0.35) + 1)
+        }
+        changed("sharedDictationDelay", { VoiceKeyMachine.Timing.sharedDictationDelay += VoiceKeyMachine.Timing.step }) {
+            timerJump(dictation) { sim in
+                sim.apply(.toggle(0), dictation)
+                sim.apply(.toggle(1), dictation)
+            }
+        }
+        let pointing = WalkRun.all.first { $0.pointing }!
+        changed("pointingWatchdog", { VoiceKeyMachine.Timing.pointingWatchdog += VoiceKeyMachine.Timing.step }) {
+            timerJump(pointing) { sim in
+                sim.apply(.toggle(0), pointing)
+                sim.apply(.toggle(1), pointing)
+                sim.apply(.waitToCut, pointing)
+            }
         }
     }
 
@@ -1964,7 +2154,7 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
         #expect(VoiceWalkClock.canonical(-3) == -2)
     }
 
-    /// The shipped talk walk finishes the canonical graph. 906,908 is that count. A bound fails the run.
+    /// The shipped talk walk finishes the canonical graph. 906,972 is that count. A bound fails the run.
     @Test func theShippedTalkHoldWalkFinishesUnderItsStateBound() {
         let run = WalkRun.all[0]
         #expect(run.name == "A talk hold Control-Option confirm 0.15")
@@ -1973,7 +2163,7 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
         #expect(!report.truncated)
         #expect(report.depth >= 5)
         #expect(report.violations.isEmpty, "\(report.violations.joined(separator: "\n"))")
-        #expect(report.states == 906_908)
+        #expect(report.states == 906_972)
     }
 
     @Test(.serialized, arguments: WalkRun.all.filter { run in
