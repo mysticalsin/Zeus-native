@@ -1884,11 +1884,17 @@ struct ClosedWingsRow<L: View, R: View>: View {
         // mascot's right side) still takes its width, so the gap cannot slide off the notch.
         HStack(spacing: 0) {
             Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) { left.ownedJourneyControl("closed-wings.left.content") }
+                .overlay(alignment: .leading) {
+                    left.frame(width: geometry.wingContentWidth, alignment: .leading).clipped()
+                        .ownedJourneyControl("closed-wings.left.content")
+                }
                 .ownedJourneyControl("closed-wings.left")
             Color.clear.frame(width: geometry.gapWidth)
             Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
-                .overlay(alignment: .trailing) { right.ownedJourneyControl("closed-wings.right.content") }
+                .overlay(alignment: .trailing) {
+                    right.frame(width: geometry.wingContentWidth, alignment: .trailing).clipped()
+                        .ownedJourneyControl("closed-wings.right.content")
+                }
                 .ownedJourneyControl("closed-wings.right")
         }
     }

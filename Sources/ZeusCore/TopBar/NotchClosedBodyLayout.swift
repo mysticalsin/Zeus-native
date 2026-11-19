@@ -51,6 +51,12 @@ public enum NotchClosedBodyLayout {
             rightWing: half ... half + content)
     }
 
+    /// Music has no cue extra. Its frames are the inset content box, 14 pt inside a full wing, flush with the notch and not past it.
+    public static func musicWingFrames(notchWidth: CGFloat, shoulder: CGFloat) -> (left: ClosedRange<CGFloat>, right: ClosedRange<CGFloat>) {
+        let box = closedWingGeometry(notchWidth: notchWidth, shoulder: shoulder, extra: 0)
+        return (box.leftWing, box.rightWing)
+    }
+
     /// Extra width on each wing for a cue kind (mirrors `ClosedWings.extraWidth` in the app target).
     public static func extraWingWidth(hasCue: Bool, cueExtra: CGFloat, wingKindExtra: CGFloat) -> CGFloat {
         guard hasCue else { return wingKindExtra }
