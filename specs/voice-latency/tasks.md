@@ -8,15 +8,15 @@
 
 ## Phase 1: Harness
 
-- [ ] T001 Add a failing ZeusCore test that a dictation trace records the five durations and that its log line contains no transcript text. `Tests/ZeusCoreTests/VoiceSpeedTests.swift`
-- [ ] T002 Add the dictation trace next to the existing spoken-answer trace. `Sources/ZeusCore/Voice/`
-- [ ] T003 Make T001 pass. Do not put audio or text in the log.
+- [x] T001 Add a failing ZeusCore test that a dictation trace records the five durations and that its log line contains no transcript text. `Tests/ZeusCoreTests/DictationLatencyTests.swift`
+- [x] T002 Add the dictation trace next to the existing spoken-answer trace. `Sources/ZeusCore/Voice/DictationLatency.swift`
+- [x] T003 Make T001 pass. Do not put audio or text in the log.
 
 ## Phase 2: Capture
 
-- [ ] T004 Add a failing test that a second press does not build a new engine while listening stays enabled, and that the second hold still accepts a buffer.
-- [ ] T005 Keep the engine and input node prepared while listening is enabled. `Sources/Zeus/Voice/SpeechInput.swift`
-- [ ] T006 Stream partials while the key is held. Mark mic-hot and first-frame on the trace.
+- [x] T004 Add a failing test that a second press does not build a new engine while the prepared format stays valid, and that a bad format builds again.
+- [x] T005 Keep the engine prepared while listening is enabled. A press reuses it when the format is valid, and builds a new one when it is not. `Sources/Zeus/Voice/SpeechInput.swift`
+- [x] T006 Mark mic-hot, the first frame, and the first partial while the key is held. The mark carries no text.
 - [ ] T007 Keep the recognizer resident between holds. Mark release-to-final.
 
 ## Phase 3: Insert and commands

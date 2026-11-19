@@ -1,6 +1,6 @@
 # Checklist: Voice latency
 
-- [ ] The log line has durations only. No audio. No transcript. No command text.
+- [x] The log line has durations only. No audio. No transcript. No command text.
 - [ ] Mic hot is under 50 ms on the hosted run, or the miss is reported as a miss.
 - [ ] A short phrase finals in under 300 ms after release with the model already warm.
 - [ ] Insertion is under 30 ms.
