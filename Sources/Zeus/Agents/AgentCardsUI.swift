@@ -235,8 +235,11 @@ final class ApprovalDetail {
         answered = true
     }
 
-    /// Drops a choice that must not ride along with a deny, a timeout, or a refused press. Currently keeps it.
-    func withdraw() {}
+    /// Drops a choice that must not ride along with a deny, a timeout, or a refused press.
+    func withdraw() {
+        updatedInput = nil
+        answered = false
+    }
 }
 
 /// The plan, question or diff section inside the notch approval card.
@@ -249,6 +252,9 @@ struct ApprovalDetailView: View {
     var plainAllow: () -> Void
     var cancelHold: () -> Void
     var gesture: () -> ApprovalGesture
+    var onPlan: (Bool) -> Void
+    var onAnswers: (Bool) -> Void
+    var cardID: () -> String
 
     var body: some View {
         switch detail.kind {
@@ -273,10 +279,11 @@ struct ApprovalDetailView: View {
                 Spacer()
                 CardButton(title: "Keep Planning", tint: Theme.cloudSecondary, filled: false) {
                     detail.denyMessage = AgentPlan.feedbackMessage("")
+                    detail.withdraw()
                     resolve(.deny)
                 }
                 .accessibilityHint("Sends the plan back to \(agent) to keep working on it.")
-                ApprovalAllowButton(title: "Approve Plan", tint: Theme.leaf, fraction: 0) {
+                ApprovalAllowButton(title: "Approve Plan", tint: Theme.leaf, fraction: 0, cardID: cardID) {
                     beginHold()
                 } release: { inside in
                     releasePlan(inside)
@@ -312,7 +319,7 @@ struct ApprovalDetailView: View {
                 terminalButton(title: "Answer in Terminal")
                 Spacer()
                 if questions.count > 1 || questions.contains(where: \.multiSelect) || !isTap {
-                    ApprovalAllowButton(title: "Send Answers", tint: Theme.accent, fraction: 0) {
+                    ApprovalAllowButton(title: "Send Answers", tint: Theme.accent, fraction: 0, cardID: cardID) {
                         beginHold()
                     } release: { inside in
                         sendAnswers(inside)
@@ -362,19 +369,10 @@ struct ApprovalDetailView: View {
         return false
     }
 
-    /// Records the choice, then uses the same release as Allow so a high gate can finish and send it.
-    private func sendAnswers(_ inside: Bool) {
-        detail.answer()
-        releasePlan(inside)
-    }
+    /// Send Answers and Approve Plan both call the controller's one release path.
+    private func sendAnswers(_ inside: Bool) { onAnswers(inside) }
 
-    private func releasePlan(_ inside: Bool) {
-        switch ApprovalDetailPress.planRelease(inside: inside, gesture: gesture()) {
-        case .cancel: cancelHold()
-        case .endHold: endHold()
-        case .activate: plainAllow()
-        }
-    }
+    private func releasePlan(_ inside: Bool) { onPlan(inside) }
 
     @ViewBuilder
     private func terminalButton(title: String) -> some View {
@@ -382,7 +380,10 @@ struct ApprovalDetailView: View {
         // terminal there is nowhere to answer, so the button is absent and a failed jump keeps the card.
         if AgentTerminals.shared.canJump(to: detail.session) {
             CardButton(title: title, tint: Theme.cloudSecondary, filled: false) {
-                if AgentTerminals.shared.jump(to: detail.session) { resolve(.ask) }
+                if AgentTerminals.shared.jump(to: detail.session) {
+                    detail.withdraw()
+                    resolve(.ask)
+                }
             }
             .accessibilityHint("Brings the terminal forward and answers there.")
         }

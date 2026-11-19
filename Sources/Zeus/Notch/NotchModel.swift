@@ -89,6 +89,10 @@ final class NotchModel {
         var activateAllow: @MainActor () -> Void = {}
         /// Send Answers. The controller installs the one production path.
         var commitAnswers: @MainActor (Bool) -> Void = { _ in }
+        /// Approve Plan. The same controller path as Allow.
+        var releasePlan: @MainActor (Bool) -> Void = { _ in }
+        /// The gesture for the card on screen, read when the button is pressed.
+        var liveGesture: @MainActor () -> ApprovalGesture = { .tap }
         var deny: @MainActor () -> Void = {}
         var denyAll: @MainActor () -> Void = {}
         var resolve: @MainActor (HookDecision.Verdict) -> Void

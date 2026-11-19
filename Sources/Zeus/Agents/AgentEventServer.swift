@@ -161,14 +161,17 @@ final class AgentEventServer {
         return nil
     }
 
-    /// The hook reply. A denied or timed-out card still forwards any answer that was typed.
+    /// The hook reply. Only an allow may carry the typed answer.
     static func hookDecision(id: String, verdict: HookDecision.Verdict, detail: ApprovalDetail?, session: String) -> HookDecision {
-        if let detail, detail.answered {
+        guard verdict == .allow, let detail else {
+            return HookDecision(id: id, decision: verdict,
+                                reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
+                                updatedInput: nil)
+        }
+        if detail.answered {
             return QuestionAnswers.shared.decision(id: id, session: session, input: detail.input, answers: detail.choices)
         }
-        return HookDecision(id: id, decision: verdict,
-                            reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
-                            updatedInput: detail?.updatedInput)
+        return HookDecision(id: id, decision: .allow, updatedInput: detail.updatedInput)
     }
 
     /// The finished card with a sound, unless a full-screen app asks for quiet.

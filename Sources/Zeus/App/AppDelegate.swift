@@ -1153,8 +1153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.notch.activateApproval(kind: .shortcut)
                     return
                 }
-                self?.notch.noteApproval(.shortcut, verdict: verdict)
-                approval.resolve(verdict)
+                self?.notch.resolveDisplayed(verdict)
             }
         }
         func run(_ key: ApprovalCardKey, _ work: @escaping (NotchModel.Approval) -> Void) -> () -> Void {

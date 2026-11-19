@@ -684,7 +684,10 @@ private struct ApprovalBody: View {
                                     endHold: { approval.endHold(true) },
                                     plainAllow: { approval.activateAllow() },
                                     cancelHold: { approval.cancelHold() },
-                                    gesture: { approval.allowGate.gesture })
+                                    gesture: { approval.liveGesture() },
+                                    onPlan: { approval.releasePlan($0) },
+                                    onAnswers: { approval.commitAnswers($0) },
+                                    cardID: { approval.id })
             }
             if approval.detail?.hasOwnActions != true {
                 let preview = NotchModel.Approval.isChangePreview(approval.command) && !MeetingState.hideDetails
@@ -716,12 +719,15 @@ private struct ApprovalBody: View {
                     ApprovalAllowButton(
                         title: approval.allowGate.confirmVisible ? "Confirm" : "Approve",
                         tint: Theme.ember,
-                        fraction: approval.allowGate.holdFraction(now: ApprovalMonotonic.now())
+                        fraction: approval.allowGate.holdFraction(now: ApprovalMonotonic.now()),
+                        cardID: { approval.id }
                     ) {
                         approval.beginHold()
                     } release: { inside in
-                        switch ApprovalPress.outcome(inside: inside, gesture: approval.allowGate.gesture) {
-                        case .cancel: approval.cancelHold()
+                        switch ApprovalPress.outcome(inside: inside, gesture: approval.liveGesture()) {
+                        case .cancel:
+                            approval.detail?.withdraw()
+                            approval.cancelHold()
                         case .endHold: approval.endHold(true)
                         case .activate: approval.activateAllow()
                         }
@@ -771,10 +777,12 @@ struct ApprovalAllowButton: View {
     let press: () -> Void
     let release: (Bool) -> Void
     let accessibility: () -> Void
+    var cardID: () -> String = { "" }
     var onCancel: () -> Void = {}
     var onDisappearAction: () -> Void = {}
     @GestureState private var tracking = false
     @State private var hold = ApprovalHoldTracking()
+    @State private var pressedID = ""
 
     var body: some View {
         Text(title)
@@ -788,10 +796,15 @@ struct ApprovalAllowButton: View {
                         .gesture(DragGesture(minimumDistance: 0)
                             .updating($tracking) { _, state, _ in state = true }
                             .onChanged { _ in
-                                if !hold.down { hold.press(); press() }
+                                if !hold.down {
+                                    pressedID = cardID()
+                                    hold.press()
+                                    press()
+                                }
                             }
                             .onEnded { value in
                                 hold.release()
+                                guard ApprovalPressOrigin.releaseCounts(pressed: pressedID, displayed: cardID()) else { return }
                                 release(ApprovalButtonHit.contains(
                                     width: proxy.size.width, height: proxy.size.height,
                                     x: value.location.x, y: value.location.y))

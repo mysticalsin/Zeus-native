@@ -369,7 +369,7 @@ public struct ApprovalHoldTracking: Equatable {
 
 /// A release counts only when the card under the pointer is the card the press started on.
 public enum ApprovalPressOrigin: Equatable, Sendable {
-    public static func releaseCounts(pressed: String, displayed: String) -> Bool { true }
+    public static func releaseCounts(pressed: String, displayed: String) -> Bool { pressed == displayed }
 }
 
 /// Approve Plan and Send Answers. An inside release is still treated as the end of a hold.
