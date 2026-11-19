@@ -176,11 +176,13 @@ public enum SocketClientTrust {
         return true
     }
 
-    public static func accepts(fd: Int32, requireSignature: Bool) -> Bool {
+    public static func accepts(fd: Int32, requireSignature: Bool, expectedIdentifier: String = ZeusPaths.bundleIdentifier) -> Bool {
         guard let peer = PeerCheck.identify(fd: fd) else { return false }
         let signature: Bool?
         if requireSignature {
             #if canImport(Darwin)
+            // The caller can name the peer, but the check still demands the app. A helper is refused.
+            _ = expectedIdentifier
             signature = PeerSigning.verifyApp(auditToken: peer.auditToken, expectedPeerIdentifier: ZeusPaths.bundleIdentifier).isAllowed
             #else
             signature = false
