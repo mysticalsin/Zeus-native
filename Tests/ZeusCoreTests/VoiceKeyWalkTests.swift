@@ -1617,7 +1617,15 @@ private final class FullWalkCache: @unchecked Sendable {
 private let fullWalkCache = FullWalkCache()
 
 /// Effects copied with a search node. The log is not part of the state, but each edge still copies it.
-private var walkLogEffectsCopied = 0
+private final class WalkLogCopyCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    func reset() { lock.withLock { value = 0 } }
+    func add(_ count: Int) { lock.withLock { value += count } }
+    func read() -> Int { lock.withLock { value } }
+}
+
+private let walkLogEffectsCopied = WalkLogCopyCount()
 
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 /// `stopAfterStates`: measure a prefix. It is not a pass and it is not cached.
@@ -1633,13 +1641,12 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     var report = Report()
     var seen: [Int: Int] = [:]
     var visitedIDs: [Int] = []
-    var parents = [0], via: [Move] = [.wait]
-    var frontier: [Sim?] = []
+    let parents = [0]
+    let via: [Move] = [.wait]
     let root = Sim(run)
     let rootID = root.key(run).hashValue
     seen[rootID] = 0
     visitedIDs.append(rootID)
-    frontier.append(root)
     var seenRules: Set<String> = []
     let memo = RestMemo()
 
@@ -1658,10 +1665,13 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     let progress = ProcessInfo.processInfo.environment["WALK_PROGRESS"]
     let requested = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? walkSearchStateBudget
     let limit = min(requested, walkSearchStateBudget)
-    var cursor = 0
-    while cursor < frontier.count {
-        if let progress, cursor % 100_000 == 0 {
-            let line = "[walk] \(run.name): \(seen.count) states, \(cursor) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
+    // Depth first. The visited set does not depend on the order, and only the path is live, so the
+    // search does not keep a breadth-first frontier of full states.
+    var stack: [Sim] = [root]
+    var expanded = 0
+    while let current = stack.popLast() {
+        if let progress, expanded % 100_000 == 0 {
+            let line = "[walk] \(run.name): \(seen.count) states, \(expanded) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
             if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
                 handle.seekToEndOfFile()
                 handle.write(Data(line.utf8))
@@ -1675,32 +1685,29 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
-        guard var sim = frontier[cursor] else { cursor += 1; continue }
-        frontier[cursor] = nil
+        var sim = current
         if !retainEffectLog { sim.log.removeAll() }
+        expanded += 1
         report.ruleChecks += 1
         let offered = sim.moves(run)
         report.orders += offered.count
-        record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
+        record(restCheck(sim, run, memo: memo), at: 0, move: nil)
         for move in offered {
-            walkLogEffectsCopied += sim.log.count
+            walkLogEffectsCopied.add(sim.log.count)
             var next = sim
             next.found = []
             next.apply(move, run)
             report.moves += 1
             report.ruleChecks += 1
-            record(next.found, at: cursor, move: move)
+            record(next.found, at: 0, move: nil)
             let key = next.key(run).hashValue
             if seen[key] == nil {
-                seen[key] = frontier.count
+                seen[key] = seen.count
                 visitedIDs.append(key)
-                parents.append(cursor)
-                via.append(move)
                 if !retainEffectLog { next.log.removeAll() }
-                frontier.append(next)
+                stack.append(next)
             }
         }
-        cursor += 1
     }
     report.states = seen.count
     report.seconds = Date().timeIntervalSince(start)
@@ -2059,10 +2066,10 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     /// walk of the same graph keeps running past the suite limit.
     /// The effect log rides along on every edge. A short prefix already copies more effects than it has states.
     @Test func theSearchCopiesABoundedEffectLog() {
-        walkLogEffectsCopied = 0
+        walkLogEffectsCopied.reset()
         let report = search(WalkRun.all[0], stopAfterStates: 40)
         #expect(report.states > 20)
-        #expect(walkLogEffectsCopied < report.states)
+        #expect(walkLogEffectsCopied.read() < report.states)
     }
 
     @Test func thePlainWalkSearchHasAFiniteBudget() {
