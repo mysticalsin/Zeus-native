@@ -802,7 +802,7 @@ struct ApprovalAllowButton: View {
             .background(Capsule().fill(tint.opacity(0.35 + 0.65 * fraction)))
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(title)
-            .accessibilityAction(.default, accessibility)
+            .accessibilityAction { accessibility() }
             .gesture(DragGesture(minimumDistance: 0)
                 .onChanged { _ in press() }
                 .onEnded { _ in release() })
