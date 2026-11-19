@@ -407,7 +407,7 @@ private struct Held: Hashable {
 private enum Move: Hashable {
     /// A key goes down or up and its event reaches the machine at once; `toggleHeld`: the event of a modifier key or an
     /// unconsumed key waits for the next forwarded key.
-    case toggle(Int), toggleHeld(Int), swallowed(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
+    case toggle(Int), toggleHeld(Int), swallowed(Int), wait, waitToCut, waitHalfSecond, deliver, abandon, interrupt, flip
     /// The main thread was busy for this many steps while an event was held back: the event is then heard at the time it
     /// happened, ahead of the wakes that fell due meanwhile (`busy`), or after them (`catchUp`).
     case busy(Int), catchUp(Int)
@@ -423,6 +423,7 @@ private enum Move: Hashable {
         case .toggleHeld(let index): run.keys[index].name + " (event held)"
         case .swallowed(let index): run.keys[index].name + " (swallowed, no event)"
         case .wait: "wait 0.05"
+        case .waitToCut: "wait to the next cut"
         case .waitHalfSecond: "wait 0.5"
         case .deliver: "deliver"
         case .abandon: "abandon"
@@ -814,6 +815,7 @@ private struct Sim {
         case .toggleHeld(let index): toggle(index, hold: true, run)
         case .swallowed(let index): swallow(index, run)
         case .wait: advance(run)
+        case .waitToCut: advance(run)
         case .waitHalfSecond: for _ in 0..<10 { advance(run) }
         case .deliver: flushHeld(run)
         case .abandon: feed(.abandon(turn: generationNow), .abandon, run)
@@ -1802,6 +1804,18 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 // The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
 // socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
 @Suite(.serialized) struct VoiceKeyWalkTests {
+    /// A wait in the search has to land on the machine's next window, not one step later.
+    @Test func aWaitJumpsToTheNextMachineCut() {
+        let run = WalkRun.all[0]
+        var sim = Sim(run)
+        sim.apply(.toggle(0), run)
+        sim.apply(.toggle(1), run)
+        let start = sim.step
+        sim.apply(.waitToCut, run)
+        let confirm = Int((0.15 / VoiceKeyMachine.Timing.step).rounded())
+        #expect(sim.step - start == confirm)
+    }
+
     /// Ages inside one gap between the rule thresholds are one age. 1 and 2 sit before the 0.15 s confirm; 4 sits at that confirm, before the 0.25 s check.
     @Test func theCanonicalStepCollapsesAgesInsideOneThreshold() {
         #expect(VoiceWalkClock.canonical(1) == 0)

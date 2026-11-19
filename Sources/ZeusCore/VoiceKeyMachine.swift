@@ -98,12 +98,32 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
     // MARK: Timing
 
+    /// The windows the walk's age fold is derived from. One source for the machine and the search.
+    public enum Timing {
+        public static let step: TimeInterval = 0.05
+        public static let checkEvery: TimeInterval = 0.25
+        public static let holdTapMax: TimeInterval = 0.30
+        public static let sharedTapMax: TimeInterval = 0.25
+        public static let holdGap: TimeInterval = 0.40
+        public static let sharedGap: TimeInterval = 0.35
+        /// One step past the longest gap, so the cap is past every window.
+        public static var cap: TimeInterval { holdGap + step }
+
+        /// Step counts of the windows, including `confirm` and the cap. Sorted, with duplicates removed.
+        public static func cuts(confirm: TimeInterval) -> [Int] {
+            let seconds = [0, confirm, checkEvery, holdTapMax, sharedTapMax, holdGap, sharedGap, cap]
+            return Array(Set(seconds.map { Int(($0 / step).rounded()) })).sorted()
+        }
+    }
+
     /// How long a first press may last and still be a tap, and how long after a tap the next one still counts as its
     /// second. A hold key keeps the old talk latch's values, the shared key the old gesture's.
-    private static func tapMax(_ config: Config) -> TimeInterval { config.mode == .hold ? 0.3 : 0.25 }
-    private static func gap(_ config: Config) -> TimeInterval { config.mode == .hold ? 0.4 : 0.35 }
+    private static func tapMax(_ config: Config) -> TimeInterval {
+        config.mode == .hold ? Timing.holdTapMax : Timing.sharedTapMax
+    }
+    private static func gap(_ config: Config) -> TimeInterval { config.mode == .hold ? Timing.holdGap : Timing.sharedGap }
     /// How often a running hold looks at the live modifiers, to find a release no event reported.
-    private static let checkEvery: TimeInterval = 0.25
+    private static let checkEvery: TimeInterval = Timing.checkEvery
     /// A wake may arrive this much early: the clock that schedules it and the clock that stamps events differ.
     private static let slack: TimeInterval = 0.001
 
