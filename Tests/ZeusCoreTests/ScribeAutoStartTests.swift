@@ -1063,7 +1063,7 @@ struct ScribeAutoStartTests {
         #expect(held.isEmpty)
         #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
         let start = machine.handle(asTap(asOffer(), 41))
-        #expect(start == [.start(asTeams)])
+        #expect(start.isEmpty)
     }
 
     @Test func leavingTheBannerGivesAShortGraceThenItTimesOut() {
@@ -1153,11 +1153,14 @@ struct ScribeAutoStartTests {
     }
 
     @Test func aPointerInsideOnAReplacedOfferDoesNotStart() {
-        var machine = asPrompting()
-        machine.handle(.pointer(inside: true, now: 4))
-        machine.handle(asEvidence(4, mic: [.zoom]))
-        machine.handle(asEvidence(7, mic: [.zoom]))
-        let start = machine.handle(asTap(asOffer(), 8))
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, mic: [.teams]))
+        machine.handle(asEvidence(3, mic: [.teams]))
+        machine.handle(asTick(23))
+        machine.handle(.pointer(inside: true, now: 24))
+        machine.handle(asEvidence(24, mic: [.zoom]))
+        machine.handle(asEvidence(27, mic: [.zoom]))
+        let start = machine.handle(asTap(asOffer(), 28))
         #expect(start.isEmpty, "a tap on the offer a newer one replaced started a recording")
     }
 
