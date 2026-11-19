@@ -1938,6 +1938,13 @@ private struct AgeSample: Equatable {
     var furthest = 0
 }
 
+/// The first age cut the fold can skip. Confirm 0.15 lands at step 3. Confirm 0 has no cut of its own, so the
+/// first one is the 0.25 s check, at step 5.
+private func firstAgeCut(confirm: TimeInterval) -> Int {
+    let steps = VoiceKeyMachine.Timing.steps(confirm)
+    return steps > 0 ? steps : VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.checkEvery)
+}
+
 private func referenceMoves(fold: Bool) -> [Move] {
     [.toggle(0), .toggle(1), fold ? .waitToCut : .wait, .abandon]
 }
@@ -2115,8 +2122,14 @@ private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
 
     /// Exact and folded agreement, for every run, over the moves the fold can skip.
     @Test func theExactAndFoldedWalksAgreePastTheFirstCut() {
+        let gap = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
         for run in WalkRun.all {
+            let cut = firstAgeCut(confirm: run.configs[0].confirm)
             let exact = ageSample(run, depth: 2, fold: false, merge: true, agreement: true)
+            #expect(exact.furthest > cut, "\(run.name) stopped at step \(exact.furthest), short of the cut at \(cut)")
+            if run.configs[0].confirm == 0.15 {
+                #expect(exact.furthest > gap, "\(run.name) stopped at step \(exact.furthest), short of the gap")
+            }
             let folded = ageSample(run, depth: 2, fold: true, merge: true, notPast: exact.furthest, agreement: true)
             #expect(exact.verdicts == folded.verdicts, "\(run.name)")
             #expect(exact.outcomes == folded.outcomes, "\(run.name)")
