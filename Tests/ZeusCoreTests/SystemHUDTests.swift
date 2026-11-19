@@ -78,7 +78,7 @@ import Testing
     }
 
     @Test func migrationTurnsAllHudOffWhenLegacyVolumeOff() throws {
-        let suite = "zeus.hud.migrate.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.hud.migrate.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("false", forKey: "opt.\(SystemHUDSettings.legacyVolumeID)")

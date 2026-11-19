@@ -8,7 +8,7 @@ import Testing
 @Suite("Dictation settings defaults")
 struct DictationSettingsTests {
     @Test func previewBeforeInsertDefaultsToFalse() {
-        let suite = "zeus.dictation.settings.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.dictation.settings.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
 
@@ -19,7 +19,7 @@ struct DictationSettingsTests {
     @Test func previewBeforeInsertStaysTrueOncePersisted() {
         // A person who turned the preview card back on keeps it on across restarts: the new
         // default only applies to a Mac that has never set the key.
-        let suite = "zeus.dictation.settings.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.dictation.settings.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(true, forKey: "dictation.preview")

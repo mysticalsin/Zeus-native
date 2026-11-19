@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -11,6 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import contracts as c
+import native_evidence
 
 SPEC = importlib.util.spec_from_file_location("zeus_closed_loop_runner", c.ROOT / "qa/closed-loop/run.py")
 runner = importlib.util.module_from_spec(SPEC)
@@ -22,10 +24,10 @@ class MatrixContractTests(unittest.TestCase):
         self.data = c.load(c.ROOT / "qa/feature-map.json")
         self.portable = runner.portable_module()
 
-    def test_current_map_has_all_nineteen_requirements_and_real_case_bindings(self):
+    def test_current_map_has_all_twentyone_requirements_and_real_case_bindings(self):
         checks = c.validate_map(self.data, self.portable)
         c.validate_registry(c.load(c.ROOT / "qa/regressions.json"), checks)
-        self.assertEqual(len(self.data["features"]), 19)
+        self.assertEqual(len(self.data["features"]), 21)
 
     def test_deleting_a_checklist_item_cannot_make_full_gate_easier(self):
         self.data["features"].pop()
@@ -51,6 +53,20 @@ class MatrixContractTests(unittest.TestCase):
                         row for row in feature["obligations"] if checks[row["check"]]["tier"] != tier]
                     with self.assertRaisesRegex(c.Invalid, feature["id"] + " needs contract, native integration, and device proof"):
                         c.validate_map(data, self.portable)
+
+    def test_a_suite_nested_in_a_serialized_parent_is_named_parent_slash_suite(self):
+        # Swift Testing reports a nested suite as Module.Parent/Suite/test(); the map names it the same way.
+        checks = c.validate_map(self.data, self.portable)
+        fit = checks["native-ScribeMeetingCardFitTests"]
+        self.assertEqual(fit["suite"], "ScribeMeetingCardHosted/ScribeMeetingCardFitTests")
+        self.assertRegex("ZeusAppTests.ScribeMeetingCardHosted/ScribeMeetingCardFitTests/fit()",
+                         native_evidence.selector([fit]))
+        for bad in ("WrongParent/ScribeMeetingCardFitTests", "ScribeMeetingCardHosted/InventedTests",
+                    "A/B/ScribeMeetingCardFitTests", "ScribeMeetingCardHosted/"):
+            data = copy.deepcopy(self.data)
+            next(row for row in data["checks"] if row["id"] == fit["id"])["suite"] = bad
+            with self.assertRaises(c.Invalid, msg=bad):
+                c.validate_map(data, self.portable)
 
     def test_missing_native_suite_and_missing_case_are_errors(self):
         data = copy.deepcopy(self.data)
@@ -452,6 +468,16 @@ class EvidenceContractTests(unittest.TestCase):
             with self.assertRaises(c.Invalid):
                 c.manifest_matches(actual, linux)
 
+    def test_scribe_group_gets_the_linux_geometry_import_for_its_card_file(self):
+        portable = runner.portable_module()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            linux = portable.prepare(output / "linux", "scribe", platform_name="linux")
+            self.assertTrue((linux / "Sources/CoreGraphics/FoundationGeometry.swift").is_file())
+            self.assertIn("CoreGraphics", c.load(linux / "validation-manifest.json")["compatibility"])
+            darwin = portable.prepare(output / "darwin", "scribe", platform_name="darwin")
+            self.assertFalse((darwin / "Sources/CoreGraphics").exists())
+
     def test_extra_versioned_package_manifest_cannot_change_compiled_recipe(self):
         portable = runner.portable_module()
         with tempfile.TemporaryDirectory() as directory:
@@ -534,6 +560,114 @@ class EvidenceContractTests(unittest.TestCase):
             code, _ = runner.execute(["/zeus/no-such-executable"], log, 1)
             self.assertEqual(code, 127)
             self.assertIn("COULD NOT START", log.read_text())
+
+
+def swift_log(names, summary_count=None, lost=()):
+    """A Swift Testing console log: one outcome line per test, minus the lines the runner dropped."""
+    lines = [f"◇ Test {name}() started.\n" for name in names]
+    lines += [f"✔ Test {name}() passed after 0.1 seconds.\n" for name in names if name not in lost]
+    count = len(names) if summary_count is None else summary_count
+    return "".join(lines) + f"✔ Test run with {count} tests in 1 suite passed after 0.1 seconds.\n"
+
+
+class DroppedLogLineTests(unittest.TestCase):
+    """swift test can drop console lines under machine load; a log that lost any is not evidence."""
+
+    def test_log_with_every_outcome_line_is_complete(self):
+        self.assertTrue(c.swift_log_complete(swift_log(["one", "two", "three"])))
+
+    def test_log_missing_an_outcome_line_is_incomplete(self):
+        self.assertFalse(c.swift_log_complete(swift_log(["one", "two", "three"], lost=("two",))))
+
+    def test_skipped_and_display_named_tests_and_case_lines_still_count_once(self):
+        log = ("◇ Test one() started.\n✔ Test one() passed after 0.1 seconds.\n"
+               "➜ Test skippedOne() skipped.\n"
+               '✔ Test "A display name" passed after 0.1 seconds.\n'
+               "◇ Test many(_:) started.\n"
+               '✔ Test case passing 1 argument x → "a" to many(_:) passed after 0.1 seconds.\n'
+               '✔ Test case passing 1 argument x → "b" to many(_:) passed after 0.1 seconds.\n'
+               "✔ Test many(_:) passed after 0.1 seconds with 2 test cases.\n"
+               "✔ Test run with 4 tests in 1 suite passed after 0.1 seconds.\n")
+        self.assertTrue(c.swift_log_complete(log))
+        self.assertFalse(c.swift_log_complete(log.replace("4 tests", "5 tests")))
+
+    def test_a_line_cut_by_another_write_does_not_count(self):
+        log = swift_log(["one", "two"]).replace(
+            "✔ Test two() passed after 0.1 seconds.\n", "✔ Test two✔ Suite Cut passed after 0.1 seconds.\n")
+        self.assertFalse(c.swift_log_complete(log))
+
+    def test_log_without_one_summary_is_incomplete(self):
+        self.assertFalse(c.swift_log_complete(""))
+        self.assertFalse(c.swift_log_complete(swift_log(["one"]) * 2))
+
+
+class PortableRetryTests(unittest.TestCase):
+    ATTEMPT_LIMIT = 3
+
+    def run_portable(self, logs):
+        """Run one portable check whose successive attempts write the given logs; return row and call count."""
+        calls = []
+        def execute(command, log, timeout, environment=None):
+            text = logs[min(len(calls), len(logs) - 1)]
+            log.write_text(text)
+            # swift test also writes structured results beside the console log; they keep every case the log lost.
+            names = re.findall(r"◇ Test (\w+)\(\) started", text)
+            cases = "".join(f'<testcase classname="S" name="{name}()" time="0.1"/>' for name in names)
+            c.swift_testing_xunit_path(log.parent / "results.xml").write_text(
+                '<?xml version="1.0" encoding="UTF-8"?><testsuites><testsuite name="TestResults" errors="0" '
+                f'tests="{len(names)}" failures="0" skipped="0" time="0.1">{cases}</testsuite></testsuites>')
+            calls.append(command)
+            return 0, 0.1
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            def prepare(folder, group, **keywords):
+                package = Path(folder) / "package"
+                package.mkdir(exist_ok=True)
+                (package / "validation-manifest.json").write_text("{}")
+                return package
+            portable = SimpleNamespace(prepare=prepare)
+            definition = {"id": "portable-synthetic", "kind": "portable", "scope": "Synthetic.", "group": "synthetic"}
+            with patch.object(runner, "execute", side_effect=execute), patch.object(runner, "manifest_matches"), \
+                 patch.object(runner, "portable_module", return_value=portable), patch("builtins.print"):
+                row = runner.run_check(definition, SimpleNamespace(mode="development", jobs=1, timeout=5), output, portable)
+            kept = sorted(path.name for path in (output / "portable-synthetic").glob("test*.log"))
+        return row, len(calls), kept
+
+    def test_a_dropped_line_is_retried_and_the_complete_log_is_the_evidence(self):
+        lossy = swift_log(["one", "two"], lost=("two",))
+        row, calls, kept = self.run_portable([lossy, swift_log(["one", "two"])])
+        self.assertEqual((row["status"], calls, row["passed_functions"]), ("passed", 2, ["one", "two"]))
+        self.assertEqual(kept, ["test.attempt-1.log", "test.log"])
+
+    def test_a_complete_log_runs_once(self):
+        row, calls, kept = self.run_portable([swift_log(["one", "two"])])
+        self.assertEqual((row["status"], calls, kept), ("passed", 1, ["test.log"]))
+
+    def test_a_log_that_stays_incomplete_stops_at_the_attempt_limit(self):
+        lossy = swift_log(["one", "two"], lost=("two",))
+        row, calls, _ = self.run_portable([lossy])
+        self.assertEqual(calls, self.ATTEMPT_LIMIT)
+        # The structured results (PR #7) are the evidence: they keep the case the console log kept dropping.
+        self.assertEqual(row["passed_functions"], ["one", "two"])
+
+    def test_a_failing_run_is_never_retried(self):
+        failed = "✘ Test one() recorded an issue: expected value\n✘ Test run with 1 test in 1 suite failed after 0.1 seconds.\n"
+        calls = []
+        def execute(command, log, timeout, environment=None):
+            log.write_text(failed)
+            calls.append(command)
+            return 1, 0.1
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            def prepare(folder, group, **keywords):
+                package = Path(folder) / "package"
+                package.mkdir(exist_ok=True)
+                return package
+            portable = SimpleNamespace(prepare=prepare)
+            definition = {"id": "portable-synthetic", "kind": "portable", "scope": "Synthetic.", "group": "synthetic"}
+            with patch.object(runner, "execute", side_effect=execute), patch("builtins.print"):
+                row = runner.run_check(definition, SimpleNamespace(mode="development", jobs=1, timeout=5), output, portable)
+        self.assertEqual((row["status"], len(calls)), ("failed", 1))
 
 
 class NativeBuildBarrierTests(unittest.TestCase):
@@ -624,6 +758,35 @@ class NativeBuildBarrierTests(unittest.TestCase):
                 execute.assert_not_called()
                 self.assertNotIn("native_build", result)
                 self.assertEqual({r["status"] for r in result["checks"]}, {"not-run" if mode == "development" else "blocked"})
+
+
+class DeclaredTestCacheTests(unittest.TestCase):
+    """The gate asks which tests a file declares once per case, so the answer is kept per file version."""
+
+    def write(self, path, names):
+        path.write_text("".join(f"    @Test func {name}() {{}}\n" for name in names))
+
+    def test_second_ask_for_the_same_file_does_not_read_it_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SampleTests.swift"
+            self.write(path, ["first", "second"])
+            self.assertEqual(c.declared_tests(path), ("first", "second"))
+            with patch.object(Path, "read_text", side_effect=AssertionError("read again")):
+                self.assertEqual(c.declared_tests(path), ("first", "second"))
+
+    def test_a_changed_file_is_read_and_scanned_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SampleTests.swift"
+            self.write(path, ["first"])
+            self.assertEqual(c.declared_tests(path), ("first",))
+            self.write(path, ["first", "added"])
+            self.assertEqual(c.declared_tests(path), ("first", "added"))
+
+    def test_python_files_list_their_test_methods(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "test_sample.py"
+            path.write_text("class T:\n    def test_one(self): pass\n    def helper(self): pass\n")
+            self.assertEqual(c.declared_tests(path), ("test_one",))
 
 
 if __name__ == "__main__":

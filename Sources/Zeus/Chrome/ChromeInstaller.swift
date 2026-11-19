@@ -65,6 +65,14 @@ enum ChromeInstaller {
         }
     }
 
+    /// Opens chrome://extensions in the Chrome that is already running, for the Reload button on the Zeus card.
+    /// Does nothing when Chrome is not running: it never starts Chrome and never shows the Load unpacked folder.
+    static func showExtensionsPage() {
+        guard let chrome = NSRunningApplication.runningApplications(withBundleIdentifier: "com.google.Chrome").first,
+              let app = chrome.bundleURL, let url = URL(string: "chrome://extensions/") else { return }
+        NSWorkspace.shared.open([url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+    }
+
     /// Opens chrome://extensions in Chrome and shows the folder to pick in Load unpacked.
     static func showLoadUnpacked() {
         NSWorkspace.shared.activateFileViewerSelecting([ZeusPaths.extensionDirectory])

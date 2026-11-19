@@ -79,9 +79,38 @@ public enum ArtworkSource {
     /// One file name per cover: the Spotify track id, or a hash of artist and album (an album's
     /// tracks share one cover). Stable across launches.
     public static func cacheKey(for playing: NowPlaying) -> String {
-        if let id = spotifyTrackID(playing.trackID) { return "spotify-" + id }
+        let prefix: String
+        switch playing.source {
+        case .player(let player):
+            if let id = spotifyTrackID(playing.trackID) { return "spotify-" + id }
+            switch player {
+            case .music: prefix = "music-"
+            case .spotify: prefix = "spotify-"
+            }
+        case .browser:
+            // The image's own link decides, hashed: nothing of the page shows in a name.
+            return "page-" + fnv(playing.artworkURL?.absoluteString ?? "")
+        }
         let album = playing.album.isEmpty ? playing.title : playing.album
-        return "\(playing.player == .music ? "music" : "spotify")-" + fnv(normalize(playing.artist) + "|" + normalize(album))
+        return prefix + fnv(normalize(playing.artist) + "|" + normalize(album))
+    }
+
+    /// Names that stay on a home or office network.
+    private static let privateSuffixes = [".local", ".localhost", ".lan", ".internal", ".home.arpa"]
+
+    /// Whether a page's cover link may be fetched: https only, a named host (no IP address in any spelling), and
+    /// no name that ends in a private suffix. A public name that resolves to a private address is not caught here.
+    public static func pageImageAllowed(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", var host = url.host?.lowercased(), !host.isEmpty else { return false }
+        if host.hasSuffix(".") { host.removeLast() }
+        guard host.contains("."), !host.contains(":") else { return false }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        // 127.0.0.1, 2130706433, 0x7f.1 and 0177.0.0.1 are all addresses.
+        let isAddress = labels.allSatisfy { label in
+            !label.isEmpty && (label.allSatisfy(\.isNumber) || (label.hasPrefix("0x") && label.dropFirst(2).allSatisfy(\.isHexDigit)))
+        }
+        guard !isAddress, !labels.contains(where: \.isEmpty) else { return false }
+        return host != "localhost" && !privateSuffixes.contains { host.hasSuffix($0) }
     }
 
     static func normalize(_ text: String) -> String {

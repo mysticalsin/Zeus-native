@@ -14,16 +14,21 @@ also used `AVSpeechSynthesizer.speak`, which bypasses any audio processing, so n
 ## Engine routing (`ZeusCore/Voice/UltronEngineRouter.swift`)
 
 `auto` (default) tries, in order: ElevenLabs (key or worker route), OpenAI voice, Kokoro (on this Mac), then the
-Mac voice. Paused engines (after a 401, quota or timeout) are skipped, and an engine whose recent first-audio time
-is over 2.5 s drops behind a faster one. Chatterbox clones from a reference clip, so it is used only when chosen.
+Mac voice. Owner decision 2026-11-16: ElevenLabs first, Kokoro as the failsafe with the same Ultron character
+(`am_michael`, same effect chain). An explicit pick in Settings still wins. Paused engines are skipped: a 401, 402 or
+quota failure pauses ElevenLabs for 15 minutes (persisted, it expires so ElevenLabs is retried after credits reset);
+a network error, first-audio timeout or rate limit pauses it for 60 seconds (timeouts and errors in memory only), so
+the rest of that reply and the next few go straight to Kokoro. ElevenLabs is never demoted for being slow; another
+cloud engine whose recent first-audio time is over 2.5 s drops behind a faster one.
+Chatterbox clones from a reference clip, so it is used only when chosen.
 Picking one engine in Settings makes it lead; the rest remain as fallbacks. The Mac voice is always last.
-Every spoken line logs `engine=... voice=... effect=60% reason=... first_audio_ms=...` (keys are never logged).
+Every spoken line logs `engine=... voice=... effect=75% reason=... first_audio_ms=...` (keys are never logged).
 
 ## Voices per engine
 
-- ElevenLabs: Voice Design from a text description (`VoiceDesigner`). The first ElevenLabs use with no saved voice
-  designs one once in the background, keeps the first preview and stores only the voice id (Keychain account
-  `elevenlabs.voice-id`). Until then the stock voice speaks. Delivery settings: stability 0.35, style 0.3, speed 0.95.
+- ElevenLabs: Voice Design from a text description (`VoiceDesigner`). The owner designs the voice in Settings > Voice
+  and stores only the voice id (Keychain account `elevenlabs.voice-id`); it is used whenever one is saved. Nothing
+  designs a voice automatically (it spends credits). With none saved the stock voice speaks. Delivery settings (take C: faster, fewer breaths): stability 0.6, similarity boost 0.85, style 0.3, speaker boost on, speed 1.0. The default model stays `eleven_flash_v2_5` for latency. Take C was auditioned on `eleven_multilingual_v2`, which is the Studio quality choice (Settings > Voice > Voice quality); pick Studio if the fast model sounds off. Nothing switches models on its own. Delivery settings depend on the personality only, so plain on Studio uses plain's own settings and Ultron on Studio uses take C.
 - OpenAI: model `gpt-4o-mini-tts`, voice `onyx`, with tone instructions (sent only to gpt-4o models), raw 24 kHz
   PCM streamed while it downloads.
 - Kokoro: `am_michael` at speed 0.88, rendered per sentence.
@@ -34,11 +39,11 @@ Every spoken line logs `engine=... voice=... effect=60% reason=... first_audio_m
 ## Effect chain (`Sources/Zeus/Voice/UltronAudioChain.swift`)
 
 Every engine's audio is converted to 24 kHz mono and played through one `AVAudioEngine` graph:
-time pitch (-350 cents at 60 %, -450 at 100 %), EQ (low shelf 140 Hz up to +7.5 dB, high shelf 4.5 kHz up to
-+5 dB), radio-tower distortion at a very low mix (up to 8 %), a 10 ms comb delay (feedback up to 35 %, wet up to
-14 %) for the metallic sheen, and a small room (wet up to 10 %), with an output trim. The numbers by intensity
+time pitch (-350 cents at 60 %, about -388 at the 75 % default, -450 at 100 %), EQ (low shelf 140 Hz up to +7.5 dB, high shelf 4.5 kHz up to
++5 dB), radio-tower distortion at a very low mix (up to 10 %), a 10 ms comb delay (feedback up to 35 %, wet up to
+17 %) for the metallic sheen, and a small room (wet up to 10 %), with an output trim. The numbers by intensity
 are `UltronEffectParameters.make(percent:)`. Settings > Voice has the toggle and an intensity slider (0 to 100 %,
-default 60 %). Intensity 0 or the toggle off is neutral. The same graph runs offline for silent previews and tests.
+default 75 %). Intensity 0 or the toggle off is neutral. The same graph runs offline for silent previews and tests.
 
 ## Latency and the sentence API
 

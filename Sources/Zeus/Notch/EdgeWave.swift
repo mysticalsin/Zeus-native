@@ -61,6 +61,8 @@ final class EdgeWaveController {
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.level = NSWindow.Level(rawValue: GlanceTopBar.windowLayer + 2)
+        // No system window animation: a stuck zoom left a ghost island 4 pt below the screen edge.
+        panel.animationBehavior = .none
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]

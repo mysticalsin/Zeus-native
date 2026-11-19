@@ -184,6 +184,9 @@ enum ZeusSound {
         play(slot: event.slot, style: event.name)
     }
 
+    /// Tests set this so no cue plays. Always false in the app.
+    nonisolated(unsafe) static var isMutedForTesting = false
+
     private static var players: [AVAudioPlayer] = []
 
     /// The bundled file for a slot and style; nil for "Off" or when the resource is missing.
@@ -197,6 +200,7 @@ enum ZeusSound {
     /// Plays one sound at the Settings volume. Previews use it too.
     @discardableResult
     static func play(slot: SoundSlot, style: String?, loops: Int = 0) -> AVAudioPlayer? {
+        guard !isMutedForTesting else { return nil }
         guard let url = url(slot: slot, style: style), let player = try? AVAudioPlayer(contentsOf: url) else { return nil }
         FlightRecorder.shared.record("sound", slot.rawValue, style ?? "")
         player.volume = Float(ExtraPreferences.shared.soundVolume) / 100
@@ -242,7 +246,7 @@ final class HotKeyCenter {
         for (index, (code, modifiers, action)) in bindings.enumerated() {
             let id = UInt32(index + 1)
             var ref: EventHotKeyRef?
-            let hotKeyID = EventHotKeyID(signature: OSType(0x5A455553), id: id) // "ZEUS"
+            let hotKeyID = EventHotKeyID(signature: CarbonHotkeySignature.center.rawValue, id: id)
             if RegisterEventHotKey(code, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref) == noErr, let ref {
                 refs.append(ref); actions[id] = action
             }
@@ -259,6 +263,8 @@ final class HotKeyCenter {
             var hotKeyID = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
                               MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            // Answer only this center's own hot keys; Chat and the talk chord have their own handlers.
+            guard CarbonHotkeySignature.owner(signature: hotKeyID.signature) == .center else { return OSStatus(eventNotHandledErr) }
             let id = hotKeyID.id
             DispatchQueue.main.async { MainActor.assumeIsolated { HotKeyCenter.shared.fire(id) } }
             return noErr

@@ -185,6 +185,25 @@ public enum ShortcutStore {
         defaults.set(true, forKey: talkMigrationKey)
     }
 
+    /// The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md): Right Option alone unless the owner chose another key or turned it off.
+    public static let secondTalkKey = "talk.secondShortcut"
+    public static let secondTalkDefault = Shortcut.rightOption
+
+    /// The second talk key, and whether the owner chose it. Absent, or a stored value that does not parse, is the default and no
+    /// choice; `off` is a choice. It never writes: the default is written nowhere until the owner records a key.
+    public static func loadSecondTalk(_ defaults: UserDefaults) -> (key: Shortcut?, explicit: Bool) {
+        guard let text = defaults.string(forKey: secondTalkKey) else { return (secondTalkDefault, false) }
+        if text == "off" { return (nil, true) }
+        if let saved = Shortcut.parse(text) { return (saved, true) }
+        return (secondTalkDefault, false)
+    }
+
+    /// The owner recorded `shortcut` for the second talk key, or nil to turn it off. The default key (also what Reset records)
+    /// removes the stored value, so the default rules apply again.
+    public static func recordSecondTalkChoice(_ shortcut: Shortcut?, in defaults: UserDefaults) {
+        if shortcut == secondTalkDefault { defaults.removeObject(forKey: secondTalkKey) } else { defaults.set(Shortcut.stored(shortcut), forKey: secondTalkKey) }
+    }
+
     /// nil means dictation has no key.
     public static func loadDictation(_ defaults: UserDefaults) -> Shortcut? {
         if let text = defaults.string(forKey: dictationKey) {
@@ -285,12 +304,18 @@ public enum ShortcutEvent: Equatable, Sendable {
 }
 
 /// Tracks which keys are down from the event stream (no polling) and says whether a shortcut is held.
-public struct ShortcutState: Sendable {
+public struct ShortcutState: Sendable, Equatable, Hashable {
     public private(set) var modifiers: ShortcutModifiers = []
+    /// The modifier set the last flags event reported. A key-down never writes it, so the Fn flag an arrow key carries
+    /// and the Command of a pasted shortcut change nothing here; `modifiers` (which a key-down overwrites) stays as it
+    /// is for `isHeld`. `KeyFacts` reads this one.
+    public private(set) var flagModifiers: ShortcutModifiers = []
     public private(set) var deviceKeys: Set<UInt16> = []
     public private(set) var keysDown: Set<UInt16> = []
-    /// A normal key joined while modifiers were down; the chord is not "alone" until all are released.
-    public private(set) var spoiled = false
+    /// The codes of the normal keys pressed while modifiers were down; cleared when every modifier is up. The chord is
+    /// not "alone" until then.
+    public private(set) var spoilers: Set<UInt16> = []
+    public var spoiled: Bool { !spoilers.isEmpty }
 
     public init() {}
 
@@ -304,6 +329,7 @@ public struct ShortcutState: Sendable {
 
     private mutating func flagsChanged(keyCode: UInt16, modifiers mods: ShortcutModifiers) {
         modifiers = mods
+        flagModifiers = mods
         // A repeated flagsChanged for `keyCode` with its flag still present is ambiguous: macOS
         // (and CGEventPost) can redeliver the *same* "still down" notification for a lone key
         // with nothing else pressed (confirmed with `tools/e2e-once.sh`'s two-call-in-a-row
@@ -327,7 +353,7 @@ public struct ShortcutState: Sendable {
         for (flag, left, right) in ShortcutModifiers.keyCodes where !mods.contains(flag) {
             deviceKeys.remove(left); deviceKeys.remove(right)
         }
-        if mods.isEmpty { spoiled = false }
+        if mods.isEmpty { spoilers = [] }
     }
 
     private mutating func keyDown(keyCode: UInt16, modifiers mods: ShortcutModifiers) {
@@ -345,10 +371,36 @@ public struct ShortcutState: Sendable {
         // auto-insert paste "spoiled" every dictation key-down after it). `deviceKeys` is only
         // ever populated by real flagsChanged holds, so its emptiness is the right signal for
         // "nothing we're tracking is actually down right now".
-        if !mods.isEmpty, !deviceKeys.isEmpty { spoiled = true }
+        if !mods.isEmpty, !deviceKeys.isEmpty { spoilers.insert(keyCode) }
     }
 
     public mutating func reset() { self = ShortcutState() }
+
+    /// Takes the modifiers the system reports now as the whole truth, for a monitor that keeps running after sleep
+    /// or a release it could not see. Both modifier values become `live`, a physical key stays tracked only while its
+    /// modifier is still down, and ordinary keys are forgotten (nothing reports them). Unlike `reset()`, a modifier
+    /// still held stays held, so a key that was let go and pressed again is a new press, not a continuation.
+    public mutating func resync(to live: ShortcutModifiers) {
+        adopt(modifiers: live)
+        keysDown.removeAll()
+    }
+
+    /// Takes the modifiers the system reports now and leaves the ordinary keys as they are: what a flags event that is
+    /// still queued would have said, read from the live flags instead. A modifier that joined is foreign from here on.
+    public mutating func adopt(modifiers live: ShortcutModifiers) {
+        modifiers = live
+        flagModifiers = live
+        for (flag, left, right) in ShortcutModifiers.keyCodes where !live.contains(flag) {
+            deviceKeys.remove(left); deviceKeys.remove(right)
+        }
+        if live.isEmpty { spoilers = [] }
+    }
+
+    /// Forgets the ordinary keys the system no longer reports down: a key-up that no monitor saw (Tab out of a username
+    /// field into a password field turns secure input on before Tab comes up). `keysDown` is otherwise cleared only by a
+    /// key-up, so one such key would read as a foreign key for every voice key until it was pressed and let go again.
+    /// Modifiers are left alone: `resync` takes them from the system.
+    public mutating func prune(keysDown live: Set<UInt16>) { keysDown.formIntersection(live) }
 
     /// `exact`: nothing else may be down (the normal case). Otherwise extra modifiers are allowed,
     /// which the shared hold-to-dictate / double-tap-to-talk key needs.

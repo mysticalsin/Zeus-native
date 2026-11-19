@@ -24,7 +24,7 @@ import Testing
     }
 
     @Test func isSetUpFalseWhenModelMissing() {
-        let name = "zeus.kokoro.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.kokoro.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         defaults.set("/tmp/zeus-missing-kokoro-\(UUID().uuidString)", forKey: "voice.kokoro.modelDir")

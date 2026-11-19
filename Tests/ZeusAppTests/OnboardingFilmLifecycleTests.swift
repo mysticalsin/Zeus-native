@@ -6,7 +6,7 @@ import Testing
 
 /// Owned windows and the actual muted AVQueuePlayer with bundled local video. No capture, sound,
 /// global input, private media or fake playback counters. This does not measure decoder CPU/energy.
-@MainActor @Suite("Onboarding film native lifecycle", .serialized)
+@MainActor @Suite("Onboarding film native lifecycle", .inNativeHost, .serialized)
 struct OnboardingFilmLifecycleTests {
     private func waitFor(_ description: String, view: LoopingFilm.FilmView, timeout: Duration = .seconds(4),
                          _ condition: () -> Bool) async throws {

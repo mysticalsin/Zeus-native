@@ -12,18 +12,25 @@ import Glibc
 @testable import Zeus
 #endif
 
+private final class BundleAnchor {}
+
 @Suite("Memory MCP process transport")
 struct MemoryMCPTransportTests {
     @Test func bundledHelperCompletesInteractiveMCPRoundTrip() async throws {
+        // The helper is built beside the test bundle, wherever the scratch path points. The default package
+        // `.build` folder is only the fallback for a plain `swift test` run.
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let products = Bundle(for: BundleAnchor.self).bundleURL.deletingLastPathComponent()
         #if ZEUS_PORTABLE_MCP
-        let executable = package.appendingPathComponent(".build/debug/zeus-memory-helper")
+        let helper = "zeus-memory-helper"
         let prefix: [String] = []
         #else
-        let executable = package.appendingPathComponent(".build/debug/zeus-cli")
+        let helper = "zeus-cli"
         let prefix = ["memory-mcp"]
         #endif
-        #expect(FileManager.default.isExecutableFile(atPath: executable.path))
+        let candidates = [products.appendingPathComponent(helper), package.appendingPathComponent(".build/debug/\(helper)")]
+        let executable = try #require(candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) },
+                                      "\(helper) is not beside the test bundle or under .build/debug")
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-mcp-process-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }

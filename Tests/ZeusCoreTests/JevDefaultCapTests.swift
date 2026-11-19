@@ -4,7 +4,7 @@ import Testing
 
 @Suite("Jev default monthly limit")
 struct JevDefaultCapTests {
-    private func freshSuite() -> String { "zeus.test.jevdefaultcap.\(UUID().uuidString)" }
+    private func freshSuite() -> String { NSTemporaryDirectory() + "zeus.test.jevdefaultcap.\(UUID().uuidString)" }
 
     @Test func defaultIsTenDollars() {
         #expect(JevBudgetStore.defaultCap == 10)

@@ -77,7 +77,7 @@ import Testing
     }
 
     @Test func preferredToolDefaultsToClaudeCode() {
-        let suite = UserDefaults(suiteName: "zeus.tests.tools.\(UUID().uuidString)")!
+        let suite = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.tests.tools.\(UUID().uuidString)")!
         #expect(CodingTool.preferred(defaults: suite) == .claude)
         suite.set("codex", forKey: CodingTool.preferenceKey)
         #expect(CodingTool.preferred(defaults: suite) == .codex)

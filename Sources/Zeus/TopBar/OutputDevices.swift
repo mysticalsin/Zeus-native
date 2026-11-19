@@ -1,5 +1,6 @@
 import AppKit
 import CoreAudio
+import ZeusCore
 
 /// The Mac's audio outputs, and a way to make one the system output.
 enum OutputDevices {
@@ -42,7 +43,19 @@ enum OutputDevices {
         guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else { return [] }
         var list = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &list) == noErr else { return [] }
-        return list
+        // The aggregates Zeus builds for shaping and listening are never an output to choose.
+        return list.filter { id in
+            !ZeusAudioDevices.isOwnAggregate(uid: string(id, kAudioDevicePropertyDeviceUID) ?? "", name: name(id) ?? "")
+        }
+    }
+
+    private static func string(_ id: AudioDeviceID, _ selector: AudioObjectPropertySelector) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: selector,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
+        return value.takeRetainedValue() as String
     }
 
     private static func channels(_ id: AudioDeviceID) -> Int {

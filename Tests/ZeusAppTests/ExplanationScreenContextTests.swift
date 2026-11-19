@@ -6,7 +6,7 @@ import ZeusCore
 
 /// Synthetic capture/metadata/permission adapters only. No screenshots, OS prompts, external
 /// applications or user preferences are accessed. The overlay test owns its drawing-only panel.
-@MainActor @Suite("Explanation selected snapshot and passive overlay", .serialized)
+@MainActor @Suite("Explanation selected snapshot and passive overlay", .inNativeHost, .serialized)
 struct ExplanationScreenContextTests {
     @MainActor private final class Fixture {
         var allowed = true
