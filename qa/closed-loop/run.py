@@ -19,8 +19,8 @@ import shutil
 
 from contracts import (ROOT, Invalid, case_passed, digest, evaluate_features, load,
                        manifest_matches, read_swift_testing_xunit, require, source_snapshot, swift_log_complete,
-                       swift_structured_results, swift_summary, swift_testing_xunit_path, validate_map,
-                       validate_registry, validate_native_build)
+                       swift_structured_results, swift_summary, swift_testing_xunit_path, validate_map, validate_registry,
+                       validate_native_build)
 
 
 TRUSTED_COMMAND = "scripts/trusted-ax-journey.sh"
