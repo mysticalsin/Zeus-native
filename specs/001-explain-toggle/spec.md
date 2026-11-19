@@ -12,7 +12,7 @@
 
 ### User Story 1 - Hold Right Option to talk (Priority: P1)
 
-Holding Right Option alone starts the turn. While it is held, the overlay is up and the person speaks. Releasing it hands that speech to Zeus, which then acts or explains. The hold does nothing when Right Option is only a modifier, when another key goes down while it is held, or when a click happens while it is held. Esc while it is held cancels the turn, and the later release does not process anything. Control-Option hold-to-talk is unchanged.
+Holding Right Option alone starts the turn. That hold already exists: `VoiceKey.owner` returns `.talk` for the second talk key, and `VoiceKey.secondKeyConfirm` is 0.25 s (`Sources/ZeusCore/VoiceKey.swift`, the confirm at lines 49–53 on main `d6d45dde`). This slice reuses that hold. It does not add a second key machine and it does not add a recognizer. While the key is held, the overlay is up and the person speaks. Releasing it hands the transcript to the existing `FastIntent.parse` (`Sources/ZeusCore/Intent/FastIntent.swift`). An `.openApp` or `.quitApp` is carried out by the existing intent path. Anything `parse` does not recognize stays an explain turn. The hold does nothing when Right Option is only a modifier, when another key goes down while it is held, or when a click happens while it is held. Esc while it is held cancels the turn, and the later release does not process anything. Control-Option hold-to-talk is unchanged.
 
 **Why this priority**: Without this hold there is no explain turn. Every later scenario starts here.
 
@@ -167,7 +167,7 @@ The same actions are available to VoiceOver. Loading, error, and recovery are sp
 
 ### Functional Requirements
 
-- **FR-001**: Holding Right Option alone MUST start an explain turn. While it is held, the overlay MUST be up and the turn MUST be listening. Releasing it MUST process the request that was spoken.
+- **FR-001**: Holding Right Option alone MUST reuse `VoiceKey.secondKeyConfirm` (0.25 s) and the existing second-talk hold. While it is held, the overlay MUST be up. Releasing it MUST pass the transcript to `FastIntent.parse`. `.openApp` and `.quitApp` MUST use that existing intent. This slice MUST NOT add a recognizer.
 - **FR-002**: The hold MUST NOT fire when Right Option is used as a modifier, when another key goes down while it is held, or when a click happens while it is held. The release after any of those MUST process nothing.
 - **FR-003**: Esc while Right Option is held MUST cancel the turn and tear the overlay down. The release after that cancel MUST process nothing.
 - **FR-004**: Control-Option hold-to-talk MUST stay on its current rules.

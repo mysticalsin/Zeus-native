@@ -8,7 +8,7 @@
 
 ## Summary
 
-Holding Right Option alone starts an explain turn. The overlay is up while it is held and the person speaks. Releasing it is what Zeus processes. The hold does not fire when Right Option is a modifier, when another key goes down, or when a click happens, and Esc while held cancels. On release Zeus can open, close, or explain, each with matching visuals, and it can still describe the screen, point at a real control, or walk one step at a time. One click-through overlay carries the pointer and the marks, and it is torn down when the turn ends. Control-Option hold-to-talk and Right Command hold-to-dictate stay. A close that would lose unsaved work, and a click Zeus would make for the person, still use the existing approval or confirm gate.
+Holding Right Option reuses the existing second-talk hold (`VoiceKey.secondKeyConfirm`, 0.25 s). The overlay is up while it is held. Release calls `FastIntent.parse` for open and close, and does not add a recognizer. The hold does not fire when Right Option is a modifier, when another key goes down, or when a click happens, and Esc while held cancels. On release Zeus can open, close, or explain, each with matching visuals, and it can still describe the screen, point at a real control, or walk one step at a time. One click-through overlay carries the pointer and the marks, and it is torn down when the turn ends. Control-Option hold-to-talk and Right Command hold-to-dictate stay. A close that would lose unsaved work, and a click Zeus would make for the person, still use the existing approval or confirm gate.
 
 ## Technical Context
 

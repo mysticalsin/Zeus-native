@@ -8,7 +8,7 @@
 
 ## Summary
 
-One owner lends the microphone to Zeus, Murmur, or Scribe, and never to two of them. One warm speech engine serves Zeus and Murmur, streams partial transcripts to the overlay, and is not rebuilt on a press. The first captured buffer is under 100 ms after a Right Option press. Murmur's Right Command hold drops six per-dictation costs, each with a before and after measurement. Scribe uses the same owner, keeps a 10 s manual prompt, records only on Tony's tap, and loses the automatic mode. A Zeus hold during a Scribe recording is mic busy: Scribe keeps recording and Zeus processes nothing.
+One owner lends the microphone to Zeus, Murmur, or Scribe, and never to two of them. One warm speech engine serves Zeus and Murmur, streams partial transcripts to the overlay, and is not rebuilt on a press. The first captured buffer is under 100 ms after a Right Option press. Murmur's Right Command hold drops six per-dictation costs, each with a before and after measurement. Scribe uses the same owner once a recording has already started. "Start automatically" and the 20 s ask timeout are not changed. A Zeus hold during a Scribe recording is mic busy: Scribe keeps recording and Zeus processes nothing.
 
 ## Technical Context
 
@@ -63,7 +63,7 @@ Sources/Zeus/Dictation/
 └── DictationController.swift and SpeechEngines.swift, the six costs
 
 Sources/ZeusCore/Scribe/ScribeAutoStart.swift
-└── manual prompt only; automatic mode removed
+└── unchanged automatic mode and 20 s ask timeout
 
 Tests/ZeusCoreTests/
 ├── SharedMicOwnerTests.swift
@@ -73,7 +73,7 @@ Tests/ZeusAppTests/
 └── DictationWarmStartTests.swift
 ```
 
-**Structure Decision**: Arbitration is a pure owner so the overlap tests do not need a device. The warm start and the six costs are measured on the Mac against the existing dictation files. Scribe's automatic mode comes out of the existing machine rather than a second policy.
+**Structure Decision**: Arbitration is a pure owner so the overlap tests do not need a device. The warm start and the measured costs are checked against `DictationController.begin` (lines 575–622) and `speech.onLevel`. Scribe's automatic mode and 20 s ask timeout are not edited.
 
 ## Complexity Tracking
 

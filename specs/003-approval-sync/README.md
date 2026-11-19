@@ -1,6 +1,6 @@
 # Approval sync
 
-**Status**: Stub. Not started. 2026-11-19 13:07 BRT.
+**Status**: Specified in `spec.md`. Not implemented. 2026-11-19.
 
 After a choice is answered in the terminal, Zeus's approval card lags or stays up, so the same choice is clicked twice.
 

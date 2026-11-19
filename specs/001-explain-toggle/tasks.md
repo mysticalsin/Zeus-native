@@ -46,7 +46,7 @@ description: "Red-first tasks for Explain slice 001"
 
 ### Tests for User Story 1
 
-- [ ] T003 [P] [US1] Write `holdingRightOptionAloneShowsTheOverlayAndReleaseProcesses` in `Tests/ZeusCoreTests/ExplainToggleTests.swift`. It fails on this branch: Right Option is the 0.25 s hold second talk key, and holding it does not raise an explain overlay or process on release.
+- [ ] T003 [P] [US1] Write `holdingRightOptionAloneShowsTheOverlayAndReleaseProcesses` in `Tests/ZeusCoreTests/ExplainToggleTests.swift`. The 0.25 s hold already exists (`VoiceKey.secondKeyConfirm`). The test fails because that hold does not raise the explain overlay. It also fails if a new recognizer is introduced instead of `FastIntent.parse`.
 - [ ] T004 [P] [US1] Write `rightOptionDoesNotFireWhenAnotherKeyOrAClickHappensWhileItIsHeld` in the same file. It fails on an implementation that still processes the release after another key or a click. Land it in the same red commit as T003.
 - [ ] T005 [P] [US1] Write `escapeWhileRightOptionIsHeldCancelsAndTheReleaseProcessesNothing` in the same file. It fails because Esc during Right Option is not an explain cancel.
 - [ ] T006 [P] [US1] Write `controlOptionHoldToTalkIsUnchanged` in the same file. It asserts the current Control-Option hold still starts and sends a talk turn and does not open an explain hold. It fails if US1's implementation moves that chord.
@@ -67,8 +67,8 @@ description: "Red-first tasks for Explain slice 001"
 
 ### Tests
 
-- [ ] T008 [P] [US2] Write `holdThenOpenLaunchesTheNamedFixtureApp` in `Tests/ZeusCoreTests/ExplainToggleTests.swift`. It fails because a release after "open" plus a fixture name does not request that launch.
-- [ ] T009 [P] [US2] Write `holdThenCloseClosesUnlessUnsavedWorkNeedsTheExistingGate` in the same file. It fails because a release after "close" does not close a clean fixture, and a fixture with unsaved work does not stop at the existing approval or confirm gate.
+- [ ] T008 [P] [US2] Write `holdThenOpenUsesFastIntentOpenApp` in `Tests/ZeusCoreTests/ExplainToggleTests.swift`. It fails unless the release calls `FastIntent.parse` and the `.openApp` case is the one that launches. A second parser fails the test.
+- [ ] T009 [P] [US2] Write `holdThenCloseUsesFastIntentQuitApp` in the same file. It fails unless `.quitApp` is the close path, and a fixture with unsaved work does not stop at the existing approval or confirm gate.
 - [ ] T010 [P] [US2] Write `holdThenExplainThisSpeaksWithNumberedMarks` in the same file. It fails because "explain this" on release does not produce a spoken answer plus one numbered mark per relevant element.
 
 ### Implementation

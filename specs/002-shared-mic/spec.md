@@ -28,7 +28,7 @@ Zeus talks by holding Right Option. The microphone and the speech engine are alr
 
 ### User Story 2 - Murmur uses the same engine (Priority: P1)
 
-Holding Right Command dictates with Murmur on the same shared engine. The press does not rebuild an audio engine, read accessibility on the main thread before capture, redraw the top bar on the main thread for every buffer, start a second speech recognizer, spawn a command-line process per dictation, or sleep a fixed time while inserting text.
+Holding Right Command dictates with Murmur on the same shared engine. On main `d6d45dde`, `DictationController.begin` (`Sources/Zeus/Dictation/DictationController.swift`, lines 575–622) does the language setup, the model prewarm, and the selected-text read on the caller before capture starts. Each press builds a cold engine (`turnEngine = readyEngine` and `prewarm()`). `speech.onLevel` hops to the main thread and calls `topBar.pushDictationLevel` for every level (`start()`, about line 391). `speech.recognizes` stays on for Apple while a local stream is also opened (lines 596–617), so two recognizers run at once. This slice removes those four costs. A command-line spawn per dictation and a fixed sleep on insertion stay on the measurement list only where a test still finds them.
 
 **Why this priority**: Those six costs are the reason dictation feels late. They are not six engines.
 
@@ -47,20 +47,18 @@ Holding Right Command dictates with Murmur on the same shared engine. The press 
 
 ### User Story 3 - Scribe is manual and uses the same owner (Priority: P1)
 
-Scribe takes the microphone from the same owner. It stays manual. A prompt can appear for 10 s. Recording starts only when Tony taps. Nothing starts a recording by itself. The leftover automatic mode is gone.
+Scribe takes the microphone from the same owner when a recording has already been started by the existing manual path. "Start automatically" and the meeting card's 20 s ask timeout stay as they are. Tony has not decided to change them. This slice does not remove `ScribeAutoStartMode.automatic` and does not change `askTimeout`.
 
-**Why this priority**: An automatic recording would take the shared microphone without a tap.
+**Why this priority**: The shared owner must not invent a new Scribe policy while that decision is held.
 
-**Independent Test**: A scripted meeting signal shows the prompt and does not record. A tap records. The prompt is gone at 10 s if it was not tapped. No mode remains that counts down and records on its own.
+**Independent Test**: A scripted recording started by the existing manual tap uses the shared owner. A test that deletes automatic mode, or that expects the prompt to leave at 10 s, is out of this slice.
 
 **Acceptance Scenarios**:
 
-1. **Given** a meeting signal and the manual choice, **When** the prompt appears, **Then** the microphone is not captured until Tony taps.
-2. **Given** the prompt is up, **When** Tony taps it, **Then** Scribe records through the shared owner.
-3. **Given** the prompt is up and Tony does not tap, **When** 10 s pass, **Then** the prompt leaves and no recording starts.
-4. **Given** the old automatic choice, **When** the same signal arrives, **Then** there is no countdown and no recording. That mode is not offered.
+1. **Given** a recording Tony already started by tapping the card, **When** it captures, **Then** it uses the shared microphone owner.
+2. **Given** the current automatic choice and the 20 s ask timeout, **When** this slice is applied, **Then** both are unchanged.
 
-The 45 s slow-start of a capture that has already begun, and any other timeout this slice does not name, stay as they are.
+The 45 s slow-start of a capture that has already begun stays as well.
 
 ---
 
@@ -122,7 +120,7 @@ Reduce Motion and VoiceOver cover the shared owner. Mic denied, mic busy, and en
 
 - A hold that loses the microphone mid-phrase ends as engine failure or mic busy, and the release does not process a partial as if it were complete.
 - Scribe's prompt can sit on screen while Zeus or Murmur holds the microphone. The prompt does not capture until a tap, and that tap waits if the hold still has the microphone.
-- Removing the automatic mode does not remove the manual prompt, the tap to record, or the 45 s allowance for a capture that has already begun.
+- "Start automatically" and the 20 s ask timeout are held for Tony. This slice does not edit them.
 - The top bar still shows dictation and recording. It does not gain a per-buffer main-thread redraw.
 - Slice 001's overlay rules stay: one click-through overlay, torn down when the Zeus turn ends.
 
@@ -134,7 +132,7 @@ Reduce Motion and VoiceOver cover the shared owner. Mic denied, mic busy, and en
 - **FR-002**: The engine MUST be warm before a Right Option press. The first captured audio MUST be under 100 ms after that press. The press MUST NOT cold-start the engine.
 - **FR-003**: A Right Command hold MUST dictate through that same engine.
 - **FR-004**: A dictation MUST NOT rebuild the audio engine, read accessibility on the main thread before capture, redraw the top bar on the main thread per buffer, create a second recognizer, spawn a command-line process, or wait on a fixed insertion sleep.
-- **FR-005**: Scribe MUST use the same owner, MUST stay manual, MUST show its prompt for 10 s, and MUST record only after Tony's tap. The automatic mode MUST be removed.
+- **FR-005**: A Scribe recording that Tony already started MUST use the same owner. This slice MUST NOT change "Start automatically" and MUST NOT change the 20 s ask timeout.
 - **FR-006**: At most one of Zeus, Murmur, and Scribe MAY capture at a time. Scribe, once started, outranks a later hold. Otherwise the earlier hold keeps the microphone, and a tie goes to Zeus.
 - **FR-007**: A Right Option hold during a Scribe recording MUST NOT capture, MUST NOT stop Scribe, and MUST NOT process a Zeus request on release. It MUST report mic busy.
 - **FR-008**: Partial transcripts MUST stream to the Zeus overlay and the proactive turn during the hold. Only the final transcript on release is processed.
@@ -162,6 +160,6 @@ Measurements use the turn's own timestamps on Tony's Mac. Do not invent a before
 
 - Slice 001's hold, release, overlay, and approval rules stay. This slice supplies the microphone and the engine underneath them.
 - "Warm" means the engine was started earlier and is idle, not constructed on the key-down.
-- The 10 s figure is the manual Scribe prompt. It is not the 45 s slow-start.
+- The 20 s ask timeout and "Start automatically" stay until Tony decides. The 45 s slow-start stays.
 - The six removals are measured one by one. A task that only deletes a sleep without a before and after count is not done.
 - No third-party application is named. The recognizer and the command-line process are described by what they do.

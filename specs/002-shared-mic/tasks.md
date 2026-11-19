@@ -64,19 +64,18 @@ Each test is red on the parent because that cost still happens. The implementati
 
 ## Phase 4: User Story 3 - Scribe stays manual (Priority: P1)
 
-**Goal**: The same owner, a 10 s prompt, recording only on Tony's tap. Automatic mode is gone.
+**Goal**: A recording Tony already started uses the shared owner. Do not change "Start automatically" or the 20 s ask timeout.
 
 ### Tests
 
-- [ ] T012 [P] [US3] Write `aMeetingSignalShowsAPromptAndDoesNotRecord` in `Tests/ZeusCoreTests/ScribeManualOnlyTests.swift`. It fails because `ScribeAutoStart.swift` still has an automatic mode that can count down and start.
-- [ ] T013 [P] [US3] Write `thePromptLeavesAtTenSecondsUnlessTonyTaps` in the same file. It fails because the prompt lifetime is `askTimeout` of 20 s, not 10 s, and a tap is not the only way a recording starts.
-- [ ] T014 [P] [US3] Write `thereIsNoAutomaticMode` in the same file. It fails while `ScribeAutoStartMode.automatic` still exists and can record.
+- [ ] T012 [P] [US3] Write `aStartedScribeRecordingUsesTheSharedOwner` in `Tests/ZeusCoreTests/SharedMicOwnerTests.swift`. It fails until that recording is the owner's capturer.
+- [ ] T013 [P] [US3] Write `automaticModeAndTheTwentySecondAskTimeoutStay` in the same file. It fails if this slice deletes `ScribeAutoStartMode.automatic` or changes `askTimeout` from 20 s.
 
 ### Implementation
 
-- [ ] T015 [US3] Make T012, T013, and T014 pass. Recording uses the shared owner. The 45 s slow-start of a capture already underway stays. Do not add a new automatic path.
+- [ ] T014 [US3] Make T012 and T013 pass. Do not edit the automatic choice or the 20 s ask timeout.
 
-**Checkpoint**: No tap, no recording. A tap records. The prompt is 10 s.
+**Checkpoint**: Scribe joins the owner only after the existing start. The held timeouts are unchanged.
 
 ---
 
@@ -137,7 +136,7 @@ Each test is red on the parent because that cost still happens. The implementati
 - T001 starts immediately.
 - US1 blocks US2, because Murmur joins the warm engine.
 - US3 can be written beside US1. It meets the owner in US4.
-- US4 waits until the owner exists (T004) and Scribe is manual (T015).
+- US4 waits until the owner exists (T004) and a started Scribe recording can be named (T014).
 - US5 waits until the engine emits transcripts (US1).
 - US6 can be written beside US4.
 - Before/after numbers are recorded on the Mac during T004 and T011. A docs head does not contain them.
