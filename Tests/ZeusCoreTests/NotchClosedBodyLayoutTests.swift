@@ -50,6 +50,20 @@ import ZeusCore
         }
     }
 
+    /// Music wings use no extra. Their frames have to sit in the inset box, 14 pt inside the full wing, not in the full wing.
+    @Test func theMusicWingFramesStayInsideTheSymmetricContentBox() {
+        let notch: CGFloat = 220
+        let box = NotchClosedBodyLayout.closedWingGeometry(notchWidth: notch, shoulder: 8, extra: 0)
+        let frames = NotchClosedBodyLayout.musicWingFrames(notchWidth: notch, shoulder: 8)
+        #expect(frames.left == box.leftWing)
+        #expect(frames.right == box.rightWing)
+        #expect(box.rightWing.upperBound - box.rightWing.lowerBound == NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset)
+        let fullWing = NotchClosedBodyLayout.closedWingGeometry(notchWidth: notch, shoulder: 8, extra: 0, inset: 0)
+        #expect(fullWing.wingContentWidth - box.wingContentWidth == 14)
+        #expect(frames.left.lowerBound >= fullWing.leftWing.lowerBound + 14 - 0.5)
+        #expect(frames.right.upperBound <= fullWing.rightWing.upperBound - 14 + 0.5)
+    }
+
     @Test func theWingsFillTheContentBoxInsideTheBodyPadding() {
         for notch in Self.notchWidths {
             for extra in Self.everyExtra {
