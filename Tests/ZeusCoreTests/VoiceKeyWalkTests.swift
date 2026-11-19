@@ -1878,6 +1878,18 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
 // The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
 // socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
 @Suite(.serialized) struct VoiceKeyWalkTests {
+    /// A nearer wake has to stop the jump. The confirm cut is later than one step.
+    @Test func theJumpStopsAtTheSoonestTimer() {
+        let run = WalkRun.all[0]
+        var sim = Sim(run)
+        sim.apply(.toggle(0), run)
+        sim.apply(.toggle(1), run)
+        sim.wakes.insert(sim.step + 1)
+        let start = sim.step
+        sim.apply(.waitToCut, run)
+        #expect(sim.step - start == 1)
+    }
+
     /// A wait in the search has to land on the machine's next window, not one step later.
     @Test func aWaitJumpsToTheNextMachineCut() {
         let run = WalkRun.all[0]
