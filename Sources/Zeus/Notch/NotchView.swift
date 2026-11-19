@@ -145,34 +145,35 @@ struct NotchView: View {
             if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: notch.height) }
             return slimPill ? CGSize(width: Self.pillSize.width, height: Self.pillSize.height) : .zero
         case .peek:
+            let raw: CGSize
             if let approval = model.approval {
                 let wide = (approval.detail?.height ?? 0) > 0
-                // 6 pt more than before for the avatar header row of the shared card grammar.
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, wide ? 520 : 440), height: barHeight + 98 + approval.extraHeight)
+                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, wide ? 520 : 440), height: barHeight + 98 + approval.extraHeight)
+            } else if model.completion != nil {
+                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, 460), height: barHeight + 10 + CompletionCardView.height)
+            } else if model.failure != nil || stalledPeek != nil {
+                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
+            } else if let recap = model.recap {
+                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))
+            } else {
+                raw = CGSize(width: (hasNotch ? notch.width : 120) + 2 * shoulder + 230, height: barHeight)
             }
-            if model.completion != nil {
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, 460), height: barHeight + 10 + CompletionCardView.height)
-            }
-            if model.failure != nil || stalledPeek != nil {
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
-            }
-            if let recap = model.recap {
-                return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))
-            }
-            return CGSize(width: (hasNotch ? notch.width : 120) + 2 * shoulder + 230, height: barHeight)
+            return NotchLayoutBounds.clamp(raw)
         case .panel:
             if let topBar {
                 return Self.topBarPanelSize(barHeight: barHeight, hasApproval: model.approval != nil, extra: model.approval?.extraHeight ?? 0,
                                             home: topBar.selectedTab == .home, homeStrip: topBar.homeExtraHeight)
             }
-            let rows = CGFloat(max(model.sessions.count, 1))
-            return CGSize(width: 540, height: barHeight + 20 + rows * 62 + (model.approval != nil ? 110 : 0) + 14)
+            let rows = CGFloat(min(max(model.sessions.count, 1), 4))
+            return NotchLayoutBounds.clamp(CGSize(width: 540, height: barHeight + 20 + rows * 62 + 14))
         }
     }
 
-    /// Glance's open panel: 870 x 210 on Home (taller pages get more room), plus the ears.
+    /// The hover panel. A notification or approval is drawn inside this size; it does not grow the frame.
     static func topBarPanelSize(barHeight: CGFloat, hasApproval: Bool, extra: CGFloat = 0, home: Bool = false, homeStrip: CGFloat = 0) -> CGSize {
-        GlanceTopBar.panelSize(home: home, extra: (hasApproval ? 126 + extra + 8 : 0) + (home ? homeStrip : 0))
+        _ = barHeight
+        return NotchLayoutBounds.size(.init(hover: true, home: home, notification: hasApproval, approval: hasApproval,
+                                            approvalExtra: extra, homeStrip: homeStrip))
     }
 
     /// The closed outline the lights follow: the black shape with wings, or the bare notch.
@@ -716,7 +717,38 @@ private struct PanelBody: View {
     }
 }
 
-/// The open top bar: tab header split around the notch, any approval, then the selected page.
+/// The approval, collapsed to one line so a hover open stays the normal panel size.
+private struct CollapsedApprovalNotice: View {
+    let approval: NotchModel.Approval
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(approval.risk == .high ? Theme.danger : Theme.ember)
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(approval.agent)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Theme.cloudPrimary)
+                .lineLimit(1)
+            Text(approval.command)
+                .font(.system(size: 11, design: .rounded))
+                .foregroundStyle(Theme.cloudSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
+            NotchButton(title: "Allow", tint: Theme.leaf, filled: true) { approval.activateAllow() }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 28)
+        .background(.ultraThinMaterial, in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(approval.agent) is waiting. \(approval.command)")
+    }
+}
+
+/// The open top bar: tab header split around the notch, then the selected page.
+/// An approval sits on top of the page instead of lengthening the panel.
 private struct TopBarPanelBody: View {
     let model: NotchModel
     let topBar: TopBarModel
@@ -741,16 +773,15 @@ private struct TopBarPanelBody: View {
                     .padding(.leading, GlanceTopBar.tabRowInset)
                     .padding(.trailing, GlanceTopBar.rowTrailing)
                 Color.clear.frame(height: GlanceTopBar.cardTop - GlanceTopBar.tabRowTop - GlanceTopBar.tabRowHeight)
-                VStack(alignment: .leading, spacing: 8) {
-                    if let approval = model.approval {
-                        ApprovalBody(approval: approval, compact: false)
-                            .padding(12)
-                            .background(Theme.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder((approval.risk == .high ? Theme.danger : Theme.ember).opacity(0.55), lineWidth: approval.risk == .high ? 2 : 1))
+                TopBarPage(topBar: topBar, agentSummary: summary, agents: AnyView(agents))
+                    .padding(.horizontal, GlanceTopBar.cardInset)
+                    .overlay(alignment: .bottom) {
+                        if let approval = model.approval {
+                            CollapsedApprovalNotice(approval: approval)
+                                .padding(.horizontal, 8)
+                                .padding(.bottom, 4)
+                        }
                     }
-                    TopBarPage(topBar: topBar, agentSummary: summary, agents: AnyView(agents))
-                }
-                .padding(.horizontal, GlanceTopBar.cardInset)
             }
         }
     }

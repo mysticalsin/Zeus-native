@@ -89,6 +89,7 @@ enum SnapshotRenderer {
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
         renderParityStates(into: directory, notch: notch)
+        renderLayoutBounds(into: directory, notch: notch)
         // The agent hub: sessions with a reply field, then the New chat form.
         let hub = AgentHub.shared
         let hubStarted = Date().addingTimeInterval(-300)
@@ -755,6 +756,34 @@ enum SnapshotRenderer {
             model.presentation = .closed
             save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-quit-peek.png"))
+        }
+    }
+
+    /// Hover opens at the normal size even when a long agent notification is already up.
+    private static func renderLayoutBounds(into directory: URL, notch: CGSize) {
+        func stage(_ name: String, scheme: ColorScheme, _ configure: (NotchModel, TopBarModel) -> Void) {
+            let model = NotchModel()
+            let topBar = TopBarModel()
+            model.presentation = .panel
+            topBar.selectedTab = .home
+            configure(model, topBar)
+            let view = NotchStage(model: model, topBar: topBar, notch: notch)
+                .environment(\.colorScheme, scheme)
+            save(view, size: CGSize(width: 1000, height: 420), to: directory.appendingPathComponent(name))
+        }
+        let long = (1...24).map { "step \($0) of a long agent note" }.joined(separator: "\n")
+        let approval = NotchModel.Approval(id: "bounds", agent: "Harbor", project: "Desk", tool: "Run",
+                                           command: long, risk: .high, resolve: { _ in })
+        stage("notch-bounds-hover-home-dark.png", scheme: .dark) { _, _ in }
+        stage("notch-bounds-hover-home-light.png", scheme: .light) { _, _ in }
+        stage("notch-bounds-notification-dark.png", scheme: .dark) { model, _ in model.approval = approval }
+        stage("notch-bounds-notification-light.png", scheme: .light) { model, _ in model.approval = approval }
+        stage("notch-bounds-scribe-dark.png", scheme: .dark) { _, topBar in topBar.selectedTab = .scribe }
+        stage("notch-bounds-now-playing-dark.png", scheme: .dark) { model, topBar in
+            topBar.selectedTab = .music
+            topBar.nowPlaying = NowPlaying(player: .music, title: "Night Drive", artist: "Ada", album: "Coast",
+                                           isPlaying: true, duration: 180, position: 12, positionAt: Date())
+            model.approval = approval
         }
     }
 
