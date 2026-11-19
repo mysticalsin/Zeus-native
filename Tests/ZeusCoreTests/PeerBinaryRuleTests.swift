@@ -526,7 +526,7 @@ struct PeerVerificationWiringTests {
         func open() { release.signal() }
     }
 
-    @Test func aSlowSignatureCheckDoesNotHoldUpAnotherConnection() async throws {
+    @Test func aSlowSignatureCheckDoesNotHoldUpAnotherConnection() throws {
         let (root, path) = try socketPath("f.sock")
         defer { try? FileManager.default.removeItem(at: root) }
         let gate = FirstCallGate()
@@ -537,11 +537,11 @@ struct PeerVerificationWiringTests {
         try server.start()
         defer { server.stop() }
         let slow = PollingWait.start { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 30) }
-        _ = try await PollingWait.until { gate.entered > 0 }
+        _ = PollingWait.until { gate.entered > 0 }
         #expect(gate.entered == 1, "the first peer is being checked")
-        let second = await PollingWait.blocking { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 5) }
+        let second = UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 5)
         #expect(second == Data("{\"ok\":true}".utf8), "the second peer is not queued behind the first check")
         gate.open()
-        #expect(await slow.value == Data("{\"ok\":true}".utf8), "the slow peer is admitted once its check passes")
+        #expect(slow.wait() == Data("{\"ok\":true}".utf8), "the slow peer is admitted once its check passes")
     }
 }

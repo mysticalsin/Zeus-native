@@ -2,36 +2,29 @@ import Foundation
 
 /// Shared waiting helpers for the socket and native host fixtures.
 ///
-/// The hosted macOS runner has three cores, so the cooperative pool has three threads while thousands of tests start
-/// at once. A waiter can be resumed seconds after its deadline, and a blocking socket call run in a detached task holds
-/// a pool thread for its whole timeout. Waits therefore look at their condition once more after the deadline, use
-/// bounds far above the happy path, and blocking calls run on their own threads.
+/// Why these tests are synchronous. The hosted runner has three cores, so the cooperative pool has three threads, and the
+/// exhaustive voice key walks are CPU bound for minutes each. While they hold every pool thread, an async test that
+/// suspends cannot resume (seen as 2268 s on CI and 632 s locally), and the wall clock deadlines and socket timeouts
+/// it started keep running. A synchronous test keeps its thread from start to end, so its clock only runs while it runs.
+/// Waits also look at their condition once more after the deadline, and blocking calls run on dispatch threads.
 enum PollingWait {
     /// Generous bound for something that normally takes milliseconds. A pass returns at once, so it costs nothing.
     static let eventBound: Duration = .seconds(20)
 
-    /// True once `condition` holds. Gives up at `timeout` or when `giveUp` says so, and then checks one last time,
-    /// because the waiter may only have been resumed after the deadline.
+    /// True once `condition` holds. Gives up at `timeout` or when `giveUp` says so, and then checks one last time.
     static func until(timeout: Duration = eventBound,
                       giveUp: () -> Bool = { false },
-                      pause: () async throws -> Void = { try await Task.sleep(for: .milliseconds(5)) },
-                      _ condition: () -> Bool) async throws -> Bool {
+                      pause: () -> Void = { usleep(5_000) },
+                      _ condition: () -> Bool) -> Bool {
         let deadline = ContinuousClock.now.advanced(by: timeout)
         repeat {
             if condition() { return true }
-            try await pause()
+            pause()
         } while !giveUp() && ContinuousClock.now < deadline
         return condition()
     }
 
-    /// Runs a blocking call on a dispatch thread so it never holds a cooperative pool thread.
-    static func blocking<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(returning: work()) }
-        }
-    }
-
-    /// `blocking`, started now and awaited later.
+    /// Runs a blocking call on a dispatch thread, so a synchronous test can keep several in flight.
     static func start<T: Sendable>(_ work: @escaping @Sendable () -> T) -> Pending<T> {
         let pending = Pending<T>()
         DispatchQueue.global(qos: .userInitiated).async { pending.finish(work()) }
@@ -39,30 +32,18 @@ enum PollingWait {
     }
 
     final class Pending<T: Sendable>: @unchecked Sendable {
-        private let lock = NSLock()
+        private let done = DispatchSemaphore(value: 0)
         private var result: T?
-        private var waiter: CheckedContinuation<T, Never>?
 
         fileprivate func finish(_ value: T) {
-            let resume = lock.withLock { () -> CheckedContinuation<T, Never>? in
-                if let waiter { self.waiter = nil; return waiter }
-                result = value
-                return nil
-            }
-            resume?.resume(returning: value)
+            result = value
+            done.signal()
         }
 
-        var value: T {
-            get async {
-                await withCheckedContinuation { continuation in
-                    let ready = lock.withLock { () -> T? in
-                        if let result { return result }
-                        waiter = continuation
-                        return nil
-                    }
-                    if let ready { continuation.resume(returning: ready) }
-                }
-            }
+        /// Blocks until the work ends. Call it once.
+        func wait() -> T {
+            done.wait()
+            return result!
         }
     }
 }
