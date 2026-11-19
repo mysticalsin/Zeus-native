@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="Resources/Logo.png" width="96" alt="ZEUS logo">
+  <img src="docs/media/banner.png" alt="ZEUS: your Mac's notch as a voice and screen aware co-pilot" width="100%">
 </p>
-
-<h1 align="center">ZEUS</h1>
 
 <p align="center">
   <b>Your Mac's notch, turned into a voice and screen aware co-pilot.</b><br>
@@ -10,10 +8,25 @@
 </p>
 
 <p align="center">
+  <img alt="macOS app" src="https://img.shields.io/badge/macOS-app-000000?logo=apple&logoColor=white">
   <img alt="macOS 14.2+" src="https://img.shields.io/badge/macOS-14.2%2B-000000?logo=apple&logoColor=white">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
   <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-2ea44f">
   <img alt="Keys in Keychain" src="https://img.shields.io/badge/keys-Keychain%20only-6f42c1">
+  <a href="https://github.com/mysticalsin/Zeus-native/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/mysticalsin/Zeus-native?include_prereleases&label=release"></a>
+</p>
+
+<p align="center">
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#keyboard-shortcuts">Shortcuts</a> ·
+  <a href="#privacy">Privacy</a> ·
+  <a href="docs/SHOWCASE.md">Every screen</a> ·
+  <a href="#highlights">Highlights</a> ·
+  <a href="#download">Download</a> ·
+  <a href="#status">Status</a> ·
+  <a href="#layout">Layout</a> ·
+  <a href="#build">Build</a>
 </p>
 
 <p align="center">
@@ -88,6 +101,46 @@ your way and to respect Reduce Motion.
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+### Record your screen
+Recordly captures a display, window or area from the notch, with a countdown, a live timer and a Stop
+button. Cursor follow and a polished export are part of it.
+
+<img src="docs/media/recordly.gif" width="100%" alt="Recordly in the notch: pick a display, countdown, recording, saved">
+
+</td>
+<td width="50%" valign="top">
+
+### Fling files to your other Mac
+Drop files on the Shelf, then send them to a nearby Mac. The receiving Mac gets a card with Accept or
+Decline, and an offer that nobody answers declines by itself.
+
+<img src="docs/media/fling.gif" width="100%" alt="Fling: an incoming transfer card, then the Shelf sending files to a nearby Mac">
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### Tile your windows
+Keyboard window layouts from the notch: move focus, swap windows, flip the split, adjust gaps, and pause
+or resume tiling when you need a free hand.
+
+<img src="docs/media/tiling.gif" width="100%" alt="The Tiling page: layout preview, gap settings and key map">
+
+</td>
+<td width="50%" valign="top">
+
+### Dictate anywhere
+Hold the dictation key, speak, release to type. Pick Voice, Message, Email, Note or Agent prompt, and keep
+a short history you can copy from.
+
+<img src="docs/media/dictation.gif" width="100%" alt="Dictation in the notch: live waveform, modes and history, and a message preview">
+
+</td>
+</tr>
 </table>
 
 ### Approvals that respect your screen
@@ -101,6 +154,52 @@ your way and to respect Reduce Motion.
 <p align="center">
   <img src="docs/media/brief-card.png" width="480" alt="The morning brief card with events and to-dos">
 </p>
+
+**[See every screen](docs/SHOWCASE.md)**: the full gallery, from notch pages to Settings and onboarding.
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+    Key["Talk key"] --> Speech["On-device speech"]
+    Speech --> Brain["Brain CLI of your choice"]
+    Brain --> Tags["Reply tags (ZeusCore)"]
+    Tags --> Actions["Actions"]
+    Actions --> Speak["Speak"]
+    Actions --> Point["Point"]
+    Actions --> Chrome["Chrome via zeus-bridge"]
+    Actions --> Cards["Notch cards"]
+    Agents["Claude Code, Codex, Cursor"] --> Hook["zeus-hook"]
+    Hook --> App["Zeus app"]
+    App --> Approvals["Notch approvals"]
+```
+
+The brain is one of Claude Code, Codex, Gemini, cursor-agent or Ollama, or the Dust API. The shared
+contracts (brain provider, reply tags, hook and bridge envelopes) live in `Sources/ZeusCore`, the menu-bar
+app is `Sources/Zeus`, coding agents call `Sources/zeus-hook`, and the Chrome extension in `extension/`
+talks to the app through `Sources/zeus-bridge`. See [Layout](#layout) for the full map.
+
+## Keyboard shortcuts
+
+| Keys | Action |
+| --- | --- |
+| Control+Option, right Option, right Command or Fn (your choice in Settings) | Talk key: hold, speak, let go |
+| Hold Control and draw | Show me: ZEUS sees what you circled |
+| Escape | Close the panel |
+| ⌘, | Open Settings |
+
+Control+Option is refused while VoiceOver is on, since VoiceOver uses it.
+
+## Privacy
+
+- No telemetry, and no account.
+- Keys live only in the macOS Keychain, never in the repo.
+- Nothing is captured without your OS consent. First launch asks for one permission per step, each
+  explained before macOS asks, and nothing is requested at launch.
+- Speech recognition and Scribe transcription run on device.
+- `zeus-hook` never answers `allow` on its own, and Chrome typing is never done into password or card fields.
 
 ---
 
