@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import contracts as c
+import native_evidence
 
 SPEC = importlib.util.spec_from_file_location("zeus_closed_loop_runner", c.ROOT / "qa/closed-loop/run.py")
 runner = importlib.util.module_from_spec(SPEC)
@@ -52,6 +53,20 @@ class MatrixContractTests(unittest.TestCase):
                         row for row in feature["obligations"] if checks[row["check"]]["tier"] != tier]
                     with self.assertRaisesRegex(c.Invalid, feature["id"] + " needs contract, native integration, and device proof"):
                         c.validate_map(data, self.portable)
+
+    def test_a_suite_nested_in_a_serialized_parent_is_named_parent_slash_suite(self):
+        # Swift Testing reports a nested suite as Module.Parent/Suite/test(); the map names it the same way.
+        checks = c.validate_map(self.data, self.portable)
+        fit = checks["native-ScribeMeetingCardFitTests"]
+        self.assertEqual(fit["suite"], "ScribeMeetingCardHosted/ScribeMeetingCardFitTests")
+        self.assertRegex("ZeusAppTests.ScribeMeetingCardHosted/ScribeMeetingCardFitTests/fit()",
+                         native_evidence.selector([fit]))
+        for bad in ("WrongParent/ScribeMeetingCardFitTests", "ScribeMeetingCardHosted/InventedTests",
+                    "A/B/ScribeMeetingCardFitTests", "ScribeMeetingCardHosted/"):
+            data = copy.deepcopy(self.data)
+            next(row for row in data["checks"] if row["id"] == fit["id"])["suite"] = bad
+            with self.assertRaises(c.Invalid, msg=bad):
+                c.validate_map(data, self.portable)
 
     def test_missing_native_suite_and_missing_case_are_errors(self):
         data = copy.deepcopy(self.data)
@@ -595,12 +610,12 @@ class PortableRetryTests(unittest.TestCase):
         def execute(command, log, timeout, environment=None):
             text = logs[min(len(calls), len(logs) - 1)]
             log.write_text(text)
-            names = re.findall(r"✔ Test ([A-Za-z_][A-Za-z_0-9]*)\(\) passed", text)
-            cases = "\n".join(f'    <testcase classname="Fixture" name="{name}()" time="0.001" />' for name in names)
-            xunit = (f'<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n'
-                     f'  <testsuite name="TestResults" errors="0" tests="{len(names)}" failures="0" skipped="0" time="0.001">\n'
-                     f"{cases}\n  </testsuite>\n</testsuites>\n")
-            (log.parent / "results-swift-testing.xml").write_text(xunit)
+            # swift test also writes structured results beside the console log; they keep every case the log lost.
+            names = re.findall(r"◇ Test (\w+)\(\) started", text)
+            cases = "".join(f'<testcase classname="S" name="{name}()" time="0.1"/>' for name in names)
+            c.swift_testing_xunit_path(log.parent / "results.xml").write_text(
+                '<?xml version="1.0" encoding="UTF-8"?><testsuites><testsuite name="TestResults" errors="0" '
+                f'tests="{len(names)}" failures="0" skipped="0" time="0.1">{cases}</testsuite></testsuites>')
             calls.append(command)
             return 0, 0.1
         with tempfile.TemporaryDirectory() as directory:
@@ -632,7 +647,8 @@ class PortableRetryTests(unittest.TestCase):
         lossy = swift_log(["one", "two"], lost=("two",))
         row, calls, _ = self.run_portable([lossy])
         self.assertEqual(calls, self.ATTEMPT_LIMIT)
-        self.assertEqual(row["passed_functions"], ["one"])
+        # The structured results (PR #7) are the evidence: they keep the case the console log kept dropping.
+        self.assertEqual(row["passed_functions"], ["one", "two"])
 
     def test_a_failing_run_is_never_retried(self):
         failed = "✘ Test one() recorded an issue: expected value\n✘ Test run with 1 test in 1 suite failed after 0.1 seconds.\n"
