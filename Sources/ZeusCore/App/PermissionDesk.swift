@@ -45,4 +45,40 @@ public enum PermissionDesk {
 
     /// A grant is recorded only when the probe says it is allowed.
     public static func record(probe: Status) -> Status { probe }
+
+    public enum Action: String, Sendable {
+        /// The status line.
+        case describe
+        /// The button that asks or opens Settings.
+        case advance
+    }
+
+    public struct Decision: Equatable, Sendable {
+        public var can: Bool
+        public var reason: String
+        public init(can: Bool, reason: String) {
+            self.can = can
+            self.reason = reason
+        }
+    }
+
+    /// One check for a capability. `reason` is the status line or the button title.
+    /// `can` is false when the button must stay disabled.
+    public static func can(resource: Kind, action: Action, status: Status) -> Decision {
+        switch action {
+        case .describe:
+            switch status {
+            case .unknown: return Decision(can: true, reason: "Not asked")
+            case .allowed: return Decision(can: true, reason: "Allowed")
+            case .denied: return Decision(can: true, reason: "Not allowed")
+            case .unavailable: return Decision(can: false, reason: "Unavailable")
+            }
+        case .advance:
+            if status == .allowed || status == .unavailable {
+                return Decision(can: false, reason: can(resource: resource, action: .describe, status: status).reason)
+            }
+            let prompts = rows.first { $0.kind == resource }?.canPrompt == true
+            return Decision(can: true, reason: prompts ? "Allow" : "Open Settings")
+        }
+    }
 }

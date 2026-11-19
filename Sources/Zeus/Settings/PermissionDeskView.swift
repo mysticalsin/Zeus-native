@@ -10,14 +10,17 @@ struct PermissionDeskView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Permissions").font(.system(size: 16, weight: .semibold))
             ForEach(PermissionDesk.rows, id: \.kind) { row in
+                let state = status[row.kind] ?? .unknown
+                let described = PermissionDesk.can(resource: row.kind, action: .describe, status: state)
+                let advance = PermissionDesk.can(resource: row.kind, action: .advance, status: state)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title).font(.system(size: 13, weight: .semibold))
-                        Text(label(status[row.kind] ?? .unknown)).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(described.reason).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button(row.canPrompt ? "Allow" : "Open Settings") { allow(row.kind) }
-                        .disabled(status[row.kind] == .allowed)
+                    Button(advance.reason) { allow(row.kind) }
+                        .disabled(!advance.can)
                 }
             }
             Button("Grant everything") { grantRemaining() }
@@ -25,14 +28,5 @@ struct PermissionDeskView: View {
         }
         .padding(16)
         .frame(maxWidth: 480, alignment: .leading)
-    }
-
-    private func label(_ status: PermissionDesk.Status) -> String {
-        switch status {
-        case .unknown: "Not asked"
-        case .allowed: "Allowed"
-        case .denied: "Not allowed"
-        case .unavailable: "Unavailable"
-        }
     }
 }

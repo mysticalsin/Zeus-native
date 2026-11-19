@@ -26,4 +26,19 @@ struct PermissionDeskTests {
         #expect(PermissionDesk.record(probe: .denied) == .denied)
         #expect(PermissionDesk.record(probe: .unknown) != .allowed)
     }
+
+    @Test func oneCheckDecidesTheButton() {
+        let allow = PermissionDesk.can(resource: .microphone, action: .advance, status: .unknown)
+        #expect(allow.can)
+        #expect(allow.reason == "Allow")
+        let settings = PermissionDesk.can(resource: .screen, action: .advance, status: .denied)
+        #expect(settings.can)
+        #expect(settings.reason == "Open Settings")
+        let done = PermissionDesk.can(resource: .microphone, action: .advance, status: .allowed)
+        #expect(done.can == false)
+        #expect(done.reason == "Allowed")
+        let gone = PermissionDesk.can(resource: .camera, action: .describe, status: .unavailable)
+        #expect(gone.can == false)
+        #expect(gone.reason == "Unavailable")
+    }
 }
