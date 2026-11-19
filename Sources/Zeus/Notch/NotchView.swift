@@ -866,8 +866,8 @@ private struct PanelBody: View {
 
             ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
                 AgentCard(session: session, onStop: model.stopHandlers[session.id],
-                          onAllow: { model.approval?.resolve(.allow) },
-                          onDeny: { model.approval?.resolve(.deny) },
+                          onAllow: { if model.approval?.sessionID == session.id { model.approval?.resolve(.allow) } },
+                          onDeny: { if model.approval?.sessionID == session.id { model.approval?.resolve(.deny) } },
                           picked: model.picker?.index == index)
             }
         }
@@ -929,8 +929,8 @@ private struct TopBarPanelBody: View {
                 }
                 ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
                     AgentCard(session: session, onStop: model.stopHandlers[session.id],
-                          onAllow: { model.approval?.resolve(.allow) },
-                          onDeny: { model.approval?.resolve(.deny) },
+                          onAllow: { if model.approval?.sessionID == session.id { model.approval?.resolve(.allow) } },
+                          onDeny: { if model.approval?.sessionID == session.id { model.approval?.resolve(.deny) } },
                           picked: model.picker?.index == index)
                 }
                 if model.picker != nil {
