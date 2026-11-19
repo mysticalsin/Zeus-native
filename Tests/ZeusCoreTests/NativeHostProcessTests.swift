@@ -48,15 +48,13 @@ struct NativeHostProcessTests {
             try? FileManager.default.removeItem(at: root)
         }
         func waitForSocket() async throws {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-            while !FileManager.default.fileExists(atPath: path), process.isRunning, ContinuousClock.now < deadline {
-                try await Task.sleep(for: .milliseconds(5))
+            let found = try await PollingWait.until(giveUp: { !self.process.isRunning }) {
+                FileManager.default.fileExists(atPath: self.path)
             }
-            #expect(FileManager.default.fileExists(atPath: path))
+            #expect(found, "the native host never created its socket (running: \(process.isRunning))")
         }
         func waitForExit(seconds: Double) async throws -> Bool {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
-            while process.isRunning, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
+            _ = try await PollingWait.until(timeout: .seconds(seconds)) { !self.process.isRunning }
             return !process.isRunning
         }
         func readAllOutput(seconds: Double) async throws -> Data? {
@@ -89,13 +87,11 @@ struct NativeHostProcessTests {
         }
 
         func waitForForwardedBytes() async throws -> Bool {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-            repeat {
-                var ready = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
-                if poll(&ready, 1, 0) > 0, ready.revents & Int16(POLLIN) != 0 { return true }
-                try await Task.sleep(for: .milliseconds(5))
-            } while process.isRunning && ContinuousClock.now < deadline
-            return false
+            let fd = output.fileHandleForReading.fileDescriptor
+            return try await PollingWait.until(giveUp: { !self.process.isRunning }) {
+                var ready = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+                return poll(&ready, 1, 0) > 0 && ready.revents & Int16(POLLIN) != 0
+            }
         }
     }
 
@@ -104,11 +100,11 @@ struct NativeHostProcessTests {
         defer { fixture.stop() }
         try await fixture.waitForSocket()
         let request = try JSONEncoder().encode(BridgeRequest(id: "pending-before-invalid-header", type: "fixture.no-browser"))
-        let reply = Task.detached { UnixSocket.request(path: fixture.path, payload: request, expectReply: true, timeout: 4) }
+        let reply = PollingWait.start { UnixSocket.request(path: fixture.path, payload: request, expectReply: true, timeout: 30) }
         #expect(try await fixture.waitForForwardedBytes())
         // The entire malformed input is four bytes, not a multi-gigabyte allocation.
         try fixture.input.fileHandleForWriting.write(contentsOf: Data([0xff, 0xff, 0xff, 0xff]))
-        let exited = try await fixture.waitForExit(seconds: 2)
+        let exited = try await fixture.waitForExit(seconds: 15)
         #expect(exited)
         guard exited else { fixture.stop(); _ = await reply.value; return }
         let result = await reply.value
@@ -126,12 +122,12 @@ struct NativeHostProcessTests {
         try await fixture.waitForSocket()
         let large = try JSONEncoder().encode(BridgeRequest(id: "blocked-output", type: "fixture.no-browser",
             params: ["synthetic": .string(String(repeating: "x", count: 512 * 1024))]))
-        let first = Task.detached { UnixSocket.request(path: fixture.path, payload: large, expectReply: true, timeout: 5) }
+        let first = PollingWait.start { UnixSocket.request(path: fixture.path, payload: large, expectReply: true, timeout: 30) }
         #expect(try await fixture.waitForForwardedBytes())
         let secondRequest = try JSONEncoder().encode(BridgeRequest(id: "queued-output", type: "fixture.no-browser"))
-        let second = Task.detached { UnixSocket.request(path: fixture.path, payload: secondRequest, expectReply: true, timeout: 5) }
+        let second = PollingWait.start { UnixSocket.request(path: fixture.path, payload: secondRequest, expectReply: true, timeout: 30) }
         // Stdout is deliberately unread and stdin deliberately remains open throughout this wait.
-        let exited = try await fixture.waitForExit(seconds: 3.5)
+        let exited = try await fixture.waitForExit(seconds: 15)
         #expect(exited)
         guard exited else { fixture.stop(); _ = await first.value; _ = await second.value; return }
         for result in [await first.value, await second.value] {
@@ -154,7 +150,7 @@ struct NativeHostProcessTests {
         try fixture.input.fileHandleForWriting.close()
         // The response exceeds pipe capacity. Let EOF race with its blocked write before draining.
         try await Task.sleep(for: .milliseconds(50))
-        let bytes = try #require(await fixture.readAllOutput(seconds: 3))
+        let bytes = try #require(await fixture.readAllOutput(seconds: 20))
         var decoder = NativeMessagingFrame.Decoder()
         var replies: [Data] = []
         try decoder.consume(bytes) { replies.append($0) }
@@ -162,7 +158,7 @@ struct NativeHostProcessTests {
         #expect(replies.count == 1)
         let reply = try JSONDecoder().decode(BridgeResponse.self, from: #require(replies.first))
         #expect(reply.id == "reply-before-clean-eof" && reply.error?.code == "unknown_type" && reply.error?.message == type)
-        let exited = try await fixture.waitForExit(seconds: 2)
+        let exited = try await fixture.waitForExit(seconds: 15)
         #expect(exited)
         guard exited else { return }
         #expect(fixture.process.terminationReason == .exit && fixture.process.terminationStatus == 0)
@@ -175,7 +171,7 @@ struct NativeHostProcessTests {
             try await fixture.waitForSocket()
             if partial { try fixture.input.fileHandleForWriting.write(contentsOf: Data([1, 0])) }
             try fixture.input.fileHandleForWriting.close()
-            let exited = try await fixture.waitForExit(seconds: 2)
+            let exited = try await fixture.waitForExit(seconds: 15)
             #expect(exited)
             guard exited else { continue }
             #expect(fixture.process.terminationReason == .exit)

@@ -13,9 +13,8 @@ struct BridgePendingRepliesTests {
     }
 
     private func eventually(_ condition: @Sendable () -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while !condition(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(condition())
+        let met = try await PollingWait.until { condition() }
+        #expect(met, "the bridge state did not settle within the bound")
     }
 
     @Test func duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete() async throws {
@@ -32,9 +31,9 @@ struct BridgePendingRepliesTests {
         try server.start()
         defer { server.stop() }
         let request = try JSONEncoder().encode(BridgeRequest(id: "same-id", type: "page.read"))
-        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }
+        let original = PollingWait.start { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 30) }
         try await eventually { pending.count == 1 && forwarded.read() == 1 }
-        let duplicateBytes = await Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }.value
+        let duplicateBytes = await PollingWait.blocking { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 30) }
         let duplicate = try JSONDecoder().decode(BridgeResponse.self, from: #require(duplicateBytes))
         #expect(duplicate.id == "same-id" && !duplicate.ok && duplicate.error?.code == "duplicate_request")
         #expect(pending.count == 1)

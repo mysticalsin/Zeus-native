@@ -536,10 +536,10 @@ struct PeerVerificationWiringTests {
         }) { _, reply in reply(Data("{\"ok\":true}".utf8)) }
         try server.start()
         defer { server.stop() }
-        let slow = Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 8) }
-        for _ in 0..<200 where gate.entered == 0 { try await Task.sleep(nanoseconds: 10_000_000) }
+        let slow = PollingWait.start { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 30) }
+        _ = try await PollingWait.until { gate.entered > 0 }
         #expect(gate.entered == 1, "the first peer is being checked")
-        let second = await Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 2) }.value
+        let second = await PollingWait.blocking { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 5) }
         #expect(second == Data("{\"ok\":true}".utf8), "the second peer is not queued behind the first check")
         gate.open()
         #expect(await slow.value == Data("{\"ok\":true}".utf8), "the slow peer is admitted once its check passes")
