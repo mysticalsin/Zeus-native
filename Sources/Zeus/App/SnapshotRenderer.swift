@@ -645,14 +645,14 @@ enum SnapshotRenderer {
             save(stage, size: CGSize(width: 960, height: 420), scale: 2, to: directory.appendingPathComponent(name))
         }
         let run = approval("Bash", "git status --short")
-        saveCard("approval-run-dark.png", run, .dark)
-        saveCard("approval-run-light.png", run, .light)
-        saveCard("approval-edit-dark.png", approval("Edit", "View.swift") { $0.changedFile = "View.swift"; $0.addedLines = 4; $0.removedLines = 1 }, .dark)
-        saveCard("approval-high-hold-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.reasons = ["deletes files"]; $0.holdElapsed = 0.4 }, .dark)
-        saveCard("approval-queue-dark.png", approval("Bash", "git status") { $0.queueCount = 3; $0.queueIndex = 0; $0.position = "1 of 3" }, .dark)
-        saveCard("approval-allowed-dark.png", approval("Bash", "git status") { $0.phase = .allowed }, .dark)
-        saveCard("approval-timeout-dark.png", approval("Bash", "git status") { $0.phase = .timedOut }, .dark)
-        saveCard("approval-high-confirm-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.allowStep = .confirm; $0.reasons = ["deletes files"] }, .dark)
+        saveCard("approval-run-dark.png", run, scheme: .dark)
+        saveCard("approval-run-light.png", run, scheme: .light)
+        saveCard("approval-edit-dark.png", approval("Edit", "View.swift") { $0.changedFile = "View.swift"; $0.addedLines = 4; $0.removedLines = 1 }, scheme: .dark)
+        saveCard("approval-high-hold-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.reasons = ["deletes files"]; $0.holdElapsed = 0.4 }, scheme: .dark)
+        saveCard("approval-queue-dark.png", approval("Bash", "git status") { $0.queueCount = 3; $0.queueIndex = 0; $0.position = "1 of 3" }, scheme: .dark)
+        saveCard("approval-allowed-dark.png", approval("Bash", "git status") { $0.phase = .allowed }, scheme: .dark)
+        saveCard("approval-timeout-dark.png", approval("Bash", "git status") { $0.phase = .timedOut }, scheme: .dark)
+        saveCard("approval-high-confirm-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.allowStep = .confirm; $0.reasons = ["deletes files"] }, scheme: .dark)
     }
 
     private static func renderParityStates(into directory: URL, notch: CGSize) {
