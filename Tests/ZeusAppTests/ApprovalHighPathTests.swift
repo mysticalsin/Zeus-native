@@ -159,9 +159,10 @@ import ZeusCore
         var posted: [String] = []
         controller.postApprovalAnnouncement = { posted.append($0) }
         controller.browseApproval(by: 1)
-        #expect(controller.lastApprovalAnnouncement?.contains("second") == true)
-        #expect(posted.contains { $0.contains("second") })
+        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .high, position: "2 of 2", outcome: nil))
+        #expect(posted.last == ApprovalCard.announcement(risk: .high, position: "2 of 2", outcome: nil))
         controller.advanceAfterDisplayed("B")
+        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .low, position: "1 of 1", outcome: nil))
         controller.advanceAfterDisplayed("A")
         #expect(controller.lastApprovalAnnouncement == "No request is waiting.")
         #expect(posted.last == "No request is waiting.")
@@ -169,7 +170,7 @@ import ZeusCore
 
     @Test func sendAnswersDuringTheQuietIntervalKeepsWhatWasTyped() {
         let (controller, _) = controller(reduceMotion: true)
-        let detail = ApprovalDetail(kind: .questions([]), input: .object([:]), session: "s")
+        let detail = ApprovalDetail(kind: .questions([]), input: .object(["q": .string("a")]), session: "s")
         controller.model.approval?.detail = detail
         controller.model.approval?.appearedAt = Date()
         detail.answer()
@@ -266,17 +267,24 @@ import ZeusCore
     @Test func theProductionAllowClosureCarriesTheRequestID() async {
         let controller = NotchController()
         controller.monotonicNow = { 1_000 }
-        let task = Task { await controller.requestApproval(agent: "Claude", project: "zeus", tool: "Bash", command: "ls", risk: .low) }
-        for _ in 0..<20 {
+        let task = Task {
+            await controller.requestApproval(agent: "Claude", project: "zeus", tool: "Bash", command: "ls", risk: .low)
+        }
+        for _ in 0..<30 {
             if controller.model.approval != nil { break }
             await Task.yield()
         }
-        let id = controller.model.approval?.id
+        let produced = controller.model.approval
+        let aimed = produced?.activateAllow
+        let other = Box()
+        controller.stageApprovals([card(id: "other", command: "other", box: other)])
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.model.approval?.activateAllow()
-        let verdict = await task.value
-        #expect(id != nil)
-        #expect(verdict == .allow)
+        aimed?()
+        #expect(produced?.id != nil)
+        #expect(produced?.id != "other")
+        #expect(other.verdict == nil)
+        produced?.resolve(.deny)
+        #expect(await task.value == .deny)
     }
 
     @Test func sendAnswersUsesTheDisplayedCommitPath() {
