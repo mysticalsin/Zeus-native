@@ -317,6 +317,13 @@ final class NotchController {
     private(set) var pendingApprovals: [NotchModel.Approval] = []
     /// The last card VoiceOver was told about after a swap, a browse, or a removal.
     var lastApprovalAnnouncement: String?
+    /// Where an announcement is posted. Tests replace it; the app posts to VoiceOver.
+    var postApprovalAnnouncement: (String) -> Void = { line in
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+            .announcement: line,
+            .priority: NSAccessibilityPriorityLevel.high.rawValue,
+        ])
+    }
 
     func stageApprovals(_ cards: [NotchModel.Approval]) {
         pendingApprovals = []
@@ -376,7 +383,9 @@ final class NotchController {
 
     /// Records the on-screen answers, then runs the same release as Allow.
     func commitDisplayedAnswers(inside: Bool) {
-        guard model.approval != nil else { return }
+        guard let card = model.approval else { return }
+        // The quiet interval is "not yet". The typed answers stay where they are.
+        guard ApprovalCard.inputOpen(now: Date(), appearedAt: card.appearedAt) else { return }
         let gesture = displayedGesture()
         switch ApprovalDetailPress.planRelease(inside: inside, gesture: gesture) {
         case .cancel:
@@ -454,12 +463,13 @@ final class NotchController {
 
     private func announceDisplayed(outcome: String? = nil) {
         guard let card = model.approval else { return }
-        let line = ApprovalCard.announcement(risk: card.risk, position: card.position, outcome: outcome)
+        let line = ApprovalCard.announcement(risk: card.risk, content: card.command, position: card.position, outcome: outcome)
+        postAnnouncement(line)
+    }
+
+    private func postAnnouncement(_ line: String) {
         lastApprovalAnnouncement = line
-        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
-            .announcement: line,
-            .priority: NSAccessibilityPriorityLevel.high.rawValue,
-        ])
+        postApprovalAnnouncement(line)
     }
 
     /// The shown card left. The next one, if any, becomes the card on screen.
@@ -471,7 +481,10 @@ final class NotchController {
         let wasVisible = model.approval?.id == id
         pendingApprovals.removeAll { $0.id == id }
         if pendingApprovals.isEmpty {
-            if wasVisible { model.approval = nil }
+            if wasVisible {
+                model.approval = nil
+                postAnnouncement("No request is waiting.")
+            }
             return
         }
         if wasVisible {

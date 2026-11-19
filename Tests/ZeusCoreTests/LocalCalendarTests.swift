@@ -11,17 +11,19 @@ struct LocalCalendarTests {
     }
 
     @Test func aTitleThatSaysExchangeIsNotTheAccountType() {
-        #expect(!LocalCalendarAccess.outlookVisible(calendarSources: ["Exchange Work"]))
-        #expect(LocalCalendarAccess.outlookReport(status: .denied, sources: []).contains("denied"))
-        #expect(!LocalCalendarAccess.outlookReport(status: .denied, sources: []).contains("not in the Mac's calendars"))
+        #expect(LocalCalendarAccess.outlookVisible(sources: [.exchange]))
+        #expect(!LocalCalendarAccess.outlookVisible(sources: [.other]))
+        #expect(LocalCalendarAccess.outlookReport(status: .denied, sources: [.exchange]).contains("denied"))
+        #expect(!LocalCalendarAccess.outlookReport(status: .denied, sources: [.exchange]).contains("not in the Mac's calendars"))
         #expect(LocalCalendarAccess.outlookReport(status: .notAsked, sources: []).contains("not been asked"))
+        #expect(!LocalCalendarAccess.outlookReport(status: .notAsked, sources: []).contains("not in the Mac's calendars"))
     }
 
     @Test func outlookIsVisibleOnlyWhenEventKitListsThatAccount() {
-        #expect(LocalCalendarAccess.outlookVisible(calendarSources: ["iCloud", "Exchange Work"]))
-        #expect(!LocalCalendarAccess.outlookVisible(calendarSources: ["iCloud", "On My Mac"]))
-        #expect(LocalCalendarAccess.outlookReport(calendarSources: ["iCloud"]).contains("not in the Mac's calendars"))
-        #expect(LocalCalendarAccess.outlookReport(calendarSources: ["Outlook"]).contains("visible"))
+        #expect(LocalCalendarAccess.outlookVisible(sources: [.other, .exchange]))
+        #expect(!LocalCalendarAccess.outlookVisible(sources: [.other]))
+        #expect(LocalCalendarAccess.outlookReport(status: .allowed, sources: [.other]).contains("not in the Mac's calendars"))
+        #expect(LocalCalendarAccess.outlookReport(status: .allowed, sources: [.exchange]).contains("visible"))
     }
 
     @Test func outlookIsNotScripted() {

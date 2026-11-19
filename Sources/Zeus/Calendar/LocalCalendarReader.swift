@@ -16,19 +16,17 @@ enum LocalCalendarReader {
         }
     }
 
-    /// Asks the first time the feature is used. A later call does not prompt again.
-    static func ensureAccess() async -> LocalCalendarAccess.Status {
-        if status == .allowed || status == .denied || status == .restricted { return status }
-        let granted = (try? await store.requestFullAccessToEvents()) ?? false
-        return granted ? .allowed : status
-    }
+    /// The reader has no caller, so it does not ask for calendar access.
+    static func ensureAccess() async -> LocalCalendarAccess.Status { status }
 
-    static func sourceNames() -> [String] {
+    static func sourceKinds() -> [LocalCalendarAccess.SourceKind] {
         guard status == .allowed else { return [] }
-        return store.calendars(for: .event).map(\.source.title)
+        return store.calendars(for: .event).map { calendar in
+            calendar.source.sourceType == .exchange ? .exchange : .other
+        }
     }
 
     static var outlookReport: String {
-        LocalCalendarAccess.outlookReport(calendarSources: sourceNames())
+        LocalCalendarAccess.outlookReport(status: status, sources: sourceKinds())
     }
 }

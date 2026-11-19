@@ -45,12 +45,42 @@ import ZeusCore
             card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
             card(id: "B", command: "second", box: second),
         ])
+        let aimedAtA = controller.model.approval?.activateAllow
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
         controller.activateApproval(kind: .card)
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
+        aimedAtA?()
         #expect(first.verdict == .allow)
         #expect(second.verdict == nil)
+    }
+
+    @Test func anOldCardIDDoesNotApproveAfterTheQuietInterval() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card, cardID: "A")
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card, cardID: "A")
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func aHoldDoesNotStartDuringTheQuietInterval() {
+        let box = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([card(id: "A", command: "hold", box: box, risk: .high)])
+        controller.beginApprovalHold()
+        controller.monotonicNow = { 1_000 + 1 }
+        controller.endApprovalHold(inside: true)
+        #expect(box.verdict == nil)
+        #expect(controller.model.approval?.allowGate.holdingSince == nil)
     }
 
     @Test func aVoiceOverActionAcrossASwapDoesNotApproveTheNextCard() {
@@ -126,16 +156,20 @@ import ZeusCore
             card(id: "A", command: "first", box: Box()),
             card(id: "B", command: "second", box: Box(), risk: .high),
         ])
+        var posted: [String] = []
+        controller.postApprovalAnnouncement = { posted.append($0) }
         controller.browseApproval(by: 1)
         #expect(controller.lastApprovalAnnouncement?.contains("second") == true)
+        #expect(posted.contains { $0.contains("second") })
         controller.advanceAfterDisplayed("B")
         controller.advanceAfterDisplayed("A")
         #expect(controller.lastApprovalAnnouncement == "No request is waiting.")
+        #expect(posted.last == "No request is waiting.")
     }
 
     @Test func sendAnswersDuringTheQuietIntervalKeepsWhatWasTyped() {
         let (controller, _) = controller(reduceMotion: true)
-        let detail = ApprovalDetail(kind: .questions([]), input: .object(["q": .string("a")]), session: "s")
+        let detail = ApprovalDetail(kind: .questions([]), input: .object([:]), session: "s")
         controller.model.approval?.detail = detail
         controller.model.approval?.appearedAt = Date()
         detail.answer()
@@ -227,6 +261,22 @@ import ZeusCore
         #expect(denied.updatedInput == nil)
         #expect(asked.updatedInput == nil)
         #expect(box.verdict == nil)
+    }
+
+    @Test func theProductionAllowClosureCarriesTheRequestID() async {
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        let task = Task { await controller.requestApproval(agent: "Claude", project: "zeus", tool: "Bash", command: "ls", risk: .low) }
+        for _ in 0..<20 {
+            if controller.model.approval != nil { break }
+            await Task.yield()
+        }
+        let id = controller.model.approval?.id
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.model.approval?.activateAllow()
+        let verdict = await task.value
+        #expect(id != nil)
+        #expect(verdict == .allow)
     }
 
     @Test func sendAnswersUsesTheDisplayedCommitPath() {

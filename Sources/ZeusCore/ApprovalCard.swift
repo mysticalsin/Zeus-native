@@ -213,8 +213,10 @@ public enum ApprovalCard {
         return now < deadline
     }
 
-    public static func announcement(risk: HookEvent.Risk, position: String, outcome: String?) -> String {
+    public static func announcement(risk: HookEvent.Risk, content: String = "", position: String, outcome: String?) -> String {
         var parts = [risk == .high ? "High risk" : "Request"]
+        let words = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !words.isEmpty { parts.append(words) }
         if !position.isEmpty { parts.append(position) }
         if let outcome, !outcome.isEmpty { parts.append(outcome) }
         return parts.joined(separator: ", ")

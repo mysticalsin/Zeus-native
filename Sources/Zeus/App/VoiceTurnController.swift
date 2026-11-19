@@ -480,7 +480,7 @@ final class VoiceTurnController {
                                                  deny: options.words("voice.denyWords"), open: options.words("voice.openWords")) {
             if verdict == .allow {
                 let before = approval.id
-                notch.activateApproval(kind: .voice)
+                notch.activateApproval(kind: .voice, cardID: approval.id)
                 if notch.model.approval?.id == before {
                     buddy.idle()
                     say("That one needs the button.")

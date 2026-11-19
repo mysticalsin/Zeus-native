@@ -13,30 +13,31 @@ public enum LocalCalendarAccess {
         return asked ? .denied : .notAsked
     }
 
-    /// True when one of the calendars EventKit can see is an Exchange or Outlook account
-    /// the person already added to the Mac.
-    public static func outlookVisible(calendarSources: [String]) -> Bool {
-        calendarSources.contains { source in
-            let name = source.lowercased()
-            return name == "outlook" || name == "exchange" || name.hasPrefix("outlook ") || name.hasPrefix("exchange ")
-        }
-    }
-
+    /// The account type EventKit reports. A calendar title is not this.
     public enum SourceKind: Equatable, Sendable {
         case exchange
         case other
     }
 
-    /// Still the title report. Denied and not-asked are not their own sentences yet.
-    public static func outlookReport(status: Status, sources: [SourceKind]) -> String {
-        outlookReport(calendarSources: [])
+    /// True when one of the calendars EventKit can see is an Exchange account.
+    public static func outlookVisible(sources: [SourceKind]) -> Bool {
+        sources.contains(.exchange)
     }
 
-    public static func outlookReport(calendarSources: [String]) -> String {
-        if outlookVisible(calendarSources: calendarSources) {
-            return "Outlook is visible through the Mac's calendars."
+    public static func outlookReport(status: Status, sources: [SourceKind]) -> String {
+        switch status {
+        case .notAsked:
+            return "Calendar access has not been asked."
+        case .denied:
+            return "Calendar access is denied."
+        case .restricted:
+            return "Calendar access is restricted."
+        case .allowed:
+            if outlookVisible(sources: sources) {
+                return "Outlook is visible through the Mac's calendars."
+            }
+            return "Outlook's calendar is not in the Mac's calendars. Add that account in System Settings, Internet Accounts. Zeus does not connect to Outlook itself."
         }
-        return "Outlook's calendar is not in the Mac's calendars. Add that account in System Settings, Internet Accounts. Zeus does not connect to Outlook itself."
     }
 
     public static let permissionsNote = "Agenda from the calendars on this Mac. Read only. Asked only when you turn the agenda on."

@@ -795,6 +795,9 @@ class ApprovalQueueGuardTests(unittest.TestCase):
         self.assertIn("activateApproval(kind: .voice, cardID:", voice)
         reader = (c.ROOT / "Sources/Zeus/Calendar/LocalCalendarReader.swift").read_text()
         self.assertNotIn("requestFullAccessToEvents", reader)
+        controller = (c.ROOT / "Sources/Zeus/Notch/NotchController.swift").read_text()
+        self.assertIn("postApprovalAnnouncement(line)", controller)
+        self.assertIn("NSAccessibility.post", controller)
 
 
 if __name__ == "__main__":
