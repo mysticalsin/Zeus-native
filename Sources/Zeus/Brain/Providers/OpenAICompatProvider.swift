@@ -67,7 +67,7 @@ final class OpenAICompatProvider: BrainProvider, @unchecked Sendable {
                 let started = Date()
                 var firstTokenLogged = false
                 do {
-                    let (bytes, response) = try await BrainHTTP.session.bytes(for: self.urlRequest(prompt: request.transcript, system: request.systemPrompt, maxTokens: request.deep ? 1024 : 512))
+                    let (bytes, response) = try await BrainHTTP.session.bytes(for: self.urlRequest(prompt: request.transcript, system: ScreenSightNote.textOnlySystemPrompt(for: request), maxTokens: request.deep ? 1024 : 512))
                     if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                         var data = Data()
                         for try await byte in bytes { data.append(byte); if data.count > 2048 { break } }

@@ -114,3 +114,12 @@ struct RecordlyVisualsTests {
         #expect(RecordlyClipSummary.line(duration: nil, bytes: nil) == "")
     }
 }
+
+@Suite("Recordly live meter rows")
+struct RecordlyLiveMeterRowsTests {
+    @Test func micRowShowsOnlyWhenMicrophoneCaptureIsOn() {
+        #expect(!RecordlyLiveMeterRows.showsMic(RecordlyAudioOptions(microphone: false, systemAudio: true)))
+        #expect(!RecordlyLiveMeterRows.showsMic(RecordlyAudioOptions(microphone: false, systemAudio: false)))
+        #expect(RecordlyLiveMeterRows.showsMic(RecordlyAudioOptions(microphone: true, systemAudio: false)))
+    }
+}

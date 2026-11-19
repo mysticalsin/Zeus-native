@@ -258,4 +258,46 @@ struct UnixSocketSafetyTests {
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == original.path)
         #expect(UnixSocket.address(for: "/tmp/hidden\0tail") == nil)
     }
+
+    // MARK: Told-apart outcomes
+
+    @Test func exchangeTellsAMissingPathASilentListenerAndAClosingOneApart() async throws {
+        let root = try location()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let payload = Data("{\"type\":\"ping\"}".utf8)
+
+        let missing = root.appendingPathComponent("missing.sock").path
+        #expect(await Task.detached { UnixSocket.exchange(path: missing, payload: payload, timeout: 0.4) }.value == .notConnected)
+        #expect(await Task.detached { UnixSocket.request(path: missing, payload: payload, expectReply: true, timeout: 0.4) }.value == nil)
+
+        let silentPath = root.appendingPathComponent("silent.sock").path
+        let held = Box<UnixSocketServer.Reply?>(nil)
+        let silent = UnixSocketServer(path: silentPath) { _, reply in held.set(reply) }
+        try silent.start()
+        defer { silent.stop() }
+        let began = ContinuousClock.now
+        #expect(await Task.detached { UnixSocket.exchange(path: silentPath, payload: payload, timeout: 0.4) }.value == .timedOut)
+        #expect(began.duration(to: .now) < .seconds(2), "the wait stays inside its bound")
+        #expect(await Task.detached { UnixSocket.request(path: silentPath, payload: payload, expectReply: true, timeout: 0.4) }.value == nil)
+
+        let closingPath = root.appendingPathComponent("closing.sock").path
+        let closing = UnixSocketServer(path: closingPath) { _, reply in reply(nil) }
+        try closing.start()
+        defer { closing.stop() }
+        #expect(await Task.detached { UnixSocket.exchange(path: closingPath, payload: payload, timeout: 1) }.value == .closedEarly)
+        #expect(await Task.detached { UnixSocket.request(path: closingPath, payload: payload, expectReply: true, timeout: 1) }.value == nil)
+    }
+
+    @Test func exchangeReturnsTheReplyLineAndNeverSendsAnOverlongPayload() async throws {
+        let root = try location()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("ok.sock").path
+        let server = UnixSocketServer(path: path) { line, reply in reply(line) }
+        try server.start()
+        defer { server.stop() }
+        let echoed = await Task.detached { UnixSocket.exchange(path: path, payload: Data("hello".utf8), timeout: 1) }.value
+        #expect(echoed == .reply(Data("hello".utf8)))
+        let none = await Task.detached { UnixSocket.exchange(path: path, payload: Data(repeating: 0x78, count: UnixSocket.maximumMessageBytes + 1), timeout: 1) }.value
+        #expect(none == .notConnected, "a payload over the limit is never sent")
+    }
 }

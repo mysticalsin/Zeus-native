@@ -506,3 +506,109 @@ export function extractText(limit: number): { url: string; title: string; text: 
   }
   return { url: location.href, title: document.title, text: cut, length: text.length, truncated: cut !== text };
 }
+
+/**
+ * What the page's best media element says, read only. The element is chosen by the helper below: `video` and
+ * `audio` in this frame that carry no MediaStream (a call), have a source, are not muted and are not silent,
+ * ranked by playing, then largest visible area, then longest finite length. A page with only a MediaStream gives
+ * nothing, so a call is never read. The fingerprint is a short hash of the source and rounded length: it names the
+ * element and is never the address.
+ */
+export function mediaState() {
+  const choose = (): HTMLMediaElement | null => {
+    const area = (el: HTMLMediaElement) => {
+      const rect = el.getBoundingClientRect();
+      const width = Math.min(rect.right, innerWidth) - Math.max(rect.left, 0);
+      const height = Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0);
+      return width > 0 && height > 0 ? width * height : 0;
+    };
+    const length = (el: HTMLMediaElement) => (Number.isFinite(el.duration) ? el.duration : 0);
+    const candidates = Array.from(document.querySelectorAll<HTMLMediaElement>("video, audio"))
+      .filter((el) => el.srcObject === null && el.currentSrc !== "" && !el.muted && el.volume > 0);
+    candidates.sort((a, b) => Number(a.paused) - Number(b.paused) || area(b) - area(a) || length(b) - length(a));
+    return candidates[0] ?? null;
+  };
+  const fingerprint = (el: HTMLMediaElement) => {
+    const text = `${el.currentSrc}|${Number.isFinite(el.duration) ? Math.round(el.duration) : "live"}`;
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index++) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  };
+  const el = choose();
+  if (!el) return { href: location.href, found: false as const };
+  const session = navigator.mediaSession;
+  const meta = session?.metadata;
+  const text = (value: unknown, limit = 2_000) => (typeof value === "string" ? value.slice(0, limit) : "");
+  return {
+    href: location.href,
+    found: true as const,
+    title: text(meta?.title),
+    artist: text(meta?.artist),
+    album: text(meta?.album),
+    artwork: Array.from(meta?.artwork ?? []).slice(0, 8).map((image) => ({ src: text(image.src, 4_096), sizes: text(image.sizes, 64) })),
+    playbackState: text(session?.playbackState) || "none",
+    currentTime: el.currentTime,
+    duration: Number.isFinite(el.duration) ? el.duration : null,
+    playbackRate: el.playbackRate,
+    paused: el.paused,
+    seekable: el.seekable.length > 0,
+    fingerprint: fingerprint(el),
+  };
+}
+
+/**
+ * Plays, pauses or seeks the element `mediaState` chose, only on the page it was read from and only while that
+ * element still has the fingerprint it was read with. Anything else changes nothing. A seek stays inside the
+ * seekable range and short of its end. The helpers repeat `mediaState`'s: each page function stands alone.
+ */
+export async function mediaCommand(
+  action: "play" | "pause" | "seek", seconds: number | null, fingerprintWanted: string, expectedURL: string,
+): Promise<{ done: string; currentTime: number } | Failure> {
+  const stale = (): Failure => ({ error: { code: "stale_target", message: "The video or audio changed. Nothing was changed." } });
+  if (location.href !== expectedURL) return stale();
+  const choose = (): HTMLMediaElement | null => {
+    const area = (el: HTMLMediaElement) => {
+      const rect = el.getBoundingClientRect();
+      const width = Math.min(rect.right, innerWidth) - Math.max(rect.left, 0);
+      const height = Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0);
+      return width > 0 && height > 0 ? width * height : 0;
+    };
+    const length = (el: HTMLMediaElement) => (Number.isFinite(el.duration) ? el.duration : 0);
+    const candidates = Array.from(document.querySelectorAll<HTMLMediaElement>("video, audio"))
+      .filter((el) => el.srcObject === null && el.currentSrc !== "" && !el.muted && el.volume > 0);
+    candidates.sort((a, b) => Number(a.paused) - Number(b.paused) || area(b) - area(a) || length(b) - length(a));
+    return candidates[0] ?? null;
+  };
+  const fingerprint = (el: HTMLMediaElement) => {
+    const text = `${el.currentSrc}|${Number.isFinite(el.duration) ? Math.round(el.duration) : "live"}`;
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index++) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  };
+  const el = choose();
+  if (!el || fingerprint(el) !== fingerprintWanted) return stale();
+  if (action === "pause") {
+    el.pause();
+    return { done: "pause", currentTime: el.currentTime };
+  }
+  if (action === "play") {
+    try { await el.play(); }
+    catch { return { error: { code: "blocked_by_page", message: "The page didn't let Zeus start playback." } }; }
+    return { done: "play", currentTime: el.currentTime };
+  }
+  const ranges = el.seekable;
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || ranges.length === 0) {
+    return { error: { code: "not_supported", message: "This media can't be scrubbed." } };
+  }
+  const start = ranges.start(0);
+  const end = ranges.end(ranges.length - 1);
+  const limit = end > start + 1 ? end - 0.5 : end;
+  el.currentTime = Math.min(Math.max(seconds, start), limit);
+  return { done: "seek", currentTime: el.currentTime };
+}

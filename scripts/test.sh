@@ -17,6 +17,9 @@ clean_test_defaults() {
 }
 trap clean_test_defaults EXIT
 
+# The two-process Fling tests run this helper; nothing else depends on it, so build it first.
+swift build --product zeus-fling-peer
+
 PLUGIN_DIR="$(xcode-select -p)/usr/lib/swift/host/plugins/testing"
 if [[ -d "$PLUGIN_DIR" ]]; then
   swift test -Xswiftc -plugin-path -Xswiftc "$PLUGIN_DIR" "$@"

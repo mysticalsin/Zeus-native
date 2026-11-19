@@ -852,7 +852,7 @@ private struct RecordlyOptionChips: View {
                     .frame(maxWidth: .infinity)
             }
             GridRow {
-                RecordlySourceChip(symbol: "camera", title: "Camera bubble", state: .unavailable,
+                RecordlySourceChip(symbol: "camera", title: "Camera", state: .unavailable,
                                    help: "Camera in recordings is coming soon") { }
                     .frame(maxWidth: .infinity)
                 RecordlySourceChip(symbol: "cursorarrow.rays", title: "Cursor zoom",

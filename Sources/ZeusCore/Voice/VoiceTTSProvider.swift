@@ -6,6 +6,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
     case chatterbox
     case elevenLabs
     case openAICompatible
+    case gemini
 
     public var id: String { rawValue }
 
@@ -15,6 +16,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
         case .chatterbox: "Local Chatterbox Turbo"
         case .elevenLabs: "ElevenLabs"
         case .openAICompatible: "OpenAI-compatible TTS"
+        case .gemini: "Google Gemini TTS"
         }
     }
 
@@ -24,6 +26,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
         case .elevenLabs: "elevenlabs.api-key"
         case .chatterbox: "chatterbox.api-key"
         case .openAICompatible: "openai-tts.api-key"
+        case .gemini: "gemini-tts.api-key"
         case .kokoro: "kokoro.api-key"
         }
     }
@@ -31,7 +34,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
     public var needsKey: Bool {
         switch self {
         case .kokoro, .chatterbox: false
-        case .elevenLabs, .openAICompatible: true
+        case .elevenLabs, .openAICompatible, .gemini: true
         }
     }
 }
@@ -63,21 +66,23 @@ public enum VoiceProviderFallback {
         public var chatterboxReady: Bool
         public var elevenLabsConfigured: Bool
         public var openAIConfigured: Bool
+        public var geminiConfigured: Bool
         public var systemVoiceReady: Bool
 
         public init(kokoroReady: Bool, chatterboxReady: Bool, elevenLabsConfigured: Bool,
-                    openAIConfigured: Bool, systemVoiceReady: Bool = true) {
+                    openAIConfigured: Bool, geminiConfigured: Bool = false, systemVoiceReady: Bool = true) {
             self.kokoroReady = kokoroReady
             self.chatterboxReady = chatterboxReady
             self.elevenLabsConfigured = elevenLabsConfigured
             self.openAIConfigured = openAIConfigured
+            self.geminiConfigured = geminiConfigured
             self.systemVoiceReady = systemVoiceReady
         }
     }
 
     /// Ordered candidates: chosen first, then the rest in K1 order, then Kokoro if not already included.
     public static func chain(chosen: VoiceTTSProvider, availability: Availability) -> [VoiceTTSProvider] {
-        let k1: [VoiceTTSProvider] = [.kokoro, .chatterbox, .elevenLabs, .openAICompatible]
+        let k1: [VoiceTTSProvider] = [.kokoro, .chatterbox, .elevenLabs, .openAICompatible, .gemini]
         var result: [VoiceTTSProvider] = []
         if isConfigured(chosen, availability: availability) { result.append(chosen) }
         for provider in k1 where provider != chosen && isConfigured(provider, availability: availability) {
@@ -93,6 +98,7 @@ public enum VoiceProviderFallback {
         case .chatterbox: availability.chatterboxReady
         case .elevenLabs: availability.elevenLabsConfigured
         case .openAICompatible: availability.openAIConfigured
+        case .gemini: availability.geminiConfigured
         }
     }
 

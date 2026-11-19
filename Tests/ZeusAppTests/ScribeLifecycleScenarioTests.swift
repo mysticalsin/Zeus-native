@@ -26,7 +26,7 @@ struct ScribeLifecycleScenarioTests {
 
     private enum Failure: Error { case eventTimedOut }
     private func preferences() throws -> (String, UserDefaults) {
-        let name = "scribe-lifecycle-\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "scribe-lifecycle-\(UUID().uuidString)"
         return (name, try #require(UserDefaults(suiteName: name)))
     }
     private func waitUntil(_ condition: () -> Bool) async throws {
@@ -37,8 +37,9 @@ struct ScribeLifecycleScenarioTests {
         throw Failure.eventTimedOut
     }
 
-    private func start(_ controller: ScribeController, provider: Capture) async throws -> ScribeSessionID {
-        controller.start()
+    private func start(_ controller: ScribeController, provider: Capture,
+                       context: ScribeMeetingContext? = nil) async throws -> ScribeSessionID {
+        controller.start(context: context)
         let id = try #require(controller.phase.sessionID)
         provider.send(.captureAcknowledged(id))
         try await waitUntil { controller.isRecording }
@@ -128,8 +129,7 @@ struct ScribeLifecycleScenarioTests {
         let clock = Clock(), capture = Capture()
         let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
         let app = ScribeCallProcessIdentity(pid: 1234, bundleID: "synthetic.call", launchedAt: 10)
-        controller.meetingCallHint = app
-        let id = try await start(controller, provider: capture)
+        let id = try await start(controller, provider: capture, context: ScribeMeetingContext(callIdentity: app))
         defer { controller.cancel() }
         controller.requestEnd()
         controller.boundCallApplicationDidTerminate(app)
@@ -141,6 +141,163 @@ struct ScribeLifecycleScenarioTests {
         #expect(controller.phase == .recording(id, since: 100))
         #expect(capture.stopCount == 0)
         #expect(controller.endingRemaining == nil)
+    }
+
+    @Test func aSuggestedEndLeavesTheRecordingRunning() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let clock = Clock(), capture = Capture()
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
+        let id = try await start(controller, provider: capture)
+        defer { controller.cancel() }
+        controller.suggestEnd()
+        #expect(controller.endSuggested)
+        #expect(controller.endingReason == .callLooksOver)
+        clock.time += 60
+        controller.tickClock()
+        #expect(controller.phase == .recording(id, since: 100))
+        #expect(capture.stopCount == 0)
+        #expect(controller.endingRemaining == nil)
+        clock.time += 3_600
+        controller.tickClock()
+        #expect(controller.phase == .recording(id, since: 100))
+        #expect(capture.stopCount == 0)
+    }
+
+    @Test func endMeetingNowOnASuggestionStopsTheProviderOnce() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let clock = Clock(), capture = Capture()
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
+        let id = try await start(controller, provider: capture)
+        defer { controller.cancel() }
+        controller.suggestEnd()
+        controller.confirmEnd()
+        #expect(capture.stopCount == 1)
+        guard case .ending(let ending, _) = controller.phase else {
+            Issue.record("expected ending, got \(controller.phase)")
+            return
+        }
+        #expect(ending == id)
+        #expect(controller.endingReason == .requestedByUser)
+        #expect(!controller.endSuggested)
+        controller.confirmEnd()
+        clock.time += 30
+        controller.tickClock()
+        #expect(capture.stopCount == 1)
+    }
+
+    @Test func keepRecordingAndTheCallReturningBothCloseASuggestion() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let clock = Clock(), capture = Capture()
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
+        let id = try await start(controller, provider: capture)
+        defer { controller.cancel() }
+        controller.suggestEnd()
+        controller.keepRecording()
+        #expect(!controller.endSuggested)
+        #expect(controller.endingReason == nil)
+        controller.suggestEnd()
+        controller.withdrawEndSuggestion()
+        #expect(!controller.endSuggested)
+        controller.withdrawEndSuggestion()
+        clock.time += 3_600
+        controller.tickClock()
+        #expect(controller.phase == .recording(id, since: 100))
+        #expect(capture.stopCount == 0)
+    }
+
+    @Test func aStopAfterASuggestionKeepsTheNineSecondWindow() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let clock = Clock(), capture = Capture()
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
+        let id = try await start(controller, provider: capture)
+        defer { controller.cancel() }
+        controller.suggestEnd()
+        clock.time += 30
+        controller.requestEnd()
+        #expect(controller.endingReason == .requestedByUser)
+        clock.time += 8.9
+        controller.tickClock()
+        #expect(capture.stopCount == 0)
+        clock.time += 0.2
+        controller.tickClock()
+        #expect(capture.stopCount == 1)
+        #expect(controller.phase.sessionID == id)
+    }
+
+    @Test func theBoundAppClosingAfterASuggestionOpensTheNineSecondWindow() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let clock = Clock(), capture = Capture()
+        let controller = ScribeController(provider: capture, monotonicClock: { clock.time }, cancellationDefaults: defaults)
+        let app = ScribeCallProcessIdentity(pid: 1234, bundleID: "synthetic.call", launchedAt: 10)
+        _ = try await start(controller, provider: capture, context: ScribeMeetingContext(callIdentity: app))
+        defer { controller.cancel() }
+        controller.suggestEnd()
+        controller.boundCallApplicationDidTerminate(app)
+        #expect(controller.endingReason == .boundCallAppClosed)
+        #expect(!controller.endSuggested)
+        #expect(controller.endingRemaining == 9)
+    }
+
+    /// Ends the recording the normal way and waits until its recap exists.
+    private func finish(_ controller: ScribeController, provider: Capture, session id: ScribeSessionID) async throws {
+        controller.receive(ScribeTranscriptSegment(id: "synthetic-\(id.rawValue)", session: id,
+            speaker: .participant("Fixture"), start: 0, end: 1, text: "A synthetic line for the recap.", isFinal: true))
+        controller.requestEnd()
+        controller.confirmEnd()
+        provider.send(.captureEnded(id))
+        try await waitUntil { controller.phase == .processing(id) }
+        controller.transcriptDidFinish(session: id)
+        try await waitUntil { controller.recaps.contains(where: { $0.id == id }) }
+    }
+
+    @Test func aStartWithContextKeepsItsTitleGuestsAndCallBinding() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-context-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = Capture()
+        let controller = ScribeController(provider: capture, store: ScribeMeetingStore(directory: root),
+                                          cancellationDefaults: defaults)
+        let app = ScribeCallProcessIdentity(pid: 4321, bundleID: "synthetic.call", launchedAt: 10)
+        let id = try await start(controller, provider: capture, context: ScribeMeetingContext(
+            title: "Planning sync", attendeeNames: ["Ada Fixture", "Grace Fixture"], callIdentity: app))
+        defer { controller.cancel() }
+        controller.boundCallApplicationDidTerminate(app)
+        #expect(controller.endingReason == .boundCallAppClosed)
+        controller.keepRecording()
+        try await finish(controller, provider: capture, session: id)
+        #expect(controller.recaps.first(where: { $0.id == id })?.title == "Planning sync")
+        #expect(controller.attendeeNames(for: id) == ["Ada Fixture", "Grace Fixture"])
+    }
+
+    @Test func aRefusedStartLeavesNoContextBehind() async throws {
+        let (suite, defaults) = try preferences()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-context-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = Capture()
+        let controller = ScribeController(provider: capture, store: ScribeMeetingStore(directory: root),
+                                          cancellationDefaults: defaults)
+        let app = ScribeCallProcessIdentity(pid: 4321, bundleID: "synthetic.call", launchedAt: 10)
+        let first = try await start(controller, provider: capture)
+        controller.start(context: ScribeMeetingContext(
+            title: "Refused sync", attendeeNames: ["Ada Fixture"], callIdentity: app))
+        #expect(controller.phase.sessionID == first)
+        controller.cancel()
+        #expect(controller.phase == .idle)
+        let second = try await start(controller, provider: capture)
+        defer { controller.cancel() }
+        controller.boundCallApplicationDidTerminate(app)
+        #expect(controller.endingReason == nil)
+        #expect(controller.endingRemaining == nil)
+        try await finish(controller, provider: capture, session: second)
+        #expect(controller.recaps.first(where: { $0.id == second })?.title == "Meeting notes")
+        #expect(controller.attendeeNames(for: second).isEmpty)
     }
 
     @Test func discardingAFailedFinalSaveAlsoDeletesItsEarlierTranscriptCheckpoint() async throws {

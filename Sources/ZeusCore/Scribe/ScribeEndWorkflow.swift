@@ -22,10 +22,16 @@ public struct ScribeCallProcessIdentity: Equatable, Sendable {
 /// End confirmation for a recording. Only an explicit Stop or a positively observed termination
 /// of its bound call-app instance can arm it. Microphone inactivity and calendar end times are
 /// deliberately not inputs. The caller still waits for the capture provider's stopped event.
+///
+/// A detector signal (the call app let go of the microphone, its call window closed) can only suggest an
+/// end. A suggestion has no deadline, so `stopIfDue` never fires for it; a tap or the bound app closing
+/// replaces it with the nine second deadline.
 public struct ScribeEndWorkflow: Equatable, Sendable {
     public enum Reason: Equatable, Sendable {
         case requestedByUser
         case boundCallAppClosed
+        /// A detector signal. Advisory: it has no deadline and nothing stops until a button is tapped.
+        case callLooksOver
     }
 
     public static let grace: TimeInterval = 9
@@ -34,6 +40,8 @@ public struct ScribeEndWorkflow: Equatable, Sendable {
     public private(set) var reason: Reason?
     public private(set) var deadline: TimeInterval?
     public private(set) var stopRequested = false
+    /// The call looks over and the person has not answered. Not an end request: there is no deadline.
+    public private(set) var isSuggested = false
     private var observedBoundTermination = false
 
     public init() {}
@@ -44,7 +52,27 @@ public struct ScribeEndWorkflow: Equatable, Sendable {
         reason = nil
         deadline = nil
         stopRequested = false
+        isSuggested = false
         observedBoundTermination = false
+    }
+
+    /// Opens a suggestion to end. A second suggestion, or one while an end is already armed, changes nothing.
+    @discardableResult
+    public mutating func suggestEnd(session: ScribeSessionID, now: TimeInterval) -> Bool {
+        guard self.session == session, !stopRequested, deadline == nil, !isSuggested,
+              now.isFinite, now >= 0 else { return false }
+        isSuggested = true
+        reason = .callLooksOver
+        return true
+    }
+
+    /// The call took the microphone again: the suggestion goes away. An armed end is not touched.
+    @discardableResult
+    public mutating func withdrawSuggestion(session: ScribeSessionID) -> Bool {
+        guard self.session == session, isSuggested else { return false }
+        isSuggested = false
+        reason = nil
+        return true
     }
 
     @discardableResult
@@ -66,8 +94,9 @@ public struct ScribeEndWorkflow: Equatable, Sendable {
 
     @discardableResult
     public mutating func keepRecording(session: ScribeSessionID) -> Bool {
-        guard self.session == session, !stopRequested, deadline != nil else { return false }
+        guard self.session == session, !stopRequested, deadline != nil || isSuggested else { return false }
         deadline = nil
+        isSuggested = false
         reason = nil
         return true
     }
@@ -98,6 +127,7 @@ public struct ScribeEndWorkflow: Equatable, Sendable {
               let deadline = Self.validDeadline(now) else { return false }
         self.deadline = deadline
         self.reason = reason
+        isSuggested = false
         return true
     }
 

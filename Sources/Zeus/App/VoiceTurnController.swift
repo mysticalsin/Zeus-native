@@ -20,11 +20,55 @@ final class VoiceTurnController {
     private let buddy: BuddyController
     private let notch: NotchController
     private let speech: SpeechInput
-    private let speaker: Speaker
+    private let speaker: any LineSpeaking
+    private let presenter: any TalkVisualPresenting
+    /// Whether the owner turned on drawing marks on the screen while Zeus answers (off by default).
+    private let drawConsent: () -> Bool
+    /// Whether the brain gets the screenshots (on by default), and whether Screen Recording is granted.
+    private let seeScreenConsent: () -> Bool
+    private let screenPermission: () -> Bool
+    /// The "I can't see your screen" notice, given once per launch.
+    private var sightNotice = ScreenSightNotice()
+    /// A drawing from this controller's last answer may still be on screen.
+    private var drawActive = false
+
+    /// What one turn really sent, for the tests: the brain request, the route it asked for, and every capture the
+    /// turn kept for POINT tags and the drive and walkthrough actions.
+    struct TurnObservation {
+        var request: BrainRequest
+        var preferAppClaude: Bool
+        var shots: [ScreenShot]
+    }
+    var turnObserver: ((TurnObservation) -> Void)?
+    /// Tests only: the engines a turn races, in place of the router's choice.
+    /// Whether the launched `claude` keeps screenshots out of the saved session (so it is sent them). Tests set it.
+    var supportsNoSessionPersistence: () -> Bool = { ClaudeFlags.supportsSafeMode }
+    var engineCandidatesOverride: (() -> [(engine: BrainEngineID, id: String, provider: BrainProvider)])?
     let brain: BrainProvider
     let chrome: ChromeActions
 
-    private var listening = false
+    /// Called when a listening turn stops for any reason, so the talk key's machine and the wake word listener forget it.
+    var onListeningEnded: (() -> Void)?
+    private var listening = false {
+        didSet { if oldValue, !listening { onListeningEnded?() } }
+    }
+    /// What a press, a release and an end do outside this controller: warm-ups, volume ducking, screen capture,
+    /// the microphone start and stop. Tests swap these so no audio, volume, screen or process is touched.
+    @MainActor struct Seams {
+        /// The key-press warm-ups (brain, voice, local-model probe) stay written in `press()`; tests turn them off.
+        var warmsOnPress = true
+        var duckBegin: @MainActor () -> Void = { SystemAudioDucker.begin() }
+        var duckEnd: @MainActor () -> Void = { SystemAudioDucker.end() }
+        var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureAll() }
+        var speechStart: @MainActor (SpeechInput) throws -> Int = { try $0.start() }
+        var speechStop: @MainActor (SpeechInput) async -> String = { await $0.stop() }
+        static func silent() -> Seams { Seams(warmsOnPress: false, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
+    }
+    var seams = Seams()
+    /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
+    private var talkSession: Int?
+    /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
+    private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
@@ -52,13 +96,22 @@ final class VoiceTurnController {
     /// Starts a brain during a 0.7 s pause. A changed phrase drops it.
     private let ahead = AheadRunner()
 
-    init(buddy: BuddyController, notch: NotchController, brain: BrainProvider) {
+    init(buddy: BuddyController, notch: NotchController, brain: BrainProvider,
+         speaker: (any LineSpeaking)? = nil, presenter: (any TalkVisualPresenting)? = nil,
+         drawConsent: @escaping () -> Bool = { FeatureSettings.talkDrawOnScreen() },
+         seeScreen: @escaping () -> Bool = { FeatureSettings.talkSeeScreen() },
+         screenPermission: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
+        _ = Microphones.cache // starts the device watch and the first list read off main, before any press
+        self.drawConsent = drawConsent
+        seeScreenConsent = seeScreen
+        self.screenPermission = screenPermission
         self.buddy = buddy
         self.notch = notch
         self.brain = brain
         chrome = ChromeActions(notch: notch)
         speech = SpeechInput()
-        speaker = Speaker(languageCode: speech.localeIdentifier)
+        self.speaker = speaker ?? Speaker(languageCode: speech.localeIdentifier)
+        self.presenter = presenter ?? TalkVisualPresenter()
         speech.onLevel = { [weak buddy] level in
             Task { @MainActor in buddy?.model.audioLevel = level }
         }
@@ -109,8 +162,23 @@ final class VoiceTurnController {
     var hasPendingApproval: Bool { notch.model.approval != nil }
     var voiceDescription: String { speaker.engineDescription }
 
+    /// One answered turn driven by a scripted reply, for the tests that watch what the turn asks of the voice and the drawing.
+    func runScriptedTurn(transcript: String, screenshots: [ScreenShot], replay: (id: String, events: AsyncThrowingStream<BrainEvent, Error>)? = nil,
+                         replaySawScreen: Bool = true) async -> TurnResult {
+        await runTurn(transcript: transcript, screenshots: screenshots, activeTab: nil, turn: UUID(), deep: false,
+                      speak: true, awaitActions: false, replay: replay, replaySawScreen: replaySawScreen)
+    }
+
+    /// Hides the marks of the last answer. A turn that never drew makes no presenter call.
+    func clearDrawingForNewTurn() {
+        guard drawActive else { return }
+        drawActive = false
+        presenter.clear()
+    }
+
     /// Menu › Stop Speaking (pressing the talk key also interrupts).
     func stopSpeaking() {
+        clearDrawingForNewTurn()
         fastRace?.cancel()
         PersistentClaudeSession.shared.abortBusy()
         turnRun.invalidate()
@@ -118,17 +186,29 @@ final class VoiceTurnController {
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
         speaker.stop()
-        SystemAudioDucker.end()
+        seams.duckEnd()
         wakeConversationActive = false
         buddy.model.captionVisible = false
         buddy.idle()
     }
 
+    /// Talk turns listen on the microphone chosen for talk (Settings > Voice), resolved now: Automatic is no device, This Mac's
+    /// microphone is the built-in device, a specific input is itself or Automatic when it is gone. Dictation's choice is separate.
+    /// The device list is read only when a device is chosen.
+    static func applyChosenMicrophone(to speech: SpeechInput, defaults: UserDefaults = .standard,
+                                      devices: () -> [MicrophoneDevice] = { Microphones.cache.devices() },
+                                      builtInUID: () -> String? = { Microphones.cache.builtInUID() }) {
+        let choice = TalkMicrophoneChoice.load(defaults)
+        speech.deviceUID = choice == .automatic ? nil : choice.resolvedUID(devices: devices(), builtInUID: builtInUID())
+    }
+
     @discardableResult
     func press(builtinCue: Bool = true) -> Bool {
+        // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
+        clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
-        BrainWarmScheduler.shared.talkKeyDown()
+        if seams.warmsOnPress { BrainWarmScheduler.shared.talkKeyDown() }
         fastRace?.cancel()
         // A hands-free silence timer from an earlier turn must not release the key the owner is holding now.
         handsFreeTask?.cancel()
@@ -136,9 +216,11 @@ final class VoiceTurnController {
         turnRun.invalidate()
         // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
         PersistentClaudeSession.shared.abortBusy()
-        KeyDownWarmer.talkKeyDown()
-        // Off the critical path: the local-model check is read from this cache when the answer starts.
-        Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        if seams.warmsOnPress {
+            KeyDownWarmer.talkKeyDown()
+            // Off the critical path: the local-model check is read from this cache when the answer starts.
+            Task { RouterSettings.shared.noteOllamaHTTPReachable(await OllamaHTTPProbe.isReachable()) }
+        }
         turnTask?.cancel()
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
@@ -149,9 +231,19 @@ final class VoiceTurnController {
         turnEngine = DictationHub.shared.controller?.voiceEngine
         speech.recordsSamples = turnEngine != nil
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
+        Self.applyChosenMicrophone(to: speech)
+        captureFailures.reset()
+        let failures = captureFailures
+        speech.onCaptureFailure = { [weak self] session, origin, failure in
+            // Recorded on the calling thread, so a release before the main-actor hop below still sees it.
+            failures.record(session: session, failure: failure)
+            Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
+        }
         do {
-            try speech.start()
+            talkSession = try seams.speechStart(speech)
         } catch {
+            // A start throws before it touches a running capture, so a live turn keeps its handler and session.
+            if !listening { speech.onCaptureFailure = nil }
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -164,7 +256,7 @@ final class VoiceTurnController {
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
         if builtinCue { ZeusSound.play(.listenStart) }
-        SystemAudioDucker.begin()
+        seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
         FastPath.shared.reset()
@@ -172,7 +264,7 @@ final class VoiceTurnController {
         buddy.model.audioLevel = 0
         buddy.listen()
         // Screens are captured while you talk, so the answer isn't waiting on them.
-        screenshotsTask = Task { await ScreenCapture.captureAll() }
+        screenshotsTask = Task { await seams.captureScreens() }
         // With Chrome in front, the extension reads the page you're looking at.
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
@@ -181,12 +273,19 @@ final class VoiceTurnController {
 
     func release(builtinCue: Bool = true) {
         guard listening else { return }
+        // Capture already gave up for this turn: end it as a failure and do not read or send the partial.
+        if let session = talkSession, let failure = captureFailures.failure(for: session) {
+            handleCaptureFailure(session: session, origin: 0, failure: failure)
+            return
+        }
         listening = false
+        speech.onCaptureFailure = nil
+        talkSession = nil
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
         if builtinCue { ZeusSound.play(.listenStop) }
-        SystemAudioDucker.end()
+        seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil
         buddy.think()
@@ -201,10 +300,47 @@ final class VoiceTurnController {
         }
     }
 
-    /// The talk keys became another shortcut while held (⌃⌥Space opens Chat): stop listening and send nothing.
+    /// The talk keys became another shortcut while held (⌃⌥C opens Chat): stop listening and send nothing.
     func cancelListening() {
-        guard listening else { return }
+        guard endListeningWithoutSending() else { return }
+        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+    }
+
+    /// The microphone kept changing (AirPods switching) and capture gave up: end the turn, send nothing, say why.
+    func handleCaptureFailure(session: Int, origin: UInt64, failure: SpeechInput.CaptureFailure) {
+        guard listening, CaptureFailureHint.owns(session: session, active: talkSession) else { return }
+        guard endListeningWithoutSending() else { return }
+        // A flapping microphone must not reopen another hands-free turn.
+        wakeConversationActive = false
+        VoiceLog.log("listen", "capture failed (\(failure)): the turn ended without sending")
+        ZeusSound.play(.voiceError)
+        notch.topBar?.show(.hint(CaptureFailureHint.text(for: failure)))
+    }
+
+    /// Test seam: marks a turn as listening on `session` without opening the microphone.
+    func beginListeningForTesting(session: Int) {
+        listening = true
+        talkSession = session
+    }
+
+    var isListeningForTesting: Bool { listening }
+    var captureHandlerInstalledForTesting: Bool { speech.onCaptureFailure != nil }
+    var talkSessionForTesting: Int? { talkSession }
+    var wakeConversationActiveForTesting: Bool {
+        get { wakeConversationActive }
+        set { wakeConversationActive = newValue }
+    }
+    /// Test seam: the speech input reports a capture failure the way its audio thread does.
+    func deliverCaptureFailureForTesting(session: Int, failure: SpeechInput.CaptureFailure) {
+        speech.onCaptureFailure?(session, 0, failure)
+    }
+
+    @discardableResult
+    private func endListeningWithoutSending() -> Bool {
+        guard listening else { return false }
         listening = false
+        speech.onCaptureFailure = nil
+        talkSession = nil
         handsFreeTask?.cancel()
         handsFreeTask = nil
         ahead.cancel()
@@ -214,18 +350,19 @@ final class VoiceTurnController {
         tabTask?.cancel()
         tabTask = nil
         turnEngine = nil
-        SystemAudioDucker.end()
+        seams.duckEnd()
         liveWords.clear()
         buddy.model.audioLevel = nil
         buddy.model.captionVisible = false
         buddy.idle()
-        VoiceLog.log("listen", "cancelled: the talk keys became another shortcut")
+        return true
     }
 
     /// "Hey Zeus, open Spotify": the request already heard by the wake-word listener runs as a
     /// voice turn at once. "Hey Zeus" alone opens a hands-free turn that ends when you stop talking.
     func wakeTurn(request: String) {
         guard !listening else { return }
+        clearDrawingForNewTurn()
         wakeConversationActive = true
         buddy.call()
         let request = Self.dropWakeEchoes(request.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -241,7 +378,7 @@ final class VoiceTurnController {
         let heardAt = ContinuousClock.now
         VoiceLatency.shared.begin(at: heardAt)
         // Only the LLM path uses these; the fast path never waits for them.
-        screenshotsTask = Task { await ScreenCapture.captureAll() }
+        screenshotsTask = Task { await seams.captureScreens() }
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
@@ -279,6 +416,7 @@ final class VoiceTurnController {
 
     /// `zeus listen`: a hands-free voice turn of up to `seconds`, as if the talk key were held.
     func listenTurn(seconds: Double) async -> TurnResult {
+        guard !listening else { return TurnResult(error: "Zeus is already listening.") }
         guard press() else {
             return TurnResult(error: "Zeus can't hear yet: microphone or speech recognition access is missing.")
         }
@@ -312,7 +450,7 @@ final class VoiceTurnController {
     }
 
     private func finishTurn() async -> TurnResult {
-        var transcript = await speech.stop().trimmingCharacters(in: .whitespacesAndNewlines)
+        var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
             transcript = await dictation.transcribeVoice(samples: samples, live: transcript, with: engine)
@@ -327,7 +465,7 @@ final class VoiceTurnController {
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
         guard !transcript.isEmpty else {
-            VoiceLog.log("transcript", "(nothing heard)")
+            VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")
             buddy.idle()
             return .nothingHeard
         }
@@ -659,7 +797,10 @@ final class VoiceTurnController {
     private func runTurn(transcript: String, screenshots: [ScreenShot], activeTab: TabContext?, turn: UUID,
                          deep: Bool, speak: Bool, awaitActions: Bool,
                          replay: (id: String, events: AsyncThrowingStream<BrainEvent, Error>)? = nil,
-                         pageText: Bool = false) async -> TurnResult {
+                         pageText: Bool = false,
+                         // The speculative run behind `replay` was started before the screenshots and the draw prompt
+                         // were in hand, so its answer never draws (its coordinates would mean nothing).
+                         replaySawScreen: Bool = false) async -> TurnResult {
         // Named agents: "ask Scout to ...", "Scribe, ...". Each has its own persona and memory.
         let agentStore = AgentStore()
         let route = AgentRouter.route(transcript, agents: agentStore.profiles())
@@ -696,9 +837,31 @@ final class VoiceTurnController {
         if !restricted, !pageText, awareness.needsCapture, shots.isEmpty {
             shots = await ScreenCapture.captureAll()
         }
-        if pageText || restricted || (awareness.preferPixels == false && !awareness.promptPrefix.isEmpty) {
-            shots = []
+        // Seeing the screen sends one image per display to the image-capable provider and keeps pixels even when window
+        // text exists. Drawing marks is a separate consent: it cuts the request to the cursor display.
+        let seeScreen = seeScreenConsent(), drawConsented = drawConsent()
+        let sight = TalkSightPolicy.plan(
+            seeScreen: seeScreen, drawConsent: drawConsented, restricted: restricted, pageRoute: pageText,
+            textAnswersIt: awareness.preferPixels == false && !awareness.promptPrefix.isEmpty, captured: shots)
+        shots = sight.kept
+        let drawing = sight.drawing
+        if drawing {
+            system += "\n\n" + ZeusPrompt.drawInstructions()
         }
+        // Only the brain request is cut to one display; POINT screenN tags and the drive and walkthrough actions keep every capture.
+        let requestShots = sight.request
+        var screenReason: ScreenSightReason?
+        var owesSightNotice = false
+        if requestShots.isEmpty {
+            if shots.isEmpty {
+                let granted = screenPermission()
+                screenReason = granted ? .notCaptured : .permissionOff
+                owesSightNotice = !granted && !restricted && !pageText && (seeScreen || drawConsented)
+            } else {
+                screenReason = .turnedOff // captured for POINT and drive, but seeing and drawing are both off
+            }
+        }
+        let drawToken = UUID()
         if let route {
             system += "\n\n" + AgentRouter.preamble(route.agent, memory: agentStore.memory(for: route.agent))
             NSLog("[ZEUS] agent %@: routed turn", route.agent.name)
@@ -707,13 +870,16 @@ final class VoiceTurnController {
         let request = BrainRequest(
             turn: turn,
             transcript: route?.request ?? transcript,
-            screenshots: shots,
+            screenshots: requestShots,
             axSummary: includeFront ? Self.context(controls: activeTab == nil && !restricted) : nil,
             activeTab: activeTab,
             history: history,
             systemPrompt: system,
-            deep: deep
+            deep: deep,
+            carriesDrawImage: sight.sendsImages,
+            screenReason: screenReason
         )
+        turnObserver?(TurnObservation(request: request, preferAppClaude: sight.sendsImages, shots: shots))
 
         var parser = ZeusTagStreamParser()
         var splitter = SentenceSplitter()
@@ -737,6 +903,10 @@ final class VoiceTurnController {
         var spokenSentenceCount = 0
         var haltedForPersonaLimit = false
         var blockedByRestriction = false
+        var winnerID: String?
+        var drawBegun = false
+        var actionStarted = false
+        var fillerGate = TurnFillerGate()
 
         func handle(_ output: ZeusTagStreamParser.Output) {
             switch output {
@@ -752,6 +922,7 @@ final class VoiceTurnController {
                     pointed = true
                 }
             case .tag(.action(let action)):
+                actionStarted = true
                 if restricted {
                     // Refused at the boundary: nothing is run, and the reply says so.
                     blockedByRestriction = true
@@ -814,6 +985,15 @@ final class VoiceTurnController {
                 }
             case .tag(.point(nil)):
                 break
+            case .tag(.draw(let draw)):
+                guard drawing, !drawBegun, let shot = shots.first,
+                      TalkSightPolicy.drawAllowed(winner: winnerID, request: request,
+                                                  supportsNoSessionPersistence: supportsNoSessionPersistence(),
+                                                  drawInstructions: ZeusPrompt.drawInstructions()) else { break }
+                presenter.begin(draw, shot: shot, token: drawToken)
+                drawBegun = true
+                drawActive = true
+                VoiceLog.log("draw", "marks=\(draw.marks.count)")
             case .text(let text):
                 guard !haltedForHallucination, !haltedForPersonaLimit else { break }
                 var sanitizedDelta = ResponseSanitizer.stripArtifacts(text)
@@ -843,7 +1023,11 @@ final class VoiceTurnController {
                         VoiceLatency.shared.mark(.firstSentence)
                         VoiceLog.log("timing", "release->firstToken ms=\(timingFirstToken ?? -1), ->firstSentence ms=\(msSinceRelease()) (audio starts speech_start_ms later, see speaker line)")
                     }
-                    if speak { speaker.speak(PersonaCompliance.stripOminousHedges(sentence)) }
+                    if speak {
+                        let index = spokenSentenceCount - 1
+                        let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
+                        speaker.speak(Self.voiced(sentence), onStart: reveal)
+                    }
                     buddy.showCaption(Self.captionTail(spoken))
                 }
             }
@@ -854,6 +1038,7 @@ final class VoiceTurnController {
             var replayed = false
             if let replay {
                 VoiceLog.log("route", "brain speculative \(replay.id)")
+                winnerID = replaySawScreen ? replay.id : nil
                 do {
                     VoiceLatency.shared.mark(.requestSent)
                     try await Self.consume(replay.events, engine: { replay.id }, started: started) { delta in
@@ -874,9 +1059,9 @@ final class VoiceTurnController {
                 // The task's privacy rule and provider choice decide the candidates before any
                 // provider (and so any request) is created; a private task never sees a cloud engine.
                 let taskKind = RouterTask.classify(transcript)
-                let ordered = BrainLatencyBook.shared.ordered(
-                    RouterSettings.shared.brainEngineCandidates(task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain),
-                    id: \.id)
+                let candidates = engineCandidatesOverride?() ?? RouterSettings.shared.brainEngineCandidates(
+                    task: taskKind, hasAnthropicKey: AnthropicAPIProvider.hasKey, claude: brain, preferAppClaude: sight.sendsImages)
+                let ordered = BrainLatencyBook.shared.ordered(candidates, id: \.id)
                 guard !ordered.isEmpty else {
                     VoiceLog.log("route", "brain (none)")
                     throw ClaudeCLIProvider.ProviderError.failed(
@@ -894,13 +1079,21 @@ final class VoiceTurnController {
                     ordered.first { $0.engine == engine }.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) }
                 }
                 VoiceLog.log("route", "brain race \(raced.map(\.id).joined(separator: " + "))\(deepReason != nil && deepTier != nil ? ", deep behind: \(deepTier?.id ?? "")" : "")")
-                let race = FastRaceRun(
-                    tiers: raced.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
-                    request: request.with(deep: deep, firstTextBudget: budget),
+                // A turn that carries screenshots races only the engine that can see them; text-only engines wait and
+                // answer (without the screen, and saying so) only if the image engine fails or times out.
+                let groups = TalkSightPolicy.raceGroups(ids: raced.map(\.id), carriesImages: request.carriesDrawImage)
+                let primary = raced.filter { groups.primary.contains($0.id) }
+                let fallback = raced.filter { groups.fallback.contains($0.id) }
+                let keepsDeep = TalkSightPolicy.keepsDeepTier(deepID: deepTier?.id, carriesImages: request.carriesDrawImage)
+                func makeRace(_ tiers: [(engine: BrainEngineID, id: String, provider: BrainProvider)], _ turnRequest: BrainRequest,
+                              deepTier: FastRaceRun.Tier?, deepReason: DeepTrigger.Reason?) -> FastRaceRun {
+                    FastRaceRun(
+                    tiers: tiers.map { FastRaceRun.Tier(id: $0.id, provider: $0.provider) },
+                    request: turnRequest.with(deep: deep, firstTextBudget: budget),
                     deepTier: deepTier, deepReason: deepReason,
                     callbacks: FastRaceRun.Callbacks(
                         filler: { [weak self] in
-                            guard speak, let self else { return }
+                            guard speak, let self, fillerGate.take() else { return }
                             let line = AckLines.filler(personality: ZeusPersonality.current())
                             VoiceLog.log("timing", "filler at \(msSinceRelease()) ms, nothing streamed yet")
                             self.say(line)
@@ -916,24 +1109,56 @@ final class VoiceTurnController {
                             VoiceLog.logContent("route", text, prefix: "\(id) failed; detail ")
                         },
                         firstText: { id, ms in
+                            winnerID = id
                             timingFirstToken = msSinceRelease()
                             VoiceLatency.shared.setBrain(engine: id, model: Self.modelLabel(id))
                             VoiceLatency.shared.mark(.firstToken)
-                            VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms)")
+                            VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms) images=\(request.screenshots.count)")
                             BrainLatencyBook.shared.record(id, firstTokenMs: Double(ms))
                         },
                         deliverDeep: { [weak self] text in
                             self?.deliverDeepAnswer(text, transcript: transcript, speak: speak)
                         }))
+                }
+                var race = makeRace(primary, request, deepTier: keepsDeep ? deepTier : nil, deepReason: keepsDeep ? deepReason : nil)
                 fastRace = race
                 VoiceLatency.shared.mark(.requestSent)
-                try await race.run { delta in parser.feed(delta).forEach(handle) }
+                do {
+                    try await race.run { delta in parser.feed(delta).forEach(handle) }
+                } catch where !fallback.isEmpty && !Task.isCancelled
+                    && TalkSightPolicy.fallbackAllowed(spokeAnything: !spoken.isEmpty, actionStarted: actionStarted) {
+                    // The image engine failed before saying anything: the text engines answer, and say they cannot see.
+                    VoiceLog.log("route", "image engine failed; racing text engines \(fallback.map(\.id).joined(separator: " + "))")
+                    let blindPrompt = TalkSightPolicy.withoutDrawInstructions(request.systemPrompt,
+                                                                              drawInstructions: ZeusPrompt.drawInstructions())
+                    let blind = request.with(screenshots: [], systemPrompt: blindPrompt, screenReason: .imageEngineFailed,
+                                             carriesDrawImage: false)
+                    // Marks or a pointer the image engine began are taken back before the text engine answers.
+                    if drawBegun { presenter.clear(); drawBegun = false; drawActive = false }
+                    if pointed { buddy.idle(); pointed = false }
+                    // Nothing from the image race reached the parser's output, so its half-read tag is dropped.
+                    parser = ZeusTagStreamParser()
+                    race = makeRace(fallback, blind, deepTier: nil, deepReason: nil)
+                    fastRace = race
+                    try await race.run { delta in parser.feed(delta).forEach(handle) }
+                }
                 VoiceLog.log("brain", "engine=\(race.winnerID ?? "?") done_ms=\(max(0, Int(Date().timeIntervalSince(started) * 1000)))")
             }
             parser.finish().forEach(handle)
-            if let rest = splitter.flush(), speak { speaker.speak(PersonaCompliance.stripOminousHedges(rest)) }
+            if let rest = splitter.flush(), speak {
+                let index = spokenSentenceCount
+                spokenSentenceCount += 1
+                let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
+                speaker.speak(Self.voiced(rest), onStart: reveal)
+            }
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()
+            // No Screen Recording: one log line and one plain notice per launch, never a permission prompt mid-turn.
+            if owesSightNotice, let notice = sightNotice.take(permissionGranted: false) {
+                VoiceLog.log("screen", "Screen Recording is off, so Zeus cannot see the screen; owner told once this launch")
+                NSLog("[ZEUS] screen sight: Screen Recording permission is off (told the owner once this launch)")
+                if speak { speaker.speak(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }
+            }
             if !pointed { buddy.idle() }
             if !result.actions.isEmpty { AvatarStatus.shared.flash(.done, for: 2) }
             // Defense in depth: a tag or control code split oddly across streamed chunks could
@@ -965,6 +1190,7 @@ final class VoiceTurnController {
         result.spoken = PersonaReplyClamp.clamp(ResponseSanitizer.sanitize(spoken), transcript: transcript,
                                                  personality: ZeusPersonality.current())
         VoiceLatency.shared.finishWhenQuiet { [weak self] in self?.speaker.isSpeaking ?? false }
+        if drawBegun { hideDrawingWhenAnswerEnds(token: drawToken) }
         if blockedByRestriction {
             // Said and captioned once (the flag is per turn), and the delivered answer says nothing ran.
             let note = Self.blockedActionNote
@@ -978,6 +1204,22 @@ final class VoiceTurnController {
             }
         }
         return result
+    }
+
+    /// What the speaker runs when sentence `index` starts to play: show that sentence's marks.
+    private func revealCallback(_ index: Int, token: UUID?) -> (@MainActor () -> Void)? {
+        guard let token else { return nil }
+        let presenter = presenter
+        return { presenter.reveal(sentence: index, token: token) }
+    }
+
+    /// The marks go a few seconds after the last line has played (the presenter owns the delay).
+    private func hideDrawingWhenAnswerEnds(token: UUID) {
+        guard speaker.isSpeaking else { presenter.answerFinished(token: token); return }
+        Task { @MainActor [weak self] in
+            while let self, self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
+            self?.presenter.answerFinished(token: token)
+        }
     }
 
     /// Frontmost app and the local time, so "what time is it" and "this app" need no tools.
@@ -1020,7 +1262,7 @@ final class VoiceTurnController {
         buddy.hideCaption()
         if speakIt, SettingsStore.shared.bool("voice.speakReplies") {
             speaker.speak("Here is the fuller answer.")
-            for sentence in sentences.prefix(4) { speaker.speak(PersonaCompliance.stripOminousHedges(sentence)) }
+            for sentence in sentences.prefix(4) { speaker.speak(Self.voiced(sentence)) }
         }
         history.append(Exchange(user: "(fuller answer to: \(transcript.prefix(80)))", assistant: String(clean.prefix(400))))
         if history.count > 10 { history.removeFirst(history.count - 10) }
@@ -1030,16 +1272,21 @@ final class VoiceTurnController {
     func say(_ text: String) {
         VoiceLog.logContent("spoken", text)
         if SettingsStore.shared.bool("voice.speakReplies") {
-            SystemAudioDucker.begin()
-            speaker.speak(text)
+            seams.duckBegin()
+            speaker.speak(Self.voiced(text))
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 while self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
-                SystemAudioDucker.end()
+                self.seams.duckEnd()
             }
         }
         buddy.showCaption(text)
         buddy.hideCaption()
+    }
+
+    /// What the voice is handed: no ominous trailing hedge, and no ellipsis in an Ultron reply.
+    static func voiced(_ text: String) -> String {
+        UltronSpeechText.prepared(PersonaCompliance.stripOminousHedges(text), personality: ZeusPersonality.current())
     }
 
     /// The last ~240 characters of the reply, cut at a word boundary.

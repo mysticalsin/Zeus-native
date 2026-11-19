@@ -8,7 +8,11 @@ struct ZeusVoiceCards: View {
     private var settings: DictationSettings { DictationSettings.shared }
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
     private var testModel: VoiceTestModel { VoiceTestModel.shared }
+    private var preview: VoicePreviewModel { VoicePreviewModel.shared }
     static let automaticTitle = "Automatic (best working voice)"
+    /// Re-read every 30 seconds and on appear, so the OpenAI note and picker flip at the shutdown instant with the window open.
+    @State private var now = Date()
+    private var openAINote: String? { OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now) }
 
     var body: some View {
         GSCard {
@@ -67,6 +71,10 @@ struct ZeusVoiceCards: View {
                     else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
                 }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
             }
+            if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
+                                                                 effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
+                GSInfo(text: line)
+            }
             GSDivider()
             GSRow(symbol: "sparkles", title: "Voice quality", text: voice.elevenQuality.detail) {
                 GSPopup(selection: Binding(get: { voice.elevenQuality.title }, set: { title in
@@ -113,7 +121,7 @@ struct ZeusVoiceCards: View {
                 GSInfo(text: line)
             }
             GSDivider()
-            GSRow(symbol: "key", title: "OpenAI TTS key", text: voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.") {
+            GSRow(symbol: "key", title: "OpenAI TTS key", text: openAINote ?? (voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.")) {
                 HStack(spacing: 10) {
                     SecureField(voice.openAIKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.openAIKeyDraft }, set: { voice.openAIKeyDraft = $0 }))
                         .textFieldStyle(.plain)
@@ -127,6 +135,46 @@ struct ZeusVoiceCards: View {
                     Button("Save key") { voice.saveOpenAIKey() }.buttonStyle(GSButtonStyle()).disabled(voice.openAIKeyDraft.isEmpty)
                     if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle()) }
                 }
+            }
+            if voice.openAIKeySaved {
+                GSDivider()
+                GSRow(symbol: "person.wave.2", title: "OpenAI voice",
+                      text: openAINote
+                          ?? "Used when OpenAI speaks. Marin and Cedar need the gpt-4o-mini-tts model.") {
+                    if voice.openAIRetired(now: now) {
+                        Text(OpenAISpeechRetirement.endedNote).font(OB.font(13.5)).foregroundStyle(GS.text.opacity(0.5))
+                            .accessibilityLabel("OpenAI voice, ended")
+                    } else {
+                        voicePicker(provider: .openAICompatible, voices: OpenAIVoiceCatalog.voices(forModel: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now),
+                                    selected: voice.openAIVoice, label: "OpenAI voice") { voice.openAIVoice = $0 }
+                    }
+                }
+            }
+            GSDivider()
+            GSRow(symbol: "key", title: "Gemini TTS key", text: voice.geminiKeySaved ? "Saved in Keychain." : "Optional Google voice. Create a key in Google AI Studio, then paste it here. Stored only in your Keychain.") {
+                HStack(spacing: 10) {
+                    SecureField(voice.geminiKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.geminiKeyDraft }, set: { voice.geminiKeyDraft = $0 }))
+                        .textFieldStyle(.plain)
+                        .snapshotSafeText(voice.geminiKeyDraft, placeholder: voice.geminiKeySaved ? "Saved" : "Paste a key", secure: true)
+                        .font(OB.font(13.5)).foregroundStyle(GS.text)
+                        .padding(.horizontal, 10).frame(width: 200, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                        .accessibilityLabel("Gemini TTS key")
+                        .onSubmit { voice.saveGeminiKey() }
+                    Button("Save key") { voice.saveGeminiKey() }.buttonStyle(GSButtonStyle()).disabled(voice.geminiKeyDraft.isEmpty)
+                    if voice.geminiKeySaved { Button("Clear") { voice.removeGeminiKey() }.buttonStyle(GSButtonStyle()) }
+                }
+            }
+            if voice.geminiKeySaved {
+                GSDivider()
+                GSRow(symbol: "person.wave.2", title: "Gemini voice", text: "Thirty Google voices. Preview speaks one short sentence with your key.") {
+                    voicePicker(provider: .gemini, voices: GeminiVoiceCatalog.voices,
+                                selected: voice.geminiVoice, label: "Gemini voice") { voice.geminiVoice = $0 }
+                }
+            }
+            if let line = preview.message {
+                GSInfo(text: line)
             }
             if voice.elevenKeySaved {
                 GSDivider()
@@ -181,6 +229,8 @@ struct ZeusVoiceCards: View {
             }
             designRows
         }
+        .onAppear { now = Date() }
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { now = $0 }
         GSCard("Speech to text") {
             GSRow(symbol: "waveform.and.mic", title: "Hears you with", text: settings.engine.detail) {
                 GSPopup(selection: Binding(get: { SpeechEngineBoard.shared.pickerTitle(settings.engine) },
@@ -255,6 +305,22 @@ struct ZeusVoiceCards: View {
             }
             return "ElevenLabs"
         case .openAICompatible: return "OpenAI-compatible TTS"
+        case .gemini: return "Google Gemini TTS"
+        }
+    }
+
+    /// A voice popup with a Preview button. Rows read "Name, tone"; the id is what gets saved.
+    private func voicePicker(provider: VoiceTTSProvider, voices: [CatalogVoice], selected: String, label: String,
+                             choose: @escaping (String) -> Void) -> some View {
+        func rowTitle(_ item: CatalogVoice) -> String { "\(item.title), \(item.detail)" }
+        return HStack(spacing: 10) {
+            GSPopup(selection: Binding(get: { voices.first { $0.id == selected }.map(rowTitle) ?? selected },
+                                       set: { title in if let item = voices.first(where: { rowTitle($0) == title }) { choose(item.id) } }),
+                    options: voices.map(rowTitle), label: label)
+            Button(preview.isActive(provider, selected) ? (preview.loading ? "Loading" : "Stop") : "Preview") {
+                preview.toggle(provider, voice: selected)
+            }
+            .buttonStyle(GSButtonStyle()).accessibilityLabel("\(label) preview")
         }
     }
 

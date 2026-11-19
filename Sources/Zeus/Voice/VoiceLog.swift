@@ -8,9 +8,32 @@ import ZeusCore
 enum VoiceLog {
     private static let queue = DispatchQueue(label: "app.zeus.voicelog")
     static var url: URL {
-        let base = ProcessInfo.processInfo.environment["ZEUS_LOG_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Zeus", isDirectory: true)
-        return base.appendingPathComponent("voice.log")
+        logDirectory().appendingPathComponent("voice.log")
+    }
+
+    /// Whether this process is a test run (XCTest or Swift Testing both load the app into a test bundle host).
+    static let isRunningTests: Bool = {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+            || ["xctest", "swiftpm-testing-helper"].contains { ProcessInfo.processInfo.processName.contains($0) }
+    }()
+
+    /// `ZEUS_LOG_DIR` wins. Otherwise the owner's `~/Library/Logs/Zeus`, except under tests, which write to a
+    /// temporary folder so a test run never adds lines to the real log.
+    static func logDirectory(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        runningTests: Bool = isRunningTests,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        temporary: URL = FileManager.default.temporaryDirectory
+    ) -> URL {
+        if let override = environment["ZEUS_LOG_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        if runningTests {
+            return temporary.appendingPathComponent("zeus-test-logs-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
+        return home.appendingPathComponent("Library/Logs/Zeus", isDirectory: true)
     }
     /// Also echoed to stdout by the offline self-test.
     nonisolated(unsafe) static var echo = false

@@ -149,9 +149,9 @@ public struct TodoSync: Sendable {
 /// without saving the upgraded row, so no migration condition is true any more. Versioned (the app stores
 /// `version` once it has run) and idempotent. Kept here so ZeusCore tests can reach it.
 public enum TopBarLayoutRepair {
-    public static let version = 1
+    public static let version = 2
     /// The tabs the one-time row upgrades switch on.
-    public static let upgradeTabs: [TopBarTab] = [.agents, .teleprompter, .insomnia, .polyglot, .recordly, .scribe]
+    public static let upgradeTabs: [TopBarTab] = [.tiling, .agents, .teleprompter, .insomnia, .polyglot, .recordly, .scribe]
 
     /// Adds each upgrade tab the row lacks and the person never had the chance to turn off (it is not in
     /// the `known` list saved with the row), then puts the default row in front. Tabs they removed

@@ -141,11 +141,15 @@ final class Relay: @unchecked Sendable {
     private static func encode(_ response: BridgeResponse) -> Data? { try? JSONEncoder().encode(response) }
 }
 
+// Chrome keeps this process running while the app is rebuilt or updated and replaces the installed copy of the file.
+// Read what this program is now, before that can happen, so the app is still recognised afterwards.
+PeerSigning.captureOwnIdentity()
 let lifetime = HostLifetime()
 do {
     let relay = try Relay(lifetime: lifetime)
     let input = try NativeMessageInput(handle: .standardInput)
-    let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path, peerPolicy: ChromeSocketPeers.policy(environment: ProcessInfo.processInfo.environment)) { [relay] line, reply in
+    let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path, peerPolicy: ChromeSocketPeers.policy(environment: ProcessInfo.processInfo.environment),
+                                  peerVerifier: ChromeSocketPeers.verifier) { [relay] line, reply in
         relay.forward(line, reply: reply)
     }
     lifetime.attach(input: input, server: server)

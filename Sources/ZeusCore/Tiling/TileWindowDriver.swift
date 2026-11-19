@@ -1,0 +1,217 @@
+import Foundation
+
+/// One admitted window, as the driver reports it. The Accessibility element stays inside the app's driver:
+/// the id's index is assigned by element identity, so the id is the element identity as far as ZeusCore goes.
+public struct TileWindowRef: Equatable, Sendable {
+    public var id: TileWindowID
+    public var bundleID: String
+    /// In engine coordinates: origin at the top left of the main display, y growing downward.
+    public var frame: TileRect
+
+    public init(id: TileWindowID, bundleID: String, frame: TileRect) {
+        self.id = id
+        self.bundleID = bundleID
+        self.frame = frame
+    }
+
+    public var pid: Int32 { id.pid }
+}
+
+/// What the driver can say about the front app. Read fresh, never kept.
+public struct TileFrontmost: Equatable, Sendable {
+    /// The front app's focused window, when the last `windows(config:)` returned it. A window that passed no
+    /// admission (an excluded app, Zeus itself) is nil, so is a front app with no focused window.
+    public var focused: TileWindowID?
+    /// The focused window of the front app is in full screen.
+    public var isFullScreen: Bool
+
+    public init(focused: TileWindowID?, isFullScreen: Bool) {
+        self.focused = focused
+        self.isFullScreen = isFullScreen
+    }
+
+    public static let none = TileFrontmost(focused: nil, isFullScreen: false)
+}
+
+/// What the layout needs from the system to arrange windows. The Accessibility version is the only real one;
+/// tests use a fake. Every frame crossing it is in engine coordinates.
+@MainActor
+public protocol TilingWindowDriver: AnyObject {
+    /// Whether Accessibility is on. Without it every other call does nothing and reports nothing.
+    var isTrusted: Bool { get }
+    /// The connected displays with their visible areas.
+    func displays() -> [TileDisplay]
+    /// The windows on the current Space that pass admission under `config`, every one read fresh in this call.
+    /// A window the call could not read in time is left out, never reported from an earlier call. Empty without
+    /// Accessibility.
+    func windows(config: TileConfig) -> [TileWindowRef]
+    /// The apps (by process id) the last `windows(config:)` could not read: the app did not answer its window list, or
+    /// one of its windows did not answer in time. A window of such an app that is missing
+    /// from the listing is unknown, not gone: the caller keeps its slot and does not write to it. A window
+    /// missing from an app that was read is gone. Without Accessibility every running app is unread.
+    var unreadPIDs: Set<Int32> { get }
+    /// Moves and resizes `window`, then reads the frame back. True only when it landed within the tolerance.
+    /// Only a window the last `windows(config:)` returned can be written; any other id is refused.
+    func setFrame(_ frame: TileRect, for window: TileWindowID) -> Bool
+    /// Brings `window` to the front and gives it keyboard focus. Does nothing for a window the last
+    /// `windows(config:)` did not return, or one that no longer passes admission when this call reads it again
+    /// (minimized or moved to another Space since).
+    func focus(_ window: TileWindowID)
+    /// Which window has the keyboard, and whether the front app is in full screen. Empty without Accessibility.
+    func frontmost() -> TileFrontmost
+}
+
+/// Gives each window of each app a number that is never used again in this session.
+public struct TileIDAllocator: Sendable {
+    private var last: [Int32: Int] = [:]
+
+    public init() {}
+
+    public mutating func next(pid: Int32) -> TileWindowID {
+        let index = (last[pid] ?? 0) + 1
+        last[pid] = index
+        return TileWindowID(pid: pid, index: index)
+    }
+}
+
+/// One window that must move.
+public struct TileMove: Equatable, Sendable {
+    public var id: TileWindowID
+    public var target: TileRect
+    public var current: TileRect
+
+    public init(id: TileWindowID, target: TileRect, current: TileRect) {
+        self.id = id
+        self.target = target
+        self.current = current
+    }
+}
+
+/// What a layout pass has to do: the windows to move, the ones already in place, and tree slots with no window.
+public struct TileMovePlan: Equatable, Sendable {
+    public var moves: [TileMove]
+    /// Windows already within the tolerance of their frame. They are not written, so nothing cascades.
+    public var inPlace: [TileWindowID]
+    /// Slots of the tree with no live window to move, or no usable frame to give.
+    public var missing: [TileWindowID]
+
+    public init(moves: [TileMove], inPlace: [TileWindowID], missing: [TileWindowID]) {
+        self.moves = moves
+        self.inPlace = inPlace
+        self.missing = missing
+    }
+}
+
+/// Matches the windows the driver found to the slots of a tree. Pure.
+public enum TilePlanner {
+    /// The windows the engine may arrange: admission's answer checked again against the config and the
+    /// displays. Floating and excluded windows, windows below the minimum size, windows on no display and
+    /// repeated ids are dropped. Discovery order is kept.
+    public static func eligible(_ windows: [TileWindowRef], config: TileConfig, displays: [TileDisplay]) -> [TileWindowRef] {
+        var seen = Set<TileWindowID>()
+        var kept: [TileWindowRef] = []
+        for window in windows {
+            guard !config.floating.contains(window.id),
+                  !config.excludedBundleIDs.contains(window.bundleID),
+                  window.frame.width >= config.minTileSize, window.frame.height >= config.minTileSize,
+                  TileDisplays.display(for: window.frame, in: displays) != nil,
+                  seen.insert(window.id).inserted else { continue }
+            kept.append(window)
+        }
+        return kept
+    }
+
+    /// The slots of `old` to keep although the listing does not hold them: a window that is not listed, not
+    /// floating, and belongs to an app the pass could not read. A window of an app that was read and is missing is
+    /// gone, so one slow app never pins the slots of windows that closed elsewhere.
+    public static func slotsToKeep(old: [TileWindowID], listed: Set<TileWindowID>, floating: Set<TileWindowID>,
+                                   unreadPIDs: Set<Int32>) -> Set<TileWindowID> {
+        Set(old.filter { !listed.contains($0) && !floating.contains($0) && unreadPIDs.contains($0.pid) })
+    }
+
+    /// The moves that put each window of `tree` into its engine frame on `display`, in tree order. A window not in
+    /// the tree, and a floating one, is never touched.
+    public static func plan(tree: TileTree, display: TileDisplay, config: TileConfig, windows: [TileWindowRef]) -> TileMovePlan {
+        let frames = TileFrames.frames(of: tree, display: display.visibleFrame, config: config)
+        var live: [TileWindowID: TileWindowRef] = [:]
+        for window in windows where live[window.id] == nil { live[window.id] = window }
+
+        var plan = TileMovePlan(moves: [], inPlace: [], missing: [])
+        for leaf in tree.windows where !config.floating.contains(leaf) {
+            guard let target = frames[leaf], !target.isEmpty, let window = live[leaf] else {
+                plan.missing.append(leaf)
+                continue
+            }
+            if TileReadBack.matches(window.frame, target) {
+                plan.inPlace.append(leaf)
+            } else {
+                plan.moves.append(TileMove(id: leaf, target: target, current: window.frame))
+            }
+        }
+        return plan
+    }
+}
+
+public enum TileApplyState: Equatable, Sendable {
+    case applied
+    /// Accessibility is off: no frame was written.
+    case accessibilityOff
+}
+
+/// What a pass did.
+public struct TileApplyOutcome: Equatable, Sendable {
+    public var state: TileApplyState
+    /// Written and landed.
+    public var moved: [TileWindowID] = []
+    /// Already in place: not written.
+    public var skipped: [TileWindowID] = []
+    /// Written but did not land. The caller marks each one floating for the session and lays the rest out again.
+    public var refused: [TileWindowID] = []
+    /// Not started because the time budget ran out. Not floating: a later pass takes them.
+    public var deferred: [TileWindowID] = []
+    /// The frame asked for in every write, landed or not. The controller records it as the window's frame for the
+    /// rest of the pass when the write landed.
+    public var intended: [TileWindowID: TileRect] = [:]
+
+    public init(state: TileApplyState) { self.state = state }
+}
+
+/// Runs a plan through a driver: each move once, in order, with no retry. Trust is checked before the first write and
+/// again after every write that fails, so a permission revoked part way ends the plan as `.accessibilityOff`.
+@MainActor
+public enum TileApplier {
+    /// Seconds one plan may take before it stops starting new writes, when the caller gives no deadline.
+    public static let defaultBudget = 0.75
+
+    /// `deadline` is a time on `clock`: no write starts at or after it, and each move left over is deferred. A pass
+    /// with several plans (one per display) gives every plan the same deadline, so the pass as a whole is bounded.
+    /// Without one the plan gets `budget` seconds from its own start.
+    public static func apply(_ plan: TileMovePlan, with driver: some TilingWindowDriver, budget: Double = TileApplier.defaultBudget,
+                             until deadline: Double? = nil,
+                             clock: () -> Double = { ProcessInfo.processInfo.systemUptime }) -> TileApplyOutcome {
+        guard driver.isTrusted else { return TileApplyOutcome(state: .accessibilityOff) }
+        var outcome = TileApplyOutcome(state: .applied)
+        outcome.skipped = plan.inPlace
+        let limit = deadline ?? clock() + budget
+        var outOfTime = false
+        for move in plan.moves {
+            if !outOfTime, clock() >= limit { outOfTime = true }
+            if outOfTime {
+                outcome.deferred.append(move.id)
+                continue
+            }
+            outcome.intended[move.id] = move.target
+            if driver.setFrame(move.target, for: move.id) {
+                outcome.moved.append(move.id)
+            } else if !driver.isTrusted {
+                // Accessibility went away part way through: every later write fails for that reason alone, and none of
+                // the windows is to blame. Stopping here keeps them out of the refused list, so the caller never floats
+                // them for the session.
+                return TileApplyOutcome(state: .accessibilityOff)
+            } else {
+                outcome.refused.append(move.id)
+            }
+        }
+        return outcome
+    }
+}

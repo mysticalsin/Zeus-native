@@ -24,9 +24,9 @@ enum VoiceDesigner {
     /// Generic qualities only, following the ElevenLabs prompt guide: language first, then age,
     /// timbre, attitude, pacing and recording quality.
     static let voiceDescription = """
-    American English, adult male in his forties. A deep, smooth, measured voice with a warm low \
-    resonance and a slight synthetic sheen. Articulate and quietly amused, theatrical but calm. \
-    Unhurried pacing with deliberate pauses before key words. Studio-quality recording.
+    American English, adult male. A deep, smooth, resonant baritone, measured and theatrical, with precise diction \
+    and dry amusement. Unhurried pacing, with quiet emphasis on key words. A subtle synthetic, metallic sheen. \
+    Studio-quality recording.
     """
 
     /// An original line in the persona's manner, long enough for a stable preview.
@@ -184,7 +184,7 @@ final class VoiceDesignModel {
     /// One short line under the button.
     var status: String {
         switch phase {
-        case .idle: "Creates an original voice from a description: deep, measured, quietly amused. Uses ElevenLabs credits for one short sample."
+        case .idle: "Creates an original voice from a description: smooth, resonant, dry and a little theatrical. Uses ElevenLabs credits for one short sample."
         case .designing: "Designing three voices. This takes a few seconds."
         case .ready: "Play each one, then keep the voice you like."
         case .saving: "Saving the voice as \u{201C}\(VoiceDesigner.voiceName)\u{201D}."

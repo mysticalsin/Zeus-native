@@ -25,7 +25,7 @@ struct ThinkingOrbView: View {
             if reduceMotion {
                 SoftPulse(tint: tint)
             } else {
-                TickingView(interval: 1.0 / 30) { context in
+                DisplaySynchronizedView(preferredFramesPerSecond: Motion.ambientFPS) { context in
                     Canvas { context2D, size in
                         Self.paint(mode: mode, time: context.date.timeIntervalSinceReferenceDate, size: size, tint: tint, into: &context2D)
                     }
