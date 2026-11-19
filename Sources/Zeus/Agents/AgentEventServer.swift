@@ -129,15 +129,7 @@ final class AgentEventServer {
             )
             notch.update(sessionID: sessionID, status: verdict == .deny ? .idle : .working)
             peekBriefly()
-            let decision: HookDecision
-            if let detail, detail.answered, verdict == .allow {
-                // Answers go the way this Claude Code is known to honour (learned, see QuestionAnswers).
-                decision = QuestionAnswers.shared.decision(id: event.id, session: sessionID, input: detail.input, answers: detail.choices)
-            } else {
-                decision = HookDecision(id: event.id, decision: verdict,
-                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
-                                        updatedInput: verdict == .allow ? detail?.updatedInput : nil)
-            }
+            let decision = Self.hookDecision(id: event.id, verdict: verdict, detail: detail, session: sessionID)
             return try? JSONEncoder().encode(decision)
 
         case "AgentResponse":
@@ -167,6 +159,16 @@ final class AgentEventServer {
             break
         }
         return nil
+    }
+
+    /// The hook reply. A denied or timed-out card still forwards any answer that was typed.
+    static func hookDecision(id: String, verdict: HookDecision.Verdict, detail: ApprovalDetail?, session: String) -> HookDecision {
+        if let detail, detail.answered {
+            return QuestionAnswers.shared.decision(id: id, session: session, input: detail.input, answers: detail.choices)
+        }
+        return HookDecision(id: id, decision: verdict,
+                            reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
+                            updatedInput: detail?.updatedInput)
     }
 
     /// The finished card with a sound, unless a full-screen app asks for quiet.

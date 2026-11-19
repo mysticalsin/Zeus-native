@@ -19,6 +19,67 @@ import ZeusCore
         return (controller, box)
     }
 
+    @Test func denyAllResolvesEveryQueuedCard() {
+        let controller = NotchController()
+        let boxes = [Box(), Box(), Box()]
+        controller.stageApprovals((0..<3).map { index in
+            card(id: "card-\(index)", command: "request \(index)", box: boxes[index])
+        })
+        controller.denyEveryApproval()
+        #expect(boxes.map(\.verdict) == [.deny, .deny, .deny])
+        #expect(controller.pendingApprovals.isEmpty)
+        #expect(controller.model.approval == nil)
+    }
+
+    @Test func browsingResetsTheShortcutQuietPeriodAndRefreshesLabels() {
+        let controller = NotchController()
+        let past = Date().addingTimeInterval(-5)
+        var cards = (0..<3).map { index in
+            card(id: "card-\(index)", command: "request \(index)", box: Box())
+        }
+        for index in cards.indices { cards[index].appearedAt = past }
+        controller.stageApprovals(cards)
+        controller.browseApproval(by: 1)
+        let shown = controller.model.approval
+        #expect(shown?.position == "2 of 3")
+        #expect(controller.pendingApprovals.map(\.position) == ["1 of 3", "2 of 3", "3 of 3"])
+        #expect(!ApprovalCard.inputOpen(now: Date(), appearedAt: shown?.appearedAt ?? past))
+    }
+
+    @Test func voiceOverConfirmArmsTheHighPlanPath() {
+        let (controller, _) = controller(reduceMotion: false)
+        controller.approvalVoiceOver = { true }
+        controller.commitDisplayedAnswers(inside: true)
+        #expect(controller.model.approval?.allowGate.confirmVisible == true)
+    }
+
+    @Test func anOutsideReleaseAndADeniedReplyDropTheAnswer() {
+        let (controller, box) = controller(reduceMotion: true)
+        let detail = ApprovalDetail(kind: .questions([]), input: .object([:]), session: "s")
+        controller.model.approval?.detail = detail
+        detail.answer()
+        controller.commitDisplayedAnswers(inside: false)
+        #expect(detail.updatedInput == nil)
+        #expect(!detail.answered)
+        detail.answer()
+        let denied = AgentEventServer.hookDecision(id: "event", verdict: .deny, detail: detail, session: "s")
+        let asked = AgentEventServer.hookDecision(id: "event", verdict: .ask, detail: detail, session: "s")
+        #expect(denied.updatedInput == nil)
+        #expect(asked.updatedInput == nil)
+        #expect(box.verdict == nil)
+    }
+
+    @Test func sendAnswersUsesTheDisplayedCommitPath() {
+        let (controller, _) = controller(reduceMotion: true)
+        let detail = ApprovalDetail(kind: .questions([]), input: .object([:]), session: "s")
+        var card = controller.model.approval!
+        card.detail = detail
+        controller.stageApprovals([card])
+        controller.model.approval?.commitAnswers(true)
+        #expect(controller.model.approval?.allowGate.confirmVisible == true)
+        #expect(detail.answered)
+    }
+
     @Test func browsingMakesAllowAndDenyActOnTheDisplayedRequest() {
         let first = Box()
         let second = Box()

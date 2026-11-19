@@ -158,6 +158,11 @@ struct ApprovalDecisionTests {
         #expect(medium.activate(now: start) == .allow)
     }
 
+    @Test func aReleaseOnAnotherCardDoesNothing() {
+        #expect(!ApprovalPressOrigin.releaseCounts(pressed: "front", displayed: "shown"))
+        #expect(ApprovalPressOrigin.releaseCounts(pressed: "shown", displayed: "shown"))
+    }
+
     @Test func aTapOnApprovePlanActivates() {
         #expect(ApprovalDetailPress.planRelease(inside: true, gesture: .tap) == .activate)
         #expect(ApprovalDetailPress.planRelease(inside: true, gesture: .onScreenConfirm(readyAfter: 0.4, expiresAfter: 8)) == .activate)

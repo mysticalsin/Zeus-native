@@ -87,6 +87,8 @@ final class NotchModel {
         var endHold: @MainActor (Bool) -> Void = { _ in }
         var cancelHold: @MainActor () -> Void = {}
         var activateAllow: @MainActor () -> Void = {}
+        /// Send Answers. The controller installs the one production path.
+        var commitAnswers: @MainActor (Bool) -> Void = { _ in }
         var deny: @MainActor () -> Void = {}
         var denyAll: @MainActor () -> Void = {}
         var resolve: @MainActor (HookDecision.Verdict) -> Void

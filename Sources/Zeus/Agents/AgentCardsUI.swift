@@ -234,6 +234,9 @@ final class ApprovalDetail {
         updatedInput = AgentQuestion.answeredInput(input, answers: choices)
         answered = true
     }
+
+    /// Drops a choice that must not ride along with a deny, a timeout, or a refused press. Currently keeps it.
+    func withdraw() {}
 }
 
 /// The plan, question or diff section inside the notch approval card.
