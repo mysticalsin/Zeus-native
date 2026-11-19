@@ -83,6 +83,8 @@ Each item has its own setting, off by default, and fails closed. Red tests come 
 
 Camera face verification is the primary identity check for a Zeus approval, so Tony does not type a password for that approval. Touch ID or `LocalAuthentication` is the fallback. This is the check spec 003 (approval sync) calls before a card or a terminal choice counts as answered. Spec 003 still clears both places within 300 ms once the check succeeds.
 
+**No LLM and no network.** Tony, 13:34 BRT (t242u). Face unlock, presence, and an approval by face or Touch ID have zero dependency on Claude, any other LLM, or the network. The pipeline is on-device Swift. Vision finds the face. Core ML runs the embedder. Nothing in this path opens a socket, loads a remote model, or asks a language model. If explain or another LLM feature is unavailable, that feature shows a clear message and does not block face unlock, presence, an approval, music, the bars, Settings, or onboarding. This stays Swift. It is not rewritten in another language.
+
 **Capture.** `AVFoundation` for the camera. Vision for face rectangles and landmarks, which `FaceVision.analyze` already requests.
 
 **Identity model.** The embedder is a protocol: a name, a model identifier, an embedding dimension, whether alignment is required, and a function from an aligned face to a vector. The selected implementation is OpenCV Zoo SFace, with YuNet for detection and five-point alignment. SFace returns the embedding. The score is cosine distance. This commit does not vendor the weights.
@@ -142,6 +144,20 @@ Selected from the 19 Nov 2026 prior-art page. Each licence file below was read t
 - **Updater (R-022).** [sparkle-project/Sparkle](https://github.com/sparkle-project/Sparkle) 2. MIT, plus the BSD and ed25519 notices in its LICENSE. Keys never go in the repo.
 - **Face (R-023).** SFace, YuNet, and glance, as written above. Boring Notch (GPL-3.0) is not used.
 
+## Local surfaces
+
+Tony, 13:34 BRT (t242u). He runs out of LLM tokens often, so these surfaces work fully with no LLM and no network:
+
+- Face unlock, presence, and approvals by face or Touch ID
+- Music transport: play, pause, shuffle, and repeat
+- Multi-monitor bars
+- Settings
+- Onboarding
+
+A lyrics lookup and the updater may use the network. Neither is required for the list above. A lyrics miss does not stop playback. An updater failure does not stop Settings. Explain, when its model is unavailable, shows a clear message and does not block any surface in the list. The implementation stays Swift. The face path uses Vision and Core ML only.
+
+The red test is `faceUnlockWithNetworkAndLLMStubbedToThrowDoesNotCallEither`. Network and LLM clients are disabled or stubbed to throw, and each stub records that it was entered. The test runs enrolment, the match, a face approval, the Touch ID fallback, and presence. It fails if either stub is entered. It fails if the run does not finish with a local result. The test is written before the pipeline code. It is not in this commit.
+
 ## Requirements
 
 - **FR-001**: Wave 1 uses public APIs only and adds no permission prompt.
@@ -154,6 +170,7 @@ Selected from the 19 Nov 2026 prior-art page. Each licence file below was read t
 - **FR-008**: Face approval uses the camera and Vision, stores only an encrypted template, and falls back to Touch ID or `LocalAuthentication`. The embedder protocol's selected weights are SFace (Apache-2.0) with YuNet (MIT). They stay out of the tree until the celebrity-dataset sign-off. InsightFace weights are not bundled.
 - **FR-009**: False-accept and false-reject figures are reported only from a real run. This spec states none.
 - **FR-010**: No private API outside the Wave 2 contracts listed above.
+- **FR-011**: Face unlock, presence, approvals by face or Touch ID, music transport, multi-monitor, Settings, and onboarding have zero dependency on Claude, any other LLM, or the network. The face path is on-device Swift using Vision and Core ML only. An unavailable LLM feature shows a clear message and does not block those surfaces. The app is not rewritten in another language.
 
 ## Success criteria
 
@@ -162,6 +179,7 @@ Selected from the 19 Nov 2026 prior-art page. Each licence file below was read t
 - **SC-003**: A Spotify repeat control never offers "one". A script is not built when consent is false. A script older than 3 s is abandoned.
 - **SC-004**: A lyrics failure does not become a cached miss. The next wait is the server's Retry-After when one was sent, plus jitter, else the doubling delay.
 - **SC-005**: Face approval locked after N failures cannot approve. The audit line for that lock contains no float vector and no image byte.
+- **SC-006**: `faceUnlockWithNetworkAndLLMStubbedToThrowDoesNotCallEither` finishes with a local result. Its network stub and its LLM stub are never entered. With the model unavailable, explain shows a message and face unlock, music, the bars, Settings, and onboarding still complete.
 
 ## Assumptions
 

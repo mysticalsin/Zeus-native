@@ -19,6 +19,7 @@ Verified on this head: nothing. A row is done only when "Verified on" is a comma
 | Audit and kill switch | `theAuditLineHasNoEmbeddingAndTheKillSwitchStopsTheCamera` | unit | |
 | No image in enrolment | `enrolmentStoresNoImage` | unit | |
 | Approval sync uses the face check | `approvalSyncUsesFaceBeforeItClearsBothSides` | unit | |
+| Face path never calls a model or the network | `faceUnlockWithNetworkAndLLMStubbedToThrowDoesNotCallEither` | unit | |
 | False-accept and false-reject | fixture run named in the notes | integration, then native Mac | |
 | Tony's face | `qa/face-approval-live.md` | live service | |
 | R-015 R-016 battery | `missingBatteryKeysHideAndUnknownIsNotZero` | unit | |

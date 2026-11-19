@@ -26,7 +26,7 @@ Wave 1 puts the existing top bar on every display, keeps one controller, and clo
 
 **Performance Goals**: Unchanged from the features already on main, plus the 3 s music-script timeout and the lyrics backoff. Face false-accept rate is unmeasured.
 
-**Constraints**: No private API except the Wave 2 contracts. No new entitlement. Camera permission is the one already in the app. No Package.swift change in this commit. Top bar visuals stay. One actor for audio and commands.
+**Constraints**: No private API except the Wave 2 contracts. No new entitlement. Camera permission is the one already in the app. No Package.swift change in this commit. Top bar visuals stay. One actor for audio and commands. Face unlock, presence, face or Touch ID approvals, music transport, multi-monitor, Settings, and onboarding do not call Claude, any other LLM, or the network. The face path is Swift, Vision, and Core ML. Stay in Swift.
 
 **Scale/Scope**: One bar per display. One capturer of actions. Held rows visible and disabled.
 
@@ -37,6 +37,7 @@ Wave 1 puts the existing top bar on every display, keeps one controller, and clo
 - **III. Clean-room**: Prior-art names are in spec.md and `THIRD_PARTY_NOTICES` because the MIT, BSD, and Apache notices have to be kept. GPL, AGPL, and MPL sources are not copied. The glance notch animation is excluded. Music, Spotify, and Chromium are the apps Zeus already scripts. Pass.
 - **IV. Privacy**: No image stored or logged. No password in the repo. Camera stays off until the setting is on. Pass.
 - **V. Motion and accessibility**: Existing top bar motion stays. New state changes follow Reduce Motion. VoiceOver hears the face failure sentences. Pass.
+- **VI. Local without a model**: Face unlock, presence, face or Touch ID approvals, music transport, multi-monitor, Settings, and onboarding do not depend on Claude, any other LLM, or the network. The face path is on-device Swift with Vision and Core ML. `faceUnlockWithNetworkAndLLMStubbedToThrowDoesNotCallEither` is the red test. An unavailable explain shows a message and does not block those surfaces. Pass, as a requirement. The test is not written in this commit.
 
 ## Project Structure
 

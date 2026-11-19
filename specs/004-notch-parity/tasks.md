@@ -52,10 +52,11 @@ Write these red, against synthetic vectors and cue readings, not against Tony's 
 - [ ] T016 [P] Write `theAuditLineHasNoEmbeddingAndTheKillSwitchStopsTheCamera` in the same file. It fails until the log string contains no float vector and the kill switch forces a deny.
 - [ ] T017 [P] Write `enrolmentStoresNoImage` in the same file. It fails if a record type can encode an image or a thumbnail.
 - [ ] T018 Write `approvalSyncUsesFaceBeforeItClearsBothSides` as the spec 003 hook test. It fails until a successful face check is what allows the card and the terminal choice to clear together, and a failed check clears neither.
+- [ ] T018a Write `faceUnlockWithNetworkAndLLMStubbedToThrowDoesNotCallEither` in `Tests/ZeusCoreTests/FaceApprovalTests.swift` before T019. Network and LLM clients are disabled or stubbed to throw, and each records that it was entered. The test runs enrolment, the match, a face approval, the Touch ID fallback, and presence. It fails if either stub is entered. It fails if the run does not finish with a local result. It stays red while the pipeline is missing or while any step calls a stub.
 
 ### Implementation
 
-- [ ] T019 Make T012 through T018 pass behind the embedder protocol. The selected implementation is SFace with YuNet, and it is not vendored until the celebrity-dataset sign-off in spec.md. Do not add an InsightFace weight. Do not add an entitlement. Camera permission only. Active liveness uses Vision landmarks.
+- [ ] T019 Make T012 through T018a pass behind the embedder protocol. The selected implementation is SFace with YuNet, converted to Core ML, and it is not vendored until the celebrity-dataset sign-off in spec.md. Do not add an InsightFace weight. Do not add an entitlement. Camera permission only. Active liveness uses Vision landmarks. Do not add a language model, a network client, or a second language to this path.
 - [ ] T020 Measure false-accept and false-reject on synthetic or licensed public fixtures and write the counts into `checklist.md`. If the fixtures are not licensed, leave the cells blank and stop. Do not invent the rates.
 - [ ] T021 Leave `qa/face-approval-live.md` for Tony. Do not fill its result fields in an agent run.
 
