@@ -48,6 +48,7 @@ import Testing
 // The whole search takes minutes under load. `WALK_ONLY=A,B2` runs only the runs whose names start with one of those.
 // Both of these are off by default: `WALK_PROGRESS=path` appends the size of each search to that file as it grows (the runner holds
 // its output until it ends), `WALK_LIMIT=n` stops a search past n states and the run fails. It is for measuring a run, not for a pass.
+// Every search also stops past `walkSearchStateBudget`. Passing that budget is a violation, not a successful shorter walk.
 //
 // A wake belongs to the phase that asked for it: when the phase changes the old wakes are dropped, so a phase that
 // forgets its own wake is caught instead of being covered by a stale one.
@@ -1824,10 +1825,36 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
     return out
 }
 
+/// How many states one search may discover before it stops and reports a violation.
+/// Run A finished at 1,883,647 states on d6d45dde (the everyOrder print). One more state fails the test.
+/// The same cap covers every `search(` in this file: the full runs in `everyOrderOfPressesKeepsTheRules`,
+/// the plain walk of run A, and the `stopAtFirst` / `until` searches, which otherwise walk the whole graph
+/// when the violation they want never appears. A finished full search is cached by run name, so the plain walk
+/// reuses run A's visited set instead of searching it again.
+private let walkSearchStateBudget = 1_883_647
+
+private func searchHitItsBudget(_ report: Report) -> Bool {
+    report.truncated || report.violations.contains {
+        $0.hasPrefix("the search passed the limit of") || $0.hasPrefix("the search stopped at")
+    }
+}
+
+/// Full searches only. A `stopAtFirst` or `until` report is partial and must not be reused as the visited set.
+private final class FullWalkCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: Report] = [:]
+    func report(named name: String) -> Report? { lock.withLock { storage[name] } }
+    func store(_ report: Report, named name: String) { lock.withLock { storage[name] = report } }
+}
+
+private let fullWalkCache = FullWalkCache()
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
     let cacheable = !stopAtFirst && until == nil
-    if cacheable, let cached = fullWalkCache.report(named: run.name), !cached.truncated { return cached }
+    if cacheable, let cached = fullWalkCache.report(named: run.name), !cached.truncated, !searchHitItsBudget(cached) {
+        return cached
+    }
     let start = Date()
     var report = Report()
     var seen: [StateKey: Int] = [:]
@@ -1853,7 +1880,8 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     // `WALK_PROGRESS=path` appends the size of the search to that file as it grows (the runner holds its output until it ends);
     // `WALK_LIMIT=n` stops it past n states (a violation), for measuring a run before it is put in the list.
     let progress = ProcessInfo.processInfo.environment["WALK_PROGRESS"]
-    let limit = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? Int.max
+    let requested = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? walkSearchStateBudget
+    let limit = min(requested, walkSearchStateBudget)
     var cursor = 0
     while cursor < frontier.count {
         if let progress, cursor % 100_000 == 0 {
@@ -1902,7 +1930,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         try? handle.close()
     }
     report.visited = Set(seen.keys)
-    if cacheable, !report.truncated, limit == Int.max, run.stateBound == nil {
+    if cacheable, !report.truncated, !searchHitItsBudget(report), limit == walkSearchStateBudget, run.stateBound == nil {
         fullWalkCache.store(report, named: run.name)
     }
     return report
@@ -2553,12 +2581,20 @@ private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
+    /// The plain walk calls the same full search as run A. That search has to have a finite state budget, or a second
+    /// walk of the same graph keeps running past the suite limit.
+    @Test func thePlainWalkSearchHasAFiniteBudget() {
+        #expect(walkSearchStateBudget < Int.max, "aPlainWalk's search has no finite state budget")
+        #expect(walkSearchStateBudget == 1_883_647)
+    }
+
     /// As a check on the state key: run A walked plainly from rest, every order up to five steps over nine moves (the eight of before and Space).
     /// It must meet no state the search did not, and break no rule.
     @Test func aPlainWalkOfRunAMeetsNoStateTheSearchDidNotAndBreaksNoRule() {
         let run = WalkRun.all[0]
         let report = search(run)
         #expect(!report.truncated)
+        #expect(!searchHitItsBudget(report), "the search stopped at its budget, so this is not a pass: \(report.violations.joined(separator: "\n"))")
         #expect(report.depth >= 5)
         let visited = report.visited
         var sequences = 0
