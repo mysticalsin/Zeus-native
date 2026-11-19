@@ -599,7 +599,6 @@ final class NotchController {
 
     /// A click or the button's VoiceOver action. Control-Option-Y and a spoken yes never allow a high-risk request.
     @discardableResult
-    @discardableResult
     func activateApproval(kind: ApprovalAudit.Kind, cardID: String? = nil) -> HookDecision.Verdict? {
         guard var card = model.approval else { return nil }
         if let cardID, cardID != card.id { return nil }
@@ -635,6 +634,7 @@ final class NotchController {
 
     func beginApprovalHold() {
         guard var card = model.approval else { return }
+        guard ApprovalCard.inputOpen(now: Date(), appearedAt: card.appearedAt) else { return }
         pressCardID = card.id
         card.allowGate.reduceMotion = approvalReduceMotion()
         card.allowGate.voiceOver = approvalVoiceOver()

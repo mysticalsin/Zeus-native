@@ -124,6 +124,7 @@ import ZeusCore
             card(id: "A", command: "first", box: first),
             card(id: "B", command: "second", box: second),
         ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
         controller.beginApprovalHold()
         controller.browseApproval(by: 1)
         controller.monotonicNow = { 1_000 + 1 }
