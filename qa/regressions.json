@@ -4357,14 +4357,14 @@
     },
     {
       "id": "REG-409",
-      "failure": "A Start tap that arrived just after the banner question stopped pending started nothing.",
+      "failure": "A Start tap that arrived after the offer had left started a recording.",
       "features": [
         "F04"
       ],
       "check": "native-ZeusCoreTests",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
-        "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
+        "function": "aTapThatArrivesJustAfterTheTimeoutDoesNotStart"
       }
     },
     {
