@@ -40,6 +40,6 @@ The notice is one row. It names the meeting, when it is, and which call the link
 - **SC-001**: `MeetingAlertTests` pass.
 - **SC-002**: Snapshots are named `meeting-alert-{teams,zoom,meet,webex}-{dark,light}.png` when the hosted renderer runs.
 
-## Open questions
+## Decisions
 
-- The integration meeting card is a separate surface with its own size tests. This slice does not resize that card. Whether the live card should become this 44-point row is unanswered.
+- The live meeting card is this 44-point row. Tony asked for it sleek and small on 19 Nov 2026.

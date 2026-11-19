@@ -5,4 +5,4 @@
 - [x] Ten minutes away reads "in 10 min". Now and Started match the clock rules.
 - [x] Teams, Zoom, Meet, and Webex hosts are recognized. A path that merely contains "zoom" is not.
 - [x] Snapshots are requested for the four calls in light and dark.
-- [ ] The live meeting card is unchanged. See the open question in spec.md.
+- [x] The live card is 44 by 420, the same size as the compact alert.
