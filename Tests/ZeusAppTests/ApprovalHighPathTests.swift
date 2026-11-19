@@ -13,6 +13,7 @@ import ZeusCore
         let box = Box()
         controller.model.approval = NotchModel.Approval(
             id: "item", agent: "Claude", project: "zeus", tool: "Bash", command: "rm -rf /tmp/x", risk: risk,
+            appearedAt: Date().addingTimeInterval(-5),
             helperDeadlineMono: 9_000,
             allowGate: ApprovalAllowGate(risk: risk, itemID: "item"),
             resolve: { box.verdict = $0 })
@@ -47,6 +48,22 @@ import ZeusCore
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
         controller.activateApproval(kind: .card)
         controller.model.approval?.activateAllow()
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func aRepeatedAllowShortcutDoesNotApproveTheCardThatJustAppeared() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .shortcut, cardID: "A")
+        controller.activateApproval(kind: .shortcut, cardID: "B")
         #expect(first.verdict == .allow)
         #expect(second.verdict == nil)
     }
@@ -187,7 +204,9 @@ import ZeusCore
         let detail = ApprovalDetail(kind: .questions([]), input: .object([:]), session: "s")
         var card = controller.model.approval!
         card.detail = detail
+        card.appearedAt = Date().addingTimeInterval(-5)
         controller.stageApprovals([card])
+        controller.model.approval?.appearedAt = card.appearedAt
         controller.model.approval?.commitAnswers(true)
         #expect(controller.model.approval?.allowGate.confirmVisible == true)
         #expect(detail.answered)
@@ -207,6 +226,7 @@ import ZeusCore
         controller.browseApproval(by: 1)
         #expect(controller.model.approval?.id == "shown")
         #expect(controller.model.approval?.position == "2 of 2")
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
         controller.activateApproval(kind: .card)
         #expect(second.verdict == .allow)
         #expect(first.verdict == nil)

@@ -322,11 +322,10 @@ final class NotchController {
         pendingApprovals = []
         for var card in cards {
             let shownID = card.id
-            card.activateAllow = { [weak self] in self?.activateApproval(kind: .card) }
+            card.activateAllow = { [weak self] in self?.activateApproval(kind: .card, cardID: shownID) }
             card.commitAnswers = { [weak self] inside in self?.commitDisplayedAnswers(inside: inside) }
             card.releasePlan = { [weak self] inside in self?.releaseDisplayedPlan(inside: inside) }
             card.liveGesture = { [weak self] in self?.displayedGesture() ?? .tap }
-            _ = shownID
             pendingApprovals.append(card)
         }
         guard let first = pendingApprovals.first else { model.approval = nil; return }
@@ -434,6 +433,8 @@ final class NotchController {
         if becomingVisible {
             if var leaving = model.approval, let old = pendingApprovals.firstIndex(where: { $0.id == leaving.id }) {
                 leaving.allowGate.cancelHold()
+                leaving.allowGate.retarget(item: "", risk: leaving.risk)
+                leaving.allowGate.retarget(item: leaving.id, risk: leaving.risk)
                 leaving.position = pendingApprovals[old].position
                 leaving.queueIndex = pendingApprovals[old].queueIndex
                 leaving.queueCount = pendingApprovals[old].queueCount
@@ -448,6 +449,17 @@ final class NotchController {
         if becomingVisible { card.appearedAt = Date() }
         pendingApprovals[index] = card
         model.approval = card
+        if becomingVisible { announceDisplayed() }
+    }
+
+    private func announceDisplayed(outcome: String? = nil) {
+        guard let card = model.approval else { return }
+        let line = ApprovalCard.announcement(risk: card.risk, position: card.position, outcome: outcome)
+        lastApprovalAnnouncement = line
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+            .announcement: line,
+            .priority: NSAccessibilityPriorityLevel.high.rawValue,
+        ])
     }
 
     /// The shown card left. The next one, if any, becomes the card on screen.
@@ -548,7 +560,7 @@ final class NotchController {
                 beginHold: { [weak self] in self?.beginApprovalHold() },
                 endHold: { [weak self] inside in self?.endApprovalHold(inside: inside) },
                 cancelHold: { [weak self] in self?.cancelApprovalHold() },
-                activateAllow: { [weak self] in self?.activateApproval(kind: .card) },
+                activateAllow: { [weak self] in self?.activateApproval(kind: .card, cardID: id) },
                 deny: { [weak self] in
                     self?.cancelApprovalHold()
                     self?.model.approval?.detail?.withdraw()
@@ -587,8 +599,12 @@ final class NotchController {
 
     /// A click or the button's VoiceOver action. Control-Option-Y and a spoken yes never allow a high-risk request.
     @discardableResult
-    func activateApproval(kind: ApprovalAudit.Kind) -> HookDecision.Verdict? {
+    @discardableResult
+    func activateApproval(kind: ApprovalAudit.Kind, cardID: String? = nil) -> HookDecision.Verdict? {
         guard var card = model.approval else { return nil }
+        if let cardID, cardID != card.id { return nil }
+        // Every risk, including high, stays quiet for the same 0.4 s after the card is displayed.
+        guard ApprovalCard.inputOpen(now: Date(), appearedAt: card.appearedAt) else { return nil }
         let moment = monotonicNow()
         if moment >= card.helperDeadlineMono {
             card.detail?.withdraw()

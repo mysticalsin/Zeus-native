@@ -1150,7 +1150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let approval = self?.notch.model.approval else { return }
                 guard ApprovalCard.inputOpen(now: Date(), appearedAt: approval.appearedAt) else { return }
                 if verdict == .allow {
-                    self?.notch.activateApproval(kind: .shortcut)
+                    self?.notch.activateApproval(kind: .shortcut, cardID: approval.id)
                     return
                 }
                 self?.notch.resolveDisplayed(verdict)
