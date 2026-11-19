@@ -13,7 +13,7 @@
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
   <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-2ea44f">
   <img alt="Keys in Keychain" src="https://img.shields.io/badge/keys-Keychain%20only-6f42c1">
-  <a href="https://github.com/mysticalsin/Zeus-native/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/mysticalsin/Zeus-native?include_prereleases&label=release"></a>
+  <a href="https://github.com/mysticalsin/Zeus-native/releases"><img alt="Download" src="https://img.shields.io/badge/download-releases-0969da?logo=github"></a>
 </p>
 
 <p align="center">
