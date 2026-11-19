@@ -255,7 +255,13 @@ final class SpeechInput: @unchecked Sendable {
                                            policy: capturePolicy, startedAt: startedAt)
         }
         beforeObserverStoreForTesting?()
-        lock.withLock { configurationObserver = observer }
+        // A stop or a newer start in this window owns the observer slot: a stopped turn keeps no live observer.
+        let stored = lock.withLock { () -> Bool in
+            guard generation == current, !stopRequested else { return false }
+            configurationObserver = observer
+            return true
+        }
+        if !stored { NotificationCenter.default.removeObserver(observer) }
 
         if recognizes, let activeRecognizer {
             beginRecognition(request: request, recognizer: activeRecognizer,
@@ -265,7 +271,11 @@ final class SpeechInput: @unchecked Sendable {
         installTap(on: capture, format: format, session: current, origin: controllerGeneration,
                    policy: capturePolicy, startedAt: startedAt, resampler: turnResampler)
         capture.prepare()
-        do { try capture.start() } catch { cancel(); throw error }
+        do { try capture.start() } catch {
+            // Only this turn's own engine: a newer turn that replaced it keeps its engine and observer.
+            if !cancelTurn(ifSession: current) { release((capture, nil)) }
+            throw error
+        }
         closeCaptureIfNotOwned(capture, session: current)
         return current
     }
@@ -344,7 +354,7 @@ final class SpeechInput: @unchecked Sendable {
         }
         let endTurn = { [self] in
             // A newer session owns the engine now: this one's late change must not cancel it.
-            guard lock.withLock({ generation == session }) else { return }
+            guard lock.withLock({ generation == session && !stopRequested }) else { return }
             let handler = onCaptureFailure
             cancel()
             handler?(session, origin, .configurationChanged)
@@ -383,7 +393,9 @@ final class SpeechInput: @unchecked Sendable {
                 }
                 installTap(on: engine, format: format, session: session, origin: origin,
                            policy: policy, startedAt: startedAt, resampler: next, requestConverter: converter)
-                return nil
+                // A stop that landed since the ownership check must not leave a tap on a closed engine.
+                closeCaptureIfNotOwned(engine, session: session)
+                return ownsCapture(session) ? nil : .turnOver
             },
             restartEngine: { [self] in
                 guard ownsCapture(session) else { return }
@@ -698,16 +710,24 @@ final class SpeechInput: @unchecked Sendable {
         }
     }
 
-    func cancel() {
-        let (oldTask, capture) = lock.withLock { () -> (SFSpeechRecognitionTask?, Capture) in
+    func cancel() { cancelTurn(ifSession: nil) }
+
+    /// Cancels the current turn, or only session `only` when given: a newer turn is left alone.
+    /// Returns whether a turn was cancelled.
+    @discardableResult
+    private func cancelTurn(ifSession only: Int?) -> Bool {
+        let taken = lock.withLock { () -> (SFSpeechRecognitionTask?, Capture)? in
+            if let only, generation != only { return nil }
             stopRequested = true
             defer { task = nil }
             return (task, takeCapture())
         }
+        guard let (oldTask, capture) = taken else { return false }
         beforeStopAudioForTesting?()
         release(capture)
         oldTask?.cancel()
         finish()
+        return true
     }
 
     /// Test seam: opens a session the way `start` does, without touching audio hardware.
@@ -732,7 +752,15 @@ final class SpeechInput: @unchecked Sendable {
     /// After `engine.start()` returns, a stop or a newer turn may have landed during the start.
     /// It closes the mic again: a stopped turn must never leave capture running.
     func closeCaptureIfNotOwned(_ engine: any CaptureEngine, session: Int) {
-        guard !ownsCapture(session) else { return }
+        let (owned, observer) = lock.withLock { () -> (Bool, (any NSObjectProtocol)?) in
+            if generation == session && !stopRequested { return (true, nil) }
+            // The observer slot is this turn's only while its generation is still current.
+            guard generation == session else { return (false, nil) }
+            defer { configurationObserver = nil }
+            return (false, configurationObserver)
+        }
+        guard !owned else { return }
+        if let observer { NotificationCenter.default.removeObserver(observer) }
         if engine.isRunning { engine.stop() }
         engine.removeInputTap()
     }

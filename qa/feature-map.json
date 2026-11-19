@@ -5772,7 +5772,7 @@
         {
           "id": "F11.capture-engine-lifecycle-race",
           "check": "native-CaptureEngineLifecycleRaceTests",
-          "acceptance": "A late stop or cancel closes the engine of the turn it belongs to and never a newer turn's engine or configuration observer, and an engine that finished starting after its turn was stopped is closed again so the microphone is not left running. Fake capture engines: no audio hardware or speech recognition.",
+          "acceptance": "A late stop or cancel closes the engine of the turn it belongs to and never a newer turn's engine or configuration observer, and an engine that finished starting after its turn was stopped is closed again so the microphone is not left running, a stopped turn keeps no live configuration observer and reports no late failure, and a tap installed after a stop is removed. Fake capture engines: no audio hardware or speech recognition.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
@@ -5793,6 +5793,26 @@
             {
               "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
               "function": "anEngineStartedForALiveTurnIsLeftRunning"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aStopInTheObserverWindowLeavesNoObserverBehind"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aFailedEngineStartReleasesItsOwnEngineAndObserver"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aStopLandingWhileTheConverterIsBuiltReportsNoFailure"
+            },
+            {
+              "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
+              "function": "aStopBetweenTheOwnershipCheckAndTheTapInstallLeavesNoTapOnTheStoppedEngine"
             }
           ]
         },

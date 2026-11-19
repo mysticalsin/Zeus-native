@@ -8674,7 +8674,7 @@
       "check": "native-CaptureEngineLifecycleRaceTests",
       "guard": {
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
-        "function": "anEngineStartedAfterTheTurnWasStoppedIsClosedAgain"
+        "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
     }
 ]
