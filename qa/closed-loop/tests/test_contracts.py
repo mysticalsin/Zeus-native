@@ -800,5 +800,20 @@ class ApprovalQueueGuardTests(unittest.TestCase):
         self.assertIn("NSAccessibility.post", controller)
 
 
+class MeetingCardGuardTests(unittest.TestCase):
+    def test_reg_404_guards_the_shipping_meeting_card(self):
+        ledger = json.loads((c.ROOT / "qa/regressions.json").read_text())
+        guard = next(item for item in ledger["regressions"] if item["id"] == "REG-404")["guard"]
+        self.assertEqual(guard["file"], "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift")
+        self.assertEqual(guard["function"], "theCardNeverExpiresUnderThePointer")
+        text = (c.ROOT / guard["file"]).read_text()
+        self.assertIn("func theCardNeverExpiresUnderThePointer()", text)
+        definitions = [
+            path.name for path in (c.ROOT / "Tests/ZeusCoreTests").glob("Scribe*.swift")
+            if "func theCardNeverExpiresUnderThePointer(" in path.read_text()
+        ]
+        self.assertEqual(definitions, ["ScribeMeetingStartOutcomeTests.swift"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
