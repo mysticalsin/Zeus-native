@@ -113,6 +113,8 @@ struct ApprovalDecisionTests {
         var log = ApprovalAudit()
         log.recordTrustedApproval(session: "chat-1", command: "ls")
         #expect(log.entries == ["trusted approval chat-1: ls"])
+        #expect(!ApprovalAudit.plain("a\u{2028}b").contains("\u{2028}"))
+        #expect(!ApprovalAudit.plain("a\u{2029}b").contains("\u{2029}"))
     }
 
     @Test func aPlainActivationDoesNotAllowHigh() {
@@ -125,10 +127,10 @@ struct ApprovalDecisionTests {
         #expect(again.releaseHold(now: start.addingTimeInterval(0.8)) == .allow)
         var reduced = ApprovalAllowGate(risk: .high, reduceMotion: true)
         #expect(reduced.activate(now: start) == nil)
-        #expect(reduced.activate(now: start) == .allow)
+        #expect(reduced.activate(now: start) == nil)
         var spoken = ApprovalAllowGate(risk: .high, voiceOver: true)
         #expect(spoken.activate(now: start) == nil)
-        #expect(spoken.activate(now: start) == .allow)
+        #expect(spoken.activate(now: start) == nil)
         var low = ApprovalAllowGate(risk: .low)
         var medium = ApprovalAllowGate(risk: .medium)
         #expect(low.activate(now: start) == .allow)
