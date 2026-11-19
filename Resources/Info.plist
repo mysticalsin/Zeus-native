@@ -27,13 +27,19 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ZEUS uses the microphone while you hold the talk or dictation key, when you turn on the optional "Hey Zeus" wake word, for meeting notes (Scribe), for live captions (Polyglot), and when you record the screen with your voice. It listens only for those features.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>ZEUS listens to the sound your Mac is playing to draw the live audio bars in the notch, to make live captions and meeting transcripts, and, if you choose, to include it in screen recordings (Recordly). Recordings and transcripts are saved only when you record, and stay on this Mac unless you choose a cloud engine.</string>
+	<string>ZEUS listens to the sound your Mac is playing to draw the live audio bars in the notch, to make live captions and meeting transcripts, and, if you choose, to include it in screen recordings (Recordly), and, if you turn on per-app sound, to adjust the sound of the apps you choose. That sound is changed as it plays and never saved. Recordings and transcripts are saved only when you record, and stay on this Mac unless you choose a cloud engine.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>ZEUS records you with the camera while you read from the teleprompter, only when you press Record.</string>
+	<string>ZEUS uses the camera while you read from the teleprompter, only when you press Record, and for Face presence, only after you turn it on, to lock your Mac when you step away. No image is saved.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>ZEUS turns what you say into text so it can answer your question.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Zeus looks for nearby Macs running Zeus so you can send files to them with Fling.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_zeus-fling._tcp</string>
+	</array>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch.</string>
+	<string>ZEUS brings Chrome to the front when you ask it to do something there, and plays or skips tracks in Music or Spotify from the notch. It also finds the Terminal or iTerm tab where a coding agent is running, brings that tab forward, and types a reply you approve into it. For presentations it reads slide notes and moves to the next slide in Keynote or PowerPoint, and it reads and clicks items in the Beamer menu bar menu through System Events to share your keyboard and mouse.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>ZEUS shows your next events in the notch and lets you join calls in one click.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

@@ -57,7 +57,9 @@ jobs:
 
   app:
     runs-on: macos-15
-    timeout-minutes: 60
+    # The exhaustive voice-key walks (VoiceKeyWalkTests) keep every order of presses; on the hosted runner the
+    # audited Core module needs more than 30 minutes, so the job and each check get room for the whole walk.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,7 +88,7 @@ jobs:
         # The app suite allowlist stays explicit; all audited ZeusCoreTests are required.
         run: |
           printf 'Synthetic voice fixture interpreter: %s\n' "$ZEUS_TEST_PYTHON_EXECUTABLE" | tee "$RUNNER_TEMP/zeus-results/app/fixture-python.log"
-          python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 1800 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
+          python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence" --jobs 4 --timeout 3600 2>&1 | tee "$RUNNER_TEMP/zeus-results/app/test.log"
       - name: Record Python launcher metadata after cold fixtures
         if: always() && steps.test.outcome != 'skipped'
         timeout-minutes: 1

@@ -30,6 +30,8 @@ struct R24LaneTests {
         #expect(GlanceSettingsSnapshotMapping.resolveSectionID("memory") == "features")
         #expect(GlanceSettingsSnapshotMapping.resolveSectionID("teleprompter") == "beamer")
         #expect(GlanceSettingsSnapshotMapping.resolveSectionID("Voice") == "voice")
+        #expect(GlanceSettingsSnapshotMapping.resolveSectionID("tiling") == "tiling")
+        #expect(GlanceSettingsSnapshotMapping.resolveSectionID("Tiling") == "tiling")
     }
 
     @Test func debugAudioPathResolvesRelativePaths() {

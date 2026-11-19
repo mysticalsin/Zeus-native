@@ -1,7 +1,7 @@
 // ZEUS extension service worker. Holds one native-messaging port to com.zeus.bridge (an open
 // native port keeps the MV3 service worker alive) and answers the app's browser requests.
 
-import { pageContext, clickElement, typeInto, fillComposer, indexElements, actOnElement, scrollPage, extractText } from "./page";
+import { pageContext, clickElement, typeInto, fillComposer, indexElements, actOnElement, scrollPage, extractText, mediaState, mediaCommand } from "./page";
 
 const HOST = "com.zeus.bridge";
 const RECONNECT_MS = 5_000;
@@ -91,6 +91,32 @@ async function handle({ type, params }: BridgeRequest): Promise<unknown> {
   switch (type) {
     case "ping":
       return { pong: true, extension: chrome.runtime.id, version: chrome.runtime.getManifest().version };
+
+    // Read only, like page.context: title, artist and position of the media in a few tabs. Never a call, a private
+    // window or a page that is not a web page.
+    case "media.state":
+      return mediaStateReply(params);
+
+    // Play, pause or seek the media of one captured document. Next and previous have no path: an extension cannot
+    // call a page's media session handlers.
+    case "media.command": {
+      const action = params.action;
+      if (action === "next" || action === "previous") {
+        throw new BridgeFailure("not_supported", "A web page's next and previous can't be pressed from outside it.");
+      }
+      if (action !== "play" && action !== "pause" && action !== "seek") throw new BridgeFailure("bad_request", "Unknown media action");
+      const fingerprint = requireString(params.fingerprint, "fingerprint");
+      let seconds: number | null = null;
+      if (action === "seek") {
+        if (typeof params.seconds !== "number" || !Number.isFinite(params.seconds)) throw new BridgeFailure("bad_request", "Missing seconds");
+        seconds = params.seconds;
+      }
+      const target = await validatedTarget(params, true);
+      if ((await chrome.tabs.get(target.tabId)).incognito) {
+        throw new BridgeFailure("stale_target", "Zeus doesn't read private windows. Nothing was changed.");
+      }
+      return runTarget(target, mediaCommand, [action, seconds, fingerprint, target.url]);
+    }
 
     case "tabs.list": {
       const tabs = await chrome.tabs.query({});
@@ -222,6 +248,122 @@ async function handle({ type, params }: BridgeRequest): Promise<unknown> {
     default:
       throw new BridgeFailure("unknown_type", type);
   }
+}
+
+// MARK: media
+
+const MEDIA_TABS = 4;
+const MEDIA_TAB_BUDGET_MS = 400;
+const MEDIA_TEXT = 300;
+const MEDIA_URL = 2048;
+
+type MediaTarget = { tabId: number; documentId: string };
+type MediaItem = {
+  tabId: number; documentId: string; url: string; audible: boolean; title: string; artist: string; album: string;
+  artworkURL?: string; playbackState: string; currentTime: number; duration: number | null; playbackRate: number;
+  paused: boolean; seekable: boolean; fingerprint: string;
+};
+type MediaReply = { items: MediaItem[]; gone: MediaTarget[]; stale?: boolean };
+
+// One read at a time: a read that arrives during another gets the last reply, marked stale, so slow tabs never
+// pile work up behind the bridge's own pending timeout.
+let mediaReading = false;
+let lastMediaReply: MediaReply = { items: [], gone: [] };
+
+async function mediaStateReply(params: Record<string, unknown>): Promise<MediaReply> {
+  if (mediaReading) return { ...lastMediaReply, stale: true };
+  mediaReading = true;
+  try {
+    const known = (Array.isArray(params.known) ? params.known : [])
+      .filter((entry): entry is MediaTarget => !!entry && Number.isInteger(entry.tabId) && typeof entry.documentId === "string")
+      .slice(0, MEDIA_TABS);
+    lastMediaReply = await readMedia(known);
+    return lastMediaReply;
+  } finally {
+    mediaReading = false;
+  }
+}
+
+async function readMedia(known: MediaTarget[]): Promise<MediaReply> {
+  const wanted = new Map<number, chrome.tabs.Tab>();
+  for (const tab of await chrome.tabs.query({ audible: true })) if (tab.id !== undefined) wanted.set(tab.id, tab);
+  const gone: MediaTarget[] = [];
+  for (const entry of known) {
+    if (wanted.has(entry.tabId)) continue;
+    try { wanted.set(entry.tabId, await chrome.tabs.get(entry.tabId)); }
+    catch { gone.push(entry); }
+  }
+  const knownDocuments = new Map(known.map((entry) => [entry.tabId, entry.documentId]));
+  const eligible: chrome.tabs.Tab[] = [];
+  for (const tab of [...wanted.values()].slice(0, MEDIA_TABS)) {
+    const documentId = knownDocuments.get(tab.id!);
+    // A private window, a discarded tab or a page that is not a web page is never read, and is dropped if known.
+    if (tab.incognito || tab.discarded || !scriptable(tab.url) || tab.url!.length > MEDIA_URL) {
+      if (documentId !== undefined) gone.push({ tabId: tab.id!, documentId });
+      continue;
+    }
+    eligible.push(tab);
+  }
+  const items: MediaItem[] = [];
+  const outcomes = await Promise.all(eligible.map((tab) => readMediaTab(tab, knownDocuments.get(tab.id!))));
+  for (const outcome of outcomes) {
+    if (!outcome) continue;
+    if (outcome.item) items.push(outcome.item);
+    gone.push(...outcome.gone);
+  }
+  return { items, gone };
+}
+
+/** One tab's read, raced against its own budget. A slow or failed tab is left out, never an error and never gone. */
+async function readMediaTab(tab: chrome.tabs.Tab, knownDocumentId: string | undefined): Promise<{ item?: MediaItem; gone: MediaTarget[] } | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const budget = new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), MEDIA_TAB_BUDGET_MS); });
+  try {
+    return await Promise.race([budget, mediaTabRead(tab, knownDocumentId).catch(() => undefined)]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function mediaTabRead(tab: chrome.tabs.Tab, knownDocumentId: string | undefined): Promise<{ item?: MediaItem; gone: MediaTarget[] } | undefined> {
+  const [frame] = await chrome.scripting.executeScript({ target: { tabId: tab.id! }, func: mediaState });
+  const state = frame?.result;
+  // The frame must be the page the tab shows: a different address means it moved while being read.
+  if (!frame?.documentId || !state || state.href !== tab.url) return undefined;
+  const gone: MediaTarget[] = [];
+  if (knownDocumentId !== undefined && (knownDocumentId !== frame.documentId || !state.found)) {
+    gone.push({ tabId: tab.id!, documentId: knownDocumentId });
+  }
+  if (!state.found) return { gone };
+  const capped = (value: string) => value.slice(0, MEDIA_TEXT);
+  const named = state.title.length > 0;
+  return {
+    gone,
+    item: {
+      tabId: tab.id!, documentId: frame.documentId, url: tab.url!, audible: tab.audible === true,
+      title: capped(named ? state.title : tab.title ?? ""),
+      artist: named ? capped(state.artist) : "",
+      album: named ? capped(state.album) : "",
+      artworkURL: pickArtwork(state.artwork, tab.url!),
+      playbackState: state.playbackState, currentTime: state.currentTime, duration: state.duration,
+      playbackRate: state.playbackRate, paused: state.paused, seekable: state.seekable, fingerprint: state.fingerprint,
+    },
+  };
+}
+
+/** The largest https cover the page named. Never `data:`, `blob:` or `http:`, and never a long link. */
+function pickArtwork(images: { src: string; sizes: string }[], base: string): string | undefined {
+  let best: { href: string; size: number } | undefined;
+  for (const image of images) {
+    let url: URL;
+    try { url = new URL(image.src, base); }
+    catch { continue; }
+    if (url.protocol !== "https:" || url.href.length > MEDIA_URL) continue;
+    const [width, height] = (image.sizes.split(" ")[0] ?? "").split("x").map(Number);
+    const size = Number.isFinite(width) && Number.isFinite(height) ? width * height : 0;
+    if (!best || size > best.size) best = { href: url.href, size };
+  }
+  return best?.href;
 }
 
 // MARK: helpers

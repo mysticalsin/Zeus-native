@@ -66,6 +66,14 @@ final class AudioSpectrumService {
         reconcile(forceOnce: true)
     }
 
+    /// The equaliser's probe heard real sound, which proves the grant. Written only after that proof; this never
+    /// writes `refused`.
+    func recordProvenAllowed() {
+        guard permission != .allowed else { return }
+        lastError = nil
+        setPermission(.allowed)
+    }
+
     func openSystemSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") { NSWorkspace.shared.open(url) }
     }

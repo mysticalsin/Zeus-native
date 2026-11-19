@@ -99,7 +99,7 @@ struct ModelRouterTests {
     }
 
     @Test func headlessArguments() {
-        let defaults = UserDefaults(suiteName: "zeus.router.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.router.\(UUID().uuidString)")!
         // Capped effort (ModelCap): never the account default, which can be "max".
         #expect(RouterEngine.codex.headlessArguments(prompt: "hi", defaults: defaults)
                 == ["exec", "--skip-git-repo-check", "-c", "model_reasoning_effort=\"low\"", "hi"])

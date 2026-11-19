@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 173 of 173 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 173 in scope). 162 are wired to real behaviour (93%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 214 of 214 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 214 in scope). 203 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 122.
+**Before this round:** has 19, partial 27, missing 163.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -18,9 +18,10 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Your defaults | Language | menu | System language | Pins the app language instead of following macOS. | missing | stub | `general.language` | ZEUS copy is English only today. TODO: localize, then honour the pin. |
 | Your defaults | Window appearance (System, Light, Dark) | segmented | System | Theme for Settings and the welcome guide. | missing | stub | `general.windowTheme` | Glass is drawn dark only. TODO: light glass palette. |
 | Your defaults | Default agent for new chats | menu | Claude Code | Agent used when you start a new chat from the notch. | missing | live | `general.defaultAgent` | Pre-selects the agent in Chat > New chat; falls back to the first offered agent. |
-| Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. Screens without a notch get a slim pill. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
+| Your defaults | Show the notch on (Built-in display, Display with the pointer, All displays) | menu | Built-in display | Which screens carry the notch. | missing | live | `notch.displays` | Rebuilds the notch windows; lock, wake and Space changes re-raise them. |
 | Day to day | Launch at login | toggle | on | Starts the app when you log in. | missing | live | `general.launchAtLogin` | SMAppService, bundled app only. |
 | Day to day | Keep the Mac awake while agents work | toggle | off | Blocks idle sleep while an agent runs; the screen can still lock. | missing | live | `general.keepAwake` | Power assertion held only while a session is working. |
+| Day to day | Keep the display awake while music plays | toggle | - | Holds the display on only while the source shown in the notch is playing. Stops on low battery or heat. | missing | live | `keepAwake.whileMusic` | M4. Display assertion with a two minute lease, renewed each minute, held only while a track plays (20 second grace). Uses the Keep awake battery floor and heat rule. Separate from sessions and the Home cup. |
 | Day to day | Welcome back recap (Recap and return) | toggle | on | After 10 minutes or more away, the notch shows what agents finished, failed or are waiting on, and Zeus says one line about it when voice answers are on. | missing | live | `general.welcomeBack` | Away is system idle time (no keys or mouse). Only agent events since you left are listed; waiting ones only while still waiting. |
 | Day to day | Meeting mode (discreet during calls and screen sharing) | toggle | on | When another app uses the mic or camera, or the display is mirrored: leave captures, mute sounds, hide details. | partial | live | `general.meetingMode` | Detects the mic in use by another app and mirrored displays. Camera detection TODO. |
 | Day to day | Show in screen sharing | toggle | - |  | missing | live | `general.showInScreenSharing` | N1. Every Zeus window uses the shared sharing helper. |
@@ -52,7 +53,12 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Agents | Agent status icon (Glyphs, Lumi, Lumi Pixel, Creatures) | picture cards | Glyphs | Symbol or a character for each agent state. | partial | custom | `avatar.alwaysInNotch` | ZEUS answer: the Mini ZEUS mascot (13 states) on General. |
 | Notch behavior | Hide the notch automatically | toggle | on | Closes when the pointer leaves. | partial | live | `notch.autoHide` | Off: it stays open until the shortcut or a click elsewhere. |
 | Notch behavior | Delay before closing | menu | Short | How long it waits after the pointer leaves. | missing | live | `notch.closeDelay` | the reference app closes about 0.53 s after the pointer leaves (private reference notes). |
-| Notch behavior | Show the notch (hover dwell) | menu | On hover | How quickly hovering opens it. | partial | live | `notch.openDelay` | 0.1 s, 0.25 s or 0.6 s. |
+| Notch behavior | Hover delay | menu | On hover | How quickly hovering opens it. | partial | live | `notch.openDelay` | 0.1 s, 0.25 s or 0.6 s. |
+| Notch behavior | Open the notch on | menu | - | Hover opens it after the delay. Click opens it only when you click the notch. | missing | live | `notch.openTrigger` | S1. Click opens the panel from the closed notch or a peek, from the hardware notch, or on a display without one from the pill grown 12 pt each side, or from the rectangle of the drawn shape; hover never opens it. |
+| Displays without a notch | Shape (Pill, Notch) | segmented | Pill | The closed notch on a display without one: the slim pill, or a notch shape you size yourself. | missing | live | `notch.shapeWithoutNotch` | D3. One shape for every such display. Notch makes the closed window take clicks over its own shape, so an import can never select it. |
+| Displays without a notch | Width | slider | 185 pt | Width of the drawn notch, shown while calibrating. | missing | live | `notch.drawnWidth` | D3. Points, 140 to 280 in steps of 5. Never wider than a quarter of the display. |
+| Displays without a notch | Height | slider | 32 pt | Height of the drawn notch, shown while calibrating. | missing | live | `notch.drawnHeight` | D3. Points, 30 to 44 in steps of 1. Never under 30 because the closed wings are laid out for that bar. |
+| Displays without a notch | Position | slider | Centre | Where the drawn notch sits sideways, shown while calibrating. | missing | live | `notch.drawnOffset` | D4. Points, minus 400 to 400 in steps of 5; below 0 is left. The drawn shape only: the hardware notch and the pill stay centred. Never further than the open panel leaves room for on the display. |
 | Notch behavior | Show Zeus next to cursor | toggle | off | When summoned, Zeus anchors beside the mouse pointer instead of the notch. | missing | live | `presence.nearCursor` | P0 item I. Offset 18 pt right and down from the pointer, clamped and flipped at screen edges, multi-display aware, 60 fps with a light spring; off keeps the notch/top-bar placement. Also in the menu bar menu and `zeus debug presence`. |
 | Halo | Halo style | menu | Classic halo | The closed-notch glow while an agent works or needs you. One setting: the notch, Settings and the welcome guide all read it. | partial | custom | `halo.style` | Stable ids; titles come from ZeusCore.HaloStyle. Replaces the old topBar.halo key (migrated at launch). |
 | Halo | Halo entrance | menu | Sweep | Animation as the halo lights up. | partial | custom | `halo.entrance` | Stable ids; titles come from ZeusCore.HaloEntrance. Each has its own choreography. |
@@ -61,9 +67,11 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Halo | Match the halo colour to the wallpaper | toggle | on | Blends with white on light wallpapers. | partial | live | `halo.wallpaper` | Samples the wallpaper under the notch and blends the halo toward white as it gets lighter. |
 | Halo | Halo arm width (Narrow, Medium, Wide, Extra wide) | segmented | Medium | 76, 130, 220 or 440 pt each side. | missing | live | `halo.armWidth` | Controls the closed-notch halo reach and live preview. |
 | Halo | Light thickness | slider | 100 % | 100 to 200 %. | missing | live | `halo.thickness` | Controls the closed-notch halo and live preview. |
+| Halo | Island background (Black, Transparent) | segmented | - | Black keeps the closed island pitch black with its outline and glow. Transparent draws only the mascot and the wing text: no body, outline or glow, and the hardware notch stays black by itself. The open panel is always black. | missing | live | `notch.background` | Zeus addition. Closed island only. |
 | Halo | Light wave to the screen edges | toggle | on | A wave of light crosses the screen on agent events. | partial | live | `halo.edgeWave` | A click-through overlay on every Space, left out of captures; fronts run round the screen edge. |
 | Everyday lights | Light wave while music plays | toggle | on | Artwork-tinted wave on the closed notch. | has | custom | `topBar.musicWings` |  |
 | Everyday lights | Progress outline on the music preview | toggle | on | Outline empties as the track plays. | missing | live | `lights.musicProgress` | Tracks media progress around the music wings. |
+| Everyday lights | Light lyrics word by word | toggle | on | Each word lights as it is sung. Word timing is estimated from the line timing. | missing | live | `lyrics.wordByWord` | Zeus addition. Estimated word timing in the lyric views. Off lights the whole line at once. |
 | Everyday lights | React to real sound (live spectrum) | toggle | off | The music light follows the sound your Mac is playing. | missing | live | `lights.liveSpectrum` | CoreAudio process tap of system output, listen only. Asks for System Audio Recording once, when this is turned on or the Waves tab opens. Runs only while music plays. |
 | Everyday lights | Waves style (Bars, Wave, Mirror) | segmented | Bars | How the Waves tab draws the spectrum. | missing | live | `waves.style` | Zeus addition. The Waves tab is off by default; add it in Settings > Appearance > Top bar tabs. |
 | Everyday lights | Waves sensitivity | slider | 100 % | How strongly the bars react to quiet sound. | missing | live | `waves.sensitivity` | Zeus addition. A gain on the live band levels. |
@@ -85,7 +93,11 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Glow when a reminder is added | toggle | on | Blue crests after you add a reminder. | missing | live | `lights.reminderGlow` | Fires when ZEUS saves a reminder. |
 | Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |
 | Everyday lights | Glow when AirDrop arrives | toggle | off | Blue intake glow and drops the file on the shelf. | missing | live | `lights.airDrop` | Gated by Downloads folder access. |
+| Everyday lights | Glow when a Fling arrives | toggle | - | Glow and a short cue when files arrive from another Mac with Fling. | missing | live | `lights.fling` | Zeus addition. Gates the Fling arrival cue and glow. Also on the Shelf page. |
 | Everyday lights | Screenshot cue | toggle | off | Camera cue and shelf drop for new screenshots. | missing | live | `lights.screenshot` | Gated by Desktop folder access. |
+| Music | Show music from | menu | - | Any player shows what started playing last. | missing | live | `music.follow` | A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player. |
+| Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
+| Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 
 ## Notifications
 
@@ -114,8 +126,10 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Sound categories | Completion chime (style + preview) | menu + play | Success | When a task completes. | partial | live | `sound.doneStyle` |  |
 | Sound categories | Dictation sounds | toggle | on | Cue when recording starts and ends. | has | custom | `dictation.sounds` |  |
 | Sound categories | Timer alarms | toggle | on | Sound when a focus round ends. | missing | live | `sound.timer` |  |
+| Sound categories | Chime when an agent starts working | toggle | off | Off by default; busy sessions start often. | missing | live | `sound.agentStart` | Plays the Run start sound when a session begins working. Completion chimes only play after 20 seconds of work, and agent chimes are limited to one every 3 seconds. |
 | Sound categories | Ambient loop while an agent works | toggle | off | A quiet looping sound under a running agent. | missing | live | `sound.runningLoop` | Zeus addition. Plays the bundled running loop at half volume while any agent is working; fades out when none is. |
 | Sound categories | Failure sound | toggle | on | A short sound when an agent turn fails. | missing | live | `sound.failure` | Plays the Failure sound when a session turns red (rate limit, auth or API error). |
+| Per-app sound | Shape sound per app | toggle | off | Taps only the apps you shape, with System Audio Recording. Off removes every tap. | missing | custom | `audio.equaliser` | Zeus addition. Off by default. Only this switch can raise the System Audio Recording prompt. |
 
 ## Voice
 
@@ -147,6 +161,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |
 |---|---|---|---|---|---|---|---|---|
 | Global shortcut | Open the agent picker (Control Option Space) | toggle | on | Arrows pick a session, Return opens, Esc closes. | partial | custom | `shortcut.openNotch` | ZEUS: a preset menu for opening the notch. |
+| Global shortcut | Open the chat window | menu | - | Opens the chat window from any app. | missing | custom | `chat.hotkey` | Carbon hot key; an explicit choice is kept. |
 | Answer from the keyboard | Answer permissions from the keyboard (Control Option Y, N, O) | toggle | on | Approve, deny or open, live only while a request waits. | missing | live | `shortcut.answerKeys` | Registered only while a card is waiting. |
 
 ## Integrations
@@ -181,6 +196,11 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Notification details | Show project and command details | toggle | on | Off hides commands and project names outside the notch. | missing | live | `privacy.details` | Off, or Meeting mode active: approval cards hide the command. |
 | Usage data | Help improve (anonymous usage counts) | toggle | on | Daily anonymous counts. | has | live | `privacy.analytics` | ZEUS sends nothing; shown as a fact, not a switch. |
 | Music metadata | Synced lyrics (LRCLIB) | toggle | off | Sends title and artist to lrclib.net. | missing | live | `privacy.lyrics` | Fetches time-synced lyrics from lrclib.net (title, artist, album, duration; no key), cached on disk. Lyrics button on the Music page and a Lyrics Home music style. Off by default as it sends data. |
+| Music metadata | Show media playing in Chrome | toggle | off | Reads title, artist and position from Chrome tabs through the Zeus extension. | missing | live | `music.browserMedia` | A3. Chrome tab media through the Zeus extension and bridge, shown like any source. Off by default and never turned on by an import. Covers load from the page's own image link and are not saved; calls, private windows and pages written to disk are never read. |
+| Music metadata | Chrome extension needs a reload | status | - | Press Reload on the Zeus card in Chrome's extensions page. | missing | custom | `music.browserMediaStatus` | A3. Present only while Chrome runs with a Zeus extension older than 0.5.0. Its button opens chrome://extensions in the running Chrome, never starts it. |
+| Face presence | Face presence | toggle | - | Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on. | missing | live | `face.presence` | Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on. |
+| Face presence | Lock after absent for | menu | - | How long no enrolled face may be missing before the Mac locks. | missing | live | `face.lockAfter` | Zeus addition. Counted from the last time an enrolled face was seen. |
+| Face presence | Status | status | - |  | missing | custom | `face.status` | Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away. |
 | Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
 
 ## Interview
@@ -248,7 +268,11 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 |---|---|---|---|---|---|---|---|---|
 | Fast path | Fast path (instant commands) | toggle | - | Simple commands run the moment you finish speaking; off sends everything to the AI. | missing | live | `fastPath.enabled` | Zeus addition. Jev is on the Engine page. |
 | Hey Zeus | Listen for "Hey Zeus" | toggle | - | Say it, then your request. Off until you turn it on. | missing | custom | `voice.heyZeus` | Zeus addition. Hand-built card on Voice. Stored under wake.enabled (default off). |
-| Talk to Zeus | Talk shortcut | recorder | - | Hold Control + Option to talk, let go to send. Point at something while you hold and Zeus sees what you mean. | missing | custom | `voice.talkKey` | Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept. |
+| Talk to Zeus | Talk shortcut | recorder | - | Hold Control + Option, or Control + Option + Space, to talk, let go to send. Point at something while you hold and Zeus sees what you mean. | missing | custom | `voice.talkKey` | Zeus addition. Recorder on Shortcuts. Earlier auto-written defaults move to Control + Option once; a key you record is kept. |
+| Talk to Zeus | Second talk key | recorder | - | Hold Right Option alone to talk, let go to send. Double-tap to keep listening. Turn it off or record another key. | missing | custom | `voice.secondTalkKey` | Zeus addition. Recorder on Shortcuts. Stored under talk.secondShortcut only when you record or turn it off. The default gives way to a key you chose for pointing, dictation or Polyglot, and to Chat on Option-Space. |
+| Talk to Zeus | Microphone | menu | - | What Zeus listens on when you talk. Automatic uses the system input, so a connected headset wins. This Mac’s microphone keeps a Bluetooth headset from switching mode. Dictation has its own. | missing | custom | `talk.microphone` | Zeus addition. Pop-up on Voice, next to the talk key. A specific input is stored as device:<uid> on this Mac and is not exported or imported. |
+| Talk to Zeus | Let Zeus see my screen when I talk | toggle | on | On: each question goes to Claude with a screenshot of every display, so Zeus can see what you see. Off: Zeus answers without looking. Needs the macOS Screen Recording permission and your Claude login. The screenshot is never saved. | missing | live | `talk.seeScreen` | Separate from drawing. Without the permission Zeus says so once per launch and never prompts mid-turn. |
+| Talk to Zeus | Draw on the screen while Zeus answers | toggle | off | Off: nothing is drawn. On: Zeus can ring, arrow or label what it talks about as it says it, and the question carries one screenshot of the display under your pointer even if seeing your screen is off. Marks go a few seconds after the answer and the screenshot is never saved. | missing | live | `talk.drawOnScreen` | Separate consent from the macOS Screen Recording permission. Needs your Claude login. |
 | Voice | Personality (Ultron or Plain) and Design voice | menu | - | How Zeus sounds and what it calls itself. | missing | custom | `voice.personality` | Zeus addition. Voice page. |
 | Dictation | Murmure speech engines | menu | - | Which speech recognition writes your words. | missing | custom | `dictation.engine` | Zeus addition. Murmure page. |
 
@@ -275,7 +299,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Browser agent | Always ask before | text | - | Extra words that always show an approval card. | missing | live | `browserAgent.alwaysAsk` | Zeus addition. Added to the built-in list (buy, send, delete, post...). |
 | Browser agent | Browser for the agent | menu | - | Your own Chrome through the ZEUS extension, or a separate browser (browser-use) with its own profile. | missing | live | `browserAgent.backend` | Zeus addition. The separate one needs the Set up button once; `zeus browse --separate` forces it for one task. |
 | Browser agent | Allowed sites (separate browser) | text | - | Sites the separate browser may open, separated by commas. Empty means any site. | missing | live | `browserAgent.allowedDomains` | Zeus addition. Passed to browser-use as BROWSER_USE_ALLOWED_DOMAINS and checked before every open. |
-| Scribe | When a meeting starts | menu | - | Off, ask first, or start notes on its own when a call or calendar meeting begins. | missing | live | `scribe.autoStart` | Zeus addition. Settings > Features > Scribe. Start automatically needs Microphone to be allowed already; otherwise Zeus asks. Never prompts for permission. |
+| Scribe | When a meeting starts | menu | - | Off, ask first, or start notes on its own when a call or calendar meeting begins. | missing | live | `scribe.autoStart` | Zeus addition. Settings > Features > Scribe, one segmented row. Choosing Start automatically is the opt-in: it stamps scribe.autoStart.optInAt and asks macOS for Microphone once if it never asked. Any other choice, a section reset or an import withdraws it, and an import never selects it. Automatic start also needs Microphone allowed and one earlier recording on this Mac; otherwise Zeus asks. The detector never prompts for permission. |
 | Coding | Default coding agent | menu | - | Claude Code, Codex, Gemini or Cursor Agent. | missing | custom | `code.tool` | Zeus addition. Stored under the code.tool key. |
 | Coding | Terminal app | menu | - | Automatic, Ghostty, iTerm, Warp or Terminal. | missing | custom | `code.terminal` | Zeus addition. Stored under the code.terminal key. |
 | Research | Research depth | menu | - | Quick or Deep when you do not say deep research. | missing | live | `research.depth` | Zeus addition. |
@@ -283,6 +307,33 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Models | Models Zeus uses (read-only) | status | - | Which model each engine uses, never above Haiku or Sonnet. | missing | custom | `models.caps` | Zeus addition. Read-only display of ModelCap. |
 | Drive | When Zeus may drive your Mac | menu | - | How much Zeus may do on its own on your Mac. | missing | custom | `privacy.driveAutonomy` | Zeus addition. Privacy page; stored under drive.autonomy. |
 | Drive | Move the system pointer | toggle | - | Drive mode may glide and click with CGEvent when Accessibility cannot. | missing | live | `present.physicalPointer` | L5. Off by default. Key present.physicalPointer. |
+
+## Tiling
+
+| Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Arrange | Arrange my windows from the keyboard | toggle | - | Snaps the windows on each screen into a tidy grid, and keys move focus, swap windows and flip a split. Off until you turn it on. | missing | live | `tiling.enabled` | Zeus addition. Off by default, and a settings import never turns it on. It reads the frames of other apps' windows and moves them with Accessibility; no window title or content is read or stored. |
+| Arrange | Tiling keys | menu | - | The keys you hold with a letter or an arrow to move, swap and resize windows. Control-Option is also Talk to Zeus and pointing, and VoiceOver uses it, so Zeus asks you to pick another pair when they clash. | missing | live | `tiling.keyBase` | Zeus addition. An unknown stored choice reads as Control-Option-Command. |
+| Layout | Gap between windows | slider | - | Space between two tiled windows, in points. | missing | live | `tiling.innerGap` | Zeus addition. Whole points; the engine keeps it between 0 and 64. |
+| Layout | Gap to the screen edge | slider | - | Space between the tiled windows and the edge of the screen, in points. | missing | live | `tiling.outerGap` | Zeus addition. Whole points; the engine keeps it between 0 and 64. |
+| Layout | Default split | slider | - | How much of a slot the window already there keeps when a new window joins it. | missing | live | `tiling.splitRatio` | Zeus addition. A percentage; the engine keeps it between 15 and 85. |
+| Focus | Ring the focused window | toggle | - | Draws a thin ring around the window the tiling keys act on. | missing | live | `tiling.focusBorder` | Zeus addition. Applies while tiling is on. |
+| Left out | Apps Zeus never tiles | text | - | Bundle ids, separated by commas. Their windows are left where they are. | missing | live | `tiling.excludedApps` | Zeus addition. Bundle ids, comma separated; case is kept. |
+
+## Shelf
+
+| Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Fling | Send and receive with nearby Macs | toggle | - | Lets this Mac send files to other Macs running Zeus and receive files from them. Off until you turn it on. Turning it on makes macOS ask once for Local Network access. | missing | live | `fling.enabled` | Zeus addition. Opt-in, and a settings import never turns it on. Nothing listens or advertises while it is off. Also the Turn on button on the Shelf. |
+| Fling | Receive while the notch is closed | toggle | - | Keeps receiving from paired Macs when the notch is not open. | missing | live | `fling.receiveInBackground` | Zeus addition. Applies once Fling is on. |
+| Fling | Name shown to nearby Macs | text | - | Leave empty to use this Mac's name. | missing | live | `fling.deviceName` | Zeus addition. Shown to Macs that are not paired yet; a paired Mac keeps the name it had when you paired. |
+| Fling | Who can see this Mac | segmented | - | Everyone nearby shows this Mac to nearby Macs running Zeus. Paired only shows it to Macs you already paired and closes the pairing door. Off hides it and stops receiving. | missing | live | `fling.visibility` | Zeus addition. Paired only advertises an id and nothing else. |
+| Fling | Accept from paired Macs without asking | toggle | - | A paired Mac can send without a prompt each time. Turn off to be asked for every stack. | missing | live | `fling.autoAcceptPaired` | Zeus addition. A Mac that is not paired is never accepted this way. |
+| Fling | Where arrivals go | segmented | - | Downloads folder, the clipboard, or ask each time. | missing | live | `fling.saveMode` | Zeus addition. Without Downloads access, files go to a private inbox and the Shelf says so. |
+| Fling | Show arrivals as floating papers | toggle | - | Each arrival floats on screen as a small paper you can drag out or close. Closing one never removes it from the Shelf. | missing | live | `fling.papers` | Zeus addition. Off by default. |
+| Fling | Flick sensitivity | segmented | - | How fast a drag must be to count as a flick toward a nearby Mac. | missing | live | `fling.flickSensitivity` | Zeus addition. 1800, 1200 or 800 points per second over the last 80 ms. |
+| Fling | Open received links in the browser | toggle | - | A link from a paired Mac opens in your browser when it arrives. Only http and https links. | missing | live | `fling.openLinks` | Zeus addition. A link from a Mac that is not paired is kept as a file and never opened. |
+| Fling | Paired Macs | button | - | The Macs you paired. Remove one and it must pair again before it can send. | missing | custom | `fling.pairedMacs` | Zeus addition. Hand-built list on the Shelf page; Remove deletes the key from the Keychain. |
 
 ## Zeus additions beyond the reference app
 

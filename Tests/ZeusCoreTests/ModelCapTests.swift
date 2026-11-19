@@ -5,7 +5,7 @@ import Testing
 @Suite("Model cap: Haiku or Sonnet size at most")
 struct ModelCapTests {
     private func store() -> UserDefaults {
-        let name = "zeus.tests.modelcap.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.tests.modelcap.\(UUID().uuidString)"
         return UserDefaults(suiteName: name)!
     }
 

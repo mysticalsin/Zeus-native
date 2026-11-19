@@ -3,6 +3,9 @@
 # Local preview: scripts/package.sh
 # Release: RELEASE=1 SIGN_IDENTITY="Developer ID Application: …" NOTARY_PROFILE=zeus scripts/package.sh
 # The notary profile must already exist in the user's keychain. No credentials are read from chat or files here.
+# A local preview DMG is signed ad hoc or with a local identity, not a team. In that build the browser bridge cannot tell
+# the app from a bundle another program of the same user assembled, so a preview DMG must never go to users. Only a
+# RELEASE=1 build, signed by a team, carries the identity the bridge checks.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ "${RELEASE:-0}" = 1 ]; then
@@ -44,5 +47,5 @@ fi
 # Keep the last good DMG if any build, submission, stapling or assessment step fails.
 mv -f "$STAGE/ZEUS.dmg" build/ZEUS.dmg
 shasum -a 256 build/ZEUS.dmg > build/ZEUS.dmg.sha256
-if [ "${RELEASE:-0}" != 1 ]; then echo "Local preview only: this DMG has not been notarized or Gatekeeper approved."; fi
+if [ "${RELEASE:-0}" != 1 ]; then echo "Local preview only: this DMG has not been notarized or Gatekeeper approved, and its bridge identity is weaker than a release. Do not give it to users."; fi
 echo "Built build/ZEUS.dmg ($(du -h build/ZEUS.dmg | cut -f1))"

@@ -48,7 +48,7 @@ import Testing
 
     @Test func ttsKeyRoundTripInKeychain() {
         let backend = MemoryKeychain()
-        let store = KeychainStore(backend: backend, defaults: UserDefaults(suiteName: "zeus.tts.\(UUID())")!)
+        let store = KeychainStore(backend: backend, defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.tts.\(UUID())")!)
         store.set("secret-value", for: VoiceTTSProvider.openAICompatible.keychainAccount)
         #expect(store.has(VoiceTTSProvider.openAICompatible.keychainAccount))
         store.remove(VoiceTTSProvider.openAICompatible.keychainAccount)
