@@ -778,7 +778,7 @@ private struct ApprovalAllowButton: View {
             }
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(title == "Confirm" ? "Confirm. Press again after a short wait." : title)
-            .accessibilityAction(.default, accessibility)
+            .accessibilityAction { accessibility() }
     }
 }
 

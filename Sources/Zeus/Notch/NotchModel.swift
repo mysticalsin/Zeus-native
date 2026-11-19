@@ -57,6 +57,24 @@ final class NotchModel {
         var sessionID: String?
         /// "1 of N" while other requests wait behind this card.
         var position: String = ""
+        var appearedAt = Date()
+        var changedFile: String? = nil
+        var addedLines: Int? = nil
+        var removedLines: Int? = nil
+        var fetchHost: String? = nil
+        var why: String? = nil
+        var reasons: [String] = []
+        var sessionTitle: String = ""
+        var queueCount: Int = 1
+        var queueIndex: Int = 0
+        var expandedCommand = false
+        var modifiersHeld = false
+        var holdElapsed: Double = 0
+        var allowStep: ApprovalAllowStep = .idle
+        var phase: ApprovalCardPhase = .asking
+        var onJump: (@MainActor () -> Void)? = nil
+        var onDenyAll: (@MainActor () -> Void)? = nil
+        var onBrowse: (@MainActor (Int) -> Void)? = nil
         /// When the helper gives up. An allow after this is a denial.
         var helperDeadline = Date.distantFuture
         /// The same deadline on the monotonic clock used for the hold. Wall-clock jumps do not move it.
@@ -104,6 +122,10 @@ final class NotchModel {
     var openedAt: Date?
     var sessions: [Session] = [] { didSet { onCardChange() } }
     var approval: Approval? { didSet { onCardChange() } }
+    /// The Mac is locked. The approval command stays hidden and the card says why.
+    var macLocked = false
+    /// The display is mirrored or captured. The approval command stays hidden and the card says why.
+    var screenShared = false
     /// Covered window frames while Zeus works behind. Nil when nothing is streaming.
     var workBehind: WorkBehindPreview? { didSet { onCardChange() } }
     /// Before/after for a selection edit. Return accepts it.
