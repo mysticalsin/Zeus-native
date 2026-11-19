@@ -4297,13 +4297,13 @@
     },
     {
       "id": "REG-404",
-      "failure": "The meeting card timed out under the pointer of the person about to tap it.",
+      "failure": "The meeting card timed out under the pointer of the person about to tap it. Jarvis on 2026-11-19 at 08:49 reversed the 2026-11-18 11:11 ruling that kept the 634b5b5 30 s hover cap. A card that disappears mid-read is worse than one that stays until the pointer leaves, and that is what ships. The offer and the failure card both stay up under a resting pointer and leave once the pointer does. The guard is the shipping meeting-start machine.",
       "features": [
         "F04"
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
         "function": "theCardNeverExpiresUnderThePointer"
       }
     },

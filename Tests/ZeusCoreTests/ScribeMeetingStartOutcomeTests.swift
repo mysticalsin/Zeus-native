@@ -451,7 +451,7 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(machine.card(now: 49) == .failed(moTeams, .noResponse))
     }
 
-    @Test func theOfferStaysUpUnderThePointerUntilThePointerLeaves() {
+    @Test func theCardNeverExpiresUnderThePointer() {
         var machine = moPrompting()
         machine.handle(.pointer(inside: true, now: 15))
         machine.handle(moTick(40))
@@ -461,6 +461,30 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(machine.card(now: 102) == .offer(moTeams, blocked: .notChosen))
         machine.handle(moTick(104))
         #expect(machine.card(now: 104) == .hidden)
+
+        var failed = moPrompting()
+        failed.handle(moTap(moOffer(), 5, microphone: .denied))
+        failed.handle(.pointer(inside: true, now: 6))
+        failed.handle(moTick(500))
+        #expect(failed.card(now: 500) == .failed(moTeams, .microphoneOff))
+        failed.handle(.pointer(inside: false, now: 500))
+        failed.handle(moTick(503))
+        #expect(failed.card(now: 503) == .failed(moTeams, .microphoneOff))
+        failed.handle(moTick(504))
+        #expect(failed.card(now: 504) == .hidden)
+    }
+
+    /// No 30 s cap. An offer and a failure stay up while the pointer rests on them, then leave after it moves off.
+    @Test func anOfferAndAFailureStayUpUnderARestingPointer() {
+        var offer = moPrompting()
+        offer.handle(.pointer(inside: true, now: 15))
+        offer.handle(moTick(40))
+        #expect(offer.card(now: 40) == .offer(moTeams, blocked: .notChosen))
+        offer.handle(.pointer(inside: false, now: 100))
+        #expect(offer.handle(moTick(102)).isEmpty)
+        #expect(offer.card(now: 102) == .offer(moTeams, blocked: .notChosen))
+        offer.handle(moTick(104))
+        #expect(offer.card(now: 104) == .hidden)
 
         var failed = moPrompting()
         failed.handle(moTap(moOffer(), 5, microphone: .denied))

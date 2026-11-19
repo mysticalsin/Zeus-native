@@ -96,7 +96,7 @@ GROUPS = {
               "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
               "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
               "ScribeMeetingCardTests", "ScribeAutoStartTests", "ScribeMeetingLedgerTests",
-              "ScribeMeetingContextTests", "ScribeAutoStartOptInTests", "ScribeMeetingStartOutcomeTests", "ScribePopupLifecycleTests",
+              "ScribeMeetingContextTests", "ScribeAutoStartOptInTests", "ScribeMeetingStartOutcomeTests",
               "ScribeDetectorPlanTests", "ScribeMeetingCardDesignTests"),
     ),
     "presentation": (
