@@ -159,10 +159,15 @@ import ZeusCore
         var posted: [String] = []
         controller.postApprovalAnnouncement = { posted.append($0) }
         controller.browseApproval(by: 1)
-        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .high, position: "2 of 2", outcome: nil))
-        #expect(posted.last == ApprovalCard.announcement(risk: .high, position: "2 of 2", outcome: nil))
+        let browsed = ApprovalCard.announcement(risk: .high, content: "second", position: "2 of 2", outcome: nil)
+        #expect(controller.lastApprovalAnnouncement == browsed)
+        #expect(browsed.contains("High risk"))
+        #expect(browsed.contains("2 of 2"))
+        #expect(posted.last == browsed)
         controller.advanceAfterDisplayed("B")
-        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .low, position: "1 of 1", outcome: nil))
+        let remaining = ApprovalCard.announcement(risk: .low, content: "first", position: "1 of 1", outcome: nil)
+        #expect(controller.lastApprovalAnnouncement == remaining)
+        #expect(remaining.contains("1 of 1"))
         controller.advanceAfterDisplayed("A")
         #expect(controller.lastApprovalAnnouncement == "No request is waiting.")
         #expect(posted.last == "No request is waiting.")
