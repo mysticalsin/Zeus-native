@@ -1795,6 +1795,8 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
             tap(&sim); tap(&sim)
         } else {
             for index in order { sim.apply(.toggle(index), run) }
+            // The waits below advance `sim`, so the step count uses that copy's harness clock.
+            let timing = sim.timing
             let steps = slotConfig.mode == .shared ? timing.steps(timing.sharedGap) : timing.steps(slotConfig.confirm) + 2
             for _ in 0..<steps { sim.apply(.wait, run) }
         }
