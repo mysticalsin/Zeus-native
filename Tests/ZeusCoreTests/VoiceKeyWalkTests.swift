@@ -1689,8 +1689,10 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     return (out + restCheck(sim, run), effects)
 }
 
-@Suite struct VoiceKeyWalkTests {
-    @Test(arguments: WalkRun.all.filter { run in
+// The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
+// socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
+@Suite(.serialized) struct VoiceKeyWalkTests {
+    @Test(.serialized, arguments: WalkRun.all.filter { run in
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
         return only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
     })

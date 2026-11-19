@@ -3,8 +3,9 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
-// Kept out of the portable equaliser group: this check runs only with ZEUS_ALLOC_CHECK=1 (malloc counts are not
-// reliable while other suites run in parallel), and the portable gate treats a skipped test as a failure.
+// An on-demand check: it runs only with ZEUS_ALLOC_CHECK=1, because malloc counts are not reliable while other suites run
+// in parallel. The portable gate and the native Core evidence both treat a skipped test as a failure, so it lives in the
+// app tests, which CI runs only as reviewed fixtures. Run it with: ZEUS_ALLOC_CHECK=1 swift test --filter EqualiserKernelAllocationTests
 
 private func sine(_ frequency: Double, amplitude: Double, frames: Int, start: Int = 0, sampleRate: Double) -> [Float] {
     (0..<frames).map { Float(amplitude * sin(2 * Double.pi * frequency * Double(start + $0) / sampleRate)) }
