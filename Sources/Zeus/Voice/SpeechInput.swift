@@ -119,6 +119,8 @@ final class SpeechInput: @unchecked Sendable {
     // `AVAudioEngine()` per turn (built in `start()`, see below) sidesteps that state machine
     // entirely -- this is Apple's own documented workaround for repeated start/stop engines.
     private var engine: any CaptureEngine = AVCaptureEngine(AVAudioEngine())
+    /// Builds each turn's engine. Tests swap in a fake; production wraps a fresh `AVAudioEngine`.
+    var captureEngineFactory: () -> any CaptureEngine = { AVCaptureEngine(AVAudioEngine()) }
     private var recognizer: SFSpeechRecognizer?
     private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -207,25 +209,25 @@ final class SpeechInput: @unchecked Sendable {
         cancel()
         // Fresh engine every turn (see the stored property's comment): avoids the second-turn
         // silent-audio bug from reusing a stopped engine's input node.
-        let engine = AVAudioEngine()
+        let capture = captureEngineFactory()
+        let avEngine = (capture as? AVCaptureEngine)?.avEngine
 
         let request = makeRequest(recognizer: activeRecognizer)
 
         if capturePolicy.strictDeviceSelection {
-            guard Microphones.use(uid: deviceUID, on: engine) else { throw InputError.inputUnavailable }
+            if let avEngine { guard Microphones.use(uid: deviceUID, on: avEngine) else { throw InputError.inputUnavailable } }
             usedDevice = deviceUID != nil
-        } else if deviceUID != nil || usedDevice {
-            usedDevice = Microphones.use(uid: deviceUID, on: engine) && deviceUID != nil
+        } else if let avEngine, deviceUID != nil || usedDevice {
+            usedDevice = Microphones.use(uid: deviceUID, on: avEngine) && deviceUID != nil
         }
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount)
+        guard let format = capture.inputFormat(),
+              Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount)
         else { throw InputError.inputUnavailable }
         let deviceName = Self.inputDeviceName(uid: deviceUID)
         lock.lock()
         // The engine changes hands in the same critical section as the generation: a stop that already
         // took the old engine closes that one, and one that comes later finds this one with its session.
-        self.engine = AVCaptureEngine(engine)
+        self.engine = capture
         self.request = request
         latest = ""
         finalizedText = ""
@@ -246,12 +248,13 @@ final class SpeechInput: @unchecked Sendable {
         // Bluetooth headsets re-negotiate their profile when capture opens, which stops the engine and can
         // change the input format. Without `cancelOnConfigurationChange` the turn recovers in place.
         let observer = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
-        ) { [weak self, weak engine] _ in
-            guard let self, let engine else { return }
-            self.handleConfigurationChange(engine: AVCaptureEngine(engine), session: current, origin: controllerGeneration,
+            forName: .AVAudioEngineConfigurationChange, object: capture.notificationObject, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.handleConfigurationChange(engine: capture, session: current, origin: controllerGeneration,
                                            policy: capturePolicy, startedAt: startedAt)
         }
+        beforeObserverStoreForTesting?()
         lock.withLock { configurationObserver = observer }
 
         if recognizes, let activeRecognizer {
@@ -259,11 +262,11 @@ final class SpeechInput: @unchecked Sendable {
                              turn: RecognitionTurn(sessionID: current, origin: controllerGeneration))
         }
 
-        installTap(on: AVCaptureEngine(engine), format: format, session: current, origin: controllerGeneration,
+        installTap(on: capture, format: format, session: current, origin: controllerGeneration,
                    policy: capturePolicy, startedAt: startedAt, resampler: turnResampler)
-        engine.prepare()
-        do { try engine.start() } catch { cancel(); throw error }
-        closeCaptureIfNotOwned(AVCaptureEngine(engine), session: current)
+        capture.prepare()
+        do { try capture.start() } catch { cancel(); throw error }
+        closeCaptureIfNotOwned(capture, session: current)
         return current
     }
 
@@ -710,6 +713,8 @@ final class SpeechInput: @unchecked Sendable {
     /// Test seam: opens a session the way `start` does, without touching audio hardware.
     /// Test seams: run between a stop's or cancel's first lock and its engine teardown, to land a newer `start` in that gap.
     var beforeStopAudioForTesting: (() -> Void)?
+    /// Test seam: runs after `start` registered its observer and before it stores it, to land a stop in that window.
+    var beforeObserverStoreForTesting: (() -> Void)?
     var hasConfigurationObserverForTesting: Bool { lock.withLock { configurationObserver != nil } }
 
     func beginSessionForTesting(requestFormat format: AVAudioFormat?, engine fake: (any CaptureEngine)? = nil) -> Int {
@@ -817,11 +822,19 @@ protocol CaptureEngine: AnyObject {
     func prepare()
     func start() throws
     func stop()
+    /// The object the system posts configuration changes for. Nil for a fake that never posts them.
+    var notificationObject: AnyObject? { get }
+}
+
+extension CaptureEngine {
+    var notificationObject: AnyObject? { nil }
 }
 
 /// The real engine.
 final class AVCaptureEngine: CaptureEngine {
     private let engine: AVAudioEngine
+    var avEngine: AVAudioEngine { engine }
+    var notificationObject: AnyObject? { engine }
     init(_ engine: AVAudioEngine) { self.engine = engine }
     var isRunning: Bool { engine.isRunning }
     func inputFormat() -> AVAudioFormat? { engine.inputNode.outputFormat(forBus: 0) }
