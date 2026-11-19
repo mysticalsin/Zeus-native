@@ -9,7 +9,8 @@ final class Preferences {
     static let shared = Preferences()
     private let defaults = UserDefaults.standard
 
-    /// "Talk to Zeus": hold to talk, double-tap to latch. Option+Command until you record another.
+    /// "Talk to Zeus": hold to talk, double-tap to latch. Control+Option until you record another
+    /// (docs/VOICE-KEY.md). Settings and onboarding set it through `chooseTalkKey`.
     var pushToTalk: Shortcut {
         didSet { defaults.set(Shortcut.stored(pushToTalk), forKey: ShortcutStore.talkKey) }
     }
@@ -44,6 +45,21 @@ final class Preferences {
 }
 
 extension Preferences {
+    /// The owner picked a talk key: saved and marked as a choice, so no later migration moves it.
+    func chooseTalkKey(_ shortcut: Shortcut) {
+        pushToTalk = shortcut
+        ShortcutStore.recordTalkChoice(shortcut, in: defaults)
+    }
+
+    /// The second talk key as stored: Right Option unless the owner chose another key, nil when turned off. Whether it talks
+    /// right now is `SecondTalkRouting.current()`.
+    var secondTalkKey: Shortcut? { ShortcutStore.loadSecondTalk(defaults).key }
+
+    /// The owner recorded the second talk key (nil: turned off). Recording Right Option, the default, is Reset: the stored value goes.
+    func chooseSecondTalkKey(_ shortcut: Shortcut?) {
+        ShortcutStore.recordSecondTalkChoice(shortcut, in: defaults)
+    }
+
     /// One line for `zeus status` and hints: what the talk key does right now.
     var talkKeyHint: String {
         let d = DictationSettings.shared
@@ -51,6 +67,7 @@ extension Preferences {
             return "double-tap \(pushToTalk.title) to talk, hold it to dictate"
         }
         var line = "hold \(pushToTalk.title) to talk, double-tap to latch"
+        if let second = SecondTalkRouting.current().key { line += " (or hold \(second.title))" }
         if d.enabled { line += "; dictation: " + (d.key.map { "hold \($0.title)" } ?? "off") }
         return line
     }
@@ -58,14 +75,64 @@ extension Preferences {
 
 enum Motion {
     /// System Settings › Accessibility › Display › Reduce motion.
-    @MainActor static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    /// Live value: `MotionCenter` republishes `read()` when the system setting changes.
+    /// A debug test host may inject reduced motion only after it sets
+    /// `ZEUS_MOTION_HARNESS_ACTIVE`. Release builds ignore that variable.
+    /// The person's own Reduce Motion setting is never turned off.
+    @MainActor static var reduced: Bool { MotionCenter.shared.reduced }
 
-    /// Shared interaction timings. Capture/completion choreography keeps its own longer sequence.
-    static let feedbackDuration = 0.12
-    static let crossfadeDuration = 0.12
-    static let pageResponse = 0.34
-    static let pageDamping = 0.84
-    static let pressedScale: CGFloat = 0.98
+    @MainActor static func read() -> Bool {
+        #if DEBUG
+        if motionEnvironmentFlag("ZEUS_HARNESS_REDUCE_MOTION") {
+            if motionEnvironmentFlag("ZEUS_MOTION_HARNESS_ACTIVE") {
+                return true
+            }
+            if !MotionHarnessWarning.shared.warned {
+                MotionHarnessWarning.shared.warned = true
+                FileHandle.standardError.write(Data("ZEUS_HARNESS_REDUCE_MOTION is ignored outside the test host\n".utf8))
+            }
+        }
+        #endif
+        return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    /// Shared interaction timings, all read from the one table in `MotionTokens`. Capture/completion
+    /// choreography keeps its own longer sequence.
+    static let feedbackDuration = MotionTokens.pressDuration
+    static let crossfadeDuration = MotionTokens.crossfadeDuration
+    static let pageResponse = MotionTokens.panelResize.response
+    static let pageDamping = MotionTokens.panelResize.damping
+    static let pressedScale = CGFloat(MotionTokens.pressScale)
+    static let windowFadeIn = MotionTokens.windowFadeInDuration
+    static let windowFadeOut = MotionTokens.windowFadeOutDuration
+    /// Frame rates of clock-driven loops.
+    static let ambientFPS = MotionRules.ambientFPS
+    static let spinnerFPS = MotionRules.spinnerFPS
+
+    private static func raw(_ token: SpringToken) -> Animation {
+        .spring(response: token.response, dampingFraction: token.damping)
+    }
+
+    /// A token spring. Under Reduce Motion nothing animates.
+    static func spring(_ token: SpringToken, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : raw(token)
+    }
+
+    /// A token spring that follows the system's Reduce Motion setting right now.
+    @MainActor static func live(_ token: SpringToken) -> Animation? { spring(token, reduceMotion: reduced) }
+
+    /// Any animation, made instant under Reduce Motion.
+    static func reducible(_ animation: Animation, reduceMotion: Bool) -> Animation? { reduceMotion ? nil : animation }
+    @MainActor static func reducible(_ animation: Animation) -> Animation? { reducible(animation, reduceMotion: reduced) }
+
+    /// The panel closing: no overshoot.
+    static let panelClose = raw(MotionTokens.panelClose)
+    /// HUD cue wings growing and shrinking.
+    static let cueGrow = raw(MotionTokens.cueGrow)
+    /// Peek cards arriving beside the closed notch.
+    static let peekContent = raw(MotionTokens.peekContent).delay(MotionTokens.peekContentDelay)
+    /// A page leaving the panel.
+    static let pageOut = Animation.easeOut(duration: MotionTokens.pageOutDuration)
 
     static func feedback(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .easeOut(duration: feedbackDuration)
@@ -73,6 +140,103 @@ enum Motion {
 
     /// Layout changes settle promptly. Reduced motion changes geometry immediately.
     static func page(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .spring(response: pageResponse, dampingFraction: pageDamping)
+        spring(MotionTokens.panelResize, reduceMotion: reduceMotion)
+    }
+}
+
+#if DEBUG
+@MainActor
+private final class MotionHarnessWarning {
+    static let shared = MotionHarnessWarning()
+    var warned = false
+}
+
+private func motionEnvironmentFlag(_ name: String) -> Bool {
+    guard let value = getenv(name) else { return false }
+    return String(cString: value) == "1"
+}
+#endif
+
+/// One observable Reduce Motion value for SwiftUI. Updated from `Motion.read()` when the
+/// system accessibility display options change, so views keep tracking the person's setting.
+@MainActor
+@Observable
+final class MotionCenter {
+    static let shared = MotionCenter()
+    private(set) var reduced: Bool
+    private var token: NSObjectProtocol?
+
+    private init() {
+        reduced = Motion.read()
+        token = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { MotionCenter.shared.refresh() }
+        }
+    }
+
+    func refresh() {
+        reduced = Motion.read()
+    }
+
+    /// Test seam. Sets the published value without touching System Settings,
+    /// `com.apple.universalaccess`, or `defaults`. Production code never calls it.
+    #if DEBUG
+    func testingSetReduced(_ value: Bool) {
+        reduced = value
+    }
+    #endif
+}
+
+/// A body that reads `Motion.reduced` publishes the value it applied.
+/// The macOS live-update test reads this after flipping `MotionCenter`.
+struct MotionLiveSampleKey: PreferenceKey {
+    static let defaultValue: Bool? = nil
+    static func reduce(value: inout Bool?, nextValue: () -> Bool?) {
+        value = nextValue() ?? value
+    }
+}
+
+/// Press scale and the animation that follows it. `body` reads `Motion.reduced`,
+/// so SwiftUI updates this when that setting changes. Button and toggle styles
+/// apply it from `makeBody` and do not read `Motion.reduced` themselves.
+struct MotionEffect: ViewModifier {
+    enum Curve { case feedback, page }
+
+    /// Pressed, or a toggle's isOn. The animation tracks this value.
+    var active: Bool
+    var enabled: Bool = true
+    /// Uses `Motion.pressedScale` only while active, enabled, and motion is allowed.
+    var presses: Bool = false
+    var curve: Curve = .feedback
+    /// Replaces the system value when set, including `false` (`PressableStyle`'s override).
+    var forced: Bool? = nil
+    /// Onboarding fixtures may add reduction. They cannot turn the person's setting off.
+    var includesOnboardingOverride: Bool = false
+
+    @Environment(\.onboardingReduceMotion) private var onboardingOverride
+
+    func body(content: Content) -> some View {
+        let reduced = resolved
+        content
+            .scaleEffect(presses && active && enabled && !reduced ? Motion.pressedScale : 1)
+            .animation(animation(reduced), value: active)
+            .preference(key: MotionLiveSampleKey.self, value: reduced)
+    }
+
+    private var resolved: Bool {
+        if let forced { return forced }
+        let system = Motion.reduced
+        guard includesOnboardingOverride else { return system }
+        return OnboardingMotionPolicy.reduced(system: system, override: onboardingOverride)
+    }
+
+    private func animation(_ reduced: Bool) -> Animation? {
+        switch curve {
+        case .feedback: Motion.feedback(reduceMotion: reduced)
+        case .page: Motion.page(reduceMotion: reduced)
+        }
     }
 }

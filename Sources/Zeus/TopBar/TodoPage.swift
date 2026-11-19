@@ -7,7 +7,7 @@ struct TodoPage: View {
     let topBar: TopBarModel
     let todo: TodoController
 
-    var body: some View { list }
+    var body: some View { list.onDisappear { todo.endVoice() } }
     private var list: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
@@ -126,7 +126,7 @@ struct TodoPage: View {
     private var footer: String {
         let count = "\(todo.open.count) open"
         if let note = todo.noteName { return "\(count) · synced with \(note)" }
-        if let connection = todo.connection, connection.access == .readOnly { return "\(count) · \(connection.source.name) is read-only, kept in ZEUS" }
+        if let connection = todo.connection, connection.access == .readOnly { return "\(count) · \(connection.source.name) is read-only, kept in Zeus" }
         return "\(count) · kept on this Mac"
     }
 }
@@ -344,7 +344,7 @@ struct BrainTodayCard: View {
                 Spacer(minLength: 0)
             }
             if model.root == nil, model.loadedAt != nil {
-                Text("Connect your second brain in Settings > Memory and ZEUS lists what's on today.")
+                Text("Connect your second brain in Settings > Memory and Zeus lists what's on today.")
                     .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
             } else if model.tasks.isEmpty {
                 Text(model.loadedAt == nil ? "Reading your brain…" : "Nothing open for today.")

@@ -2,11 +2,22 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
-/// Loads a vector engine mark from `Integrations/Brands/<asset>.pdf`.
+/// Loads each verified vector format from the bundled brand directory. Unsupported SVG
+/// decoding returns nil so the views keep their existing safe text/symbol fallback.
 enum EngineBrandImage {
+    @MainActor private static var images: [EngineBrandMark: NSImage] = [:]
+    /// This deliberately excludes the source-tree fallback so native tests prove packaging.
+    /// Never `Bundle.module`: its generated accessor only looks beside Zeus.app, not in
+    /// Contents/Resources where scripts/bundle.sh seals the resource bundle, and traps when it
+    /// misses (fatal on first logo render in the packaged app). `ZeusResources` covers both layouts.
+    static func bundledURL(for mark: EngineBrandMark) -> URL? {
+        ZeusResources.bundle?.url(forResource: mark.assetName, withExtension: mark.assetExtension, subdirectory: "Brands")
+    }
+
     static func url(for mark: EngineBrandMark) -> URL? {
-        let name = "\(mark.assetName).pdf"
+        let name = "\(mark.assetName).\(mark.assetExtension)"
         let candidates = [
+            bundledURL(for: mark),
             ZeusResources.bundle?.resourceURL?.appendingPathComponent("Brands/\(name)"),
             Bundle.main.resourceURL?.appendingPathComponent("Brands/\(name)"),
             URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Brands/\(name)"),
@@ -14,9 +25,11 @@ enum EngineBrandImage {
         return candidates.compactMap { $0 }.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    static func load(_ mark: EngineBrandMark) -> NSImage? {
+    @MainActor static func load(_ mark: EngineBrandMark) -> NSImage? {
+        if let image = images[mark] { return image }
         guard let url = url(for: mark), let image = NSImage(contentsOf: url) else { return nil }
         image.isTemplate = true
+        images[mark] = image
         return image
     }
 }
@@ -25,6 +38,7 @@ enum EngineBrandImage {
 struct EngineBrandLogo: View {
     let agentLabel: String
     var size: CGFloat = 16
+    var tint: Color = Theme.cloudPrimary
 
     private var mark: EngineBrandMark { EngineBrand.resolve(agentLabel) }
 
@@ -41,7 +55,7 @@ struct EngineBrandLogo: View {
                     .font(.system(size: size * 0.78, weight: .medium))
             }
         }
-        .foregroundStyle(Theme.cloudPrimary)
+        .foregroundStyle(tint)
         .frame(width: size, height: size)
         .accessibilityLabel(agentLabel)
         .help(agentLabel)

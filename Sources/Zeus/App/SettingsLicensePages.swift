@@ -48,6 +48,10 @@ struct AssistantSettings: View {
                     if index > 0 { GlassDivider() }
                     keyRow(provider)
                 }
+                if let message = account.keyMessage {
+                    GlassDivider()
+                    GlassRow(title: "Keychain", note: message) { EmptyView() }
+                }
             }
             GlassCard(title: "Model") {
                 GlassRow(title: "Provider", note: "Who answers in chat and drafts replies.") {
@@ -89,8 +93,9 @@ struct AssistantSettings: View {
                 } else {
                     GlassSecureField(placeholder: provider.hint, text: Binding(get: { drafts.keys[provider] ?? "" }, set: { drafts.keys[provider] = $0 }), width: 200)
                     Button("Save") {
-                        account.save(drafts.keys[provider] ?? "", for: provider)
-                        drafts.keys[provider] = nil
+                        if account.save(drafts.keys[provider] ?? "", for: provider) {
+                            drafts.keys[provider] = nil
+                        }
                     }
                     .buttonStyle(GlassButtonStyle(kind: .primary, compact: true))
                     .disabled((drafts.keys[provider] ?? "").isEmpty)

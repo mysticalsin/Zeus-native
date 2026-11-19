@@ -122,7 +122,9 @@ final class AgentTerminals {
         if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
             return app.activate()
         }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return false }
+        // Launching is limited to known terminals and editors: the ID came from the hook client.
+        guard HookClientInput.mayLaunch(bundleID: bundleID),
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return false }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         return true
     }

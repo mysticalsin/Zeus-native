@@ -20,8 +20,8 @@ struct ScribePresentationTests {
     @Test func micIndicatorFailsClosed() {
         #expect(ScribeMicIndicator(.unmuted) == .listening)
         #expect(ScribeMicIndicator(.unmuted).label == "Listening")
-        #expect(ScribeMicIndicator(.muted).label == "Mic muted — not recorded")
-        #expect(ScribeMicIndicator(.unknown).label == "Mic status unknown — not recorded")
+        #expect(ScribeMicIndicator(.muted).label == "Mic muted, not recorded")
+        #expect(ScribeMicIndicator(.unknown).label == "Mic status unknown, not recorded")
         #expect(ScribeMicIndicator(nil) == .unknownNotRecorded)
         #expect(!ScribeMicIndicator(.muted).isRecorded)
         #expect(!ScribeMicIndicator(nil).isRecorded)

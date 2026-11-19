@@ -54,28 +54,28 @@ struct ScribeDetectedCall: Equatable, Sendable {
 struct ScribeCallScan: Equatable, Sendable {
     /// Calls in progress: a known call app (or a browser on a Meet tab) capturing the microphone.
     var calls: [ScribeDetectedCall]
-    /// What the mute detector needs: incomplete when any process couldn't be read, browser state unknown unless
-    /// window titles were read. Never "no call" by default.
-    var inputScan: ScribeInputScan
     /// Known call apps that are running (or a browser showing a Meet tab) whether or not they use the
     /// microphone right now. A call app that stopped capturing while muted still shows up here.
     var runningCallApps: [ScribeDetectedCall] = []
-    /// A known call app is running or browser call evidence exists, even when `inputScan` is `.incomplete`
-    /// (an unreadable process). Never used to admit the microphone.
+    /// A known call app is capturing or browser call evidence exists, even when a process couldn't be read.
+    /// Never used to withhold the microphone; it only drives the "shared" note.
     var callPresent: Bool = false
-    /// Includes unsupported owners: releasing input later must not silently restore Zeus's microphone.
+    /// Any other process capturing the microphone right now, identified or not. Never withholds Zeus's microphone.
     var externalInputDetected: Bool = false
+    /// Whether each running call app's call window is on screen. Unknown unless window titles are readable.
+    var callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]
 }
 
 /// Finds calls in progress: a known call app (or a browser on a Meet tab) that is capturing the microphone.
 /// A running call app alone does not prove a call (Teams is always open), so `calls` follows microphone
-/// capture; `inputScan` and `runningCallApps` are reported for the mute detector, which fails closed on them.
+/// capture. Another app using the microphone never withholds Zeus's own microphone; the mute detector only
+/// reports it.
 enum ScribeCallProbe {
     static func scan() -> ScribeCallScan {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let running = runningApps()
+        let titles = windowTitlesByPID()
+        let running = runningApps(titles: titles)
         let reads = inputReads()
-        let inputScan = reads.map { ScribeScanReducer.reduce(reads: $0, running: running, ownPID: ownPID) } ?? .incomplete
         var calls: [ScribeDetectedCall] = []
         for case .input(let pid, let bundleID) in reads ?? [] where pid != ownPID {
             guard let appBundleID = ScribeCallDetection.appBundleID(for: bundleID) else { continue }
@@ -89,15 +89,36 @@ enum ScribeCallProbe {
         calls.sort { rank($0.app) != rank($1.app) ? rank($0.app) < rank($1.app) : ScribeCallDetection.displayName($0.app) < ScribeCallDetection.displayName($1.app) }
         let callPresent = ScribeScanReducer.callPresence(reads: reads ?? [], running: running, ownPID: ownPID)
         let externalInput = (reads ?? []).contains { $0.isExternalInput(excluding: ownPID) }
-        return ScribeCallScan(calls: calls, inputScan: inputScan, runningCallApps: runningCallApps(from: running),
-                              callPresent: callPresent, externalInputDetected: externalInput)
+        return ScribeCallScan(calls: calls, runningCallApps: runningCallApps(from: running),
+                              callPresent: callPresent, externalInputDetected: externalInput,
+                              callWindows: callWindows(running: running, titles: titles))
+    }
+
+    /// Call window state per call app. A native app is judged by its own window titles; Meet by whether any
+    /// browser shows a Meet tab. Hidden or missing titles are "unknown", which never ends a recording.
+    private static func callWindows(
+        running: [ScribeRunningApp],
+        titles: [pid_t: (titles: [String], numbers: [Int], complete: Bool)]?
+    ) -> [ScribeCallApp: ScribeCallWindowState] {
+        var states: [ScribeCallApp: ScribeCallWindowState] = [:]
+        for app in running where !ScribeCallDetection.isBrowser(app.bundleID) {
+            guard let kind = ScribeCallDetection.identify(bundleID: app.bundleID) else { continue }
+            guard let read = titles?[app.pid] else { states[kind] = .unknown; continue }
+            states[kind] = ScribeCallWindow.state(app: kind, titles: read.titles, complete: read.complete)
+        }
+        let browsers = running.filter { ScribeCallDetection.isBrowser($0.bundleID) }
+        if browsers.contains(where: { ScribeCallDetection.identify(bundleID: $0.bundleID, windowTitles: $0.windowTitles ?? []) == .meet }) {
+            states[.meet] = .present
+        } else {
+            states[.meet] = browsers.allSatisfy { $0.windowTitles != nil && $0.titlesComplete } ? .gone : .unknown
+        }
+        return states
     }
 
     /// Running GUI apps. Browsers carry their window titles, read once for all windows (nil when the list
     /// couldn't be read; empty when titles are hidden).
-    private static func runningApps() -> [ScribeRunningApp] {
+    private static func runningApps(titles: [pid_t: (titles: [String], numbers: [Int], complete: Bool)]?) -> [ScribeRunningApp] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let titles = windowTitlesByPID()
         return NSWorkspace.shared.runningApplications.compactMap { application -> ScribeRunningApp? in
             guard !application.isTerminated, application.processIdentifier != ownPID,
                   let bundleID = application.bundleIdentifier else { return nil }
@@ -182,87 +203,121 @@ enum ScribeCallProbe {
     }
 }
 
-/// Watches for a call in progress or a meeting about to start, and shows the one-tap popup.
-/// Started lazily by the first access to `ScribeController.shared`, never at app launch. It never asks for any
-/// permission: calendar events are read only when full access was already granted elsewhere.
+/// What the watcher needs from the microphone listeners; a test supplies its own.
+protocol ScribeMicObserving: AnyObject {
+    func start()
+    func stop()
+}
+
+extension ScribeMicActivityObserver: ScribeMicObserving {}
+
+/// Watches for a call in progress or a meeting about to start and hands each reading to the meeting-start
+/// machine, which decides what the card says.
+/// It runs only when a meeting is near (`ScribeDetectorPlan`). Off with the machine idle: nothing runs, no timer,
+/// no microphone listeners, no calendar reads. Otherwise the microphone listeners and one wake-up two minutes
+/// before the next calendar meeting; the 5 s poll is only the backup while a meeting is near. It starts at launch
+/// unless the choice is Off and follows the choice at once. It never asks for any permission: calendar events
+/// are read only when full access was already granted elsewhere.
 @MainActor
 final class ScribeCallWatcher {
-    static let shared = ScribeCallWatcher()
+    /// What the watcher reads and does outside itself. The shipped ports are the real clock, setting, calendar,
+    /// probe and machine; a test replaces each.
+    struct Ports {
+        var mode: () -> ScribeAutoStartMode
+        /// The meeting-start machine has nothing in hand: no card, no start, no recording to follow.
+        var machineIdle: () -> Bool
+        /// The meetings from a little before `now` to `lookAhead` after it.
+        var slots: (Date, TimeInterval) -> [ScribeCalendarSlot]
+        var scan: @MainActor () async -> ScribeCallScan
+        var ingest: (ScribeCallScan, [ScribeCalendarSlot], Date) -> Void
+        /// Forgets the machine when the detector stops.
+        var reset: () -> Void
+        var terminated: (ScribeCallProcessIdentity) -> Void
+        var now: () -> Date
+    }
 
-    private(set) var decision: ScribePromptDecision = .none
+    typealias MicObserverFactory = (@escaping @MainActor @Sendable () -> Void) -> ScribeMicObserving
 
+    static let shared = ScribeCallWatcher(
+        ports: Ports(
+            mode: { ScribeAutoStartMode.current() },
+            machineIdle: { ScribeAutoStartController.shared.isIdle },
+            slots: { now, lookAhead in
+                ScribeCalendarReader.shared.slots(from: now.addingTimeInterval(-ScribeMeetingStartPolicy.lateWindow),
+                                                  to: now.addingTimeInterval(lookAhead))
+            },
+            scan: { await Task.detached(priority: .utility) { ScribeCallProbe.scan() }.value },
+            ingest: { scan, slots, now in ScribeAutoStartController.shared.ingest(scan: scan, slots: slots, date: now) },
+            reset: { ScribeAutoStartController.shared.stop() },
+            terminated: { ScribeController.shared.boundCallApplicationDidTerminate($0) },
+            now: { Date() }),
+        micObserver: { onChange in ScribeMicActivityObserver(onChange: onChange) },
+        scheduler: ScribeRunLoopScheduler(),
+        workspaceCenter: NSWorkspace.shared.notificationCenter,
+        notificationCenter: .default)
+
+    /// The backup poll while a meeting is near.
     private static let interval: TimeInterval = 5
+    /// The longest one scan may take. A probe that hangs is given up on, so the gate cannot stay in `scanning`.
+    static let scanTimeout: TimeInterval = 10
 
-    private var timer: Timer?
-    private var scanning = false
-    private var dismissedIDs: Set<String> = []
-    private var dismissedApps: Set<ScribeCallApp> = []
-    private var dismissedInstances: [ScribeCallApp: ScribeCallProcessIdentity] = [:]
+    private let ports: Ports
+    private let makeMicObserver: MicObserverFactory
+    private let scheduler: ScribeOneShotScheduling
+    private let workspaceCenter: NotificationCenter
+    private let notificationCenter: NotificationCenter
+
+    private var running = false
+    /// Bumped each time the detector stops, so a scan that began before the stop is dropped when it ends.
+    private var generation = 0
+    private var gate = ScribeScanGate()
+    /// The scan in flight, by number; nil when none is. A reading for any other number is dropped, so a probe
+    /// that answers after it was given up on cannot be mistaken for the scan that replaced it.
+    private var scanNumber = 0
+    private var scanInFlight: Int?
     private var latestCalls: [ScribeDetectedCall] = []
-    private var terminationObserver: NSObjectProtocol?
-    private lazy var eventStore = EKEventStore()
+    private var lastMicActive = false
+    private var lastSlots: [ScribeCalendarSlot] = []
+    private(set) var plan: ScribeDetectorPlan = .stopped
+    private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    private var micObserver: ScribeMicObserving?
 
-    var isRunning: Bool { timer != nil }
-
-    func start() {
-        guard timer == nil else { return }
-        terminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] notification in
-            MainActor.assumeIsolated {
-                guard let self,
-                      let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      let identity = Self.identity(of: app) else { return }
-                self.applicationTerminated(identity)
-            }
-        }
-        timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.poll() }
-        }
-        // Not synchronously: `start()` runs inside `ScribeController.shared`'s initialiser.
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(1))
-            self?.poll()
-        }
+    init(ports: Ports, micObserver: @escaping MicObserverFactory, scheduler: ScribeOneShotScheduling,
+         workspaceCenter: NotificationCenter, notificationCenter: NotificationCenter) {
+        self.ports = ports
+        self.makeMicObserver = micObserver
+        self.scheduler = scheduler
+        self.workspaceCenter = workspaceCenter
+        self.notificationCenter = notificationCenter
     }
 
-    func stop() {
-        if let terminationObserver { NSWorkspace.shared.notificationCenter.removeObserver(terminationObserver) }
-        terminationObserver = nil
-        timer?.invalidate()
-        timer = nil
-        decision = .none
-        ScribeCallPopup.shared.hide()
+    var isRunning: Bool { running }
+
+    /// True while the watcher runs and a call in progress has a browser as its main process. Read only.
+    var browserCallPresent: Bool {
+        isRunning && latestCalls.contains { $0.pid.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }.map(ScribeCallDetection.isBrowser) ?? false }
     }
 
-    /// Dismisses this prompt: a calendar slot by id, a detected call until that call ends.
-    func dismiss(_ dismissed: ScribePromptDecision) {
-        switch dismissed {
-        case .upcoming(let slot): dismissedIDs.insert(slot.id)
-        case .callDetected(let app):
-            dismissedApps.insert(app)
-            if let call = latestCalls.first(where: { $0.app == app }), let pid = call.pid,
-               let running = NSRunningApplication(processIdentifier: pid), !running.isTerminated {
-                dismissedInstances[app] = Self.identity(of: running)
-            }
-        case .none: break
+    /// Brings the detector in line with the "When a meeting starts" choice and the machine. Called at launch and
+    /// at every change of the choice: the plan decides between stopping and reading now.
+    func follow() {
+        let wanted = ScribeDetectorPlan.plan(mode: ports.mode(), machineIdle: ports.machineIdle(),
+                                             micActive: lastMicActive, slots: lastSlots, now: ports.now())
+        guard wanted != .stopped else {
+            halt()
+            return
         }
-        if decision == dismissed { decision = .none }
-        ScribeCallPopup.shared.hide()
+        begin()
+        wake()
     }
 
-    /// Recording began: the prompt has done its job.
-    func recordingDidStart() {
-        guard isRunning else { return }
-        decision = .none
-        ScribeCallPopup.shared.hide()
-    }
+    /// Reads fresh signals now (the call-ended timer and microphone wake-ups ask for this).
+    func pollNow() { wake() }
 
     /// Bind only a positively detected native app instance. A browser process owns many tabs and is not
     /// a call identity; calendar/manual starts likewise have no automatic end adapter.
-    func recordingIdentity(for decision: ScribePromptDecision) -> ScribeCallProcessIdentity? {
-        guard case .callDetected(let kind) = decision,
-              let call = latestCalls.first(where: { $0.app == kind }), let pid = call.pid,
+    func recordingIdentity(for kind: ScribeCallApp) -> ScribeCallProcessIdentity? {
+        guard let call = latestCalls.first(where: { $0.app == kind }), let pid = call.pid,
               let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated,
               let bundle = app.bundleIdentifier, !ScribeCallDetection.isBrowser(bundle),
               ScribeCallDetection.identify(bundleID: bundle) == kind else { return nil }
@@ -275,70 +330,120 @@ final class ScribeCallWatcher {
                                         launchedAt: launched.timeIntervalSince1970)
     }
 
-    private func applicationTerminated(_ identity: ScribeCallProcessIdentity) {
-        for (kind, dismissed) in dismissedInstances where dismissed == identity {
-            dismissedApps.remove(kind)
-            dismissedInstances.removeValue(forKey: kind)
+    // MARK: Running
+
+    /// Installs the listeners. Nothing here reads the calendar or the microphone: the first scan does.
+    private func begin() {
+        guard !running else { return }
+        running = true
+        observe(workspaceCenter, NSWorkspace.didTerminateApplicationNotification) { [weak self] notification in
+            // Notification/userInfo are not Sendable. Read the OS object on its callback queue and
+            // carry only immutable identity values into actor isolation, as for the music observers.
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier > 0, let bundle = app.bundleIdentifier, let launched = app.launchDate else { return }
+            let identity = ScribeCallProcessIdentity(pid: app.processIdentifier, bundleID: bundle,
+                                                    launchedAt: launched.timeIntervalSince1970)
+            MainActor.assumeIsolated { self?.ports.terminated(identity) }
         }
-        ScribeController.shared.boundCallApplicationDidTerminate(identity)
+        observe(workspaceCenter, NSWorkspace.didWakeNotification) { [weak self] _ in
+            MainActor.assumeIsolated { self?.wake() }
+        }
+        // A changed calendar moves the next meeting, so the wake-up is set again after the next scan.
+        observe(notificationCenter, .EKEventStoreChanged) { [weak self] _ in
+            MainActor.assumeIsolated { self?.wake() }
+        }
+        let observer = makeMicObserver { [weak self] in self?.wake() }
+        observer.start()
+        micObserver = observer
     }
 
-    private func poll() {
-        guard isRunning, !scanning else { return }
-        scanning = true
-        let now = Date()
-        let slots = upcomingSlots(now: now)
-        Task.detached(priority: .utility) { [weak self] in
-            let scan = ScribeCallProbe.scan()
-            await self?.apply(scan: scan, slots: slots, now: now)
+    private func observe(_ center: NotificationCenter, _ name: Notification.Name,
+                         _ handler: @escaping @Sendable (Notification) -> Void) {
+        observers.append((center, center.addObserver(forName: name, object: nil, queue: .main, using: handler)))
+    }
+
+    /// Takes everything down. A scan still in flight is dropped when it ends.
+    private func halt() {
+        generation += 1
+        for (center, token) in observers { center.removeObserver(token) }
+        observers = []
+        micObserver?.stop()
+        micObserver = nil
+        scheduler.schedule(after: nil) {}
+        gate = ScribeScanGate()
+        scanInFlight = nil
+        plan = .stopped
+        latestCalls = []
+        lastMicActive = false
+        lastSlots = []
+        let wasRunning = running
+        running = false
+        // Off means the machine is idle, so this only clears what it remembers of the last call.
+        if wasRunning { ports.reset() }
+    }
+
+    /// One reason to read the signals now: the wake-up, the poll, a microphone change, the calendar or the setting.
+    private func wake() {
+        guard running, gate.handle(.wake) == .scan else { return }
+        scan()
+    }
+
+    private func scan() {
+        let started = generation
+        scanNumber += 1
+        let number = scanNumber
+        scanInFlight = number
+        Task { @MainActor [weak self] in
+            // The detector may have stopped since the wake: then nothing is read.
+            guard let self, running, started == generation else { return }
+            let now = ports.now()
+            let slots = ports.slots(now, ScribeMeetingStartPolicy.leadWindow)
+            // The one scheduler slot is free while a scan runs; `applyPlan` takes it back when the scan ends. If the
+            // probe never answers, this fires and the scan ends as an empty reading.
+            scheduler.schedule(after: Self.scanTimeout) { [weak self] in
+                self?.finish(ScribeCallScan(calls: []), slots: slots, now: now, generation: started, number: number)
+            }
+            let reading = await ports.scan()
+            finish(reading, slots: slots, now: now, generation: started, number: number)
         }
     }
 
-    private func apply(scan: ScribeCallScan, slots: [ScribeCalendarSlot], now: Date) {
-        scanning = false
-        guard isRunning else { return }
+    private func finish(_ scan: ScribeCallScan, slots: [ScribeCalendarSlot], now: Date, generation started: Int,
+                        number: Int) {
+        guard running, started == generation, scanInFlight == number else { return }
+        scanInFlight = nil
         latestCalls = scan.calls
-        let detectedApps = scan.calls.map(\.app)
-        // Mic disappearance can mean mute. Keep Not now suppressed until a positive app-instance exit;
-        // neither an empty/incomplete scan nor a changed browser title proves a new call.
-        let next = ScribeCallPrompt.decide(
-            now: now,
-            upcoming: slots,
-            activeCallApp: detectedApps.first { !dismissedApps.contains($0) },
-            isRecording: ScribeController.shared.phase.isActive,
-            dismissedIDs: dismissedIDs,
-            dismissedCallApps: dismissedApps
-        )
-        guard next != decision else {
-            ScribeCallPopup.shared.refresh(now: now)
-            return
-        }
-        decision = next
-        if case .none = next {
-            ScribeCallPopup.shared.hide()
-        } else {
-            ScribeCallPopup.shared.present(next, now: now)
-        }
+        lastMicActive = !scan.calls.isEmpty
+        lastSlots = slots
+        // The meeting-start machine owns every card: the heads-up before a calendar meeting, a meeting that has
+        // started and a call in progress. It asks, starts by itself or stays quiet by the "When a meeting
+        // starts" setting.
+        ports.ingest(scan, slots, now)
+        let again = gate.handle(.finished) == .scan
+        applyPlan()
+        // A wake that came during the scan reads once more.
+        if again, running { self.scan() }
     }
 
-    /// Meetings that start within the prompt window. Empty unless calendar access was already granted.
-    private func upcomingSlots(now: Date) -> [ScribeCalendarSlot] {
-        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
-        let from = now.addingTimeInterval(-ScribeCallPrompt.lateWindow)
-        let to = now.addingTimeInterval(ScribeCallPrompt.leadWindow + 60)
-        let predicate = eventStore.predicateForEvents(withStart: from, end: to, calendars: nil)
-        return eventStore.events(matching: predicate).compactMap { event in
-            guard !event.isAllDay, event.status != .canceled, let start = event.startDate else { return nil }
-            // A meeting, not a reminder to yourself: it has guests or a call link.
-            let hasLink = MeetingLink.find(in: [event.url?.absoluteString, event.location, event.notes]) != nil
-            guard event.hasAttendees || hasLink else { return nil }
-            let base = event.eventIdentifier ?? event.title ?? "event"
-            return ScribeCalendarSlot(
-                id: "\(base)@\(Int(start.timeIntervalSince1970))",
-                title: event.title ?? "Meeting",
-                start: start,
-                end: event.endDate
-            )
+    /// Sets the one wake-up the plan asks for, after the machine has seen the scan.
+    private func applyPlan() {
+        let now = ports.now()
+        let mode = ports.mode()
+        let idle = ports.machineIdle()
+        plan = ScribeDetectorPlan.plan(mode: mode, machineIdle: idle, micActive: lastMicActive, slots: lastSlots, now: now)
+        // Scans read only the short window around now. Nothing near means the wake is chosen from the full
+        // look-ahead, read once here rather than on every poll.
+        if case .listening = plan {
+            lastSlots = ports.slots(now, ScribeDetectorPlan.lookAhead)
+            plan = ScribeDetectorPlan.plan(mode: mode, machineIdle: idle, micActive: lastMicActive, slots: lastSlots, now: now)
+        }
+        switch plan {
+        case .stopped:
+            halt()
+        case .polling:
+            scheduler.schedule(after: Self.interval) { [weak self] in self?.wake() }
+        case .listening(let wakeAt):
+            scheduler.schedule(after: wakeAt.map { max(0, $0.timeIntervalSince(now)) }) { [weak self] in self?.wake() }
         }
     }
 }

@@ -1,18 +1,24 @@
 import Foundation
 
-/// Zeus's own sound set (rendered by tools/sounds/make_sounds.py, bundled as AAC in Sources/Zeus/Sounds).
+/// Zeus's own sound set (rendered by tools/sounds/make_sounds.py, bundled as AAC in Sources/Zeus/Sounds;
+/// the Crystal dictation cues come from scripts/gen-dictation-sounds.py and stay uncompressed WAV).
 /// Each slot is one thing that makes a sound; a slot with several styles gets a picker in Settings.
 public enum SoundSlot: String, CaseIterable, Sendable {
-    case runStart, request, answer, done, failure, dictationBegin, dictationEnd
+    case runStart, request, answer, done, failure, dictationBegin, dictationEnd, dictationCancel
     case listenStart, listenStop, voiceDone, voiceError, todo, timer, runningLoop
 }
 
 public struct SoundSpec: Equatable, Sendable {
     public let style: String
-    /// File name without extension; the file is `<file>.m4a` in the Sounds resource folder.
+    /// File name without extension; the file is `<file>.<fileExtension>` in the Sounds resource folder.
     public let file: String
     /// The rendered length, which the tests hold the bundled files to.
     public let seconds: Double
+    /// AAC (`m4a`) for most sounds; the short dictation cues are WAV so they start with no decoder delay.
+    public var fileExtension: String = SoundCatalog.fileExtension
+
+    /// The bundled file's name, such as `dictation_crystal_start.wav`.
+    public var fileName: String { "\(file).\(fileExtension)" }
 }
 
 public enum SoundCatalog {
@@ -41,11 +47,20 @@ public enum SoundCatalog {
         .init(style: "Gentle", file: "success_gentle", seconds: 1.96),
         .init(style: "Spark", file: "success_spark", seconds: 0.96),
     ]
+    /// Dictation start and stop: the original click first (what a nil style means), then the Crystal
+    /// chimes that Settings > Dictation uses by default (DictationCueStyle.crystal).
+    public static let dictationBegin: [SoundSpec] = [
+        .init(style: "Dictation begin", file: "dictation_begin", seconds: 0.50),
+        .init(style: DictationCueStyle.crystal.rawValue, file: "dictation_crystal_start", seconds: 0.26, fileExtension: "wav"),
+    ]
+    public static let dictationEnd: [SoundSpec] = [
+        .init(style: "Dictation end", file: "dictation_end", seconds: 0.46),
+        .init(style: DictationCueStyle.crystal.rawValue, file: "dictation_crystal_stop", seconds: 0.26, fileExtension: "wav"),
+    ]
     /// Slots with a single sound.
     private static let single: [SoundSlot: SoundSpec] = [
         .failure: .init(style: "Failure", file: "failure", seconds: 1.46),
-        .dictationBegin: .init(style: "Dictation begin", file: "dictation_begin", seconds: 0.50),
-        .dictationEnd: .init(style: "Dictation end", file: "dictation_end", seconds: 0.46),
+        .dictationCancel: .init(style: "Dictation cancel", file: "dictation_cancel", seconds: 0.18, fileExtension: "wav"),
         .listenStart: .init(style: "Listening", file: "listen_start", seconds: 0.40),
         .listenStop: .init(style: "Stopped listening", file: "listen_stop", seconds: 0.40),
         .voiceDone: .init(style: "Answer done", file: "answer_done", seconds: 0.80),
@@ -61,6 +76,8 @@ public enum SoundCatalog {
         case .request: request
         case .answer: answer
         case .done: done
+        case .dictationBegin: dictationBegin
+        case .dictationEnd: dictationEnd
         default: single[slot].map { [$0] } ?? []
         }
     }

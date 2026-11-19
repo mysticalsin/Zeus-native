@@ -1,0 +1,309 @@
+{
+  "head": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+  "tested": "1d15913cd9b5ef513658dbac3ea567764822d3ad",
+  "source_snapshot_sha256": "099b999349d9f621a0e4db3d051e362bca55e89bc355e1a8f91820c14f8c2dcc",
+  "verified_partition_count": 27,
+  "verified_tests": 2334,
+  "verified_partitions": [
+    {
+      "id": "native-ZeusCoreTests",
+      "tests": 2146,
+      "suites": 290
+    },
+    {
+      "id": "native-DictationOwnershipIntegrationTests",
+      "tests": 49,
+      "suites": 1
+    },
+    {
+      "id": "native-PolyglotPinTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-RecorderPillTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainCaptureModelTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-UltronVoiceEffectTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-EngineBrandLogoTests",
+      "tests": 6,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingTests",
+      "tests": 18,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingIsolationTests",
+      "tests": 14,
+      "suites": 1
+    },
+    {
+      "id": "native-PermissionsCaptureTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordlyDebugWiringTests",
+      "tests": 5,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeLifecycleScenarioTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordingFeedbackRenderTests",
+      "tests": 7,
+      "suites": 1
+    },
+    {
+      "id": "native-WikiGraphNavigationTests",
+      "tests": 10,
+      "suites": 1
+    },
+    {
+      "id": "native-HaloRendererTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeComponentJourneyTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-DisplaySynchronizedViewTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeIncomingWordTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-LicenseCredentialCleanupTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-MemoryMCPTransportTests",
+      "tests": 12,
+      "suites": 1
+    },
+    {
+      "id": "native-OwnedWindowEventDriverTests",
+      "tests": 5,
+      "suites": 1
+    },
+    {
+      "id": "native-KokoroWorkerTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-TickingTests",
+      "tests": 9,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainWarmSchedulerTests",
+      "tests": 8,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingComponentJourneyTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingFilmLifecycleTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-AudioSamplesConversionTests",
+      "tests": 3,
+      "suites": 1
+    }
+  ],
+  "failed_partitions": [
+    {
+      "id": "native-ScribeAccessibilityJourneyTests",
+      "reason": "command exited -5",
+      "exit_code": -5,
+      "issues": [
+        {
+          "test_id": "ZeusAppTests.ScribeAccessibilityJourneyTests/waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl()/ScribeComponentJourneyTests.swift:757:6",
+          "source": {
+            "fileID": "ZeusAppTests/ScribeComponentJourneyTests.swift",
+            "line": 757,
+            "column": 6
+          },
+          "messages": [
+            "Caught error: Fixture control rejected accessibilityPerformPress: scribe.start"
+          ],
+          "is_known": false
+        }
+      ]
+    },
+    {
+      "id": "native-KokoroWorkerSessionTests",
+      "reason": "command exited 1",
+      "exit_code": 1,
+      "issues": [
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/productionWorkerPublishesOnlyACompleteAcknowledgedWAV()/KokoroWorkerSessionTests.swift:305:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 302,
+            "column": 13
+          },
+          "messages": [
+            "Expectation failed: await condition()"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/cancellingSynthesisReturnsNoArtifactAndStopsItsWorker()/KokoroWorkerSessionTests.swift:375:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 302,
+            "column": 13
+          },
+          "messages": [
+            "Expectation failed: await condition()"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/cancelledPartialWriteCannotLeaveAnAudioArtifact()/KokoroWorkerSessionTests.swift:519:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 302,
+            "column": 13
+          },
+          "messages": [
+            "Expectation failed: await condition()"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/completedRequestCanImmediatelyReuseTheSameWorker()/KokoroWorkerSessionTests.swift:741:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 747,
+            "column": 34
+          },
+          "messages": [
+            "Expectation failed: await session.render(text, voice: \"synthetic\", speed: 1) \u2192 nil"
+          ],
+          "is_known": false
+        },
+        {
+          "test_id": "ZeusAppTests.KokoroWorkerSessionTests/idleWorkerReleasesItsProcessAndClosedSessionCannotRestart()/KokoroWorkerSessionTests.swift:466:6",
+          "source": {
+            "fileID": "ZeusAppTests/KokoroWorkerSessionTests.swift",
+            "line": 469,
+            "column": 29
+          },
+          "messages": [
+            "Expectation failed: await session.render(\"first\", voice: \"synthetic\", speed: 1) \u2192 nil"
+          ],
+          "is_known": false
+        }
+      ]
+    }
+  ],
+  "complete_native_acceptance": false,
+  "evidence_kind": "partial-native-revalidation",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42826489190",
+  "app_job": 129865053827,
+  "artifact_id": 13769653618,
+  "artifact_zip_sha256": "6eefc8c2be2a9a8b1c176d3383afb8749d33f0b43c812920b7cd86a245b09785",
+  "revalidated_artifacts": {
+    "job.json": "bbe77f885e08f211390136dd528f5e7533bb7204ca2a1ebd1b5e4dfb09579451",
+    "build.log": "f4591eb077fdeac46cb571cdf4d233e18d01f009af7808e86418c55cdce72d0d",
+    "native-evidence/result.json": "65d0deea0594beade194d4202833f54b93d908c846eb10726baed8f67b0a887d",
+    "native-evidence/source-manifest.json": "3685d58ebada2325d1b3f34c9ec6fa431e589e28dcf5fe6466ccabe53997cf59",
+    "native-evidence/native-build/build.log": "d42ff96b69089e3d551416625dee78aeb537f75aa686ca4a2fe5fb9cbace1a80",
+    "native-evidence/native-discovery/events.jsonl": "389ac8f0169ed8beb6c02a9f76a4c83033e7984737a9bb943185275fd96a9bb5",
+    "python-launcher.log": "e8e1c1496b4b29b71454c1f66638237c596d7d135f9b98f506e07629ff92e3d4",
+    "test.log": "ddb2e5a3368e77e0029d57fdc67c48e90b6f2f3fc6a8daa5274b07d50416e6b5"
+  },
+  "validation_scope": {
+    "production_compiler_log": "passed",
+    "native_test_build_receipt": "passed",
+    "source_manifest": "exact head tree",
+    "feature_map_checks": 72,
+    "regressions": 148,
+    "compiled_selected_functions": 2360,
+    "hashed_partition_artifacts": 144,
+    "complete_receipt_rejection": "missing fields: {'native_summary'}"
+  },
+  "python_launcher_metadata": {
+    "artifact": "python-launcher.log",
+    "sha256": "e8e1c1496b4b29b71454c1f66638237c596d7d135f9b98f506e07629ff92e3d4",
+    "binary": "/usr/bin/python3",
+    "linkage": "/usr/lib/libxcselect.dylib",
+    "import": "_xcselect_invoke_xcrun",
+    "resolved_interpreter": "/Applications/Xcode_26.3.app/Contents/Developer/usr/bin/python3",
+    "scope": "Observed exact-runner launcher indirection only; these after-test metadata probes do not attribute cold startup delay."
+  },
+  "motion_profile": {
+    "normal_motion_verified_before_hosted_runs": [
+      {
+        "id": "native-ScribeComponentJourneyTests",
+        "log_sha256": "54da3788014a197ca3d4b9b8b3a70faf27418d2c8e342ecaf5a82f85880d459d"
+      },
+      {
+        "id": "native-ScribeAccessibilityJourneyTests",
+        "log_sha256": "1c11cad1e71611f57724094b9dbca37af23f9eb5b2d8e0202ef6492bc01f7d54"
+      },
+      {
+        "id": "native-OwnedWindowEventDriverTests",
+        "log_sha256": "cba9c20ebe71c23ea190571e78300d0a713c5954a8c72a3dbea8f43eaf0e6954"
+      },
+      {
+        "id": "native-OnboardingComponentJourneyTests",
+        "log_sha256": "75a0bdee35c90512ef5dcf0dd366a437daa103cdcc915c77f36a091275fe300e"
+      },
+      {
+        "id": "native-OnboardingFilmLifecycleTests",
+        "log_sha256": "eb5161843fdfc3bb77b8d61291abec9de5dce18d2b36fb63da5f4f8c2459bb9f"
+      }
+    ],
+    "original_reduce_motion": true,
+    "restored_original": true,
+    "wrapper_exit_code": 1,
+    "restoration_log_sha256": "ddb2e5a3368e77e0029d57fdc67c48e90b6f2f3fc6a8daa5274b07d50416e6b5",
+    "onboarding_requested_and_effective_modes_match": true,
+    "scope": "Actual CI NSWorkspace profile observed before tests and stored preference restored after failure; not physical-device/frame-pacing proof."
+  },
+  "passed_film_partition": {
+    "id": "native-OnboardingFilmLifecycleTests",
+    "tests": 4,
+    "passed_functions": [
+      "actualOcclusionHiddenViewAndReducedMotionPausePlayback",
+      "actualPlayerPausesForMiniaturizationHiddenAppAndOrderedOutWindow",
+      "onlyOwnedNaturalCompletionsCanRequeueBundledFilms",
+      "reattachmentIgnoresOldWindowAndDisposalCannotRestartPlayback"
+    ],
+    "tests_included_in_verified_total": 4,
+    "scope": "Complete source-bound native partition validation; not physical-device or frame-pacing proof."
+  }
+}

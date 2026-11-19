@@ -35,6 +35,7 @@ struct SpeechEngineSection: View {
             if settings.engine == .parakeet {
                 if let progress = status.progress {
                     ProgressView(value: progress) { Text(status.downloaded ? "Loading Parakeet…" : "Downloading Parakeet…") }
+                    if let dictation { Button("Cancel") { dictation.cancelModelPreparation() } }
                 } else if status.downloaded {
                     Label("On this Mac. Audio never leaves it.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {

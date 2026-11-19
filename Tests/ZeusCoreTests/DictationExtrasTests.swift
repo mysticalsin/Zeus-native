@@ -42,10 +42,10 @@ struct DictationExtrasTests {
     }
 
     @Test func captureTurnsCorrectionsIntoReplacements() {
-        let suggestion = VocabularyCapture.suggest(original: "Glance and vibe is all live in the menu bar.",
-                                                   corrected: "Glance and Vibe Island all live in the menu bar.")
-        #expect(suggestion.replacements == [Replacement(id: suggestion.replacements[0].id, original: "vibe is", with: "Vibe Island")])
-        #expect(suggestion.words == ["Vibe Island"])
+        let suggestion = VocabularyCapture.suggest(original: "Murmure and mount roil all live in the menu bar.",
+                                                   corrected: "Murmure and Mount Royal all live in the menu bar.")
+        #expect(suggestion.replacements == [Replacement(id: suggestion.replacements[0].id, original: "mount roil", with: "Mount Royal")])
+        #expect(suggestion.words == ["Mount Royal"])
     }
 
     @Test func captureLearnsCasingAndInsertedNames() {
@@ -59,12 +59,12 @@ struct DictationExtrasTests {
     }
 
     @Test func mergeSkipsKnownEntries() {
-        let vocabulary = Vocabulary(words: ["ZEUS"], replacements: [Replacement(original: "vibe is", with: "Vibe Island")])
-        let suggestion = VocabularyCapture.Suggestion(replacements: [Replacement(original: "Vibe Is", with: "x"), Replacement(original: "glans", with: "Glance")],
-                                                      words: ["zeus", "Glance"])
+        let vocabulary = Vocabulary(words: ["ZEUS"], replacements: [Replacement(original: "mount roil", with: "Mount Royal")])
+        let suggestion = VocabularyCapture.Suggestion(replacements: [Replacement(original: "Mount Roil", with: "x"), Replacement(original: "murmer", with: "Murmure")],
+                                                      words: ["zeus", "Murmure"])
         let merged = VocabularyCapture.merge(suggestion, into: vocabulary)
-        #expect(merged.words == ["ZEUS", "Glance"])
-        #expect(merged.replacements.map(\.original) == ["vibe is", "glans"])
+        #expect(merged.words == ["ZEUS", "Murmure"])
+        #expect(merged.replacements.map(\.original) == ["mount roil", "murmer"])
     }
 
     @Test func deepLinksParse() {
@@ -86,6 +86,19 @@ struct DictationExtrasTests {
         #expect(link("zeus:dictation/start") == .dictationStart)
         #expect(link("https://dictation/start") == nil)
         #expect(link("zeus://weather") == nil)
+    }
+
+    @Test func settingsDeepLinkParses() {
+        func link(_ string: String) -> ZeusDeepLink? { ZeusDeepLink.parse(URL(string: string)!) }
+        #expect(link("zeus://settings") == .settings(section: nil))
+        #expect(link("zeus://settings/") == .settings(section: nil))
+        #expect(link("ZEUS://Settings") == .settings(section: nil))
+        #expect(link("zeus:settings") == .settings(section: nil))
+        #expect(link("zeus://settings/permissions") == .settings(section: "permissions"))
+        #expect(link("zeus://settings/Shortcuts") == .settings(section: "shortcuts"))
+        // Only the first segment names a section; the app resolves it and falls back to just opening Settings.
+        #expect(link("zeus://settings/appearance/extra") == .settings(section: "appearance"))
+        #expect(link("https://settings") == nil)
     }
 
     @Test func typingSplitsIntoSafeChunks() {

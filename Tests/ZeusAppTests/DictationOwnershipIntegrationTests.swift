@@ -11,6 +11,18 @@ import ZeusCore
 @MainActor
 @Suite("Dictation ownership and delivery gate")
 struct DictationOwnershipIntegrationTests {
+    @Test func missingCloudKeyRetainsFailureDuringFinish() async {
+        // A nil key exits before creating/resuming any socket. This exercises the real
+        // stream's terminal lock snapshot without provider calls, audio or credentials.
+        let stream = ElevenLabsStream(apiKey: nil, language: nil, keyterms: [])
+        do {
+            _ = try await stream.finish()
+            Issue.record("Missing-key failure was lost while finishing the stream")
+        } catch {
+            #expect(error as? CloudTranscriptionError == .missingKey(ElevenLabsRealtime.provider))
+        }
+    }
+
     /// Holds queued work so a test can cancel or replace the turn before it runs.
     @MainActor
     private final class ManualQueue {

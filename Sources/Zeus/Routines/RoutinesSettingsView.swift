@@ -16,7 +16,7 @@ struct RoutinesSettingsView: View {
             }
             Section {
                 if runner.routines.isEmpty {
-                    Text("No routines yet. A routine is a prompt ZEUS runs for you, for example a weekday morning summary.")
+                    Text("No routines yet. A routine is a prompt Zeus runs for you, for example a weekday morning summary.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(runner.routines) { routine in

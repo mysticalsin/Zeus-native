@@ -19,8 +19,10 @@ public enum DiagnosticsRedactor {
     private static let patterns: [(NSRegularExpression, String)] = {
         func rx(_ pattern: String) -> NSRegularExpression { try! NSRegularExpression(pattern: pattern) }
         return [
-            // key = value pairs keep the key so the log still reads
-            (rx("(?i)\\b(api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|authorization|license[_-]?key|licence)([\"']?\\s*[:=]\\s*[\"']?)(Bearer\\s+)?[^\\s\"',;&}]+"), "$1$2" + mask),
+            // key = value pairs keep the key so the log still reads. The key may carry an identifier prefix
+            // (DUST_API_KEY, GITLAB_TOKEN, AWS_SECRET_ACCESS_KEY); the prefix is capped so a long run of word
+            // characters stays cheap. A Bearer or Basic scheme word is consumed with its value.
+            (rx("(?i)([A-Za-z0-9_]{0,40}?(?:api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|secret[_-]?access[_-]?key|secret[_-]?key|secret|private[_-]?key|credentials?|password|passwd|authorization|license[_-]?key|licence))([\"']?\\s*[:=]\\s*[\"']?)((?:Bearer|Basic)\\s+)?[^\\s\"',;&}]+"), "$1$2" + mask),
             (rx("(?i)\\bbearer\\s+[A-Za-z0-9._~+/=\\-]{8,}"), "Bearer " + mask),
             (rx("\\bsk-[A-Za-z0-9_\\-]{12,}"), mask),
             (rx("\\b(?:ghp|gho|ghs|github_pat|xox[abprs]|AIza|AKIA)[A-Za-z0-9_\\-]{10,}"), mask),
@@ -132,7 +134,7 @@ public struct DiagnosticsManifest: Codable, Equatable, Sendable {
 }
 
 public enum DiagnosticsExporter {
-    public struct Input {
+    public struct Input: Sendable {
         public var version: String
         public var build: String
         public var settingsJSON: Data

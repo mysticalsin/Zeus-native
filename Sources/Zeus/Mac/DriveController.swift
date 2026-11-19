@@ -52,7 +52,7 @@ final class DriveController {
         log("plan risk=\(plan.risk) autonomy=\(autonomy.rawValue) steps=\(plan.steps.count) approval=\(plan.needsApproval(autonomy))")
         if plan.needsApproval(autonomy) {
             let risk: HookEvent.Risk = plan.risk == .destructive ? .high : .medium
-            let verdict = await notch?.requestApproval(agent: "ZEUS", project: "Drive mode", tool: "Mac",
+            let verdict = await notch?.requestApproval(agent: "Zeus", project: "Drive mode", tool: "Mac",
                                                        command: Self.approvalCard(plan), risk: risk) ?? .deny
             guard verdict == .allow else { log("declined"); return "Okay, I won't touch anything." }
         }

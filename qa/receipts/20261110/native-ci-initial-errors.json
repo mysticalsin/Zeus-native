@@ -1,0 +1,237 @@
+{
+  "run_id": 42731139415,
+  "job_id": 129549169770,
+  "tested_sha": "f07b1192ebdfb85f0dd9dadba397b52bbd63eebe",
+  "errors": [
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/App/KeychainSelfTest.swift:73:14: error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:143:51: error: closure captures 'failure' before it is declared",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:151:43: error: closure captures 'committed' before it is declared",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:151:43: error: closure captures 'failure' before it is declared",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Prompter/PrompterWindow.swift:124:50: error: ambiguous use of operator '-'",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Notch/HaloRenderer.swift:27:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Voice/VoiceSample.swift:31:14: error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:168:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:254:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:65:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:66:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+    "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/TopBarViews.swift:135:25: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions"
+  ],
+  "snippets": [
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/App/KeychainSelfTest.swift:73:14: error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+      "lines": [
+        "8 | ",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/App/KeychainSelfTest.swift:73:14: error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+        "71 |         nonisolated(unsafe) var line = \"\"",
+        "72 |         nonisolated(unsafe) var ok = false",
+        "73 |         Task.detached {",
+        "|              |- error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+        "|              `- note: Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code",
+        "74 |             do {",
+        "75 |                 let d = try await guardian.decide(request)",
+        ":",
+        "83 |         }",
+        "84 |         done.wait()"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:143:51: error: closure captures 'failure' before it is declared",
+      "lines": [
+        "269 |                 return buffer",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:143:51: error: closure captures 'failure' before it is declared",
+        "141 | ",
+        "142 |     func finish() async throws -> String {",
+        "143 |         let (rest, alreadyFailed) = lock.withLock { () -> (Data, Bool) in",
+        "|                                                   `- error: closure captures 'failure' before it is declared",
+        "144 |             finishing = true",
+        "145 |             defer { pending = Data() }",
+        "146 |             return (pending, failure != nil)",
+        "|                              `- note: captured here",
+        "147 |         }",
+        "148 |         if !alreadyFailed {"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:151:43: error: closure captures 'committed' before it is declared",
+      "lines": [
+        "164 |         if !committed && text.isEmpty { throw CloudTranscriptionError.timeout(ElevenLabsRealtime.provider) }",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:151:43: error: closure captures 'committed' before it is declared",
+        "149 |             if !rest.isEmpty { sendText(ElevenLabsRealtime.audioChunk(rest, commit: false)) }",
+        "150 |             sendText(ElevenLabsRealtime.audioChunk(Data(), commit: true))",
+        "151 |             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in",
+        "|                                           `- error: closure captures 'committed' before it is declared",
+        "152 |                 let done = lock.withLock { () -> Bool in",
+        "153 |                     if committed || failure != nil { return true }",
+        "|                        `- note: captured here",
+        "154 |                     waiter = continuation",
+        "155 |                     return false",
+        ":"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:151:43: error: closure captures 'failure' before it is declared",
+      "lines": [
+        "164 |         if !committed && text.isEmpty { throw CloudTranscriptionError.timeout(ElevenLabsRealtime.provider) }",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Dictation/CloudSpeechEngines.swift:151:43: error: closure captures 'failure' before it is declared",
+        "149 |             if !rest.isEmpty { sendText(ElevenLabsRealtime.audioChunk(rest, commit: false)) }",
+        "150 |             sendText(ElevenLabsRealtime.audioChunk(Data(), commit: true))",
+        "151 |             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in",
+        "|                                           `- error: closure captures 'failure' before it is declared",
+        "152 |                 let done = lock.withLock { () -> Bool in",
+        "153 |                     if committed || failure != nil { return true }",
+        "|                                     `- note: captured here",
+        "154 |                     waiter = continuation",
+        "155 |                     return false",
+        ":"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Prompter/PrompterWindow.swift:124:50: error: ambiguous use of operator '-'",
+      "lines": [
+        "3 | ",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Prompter/PrompterWindow.swift:124:50: error: ambiguous use of operator '-'",
+        "122 |     var currentBlock: Int? {",
+        "123 |         let line = offset + viewHeight * Self.readingLine",
+        "124 |         return blockFrames.first { $0.value.minY - 4 <= line && line <= $0.value.maxY + 4 }?.key",
+        "|                                                  `- error: ambiguous use of operator '-'",
+        "125 |     }",
+        "126 | ",
+        "",
+        "Swift.Double.-:2:20: note: found this candidate in module 'Swift'",
+        "1 | struct Double {",
+        "2 | public static func - (lhs: Double, rhs: Double) -> Double}"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Notch/HaloRenderer.swift:27:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+      "lines": [
+        "[888/939] Compiling Zeus BrainCaptureWindow.swift",
+        "[889/963] Compiling Zeus WalkthroughController.swift",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Notch/HaloRenderer.swift:27:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "25 |         var pts: [CGPoint] = []",
+        "26 |         var current = CGPoint.zero",
+        "27 |         path.forEach { element in",
+        "|         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "28 |             switch element {",
+        "29 |             case .move(let p): pts.append(p); current = p",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Onboarding/OnboardingVisuals.swift:119:95: warning: main actor-isolated property 'asset' can not be referenced from a Sendable closure",
+        "117 |                 // Each film that finishes goes to the back of the queue.",
+        "118 |                 endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] note in"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Voice/VoiceSample.swift:31:14: error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+      "lines": [
+        "138 |     }",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Voice/VoiceSample.swift:31:14: error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+        "29 |         nonisolated(unsafe) var status = 0",
+        "30 |         nonisolated(unsafe) var firstByteMs = -1",
+        "31 |         Task.detached {",
+        "|              |- error: sending value of non-Sendable type '() async -> ()' risks causing data races [#SendingRisksDataRace]",
+        "|              `- note: Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code",
+        "32 |             do {",
+        "33 |                 let (bytes, response) = try await URLSession.shared.bytes(for: voice.request(for: text))",
+        ":",
+        "42 |         done.wait()",
+        "43 |         let route = voice.engineName"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:168:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+      "lines": [
+        "[#SendingRisksDataRace]: <https://docs.swift.org/compiler/documentation/diagnostics/sending-risks-data-race>",
+        "[936/986] Compiling Zeus ShelfBrainMenu.swift",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:168:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "166 |     private static func marble(_ gc: inout GraphicsContext, _ size: CGSize, _ t: Double) {",
+        "167 |         fillBase(&gc, size, Color(red: 0.17, green: 0.17, blue: 0.22), Color(red: 0.10, green: 0.10, blue: 0.15))",
+        "168 |         gc.drawLayer { layer in",
+        "|         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "169 |             layer.addFilter(.blur(radius: 0.8))",
+        "170 |             for vein in 0..<6 {",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:254:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "252 |     private static func caustics(_ gc: inout GraphicsContext, _ size: CGSize, _ t: Double) {",
+        "253 |         fillBase(&gc, size, Color(red: 0.05, green: 0.38, blue: 0.52), Color(red: 0.03, green: 0.25, blue: 0.42))"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:254:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+      "lines": [
+        "170 |             for vein in 0..<6 {",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/HomeBackdrops.swift:254:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "252 |     private static func caustics(_ gc: inout GraphicsContext, _ size: CGSize, _ t: Double) {",
+        "253 |         fillBase(&gc, size, Color(red: 0.05, green: 0.38, blue: 0.52), Color(red: 0.03, green: 0.25, blue: 0.42))",
+        "254 |         gc.drawLayer { layer in",
+        "|         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "255 |             layer.addFilter(.blur(radius: 1.6))",
+        "256 |             layer.blendMode = .plusLighter",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:65:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+        "63 |             }",
+        "64 |             .buttonStyle(PressableStyle())"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:65:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+      "lines": [
+        "256 |             layer.blendMode = .plusLighter",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:65:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+        "63 |             }",
+        "64 |             .buttonStyle(PressableStyle())",
+        "65 |             .environment(\\.accessibilityReduceMotion, reduceMotion)",
+        "|                          `- error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+        "66 |             .environment(\\.accessibilityReduceTransparency, reduceTransparency)",
+        "67 |             .accessibilityElement(children: .ignore)",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:66:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+        "64 |             .buttonStyle(PressableStyle())",
+        "65 |             .environment(\\.accessibilityReduceMotion, reduceMotion)"
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:66:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+      "lines": [
+        "67 |             .accessibilityElement(children: .ignore)",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/RecordingFeedbackView.swift:66:26: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+        "64 |             .buttonStyle(PressableStyle())",
+        "65 |             .environment(\\.accessibilityReduceMotion, reduceMotion)",
+        "66 |             .environment(\\.accessibilityReduceTransparency, reduceTransparency)",
+        "|                          `- error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'",
+        "67 |             .accessibilityElement(children: .ignore)",
+        "68 |             .accessibilityLabel(snapshot.label)",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/SystemHUDHardware.swift:10:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'DisplayBrightness.Getter?' (aka 'Optional<@convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32>'), consider removing it",
+        "8 |     private typealias Setter = @convention(c) (UInt32, Float) -> Int32",
+        "9 | "
+      ]
+    },
+    {
+      "key": "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/TopBarViews.swift:135:25: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+      "lines": [
+        "59 |               let symbol = dlsym(handle, \"KeyboardBrightnessClientSetBrightness\") else { return nil }",
+        "[960/986] Compiling Zeus SystemHUDMonitor.swift",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/TopBar/TopBarViews.swift:135:25: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "133 |     var height: CGFloat = 14",
+        "134 | ",
+        "135 |     var body: some View {",
+        "|                         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions",
+        "136 |         TickingView(interval: 1 / 30, paused: !active || Motion.reduced) { context in",
+        "137 |             let t = context.date.timeIntervalSinceReferenceDate",
+        "",
+        "/Users/runner/work/Zeus-native/Zeus-native/Sources/Zeus/Voice/LocalPython.swift:40:40: warning: mutation of captured var 'collected' in concurrently-executing code [#SendableClosureCaptures]",
+        "38 |         do { try process.run() } catch { return (-1, \"\", error.localizedDescription) }",
+        "39 |         group.enter(); group.enter()"
+      ]
+    }
+  ]
+}

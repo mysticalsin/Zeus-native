@@ -35,4 +35,50 @@ import ZeusCore
         controller.dismissAutomatically()
         #expect(controller.model.presentation == .closed)
     }
+
+    @Test func stopKeepsPinAndBarVisible() {
+        let polyglot = PolyglotController.shared
+        let wasPinned = polyglot.isPinned
+        defer { if polyglot.isPinned != wasPinned { polyglot.togglePin() } }
+        if !polyglot.isPinned { polyglot.togglePin() }
+        let controller = NotchController()
+        let topBar = TopBarModel()
+        topBar.selectedTab = .polyglot
+        controller.topBar = topBar
+        // Uses the real isPinned. Stop with nothing live only resets state; it never captures.
+        controller.show(.panel)
+        polyglot.stop()
+        #expect(polyglot.isPinned)
+        controller.dismissAutomatically()
+        #expect(controller.model.presentation == .panel)
+    }
+
+    @Test func explicitDismissClosesPinnedBar() {
+        let controller = NotchController()
+        let topBar = TopBarModel()
+        topBar.selectedTab = .polyglot
+        controller.topBar = topBar
+        controller.isPolyglotPinned = { true }
+        controller.show(.panel)
+        // The Dismiss button goes through NotchControllerBridge.controller?.dismissExplicitly().
+        NotchControllerBridge.controller = controller
+        defer { NotchControllerBridge.controller = nil }
+        NotchControllerBridge.controller?.dismissExplicitly()
+        #expect(controller.model.presentation == .closed)
+    }
+
+    @Test func unpinRestoresAutomaticDismissal() {
+        let controller = NotchController()
+        let topBar = TopBarModel()
+        topBar.selectedTab = .polyglot
+        controller.topBar = topBar
+        var pinned = true
+        controller.isPolyglotPinned = { pinned }
+        controller.show(.panel)
+        controller.dismissAutomatically()
+        #expect(controller.model.presentation == .panel)
+        pinned = false
+        controller.dismissAutomatically()
+        #expect(controller.model.presentation == .closed)
+    }
 }

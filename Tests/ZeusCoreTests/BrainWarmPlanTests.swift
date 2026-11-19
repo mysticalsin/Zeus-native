@@ -12,9 +12,23 @@ struct BrainWarmPlanTests {
         #expect(BrainWarmPlan.due(now: now, lastActivity: longAgo, lastCloud: nil, lastLocal: nil).isEmpty)
     }
 
-    @Test func launchAndWakeWarmEverythingOnce() {
-        #expect(BrainWarmPlan.due(now: now, lastActivity: nil, lastCloud: now, lastLocal: now, forced: true)
+    @Test func launchAndWakeNeverWarmButTheTalkKeyDoes() {
+        #expect(!BrainWarmPlan.mayWarm(on: .launch))
+        #expect(!BrainWarmPlan.mayWarm(on: .wake))
+        #expect(BrainWarmPlan.mayWarm(on: .talkKeyDown))
+        #expect(BrainWarmPlan.mayWarm(on: .voiceActivity))
+    }
+
+    @Test func firstTalkKeyWarmsBothAndNothingBeforeIt() {
+        #expect(BrainWarmPlan.due(now: now, lastActivity: nil, lastCloud: nil, lastLocal: nil).isEmpty)
+        #expect(BrainWarmPlan.due(now: now, lastActivity: now, lastCloud: nil, lastLocal: nil)
                 == [.localModel, .cloudConnection])
+    }
+
+    @Test func timerStopsOnceTheActiveWindowEnds() {
+        #expect(BrainWarmPlan.isIdle(now: now, lastActivity: nil))
+        #expect(!BrainWarmPlan.isIdle(now: now, lastActivity: now))
+        #expect(BrainWarmPlan.isIdle(now: now, lastActivity: now.addingTimeInterval(-BrainWarmPlan.activeWindow - 1)))
     }
 
     @Test func whileInUseTheConnectionIsRefreshedBeforeItGoesCold() {

@@ -166,7 +166,7 @@ final class PresenterNotesController {
                 advancer.confirm()
             } else {
                 advancer.failed()
-                onProblem("The slide did not change. ZEUS will try again as you keep reading.")
+                onProblem("The slide did not change. Zeus will try again as you keep reading.")
             }
         }
     }

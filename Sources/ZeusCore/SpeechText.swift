@@ -15,7 +15,13 @@ public struct SentenceSplitter: Sendable {
         while index < buffer.endIndex {
             let character = buffer[index]
             let next = buffer.index(after: index)
-            let endsSentence = ".!?…".contains(character) && next < buffer.endIndex && buffer[next].isWhitespace
+            var endsSentence = ".!?…".contains(character) && next < buffer.endIndex && buffer[next].isWhitespace
+            if endsSentence, Self.endsEllipsis(buffer, at: index) {
+                // "Fine... that works." is one clause. Hold until the next word shows; a capital starts a new sentence.
+                let following = buffer[next...].first { !$0.isWhitespace }
+                endsSentence = following.map(\.isUppercase) ?? false
+                if following == nil { break }
+            }
             if endsSentence || character == "\n" {
                 let sentence = buffer[start...index].trimmingCharacters(in: .whitespacesAndNewlines)
                 if sentence.count > 1 { sentences.append(sentence) }
@@ -25,11 +31,23 @@ public struct SentenceSplitter: Sendable {
         }
         buffer = String(buffer[start...])
         if !sentences.isEmpty { spokeClause = true }
-        if !spokeClause, let early = takeEarlyClause() {
-            sentences.append(early)
-            spokeClause = true
+        if !spokeClause {
+            var early = takeEarlyClause()
+            if early == nil { early = takeLongFirstWords() }
+            if let early {
+                sentences.append(early)
+                spokeClause = true
+            }
         }
         return sentences
+    }
+
+    private static func endsEllipsis(_ text: String, at index: String.Index) -> Bool {
+        if text[index] == "\u{2026}" { return true }
+        guard text[index] == ".", index > text.startIndex else { return false }
+        let one = text.index(before: index)
+        guard text[one] == ".", one > text.startIndex else { return false }
+        return text[text.index(before: one)] == "."
     }
 
     /// The first comma or semicolon clause, so speech can start before the sentence ends.
@@ -39,6 +57,34 @@ public struct SentenceSplitter: Sendable {
         guard head.split(whereSeparator: \.isWhitespace).count >= 3 else { return nil }
         buffer = String(buffer[range.upperBound...])
         return head + ","
+    }
+
+    /// A long first sentence with no comma: speak its first `firstChunkWords` complete words so audio
+    /// starts while the rest is still being written. Only a word followed by whitespace counts as complete.
+    public static let firstChunkWords = 12
+
+    private mutating func takeLongFirstWords() -> String? {
+        var count = 0
+        var index = buffer.startIndex
+        var inWord = false
+        while index < buffer.endIndex {
+            let character = buffer[index]
+            if character.isWhitespace {
+                if inWord {
+                    count += 1
+                    inWord = false
+                    if count == Self.firstChunkWords {
+                        let head = buffer[..<index].trimmingCharacters(in: .whitespacesAndNewlines)
+                        buffer = String(buffer[index...])
+                        return head
+                    }
+                }
+            } else {
+                inWord = true
+            }
+            index = buffer.index(after: index)
+        }
+        return nil
     }
 
     /// Whatever is left once the reply has finished.

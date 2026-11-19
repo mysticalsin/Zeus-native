@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "authored_head": "ca6d1ca4564c7c155956be760bd02fbe139a8ed9",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42737334798",
+  "scope": "Historical native CI checkpoint; never satisfies current-source obligations after later edits.",
+  "app": {
+    "job_id": 129569661281,
+    "production_compilation": "passed",
+    "test_target_compilation": "passed",
+    "reported_tests": 164,
+    "reported_passed": 162,
+    "result": "failed",
+    "failures": [
+      {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "waitsForOwnedButtonReadinessAndRejectsPermanentlyDisabledControl",
+        "reason": "Identified own-process element did not report the button accessibility role."
+      },
+      {
+        "file": "Tests/ZeusAppTests/ScribeComponentJourneyTests.swift",
+        "function": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose",
+        "reason": "SwiftUI hosting view exposed no semantic accessibility children; Start could not be resolved."
+      }
+    ]
+  },
+  "development_feature_map": {
+    "job_id": 129569661291,
+    "result": "passed",
+    "reported_checks": 499,
+    "policy": 67,
+    "portable_swift": 419,
+    "release_script_tests": 13
+  },
+  "aggregate": "failed",
+  "limitations": [
+    "Console totals describe this historical run; expanded verification requires qualified structured test events.",
+    "No physical device, installed-app, reference-motion, signing, notarization or Gatekeeper acceptance.",
+    "Component animations are generated own-view frames, not screen capture or complete app journeys."
+  ]
+}

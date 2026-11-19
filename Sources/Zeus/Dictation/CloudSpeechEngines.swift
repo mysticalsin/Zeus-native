@@ -159,9 +159,9 @@ final class ElevenLabsStream: TranscriptionStream, @unchecked Sendable {
             }
         }
         cancel()
-        let (text, failure, committed) = lock.withLock { (transcript.text, self.failure, self.committed) }
-        if let failure { throw failure }
-        if !committed && text.isEmpty { throw CloudTranscriptionError.timeout(ElevenLabsRealtime.provider) }
+        let (text, finalFailure, didCommit) = lock.withLock { (transcript.text, failure, committed) }
+        if let finalFailure { throw finalFailure }
+        if !didCommit && text.isEmpty { throw CloudTranscriptionError.timeout(ElevenLabsRealtime.provider) }
         return text
     }
 

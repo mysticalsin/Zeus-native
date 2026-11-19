@@ -97,10 +97,10 @@ import Testing
     }
 
     @Test func lengthsIncludeLongPresetsAndIndefinitely() {
-        #expect(KeepAwakeLength.all.map(KeepAwakeLength.label) == ["15 m", "30 m", "1 h", "2 h", "4 h", "8 h", "24 h", "Indefinitely"])
-        #expect(KeepAwakeLength.minutes(fromLabel: "8 h") == .some(480))
+        #expect(KeepAwakeLength.all.map(KeepAwakeLength.label) == ["15 minutes", "30 minutes", "1 hour", "2 hours", "4 hours", "8 hours", "24 hours", "Indefinitely"])
+        #expect(KeepAwakeLength.minutes(fromLabel: "8 hours") == .some(480))
         #expect(KeepAwakeLength.minutes(fromLabel: "Indefinitely") == .some(nil))
-        #expect(KeepAwakeLength.minutes(fromLabel: "3 h") == nil)
+        #expect(KeepAwakeLength.minutes(fromLabel: "3 hours") == nil)
     }
 
     @Test func countdownText() {

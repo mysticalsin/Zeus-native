@@ -15,8 +15,15 @@ public enum ZeusScreenSharePolicy {
     }
 
     /// Zeus windows (notch, buddy, trails, HUD overlays) appear in capture when this is true.
+    ///
+    /// `showInScreenSharing` is off by default, so it is true only when the owner chose "Show to
+    /// people I share with". That explicit choice wins over the meeting auto-hide: sharing a screen
+    /// is exactly when a meeting is active, and a switch that did nothing then looked broken. With no
+    /// choice made, Zeus stays hidden (the default), meeting or not. The teleprompter's own private
+    /// session still hides the surfaces that carry private notes.
     public static func zeusSurfacesVisible(showInScreenSharing: Bool, meetingActive: Bool, teleprompterSessionHidden: Bool) -> Bool {
-        showInScreenSharing && !meetingActive && !teleprompterSessionHidden
+        _ = meetingActive
+        return showInScreenSharing && !teleprompterSessionHidden
     }
 
     /// macOS 27: `.none` can yield blank content in some capture paths; Atticus uses `.readOnly` as a workaround when hiding.

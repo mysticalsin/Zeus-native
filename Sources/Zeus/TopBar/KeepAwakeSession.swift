@@ -31,11 +31,11 @@ final class KeepAwakeSession {
     }
     /// End below this battery percent on battery power. 0 is Off.
     var batteryFloor = UserDefaults.standard.object(forKey: "keepAwake.batteryFloor") as? Int ?? 10 {
-        didSet { save(batteryFloor, "keepAwake.batteryFloor"); evaluate() }
+        didSet { save(batteryFloor, "keepAwake.batteryFloor"); evaluate(); onRulesChange() }
     }
     /// End when the Mac reaches a critical thermal state.
     var endWhenHot = UserDefaults.standard.object(forKey: "keepAwake.endWhenHot") as? Bool ?? true {
-        didSet { save(endWhenHot, "keepAwake.endWhenHot"); evaluate() }
+        didSet { save(endWhenHot, "keepAwake.endWhenHot"); evaluate(); onRulesChange() }
     }
     /// Length the Home cup starts. Nil is Indefinitely (saved as 0).
     var homeMinutes: Int? = KeepAwakeSession.storedHomeMinutes() {
@@ -46,6 +46,9 @@ final class KeepAwakeSession {
     @ObservationIgnored var onNotice: (String) -> Void = { _ in }
     /// Called whenever a session ends, by hand or by a rule.
     @ObservationIgnored var onEnd: () -> Void = {}
+    /// Called when the battery floor or the heat setting changes, session or not. The music hold reads
+    /// the same limits and re-runs its own rule on it; the session never calls the hold directly.
+    @ObservationIgnored var onRulesChange: () -> Void = {}
     /// More listeners for the end (the Insomnia lid-closed guard restores on it).
     @ObservationIgnored private var endObservers: [() -> Void] = []
 
@@ -149,11 +152,11 @@ final class KeepAwakeSession {
         releaseAll()
         guard isActive else { return }
         let timeout = endsAt.map { max(30, $0.timeIntervalSinceNow + 5) } ?? Self.openEndedLease
-        if create("PreventUserIdleSystemSleep", reason: "ZEUS keep-awake session", timeout: timeout, into: &systemID) {
+        if create("PreventUserIdleSystemSleep", reason: "Zeus keep-awake session", timeout: timeout, into: &systemID) {
             hasSystem = true
         }
         if keepDisplay,
-           create("PreventUserIdleDisplaySleep", reason: "ZEUS keep-awake display", timeout: timeout, into: &displayID) {
+           create("PreventUserIdleDisplaySleep", reason: "Zeus keep-awake display", timeout: timeout, into: &displayID) {
             hasDisplay = true
         }
     }
@@ -177,7 +180,7 @@ final class KeepAwakeSession {
         let result = IOPMAssertionCreateWithDescription(
             type as CFString,
             reason as CFString,
-            "Session from ZEUS. Ends when the countdown hits zero, a battery or heat rule trips, or you end it." as CFString,
+            "Session from Zeus. Ends when the countdown hits zero, a battery or heat rule trips, or you end it." as CFString,
             nil, nil,
             timeout,
             "TimeoutActionRelease" as CFString,

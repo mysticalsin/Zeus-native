@@ -164,7 +164,7 @@ public struct TodoLearning: Codable, Equatable, Sendable {
     public func rankReason(for item: TodoItem, now: Date = Date(), calendar: Calendar = .current) -> String? {
         guard enabled else { return nil }
         let today = TodoQuickAdd.dayString(now, calendar: calendar)
-        if let due = item.due, due < today { return "Overdue — do this next." }
+        if let due = item.due, due < today { return "Overdue. Do this next." }
         if let due = item.due, due == today { return "Due today." }
         let k = Self.key(for: item.title)
         if let pattern = patterns.first(where: { $0.key == k }), let usual = mode(pattern.addHours),
@@ -172,7 +172,7 @@ public struct TodoLearning: Codable, Equatable, Sendable {
             return "You usually handle “\(pattern.sampleTitle)” around now."
         }
         if let pattern = patterns.first(where: { $0.key == k }), pattern.timesPushed >= 2 {
-            return "You’ve pushed this back before — finish it this time."
+            return "You’ve pushed this back before. Finish it this time."
         }
         return nil
     }

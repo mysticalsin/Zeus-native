@@ -8,7 +8,6 @@ The production Package.swift and source files are never changed.
 import argparse
 import hashlib
 import json
-import re
 from pathlib import Path
 import subprocess
 import sys
@@ -29,8 +28,38 @@ def tests(*names):
 
 
 GROUPS = {
+    "explanation": (
+        core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
+             "Explanation/ExplanationModelWire.swift", "Explanation/ExplanationRecipes.swift",
+             "Explanation/ExplanationModelMotion.swift",
+             "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
+             "Explanation/ExplanationPlayback.swift", "Explanation/ExplanationCoordinates.swift",
+             "Explanation/ExplanationHistory.swift", "Explanation/ExplanationDiagnostics.swift",
+             "Explanation/ExplanationChartMath.swift", "Explanation/ExplanationCardPlacement.swift",
+             "Explanation/ExplanationCardContentBuilder.swift"),
+        tests("ExplanationProtocolTests", "ExplanationReducerTests", "ExplanationStreamTests",
+              "ExplanationCompletionStreamTests", "ExplanationPlaybackTests", "ExplanationCoordinatesTests",
+              "ExplanationHistoryTests", "ExplanationDiagnosticsTests", "ExplanationModelSchemaTests",
+              "ExplanationRecipeTests", "ExplanationModelEditTests", "ExplanationModelMotionTests",
+              "ExplanationChartMathTests", "ExplanationCardPlacementTests"),
+    ),
+    "socket-safety": (
+        core("UnixSocket.swift", "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "ZeusPaths.swift"),
+        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests"),
+    ),
+    "bridge-transport": (
+        core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
+             "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "JSONValue.swift", "ZeusPaths.swift",
+             "Version.swift") + ["Sources/zeus-bridge/main.swift"],
+        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
+    ),
+    "keychain": (
+        core("Keychain/KeychainStore.swift"),
+        tests("KeychainStoreTests"),
+    ),
     "wiki-export": (
-        core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift",
+        core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
@@ -43,8 +72,8 @@ GROUPS = {
         tests("TextInsertionReceiptTests"),
     ),
     "polyglot": (
-        core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
-        tests("PolyglotTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),
+        core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
+        tests("PolyglotTests", "PolyglotPinPolicyTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),
     ),
     "regressions": (
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
@@ -54,17 +83,27 @@ GROUPS = {
               "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests", "ThinkingOrbMathTests"),
     ),
     "scribe": (
-        core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift", "Scribe/ScribeCallPrompt.swift",
+        core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift",
              "Scribe/ScribeCapture.swift", "Scribe/ScribeMicGate.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribePresentation.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeSpeakerStats.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift"),
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift",
+             "Scribe/ScribeMuteReadScheduler.swift", "Scribe/ScribeIncomingWordLayout.swift", "Scribe/MicInputOwnership.swift",
+             "Scribe/ScribeMeetingCard.swift", "Scribe/ScribeAutoStart.swift",
+             "Scribe/ScribeMeetingSignals.swift", "Scribe/ScribeMeetingLedger.swift", "Scribe/ScribeMeetingContext.swift",
+             "Scribe/ScribeAutoStartOptIn.swift", "Scribe/ScribeDetectorPlan.swift", "Scribe/ScribeJoinApps.swift",
+             "Alerts/AppBrandCatalog.swift"),
         tests("ScribeCoreTests", "ScribePresentationTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
-              "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests"),
+              "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
+              "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
+              "ScribeMeetingCardTests", "ScribeAutoStartTests", "ScribeMeetingLedgerTests",
+              "ScribeMeetingContextTests", "ScribeAutoStartOptInTests", "ScribeMeetingStartOutcomeTests",
+              "ScribeDetectorPlanTests", "ScribeMeetingCardDesignTests"),
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift"),
-        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests"),
+             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
+             "TopBar/RecordingFeedback.swift"),
+        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
@@ -72,22 +111,65 @@ GROUPS = {
              "Recordly/RecordlyExportSettings.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
     ),
+    "pointing": (
+        core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
+             "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
+             "Explanation/ExplanationModelWire.swift", "Explanation/ExplanationRecipes.swift",
+             "Explanation/ExplanationModelMotion.swift",
+             "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
+             "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
+             "Explanation/ExplanationChartMath.swift", "Pointing/PointingCardAnchors.swift", "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
+             "KeyFacts.swift", "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
+             "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
+             "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
+             "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",
+             "Pointing/PointingStaleTarget.swift", "Pointing/PointingShortcutConflicts.swift", "Pointing/ShowMeKey.swift",
+             "Pointing/PointingInkTrail.swift", "Pointing/PointingTraceSpans.swift"),
+        tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
+              "ExplanationProtocolV2Tests", "ExplanationProtocolV3Tests", "PointingCardAnchorsTests", "PointingProviderTests", "PointingStrokeTargetingTests", "PointingDeixisTests",
+              "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
+              "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests", "ShowMeKeyTests"),
+    ),
     "buddy": (
         core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift"),
-        tests("WikiRelationshipsTests", "ScribeRecapNavigationTests"),
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
+        tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
+    ),
+    # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
+    "equaliser": (
+        core("Audio/EqualiserTypes.swift", "Audio/EqualiserModel.swift", "Audio/EqualiserDSP.swift",
+             "Audio/EqualiserCardRules.swift", "Audio/EqualiserPolicy.swift", "Audio/EqualiserLifecycle.swift", "Audio/Spectrum.swift",
+             "MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift",
+             "Scribe/ScribeLiveLogic.swift", "Intent/WakePhrase.swift",
+             "Intent/Utterance.swift", "Dictation/TranscriptionEngine.swift", "ZeusPaths.swift"),
+        tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
+              "EqualiserPolicyTests", "EqualiserLifecycleTests", "EqualiserConsentTests"),
     ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
              "Wiki/WikiStore.swift", "Wiki/SensitiveInfoScanner.swift"),
         tests("WikiTests"),
+    ),
+}
+
+# Darwin only, and not default groups: these files use CoreGraphics transforms and CryptoKit, which a Linux host does
+# not have, so the feature map's portable checks (which list GROUPS only) never select them. On a Mac they run the pure
+# face presence rules in a small package of their own, without the app, a camera or the Keychain.
+DARWIN_GROUPS = {
+    "face-presence": (
+        core("FacePresence/LandmarkMath.swift", "FacePresence/FaceSelection.swift", "FacePresence/SpoofCues.swift",
+             "FacePresence/FaceMatch.swift", "FacePresence/EnrollmentPlan.swift", "FacePresence/PresenceSampler.swift",
+             "FacePresence/FaceVault.swift", "FacePresence/FacePresenceMachine.swift", "FacePresence/FacePresenceStatus.swift"),
+        tests("LandmarkMathTests", "FaceSelectionTests", "SpoofCuesTests", "FaceMatchTests", "EnrollmentPlanTests",
+              "PresenceSamplerTests", "FaceVaultTests", "FacePresenceMachineTests", "FacePresenceStatusTests"),
     ),
 }
 
@@ -122,6 +204,10 @@ def write_excerpts(root, group, manifest):
             text, evidence = section(path, start, end)
             pieces.append(text)
             manifest["excerpts"].append(evidence)
+        # The meeting-start rules read two Settings helpers; the whole file needs types this group does not carry.
+        text, evidence = section(CORE + "FeatureSettings.swift", "public enum FeatureSettings {", "    // MARK: Fast path")
+        pieces.append(text + "}\n")
+        manifest["excerpts"].append(evidence)
         text, evidence = section(TESTS + "ScribeLiveLogicTests.swift",
                                  "    @Test func freshEvidenceIsServedAndExpiredEvidenceIsUnknown()",
                                  "    // MARK: Evidence coverage")
@@ -160,31 +246,44 @@ def write_excerpts(root, group, manifest):
         pieces.append(text)
         manifest["excerpts"].append(evidence)
     if pieces:
-        (root / CORE / "PortableExcerpts.swift").write_text("import Foundation\n\n" + "\n".join(pieces))
+        imports = ["Foundation"]
+        # These exact declarations use CoreGraphics extensions on Apple SDKs.
+        # Linux Foundation provides the geometry values without that module.
+        if group in {"presentation", "recordly-geometry"} and manifest["platform"] == "darwin":
+            imports.append("CoreGraphics")
+        manifest["excerpt_imports"] = imports
+        (root / CORE / "PortableExcerpts.swift").write_text("".join(f"import {name}\n" for name in imports) + "\n" + "\n".join(pieces))
 
 
 def prepare(output, group, *, platform_name=None):
     platform_name = platform_name or ("linux" if sys.platform.startswith("linux") else sys.platform)
     if platform_name not in {"linux", "darwin"}:
         raise ValueError("Portable recipe supports only linux or darwin")
+    if group in DARWIN_GROUPS and platform_name != "darwin":
+        raise ValueError(f"The {group} group uses CoreGraphics and CryptoKit and runs on darwin only")
+    definition = GROUPS[group] if group in GROUPS else DARWIN_GROUPS[group]
     root = output / group
     (root / CORE).mkdir(parents=True)
     (root / TESTS).mkdir(parents=True)
     manifest = {"group": group, "repository": str(REPO), "platform": platform_name, "scope": "Synthetic portable subset; no native app validation",
                 "files": [], "excerpts": []}
-    for source in sum(GROUPS[group], []):
+    for source in sum(definition, []):
         data = (REPO / source).read_bytes()
         target = root / source
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe") and platform_name == "linux"
     extra_target = ''
+    products = ''
     core_dependencies = '[]'
     test_dependencies = '["ZeusCore"]'
     test_settings = ''
-    if group == "wiki-export":
+    if group == "bridge-transport":
+        products = 'products: [.executable(name: "zeus-bridge", targets: ["zeus-bridge"])], '
+        extra_target = '    .executableTarget(name: "zeus-bridge", dependencies: ["ZeusCore"]),\n'
+    elif group == "wiki-export":
         wrapper = root / "Sources/zeus-memory-helper/main.swift"
         wrapper.parent.mkdir(parents=True)
         wrapper.write_text('import Foundation\nimport ZeusCore\nexit(WikiExportMCPCommand.run(Array(CommandLine.arguments.dropFirst())))\n')
@@ -192,6 +291,7 @@ def prepare(output, group, *, platform_name=None):
                         '    .target(name: "MCPTransportValidation", dependencies: ["ZeusCore"]),\n')
         for source, target in [
             ("Sources/Zeus/BrowserAgent/MCPStdioClient.swift", "Sources/MCPTransportValidation/MCPStdioClient.swift"),
+            ("Sources/Zeus/BrowserAgent/MCPPipeIO.swift", "Sources/MCPTransportValidation/MCPPipeIO.swift"),
             ("Tests/ZeusAppTests/MemoryMCPTransportTests.swift", TESTS + "MemoryMCPTransportTests.swift"),
         ]:
             data = (REPO / source).read_bytes()
@@ -213,7 +313,8 @@ def prepare(output, group, *, platform_name=None):
         core_dependencies = '["CoreGraphics"]'
     (root / "Package.swift").write_text(
         '// swift-tools-version: 6.0\nimport PackageDescription\n'
-        'let package = Package(name: "ZeusPortableValidation", targets: [\n'
+        'let package = Package(name: "ZeusPortableValidation", platforms: [.macOS("14.2")], '
+        + products + 'targets: [\n'
         + extra_target + f'    .target(name: "ZeusCore", dependencies: {core_dependencies}),\n'
         +
         f'    .testTarget(name: "ZeusCoreTests", dependencies: {test_dependencies}{test_settings})\n])\n')
@@ -223,8 +324,8 @@ def prepare(output, group, *, platform_name=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--group", action="append", choices=GROUPS,
-                        help="Repeat to select groups. Default: all except wiki.")
+    parser.add_argument("--group", action="append", choices=[*GROUPS, *DARWIN_GROUPS],
+                        help="Repeat to select groups. Default: all except wiki and the darwin-only groups.")
     parser.add_argument("--output", type=Path, help="New output directory; existing paths are never overwritten.")
     parser.add_argument("--run", action="store_true", help="Run swift test in each generated package and retain logs.")
     parser.add_argument("--jobs", type=int, default=4)
@@ -242,17 +343,27 @@ def main():
         root = prepare(output, group)
         print(f"Prepared {group}: {root}", flush=True)
         if args.run:
-            command = ["swift", "test", "--package-path", str(root), "--jobs", str(args.jobs)]
+            sys.path.insert(0, str(REPO / "qa/closed-loop"))
+            from contracts import Invalid, read_swift_testing_xunit, swift_structured_results, swift_testing_xunit_path
+            xunit = root / "results.xml"
+            command = ["swift", "test", "--package-path", str(root), "--jobs", str(args.jobs),
+                       "--xunit-output", str(xunit)]
             log = root / "test.log"
             with log.open("w") as stream:
                 result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, check=False)
-            row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log)}
-            summaries = re.findall(r"Test run with (\d+) tests? in (\d+) suites? (passed|failed)", log.read_text())
-            if summaries:
-                count, suites, status = summaries[-1]
-                row.update(tests=int(count), suites=int(suites), test_summary=status)
+            structured = swift_testing_xunit_path(xunit)
+            row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log),
+                   "results": str(structured)}
+            try:
+                count, suites, functions = swift_structured_results(
+                    read_swift_testing_xunit(structured), result.returncode, log.read_text())
+                row.update(tests=count, suites=suites, passed_functions=functions)
+            except (Invalid, OSError) as error:
+                row["structured_error"] = str(error)
+                if row["exit_code"] == 0:
+                    row["exit_code"] = 1
             results.append(row)
-            print(f"{group}: exit {result.returncode}; {log}", flush=True)
+            print(f"{group}: exit {row['exit_code']}; {log}", flush=True)
     if results:
         (output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
     raise SystemExit(1 if any(row["exit_code"] for row in results) else 0)

@@ -11,7 +11,7 @@ import Testing
 
     @Test func everyCataloguedSoundIsBundledAtItsTargetDuration() throws {
         for spec in SoundCatalog.everySpec {
-            let url = Self.folder.appendingPathComponent("\(spec.file).\(SoundCatalog.fileExtension)")
+            let url = Self.folder.appendingPathComponent(spec.fileName)
             #expect(FileManager.default.fileExists(atPath: url.path), "missing \(spec.file)")
             let file = try AVAudioFile(forReading: url)
             let seconds = Double(file.length) / file.processingFormat.sampleRate
@@ -57,7 +57,7 @@ import Testing
         #expect(urls.count == SoundCatalog.everySpec.count)
         // No clicks: decode each and look at the first and last samples and the biggest jump.
         for spec in SoundCatalog.everySpec where spec.file != "running_loop" {
-            let file = try AVAudioFile(forReading: Self.folder.appendingPathComponent("\(spec.file).m4a"))
+            let file = try AVAudioFile(forReading: Self.folder.appendingPathComponent(spec.fileName))
             let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
             try file.read(into: buffer)
             let samples = UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))

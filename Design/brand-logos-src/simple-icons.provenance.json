@@ -1,0 +1,105 @@
+{
+  "verified_at_utc": "2026-11-10",
+  "purpose": "Provider identification in existing supported Zeus integrations, not endorsement or connection status.",
+  "rights_note": "Simple Icons package license is CC0-1.0; trademarks remain their owners. No trademark rights are granted by CC0.",
+  "verification": "Source SVG bytes compared exactly with version-pinned npm CDN files. Existing PDFs retain their prior native conversion; native bundle decoding is separately required. New Ollama/LM Studio SVGs are byte-for-byte copies.",
+  "openai_note": "Existing OpenAI source matches simple-icons 15.0.0 exactly; it is absent from 16.36.0. Codex and ChatGPT use the OpenAI provider mark, not a distinct invented Codex logo.",
+  "assets": [
+    {
+      "mark": "cursor",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/cursor.svg",
+      "source_asset": "Design/brand-logos-src/cursor.svg",
+      "source_sha256": "71572a9be192cc069ec22b48d785e61d754eeed7edb7d082d615f6d5620f70ec",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-cursor.pdf",
+      "bundled_sha256": "67899eacaaf44441e7c91f0a55fef5048b51833301c4e8f603a1e586f8af763e",
+      "bundled_format": "pdf"
+    },
+    {
+      "mark": "claude",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/claude.svg",
+      "source_asset": "Design/brand-logos-src/claude.svg",
+      "source_sha256": "2d6fda79eb18ddccca35b799eeb3cece0dfabc22520ce3b10abd25668df9fa93",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-claude.pdf",
+      "bundled_sha256": "3dce82656d06a48bfabfee66e150cafb5178dda175ac759f72712c0a48bbcc58",
+      "bundled_format": "pdf"
+    },
+    {
+      "mark": "anthropic",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/anthropic.svg",
+      "source_asset": "Design/brand-logos-src/anthropic.svg",
+      "source_sha256": "1cc599f6ebce2016dc388cf84e54a52c6b13487655c7e243554d654c7bce1882",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-anthropic.pdf",
+      "bundled_sha256": "5aa68b813bb8f9c59017a64bdf9e4591e3c18a715014bf6dfc6956c6792b9d07",
+      "bundled_format": "pdf"
+    },
+    {
+      "mark": "gemini",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/googlegemini.svg",
+      "source_asset": "Design/brand-logos-src/googlegemini.svg",
+      "source_sha256": "a6228d8846040401e941a39ed17459785e8324dbb7b870ce84233c9b3e9863a0",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-gemini.pdf",
+      "bundled_sha256": "8320df94d35292d56eea589e27dec18aa849e0944c6b6af41378df2c4c330106",
+      "bundled_format": "pdf"
+    },
+    {
+      "mark": "kimi",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/kimi.svg",
+      "source_asset": "Design/brand-logos-src/kimi.svg",
+      "source_sha256": "01fb4be70032974e2c9a4f2af9688ea505ad7d996de8866cea0844c4b0581091",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-kimi.pdf",
+      "bundled_sha256": "23a3befdee88a896411888bf79b9036d9b0ef6aa1d7268358bec956e1a1afc52",
+      "bundled_format": "pdf"
+    },
+    {
+      "mark": "openai",
+      "package": "simple-icons",
+      "version": "15.0.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@15.0.0/icons/openai.svg",
+      "source_asset": "Design/brand-logos-src/openai.svg",
+      "source_sha256": "2b4a04ddc2395b20d168694d3850ce2050a702c4a0cdeb4d8b31b9a970481a8c",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-openai.pdf",
+      "bundled_sha256": "c3316f73350caf39513ea758afe4460bb81004c4d57d3026e246595c5e049682",
+      "bundled_format": "pdf"
+    },
+    {
+      "mark": "ollama",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/ollama.svg",
+      "source_asset": "Design/brand-logos-src/ollama.svg",
+      "source_sha256": "9c62bf0159ee96c8b58c86a732f33b002b4b3bb165ec86e8ecca51ad6a82dab6",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-ollama.svg",
+      "bundled_sha256": "9c62bf0159ee96c8b58c86a732f33b002b4b3bb165ec86e8ecca51ad6a82dab6",
+      "bundled_format": "svg"
+    },
+    {
+      "mark": "lmstudio",
+      "package": "simple-icons",
+      "version": "16.36.0",
+      "license": "CC0-1.0",
+      "source_url": "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/lmstudio.svg",
+      "source_asset": "Design/brand-logos-src/lmstudio.svg",
+      "source_sha256": "16e14708a6ecd687e33700b6e9d47e2e60800407d7f995610871603ddbe3816c",
+      "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-lmstudio.svg",
+      "bundled_sha256": "16e14708a6ecd687e33700b6e9d47e2e60800407d7f995610871603ddbe3816c",
+      "bundled_format": "svg"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "provider": "Grok / xAI",
+  "source_url": "https://x.ai/legal/brand-guidelines",
+  "corroborating_source_url": "https://x.ai/grok",
+  "retrieved_at_utc": "2026-11-10T01:46:19.114665+00:00",
+  "source_page_sha256": "52016287070495833425e52b54cd733dcde8d3acc4ed42b3bdf2ee03132624b5",
+  "corroborating_page_sha256": "5ee7a79724dcd2b8d6b23a4ded4464c152fc59403ac80d397dd5f8c3a8dfb25f",
+  "source_asset": "Design/brand-logos-src/grok.svg",
+  "bundled_asset": "Sources/Zeus/Integrations/Brands/engine-grok.svg",
+  "asset_sha256": "8157a9b2e3ff94a690000ee9327156eb28539efe176fcb06cadcc7688fb4df90",
+  "asset_bytes": 1012,
+  "viewBox": "0 0 34 32",
+  "source_dimensions": {
+    "width": 34,
+    "height": 32
+  },
+  "extraction": "Exact original inline SVG bytes, no path/color edits; appears identically twice in official footer Grok link labelled Built with Grok.",
+  "rendering": "Original paths, dimensions and currentColor attributes retained byte-for-byte. Native UI preserves aspect ratio and uses its label color for currentColor/template rendering. No redraw, raster conversion, geometry adjustment or ZIP-pack attribution.",
+  "guidance": [
+    "Use our Marks only to accurately refer to us or our services.",
+    "Do not misrepresent your relationship or imply endorsement, approval, or sponsorship.",
+    "By using our logos, you agree to the Usage Terms above and further agree to only use our logos exactly as provided at the download link below, without any alteration or adjustment."
+  ],
+  "rights": "Proprietary trademark, nominative provider identification only. No CC0, open-source logo license, endorsement, or broader trademark permission claimed.",
+  "official_zip_status": "Official page linked a ZIP whose public request returned HTTP403 during review. This asset is the independently verified official inline SVG; correspondence to inaccessible ZIP content is not claimed."
+}

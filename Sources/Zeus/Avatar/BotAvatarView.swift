@@ -27,7 +27,7 @@ struct BotAvatarView: View {
     let lightAngle: Double
     let customPath: BotPath?
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @StateObject private var input = BotAvatarInput()
 
     init(type: BotAvatarType, face: BotFace = .mouth, state: BotAvatarState = .default, size: CGFloat = 28,
@@ -56,7 +56,9 @@ struct BotAvatarView: View {
 
     var body: some View {
         let paused = reduceMotion || !input.visible
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: paused)) { timeline in
+        // Display-synchronized at up to 60 fps: smooth without a display link per avatar running at 120 Hz
+        // in long agent lists. Paused while hidden or under Reduce Motion, like before.
+        DisplaySynchronizedView(paused: paused, preferredFramesPerSecond: 60) { timeline in
             let frame = makeFrame(date: timeline.date)
             Canvas { context, canvasSize in
                 var ctx = context

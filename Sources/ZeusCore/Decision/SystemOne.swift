@@ -1,7 +1,7 @@
 import Foundation
 
-/// The System One request and response shape (TypeSafe's `/v1/systemone`), shared by paid Jev and
-/// the local Laya server (laya-serve), which accepts the same body. Our own thin client, no SDK.
+/// The System One request and response shape (TypeSafe's `/v1/systemone`), shared by paid Jev.
+/// Our own thin client, no SDK.
 public struct SystemOneQuestion: Codable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable { case choice, noul, score }
     public var type: Kind

@@ -1,0 +1,165 @@
+{
+  "head": "139eb5558155d44015c3f63b841f0cb405cd6075",
+  "tested": "bfcf4d7d5e5ea111e2d8d411a101b63222e0399e",
+  "source_snapshot_sha256": "5f54116ade1a780d015cbc6e5fe16a0ffd32e966a6afec1df80454f746d0b1e2",
+  "verified_partition_count": 23,
+  "verified_tests": 2320,
+  "verified_partitions": [
+    {
+      "id": "native-ZeusCoreTests",
+      "tests": 2146,
+      "suites": 290
+    },
+    {
+      "id": "native-DictationOwnershipIntegrationTests",
+      "tests": 49,
+      "suites": 1
+    },
+    {
+      "id": "native-PolyglotPinTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-RecorderPillTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainCaptureModelTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-UltronVoiceEffectTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-EngineBrandLogoTests",
+      "tests": 6,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingTests",
+      "tests": 18,
+      "suites": 1
+    },
+    {
+      "id": "native-OnboardingIsolationTests",
+      "tests": 14,
+      "suites": 1
+    },
+    {
+      "id": "native-PermissionsCaptureTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordlyDebugWiringTests",
+      "tests": 5,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeLifecycleScenarioTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-RecordingFeedbackRenderTests",
+      "tests": 7,
+      "suites": 1
+    },
+    {
+      "id": "native-WikiGraphNavigationTests",
+      "tests": 10,
+      "suites": 1
+    },
+    {
+      "id": "native-HaloRendererTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeComponentJourneyTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-DisplaySynchronizedViewTests",
+      "tests": 2,
+      "suites": 1
+    },
+    {
+      "id": "native-ScribeIncomingWordTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-LicenseCredentialCleanupTests",
+      "tests": 4,
+      "suites": 1
+    },
+    {
+      "id": "native-MemoryMCPTransportTests",
+      "tests": 12,
+      "suites": 1
+    },
+    {
+      "id": "native-KokoroWorkerTests",
+      "tests": 3,
+      "suites": 1
+    },
+    {
+      "id": "native-TickingTests",
+      "tests": 9,
+      "suites": 1
+    },
+    {
+      "id": "native-BrainWarmSchedulerTests",
+      "tests": 8,
+      "suites": 1
+    }
+  ],
+  "failed_partitions": [
+    {
+      "id": "native-ScribeAccessibilityJourneyTests",
+      "reason": "command exited 1",
+      "exit_code": 1
+    },
+    {
+      "id": "native-OwnedWindowEventDriverTests",
+      "reason": "command exited 1",
+      "exit_code": 1
+    },
+    {
+      "id": "native-KokoroWorkerSessionTests",
+      "reason": "command exited 1",
+      "exit_code": 1
+    }
+  ],
+  "complete_native_acceptance": false,
+  "evidence_kind": "partial-native-revalidation",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42801415962",
+  "app_job": 129779602366,
+  "artifact_id": 13755649815,
+  "artifact_zip_sha256": "c430f28c9014a23b1a6a861dd9251ff6a3eae382e312045113cac5071aaa15e6",
+  "revalidated_artifacts": {
+    "job.json": "c9d4db0e257054110ba2e5a55fe4f451b4376c614c18962d3a9fecb89485e47c",
+    "build.log": "59b17234efdc54974a87cca40e169bcc73dd2a200993270bae8a1249a350f1db",
+    "native-evidence/result.json": "d4747b127d96199fac543f9efd58ad063271f88a8692684fe382400b332c9b89",
+    "native-evidence/source-manifest.json": "568150c9fe39dd6101c88ae81dfaac8abeb9f205e9d3159d00df35bd3cb73bf3",
+    "native-evidence/native-build/build.log": "d0ffe51a71720d0d3988b231754078923a4812317de017b600815fcb7894e0f3",
+    "native-evidence/native-discovery/events.jsonl": "3b0e663d7d3bc7d01da3a91be0b8aeef396570635d0f1898ec096c7107612640"
+  },
+  "validation_scope": {
+    "production_compiler_log": "passed",
+    "native_test_build_receipt": "passed",
+    "source_manifest": "exact head tree",
+    "feature_map_checks": 69,
+    "regressions": 132,
+    "compiled_selected_functions": 2349,
+    "hashed_partition_artifacts": 134,
+    "complete_receipt_rejection": "missing fields: {'native_summary'}"
+  }
+}

@@ -10,6 +10,7 @@ public enum GlanceSettingsSnapshotHeight {
         case "appearance": 2400
         case "murmure", "dictation": 2600
         case "notifications", "privacy", "diagnostics": 1400
+        case "about": 1000
         default: 2200
         }
     }

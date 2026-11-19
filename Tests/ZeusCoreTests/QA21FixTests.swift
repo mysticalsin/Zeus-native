@@ -44,9 +44,8 @@ struct QA21LatencyTests {
 @Suite("QA21 default shortcuts")
 struct QA21ShortcutTests {
     private func defaults() -> UserDefaults {
-        let suite = "zeus.qa21.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.qa21.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suite)!
-        d.removePersistentDomain(forName: suite)
         return d
     }
 
@@ -54,7 +53,7 @@ struct QA21ShortcutTests {
         let d = defaults()
         let talk = ShortcutStore.loadTalk(d)
         let dictation = ShortcutStore.loadDictation(d)
-        #expect(talk == .optionCommand)
+        #expect(talk == .controlOption)
         #expect(dictation == .rightCommand)
         #expect(ShortcutConflicts.warningsForShippedDefaults(talk: talk, dictation: dictation).isEmpty)
     }

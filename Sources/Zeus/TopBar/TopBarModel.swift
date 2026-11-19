@@ -8,6 +8,11 @@ import ZeusCore
 @MainActor
 @Observable
 final class TopBarModel {
+    @ObservationIgnored private let defaults: UserDefaults
+    /// Offscreen snapshots give the Record page its own controller with fake displays; nil in the app.
+    @ObservationIgnored var recordlyForSnapshot: RecordlyController?
+    /// Offscreen snapshots give the Tiling page a seeded controller that reads and starts nothing; nil in the app.
+    @ObservationIgnored var tilingForSnapshot: TilingController?
     struct CalendarItem: Identifiable, Equatable {
         let id: String
         var title: String
@@ -31,6 +36,13 @@ final class TopBarModel {
     struct ShelfItem: Identifiable, Equatable {
         let id = UUID()
         var url: URL
+        /// Where it came from. Only Fling items are persisted across a relaunch.
+        var origin: ShelfOrigin = .local
+        /// The Fling stack it arrived in, so a stack can be shown and moved as one.
+        var stackID: UUID? = nil
+        /// True once its SHA-256 matched what the sender offered.
+        var verified = false
+        var addedAt = Date()
         var name: String { url.lastPathComponent }
         var isMedia: Bool {
             ["m4a", "mp3", "wav", "aiff", "aif", "caf", "mp4", "mov", "m4v", "flac", "ogg"].contains(url.pathExtension.lowercased())
@@ -43,9 +55,8 @@ final class TopBarModel {
         var pluggedIn: Bool
     }
 
-    enum DictationPhase: Equatable {
-        case idle, listening, transcribing, rewriting, done, failed(String)
-    }
+    /// The phases live in ZeusCore (`DictationFlow` decides them); the top bar only reads the value.
+    typealias DictationPhase = ZeusCore.DictationPhase
 
     enum Access: Equatable { case unknown, granted, denied }
 
@@ -87,8 +98,8 @@ final class TopBarModel {
 
     var layout: TopBarLayout {
         didSet {
-            UserDefaults.standard.set(layout.encoded(), forKey: "topBar.tabs")
-            UserDefaults.standard.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
+            defaults.set(layout.encoded(), forKey: "topBar.tabs")
+            defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
         }
     }
     /// Hover and drop-target state for rows, kept here because the toolchain builds without SwiftUI macros.
@@ -108,24 +119,40 @@ final class TopBarModel {
     }
     /// Short cues on the closed notch (copy, caps lock, volume, battery, track change).
     var cuesEnabled: Bool {
-        didSet { UserDefaults.standard.set(cuesEnabled, forKey: "topBar.cues") }
+        didSet { defaults.set(cuesEnabled, forKey: "topBar.cues") }
     }
     /// Music artwork and bars beside the closed notch while something plays.
     var liveMusicWings: Bool {
-        didSet { UserDefaults.standard.set(liveMusicWings, forKey: "topBar.musicWings") }
+        didSet { defaults.set(liveMusicWings, forKey: "topBar.musicWings") }
     }
     var weatherCity: String {
-        didSet { UserDefaults.standard.set(weatherCity, forKey: "topBar.weatherCity") }
+        didSet { defaults.set(weatherCity, forKey: "topBar.weatherCity") }
     }
     var useCelsius: Bool {
-        didSet { UserDefaults.standard.set(useCelsius, forKey: "topBar.celsius") }
+        didSet { defaults.set(useCelsius, forKey: "topBar.celsius") }
     }
 
     // MARK: Live data
 
     var nowPlaying: NowPlaying? {
-        didSet { if oldValue?.isPlaying != nowPlaying?.isPlaying { AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true) } }
+        didSet {
+            guard oldValue?.isPlaying != nowPlaying?.isPlaying else { return }
+            AudioSpectrumService.shared.setMusicPlaying(nowPlaying?.isPlaying == true)
+            onMusicPlaying(nowPlaying?.isPlaying == true)
+        }
     }
+    /// What the shown source says about shuffle and repeat. Kept apart from `nowPlaying` so a playback
+    /// notification never wipes it; unknown when the source has not answered or has no such controls.
+    var musicModes = MusicModes()
+    /// Where a music command goes: the shown source, else the pinned player, else Music. The hub writes it, only when
+    /// it differs, so the Open label redraws when the setting moves while nothing is shown.
+    var commandTarget = NowPlayingSource.player(.music)
+    /// The Music page is on screen. Set by the page; the hub tells whoever registered with `observeMusicPage`.
+    var musicPageVisible = false {
+        didSet { if musicPageVisible != oldValue { onMusicPageVisible(musicPageVisible) } }
+    }
+    /// The hub, so a caller outside the notch (voice, dictation) can ask what the sources are doing.
+    @ObservationIgnored weak var nowPlayingHub: NowPlayingHub?
     var events: [CalendarItem] = []
     var reminders: [ReminderItem] = []
     var calendarAccess: Access = .unknown
@@ -135,9 +162,13 @@ final class TopBarModel {
     var battery: Battery?
     var clipboard = ClipboardHistory()
     var shelf: [ShelfItem] = []
+    /// Where Fling items are saved (`shelf.json`). Nil in tests and snapshots that do not persist.
+    @ObservationIgnored var shelfPersistence: FlingShelfPersistence?
+    /// Fling, once the app built it. The Shelf reads it for Nearby Macs and sends through it.
+    var fling: (any FlingSending)?
     var focus = FocusTimer()
     var note: String {
-        didSet { UserDefaults.standard.set(note, forKey: "topBar.note") }
+        didSet { defaults.set(note, forKey: "topBar.note") }
     }
 
     // Dictation
@@ -151,17 +182,17 @@ final class TopBarModel {
     var dictationHistory: [DictationRecord] = []
     var dictationModes: [DictationMode] = DictationMode.builtIns
     var selectedModeKey: String {
-        didSet { UserDefaults.standard.set(selectedModeKey, forKey: "dictation.mode") }
+        didSet { defaults.set(selectedModeKey, forKey: "dictation.mode") }
     }
 
     // Teleprompter
     var script: String {
-        didSet { UserDefaults.standard.set(script, forKey: "prompter.script") }
+        didSet { defaults.set(script, forKey: "prompter.script") }
     }
     var roll: PrompterRoll {
         didSet {
-            if roll.speed != oldValue.speed { UserDefaults.standard.set(roll.speed, forKey: "prompter.speed") }
-            if roll.voiceFollow != oldValue.voiceFollow, !savingVoiceFallback { UserDefaults.standard.set(roll.voiceFollow, forKey: "prompter.voice") }
+            if roll.speed != oldValue.speed { defaults.set(roll.speed, forKey: "prompter.speed") }
+            if roll.voiceFollow != oldValue.voiceFollow, !savingVoiceFallback { defaults.set(roll.voiceFollow, forKey: "prompter.voice") }
         }
     }
     private var savingVoiceFallback = false
@@ -175,10 +206,10 @@ final class TopBarModel {
 
     /// A new run starts from the saved voice-follow choice (a fallback lasted one run only).
     func restoreSavedVoiceFollow() {
-        roll.voiceFollow = UserDefaults.standard.object(forKey: "prompter.voice") as? Bool ?? true
+        roll.voiceFollow = defaults.object(forKey: "prompter.voice") as? Bool ?? true
     }
     var prompterTextSize: Double {
-        didSet { UserDefaults.standard.set(prompterTextSize, forKey: "prompter.size") }
+        didSet { defaults.set(prompterTextSize, forKey: "prompter.size") }
     }
     var prompterHovered = false
     var prompterLevel: Double = 0
@@ -201,6 +232,10 @@ final class TopBarModel {
 
     // Actions the views call; wired by the services so views stay free of system calls.
     var musicCommand: (MusicCommand) -> Void = { _ in }
+    /// Pauses the shown source if it plays and returns it; dictation resumes that same source afterwards.
+    var pauseForDictation: () -> NowPlayingSource? = { nil }
+    var resumeAfterDictation: (NowPlayingSource) -> Void = { _ in }
+    var onMusicPageVisible: (Bool) -> Void = { _ in }
     var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
     var copyText: (String) -> Void = { text in
         NSPasteboard.general.clearContents()
@@ -216,6 +251,8 @@ final class TopBarModel {
     var editScript: () -> Void = {}
     var setPrompterVoice: (Bool) -> Void = { _ in }
     var onKeepAwake: (Bool) -> Void = { _ in }
+    /// A track started or stopped playing (the music display hold listens).
+    var onMusicPlaying: (Bool) -> Void = { _ in }
     /// Selects a tab and opens the panel on it (the wings' Stop uses this for Scribe's confirmation).
     var onOpenTab: (TopBarTab) -> Void = { _ in }
     /// Speaks the daily brief in ZEUS's voice.
@@ -228,7 +265,7 @@ final class TopBarModel {
     /// The notch's dictation button: click to start, click again to stop and type it where you were.
     var toggleDictation: () -> Void = {}
 
-    enum MusicCommand { case playPause, next, previous, open }
+    enum MusicCommand { case playPause, next, previous, open, toggleShuffle, cycleRepeat }
 
     /// Jumps the current track to this many seconds (the progress line's drag).
     var seek: (Double) -> Void = { _ in }
@@ -237,8 +274,8 @@ final class TopBarModel {
     /// A menu from the notch (the ... button) is open: the notch stays up while it is.
     var menuOpen = false
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let knownBefore = defaults.string(forKey: "topBar.tabs.known")
         let saved = TopBarLayout.decode(defaults.string(forKey: "topBar.tabs"), known: knownBefore)
         // Once: put the nine-tab row (Glance's seven, Teleprompter, Insomnia) first in a saved layout.
@@ -259,6 +296,14 @@ final class TopBarModel {
         let addScribe = !defaults.bool(forKey: "topBar.row12.v1")
         if addScribe, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row12.v1") }
         if addScribe { upgraded = upgraded.upgradedToScribeRow() }
+        // v2: v1 set its flag without saving the moved row, so Agents fell back past the visible end on relaunch.
+        let addAgents = !defaults.bool(forKey: "topBar.row13.v2")
+        if addAgents, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row13.v2") }
+        if addAgents { upgraded = upgraded.upgradedToAgentsRow() }
+        // Tiling joins the row right after Home (fourteen tabs). The flag is saved together with the row below.
+        let addTiling = !defaults.bool(forKey: "topBar.row14.v1")
+        if addTiling, !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA { defaults.set(true, forKey: "topBar.row14.v1") }
+        if addTiling { upgraded = upgraded.upgradedToTilingRow() }
         // Repair, once per version: an earlier launch saved the flags above without the upgraded row, so on
         // this launch none of them is true and the row would stay old. Only a row that was saved is repaired.
         let needsRepair = defaults.integer(forKey: "topBar.layoutRepair") < TopBarLayoutRepair.version
@@ -272,7 +317,7 @@ final class TopBarModel {
         // Property observers don't run inside init, so save the upgraded row here. Otherwise the
         // one-time flags above stop the upgrade from running again while the old row stays saved.
         if !TopBarStyle.isSnapshot, !StartupPolicy.current.isQA {
-            if reorder || addPolyglot || addRecordly || addScribe || repairedRow {
+            if reorder || addPolyglot || addRecordly || addScribe || addAgents || addTiling || repairedRow {
                 defaults.set(upgraded.encoded(), forKey: "topBar.tabs")
                 defaults.set(TopBarLayout.knownEncoded(), forKey: "topBar.tabs.known")
             }
@@ -293,7 +338,7 @@ final class TopBarModel {
     static let sampleScript = """
     # Opening
     Hi, I'm Tony. Thanks for taking the time today.
-    I'll keep this short and show you what ZEUS does.
+    I'll keep this short and show you what Zeus does.
 
     # Demo
     Watch the notch. It follows my voice, so when I stop talking, the words wait for me.
@@ -388,6 +433,7 @@ final class TopBarModel {
         case .volume: SystemHUDSettings.settingID(for: .volume)
         case .charging, .lowBattery: "lights.battery"
         case .shelfAdded: "lights.shelf"
+        case .flingArrived: "lights.fling"
         case .brightness: SystemHUDSettings.settingID(for: .brightness)
         case .keyboardBacklight: SystemHUDSettings.settingID(for: .keyboardBacklight)
         case .shortcut: "lights.shortcutPeeks"
@@ -412,10 +458,7 @@ final class TopBarModel {
         let light = NotchLightKind.hudLevel(
             kind, value: value, previousLevel: previous.seen ? previous.value : value,
             muted: muted, limitEcho: atLowerBound || atUpperBound)
-        let spring = Animation.spring(
-            response: NotchClosedBodyLayout.wingsSpringResponse,
-            dampingFraction: NotchClosedBodyLayout.wingsSpringDamping)
-        withAnimation(spring) {
+        withAnimation(Motion.reducible(Motion.cueGrow)) {
             show(cue)
             flash(light, ignoreSettings: ignoreSettings)
         }
@@ -531,6 +574,7 @@ final class TopBarModel {
         case .capsLock, .shiftCrest: "lights.capsLock"
         case .battery: "lights.battery"
         case .landed(let airDrop): airDrop ? "lights.airDrop" : "lights.shelf"
+        case .flingLanded: "lights.fling"
         case .reminderPinned: "lights.reminderGlow"
         case .eventRibbon: "lights.eventGlow"
         case .shortcut: "lights.shortcutPeeks"
@@ -548,14 +592,56 @@ final class TopBarModel {
     // MARK: Shelf
 
     func addToShelf(_ urls: [URL], isAirDrop: Bool = false) {
-        let fresh = urls.filter { url in !shelf.contains { $0.url == url } }
-        guard !fresh.isEmpty else { return }
-        shelf.insert(contentsOf: fresh.map { ShelfItem(url: $0) }, at: 0)
-        show(.shelfAdded(fresh.count))
-        flash(.landed(airDrop: isAirDrop))
+        addToShelf(urls, origin: isAirDrop ? .airDrop : .local, stack: nil)
     }
 
-    func removeFromShelf(_ id: UUID) { shelf.removeAll { $0.id == id } }
+    /// Puts files on the Shelf. Fling arrivals are verified by construction: they get here only after their hash matched.
+    func addToShelf(_ urls: [URL], origin: ShelfOrigin, stack: UUID? = nil) {
+        let fresh = urls.filter { url in !shelf.contains { $0.url == url } }
+        guard !fresh.isEmpty else { return }
+        let isFling: Bool = { if case .fling = origin { return true } else { return false } }()
+        shelf.insert(contentsOf: fresh.map { ShelfItem(url: $0, origin: origin, stackID: stack, verified: isFling) }, at: 0)
+        switch origin {
+        case .fling(let peer):
+            persistShelf()
+            show(.flingArrived(count: fresh.count, from: peer))
+            flash(.flingLanded)
+        case .airDrop, .local:
+            show(.shelfAdded(fresh.count))
+            flash(.landed(airDrop: origin == .airDrop))
+        }
+    }
+
+    func removeFromShelf(_ id: UUID) {
+        var wasFling = false
+        if let item = shelf.first(where: { $0.id == id }), case .fling = item.origin { wasFling = true }
+        shelf.removeAll { $0.id == id }
+        if wasFling { persistShelf() }
+    }
+
+    /// Saves the Fling items. A `shelf.json` this build cannot read is left alone.
+    func persistShelf() {
+        guard let shelfPersistence else { return }
+        let records = shelf.compactMap { item -> FlingShelfRecord? in
+            guard case .fling = item.origin else { return nil }
+            return FlingShelfRecord(path: item.url.path, origin: item.origin, stackID: item.stackID, verified: item.verified, addedAt: item.addedAt, link: nil)
+        }
+        _ = shelfPersistence.save(records)
+    }
+
+    /// Puts the saved Fling items back on the Shelf, newest first, skipping files that are gone.
+    func loadPersistedShelf() {
+        guard let shelfPersistence else { return }
+        let loaded = shelfPersistence.load()
+        let present = loaded.records.filter { FileManager.default.fileExists(atPath: $0.path) }
+        let items = present.sorted { $0.addedAt > $1.addedAt }.compactMap { record -> ShelfItem? in
+            let url = URL(fileURLWithPath: record.path)
+            guard !shelf.contains(where: { $0.url == url }) else { return nil }
+            return ShelfItem(url: url, origin: record.origin, stackID: record.stackID, verified: record.verified, addedAt: record.addedAt)
+        }
+        shelf.append(contentsOf: items)
+        if present.count != loaded.records.count { persistShelf() }
+    }
 
     // MARK: Home customise
 

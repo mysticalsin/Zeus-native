@@ -8,9 +8,32 @@ import ZeusCore
 enum VoiceLog {
     private static let queue = DispatchQueue(label: "app.zeus.voicelog")
     static var url: URL {
-        let base = ProcessInfo.processInfo.environment["ZEUS_LOG_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Zeus", isDirectory: true)
-        return base.appendingPathComponent("voice.log")
+        logDirectory().appendingPathComponent("voice.log")
+    }
+
+    /// Whether this process is a test run (XCTest or Swift Testing both load the app into a test bundle host).
+    static let isRunningTests: Bool = {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+            || ["xctest", "swiftpm-testing-helper"].contains { ProcessInfo.processInfo.processName.contains($0) }
+    }()
+
+    /// `ZEUS_LOG_DIR` wins. Otherwise the owner's `~/Library/Logs/Zeus`, except under tests, which write to a
+    /// temporary folder so a test run never adds lines to the real log.
+    static func logDirectory(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        runningTests: Bool = isRunningTests,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        temporary: URL = FileManager.default.temporaryDirectory
+    ) -> URL {
+        if let override = environment["ZEUS_LOG_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        if runningTests {
+            return temporary.appendingPathComponent("zeus-test-logs-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
+        return home.appendingPathComponent("Library/Logs/Zeus", isDirectory: true)
     }
     /// Also echoed to stdout by the offline self-test.
     nonisolated(unsafe) static var echo = false
@@ -24,14 +47,11 @@ enum VoiceLog {
 
     /// What a log line may say about a piece of conversation text.
     static func described(_ text: String, content: Bool = contentLoggingEnabled) -> String {
-        content ? text : "(\(text.count) chars)"
+        VoiceLogRecord.contentDescription(text, includeContent: content)
     }
 
     static func format(_ date: Date, _ stage: String, _ detail: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let text = detail.replacingOccurrences(of: "\n", with: " ")
-        return "\(formatter.string(from: date)) \(stage.padding(toLength: 10, withPad: " ", startingAt: 0)) \(text)"
+        VoiceLogRecord(stage: stage, detail: detail).line(at: date)
     }
 
     /// Logs conversation text (a transcript, a spoken answer): metadata unless content logging is on.
@@ -39,10 +59,12 @@ enum VoiceLog {
         log(stage, prefix + described(text))
     }
 
-    static func log(_ stage: String, _ detail: String = "") {
-        let line = format(Date(), stage, detail)
-        FlightRecorder.shared.record(stage == "error" ? "error" : "voice", stage, detail)
-        NSLog("[ZEUS] voice: %@ %@", stage, detail)
+    /// `mirror: false` skips the `[ZEUS] voice:` system-log line for callers that write their own (`voice-latency`).
+    static func log(_ stage: String, _ detail: String = "", mirror: Bool = true) {
+        let record = VoiceLogRecord(stage: stage, detail: detail)
+        let line = record.line(at: Date())
+        FlightRecorder.shared.record(record.stage == "error" ? "error" : "voice", record.stage, record.detail)
+        if mirror { NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail) }
         if echo { print(line) }
         queue.async {
             let fm = FileManager.default

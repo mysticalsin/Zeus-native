@@ -4,7 +4,7 @@ Daniel|The meeting with Sarah moved to three thirty tomorrow afternoon, so pleas
 Daniel|Remind me to buy milk, eggs, and coffee on the way home tonight.
 Karen|I think we should refactor the notch controller so the dictation tab and the chat window share one store.
 Karen|Please write a short email to the landlord saying the heating has been broken since Monday.
-Moira|Glance, Superwhisper and Vibe Island all live in the menu bar, but each one solves a different problem.
+Moira|Notes, mail and the calendar all live in the menu bar, but each one solves a different problem.
 Moira|The latency budget for dictation is under three hundred milliseconds after the key is released.
 Samantha|Add a unit test that checks the word error rate is zero when both strings match exactly.
 Daniel|Let's grab lunch at the Italian place near the station around twelve fifteen.

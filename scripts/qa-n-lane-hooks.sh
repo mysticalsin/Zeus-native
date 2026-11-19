@@ -1,5 +1,8 @@
 #!/bin/bash
 # N5/N6 silent E2E hooks for the integrator (requires running Zeus via zeus CLI, not Zeus.app direct).
+# Preflight: `zeus debug open-settings` and the other panel hooks refuse unless "Allow command-line control"
+# is on in Zeus Settings > Privacy (only that toggle sets it) and the request comes from the zeus command in
+# Zeus.app/Contents/Helpers or its installed copy in ~/Library/Application Support/Zeus/bin. A refusal says so.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 QA="$ROOT/../glance-clone-proof/qa/N"

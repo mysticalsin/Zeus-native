@@ -12,15 +12,14 @@ enum TopBarStyle {
     /// Glance's open panel: about 870 x 340 pt. Pages get the room under the tab row.
     static let panelWidth: CGFloat = 870
     static let pageHeight: CGFloat = 236
-    /// Glance-feel motion: a soft spring with a touch of overshoot for open/close and pages.
-    /// Measured from Glance's hover video: opens with no visible overshoot, closes firmly.
-    static let openSpring = Animation.spring(response: GlanceTopBar.openSpring.response, dampingFraction: GlanceTopBar.openSpring.damping)
-    static let closeMotion = Animation.linear(duration: GlanceTopBar.closeDuration)
+    /// Glance-feel motion, from the token table: open has a touch of overshoot, close has none.
+    @MainActor static var openSpring: Animation? { Motion.live(MotionTokens.panelOpen) }
+    @MainActor static var closeMotion: Animation? { Motion.reducible(Motion.panelClose) }
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
     static var tabLabel: Font {
         GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)
     }
-    static let openHeightSpring = Animation.spring(response: GlanceTopBar.openHeightSpring.response, dampingFraction: GlanceTopBar.openHeightSpring.damping)
+    @MainActor static var openHeightSpring: Animation? { Motion.live(MotionTokens.panelOpenHeight) }
     @MainActor static var pageSpring: Animation? { Motion.page(reduceMotion: Motion.reduced) }
     static let tile = Glass.notchTile
     static let tileStroke = Glass.notchTileStroke
@@ -34,7 +33,20 @@ enum TopBarStyle {
 }
 
 /// A rounded glass tile used by every zone and page.
+private struct CardFinishOverrideKey: EnvironmentKey {
+    static var defaultValue: CardFinish? { nil }
+}
+
+extension EnvironmentValues {
+    /// A scoped appearance value, used by isolated hosts without reading process-global preferences.
+    var cardFinishOverride: CardFinish? {
+        get { self[CardFinishOverrideKey.self] }
+        set { self[CardFinishOverrideKey.self] = newValue }
+    }
+}
+
 struct Tile<Content: View>: View {
+    @Environment(\.cardFinishOverride) private var finishOverride
     var padding: CGFloat = CardFinish.inset
     /// Home band tiles follow Home style; every other card follows Card style.
     var home = false
@@ -42,11 +54,11 @@ struct Tile<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        let finish: CardFinish? = home ? CardFinish.home.finish : CardFinish.current
+        let finish: CardFinish? = finishOverride ?? (home ? CardFinish.home.finish : CardFinish.current)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .notchCard(finish, tint: home && CardFinish.home.tinted ? tint : nil)
+            .notchCard(finish, tint: finishOverride == nil && home && CardFinish.home.tinted ? tint : nil)
             .cardHoverLift()
     }
 }
@@ -57,6 +69,11 @@ struct GlyphButton: View {
     var size: CGFloat = 13
     var tint: Color = Theme.cloudPrimary
     let label: String
+    /// A toggle that is on: a filled, bordered capsule and the glyph in the primary tone, so the state
+    /// never rests on colour alone. Off has no capsule.
+    var active = false
+    /// Spoken state for a toggle ("on", "all"); none for a plain button.
+    var value: String?
     let action: () -> Void
 
 
@@ -64,15 +81,17 @@ struct GlyphButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(tint)
+                .foregroundStyle(active ? Theme.cloudPrimary : tint)
                 .frame(width: size + 15, height: size + 15)
-                .background(Circle().fill(Color.white.opacity(0)))
+                .background(Capsule().fill(Color.white.opacity(ToggleOnLook.fill(active: active))))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(ToggleOnLook.stroke(active: active)), lineWidth: 1))
                 .contentShape(Circle())
         }
         .buttonStyle(PressableStyle())
 
         .help(label)
         .accessibilityLabel(label)
+        .accessibilityValue(value ?? "")
     }
 }
 
@@ -80,6 +99,7 @@ struct GlyphButton: View {
 /// own colour that stays as the placeholder while it loads or when no cover can be found.
 struct AlbumTile: View {
     let playing: NowPlaying?
+
     /// Glance Home Music art tile is 48 pt (TOPBAR-SPEC §4); empty state keeps the quiet grey fill.
     var size: CGFloat = 48
 
@@ -95,7 +115,7 @@ struct AlbumTile: View {
                                                   Color(hue: (hue + 0.12).truncatingRemainder(dividingBy: 1), saturation: 0.8, brightness: 0.45)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .overlay(
-                        Image(systemName: playing.player == .spotify ? "dot.radiowaves.left.and.right" : "music.note")
+                        Image(systemName: NowPlayingDisplay.glyph(for: playing.source))
                             .font(.system(size: size * 0.35, weight: .medium))
                             .foregroundStyle(.white.opacity(art == nil ? 0.9 : 0))
                     )
@@ -133,19 +153,24 @@ struct LevelBars: View {
     var height: CGFloat = 14
 
     var body: some View {
-        TickingView(interval: 1 / 30, paused: !active || Motion.reduced) { context in
+        DisplaySynchronizedView(paused: !active || Motion.reduced, preferredFramesPerSecond: Motion.ambientFPS) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<count, id: \.self) { index in
-                    let phase = sin(t * (5.1 + Double(index) * 1.7) + Double(index) * 1.3)
-                    let base = level.map { max($0, 0.08) * (0.6 + 0.4 * abs(phase)) } ?? (0.35 + 0.65 * abs(phase))
                     Capsule()
                         .fill(color)
-                        .frame(width: 2.6, height: max(3, height * (active ? base : 0.2)))
+                        .frame(width: 2.6, height: barHeight(index: index, time: t))
                 }
             }
             .frame(height: height)
         }
+    }
+
+    private func barHeight(index: Int, time: TimeInterval) -> CGFloat {
+        let phase: Double = sin(time * (5.1 + Double(index) * 1.7) + Double(index) * 1.3)
+        let base: Double = level.map { max($0, 0.08) * (0.6 + 0.4 * abs(phase)) } ?? (0.35 + 0.65 * abs(phase))
+        let fraction = CGFloat(active ? base : 0.2)
+        return max(CGFloat(3), height * fraction)
     }
 }
 
@@ -233,7 +258,7 @@ struct TopBarHeader: View {
     let notchWidth: CGFloat
     let height: CGFloat
     @Namespace private var pill
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     /// Glance's layout: the menu-bar row stays clear around the notch (Mini ZEUS sits left of it),
     /// and the tabs live in one glass capsule just under it, the selected one showing its name.
@@ -269,6 +294,7 @@ struct TopBarHeader: View {
             .accessibilityHint("Opens a menu with settings and the Zeus pointer toggle.")
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("notch.more")
+            .accessibilityAction { MoreMenu.show(topBar: topBar) }
         }
         .frame(height: GlanceTopBar.tabRowHeight)
         // N9 (parity/N9-glance-switch): new label appears at once; pill slides about 3 frames later
@@ -341,6 +367,9 @@ struct TopBarHeader: View {
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .accessibilityHint(selected ? "" : "Shows \(tab.title).")
         .accessibilityIdentifier("notch.tab.\(tab.rawValue)")
+        // `.ignore` replaces the Button with a new element that has no default action of its own, so AXPress
+        // from outside (VoiceOver, Switch Control) did nothing. Say what pressing it does.
+        .accessibilityAction { topBar.selectedTab = tab }
     }
 
     /// Counts shown as numbers (Glance): alerts from the last day, files in the Inbox, clipboard items.
@@ -348,7 +377,7 @@ struct TopBarHeader: View {
         switch tab {
         case .notifications:
             let since = Date().addingTimeInterval(-86_400)
-            return NotificationsController.shared.items.filter { $0.date > since }.count
+            return NotificationsController.shared.visibleItems.filter { $0.date > since }.count
         case .shelf: return topBar.shelf.count
         case .clipboard: return topBar.clipboard.entries.count
         default: return nil
@@ -396,6 +425,8 @@ enum MoreMenu {
         }
         parent.submenu = sub
         menu.addItem(parent)
+        menu.addItem(.separator())
+        menu.addItem(ScreenShareQuickToggle.menuItem(target: MoreMenuTarget.shared, action: #selector(MoreMenuTarget.toggleScreenShareVisibility)))
         MoreMenuTarget.shared.topBar = topBar
         topBar.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
@@ -411,6 +442,7 @@ final class MoreMenuTarget: NSObject {
     @objc func openSettings() { topBar?.openSettings() }
     @objc func editTabs() { topBar?.beginTabEditing() }
     @objc func customizeHome() { topBar?.beginHomeCustomize() }
+    @objc func toggleScreenShareVisibility() { ScreenShareQuickToggle.toggle() }
 
     @objc func chooseBuddy(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String, let choice = BuddyShow(rawValue: raw) else { return }
@@ -424,9 +456,13 @@ struct TopBarPage: View {
     let topBar: TopBarModel
     let agentSummary: String
     let agents: AnyView
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
+        PageSwitcher(key: topBar.selectedTab, reduceMotion: reduceMotion) { page }
+    }
+
+    private var page: some View {
         Group {
             switch topBar.selectedTab {
             case .home:
@@ -452,8 +488,9 @@ struct TopBarPage: View {
             case .continuity: ContinuityPage()
             case .waves: WavesPage(topBar: topBar)
             case .polyglot: PolyglotPage(polyglot: .shared, topBar: topBar)
-            case .recordly: RecordlyPage(topBar: topBar, recordly: .shared)
+            case .recordly: RecordlyPage(topBar: topBar, recordly: topBar.recordlyForSnapshot ?? .shared)
             case .scribe: ScribePage(topBar: topBar, scribe: .shared)
+            case .tiling: TilingPage(topBar: topBar, tiling: topBar.tilingForSnapshot ?? .shared)
             case .chat: ChatPage(chat: .shared)
             case .usage: UsagePage(usage: .shared)
             case .today: TodayPage(topBar: topBar, today: .shared)
@@ -462,13 +499,44 @@ struct TopBarPage: View {
             }
         }
         .frame(height: GlanceTopBar.pageHeight(home: topBar.selectedTab == .home) + (topBar.selectedTab == .home ? topBar.homeExtraHeight : 0), alignment: .top)
-        // Glance's section switch: the new page crossfades in with a small rise and scale.
-        .transition(.asymmetric(insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
-                                // The old page leaves at once: fading it over the new one drew its title
-                                // (e.g. Music's "Nothing playing") on top of the Calendar's add-event field.
-                                removal: .identity))
-        .id(topBar.selectedTab)
-        .animation(Motion.page(reduceMotion: reduceMotion), value: topBar.selectedTab)
+    }
+}
+
+/// The pages overlap from the top: while one leaves, the new one is laid out where it will stay, not pushed down
+/// by the old one above it.
+struct PageStack<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    var body: some View { ZStack(alignment: .topLeading, content: content) }
+}
+
+/// Glance's section switch: the new page crossfades in with a small rise and scale, and the old one fades out fast
+/// (0.08 s) over it. A slower fade drew its title (e.g. Music's "Nothing playing") on top of the Calendar's
+/// add-event field. The leaving page takes no clicks.
+struct PageSwitcher<Key: Hashable, Page: View>: View {
+    let key: Key
+    let reduceMotion: Bool
+    @ViewBuilder let page: () -> Page
+
+    /// A page that is on its way out: faded and not hittable.
+    private struct Leaving: ViewModifier {
+        let leaving: Bool
+        func body(content: Content) -> some View {
+            content.opacity(leaving ? 0 : 1).allowsHitTesting(!leaving)
+        }
+    }
+
+    private var transition: AnyTransition {
+        .asymmetric(
+            insertion: reduceMotion ? .identity : .opacity.combined(with: .offset(y: 8)).combined(with: .scale(scale: 0.985, anchor: .top)),
+            removal: reduceMotion ? .identity : AnyTransition.modifier(active: Leaving(leaving: true), identity: Leaving(leaving: false))
+                .animation(Motion.pageOut))
+    }
+
+    var body: some View {
+        PageStack {
+            page().id(key).transition(transition)
+        }
+        .animation(Motion.page(reduceMotion: reduceMotion), value: key)
     }
 }
 
@@ -477,13 +545,34 @@ struct MusicControls: View {
     var size: CGFloat = 13
 
     var body: some View {
+        let modes = topBar.musicModes
+        // A control the shown source cannot honour is not drawn; the rest keep their place and the row stays centred.
+        let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
+        // Until the player has answered, a mode control is drawn subdued; it still takes a press.
+        let known = Theme.cloudPrimary
+        let unknown = Theme.cloudSecondary.opacity(0.5)
         HStack(spacing: 4) {
             Spacer(minLength: 0)
-            GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
-            GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
-                topBar.musicCommand(.playPause)
+            if shown.contains(.shuffle) {
+                GlyphButton(symbol: "shuffle", size: size, tint: modes.shuffle == nil ? unknown : known, label: "Shuffle",
+                            active: modes.shuffle == true, value: MusicModeRules.spokenShuffle(modes.shuffle)) { topBar.musicCommand(.toggleShuffle) }
             }
-            GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
+            if shown.contains(.previous) {
+                GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
+            }
+            if shown.contains(.playPause) {
+                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
+                    topBar.musicCommand(.playPause)
+                }
+            }
+            if shown.contains(.next) {
+                GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
+            }
+            if shown.contains(.repeatMode) {
+                GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
+                            tint: modes.repeatMode == nil ? unknown : known, label: "Repeat",
+                            active: modes.repeatMode.map { $0 != .off } ?? false, value: MusicModeRules.spokenRepeat(modes.repeatMode)) { topBar.musicCommand(.cycleRepeat) }
+            }
             Spacer(minLength: 0)
         }
     }
@@ -500,22 +589,36 @@ struct MusicPage: View {
     let topBar: TopBarModel
     /// The SwiftUI @State macro is unavailable to this toolchain, so the toggle lives in an ObservableObject.
     @StateObject private var lyricsToggle = LyricsToggle()
-    private var showLyrics: Bool { lyricsToggle.show }
+    private static let buttonGap: CGFloat = 8
+    /// Output, Lyrics and Open: three 27 pt buttons (a 12 pt glyph and 15 pt of frame) and the gaps between them.
+    private static let trailingWidth: CGFloat = 3 * 27 + 2 * buttonGap
 
     var body: some View {
         let scrub = ScrubState.shared
+        let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
+        // Lyrics a source cannot give are not shown, even if the toggle was on for the last one.
+        let showLyrics = lyricsToggle.show && shown.contains(.lyrics)
         HStack(spacing: 14) {
             AlbumTile(playing: topBar.nowPlaying, size: 132)
             VStack(alignment: .leading, spacing: 8) {
-                if showLyrics {
-                    Text([topBar.nowPlaying?.title, topBar.nowPlaying?.artist].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
-                        .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
-                    LyricsView(playing: topBar.nowPlaying, rows: 3, rowHeight: 24, fontSize: 14)
-                } else {
-                    Text(topBar.nowPlaying?.title ?? "Nothing playing")
-                        .font(TopBarStyle.label(17, .bold)).foregroundStyle(Theme.cloudPrimary).lineLimit(2)
-                    Text([topBar.nowPlaying?.artist, topBar.nowPlaying?.album].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
-                        .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let playing = topBar.nowPlaying {
+                        Text(NowPlayingDisplay.sourceLine(playing.source))
+                            .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        if showLyrics {
+                            Text([topBar.nowPlaying?.title, topBar.nowPlaying?.artist].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
+                                .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                            LyricsView(playing: topBar.nowPlaying, rows: 3, rowHeight: 24, fontSize: 14)
+                        } else {
+                            Text(topBar.nowPlaying?.title ?? "Nothing playing")
+                                .font(TopBarStyle.label(17, .bold)).foregroundStyle(Theme.cloudPrimary).lineLimit(2)
+                            Text([topBar.nowPlaying?.artist, topBar.nowPlaying?.album].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
+                                .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
+                        }
+                    }
                 }
                 Spacer(minLength: 0)
                 if let playing = topBar.nowPlaying {
@@ -525,7 +628,7 @@ struct MusicPage: View {
                         VStack(spacing: 2) {
                             ProgressLine(fraction: MusicSeek.fraction(elapsed: playing.elapsed(at: context.date), duration: playing.duration),
                                          tint: tint,
-                                         onSeek: playing.duration > 0 ? { fraction in
+                                         onSeek: shown.contains(.scrub) ? { fraction in
                                              if let seconds = MusicSeek.seconds(fraction: fraction, duration: playing.duration) { topBar.seek(seconds) }
                                          } : nil)
                             HStack {
@@ -537,17 +640,26 @@ struct MusicPage: View {
                         }
                     }
                 }
-                HStack {
+                HStack(spacing: 0) {
                     MusicControls(topBar: topBar, size: 16)
-                    OutputDeviceMenu(topBar: topBar)
-                    GlyphButton(symbol: "quote.bubble", size: 12, tint: showLyrics ? Theme.glow : Theme.cloudSecondary,
-                                label: showLyrics ? "Hide lyrics" : "Show lyrics") { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
-                    GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
-                                label: "Open \(topBar.nowPlaying?.player.rawValue ?? "Music")") { topBar.musicCommand(.open) }
+                    HStack(spacing: Self.buttonGap) {
+                        OutputDeviceMenu(topBar: topBar)
+                        if shown.contains(.lyrics) {
+                            GlyphButton(symbol: "quote.bubble", size: 12, tint: Theme.cloudSecondary, label: "Lyrics",
+                                        active: showLyrics, value: ToggleOnLook.spoken(showLyrics)) { withAnimation(TopBarStyle.pageSpring) { lyricsToggle.show.toggle() } }
+                        }
+                        GlyphButton(symbol: "arrow.up.forward.app", size: 12, tint: Theme.cloudSecondary,
+                                    label: NowPlayingDisplay.openLabel(for: topBar.commandTarget)) { topBar.musicCommand(.open) }
+                    }
+                    // The trailing buttons keep the width of the full set, so the transport stays where it is when
+                    // the Lyrics button is not drawn.
+                    .frame(minWidth: Self.trailingWidth, alignment: .trailing)
                 }
             }
         }
         .padding(.vertical, 6)
+        .onAppear { topBar.musicPageVisible = true }
+        .onDisappear { topBar.musicPageVisible = false }
     }
 }
 
@@ -947,6 +1059,12 @@ private struct ClipboardRow: View {
         }
     }
 
+    /// A click, and the default accessibility action: copy this entry again.
+    private func copyBack() {
+        if entry.kind == .text || entry.kind == .link { topBar.copyText(entry.text) } else { ClipboardMedia.copyBack(entry) }
+        topBar.show(.copied(entry.preview))
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if hasThumb, let thumb = ClipboardMedia.thumbnail(for: entry) {
@@ -984,14 +1102,12 @@ private struct ClipboardRow: View {
         .background(Color.white.opacity((topBar.hovered == "c\(entry.id)") ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .contentShape(Rectangle())
         .onHover { topBar.hovered = $0 ? "c\(entry.id)" : (topBar.hovered == "c\(entry.id)" ? nil : topBar.hovered) }
-        .onTapGesture {
-            if entry.kind == .text || entry.kind == .link { topBar.copyText(entry.text) } else { ClipboardMedia.copyBack(entry) }
-            topBar.show(.copied(entry.preview))
-        }
+        .onTapGesture { copyBack() }
         .live { $0.onDrag { ClipboardMedia.dragProvider(for: entry) } }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Copies this again. Drag it out to drop it elsewhere.")
+        .accessibilityAction { copyBack() }
         // Pin and Remove only draw while hovered; VoiceOver and the keyboard get them here.
         .accessibilityAction(named: entry.pinned ? "Unpin" : "Pin") { topBar.clipboard.togglePin(entry.id) }
         .accessibilityAction(named: "Remove") { removeEntry() }
@@ -1009,7 +1125,8 @@ private struct ClipboardRow: View {
 
 struct ShelfPage: View {
     let topBar: TopBarModel
-    
+    /// The stack whose files are laid out in a ribbon, if one is open.
+    @State private var openStack: UUID?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1025,11 +1142,25 @@ struct ShelfPage: View {
             .frame(maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous)
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topBar.shelfTargeted)
+            .animation(Motion.live(MotionTokens.panelResize), value: topBar.shelfTargeted)
 
-            PageScroll(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(topBar.shelf) { item in ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url) } }
+            VStack(alignment: .leading, spacing: 4) {
+                if let fling = topBar.fling { FlingNearbyStrip(fling: fling, topBar: topBar) }
+                PageScroll(.horizontal) {
+                    HStack(spacing: 8) {
+                        if let openStack, case let files = topBar.shelf.filter({ $0.stackID == openStack }), files.count > 1 {
+                            FlingStackRibbon(items: files, topBar: topBar) { self.openStack = nil }
+                        } else {
+                            ForEach(ShelfStacks.cells(topBar.shelf)) { cell in
+                                switch cell {
+                                case .item(let item):
+                                    ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item, fling: topBar.fling) }
+                                case .stack(let id, let items):
+                                    FlingStackCell(stack: id, items: items, topBar: topBar) { openStack = id }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -1046,7 +1177,7 @@ struct ShelfPage: View {
     }
 }
 
-private struct ShelfCell: View {
+struct ShelfCell: View {
     let item: TopBarModel.ShelfItem
     let topBar: TopBarModel
 
@@ -1055,10 +1186,21 @@ private struct ShelfCell: View {
         VStack(spacing: 5) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                 .resizable().frame(width: 52, height: 52)
+                .overlay(alignment: .bottomTrailing) {
+                    if item.verified {
+                        Image(systemName: "checkmark.seal.fill").font(.system(size: 11)).foregroundStyle(Theme.leaf)
+                            .accessibilityLabel("Verified")
+                    }
+                }
             Text(item.name).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 84)
             HStack(spacing: 0) {
-                GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
-                    NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
+                if let fling = topBar.fling, fling.isEnabled {
+                    FlingPickerMenu(items: [item], fling: fling)
+                    FlingFlickHandle(items: [item], fling: fling, sensitivity: fling.flickSensitivity)
+                } else {
+                    GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
+                        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
+                    }
                 }
                 if item.isMedia {
                     GlyphButton(symbol: "text.bubble", size: 9, tint: Theme.cloudSecondary, label: "Transcribe") { topBar.transcribeFile(item.url) }
@@ -1292,6 +1434,7 @@ struct NotchActionButton: View {
             Text(title)
                 .font(TopBarStyle.label(12, .semibold))
                 .foregroundStyle(filled ? Theme.storm : tint)
+                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 28)
                 .background(Capsule().fill(filled ? tint : Color.white.opacity(0.12)))
@@ -1308,6 +1451,8 @@ struct NotchActionButton: View {
 /// dictation, a focus countdown or the track that's playing (in that order of importance).
 struct ClosedWings: View {
     let topBar: TopBarModel
+    /// The width between the wings: the footprint's wing base, so the gap is exactly the notch.
+    var notchGap: CGFloat = NotchClosedBodyLayout.noNotchGap
 
     enum Kind: Equatable { case recordly, scribe, recordingFeedback, cue(NotchCue), dictation, avatar(AvatarState), focus, music, none }
 
@@ -1392,7 +1537,7 @@ struct ClosedWings: View {
             wings { cueIcon(cue) } right: { cueDetail(cue) }
         case .avatar(let state):
             // ZEUS itself: the v2 mascot posed for what it is doing, and a word for it.
-            wings { MiniMascotView(state: state, size: 22) } right: {
+            wings { MiniMascotView(state: state, size: NotchClosedBodyLayout.miniMascotSize) } right: {
                 if state != .idle {
                     Text(state.short).font(TopBarStyle.label(10.5, .semibold)).foregroundStyle(.white.opacity(0.88))
                         .lineLimit(1).contentTransition(.opacity)
@@ -1409,7 +1554,11 @@ struct ClosedWings: View {
                 }
             }
         case .music:
-            wings { AlbumTile(playing: topBar.nowPlaying, size: 18) } right: {
+            wings {
+                AlbumTile(playing: topBar.nowPlaying, size: 18)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
+            } right: {
                 LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
             }
         case .none:
@@ -1419,15 +1568,11 @@ struct ClosedWings: View {
 
     private func wings<L: View, R: View>(@ViewBuilder left: () -> L, @ViewBuilder right: () -> R) -> some View {
         // Width springs via `NotchView.wingsSpring`; scale insertion caused a one-frame full-size jump (R24 C1).
-        HStack(spacing: 0) {
-            left().frame(width: Self.wingWidth - 14, alignment: .leading)
-            Spacer(minLength: 0)
-            right().frame(width: Self.wingWidth - 14 + Self.extraWidth(for: topBar), alignment: .trailing)
-        }
+        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar), left: left(), right: right())
     }
 
-    static let wingWidth: CGFloat = 62
-    /// Cues with text get a wider right wing.
+    static let wingWidth: CGFloat = NotchClosedBodyLayout.wingWidth
+    /// Cues with text widen both wings by the same extra.
     static func extraWidth(for topBar: TopBarModel) -> CGFloat {
         switch kind(of: topBar) {
         case .cue(let cue):
@@ -1438,7 +1583,8 @@ struct ClosedWings: View {
             case .volume, .brightness, .keyboardBacklight: return 58
             default: return 30
             }
-        case .avatar: return 14
+        // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
+        case .avatar(let state): return state == .idle ? NotchClosedBodyLayout.idleMascotExtra : 14
         case .dictation: return 60
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }
@@ -1459,7 +1605,7 @@ struct ClosedWings: View {
         case .volume(let level, let muted): (muted || level == 0 ? "speaker.slash.fill" : level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill", Theme.cloudPrimary)
         case .charging: ("battery.100percent.bolt", Theme.leaf)
         case .lowBattery: ("battery.25percent", Theme.danger)
-        case .trackChanged: ("music.note", Theme.leaf)
+        case .trackChanged(_, _, let source, _): (NowPlayingDisplay.cueGlyph(for: source), Theme.leaf)
         case .shelfAdded: ("tray.and.arrow.down.fill", Theme.bolt)
         case .focusFinished: ("timer", TopBarStyle.violet)
         case .dictation: ("waveform", TopBarStyle.rec)
@@ -1472,6 +1618,8 @@ struct ClosedWings: View {
         case .rain: ("cloud.rain.fill", Theme.sky)
         case .decided: ("checkmark.circle.fill", Theme.bolt)
         case .screenshot: ("camera.fill", Theme.bolt)
+        case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
+        case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1506,19 +1654,27 @@ struct ClosedWings: View {
             Text("+\(count)").font(TopBarStyle.label(11, .bold)).foregroundStyle(Theme.bolt)
         case .screenshot(let title):
             Text(title).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingArrived(let count, let from):
+            Text("\(count) from \(from)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingSent(let count, let to):
+            Text("Sent \(count) to \(to)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .flingProblem(let text):
+            Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .permission(let text, let pane):
             HStack(spacing: 6) {
-                Text(text).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                // Wraps on word boundaries instead of cutting mid-word: the wing width is fixed and the copy varies.
+                Text(text).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit(2).multilineTextAlignment(.trailing).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                 Button("Open") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(url) }
                 }
                 .buttonStyle(.plain).font(TopBarStyle.label(10.5, .bold)).foregroundStyle(Theme.bolt)
                 .accessibilityLabel("Open System Settings")
             }.frame(width: 250, alignment: .trailing)
-        case .trackChanged(let title, let artist):
-            Text(artist.isEmpty ? title : "\(title) · \(artist)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
+        case .trackChanged(let title, let artist, let source, let sourceChanged):
+            Text(NowPlayingDisplay.cueText(title: title, artist: artist, source: source, sourceChanged: sourceChanged)).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(1).frame(width: 190, alignment: .trailing)
         }
     }
@@ -1535,7 +1691,7 @@ enum ScribeWings {
         /// True where this meter is the only Scribe indicator (the combined Recordly wings): it then
         /// is its own accessibility element. Alone, the trailing ticker speaks for Scribe.
         var announces = false
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        private var reduceMotion: Bool { Motion.reduced }
 
         var body: some View {
             if compact {
@@ -1592,7 +1748,7 @@ enum ScribeWings {
     struct Trailing: View {
         let scribe: ScribeController
         let topBar: TopBarModel
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        private var reduceMotion: Bool { Motion.reduced }
 
         var body: some View {
             // Ending is confirmed on the page, so this only brings the person there (capture continues).
@@ -1606,6 +1762,7 @@ enum ScribeWings {
             .accessibilityLabel("Scribe recording")
             .accessibilityValue(RecordingMotion.spokenElapsed(scribe.elapsed) ?? "Elapsed time unavailable")
             .accessibilityHint("Opens Scribe, where you can end the meeting.")
+            .accessibilityAction { topBar.onOpenTab(.scribe) }
         }
 
         /// The clock for the words' pacing runs only while this wing is on screen (that is, while recording).
@@ -1647,10 +1804,14 @@ enum ScribeWings {
                 let rgb = ScribeSpeakerPalette.color(for: segment.speaker)
                 pill {
                     Circle().fill(Color(red: rgb.red, green: rgb.green, blue: rgb.blue)).frame(width: 6, height: 6)
-                    Text(ScribeTickerText.tail(shown, words: Self.tailWords))
-                        .font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
-                        .lineLimit(1).fixedSize()
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    // The words overlay a flexible spacer, so a long sentence is clipped to the wing and
+                    // never widens the pill leftwards under the notch.
+                    Color.clear.frame(maxWidth: .infinity).frame(height: 14)
+                        .overlay(alignment: .trailing) {
+                            Text(ScribeTickerText.tail(shown, words: Self.tailWords))
+                                .font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
+                                .lineLimit(1).fixedSize()
+                        }
                         .clipped()
                         .mask(LinearGradient(
                             stops: [
@@ -1690,7 +1851,7 @@ enum ScribeWings {
     }
 }
 
-/// Superwhisper-style live waveform: the last levels scroll right to left, newest at the notch.
+/// Live waveform: the last levels scroll right to left, newest at the notch.
 struct DictationWave: View {
     let levels: [Double]
     let color: Color
@@ -1706,6 +1867,30 @@ struct DictationWave: View {
         }
         .frame(height: 18)
         .animation(Motion.reduced ? nil : .linear(duration: 0.08), value: levels)
+    }
+}
+
+/// The closed wings as `NotchClosedBodyLayout.closedWingGeometry` places them: two equal wings and a gap that
+/// is exactly the notch, so no wing content can start under the camera.
+struct ClosedWingsRow<L: View, R: View>: View {
+    let notchGap: CGFloat
+    let extra: CGFloat
+    let left: L
+    let right: R
+
+    var body: some View {
+        let geometry = NotchClosedBodyLayout.closedWingGeometry(notchWidth: notchGap, shoulder: 0, extra: extra)
+        // Each wing is a fixed-width clear box with its content overlaid: a wing with nothing in it (the resting
+        // mascot's right side) still takes its width, so the gap cannot slide off the notch.
+        HStack(spacing: 0) {
+            Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .overlay(alignment: .leading) { left.ownedJourneyControl("closed-wings.left.content") }
+                .ownedJourneyControl("closed-wings.left")
+            Color.clear.frame(width: geometry.gapWidth)
+            Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .overlay(alignment: .trailing) { right.ownedJourneyControl("closed-wings.right.content") }
+                .ownedJourneyControl("closed-wings.right")
+        }
     }
 }
 
@@ -1750,7 +1935,7 @@ struct EngineBadge: View {
     }
 }
 
-/// Superwhisper in one click: start talking, click again (or press the talk key) to type it
+/// Dictation in one click: start talking, click again (or press the talk key) to type it
 /// into the app you were in. The notch never takes focus, so the text lands where your cursor was.
 struct DictateButton: View {
     let topBar: TopBarModel

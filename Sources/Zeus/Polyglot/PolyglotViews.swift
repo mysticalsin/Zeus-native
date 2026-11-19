@@ -198,7 +198,7 @@ struct PolyglotPage: View {
                                     label: polyglot.isPoppedOut ? "Close the floating captions" : "Pop out floating captions") { polyglot.togglePopOut() }
                         GlyphButton(symbol: "trash", size: 12, tint: Theme.cloudSecondary, label: "Clear captions") { polyglot.clear() }
                         GlyphButton(symbol: "xmark", size: 10, tint: Theme.cloudSecondary, label: "Dismiss Polyglot bar") {
-                            NotchControllerBridge.controller?.show(.closed)
+                            NotchControllerBridge.controller?.dismissExplicitly()
                         }
                         Spacer(minLength: 0)
                     }

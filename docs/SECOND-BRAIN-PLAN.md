@@ -3,9 +3,10 @@
 Reviewed 9 November 2026 on `codex/zeus-readiness-20261109`, based on
 `cursor/polyglot-caption-flow-fa03-from-packet`. The first outbound destination
 requested by Tony is **Obsidian / local Markdown**. This branch adds saved-meeting
-source navigation, a related-pages list, and a selected-page local MCP export
-workflow. The visual graph and unified learning stages remain implementation plans.
-Native macOS acceptance is still required for the new export sheet and security-scoped access.
+source navigation, a bounded native focus graph with an equivalent list, and a
+selected-page local MCP export workflow. Unified learning remains planned.
+Native macOS acceptance is still required for graph navigation, the export sheet
+and security-scoped access.
 
 ## What exists
 
@@ -14,9 +15,9 @@ Native macOS acceptance is still required for the new export sheet and security-
 | Learning wiki | `WikiController`, `WikiCompiler`, `WikiPage`, `WikiStore`. Saved Scribe decisions and action items are deduplicated into topic pages. No raw audio or private meeting notes are ingested. |
 | Durable memory controls | Wiki search, pin, body editing, pause, forget-meeting tombstones, delete, pending-write retries, and recovery notices. Edited pages affected by a forgotten source require review before export or promotion. |
 | Provenance | `WikiFact.sources` and `WikiPage.sources` preserve meeting IDs. A meeting source can open its existing saved recap; missing, dismissed, cancelled or forgotten sources cannot be revived. Opening is blocked while a Scribe capture/processing session runs. `WikiSource.preference` and `.memory` are defined, but the compiler currently ingests meetings only. |
-| Related pages | `WikiRelationships` derives an accessible navigation list from explicit `[[Page title]]` / exact-page-ID links in edited pages and identical current source IDs. Links show incoming, outgoing or both directions; shared-source connections retain their evidence separately. Missing or removed meeting evidence and forget tombstones are excluded. Ambiguous titles, missing pages and self-links do not resolve. This is not a visual graph or Graphify parity. |
+| Related pages | `WikiRelationships` derives an accessible navigation list from explicit `[[Page title]]` / exact-page-ID links in edited pages and identical current source IDs. Links show incoming, outgoing or both directions; shared-source connections retain their evidence separately. Missing or removed meeting evidence and forget tombstones are excluded. Ambiguous titles, missing pages and self-links do not resolve. The Connections sheet projects the same evidence into a bounded focus graph and complete filtered list. It makes no claim of Graphify parity or inferred semantic connections. |
 | Explicit wiki export | The existing Save Panel exports one selected page. The new **Send to vault…** sheet selects up to 20 pages, previews exact Markdown and provenance, applies source/review/sensitive-information gates, and sends only after an explicit Export action. |
-| Preferences and to-do learning | `UserMemoryStore` keeps explicitly remembered rules/facts; `TodoLearning` learns local recurring-task patterns. These stores are separate from the learning wiki. There is no first-class lesson record or graph. |
+| Preferences and to-do learning | `UserMemoryStore` keeps explicitly remembered rules/facts; `TodoLearning` learns local recurring-task patterns. These stores are separate from the learning wiki. There is no first-class lesson record or cross-store learning graph. |
 | Vault integration | Local note search, today's tasks, to-do mirroring, profile creation, and explicit Save to Brain from chat, stickies, routines, and shelf items. Existing capture has a source category such as `zeus-chat`, but does not retain the original record ID. |
 | MCP | `WikiMCPExportModel` uses the real `MCPStdioClient` and bundled `zeus memory-mcp` helper. The helper exposes only create and inspect for UUID-named exports in the explicitly configured Obsidian/Markdown inbox. No arbitrary third-party server adapter or background sync exists. Global wiki scope remains unrelated to export permission. |
 
@@ -74,31 +75,52 @@ Acceptance: synthetic records of every kind survive restart, expose the correct
 source, update on edits, and stay forgotten after source refresh. Inaccessible or
 partially corrupt source storage must not delete unrelated learned facts.
 
-## Stage 2: Graph with inspectable connections
+## Stage 2: Focus graph with inspectable connections — implemented slice
 
-The first bounded connection model is implemented: `WikiRelatedPage` carries the
-target page ID/title, explicit authored-link direction and exact shared source
-IDs, derived by `WikiRelationships`. It recomputes after source or page removal
-and does not mutate page contents or clear a review flag. Native
-keyboard/VoiceOver/source routing acceptance is still pending.
+`WikiGraphSnapshot` projects the existing `WikiRelationships` results. The native
+**Explore connections…** sheet shows the selected page plus up to eight neighbors.
+Selecting a page uses the existing navigation guard and saves pending edits;
+selecting ⓘ exposes authored-link direction and exact shared source records.
+Valid shared meeting records open through the existing saved-recap resolver,
+which preserves active recording/processing sessions and rechecks source access.
+No vault, screen text, inferred relationship or external service is consulted.
 
-Extend this to `WikiRelation(id, fromID, toID, kind, sourceIDs, origin, confidence, revision)`.
-Start with deterministic `derivedFrom`, `sameTopic`, and `actionFromMeeting`
-relationships. Suggested semantic relationships must show their supporting
-sources and remain distinguishable from confirmed ones. A shared topic alone is
-not evidence that one fact caused another.
+The Graph/List switch uses one snapshot. The list retains every matching
+relationship, including neighbors omitted by the drawing cap. Both views offer
+connected-title/ID search and All / Authored links / Shared sources filters.
+Native buttons expose titles, evidence and navigation actions to keyboard and
+accessibility clients; decorative lines are hidden from the accessibility tree.
+Source evidence is available from both views. Reduced Motion removes the view
+switch transition; there is no force simulation or continuously animated layout.
 
-Build the graph and an equivalent accessible list from the same relation model.
-Selecting a node opens its page; selecting an edge shows its explanation and
-source records. Provide search, focus on one topic, keyboard navigation, reduced
-motion, and a readable empty state. Deletion/forgetting removes derived edges;
-edited content invalidates suggestions whose evidence changed. Benchmark large
-synthetic graphs before enabling an unbounded all-pages view.
+Opening the graph refreshes the saved-meeting availability used by the existing
+wiki. Missing, dismissed, cancelled and forgotten meeting evidence stays
+excluded. Links from unreviewed or forgotten text remain withheld; the graph
+never clears a review flag. Page edits/deletion/forgetting in Memory recompute
+connections. Out-of-process edits to wiki JSON are still subject to the existing
+controller's reload lifecycle; this graph adds no filesystem watcher.
 
-Acceptance: source links work from both graph and list; no orphan edges survive
-forget/delete/restart; VoiceOver and keyboard can reach every relationship;
-performance is measured on a representative Mac. Graphify-style visual parity
-needs the user's actual reference and live review.
+Layout is deterministic for identical selected nodes and relationships, including
+reordered inputs. Adding/removing/filtering nodes can change their positions.
+Projection is O(R log R), draws at most nine nodes/eight edges, and has no per-frame
+relationship scan. The existing relationship parser caps each page at 65,536
+characters and 128 references. A 10,000-relationship synthetic test retains all
+10,000 list rows while drawing only eight connections. This is a projection
+check, not a native rendering benchmark.
+
+The portable graph group has **12 new regression tests** plus **14 existing
+relationship/source-navigation tests**, covering stable layout, overflow, filter
+and query behavior, exact source identity, authored direction, review preservation,
+source exclusion and duplicate conflicts. Four native controller journey tests
+cover editing an explicit link, opening and navigating the graph with saved edits,
+deleting a target, forgetting its source, and unreadable settings. Native journey
+and keyboard/VoiceOver/rendering acceptance still require the macOS test run.
+
+Remaining work: an all-pages overview or semantic suggestions need a separately
+bounded relation model with inspectable provenance and measured native performance.
+Unified preference, remembered-fact, lesson and to-do learning remains Stage 1.
+The current focus graph does not assert semantic agreement, causation or
+Graphify-style visual/motion parity.
 
 ## Stage 3: Selected Obsidian export over MCP — implemented slice
 
@@ -169,7 +191,7 @@ send selected content to an arbitrary configured server.
 The current recovery record describes the latest export only; a browsable durable
 history of all verified exports and source-level external-copy notices is future
 work. Unified preference/lesson/to-do ingestion, versioned source locators,
-portable source deep links, and the visual graph remain in Stages 1–2.
+portable source deep links, and a broader all-pages graph remain in Stages 1–2.
 
 ## Validation evidence and limits
 

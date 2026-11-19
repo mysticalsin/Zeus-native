@@ -1,0 +1,158 @@
+{
+  "scope": "Exact production Controller logic plus new Core Diagnostics, synthetic services and real private history stores; portable excerpt with inert native boundaries, not native SDK/AVFoundation/permission proof",
+  "command": "/workspace/toolchains/swift-6.2.1-RELEASE-ubuntu24.04/usr/bin/swift test --jobs 1",
+  "exit_code": 0,
+  "passed": 25,
+  "suites": 1,
+  "test_seconds": 18.252,
+  "build_duration": "83.93s",
+  "source_matches_repository": true,
+  "inputs": [
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationCompletionStream.swift",
+      "source_sha256": "7a97f83d6e4253a5f0e44e7c786305cc04659855cc59fce03ace0bceca48426e",
+      "destination": "Sources/ZeusCore/ExplanationCompletionStream.swift",
+      "destination_sha256": "7a97f83d6e4253a5f0e44e7c786305cc04659855cc59fce03ace0bceca48426e",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationCoordinates.swift",
+      "source_sha256": "da597f3cbd9e4b011ad87f974378c9508213d20b0d14147ee8d12924e722eb66",
+      "destination": "Sources/ZeusCore/ExplanationCoordinates.swift",
+      "destination_sha256": "da597f3cbd9e4b011ad87f974378c9508213d20b0d14147ee8d12924e722eb66",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationHistory.swift",
+      "source_sha256": "9a2d1ef34ead7957a2baf5e5621d9a229700c8425dd6b219da1955982491f43f",
+      "destination": "Sources/ZeusCore/ExplanationHistory.swift",
+      "destination_sha256": "9a2d1ef34ead7957a2baf5e5621d9a229700c8425dd6b219da1955982491f43f",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationPlayback.swift",
+      "source_sha256": "50f67bf3668c3e9d788971c146c7e7af34d46dc894aaffe4a0a8d16ba60edb06",
+      "destination": "Sources/ZeusCore/ExplanationPlayback.swift",
+      "destination_sha256": "50f67bf3668c3e9d788971c146c7e7af34d46dc894aaffe4a0a8d16ba60edb06",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationProtocol.swift",
+      "source_sha256": "f2333d36b7220c65aa6ca6a7543940088c8ec56e2fc7f529461982493dc7caae",
+      "destination": "Sources/ZeusCore/ExplanationProtocol.swift",
+      "destination_sha256": "f2333d36b7220c65aa6ca6a7543940088c8ec56e2fc7f529461982493dc7caae",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationReducer.swift",
+      "source_sha256": "771344da89e09d585c29e194a619c0dc36bec401a5abe63880909332ad76a1d7",
+      "destination": "Sources/ZeusCore/ExplanationReducer.swift",
+      "destination_sha256": "771344da89e09d585c29e194a619c0dc36bec401a5abe63880909332ad76a1d7",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationStream.swift",
+      "source_sha256": "172d06ec37f64c6b24d213fe44ad18c792927dc8a327c06a19e265144bd7a071",
+      "destination": "Sources/ZeusCore/ExplanationStream.swift",
+      "destination_sha256": "172d06ec37f64c6b24d213fe44ad18c792927dc8a327c06a19e265144bd7a071",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/ZeusCore/Dictation/TranscriptionEngine.swift",
+      "source_sha256": "e471cbd77794ed1a3c5f89a482fbad0210777143e4a2019766e8b9a82cb7a65a",
+      "destination": "Sources/ZeusCore/TranscriptionEngine.swift",
+      "destination_sha256": "e471cbd77794ed1a3c5f89a482fbad0210777143e4a2019766e8b9a82cb7a65a",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "/workspace/zeus-validation/visual-controller-1/Sources/Zeus/InertNativeAdapters.swift",
+      "source_sha256": "2706b9bfd69c5875c2bd3804bd8485cd47ebb902bb2906f34aecbcb01bc2306c",
+      "destination": "Sources/Zeus/InertNativeAdapters.swift",
+      "destination_sha256": "2706b9bfd69c5875c2bd3804bd8485cd47ebb902bb2906f34aecbcb01bc2306c",
+      "transformation": "previous independently tested inert/portable excerpt; no live services/Observation runtime"
+    },
+    {
+      "source": "/workspace/zeus-validation/visual-controller-1/Sources/Zeus/InertScreenAdapter.swift",
+      "source_sha256": "916aaff05da9be53230b78bf4a6c4251c9cc0f2f9be454bbd84f4f9f7b4fdf4d",
+      "destination": "Sources/Zeus/InertScreenAdapter.swift",
+      "destination_sha256": "916aaff05da9be53230b78bf4a6c4251c9cc0f2f9be454bbd84f4f9f7b4fdf4d",
+      "transformation": "previous independently tested inert/portable excerpt; no live services/Observation runtime"
+    },
+    {
+      "source": "/workspace/zeus-validation/visual-controller-1/Sources/Zeus/ExplanationScreenContext.swift",
+      "source_sha256": "d9dfe5cf4d7f94020b2a1e72ea5eea20dbbf4d777f5138f6249c88a1168c111b",
+      "destination": "Sources/Zeus/ExplanationScreenContext.swift",
+      "destination_sha256": "d9dfe5cf4d7f94020b2a1e72ea5eea20dbbf4d777f5138f6249c88a1168c111b",
+      "transformation": "previous independently tested inert/portable excerpt; no live services/Observation runtime"
+    },
+    {
+      "source": "/workspace/zeus-validation/visual-controller-1/Sources/ZeusCore/ScreenShot.swift",
+      "source_sha256": "5962b34a7b5e19638e6da77b594ad681b03e33f5096beeaa59452d3a27b57f90",
+      "destination": "Sources/ZeusCore/ScreenShot.swift",
+      "destination_sha256": "5962b34a7b5e19638e6da77b594ad681b03e33f5096beeaa59452d3a27b57f90",
+      "transformation": "previous Foundation value excerpt; no capture"
+    },
+    {
+      "source": "/workspace/zeus-validation/visual-controller-1/Package.swift",
+      "source_sha256": "87300ec773b094d18b593419f89a1755a6d42dc437b8ba085f7fb189bf9c024a",
+      "destination": "Package.swift",
+      "destination_sha256": "87300ec773b094d18b593419f89a1755a6d42dc437b8ba085f7fb189bf9c024a",
+      "transformation": "exact copy"
+    },
+    {
+      "source": "Sources/Zeus/Explanation/ExplanationController.swift",
+      "source_sha256": "c8bd8bcce3c66ad230a4180d71684709a3e67d58876df2b4935bf13c7c39245c",
+      "destination": "Sources/Zeus/ExplanationController.swift",
+      "destination_sha256": "4138c69ddca03f5e4de9e6dd0b188504c796a60f01bbc7e174b800ff3decfd17",
+      "transformation": "Only import AppKit\u2192Foundation and Observation annotation/import removed (unavailable Linux runtime); controller logic unchanged"
+    },
+    {
+      "source": "Sources/Zeus/Explanation/ExplanationAudio.swift",
+      "source_sha256": "24619d41a0ba13a636ae8f5486eaffa1f92fa1e69f9eccdf237b0bddc7a57e12",
+      "destination": "Sources/Zeus/ExplanationAudioContracts.swift",
+      "destination_sha256": "a3f412ac5ea1177f072a8691dbeb2016768b1bc32753e8130dc80f29761c56c8",
+      "transformation": "Exact prepared ownership/render queue/media protocol/player. Native PCM/synth/media/Fluid omitted; default factory replaced with throwing inert closure. Tests inject fakes."
+    },
+    {
+      "source": "Sources/Zeus/Explanation/ExplanationMicrophone.swift",
+      "source_sha256": "ff0a3a379663092c88ef59f8af316c05961b88d5a2132a6b23f3a75fd388aaea",
+      "destination": "Sources/Zeus/ExplanationMicrophone.swift",
+      "destination_sha256": "667e48f1831392ed640e831193d618828a1693575de3ac88c00058e3f2d4578e",
+      "transformation": "Exact protocols/PTT state machine/mailbox; native capture/permission/WhisperKit conformance and Observation omitted. Inert defaults."
+    },
+    {
+      "source": "Sources/Zeus/Explanation/ExplanationProvider.swift",
+      "source_sha256": "48252f2a1703b8c7a844fe7460c3a703915679dbd9a292af2f4c6f714a094c33",
+      "destination": "Sources/Zeus/ExplanationProviderContracts.swift",
+      "destination_sha256": "c58a52fe3ab7251c9d0939136e342d129120568beb5bcedefced13e0bcee6dd3",
+      "transformation": "Exact request/error/protocol only; concrete network provider omitted; fake injected."
+    },
+    {
+      "source": "Tests/ZeusAppTests/ExplanationControllerTests.swift",
+      "source_sha256": "564d790d50eb08e2265aebed85719227ec78e439aa49b69254d8f334a706bf9e",
+      "destination": "Tests/ZeusTests/ExplanationControllerTests.swift",
+      "destination_sha256": "564d790d50eb08e2265aebed85719227ec78e439aa49b69254d8f334a706bf9e",
+      "transformation": "Exact copy; native-only synthetic PCM/seek guard excluded by canImport(AVFoundation) on Linux."
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationDiagnostics.swift",
+      "source_sha256": "e343841619390623bc96136d0bb6b2df04198630d73fca93eeae5296a57cc8de",
+      "destination": "Sources/ZeusCore/ExplanationDiagnostics.swift",
+      "destination_sha256": "e343841619390623bc96136d0bb6b2df04198630d73fca93eeae5296a57cc8de",
+      "transformation": "exact copy"
+    }
+  ],
+  "manifest_sha256": "b0d89d32aececc003dff3408b07f63e55e1b7a243b8d7b3a32bc0004e34abad8",
+  "log": "test-1.log",
+  "log_sha256": "6d5ae8ed4e10997e14083090f3c5709e3cf46c54c2d2503bea0abd7d42d57b39",
+  "native_only_test_not_run": "currentBeatSeekEndsPreviewWithoutPlayingOrSynthesizingQueuedFuture",
+  "native_adapters": "AVFoundation PCM/synthesis/media implementation, Fluid candidate and native capture/permissions omitted; inert default adapters and injected fakes. No installed voice, model, audio playback, capture, provider, or network invocation.",
+  "observation": "Observation import/annotations omitted due known Linux libswiftObservation link defect. No Observation runtime acceptance.",
+  "process_measurements": "Controller platform sampler native AppKit branch remains conditionally excluded; tests inject numeric samples. Diagnostics are not measured product/device performance.",
+  "prior_receipts_preserved": [
+    "/workspace/zeus-validation/visual-controller-1/receipt.json",
+    "/workspace/zeus-validation/visual-controller-2/final-receipt.json"
+  ],
+  "failures_in_this_run": [],
+  "unrelated_test_hardening": "ExplanationAudioTests directory read moved outside #require; syntax-only native test change, not executed in this harness."
+}

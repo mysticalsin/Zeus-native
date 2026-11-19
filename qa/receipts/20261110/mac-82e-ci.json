@@ -1,0 +1,54 @@
+{
+  "scope": "Actual macOS compilation and incomplete native execution. Completed named fixtures are diagnostic subsets, not aggregate acceptance.",
+  "head_sha": "82e310c1bd853df57c66a111c126947b8b26f152",
+  "tested_sha": "6ff3ad8d2f14bc5e2441278d122cf47fdf61a7f4",
+  "source_snapshot_sha256": "3453e7de73564699ff9b31fae48dbab59cc1fed4e4dcf88bf74e75fd35b1c823",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42750405765",
+  "app_job_id": 129612407173,
+  "production_build": "passed",
+  "test_target_build": "passed",
+  "native_discovery": "passed",
+  "native_execution": {
+    "status": "incomplete",
+    "exit_code": 0,
+    "reason": "missing or ambiguous Swift Testing summary",
+    "run_ended_present": false,
+    "recorded_issues": 5
+  },
+  "completed_suite_subsets": [
+    "EngineBrandLogoTests",
+    "ScribeIncomingWordTests",
+    "WikiGraphNavigationTests",
+    "DisplaySynchronizedViewTests",
+    "MemoryMCPTransportTests"
+  ],
+  "not_completed": [
+    "OnboardingIsolationTests",
+    "RecordingFeedbackRenderTests",
+    "OwnedWindowEventDriverTests"
+  ],
+  "failures": [
+    "Two strict Scribe accessibility fixtures",
+    "Scribe production-control event journey",
+    "Native NSButton event fixture",
+    "Delayed license activation fixture did not reach the synthetic server"
+  ],
+  "artifacts": [
+    {
+      "path": "result.json",
+      "sha256": "b79ba82ef6a1e7d3ced988496db8298bcc5f3dc9a4391ba35afb7f2d7d950134"
+    },
+    {
+      "path": "native-all/test.log",
+      "sha256": "3d8f153cc078ef6c979c68e49aba0b6b22d98bc35c6dddb1953a342190be1c91"
+    },
+    {
+      "path": "native-all/events.jsonl",
+      "sha256": "a365f71638b11354c4411cf12491887ef1e139c0fad1d6125cd76c5e66b196e4"
+    }
+  ],
+  "follow_up": "Run Core and each selected app suite in separate processes after the same compilation/discovery barrier. Preserve every exact test identity, terminal event and failure. This removes shared snapshot and application-lifecycle fixture interference; it does not prove a physical journey.",
+  "preview_bundle": "skipped after native failure",
+  "release_acceptance": false,
+  "physical_frame_pacing": "not measured; 20 Hz offscreen GIF samples do not prove display presentation or 240 FPS"
+}

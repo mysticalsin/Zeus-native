@@ -30,6 +30,8 @@ struct R24LaneTests {
         #expect(GlanceSettingsSnapshotMapping.resolveSectionID("memory") == "features")
         #expect(GlanceSettingsSnapshotMapping.resolveSectionID("teleprompter") == "beamer")
         #expect(GlanceSettingsSnapshotMapping.resolveSectionID("Voice") == "voice")
+        #expect(GlanceSettingsSnapshotMapping.resolveSectionID("tiling") == "tiling")
+        #expect(GlanceSettingsSnapshotMapping.resolveSectionID("Tiling") == "tiling")
     }
 
     @Test func debugAudioPathResolvesRelativePaths() {
@@ -49,14 +51,14 @@ struct R24LaneTests {
     }
 
     @Test func metaphysicalQuestionsStayLocalAndShort() {
-        let answer = PersonaQueries.localAnswer(for: "Are you conscious?")
+        let answer = PersonaQueries.localAnswer(for: "Are you conscious?", personality: .ultron)
         #expect(answer != nil)
         #expect(answer!.split(separator: " ").count <= 20)
         #expect(!answer!.lowercased().contains("weekly limit"))
     }
 
     @Test func smallTalkIsNotServile() {
-        let answer = PersonaQueries.localAnswer(for: "how are you today") ?? ""
+        let answer = PersonaQueries.localAnswer(for: "how are you today", personality: .ultron) ?? ""
         #expect(!answer.lowercased().contains("at your disposal"))
         #expect(!answer.lowercased().contains("operational"))
     }
@@ -74,7 +76,7 @@ struct R24LaneTests {
         #expect(!line.lowercased().contains("nov"))
         #expect(line.split(separator: " ").count <= 10)
         let dumped = SpokenFailure.line("HTTP 500 traceback in the provider")
-        #expect(dumped == "I couldn't finish that.")
+        #expect(Set(ZeusVoiceLines.bank(.ultron)[.errorSpoken] ?? []).union(ZeusVoiceLines.bank(.plain)[.errorSpoken] ?? []).contains(dumped))
         #expect(BrowserAgentOutcome.failed(raw).spokenText == "Every AI is out of quota.")
     }
 

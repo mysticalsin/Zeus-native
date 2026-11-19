@@ -20,7 +20,7 @@ import Testing
         #expect(result.tags == [.point(PointTarget(x: 10, y: 20, label: nil, screen: 1))])
     }
 
-    @Test func trailingClickyStyleTagStillWorks() {
+    @Test func trailingLegacyStyleTagStillWorks() {
         let result = ZeusTagParser.parse("click the blue button. [POINT:100,200:save]")
         #expect(result.tags == [.point(PointTarget(x: 100, y: 200, label: "save"))])
         #expect(result.spokenText == "click the blue button.")
@@ -90,7 +90,7 @@ import Testing
         let json = try JSONEncoder().encode(request)
         var buffer = try NativeMessagingFrame.encode(json) + NativeMessagingFrame.encode(json)
         buffer.append(contentsOf: [0x05, 0x00]) // start of a third, incomplete frame
-        let messages = NativeMessagingFrame.decode(&buffer)
+        let messages = try NativeMessagingFrame.decode(&buffer)
         #expect(messages.count == 2)
         #expect(try JSONDecoder().decode(BridgeRequest.self, from: messages[0]) == request)
         #expect(buffer.count == 2)
@@ -192,5 +192,64 @@ import Testing
     @Test func jsonValueAccessors() {
         let value: JSONValue = .object(["a": .array([.bool(true)])])
         #expect(value["a"]?.arrayValue?.first?.boolValue == true)
+    }
+}
+
+@Suite struct ZeusTagStreamParserTests {
+    private static let wire = #"[DRAW:{"s":1,"m":[{"k":"ring","x":412,"y":88,"r":24,"at":0},{"k":"card","x":440,"y":120,"t":"Export as PDF","at":2}]}]"#
+
+    private static func run(_ chunks: [String]) -> (tags: [ZeusTag], spoken: String) {
+        var parser = ZeusTagStreamParser()
+        var outputs: [ZeusTagStreamParser.Output] = []
+        for chunk in chunks { outputs += parser.feed(chunk) }
+        outputs += parser.finish()
+        var tags: [ZeusTag] = []
+        var spoken = ""
+        for output in outputs {
+            switch output {
+            case .tag(let tag): tags.append(tag)
+            case .text(let text): spoken += text
+            }
+        }
+        return (tags, spoken.trimmingCharacters(in: .whitespaces))
+    }
+
+    @Test func aLeadingDrawTagIsEmittedAndNeverSpoken() {
+        let result = Self.run([Self.wire + " It is in the File menu."])
+        #expect(result.spoken == "It is in the File menu.")
+        guard case .draw(let draw)? = result.tags.first else {
+            Issue.record("expected a draw tag, got \(result.tags)")
+            return
+        }
+        #expect(draw.screen == 1)
+        #expect(draw.marks.count == 2)
+    }
+
+    @Test func aDrawTagSplitAcrossChunksStillParses() {
+        let text = Self.wire + " Open the File menu."
+        let chunks = stride(from: 0, to: text.count, by: 7).map { start -> String in
+            let from = text.index(text.startIndex, offsetBy: start)
+            let to = text.index(from, offsetBy: 7, limitedBy: text.endIndex) ?? text.endIndex
+            return String(text[from..<to])
+        }
+        let result = Self.run(chunks)
+        #expect(result.spoken == "Open the File menu.")
+        #expect(result.tags.count == 1)
+        if case .draw = result.tags.first {} else { Issue.record("expected a draw tag, got \(result.tags)") }
+    }
+
+    @Test func aMalformedDrawTagIsStrippedAndNeverSpoken() {
+        for bad in [#"[DRAW:{"s":1,"m":"nope"}]"#, #"[DRAW:{"s":1,"m":[{"k":"star"}]}]"#, #"[DRAW:{not json}]"#] {
+            let result = Self.run([bad + " Still speaking."])
+            #expect(result.tags.isEmpty, "\(bad)")
+            #expect(result.spoken == "Still speaking.", "\(bad)")
+        }
+    }
+
+    @Test func aDrawTagKeepsTheTagAfterItInOrder() {
+        let result = Self.run([Self.wire, "[POINT:5,6:menu]", " Here."])
+        #expect(result.tags.count == 2)
+        #expect(result.tags.last == .point(PointTarget(x: 5, y: 6, label: "menu")))
+        #expect(result.spoken == "Here.")
     }
 }

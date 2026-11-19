@@ -15,7 +15,7 @@ enum VoiceRoute: Equatable {
 
 enum VoiceRouting {
     /// - `engine`: the stored/default `VoiceSettings.engine` choice.
-    /// - `kokoroReady`: `KokoroVoice.isSetUp` right now.
+    /// - `kokoroReady`: the cached, asynchronously verified local voice readiness.
     /// - `hasElevenLabsRoute`: `!ElevenLabsVoice.loadRoutes().isEmpty` (a direct key or a worker).
     /// - `elevenLabsPaused`: either the persisted `VoiceSettings.elevenLabsPausedUntil` or the
     ///   `Speaker` instance's own short pause, already resolved to a single "paused right now" bool.

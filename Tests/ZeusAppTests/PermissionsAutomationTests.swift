@@ -56,4 +56,28 @@ struct PermissionsAutomationTests {
         #expect(calls == afterTimeout)
         Automation.resetCacheForTesting()
     }
+
+    @Test func checkStartedBeforeAllowCannotOverwriteTheGrantOrDeleteTheSavedOne() {
+        // A background check is mid-flight (it will report "would require consent"), the person clicks
+        // Allow and the grant is stored, then the older check finishes. The grant must survive.
+        Automation.resetCacheForTesting()
+        let target = "com.spotify.client"
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        Automation.testStatusProvider = { id, ask in
+            guard id == target, !ask else { return noErr }
+            entered.signal()
+            _ = release.wait(timeout: .now() + 3)
+            return OSStatus(errAEEventWouldRequireUserConsent)
+        }
+        _ = Automation.allowed(target)
+        #expect(entered.wait(timeout: .now() + 2) == .success)
+        Automation.promptAnswered(target, noErr)
+        #expect(Automation.allowed(target))
+        release.signal()
+        Automation.waitForChecksToEndForTesting()
+        #expect(Automation.allowed(target), "the older check must not replace the newer grant")
+        #expect(Automation.grantIsRemembered(target), "the older check must not delete the saved grant")
+        Automation.resetCacheForTesting()
+    }
 }

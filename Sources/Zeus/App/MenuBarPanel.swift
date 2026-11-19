@@ -27,7 +27,7 @@ final class MenuBarPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         contentViewController = hosting
-        setAccessibilityLabel("ZEUS")
+        setAccessibilityLabel("Zeus")
         setAccessibilityRole(.popover)
     }
 

@@ -10,14 +10,14 @@ import ZeusCore
 @MainActor
 final class TopBarServices {
     let model: TopBarModel
+    /// What the notch shows from Music, Spotify and later sources, and where a music command goes.
+    let nowPlayingHub: NowPlayingHub
+    private let musicFeed: MusicPlayerFeed
+    private let browserFeed: BrowserMediaFeed
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
     var onTimerFinished: () -> Void = {}
     private var timers: [Timer] = []
     private var observers: [NSObjectProtocol] = []
-    private var workspaceObservers: [NSObjectProtocol] = []
-    private var musicSyncTasks: [NowPlaying.Player: Task<Void, Never>] = [:]
-    /// Bumped by each player notification, so a slower state read started earlier never overwrites it.
-    private var musicRevision: [NowPlaying.Player: Int] = [:]
     private var flagsMonitor: Any?
     private var capsOn = NSEvent.modifierFlags.contains(.capsLock)
     private var lastChangeCount = NSPasteboard.general.changeCount
@@ -32,21 +32,29 @@ final class TopBarServices {
     private var rainGate = RainAlertGate()
     private var hudMonitor: SystemHUDMonitor?
     private var intakeWatcher: AirDropScreenshotWatcher?
+    private(set) var flingService: FlingService?
+    private var flingPrompts: FlingPromptPanelController?
+    private var flingPapers: FlingPaperController?
+    /// Whether the notch is open. Fling reads it only when background receiving is off.
+    var notchIsOpen: @MainActor () -> Bool = { true }
 
     init(model: TopBarModel) {
         self.model = model
+        nowPlayingHub = NowPlayingHub(model: model, ports: NowPlayingHub.livePorts(model: model))
+        musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
+        browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
     }
 
     func start() {
-        model.musicCommand = { [weak self] command in self?.music(command) }
-        model.seek = { [weak self] seconds in self?.seek(to: seconds) }
+        nowPlayingHub.attach()
         model.chooseOutputDevice = { [weak self] in self?.showOutputDevices() }
         model.requestCalendarAccess = { [weak self] in self?.requestCalendar() }
         model.refreshWeather = { [weak self] in self?.fetchWeather(force: true) }
         model.fetchEvents = { [weak self] start, end in self?.events(from: start, to: end) ?? [] }
         model.createEvent = { [weak self] parsed in await self?.saveEvent(parsed) ?? .failed("Calendar isn't available.") }
 
-        observeMusic()
+        musicFeed.start()
+        browserFeed.start()
         observeClipboard()
         observeCapsLock()
         observeVolume()
@@ -58,6 +66,7 @@ final class TopBarServices {
         refreshCalendarIfAllowed()
         fetchWeather(force: false)
         updateIntakeWatcher()
+        updateFlingService()
         BannerAutoDismisser.shared.update()
 
         every(1) { [weak self] in self?.tickFocus() }
@@ -74,123 +83,16 @@ final class TopBarServices {
         })
     }
 
-    /// Removes the app launch/quit observers and stops pending music reads.
+    /// Removes the music observers, stops pending music reads and takes the players and tabs off the notch.
     func stop() {
-        for observer in workspaceObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
-        workspaceObservers.removeAll()
-        for task in musicSyncTasks.values { task.cancel() }
-        musicSyncTasks.removeAll()
+        browserFeed.stop()
+        musicFeed.stop()
     }
 
     private func every(_ seconds: TimeInterval, _ body: @escaping @MainActor () -> Void) {
         let timer = Timer(timeInterval: seconds, repeats: true) { _ in MainActor.assumeIsolated { body() } }
         RunLoop.main.add(timer, forMode: .common)
         timers.append(timer)
-    }
-
-    // MARK: Music (public player notifications; controls through Apple Events on first tap)
-
-    private func observeMusic() {
-        let center = DistributedNotificationCenter.default()
-        for player in [NowPlaying.Player.music, .spotify] {
-            observers.append(center.addObserver(forName: .init(player.notificationName), object: nil, queue: .main) { [weak self] note in
-                let info = note.userInfo ?? [:]
-                let parsed = NowPlaying.parse(info, player: player)
-                MainActor.assumeIsolated {
-                    self?.musicRevision[player, default: 0] += 1
-                    self?.updateMusic(parsed, player: player)
-                }
-            })
-        }
-        // Apps launching or quitting: catch music already playing, and drop a track whose player is gone.
-        let workspace = NSWorkspace.shared.notificationCenter
-        workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] note in
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            guard let player = app?.bundleIdentifier.flatMap(NowPlaying.Player.init(bundleID:)) else { return }
-            MainActor.assumeIsolated { self?.syncMusicSoon(player, delays: [2, 5, 10]) }
-        })
-        workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] note in
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            guard let player = app?.bundleIdentifier.flatMap(NowPlaying.Player.init(bundleID:)) else { return }
-            MainActor.assumeIsolated {
-                self?.musicSyncTasks[player]?.cancel()
-                self?.updateMusic(nil, player: player)
-            }
-        })
-        // Music already playing at launch sends no notification. The Automation check is asynchronous,
-        // so the first tries may find it unresolved; each try stops once it could read (or nothing runs).
-        for player in [NowPlaying.Player.music, .spotify] { syncMusicSoon(player, delays: [1.5, 4, 9]) }
-    }
-
-    /// Reads the player's current state a few times with growing gaps, stopping after the first try that could.
-    private func syncMusicSoon(_ player: NowPlaying.Player, delays: [TimeInterval]) {
-        musicSyncTasks[player]?.cancel()
-        musicSyncTasks[player] = Task { @MainActor [weak self] in
-            for delay in delays {
-                try? await Task.sleep(for: .seconds(delay))
-                guard !Task.isCancelled, let self else { return }
-                if await self.syncMusic(player) { return }
-            }
-        }
-    }
-
-    /// One read of the player's state through Apple Events. True when it is settled (answered, or the
-    /// player isn't running); false when Automation isn't confirmed yet. Never prompts: without
-    /// consent no AppleScript runs at all.
-    private func syncMusic(_ player: NowPlaying.Player) async -> Bool {
-        guard NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleID).isEmpty == false else { return true }
-        guard Automation.allowed(player.bundleID) else { return false }
-        let revision = musicRevision[player, default: 0]
-        let output = await SpotifyPlayer.osascript(NowPlaying.probeScript(player: player))
-        // A notification that arrived during the read is newer than this answer.
-        guard musicRevision[player, default: 0] == revision else { return true }
-        guard !Task.isCancelled,
-              NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleID).isEmpty == false else { return true }
-        let playing = NowPlaying.parseProbe(output, player: player)
-        // A notification that arrived during the read is fresher; don't override another player that is playing.
-        if let current = model.nowPlaying, current.player != player, current.isPlaying { return true }
-        if let playing {
-            updateMusic(playing, player: player, announce: false)
-        } else if output != nil {
-            // A stopped player (or one with no track) leaves nothing to show; a failed read changes nothing.
-            updateMusic(nil, player: player)
-        }
-        return true
-    }
-
-    private func updateMusic(_ playing: NowPlaying?, player: NowPlaying.Player, announce: Bool = true) {
-        let previous = model.nowPlaying
-        if let playing {
-            model.nowPlaying = playing
-            if announce, previous?.title != playing.title, playing.isPlaying {
-                model.show(.trackChanged(title: playing.title, artist: playing.artist))
-            }
-        } else if previous?.player == player {
-            model.nowPlaying = nil
-        }
-        ArtworkStore.shared.request(for: model.nowPlaying)
-    }
-
-    /// Scrub: `set player position` through Apple Events, only for a running player Zeus may already
-    /// script (it never prompts here). The bar moves at once; the player confirms on its next notification.
-    private func seek(to seconds: Double) {
-        guard var playing = model.nowPlaying else { return }
-        let target = MusicSeek.clampedTarget(seconds, duration: playing.duration)
-        let player = playing.player
-        guard NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleID).isEmpty == false else { return }
-        guard Automation.allowed(player.bundleID) else {
-            model.show(.hint(PermissionsModel.hint(.automation)))
-            return
-        }
-        playing.position = target
-        playing.positionAt = Date()
-        model.nowPlaying = playing
-        let source = MusicSeek.script(player: player, seconds: target)
-        DispatchQueue.global(qos: .userInitiated).async {
-            var error: NSDictionary?
-            NSAppleScript(source: source)?.executeAndReturnError(&error)
-            if let error { NSLog("[ZEUS] seek failed: %@", error) }
-        }
     }
 
     // MARK: Output devices
@@ -209,39 +111,6 @@ final class TopBarServices {
         model.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
         model.menuOpen = false
-    }
-
-    private func music(_ command: TopBarModel.MusicCommand) {
-        let player = model.nowPlaying?.player ?? .music
-        if command == .open {
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: player.bundleID) {
-                NSWorkspace.shared.openApplication(at: url, configuration: .init())
-            }
-            return
-        }
-        let verb = switch command {
-        case .playPause: "playpause"
-        case .next: "next track"
-        case .previous: "previous track"
-        case .open: ""
-        }
-        // Only talk to a player that is already running, so a tap never launches one.
-        guard NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleID).isEmpty == false else { return }
-        // Apple Events would prompt the first time; without consent the notch points to Settings.
-        guard Automation.allowed(player.bundleID) else {
-            NSLog("[ZEUS] permissions: Automation off for %@, showing hint", player.bundleID)
-            model.show(.hint(PermissionsModel.hint(.automation)))
-            return
-        }
-        // Off the main thread and bounded: a hung player must never freeze the notch.
-        let source = "tell application id \"\(player.bundleID)\" to \(verb)"
-        Task.detached(priority: .userInitiated) { _ = await SpotifyPlayer.osascript(source) }
-        if command == .playPause, var playing = model.nowPlaying {
-            playing.position = playing.elapsed()
-            playing.positionAt = Date()
-            playing.isPlaying.toggle()
-            model.nowPlaying = playing
-        }
     }
 
     // MARK: Clipboard (concealed and transient items, like passwords, are never kept)
@@ -564,6 +433,27 @@ final class TopBarServices {
             throw URLError(.cannotFindHost)
         }
         return place
+    }
+
+    // MARK: Fling
+
+    /// Builds Fling once and lets Settings drive it. Nothing listens until `fling.enabled` is on.
+    func updateFlingService() {
+        if flingService == nil {
+            let service = FlingService(model: model, transport: FlingService.liveEndpoint())
+            service.notchIsOpen = { [weak self] in self?.notchIsOpen() ?? true }
+            model.shelfPersistence = FlingShelfPersistence(url: FlingService.supportDirectory.appendingPathComponent("Shelf/shelf.json"))
+            model.loadPersistedShelf()
+            model.fling = service
+            flingService = service
+            FlingService.current = service
+            flingPrompts = FlingPromptPanelController(fling: service)
+            let papers = FlingPaperController()
+            flingPapers = papers
+            service.presentPapers = { [weak papers] urls, peer in papers?.show(urls: urls, from: peer) }
+            service.observeSettings()
+        }
+        flingService?.reconfigure()
     }
 
     // MARK: Intake (AirDrop and Screenshots)

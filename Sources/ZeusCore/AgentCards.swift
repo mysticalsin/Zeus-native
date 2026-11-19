@@ -200,7 +200,8 @@ public struct TerminalInfo: Codable, Equatable, Sendable {
 
     /// The app to bring forward: the launching app's bundle ID, else one known for TERM_PROGRAM.
     public var targetBundleID: String? {
-        if let bundleID { return bundleID }
+        // The bundle ID arrives from the hook client: only a well-formed one is used.
+        if let bundleID, let valid = HookClientInput.wellFormedBundleID(bundleID) { return valid }
         guard let program = program?.lowercased() else { return nil }
         return Self.programBundles[program]
     }

@@ -3,24 +3,34 @@ import Foundation
 /// Questions answered locally from the persona bank, without calling the brain.
 public enum PersonaQueries {
     public static func localAnswer(for transcript: String) -> String? {
+        localAnswer(for: transcript) { ZeusVoiceLines.line(for: $0) }
+    }
+
+    /// An explicit personality and owned line bank keep fixtures independent of saved preferences.
+    public static func localAnswer(for transcript: String, personality: ZeusPersonality,
+                                   lines: ZeusVoiceLines = ZeusVoiceLines()) -> String? {
+        localAnswer(for: transcript) { lines.line(for: $0, personality: personality) }
+    }
+
+    private static func localAnswer(for transcript: String, line: (ZeusVoiceLines.Situation) -> String) -> String? {
         if let spoken = InstantTable.spokenAnswer(for: transcript) { return spoken }
         let key = Utterance(transcript).words.joined(separator: " ")
         guard !key.isEmpty else { return nil }
 
         if matchesIdentity(key) {
-            return ZeusVoiceLines.line(for: .identity)
+            return line(.identity)
         }
         if matchesMetaphysical(key) {
-            return ZeusVoiceLines.line(for: .metaphysical)
+            return line(.metaphysical)
         }
         if matchesJoke(key) {
-            return ZeusVoiceLines.line(for: .joke)
+            return line(.joke)
         }
         if matchesComparison(key) {
-            return ZeusVoiceLines.line(for: .comparison)
+            return line(.comparison)
         }
         if matchesSmallTalk(key) {
-            return ZeusVoiceLines.line(for: .smallTalk)
+            return line(.smallTalk)
         }
         if key.contains("capital"), key.contains("australia") {
             return "Canberra. A planned city between Sydney and Melbourne, still standing."

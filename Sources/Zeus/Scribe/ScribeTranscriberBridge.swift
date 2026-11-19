@@ -12,6 +12,29 @@ struct ScribeTranscriberCallbacks: Sendable {
     var onIssue: @Sendable (String) -> Void = { _ in }
     /// How loud a source's newest gated audio is (0...1), at most about 20 times a second per source.
     var onLevel: @Sendable (ScribeAudioSource, Double) -> Void = { _, _ in }
+    /// Every closed turn's voice, said once, just before `onFinished`. Memory only: it feeds the post-meeting
+    /// speaker correction and "Remember this voice", and is never written to disk.
+    var onTurns: @Sendable ([ScribeTurnEmbedding]) -> Void = { _ in }
+    /// Said once at the end when the streaming diarizer ran: the system-audio turns (segment id to "Speaker N")
+    /// whose final label differs from the live one. Empty when nothing changed; never said without the model.
+    var onRelabel: @Sendable ([String: String]) -> Void = { _ in }
+}
+
+/// What the recogniser needs to tell voices apart, ready before the first chunk: a trained embedder when its
+/// model is on disk (else nil, and the hand-built voiceprint is used) and the voices the owner chose to remember.
+struct ScribeSpeakerSetup: Sendable {
+    var embedder: FluidVoiceEmbedder?
+    var library = ScribeVoiceLibrary()
+    /// The Nemotron streaming diarizer for the system channel when its model is on disk (preferred), else nil.
+    var streaming: FluidStreamingDiarizer?
+
+    /// The shipped app: the model if downloaded, and the saved voices if the file reads.
+    static func live() async -> ScribeSpeakerSetup {
+        let embedder = await SpeakerModelStore.loadEmbedder()
+        let streaming = await StreamingDiarizerStore.load()
+        let library = (try? ScribeVoiceLibraryStore.standard.load()) ?? ScribeVoiceLibrary()
+        return ScribeSpeakerSetup(embedder: embedder, library: library, streaming: streaming)
+    }
 }
 
 /// Cuts each source's gated frames into speaker turns (a pause closes one, 8 s at most) and recognises them
@@ -27,7 +50,7 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
     typealias TranscribePreview = @Sendable ([Float]) async -> String?
 
     static let maxPendingChunksPerSource = 4
-    static let overloadMessage = "Transcription is behind — some audio wasn't transcribed."
+    static let overloadMessage = "Transcription is behind, so some audio wasn't transcribed."
     /// Audio seconds between two preview reads of the same source.
     static let previewInterval: TimeInterval = 1.2
     /// Wall-clock seconds one preview read may take before it is abandoned; finals never wait for it.
@@ -195,15 +218,56 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
     /// Who is speaking, kept on the recognition task. A closed chunk's speaker comes from the diarizer (which
     /// learns from it); a preview is only classified against the voices already known, and shows the source's
     /// neutral label when it matches none, so a new speaker is never labelled as the previous one.
+    /// With a trained embedder the diarizer clusters its vectors and starts with the saved voices; without one
+    /// it clusters the hand-built voiceprint, exactly as before the model existed.
     private struct Speakers {
         private var diarizer = ScribeDiarizer()
+        private var embedder: (any ScribeVoiceEmbedder)?
+        private var streaming: FluidStreamingDiarizer?
 
-        mutating func assign(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
-            diarizer.assign(source: source, samples: samples)
+        init(setup: ScribeSpeakerSetup = ScribeSpeakerSetup()) {
+            embedder = setup.embedder
+            streaming = setup.streaming
+            if let embedder {
+                for seed in setup.library.seeds(kind: embedder.kind) { diarizer.seed(name: seed.name, embedding: seed.embedding) }
+            }
+        }
+
+        private func embedding(for samples: [Float]) -> ScribeVoiceEmbedding? {
+            (embedder ?? ScribeHandBuiltEmbedder()).embedding(samples: samples)
+        }
+
+        /// The speaker and the voice that decided it (nil when the chunk was too short or had no speech).
+        mutating func assign(id: String, source: ScribeAudioSource, samples: [Float]) -> (speaker: ScribeSpeaker, voice: ScribeVoiceEmbedding?) {
+            let voice = embedding(for: samples)
+            guard let streaming else { return (diarizer.assign(source: source, embedding: voice), voice) }
+            switch source {
+            case .system:
+                // The streaming model decides who spoke. A saved voice that matches still keeps its own name.
+                let slot = streaming.assign(id: id, samples: samples)
+                if let known = diarizer.classify(source: .system, embedding: voice) {
+                    streaming.exclude(id: id)
+                    return (known, voice)
+                }
+                return (.participant("Speaker \((slot ?? streaming.lastSlot ?? 0) + 1)"), voice)
+            case .microphone:
+                // A second voice in the room gets its own label so it never shares a number with a call voice.
+                let speaker = diarizer.assign(source: source, embedding: voice)
+                if case .participant(let label) = speaker, label.hasPrefix("Speaker ") {
+                    return (.participant("Room voice " + label.dropFirst("Speaker ".count)), voice)
+                }
+                return (speaker, voice)
+            }
+        }
+
+        /// Flushes the stream and returns the turns whose final speaker differs from the live one; nil without the model.
+        mutating func finishStreaming() -> [String: String]? {
+            guard let streaming else { return nil }
+            return streaming.finish().mapValues { "Speaker \($0 + 1)" }
         }
 
         func provisional(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
-            if let known = diarizer.classify(source: source, samples: samples) { return known }
+            if let known = diarizer.classify(source: source, embedding: embedding(for: samples)) { return known }
             // An unmatched microphone voice may be someone else in the room: never call it "You" until the
             // final read assigns a label.
             return source == .microphone ? .unknown : ScribeLiveSpeakers.speaker(for: source)
@@ -211,15 +275,41 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
     }
 
     /// What the closed-chunk task and the preview task share: the speaker memory and the ids that already show
-    /// preview text. One lock; every call is short.
+    /// preview text. One lock; every call is short. The trained embedder is not thread-safe, so every use of it
+    /// is inside this lock.
     private final class Recogniser: @unchecked Sendable {
+        /// Turns kept for the post-meeting pass; more than the pass accepts is pointless.
+        private static let turnCap = 1_200
         private let lock = NSLock()
         private var speakers = Speakers()
+        private var turns: [ScribeTurnEmbedding] = []
         /// Segment ids that already show preview text, so the "…" placeholder doesn't blank it.
         private var previewed: Set<String> = []
 
-        func assign(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
-            lock.withLock { speakers.assign(source: source, samples: samples) }
+        func install(_ setup: ScribeSpeakerSetup) {
+            lock.withLock { speakers = Speakers(setup: setup) }
+        }
+
+        func assign(id: String, source: ScribeAudioSource, samples: [Float], duration: TimeInterval) -> ScribeSpeaker {
+            lock.withLock {
+                let result = speakers.assign(id: id, source: source, samples: samples)
+                if let voice = result.voice {
+                    turns.append(ScribeTurnEmbedding(segmentID: id, source: source, embedding: voice, duration: duration))
+                    if turns.count > Self.turnCap { turns.removeFirst(turns.count - Self.turnCap) }
+                }
+                return result.speaker
+            }
+        }
+
+        func finishStreaming() -> [String: String]? {
+            lock.withLock { speakers.finishStreaming() }
+        }
+
+        func takeTurns() -> [ScribeTurnEmbedding] {
+            lock.withLock {
+                defer { turns = [] }
+                return turns
+            }
         }
 
         func provisional(source: ScribeAudioSource, samples: [Float]) -> ScribeSpeaker {
@@ -345,7 +435,8 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
         session: ScribeSessionID,
         callbacks: ScribeTranscriberCallbacks,
         transcribe: Transcribe? = nil,
-        transcribePreview: TranscribePreview? = nil
+        transcribePreview: TranscribePreview? = nil,
+        speakerSetup: (@Sendable () async -> ScribeSpeakerSetup)? = nil
     ) {
         self.session = session
         self.callbacks = callbacks
@@ -368,8 +459,20 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
         let pending = self.pending
         let previewRun = self.previewRun
         let state = Recogniser()
+        // A caller that injects its own `transcribe` (tests) gets the hand-built voiceprint and no saved voices:
+        // no model load and no read of the owner's voice file.
+        let prepareSpeakers: @Sendable () async -> ScribeSpeakerSetup
+        if let speakerSetup {
+            prepareSpeakers = speakerSetup
+        } else if transcribe == nil {
+            prepareSpeakers = { await ScribeSpeakerSetup.live() }
+        } else {
+            prepareSpeakers = { ScribeSpeakerSetup() }
+        }
         // Closed chunks: only they decide when the transcript is complete, and nothing a preview does can delay them.
         Task.detached(priority: .utility) {
+            // Loaded from disk only (never downloaded here); chunks wait in their bounded queue meanwhile.
+            state.install(await prepareSpeakers())
             for await _ in stream {
                 while !cancelled.isSet, let (source, chunk) = pending.pop() {
                     await Self.recognise(source: source, chunk: chunk, session: session, callbacks: callbacks,
@@ -377,6 +480,8 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
                 }
                 if cancelled.isSet { break }
                 if pending.isDrainedAndFinishing {
+                    if let relabels = state.finishStreaming() { callbacks.onRelabel(relabels) }
+                    callbacks.onTurns(state.takeTurns())
                     callbacks.onFinished(session)
                     break
                 }
@@ -473,7 +578,7 @@ final class ScribeTranscriberBridge: ScribeTranscriber, @unchecked Sendable {
         // A dead input or a quiet room: nothing to recognise, and nothing to show.
         guard !ScribeAudioMath.isSilent(chunk.samples) else { return }
         let id = ScribeLiveSpeakers.segmentID(source: source, chunkIndex: chunk.index)
-        let speaker = state.assign(source: source, samples: chunk.samples)
+        let speaker = state.assign(id: id, source: source, samples: chunk.samples, duration: chunk.duration)
         func segment(_ text: String, isFinal: Bool) -> ScribeTranscriptSegment {
             ScribeTranscriptSegment(
                 id: id, session: session, speaker: speaker,

@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 /// Where secrets physically live. The real one is the macOS Keychain; tests use memory.
 public protocol KeychainBackend: Sendable {
@@ -8,7 +7,7 @@ public protocol KeychainBackend: Sendable {
     /// The value, or nil when missing or when reading would need the person to click a dialog.
     func read(service: String, account: String) -> String?
     @discardableResult func write(_ value: String, service: String, account: String) -> Bool
-    func delete(service: String, account: String)
+    @discardableResult func delete(service: String, account: String) -> Bool
 }
 
 /// ZEUS's single Keychain home: one service, `com.zeus.app`, read once at launch and kept in
@@ -49,12 +48,18 @@ public final class KeychainStore: @unchecked Sendable {
     private var cache: [String: String] = [:]
     private var loaded = false
     private let defaults: UserDefaults
+    private let now: @Sendable () -> Date
+    private var lastRefresh: [String: Date] = [:]
+    /// Least time between two backend re-reads of the same account.
+    public static let refreshInterval: TimeInterval = 5
     /// Legacy items that exist but could not be read without a dialog.
     public private(set) var unreadableLegacy: [String] = []
 
-    public init(backend: KeychainBackend, defaults: UserDefaults = .standard) {
+    public init(backend: KeychainBackend, defaults: UserDefaults = .standard,
+                now: @escaping @Sendable () -> Date = { Date() }) {
         self.backend = backend
         self.defaults = defaults
+        self.now = now
     }
 
     /// Reads everything once (and migrates once). Safe to call again; later calls do nothing.
@@ -89,6 +94,27 @@ public final class KeychainStore: @unchecked Sendable {
         return cache[account]
     }
 
+    /// Re-reads one account from the backend so a value saved outside this process (a script, another
+    /// ZEUS) shows up without a restart. The backend is asked at most once per `refreshInterval` per
+    /// account; inside that window the cached value is returned. An account that no longer exists is
+    /// cleared; one that exists but cannot be read without a dialog keeps its cached value.
+    @discardableResult
+    public func refresh(_ account: String) -> String? {
+        load()
+        lock.lock(); defer { lock.unlock() }
+        let stamp = now()
+        if let last = lastRefresh[account], stamp.timeIntervalSince(last) < Self.refreshInterval {
+            return cache[account]
+        }
+        lastRefresh[account] = stamp
+        if let value = backend.read(service: Self.service, account: account) {
+            cache[account] = value
+        } else if !backend.accounts(service: Self.service).contains(account) {
+            cache[account] = nil
+        }
+        return cache[account]
+    }
+
     public func has(_ account: String) -> Bool { get(account) != nil }
 
     @discardableResult
@@ -107,129 +133,19 @@ public final class KeychainStore: @unchecked Sendable {
         return true
     }
 
-    public func remove(_ account: String) {
+    /// Success means the backend confirmed deletion or the item was already absent.
+    /// Keep cached state on failure so callers cannot falsely report a removed secret.
+    @discardableResult
+    public func remove(_ account: String) -> Bool {
         load()
         lock.lock(); defer { lock.unlock() }
-        backend.delete(service: Self.service, account: account)
+        guard backend.delete(service: Self.service, account: account) else { return false }
         cache[account] = nil
+        return true
     }
 }
 
-/// Local builds signed with the self-signed "Zeus Local Dev" identity have no Team ID, and macOS
-/// then pins every Keychain item an app creates to that exact binary (partition `cdhash:`), so a
-/// rebuild silently loses its own secrets even with a stable designated requirement. For those
-/// builds only, `com.zeus.app` lives in the dedicated `zeus-dev` keychain, whose password sits in a
-/// mode-600 file outside the repo; `scripts/bundle.sh` adds each new build's cdhash to the items'
-/// partition list with that password, so no dialog ever appears. Team-signed (Developer ID)
-/// builds get a stable `teamid:` partition and keep using the login keychain.
-public enum DevKeychain {
-    public static var path: String { NSHomeDirectory() + "/Library/Keychains/zeus-dev.keychain-db" }
-    public static var passwordFiles: [String] {
-        [NSHomeDirectory() + "/.zeus/devkeychain.pass", NSHomeDirectory() + "/.zeus-dev/codesign/keychain-pass"]
-    }
-
-    /// True when this process's signature carries no Team ID (ad hoc or self-signed).
-    public static var isLocalBuild: Bool {
-        var code: SecCode?
-        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return true }
-        var staticCode: SecStaticCode?
-        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else { return true }
-        var info: CFDictionary?
-        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
-              let dict = info as? [String: Any] else { return true }
-        return dict[kSecCodeInfoTeamIdentifier as String] == nil
-    }
-
-    /// The opened (and unlocked) dev keychain, or nil when this build should use the login keychain.
-    nonisolated(unsafe) public static let shared: SecKeychain? = {
-        guard ProcessInfo.processInfo.environment["ZEUS_LOGIN_KEYCHAIN"] == nil, isLocalBuild,
-              FileManager.default.fileExists(atPath: path),
-              let file = passwordFiles.first(where: { FileManager.default.isReadableFile(atPath: $0) }),
-              let raw = try? String(contentsOfFile: file, encoding: .utf8) else { return nil }
-        let password = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        var keychain: SecKeychain?
-        guard SecKeychainOpen(path, &keychain) == errSecSuccess, let keychain else { return nil }
-        var status = SecKeychainStatus()
-        if SecKeychainGetStatus(keychain, &status) != errSecSuccess || status & UInt32(kSecUnlockStateStatus) == 0 {
-            let bytes = Array(password.utf8)
-            guard SecKeychainUnlock(keychain, UInt32(bytes.count), bytes, true) == errSecSuccess else { return nil }
-        }
-        return keychain
-    }()
-}
-
-/// The Keychain, with user interaction switched off for every call. `com.zeus.app` uses the
-/// dev keychain on local builds (see `DevKeychain`), the login keychain otherwise.
-public struct SystemKeychain: KeychainBackend {
-    private var dev: SecKeychain? { DevKeychain.shared }
-    public init() {}
-
-    /// "zeus-dev" or "login", for reports.
-    public var location: String { dev == nil ? "login" : "zeus-dev" }
-
-    private func quietly<T>(_ body: () -> T) -> T {
-        var allowed: DarwinBoolean = true
-        SecKeychainGetUserInteractionAllowed(&allowed)
-        SecKeychainSetUserInteractionAllowed(false)
-        defer { SecKeychainSetUserInteractionAllowed(allowed.boolValue) }
-        return body()
-    }
-
-    private func scoped(_ service: String) -> SecKeychain? { service == KeychainStore.service ? dev : nil }
-
-    private func base(_ service: String, _ account: String? = nil) -> [String: Any] {
-        var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service]
-        if let account { query[kSecAttrAccount as String] = account }
-        if let keychain = scoped(service) { query[kSecMatchSearchList as String] = [keychain] }
-        return query
-    }
-
-    public func accounts(service: String) -> [String] {
-        quietly {
-            var query = base(service)
-            query[kSecReturnAttributes as String] = true
-            query[kSecMatchLimit as String] = kSecMatchLimitAll
-            var result: CFTypeRef?
-            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-                  let items = result as? [[String: Any]] else { return [] }
-            return items.compactMap { $0[kSecAttrAccount as String] as? String }
-        }
-    }
-
-    public func read(service: String, account: String) -> String? {
-        quietly {
-            var query = base(service, account)
-            query[kSecReturnData as String] = true
-            query[kSecMatchLimit as String] = kSecMatchLimitOne
-            var result: CFTypeRef?
-            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-            return String(data: data, encoding: .utf8)
-        }
-    }
-
-    public func write(_ value: String, service: String, account: String) -> Bool {
-        quietly {
-            let data = Data(value.utf8)
-            let update = [kSecValueData as String: data]
-            let status = SecItemUpdate(base(service, account) as CFDictionary, update as CFDictionary)
-            if status == errSecSuccess { return true }
-            guard status == errSecItemNotFound else { return false }
-            var add: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
-                                      kSecAttrAccount as String: account]
-            if let keychain = scoped(service) { add[kSecUseKeychain as String] = keychain }
-            add[kSecValueData as String] = data
-            add[kSecAttrLabel as String] = "ZEUS"
-            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
-        }
-    }
-
-    public func delete(service: String, account: String) {
-        _ = quietly { SecItemDelete(base(service, account) as CFDictionary) }
-    }
-}
-
-/// An in-memory Keychain for tests and snapshots. `locked` items exist but cannot be read.
+/// An in-memory Keychain for tests and snapshots. `locked` items cannot be read or removed.
 public final class MemoryKeychain: KeychainBackend, @unchecked Sendable {
     private let lock = NSLock()
     public private(set) var items: [String: String] = [:]
@@ -253,8 +169,12 @@ public final class MemoryKeychain: KeychainBackend, @unchecked Sendable {
         items[Self.key(service, account)] = value
         return true
     }
-    public func delete(service: String, account: String) {
+    @discardableResult
+    public func delete(service: String, account: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        items[Self.key(service, account)] = nil
+        let key = Self.key(service, account)
+        guard !locked.contains(key) else { return false }
+        items[key] = nil
+        return true
     }
 }

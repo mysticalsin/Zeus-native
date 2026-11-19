@@ -130,6 +130,17 @@ public struct JevBudgetStore: Sendable {
     private struct LedgerSnapshot: Codable {
         var budget: JevBudget
         var pending: PendingReservation?
+        /// True once a cap choice was saved on purpose, including "no cap" (Remove). Older payloads
+        /// lack it, so a stored nil cap without it means the owner never chose and gets the default.
+        var capChosen: Bool?
+
+        /// Applies the default cap to a ledger whose owner never chose one. Never changes a chosen cap.
+        func withDefaultCapIfNeverChosen() -> LedgerSnapshot {
+            guard capChosen != true, budget.monthlyCap == nil else { return self }
+            var copy = self
+            copy.budget.monthlyCap = JevBudgetStore.defaultCap
+            return copy
+        }
     }
 
     enum ReservationAttempt {
@@ -161,10 +172,12 @@ public struct JevBudgetStore: Sendable {
         guard let data = storedDataUnlocked() else {
             return (LedgerSnapshot(budget: JevBudget(monthlyCap: Self.defaultCap), pending: nil), false)
         }
-        if let snapshot = try? JSONDecoder().decode(LedgerSnapshot.self, from: data) { return (snapshot, false) }
+        if let snapshot = try? JSONDecoder().decode(LedgerSnapshot.self, from: data) {
+            return (snapshot.withDefaultCapIfNeverChosen(), false)
+        }
         // Migrate the old single-budget payload without losing existing month-to-date usage.
         if let budget = try? JSONDecoder().decode(JevBudget.self, from: data) {
-            return (LedgerSnapshot(budget: budget, pending: nil), false)
+            return (LedgerSnapshot(budget: budget, pending: nil).withDefaultCapIfNeverChosen(), false)
         }
         return (LedgerSnapshot(budget: JevBudget(monthlyCap: Self.defaultCap), pending: nil), true)
     }
@@ -190,6 +203,7 @@ public struct JevBudgetStore: Sendable {
         var read = readSnapshotUnlocked()
         guard !read.isCorrupt else { return }
         read.snapshot.budget = budget
+        read.snapshot.capChosen = true
         saveSnapshotUnlocked(read.snapshot)
     }
 
@@ -200,6 +214,7 @@ public struct JevBudgetStore: Sendable {
         var read = readSnapshotUnlocked()
         guard !read.isCorrupt else { return nil }
         read.snapshot.budget.monthlyCap = cap.map { min(max($0, 0), Self.maxCap) }
+        read.snapshot.capChosen = true
         guard saveSnapshotUnlocked(read.snapshot) else { return nil }
         return read.snapshot.budget
     }

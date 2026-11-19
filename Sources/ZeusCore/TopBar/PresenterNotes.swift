@@ -162,7 +162,7 @@ public enum AutomationGate {
         switch status {
         case .granted: nil
         case .appNotRunning: "Open your presentation in \(app) first."
-        case .notAsked, .denied: "Allow ZEUS to control \(app) in Settings > Permissions > Automation, then try again."
+        case .notAsked, .denied: "Allow Zeus to control \(app) in Settings > Permissions > Automation, then try again."
         }
     }
 }

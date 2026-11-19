@@ -33,7 +33,7 @@ struct QA20ClockTests {
     @Test func otherQuestionsStayOnTheBrain() {
         #expect(LocalClock.answer(for: "what time is the meeting") == nil)
         #expect(LocalClock.answer(for: "open Spotify") == nil)
-        let answer = PersonaQueries.localAnswer(for: "what time is it")
+        let answer = PersonaQueries.localAnswer(for: "what time is it", personality: .ultron)
         #expect(answer?.contains("AM.") == true || answer?.contains("PM.") == true)
     }
 
@@ -145,7 +145,7 @@ struct QA20ScreenshotTests {
 struct QA20VoiceTests {
     @Test func defaultPresetIsTheLocalEngineFirst() {
         #expect(UltronVoicePlan.presetTitle == "Ultron voice (default)")
-        #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: true) == .kokoro)
+        #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
         #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: false) == .kokoro)
         #expect(UltronVoicePlan.preferred(kokoroReady: false, elevenLabsKeyValid: true) == .elevenLabs)
         #expect(UltronVoicePlan.preferred(kokoroReady: false, elevenLabsKeyValid: false) == .system)

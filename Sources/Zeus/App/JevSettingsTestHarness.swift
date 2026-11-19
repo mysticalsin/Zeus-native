@@ -47,7 +47,7 @@ enum JevSettingsTestHarness {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 850),
                                   styleMask: [.titled, .closable, .miniaturizable],
                                   backing: .buffered, defer: false)
-            window.title = "ZEUS Jev Settings — TEST MODE"
+            window.title = "Zeus Cloud Model Settings: TEST MODE"
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.contentView = NSHostingView(rootView: root)

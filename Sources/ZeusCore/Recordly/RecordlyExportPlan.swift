@@ -7,7 +7,7 @@ public enum RecordlyExportPlan {
     public static let gifMaxSeconds: Double = 30
     public static let gifMaxFrames = 600
     public static let minTrimSeconds: Double = 0.1
-    public static let outputFolderName = "Zeus Recordly"
+    public static let outputFolderName = "Zeus Recordings"
 
     public struct PixelSize: Equatable, Sendable {
         public let width: Int
@@ -191,7 +191,7 @@ public enum RecordlyExportPlan {
 
     // MARK: Naming and location
 
-    /// "Recordly <yyyy-MM-dd HH.mm.ss>.<ext>"; no slashes or colons. `collisionIndex` > 1 appends " <n>".
+    /// "Zeus Recording <yyyy-MM-dd HH.mm.ss>.<ext>"; no slashes or colons. `collisionIndex` > 1 appends " <n>".
     public static func fileName(date: Date, fileExtension: String, timeZone: TimeZone = .current, collisionIndex: Int = 1) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -200,10 +200,10 @@ public enum RecordlyExportPlan {
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
         let ext = fileExtension.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
         let suffix = collisionIndex > 1 ? " \(collisionIndex)" : ""
-        return "Recordly \(formatter.string(from: date))\(suffix).\(ext.isEmpty ? "bin" : ext)"
+        return "Zeus Recording \(formatter.string(from: date))\(suffix).\(ext.isEmpty ? "bin" : ext)"
     }
 
-    /// ~/Movies/Zeus Recordly. Pure path math: nothing is created here.
+    /// ~/Movies/Zeus Recordings. Pure path math: nothing is created here.
     public static func outputDirectory(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         home.appendingPathComponent("Movies", isDirectory: true)
             .appendingPathComponent(outputFolderName, isDirectory: true)

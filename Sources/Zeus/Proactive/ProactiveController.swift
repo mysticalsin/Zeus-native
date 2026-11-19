@@ -65,7 +65,7 @@ final class ProactiveController {
             }
             // So the card can stay away during Focus. If macOS declines, full screen is still respected.
             if INFocusStatusCenter.default.authorizationStatus == .notDetermined {
-                INFocusStatusCenter.default.requestAuthorization { _ in }
+                Task { _ = await SystemAuthorization.requestFocusStatus() }
             }
         }
     }
@@ -85,8 +85,8 @@ final class ProactiveController {
         }
     }
 
-    private static let calendarProblem = "Allow Calendars for ZEUS in System Settings › Privacy & Security to see your day, then turn the morning brief on again."
-    private static let nudgeProblem = "Allow Reminders and Notifications for ZEUS to get nudges when a to-do is due."
+    private static let calendarProblem = "Allow Calendars for Zeus in System Settings › Privacy & Security to see your day, then turn the morning brief on again."
+    private static let nudgeProblem = "Allow Reminders and Notifications for Zeus to get nudges when a to-do is due."
 
     /// Clears a stale message once the permission was granted in System Settings. Called when the
     /// settings appear and at unlock; it never asks for anything.

@@ -1,0 +1,38 @@
+{
+  "scope": "Actual macOS CI compilation and test-discovery checkpoint; no executed native tests or physical-device acceptance.",
+  "head_sha": "df3dcc3d489be3d62830bbcde57d2f6b307fa0e4",
+  "tested_sha": "6702d1ea966e26f14e38dbed31edcaf8a55c98a2",
+  "source_snapshot_sha256": "2a498807a98b682d53a5b86476ca557c5f161e9df1fcf67f0b2dbacc2831bc42",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42744043519",
+  "app_job_id": 129591763939,
+  "production_build": "passed",
+  "test_target_build": "passed",
+  "native_tests_executed": 0,
+  "native_discovery": {
+    "status": "failed",
+    "reason": "parameterized tests need a nonempty discovered case set",
+    "command": [
+      "swift",
+      "test",
+      "--skip-build",
+      "--event-stream-output-path",
+      "/Users/runner/work/_temp/zeus-results/app/native-evidence/native-discovery/events.jsonl",
+      "--event-stream-version",
+      "0",
+      "list"
+    ],
+    "artifacts": [
+      {
+        "path": "native-discovery/test.log",
+        "sha256": "43cae0e7e624af78c308d9ae857e9570b135f49892d8efa7e85575598660fc7b"
+      },
+      {
+        "path": "native-discovery/events.jsonl",
+        "sha256": "2e24ba5dc7011c26dbe0a2897fe1799dc9dda6950c3248949d15545991797f22"
+      }
+    ]
+  },
+  "preview_bundle": "skipped after discovery failure",
+  "release_acceptance": false,
+  "follow_up": "Repair structured discovery against actual Swift Testing wire output while retaining complete per-function and per-argument execution checks."
+}

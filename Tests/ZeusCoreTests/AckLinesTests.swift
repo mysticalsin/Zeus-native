@@ -5,6 +5,16 @@ import Testing
 /// playlist or to-do name) blowing a short ack past the persona's one-clause, ≤10-word rule.
 @Suite("Ack line clamp")
 struct AckLinesTests {
+    @Test func explicitPersonalityDoesNotShareTheLiveLineBank() {
+        let plain = AckLines.persona(personality: .plain, lines: ZeusVoiceLines(pick: { _ in 0 }))
+        let ultron = AckLines.persona(personality: .ultron, lines: ZeusVoiceLines(pick: { _ in 0 }))
+        #expect(plain.line(.opening("Notes")) == "Opening Notes.")
+        #expect(ultron.line(.opening("Notes")) == "Notes, summoned.")
+        let fresh = AckLines.persona(personality: .plain, lines: ZeusVoiceLines(pick: { _ in 0 }))
+        #expect(fresh.line(.opening("Notes")) == "Opening Notes.")
+        #expect(plain.line(.volume(.up)) == nil)
+    }
+
     @Test func passesShortTextThroughUnchanged() {
         #expect(AckLines.clamp("Opening Safari.") == "Opening Safari.")
     }
@@ -46,7 +56,7 @@ struct AckLinesTests {
 
     @Test func neutralAndPersonaAckLinesStayWithinTenWordsEvenWithALongName() {
         let longName = "The Quarterly Financial Planning And Strategy Review Document Final Version Two"
-        for bank in [AckLines.neutral, AckLines.persona] {
+        for bank in [AckLines.neutral, AckLines.persona(personality: .ultron)] {
             for ack in [FastAck.opening(longName), .searchingSpotify(longName), .added([longName])] {
                 guard let line = bank.line(ack) else { continue }
                 #expect(line.split(separator: " ").count <= 10, "\(line)")

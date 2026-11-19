@@ -87,6 +87,8 @@ final class RecordlyCaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @
 
     private let queue = DispatchQueue(label: "zeus.recordly.capture")
     private let stateLock = OSAllocatedUnfairLock()
+    /// Latest system-audio peak (0...1) and when it arrived. Written on the capture queue, read by the page's meter.
+    private let levelLock = OSAllocatedUnfairLock<(peak: Float, at: TimeInterval)>(initialState: (0, 0))
     // Guarded by stateLock.
     private var owner: RecordlyRecordingAttempt?
     private var beginInFlight = false
@@ -429,6 +431,11 @@ final class RecordlyCaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
         let track = RecordlySampleRoute.track(for: sampleKind(for: type))
+        if track == .audio {
+            let peak = Self.peak(of: sampleBuffer)
+            let now = ProcessInfo.processInfo.systemUptime
+            levelLock.withLock { $0 = (peak, now) }
+        }
         if track == .video {
             guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
                   let rawStatus = attachments.first?[.status] as? Int,
@@ -458,6 +465,38 @@ final class RecordlyCaptureEngine: NSObject, SCStreamOutput, SCStreamDelegate, @
             return (current.attempt, hook, current.writer.error?.localizedDescription ?? "A recording frame could not be written.")
         }
         if let (attempt, hook, message) = failure { hook(attempt, message) }
+    }
+
+    /// Linear peak (0...1) of the system audio the stream is delivering, or 0 once no audio arrived for 0.3 s.
+    /// Read-only: it never touches the writer.
+    func currentLevel() -> Float {
+        let latest = levelLock.withLock { $0 }
+        return ProcessInfo.processInfo.systemUptime - latest.at > 0.3 ? 0 : latest.peak
+    }
+
+    /// Peak of the first contiguous run of 32-bit float samples, which is what ScreenCaptureKit delivers.
+    /// Any other layout reads as silence rather than guessing.
+    private static func peak(of sampleBuffer: CMSampleBuffer) -> Float {
+        guard let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let description = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
+              description.mFormatID == kAudioFormatLinearPCM,
+              description.mFormatFlags & kAudioFormatFlagIsFloat != 0,
+              description.mBitsPerChannel == 32,
+              let block = CMSampleBufferGetDataBuffer(sampleBuffer) else { return 0 }
+        var length = 0
+        var pointer: UnsafeMutablePointer<CChar>?
+        guard CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: &length, totalLengthOut: nil,
+                                          dataPointerOut: &pointer) == kCMBlockBufferNoErr,
+              let pointer, length >= MemoryLayout<Float>.size else { return 0 }
+        let count = length / MemoryLayout<Float>.size
+        return pointer.withMemoryRebound(to: Float.self, capacity: count) { samples in
+            var peak: Float = 0
+            for index in 0..<count {
+                let value = abs(samples[index])
+                if value.isFinite, value > peak { peak = value }
+            }
+            return min(peak, 1)
+        }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {

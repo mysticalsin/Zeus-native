@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 import ZeusCore
 
-/// Superwhisper style recorder: a small floating pill at the bottom of the screen with a live
+/// Floating recorder: a small floating pill at the bottom of the screen with a live
 /// waveform, the mode and a timer while you speak, then a short "Transcribing" and a result mark.
 /// It shows only while a dictation runs, takes no focus, and does no work while hidden.
 @MainActor
@@ -83,7 +83,7 @@ final class RecorderPill {
         if !panel.isVisible {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
-            NSAnimationContext.runAnimationGroup({ $0.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.16
+            NSAnimationContext.runAnimationGroup({ $0.duration = Motion.reduced ? 0 : 0.16
                 panel.animator().alphaValue = 1 }, completionHandler: nil)
         }
     }

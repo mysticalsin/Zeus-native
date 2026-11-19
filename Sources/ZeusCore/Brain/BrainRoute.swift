@@ -40,7 +40,8 @@ public enum BrainRoute {
 public enum ModelBudget {
     public static let medianCostCeiling = 0.002
     public static let medianLatencyCeilingMs = 6_000
-    public static let promptCharacterLimit = 10_000
+    /// Raised from 10,000 for the Ultron personality block (about 4,200 characters); the whole spoken system prompt is about 11,400.
+    public static let promptCharacterLimit = 12_000
 
     public struct Sample: Equatable, Sendable {
         public var latencyMs: Int
@@ -157,6 +158,11 @@ public struct AheadBrain: Equatable, Sendable {
 public enum ClaudeLaunch {
     public static func supportsStrictMCP(_ help: String) -> Bool {
         help.contains("--strict-mcp-config")
+    }
+
+    /// `--safe-mode` starts with every customization (hooks, plugins, MCP, CLAUDE.md) off. A spoken turn uses it.
+    public static func supportsSafeMode(_ help: String) -> Bool {
+        help.contains("--safe-mode")
     }
 }
 

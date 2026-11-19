@@ -16,6 +16,8 @@ public enum PolyglotPackStatus: Equatable, Sendable {
     /// Translation is possible once the person downloads the pack (macOS asks).
     case needsDownload
     case unsupported
+    /// Translation itself is unavailable on this macOS version; heard lines still show.
+    case requiresNewerSystem
 }
 
 public struct PolyglotTranslationRequest: Equatable, Sendable {
@@ -172,6 +174,8 @@ public actor PolyglotPipeline {
     private var targetRevision = 0
     private var latestTargetRequest = 0
     private var contentRevision = 0
+    /// The macOS 26 notice is said once per run. Clear and a target change reset it: the card drops its notice on both.
+    private var saidNewerSystem = false
     private let expectedLanguages: Set<String>
     /// The microphone and remote speakers can speak different languages at the same time.
     private var trackers: [PolyglotSide: PolyglotLanguageTracker] = [:]
@@ -214,6 +218,7 @@ public actor PolyglotPipeline {
         guard next != target else { return }
         target = next
         targetRevision += 1
+        saidNewerSystem = false
     }
 
     /// Feeds 16 kHz mono samples from one input.
@@ -228,6 +233,7 @@ public actor PolyglotPipeline {
     /// stopping capture; only samples fed after the barrier can produce another caption.
     public func clear(token: Int) {
         contentRevision += 1
+        saidNewerSystem = false
         session += 1
         queue.removeAll()
         segmenters.removeAll()
@@ -344,6 +350,11 @@ public actor PolyglotPipeline {
         case .installed: break
         case .needsDownload:
             emit(.needsPack(source: batch.language, target: destination))
+            return
+        case .requiresNewerSystem:
+            guard !saidNewerSystem else { return }
+            saidNewerSystem = true
+            emit(.failed("Translation needs macOS 26 or later. Heard lines still show."))
             return
         case .unsupported:
             emit(.failed("\(PolyglotLanguage.name(for: batch.language)) to \(PolyglotLanguage.name(for: destination)) is not available for translation."))

@@ -37,7 +37,7 @@ public enum LicensePlan: String, CaseIterable, Sendable {
         case .lifetime: "Lifetime license"
         case .annual: "Annual license"
         case .trial: "Trial license"
-        case .pro: "ZEUS Pro"
+        case .pro: "Zeus Pro"
         }
     }
 }
@@ -47,7 +47,7 @@ public enum LicenseError: Error, Equatable, Sendable {
 
     public var message: String {
         switch self {
-        case .malformed: "That doesn't look like a ZEUS license key."
+        case .malformed: "That doesn't look like a Zeus license key."
         case .badSignature: "This key isn't valid. Check it was pasted in full."
         case .expired: "This license has expired."
         case .wrongDevice: "This key belongs to another Mac. Deactivate it there first."

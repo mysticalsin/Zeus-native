@@ -7,7 +7,7 @@ public enum PerformanceBudget {
     public static let notchFPS = 60
     public static let modelIdleUnload: TimeInterval = 300
     /// Helper processes that must not be running by default.
-    public static let forbiddenDefaultProcesses = ["ollama", "kev", "laya-serve"]
+    public static let forbiddenDefaultProcesses = ["ollama", "kev"]
 }
 
 /// Whether to fall back to lighter engines: Low Power Mode or a serious or critical thermal state.
@@ -21,11 +21,11 @@ public struct PowerState: Equatable, Sendable {
     public var constrained: Bool { lowPower || thermal == .serious || thermal == .critical }
 }
 
-/// Large local models (Parakeet, Laya, Kokoro) load on first use, unload after five idle minutes,
+/// Large local models (Parakeet, Kokoro) load on first use, unload after five idle minutes,
 /// and only one is resident at a time: loading one unloads the other. Driven by events and a
 /// single one-shot timer per load, never a polling loop.
 public final class ModelResidency: @unchecked Sendable {
-    public enum Model: String, CaseIterable, Sendable { case parakeet, laya, kokoro }
+    public enum Model: String, CaseIterable, Sendable { case parakeet, kokoro }
     public struct Hooks: Sendable {
         public var load: @Sendable (Model) -> Void
         public var unload: @Sendable (Model) -> Void

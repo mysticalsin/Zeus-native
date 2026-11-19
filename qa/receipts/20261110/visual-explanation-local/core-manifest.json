@@ -1,0 +1,73 @@
+{
+  "group": "explanation",
+  "repository": "/workspace/Zeus-visual",
+  "platform": "linux",
+  "scope": "Synthetic portable subset; no native app validation",
+  "files": [
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationProtocol.swift",
+      "sha256": "f2333d36b7220c65aa6ca6a7543940088c8ec56e2fc7f529461982493dc7caae"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationReducer.swift",
+      "sha256": "771344da89e09d585c29e194a619c0dc36bec401a5abe63880909332ad76a1d7"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationStream.swift",
+      "sha256": "172d06ec37f64c6b24d213fe44ad18c792927dc8a327c06a19e265144bd7a071"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationCompletionStream.swift",
+      "sha256": "7a97f83d6e4253a5f0e44e7c786305cc04659855cc59fce03ace0bceca48426e"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationPlayback.swift",
+      "sha256": "50f67bf3668c3e9d788971c146c7e7af34d46dc894aaffe4a0a8d16ba60edb06"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationCoordinates.swift",
+      "sha256": "da597f3cbd9e4b011ad87f974378c9508213d20b0d14147ee8d12924e722eb66"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationHistory.swift",
+      "sha256": "9a2d1ef34ead7957a2baf5e5621d9a229700c8425dd6b219da1955982491f43f"
+    },
+    {
+      "source": "Sources/ZeusCore/Explanation/ExplanationDiagnostics.swift",
+      "sha256": "e343841619390623bc96136d0bb6b2df04198630d73fca93eeae5296a57cc8de"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationProtocolTests.swift",
+      "sha256": "1b30d196c69a9532252c637983bc0319137b510cee5c12f6120faa21d8c45dba"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationReducerTests.swift",
+      "sha256": "a54edbc9978f8f4d7337e392815bb457b8460a88ce54be060705c4d9784cf796"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationStreamTests.swift",
+      "sha256": "e9817e4342bbf3c510fdfdc33b00fb5b5c0d049cd1deb5978cc73c44c73285eb"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationCompletionStreamTests.swift",
+      "sha256": "f1cde5947922937e11192fd37e19cae6a2d02e3c0225cdc77e5cf22c4a9a6f2b"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationPlaybackTests.swift",
+      "sha256": "8549aa7f24407099f67e54cac1b16a19d8e2df8a36759b2cd94e35b07a3e4c68"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationCoordinatesTests.swift",
+      "sha256": "5799ddc0d885260f5799a95b738a4c307f81bdc939d5667dacc88077c47c5c72"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationHistoryTests.swift",
+      "sha256": "5e4d483f0ccad6ac2c58b15fe54fce06f7e9da9d3b7cf10c5723b65235dd4f46"
+    },
+    {
+      "source": "Tests/ZeusCoreTests/ExplanationDiagnosticsTests.swift",
+      "sha256": "87b6c0756c54f031b93923b7e583e1e99358c1fe612ebf42a72bdb0848f7bb7c"
+    }
+  ],
+  "excerpts": []
+}

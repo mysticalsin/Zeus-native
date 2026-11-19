@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42734553020",
+  "job_id": 129560455714,
+  "head_sha": "f5b7f2be4c0a3f9ad53dc7d63fe9f6ce6ebc7dd6",
+  "tested_sha": "46c7059de7bc3dbf62be31ee11a4619abc77f5c4",
+  "production_build": "passed",
+  "test_target_compilation": "passed",
+  "native_fixtures": {
+    "status": "failed",
+    "tests": 163,
+    "suites": 17,
+    "individual_pass_lines": 162,
+    "failed_case": "realButtonsDriveStartKeepStopFailedSaveRetryAndClose",
+    "issue": "Missing fixture control scribe.start in the owned accessibility tree.",
+    "excerpt_sha256": "309de892d195ee66b62e61c065857cc98ee7e2c6f5069c78ae85dcea6797804a"
+  },
+  "scope": "Actual macOS selected native fixture execution. Does not prove hardware capture, full-app physical interaction, reference parity or signing. The failed component control journey remains mandatory and requires repair plus a fresh Mac run."
+}

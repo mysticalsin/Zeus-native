@@ -5,6 +5,9 @@ public enum PhysicalPointerSettings {
     public static let defaultsKey = "present.physicalPointer"
 
     public static var enabled: Bool {
-        UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? false
+        enabled(storedValue: UserDefaults.standard.object(forKey: defaultsKey) as? Bool)
     }
+
+    /// The preference decision is independent of its host-backed storage.
+    public static func enabled(storedValue: Bool?) -> Bool { storedValue ?? false }
 }

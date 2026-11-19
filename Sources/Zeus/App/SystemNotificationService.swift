@@ -30,6 +30,10 @@ struct SystemNotificationPayload: Equatable, Sendable {
     /// The agent session Open shows in the notch.
     var sessionID: String? = nil
 
+    /// The macOS request id for a payload with a dedupe key: the same key always gets the same opaque id, so a
+    /// repeat replaces its banner. Nil means a one-off banner with a fresh id.
+    var replaceIdentifier: String? { dedupeKey.map(AgentAlert.opaqueID) }
+
     static func forCue(_ cue: NotchCue) -> SystemNotificationPayload? {
         switch cue {
         case .usageAlert(let text):
@@ -39,9 +43,9 @@ struct SystemNotificationPayload: Equatable, Sendable {
         case .rain(let minutes):
             SystemNotificationPayload(title: "Rain soon", body: "Rain may start in \(minutes) minutes.")
         case .hint(let text):
-            SystemNotificationPayload(title: "ZEUS needs access", body: text)
+            SystemNotificationPayload(title: "Zeus needs access", body: text)
         case .permission(let text, _):
-            SystemNotificationPayload(title: "ZEUS needs access", body: text)
+            SystemNotificationPayload(title: "Zeus needs access", body: text)
         case .keepAwake(let text):
             SystemNotificationPayload(title: "Keep awake", body: text)
         default:
@@ -58,10 +62,14 @@ struct NotificationDedupe: Sendable {
     var window: TimeInterval = NotificationDedupe.defaultWindow
     private var lastDelivered: [String: Date] = [:]
 
-    /// True (and remembered) when `key` has not been delivered within the window.
-    mutating func shouldDeliver(_ key: String, now: Date) -> Bool {
+    /// True (and remembered) when `key` has not been delivered within the window. With `slide`, a suppressed
+    /// repeat restarts the window, so something repeating without a pause never re-alerts.
+    mutating func shouldDeliver(_ key: String, now: Date, slide: Bool = false) -> Bool {
         lastDelivered = lastDelivered.filter { now.timeIntervalSince($0.value) < window }
-        if lastDelivered[key] != nil { return false }
+        if lastDelivered[key] != nil {
+            if slide { lastDelivered[key] = now }
+            return false
+        }
         lastDelivered[key] = now
         return true
     }
@@ -206,9 +214,9 @@ private final class UserNotificationCenterClient: NSObject, SystemNotificationCl
             registerAgentCategory()
             content.categoryIdentifier = AgentNotificationIDs.category
             if let session = payload.sessionID { content.userInfo = [AgentNotificationIDs.sessionKey: session] }
-            // A repeat of the same alert replaces the banner instead of stacking another.
-            if let key = payload.dedupeKey { identifier = AgentAlert.opaqueID(key) }
         }
+        // A repeat of the same alert or cue replaces its banner instead of stacking another.
+        if let replace = payload.replaceIdentifier { identifier = replace }
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         try? await center.add(request)
     }
@@ -290,7 +298,7 @@ final class SystemNotificationService {
         return switch authorization {
         case .unknown, .notDetermined: "Turn on to ask macOS for permission."
         case .authorized: isEnabled() ? "Focused banners appear while the notch is closed." : "Allowed by macOS; turn on to show banners."
-        case .denied: "Allow ZEUS notifications in System Settings."
+        case .denied: "Allow Zeus notifications in System Settings."
         }
     }
 
@@ -330,10 +338,20 @@ final class SystemNotificationService {
     func openSystemSettingsAfterUserAction() { client.openSystemSettings() }
 
     /// Delivers only already-authorized, explicitly enabled cues. This path never requests access.
+    /// Cues repeat (the capture cue re-shows every 2 s, permission hints fire on each try), so the same
+    /// title and text gets one banner until it has been quiet for the dedupe window, and a later repeat
+    /// replaces that banner. A finished timer or focus round is a new event every time and is never held back.
     func deliver(_ cue: NotchCue) async {
-        guard isEnabled(), let payload = SystemNotificationPayload.forCue(cue) else { return }
+        guard isEnabled(), var payload = SystemNotificationPayload.forCue(cue) else { return }
         authorization = await client.authorizationStatus()
         guard authorization == .authorized, isEnabled() else { return }
+        if case .focusFinished = cue {
+            await client.deliver(payload)
+            return
+        }
+        let key = "cue|\(payload.title)|\(payload.body)"
+        guard dedupe.shouldDeliver(key, now: clock(), slide: true) else { return }
+        payload.dedupeKey = key
         await client.deliver(payload)
     }
 

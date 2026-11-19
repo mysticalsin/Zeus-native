@@ -23,7 +23,7 @@ public struct ShortcutModifiers: OptionSet, Codable, Hashable, Sendable {
     var count: Int { rawValue.nonzeroBitCount }
 }
 
-/// One user-chosen shortcut: a modifier-only chord (Option+Command, Right Command, Fn) or a key
+/// One user-chosen shortcut: a modifier-only chord (Control+Option, Right Command, Fn) or a key
 /// with modifiers (⌥Space, ⌃⌥Z). Pure data; `ShortcutState` decides whether it is held.
 public struct Shortcut: Codable, Hashable, Sendable {
     public enum Side: String, Codable, Sendable { case any, left, right }
@@ -142,25 +142,66 @@ private extension JSONEncoder {
     }
 }
 
-/// Loads and migrates the two bindings. "Talk to Zeus" defaults to Option+Command; dictation
-/// keeps its old default (Right Command). Saved choices of the old fixed list carry over.
+/// Loads and migrates the two bindings. "Talk to Zeus" defaults to Control+Option (docs/VOICE-KEY.md);
+/// dictation keeps its old default (Right Command). Saved choices of the old fixed list carry over.
 public enum ShortcutStore {
     public static let talkKey = "talk.shortcut"
     public static let dictationKey = "dictation.shortcut"
     public static let legacyTalk = "pushToTalk"
     public static let legacyDictation = "dictation.key"
+    /// True once the owner picked a talk key in Settings or onboarding. Auto-written defaults never set it.
+    public static let talkChosenKey = "talk.shortcut.chosen"
+    /// The one-time move of auto-written talk keys to Control+Option has run.
+    public static let talkMigrationKey = "talk.shortcut.migratedToControlOption"
+    public static let talkDefault = Shortcut.controlOption
+    /// Defaults earlier builds wrote for everybody who had not chosen: not choices, so they migrate once.
+    static let autoTalkDefaults: Set<Shortcut> = [.optionCommand, .rightCommand]
 
-    /// Tony's earlier build forced Right Command for everybody who had not chosen a key. That is
-    /// not a choice, so it (and the original Control+Option default) moves to Option+Command.
+    /// Earlier builds wrote Option+Command (and before that Right Command) into `talk.shortcut` on first load,
+    /// so a stored value alone is not a choice. Those move to Control+Option once; after that, and for any
+    /// key the owner recorded, the stored value is kept as it is.
     public static func loadTalk(_ defaults: UserDefaults) -> Shortcut {
-        if let text = defaults.string(forKey: talkKey), let saved = Shortcut.parse(text) { return saved }
-        var result = Shortcut.optionCommand
+        let migrated = defaults.bool(forKey: talkMigrationKey)
+        defaults.set(true, forKey: talkMigrationKey)
+        if let text = defaults.string(forKey: talkKey), let saved = Shortcut.parse(text) {
+            guard !migrated, !defaults.bool(forKey: talkChosenKey), autoTalkDefaults.contains(saved) else { return saved }
+            defaults.set(Shortcut.stored(talkDefault), forKey: talkKey)
+            return talkDefault
+        }
+        var result = talkDefault
         if let name = defaults.string(forKey: legacyTalk), let old = Shortcut.legacy(name),
-           old != .rightCommand, old != .controlOption {
+           !autoTalkDefaults.contains(old), old != talkDefault {
             result = old
+            defaults.set(true, forKey: talkChosenKey) // Picked from the old fixed list.
         }
         defaults.set(Shortcut.stored(result), forKey: talkKey)
         return result
+    }
+
+    /// The owner picked `shortcut` (Settings recorder, Reset, onboarding). Later migrations leave it alone.
+    public static func recordTalkChoice(_ shortcut: Shortcut, in defaults: UserDefaults) {
+        defaults.set(Shortcut.stored(shortcut), forKey: talkKey)
+        defaults.set(true, forKey: talkChosenKey)
+        defaults.set(true, forKey: talkMigrationKey)
+    }
+
+    /// The second talk key (docs/RIGHT-OPTION-TALK-PLAN.md): Right Option alone unless the owner chose another key or turned it off.
+    public static let secondTalkKey = "talk.secondShortcut"
+    public static let secondTalkDefault = Shortcut.rightOption
+
+    /// The second talk key, and whether the owner chose it. Absent, or a stored value that does not parse, is the default and no
+    /// choice; `off` is a choice. It never writes: the default is written nowhere until the owner records a key.
+    public static func loadSecondTalk(_ defaults: UserDefaults) -> (key: Shortcut?, explicit: Bool) {
+        guard let text = defaults.string(forKey: secondTalkKey) else { return (secondTalkDefault, false) }
+        if text == "off" { return (nil, true) }
+        if let saved = Shortcut.parse(text) { return (saved, true) }
+        return (secondTalkDefault, false)
+    }
+
+    /// The owner recorded `shortcut` for the second talk key, or nil to turn it off. The default key (also what Reset records)
+    /// removes the stored value, so the default rules apply again.
+    public static func recordSecondTalkChoice(_ shortcut: Shortcut?, in defaults: UserDefaults) {
+        if shortcut == secondTalkDefault { defaults.removeObject(forKey: secondTalkKey) } else { defaults.set(Shortcut.stored(shortcut), forKey: secondTalkKey) }
     }
 
     /// nil means dictation has no key.
@@ -200,15 +241,24 @@ public enum ShortcutConflicts {
         (Shortcut(keyCode: 23, modifiers: [.shift, .command]), "Screenshot options (⇧⌘5)"),
         (Shortcut(keyCode: 53, modifiers: [.option, .command]), "Force Quit (⌥⌘Esc)"),
         (Shortcut(keyCode: 12, modifiers: [.control, .command]), "Lock screen (⌃⌘Q)"),
-        (Shortcut(modifiers: [.control, .option]), "VoiceOver's modifier (⌃⌥)"),
         (Shortcut(modifiers: .function), "the Globe key (emoji and Apple Dictation)"),
     ]
 
     /// Why `shortcut` may misbehave, as short sentences. Empty when it looks safe.
-    public static func warnings(for shortcut: Shortcut, other: Shortcut?, otherName: String) -> [String] {
+    /// Control+Option is VoiceOver's modifier, so it warns only while VoiceOver is on; `voiceOverFallback` is
+    /// the key that stands in meanwhile (the talk key has one, see `VoiceKey.effectiveTalkKey`).
+    public static func warnings(for shortcut: Shortcut, other: Shortcut?, otherName: String,
+                                voiceOverOn: Bool = false, voiceOverFallback: Shortcut? = nil) -> [String] {
         var out: [String] = []
         if let hit = system.first(where: { $0.0 == shortcut }) {
             out.append("This is also \(hit.1). One of them will win; the system usually does.")
+        }
+        if voiceOverOn, shortcut == .controlOption {
+            if let voiceOverFallback, voiceOverFallback != shortcut {
+                out.append("VoiceOver is on and uses Control and Option. Hold \(voiceOverFallback.title) to talk until VoiceOver is off.")
+            } else {
+                out.append("VoiceOver is on and uses Control and Option, so this key pauses until VoiceOver is off.")
+            }
         }
         if let other {
             if other == shortcut {
@@ -230,7 +280,7 @@ public enum ShortcutConflicts {
         return false
     }
 
-    /// Shipped talk (Option+Command) and dictation (Right Command) must never warn.
+    /// Shipped talk (Control+Option) and dictation (Right Command) must never warn.
     public static func warningsForShippedDefaults(talk: Shortcut, dictation: Shortcut?) -> [String] {
         guard let dictation else { return [] }
         return warnings(for: dictation, other: talk, otherName: "Talk to Zeus")
@@ -254,12 +304,18 @@ public enum ShortcutEvent: Equatable, Sendable {
 }
 
 /// Tracks which keys are down from the event stream (no polling) and says whether a shortcut is held.
-public struct ShortcutState: Sendable {
+public struct ShortcutState: Sendable, Equatable, Hashable {
     public private(set) var modifiers: ShortcutModifiers = []
+    /// The modifier set the last flags event reported. A key-down never writes it, so the Fn flag an arrow key carries
+    /// and the Command of a pasted shortcut change nothing here; `modifiers` (which a key-down overwrites) stays as it
+    /// is for `isHeld`. `KeyFacts` reads this one.
+    public private(set) var flagModifiers: ShortcutModifiers = []
     public private(set) var deviceKeys: Set<UInt16> = []
     public private(set) var keysDown: Set<UInt16> = []
-    /// A normal key joined while modifiers were down; the chord is not "alone" until all are released.
-    public private(set) var spoiled = false
+    /// The codes of the normal keys pressed while modifiers were down; cleared when every modifier is up. The chord is
+    /// not "alone" until then.
+    public private(set) var spoilers: Set<UInt16> = []
+    public var spoiled: Bool { !spoilers.isEmpty }
 
     public init() {}
 
@@ -273,6 +329,7 @@ public struct ShortcutState: Sendable {
 
     private mutating func flagsChanged(keyCode: UInt16, modifiers mods: ShortcutModifiers) {
         modifiers = mods
+        flagModifiers = mods
         // A repeated flagsChanged for `keyCode` with its flag still present is ambiguous: macOS
         // (and CGEventPost) can redeliver the *same* "still down" notification for a lone key
         // with nothing else pressed (confirmed with `tools/e2e-once.sh`'s two-call-in-a-row
@@ -296,7 +353,7 @@ public struct ShortcutState: Sendable {
         for (flag, left, right) in ShortcutModifiers.keyCodes where !mods.contains(flag) {
             deviceKeys.remove(left); deviceKeys.remove(right)
         }
-        if mods.isEmpty { spoiled = false }
+        if mods.isEmpty { spoilers = [] }
     }
 
     private mutating func keyDown(keyCode: UInt16, modifiers mods: ShortcutModifiers) {
@@ -314,10 +371,36 @@ public struct ShortcutState: Sendable {
         // auto-insert paste "spoiled" every dictation key-down after it). `deviceKeys` is only
         // ever populated by real flagsChanged holds, so its emptiness is the right signal for
         // "nothing we're tracking is actually down right now".
-        if !mods.isEmpty, !deviceKeys.isEmpty { spoiled = true }
+        if !mods.isEmpty, !deviceKeys.isEmpty { spoilers.insert(keyCode) }
     }
 
     public mutating func reset() { self = ShortcutState() }
+
+    /// Takes the modifiers the system reports now as the whole truth, for a monitor that keeps running after sleep
+    /// or a release it could not see. Both modifier values become `live`, a physical key stays tracked only while its
+    /// modifier is still down, and ordinary keys are forgotten (nothing reports them). Unlike `reset()`, a modifier
+    /// still held stays held, so a key that was let go and pressed again is a new press, not a continuation.
+    public mutating func resync(to live: ShortcutModifiers) {
+        adopt(modifiers: live)
+        keysDown.removeAll()
+    }
+
+    /// Takes the modifiers the system reports now and leaves the ordinary keys as they are: what a flags event that is
+    /// still queued would have said, read from the live flags instead. A modifier that joined is foreign from here on.
+    public mutating func adopt(modifiers live: ShortcutModifiers) {
+        modifiers = live
+        flagModifiers = live
+        for (flag, left, right) in ShortcutModifiers.keyCodes where !live.contains(flag) {
+            deviceKeys.remove(left); deviceKeys.remove(right)
+        }
+        if live.isEmpty { spoilers = [] }
+    }
+
+    /// Forgets the ordinary keys the system no longer reports down: a key-up that no monitor saw (Tab out of a username
+    /// field into a password field turns secure input on before Tab comes up). `keysDown` is otherwise cleared only by a
+    /// key-up, so one such key would read as a foreign key for every voice key until it was pressed and let go again.
+    /// Modifiers are left alone: `resync` takes them from the system.
+    public mutating func prune(keysDown live: Set<UInt16>) { keysDown.formIntersection(live) }
 
     /// `exact`: nothing else may be down (the normal case). Otherwise extra modifiers are allowed,
     /// which the shared hold-to-dictate / double-tap-to-talk key needs.

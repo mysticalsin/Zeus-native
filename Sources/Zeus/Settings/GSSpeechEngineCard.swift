@@ -9,6 +9,8 @@ struct SpeechEngineCard: View {
     var showsWhisperModel = false
     /// Murmure settings: one row plus picker, not the full engine catalog.
     var compact = false
+    /// Murmure only links to the Dictation page, where "Use for voice commands too" lives.
+    var navigation: GSNavigation? = nil
     private var board: SpeechEngineBoard { SpeechEngineBoard.shared }
     private var settings: DictationSettings { DictationSettings.shared }
 
@@ -20,9 +22,13 @@ struct SpeechEngineCard: View {
                 fullBody
             }
             GSDivider()
-            GSToggleRow(symbol: "waveform", title: "Use for voice commands too",
-                        text: "",
-                        isOn: Binding(get: { settings.engineForVoice }, set: { settings.engineForVoice = $0 }))
+            if compact, let navigation {
+                GSLinkRow(symbol: "waveform", title: "Use for voice commands too", destination: .dictation, navigation: navigation)
+            } else {
+                GSToggleRow(symbol: "waveform", title: "Use for voice commands too",
+                            text: "Spoken commands to Zeus use this engine instead of Apple's.",
+                            isOn: Binding(get: { settings.engineForVoice }, set: { settings.engineForVoice = $0 }))
+            }
             if let message = board.message { GSInfo(text: message) }
         }
         .task { await board.refresh() }
@@ -50,12 +56,26 @@ struct SpeechEngineCard: View {
         }
     }
 
-    private func row(_ kind: TranscriptionEngineKind) -> some View {
+    /// OpenAI speech shows the OpenAI mark already in the app (the same verified asset Codex uses);
+    /// the other rows keep their symbol until an official mark is bundled for them.
+    @ViewBuilder private func row(_ kind: TranscriptionEngineKind) -> some View {
+        if kind == .openAI {
+            HStack(spacing: 0) {
+                EngineBrandLogo(agentLabel: "OpenAI", size: 20, tint: GS.text)
+                    .frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                engineRow(kind, symbol: nil)
+            }
+        } else {
+            engineRow(kind, symbol: symbol(kind))
+        }
+    }
+
+    private func engineRow(_ kind: TranscriptionEngineKind, symbol: String?) -> some View {
         let availability = board.availability(kind)
         let megabytes = kind == .whisper ? WhisperCppEngine.selectedModel.megabytes : nil
         let line = EngineStatusMapping.line(for: kind, availability: availability, selected: settings.engine == kind, megabytes: megabytes, cancellable: kind == .whisperKit)
         let text = line.reason ?? ""
-        return GSRow(symbol: symbol(kind), title: kind.title, text: text) {
+        return GSRow(symbol: symbol, title: kind.title, text: text) {
             HStack(spacing: 10) {
                 if line.action == .inUse {
                     GSStatus(ok: true, text: "In use")

@@ -1,9 +1,9 @@
 import Foundation
 
 /// A command Zeus can carry out on the Mac at once, with no model call: the "local rules" stage
-/// of the decision chain (rules → Laya → Jev, see `DecisionRouter`). `parse` is strict and pure
+/// of the decision chain (rules → Jev, see `DecisionRouter`). `parse` is strict and pure
 /// (no network, no model, well under 2 ms); anything ambiguous or compound returns nil so the
-/// next stage (Laya, Jev, then the LLM brain) handles it. English first, with French and
+/// next stage (Jev, then the LLM brain) handles it. English first, with French and
 /// Portuguese where it is cheap.
 public enum FastIntent: Equatable, Sendable {
     public enum Media: String, Equatable, Sendable { case play, pause, toggle, next, previous }
@@ -64,7 +64,7 @@ public enum FastIntent: Equatable, Sendable {
         }
     }
 
-    /// The labels a Laya or Jev decision may carry that Zeus can act on directly.
+    /// The labels a Jev decision may carry that Zeus can act on directly.
     public static let actionableLabels: Set<String> = ["app.open", "app.quit", "media.play", "system.volume", "timer.start", "timer.cancel", "todo.add", "browser.open"]
 
     /// Spoken English to-do adds that use a colon after the lead ("add a to-do: buy milk").
@@ -103,7 +103,7 @@ public enum FastIntent: Equatable, Sendable {
         "que", "porque", "por", "como", "quando", "onde", "quem", "qual", "explica", "escreve",
     ]
 
-    /// Whether an utterance the rules missed is worth a quick Laya or Jev look before the LLM: short,
+    /// Whether an utterance the rules missed is worth a quick Jev look before the LLM: short,
     /// and not a question or a writing job (those are the LLM's anyway, so asking first only adds delay).
     public static func mayBeCommand(_ text: String) -> Bool {
         var utterance = Utterance(text)
@@ -120,7 +120,7 @@ public enum FastIntent: Equatable, Sendable {
         return utterance.words.joined(separator: " ")
     }
 
-    // MARK: Engine answers (Laya, Jev, Ollama)
+    // MARK: Engine answers (Jev, Ollama)
 
     /// Turns an engine's intent label into an action, reading the details (which app, how long,
     /// what to search) from the words. More forgiving than `parse` because the engine already

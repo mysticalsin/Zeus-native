@@ -48,6 +48,7 @@ extension OnboardingStep {
         case .day: .curious
         case .theme: .idle
         case .halo: .thinking
+        case .languages: .guiding
         case .sounds: .celebrate
         }
     }

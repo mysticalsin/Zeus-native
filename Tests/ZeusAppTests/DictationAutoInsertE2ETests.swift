@@ -35,7 +35,7 @@ struct DictationAutoInsertE2ETests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         // Item C: a fresh Mac auto-inserts, no preview card in the way.
-        let suite = "zeus.dictation.settings.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.dictation.settings.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         #expect(DictationSettings(defaults: defaults).previewBeforeInsert == false)

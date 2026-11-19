@@ -23,23 +23,6 @@ struct GSOtherAppsCards: View {
                 GSInfo(text: "Allow Full Disk Access in Settings \u{203A} Permissions to see them.")
             }
         }
-        GSCard("Quiet the originals") {
-            let topApps = topNotifyingApps()
-            if topApps.isEmpty {
-                Text("Apps appear here after they send a notification.").font(GS.rowText).foregroundStyle(GS.secondary).padding(.vertical, 14)
-            }
-            ForEach(Array(topApps.enumerated()), id: \.element.id) { index, app in
-                if index > 0 { GSDivider() }
-                GSRow(symbol: "app", title: notifications.appName(app.id), text: app.id) {
-                    Button("Open in Settings") {
-                        if let url = NotificationSettingsURL.url(for: app.id) {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                    .buttonStyle(GSButtonStyle())
-                }
-            }
-        }
         GSCard("Replace system banners (Experimental)") {
             Text("Automatically dismisses macOS system banners for selected apps after Zeus has shown the notification in the notch. Requires Accessibility.")
                 .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 6)
@@ -59,14 +42,16 @@ struct GSOtherAppsCards: View {
                 let seenApps = Array(Set(notifications.items.map { $0.app.lowercased() })).sorted()
                 let ticked = BannerDismissDecision.parseTickedApps(store.string("notify.dismissApps"))
                 if seenApps.isEmpty {
-                    Text("Apps will be listed here as they send notifications.").font(GS.rowText).foregroundStyle(GS.secondary).padding(.vertical, 8)
+                    GSInfo(text: "Apps will be listed here as they send notifications.")
                 } else {
                     Text("Auto-dismiss banners for:").font(OB.font(12, .semibold)).foregroundStyle(GS.secondary).padding(.top, 4)
                     ForEach(seenApps, id: \.self) { appID in
                         GSDivider()
                         let isTicked = ticked.contains(appID)
-                        GSRow(symbol: "app.badge", title: notifications.appName(appID), text: appID) {
-                            Toggle(appID, isOn: Binding(
+                        HStack(spacing: 0) {
+                        GSAppIcon(bundleID: appID).frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                        GSRow(title: notifications.appName(appID)) {
+                            Toggle(notifications.appName(appID), isOn: Binding(
                                 get: { isTicked },
                                 set: { isOn in
                                     var next = ticked
@@ -78,23 +63,37 @@ struct GSOtherAppsCards: View {
                             .toggleStyle(GSToggleStyle())
                             .labelsHidden()
                         }
+                        }
+                        .help(appID)
                     }
                 }
             }
         }
-        GSCard("Muted apps") {
+        GSCard("Apps that notify you") {
             let muted = NotificationPeekRules.mutedSet(store.string("notify.mutedApps"))
             let seen = Set(notifications.items.map { $0.app.lowercased() })
             let ids = Array(muted.union(seen)).sorted()
             if ids.isEmpty {
-                Text("Apps appear here after they send a notification.").font(GS.rowText).foregroundStyle(GS.secondary).padding(.vertical, 14)
+                GSEmptyState(symbol: "bell.slash", title: "No apps yet", text: "Apps appear here after they send a notification.")
             }
             ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                 if index > 0 { GSDivider() }
                 let isMuted = muted.contains(id)
-                GSRow(symbol: "app", title: notifications.appName(id), text: id) {
-                    Button(isMuted ? "Unmute" : "Mute") { toggle(id, muted: muted) }.buttonStyle(GSButtonStyle())
+                HStack(spacing: 0) {
+                    GSAppIcon(bundleID: id).frame(width: 42, alignment: .leading).accessibilityHidden(true)
+                    GSRow(title: notifications.appName(id), text: isMuted ? "Muted in the notch." : nil) {
+                        HStack(spacing: 8) {
+                            // The app's own macOS banners: the one place to quiet the original notification.
+                            Button("macOS settings") {
+                                if let url = NotificationSettingsURL.url(for: id) { NSWorkspace.shared.open(url) }
+                            }
+                            .buttonStyle(GSButtonStyle())
+                            .accessibilityLabel("Open macOS notification settings for \(notifications.appName(id))")
+                            Button(isMuted ? "Unmute" : "Mute") { toggle(id, muted: muted) }.buttonStyle(GSButtonStyle())
+                        }
+                    }
                 }
+                .help(id)
             }
         }
     }
@@ -141,6 +140,18 @@ struct GSTrustedChatsCard: View {
                     Button("Stop trusting") { trusted.revoke(session: entry.id) }.buttonStyle(GSButtonStyle())
                 }
             }
+        }
+    }
+}
+
+/// An app's own icon, found from its bundle ID, with a neutral fallback. Users see names and icons, never bundle IDs.
+struct GSAppIcon: View {
+    let bundleID: String
+    var body: some View {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 24, height: 24)
+        } else {
+            Image(systemName: "app").font(.system(size: 18)).foregroundStyle(GS.text)
         }
     }
 }

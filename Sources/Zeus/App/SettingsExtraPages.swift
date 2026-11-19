@@ -114,7 +114,7 @@ struct ShortcutSettings: View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Hold to talk") {
                 GlassRow(title: "Talk to ZEUS", note: dictation.enabled && dictation.key == preferences.pushToTalk ? "Double-tap, then speak." : "Hold, ask, let go.", icon: ("bolt.fill", Theme.bolt)) {
-                    ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.pushToTalk = $0 }, accessibilityName: "Talk key")
+                    ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
                 }
                 GlassDivider()
                 GlassRow(title: "Dictate", note: dictation.key == nil ? "Off" : "Change it on the Dictation page.", icon: ("mic.fill", Color(hex: 0x2F80ED))) {

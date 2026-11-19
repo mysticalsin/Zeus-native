@@ -115,8 +115,7 @@ struct BriefCardView: View {
         }
         .padding(16)
         .frame(width: 420)
-        .background(Theme.storm.opacity(0.96), in: RoundedRectangle(cornerRadius: Theme.panelRadius + 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.panelRadius + 6, style: .continuous).strokeBorder(TopBarStyle.tileStroke))
+        .alertGlass(radius: Theme.panelRadius + 6)
         .preferredColorScheme(.dark)
     }
 }

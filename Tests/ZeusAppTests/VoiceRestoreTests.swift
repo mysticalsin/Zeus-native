@@ -10,20 +10,34 @@ struct VoiceRestoreTests {
         #expect(ElevenLabsVoice.model == "eleven_flash_v2_5")
     }
 
-    @Test func ultronDeliveryMatchesSevenEac431() throws {
+    @Test func ultronDeliveryIsTakeCSettings() throws {
         let ultron = ElevenLabsVoice.voiceSettings(for: .ultron)
-        #expect(ultron["stability"] as? Double == 0.35)
-        #expect(ultron["similarity_boost"] as? Double == 0.8)
+        #expect(ultron["stability"] as? Double == 0.6)
+        #expect(ultron["similarity_boost"] as? Double == 0.85)
         #expect(ultron["style"] as? Double == 0.3)
         #expect(ultron["use_speaker_boost"] as? Bool == true)
-        #expect(ultron["speed"] as? Double == 0.95)
+        #expect(ultron["speed"] as? Double == 1.2)
         let body = ElevenLabsVoice.speechBody(text: "Ready.", personality: .ultron)
         #expect(body["model_id"] as? String == "eleven_flash_v2_5")
     }
 
+    @Test func plainDeliveryIsUnchangedAndStudioDeliversUltronItsOwnSettings() {
+        let plain = ElevenLabsVoice.voiceSettings(for: .plain)
+        #expect(plain["stability"] as? Double == 0.45)
+        #expect(plain["similarity_boost"] as? Double == 0.8)
+        #expect(plain["style"] as? Double == 0.0)
+        // Delivery depends on the personality only, so Studio (`speechBody` with the Studio model) keeps it too.
+        let studioBody = ElevenLabsVoice.speechBody(text: "Ready.", personality: .ultron, model: ElevenLabsQuality.studioModel)
+        #expect(studioBody["model_id"] as? String == "eleven_multilingual_v2")
+        let studio = studioBody["voice_settings"] as? [String: Any] ?? [:]
+        #expect(studio["stability"] as? Double == 0.6)
+        #expect(studio["speed"] as? Double == 1.2)
+        #expect(studio["use_speaker_boost"] as? Bool == true)
+    }
+
     @Test func offlineFallbackIsKokoroMichael() {
         #expect(ElevenLabsVoice.offlineKokoroVoice == "am_michael")
-        #expect(ElevenLabsVoice.offlineKokoroSpeed == 0.94)
+        #expect(ElevenLabsVoice.offlineKokoroSpeed == 0.88)
     }
 
     @Test func directRequestUsesGeorgeWhenNoSavedVoice() {
@@ -39,7 +53,7 @@ struct VoiceRestoreTests {
         #expect(ElevenLabsVoice.isKeyRejection(429))
         #expect(!ElevenLabsVoice.isKeyRejection(500))
         #expect(ElevenLabsVoice.detailStatus(from: body) == "invalid_api_key")
-        #expect(ElevenLabsVoice.settingsMessage(status: 401, body: body) == "ElevenLabs key rejected, using the offline voice")
+        #expect(ElevenLabsVoice.settingsMessage(status: 401, body: body).contains("Paste a new key"))
         let limited = Data(#"{"detail":{"status":"too_many_concurrent_requests"}}"#.utf8)
         #expect(ElevenLabsVoice.settingsMessage(status: 429, body: limited).contains("rate limit"))
         #expect(ElevenLabsVoice.settingsMessage(status: 429, body: limited).contains("offline voice"))
@@ -48,7 +62,7 @@ struct VoiceRestoreTests {
     @Test @MainActor func settingsStoresRejectionLine() {
         let body = Data(#"{"detail":{"status":"invalid_api_key"}}"#.utf8)
         VoiceSettings.shared.noteElevenLabsKeyRejected(status: 401, body: body)
-        #expect(VoiceSettings.shared.elevenLabsStatusMessage == "ElevenLabs key rejected, using the offline voice")
+        #expect(VoiceSettings.shared.elevenLabsStatusMessage?.contains("Paste a new key") == true)
         VoiceSettings.shared.clearElevenLabsPause()
     }
 

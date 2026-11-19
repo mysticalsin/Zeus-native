@@ -8,23 +8,13 @@ struct IntelligenceSettings: View {
 
     var body: some View {
         VStack(spacing: Glass.gap) {
-            GlassCard(title: "Engine") {
-                GlassRow(title: "Understands your commands", note: note) {
-                    GlassMenu(options: IntelligenceEngine.allCases.map { ($0.rawValue, $0.title) },
-                              selection: Binding(get: { center.engine.rawValue },
-                                                 set: { center.engine = IntelligenceEngine(rawValue: $0) ?? .laya }))
-                }
-                GlassDivider()
-                GlassRow(title: "Laya", note: center.layaInstalled ? "Loads on first use and unloads after 5 idle minutes." : "Not installed on this Mac yet. Commands use rules, then Jev if allowed.") {
-                    GlassStatus(ok: center.layaInstalled, text: center.layaRunning ? "Loaded" : center.layaInstalled ? "Ready" : "Not installed")
-                }
-                GlassDivider()
-                GlassRow(title: "Jev", note: center.hasJevKey ? "Key saved in Keychain." : "No key saved.") {
-                    GlassStatus(ok: center.hasJevKey, text: center.hasJevKey ? "Ready" : "No key")
+            GlassCard(title: "Instant commands") {
+                GlassRow(title: "Jev", note: center.jevReadiness.statusText) {
+                    GlassStatus(ok: center.jevReadiness == .ready, text: center.jevReadiness == .ready ? "On" : "Off")
                 }
             }
             GlassCard(title: "Usage") {
-                GlassRow(title: "Local (free)", note: "Rules and Laya answers since launch.") {
+                GlassRow(title: "Local (free)", note: "Rules answers since launch.") {
                     Text("\(center.localCount)").font(Glass.font(12, .semibold).monospacedDigit()).foregroundStyle(Glass.secondary)
                 }
                 GlassDivider()
@@ -53,14 +43,6 @@ struct IntelligenceSettings: View {
             }
         }
     }
-
-    private var note: String {
-        switch center.engine {
-        case .laya: "Free and private: runs on this Mac."
-        case .jev: "TypeSafe's cloud model. Counts against the local usage estimate."
-        case .auto: "Laya first; Jev only when Laya is unsure."
-        }
-    }
 }
 
 /// Live CPU and memory of this process. Samples every 2 s only while the Energy card is on
@@ -71,15 +53,21 @@ final class EnergyMonitor {
     static let shared = EnergyMonitor()
     private(set) var cpu = 0.0
     private(set) var memory = 0.0
+    /// False from a fresh start until the first 2 s sample, so a reader can say Unknown rather than 0.
+    private(set) var hasCPUSample = false
     private var last = (ProcessEnergy.sample(), Date())
     private var timer: Timer?
     private var viewers = 0
+
+    /// True while the 2 s timer exists, that is while at least one viewer holds the monitor.
+    var isSampling: Bool { timer != nil }
 
     func start() {
         viewers += 1
         guard timer == nil else { return }
         last = (ProcessEnergy.sample(), Date())
         memory = last.0.residentMB
+        hasCPUSample = false
         let t = Timer(timeInterval: 2, repeats: true) { _ in Task { @MainActor in EnergyMonitor.shared.sample() } }
         t.tolerance = 0.5
         RunLoop.main.add(t, forMode: .common)
@@ -92,10 +80,11 @@ final class EnergyMonitor {
         timer?.invalidate(); timer = nil
     }
 
-    private func sample() {
+    func sample() {
         let now = Date(), s = ProcessEnergy.sample()
         cpu = ProcessEnergy.cpuPercent(from: last.0, to: s, over: now.timeIntervalSince(last.1))
         memory = s.residentMB
+        hasCPUSample = true
         last = (s, now)
     }
 }

@@ -1,0 +1,36 @@
+{
+  "evidence_kind": "development-failure-source-and-artifact-revalidation",
+  "head": "2edc3c18e05aa11ffd1e7d0ca084c40a33389956",
+  "tested": "d7b353e26ffbb87c623b64b094fe51f43f5b7670",
+  "source_snapshot_sha256": "701e0a835bcfc73d4b0025c1fea3c6867375b0444e65e0c634b35d8278efcd17",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42828280526",
+  "job_id": 129871234701,
+  "artifact_id": 13770214566,
+  "artifact_zip_sha256": "9abec18d481b3428aa6750b5b8179ed1a19bf70c614f3b4e9154718813d7a727",
+  "status": "failed",
+  "failed_check": {
+    "id": "closed-loop-selftests",
+    "exit_code": 1,
+    "duration_seconds": 95.393,
+    "tests_counted": 0,
+    "reported_tests_attempted": 130,
+    "reported_test_errors": 1,
+    "test": "test_keyboard_interrupt_cleans_owned_group_before_rethrow",
+    "source": "qa/closed-loop/tests/test_execution_cleanup.py:133",
+    "operation": "os.killpg(process.pid, signum)",
+    "error": "PermissionError: [Errno 1] Operation not permitted",
+    "scope": "Failure occurred in the outer isolated supervisor teardown; retained evidence does not establish which signal raised EPERM or the macOS kernel cause. No failed selftest partition credit."
+  },
+  "reported_development_totals": {
+    "tests": 528,
+    "suites": 55
+  },
+  "validation_scope": "Exact source/policy/job hashes and failure artifacts revalidated; this receipt does not independently certify each passing portable test. Failed selftest partition remains failed.",
+  "revalidated_artifacts": {
+    "job.json": "027722ced35e454707efa685484f61cf72c22df4d47c90485c536728b8d701ad",
+    "result.json": "28c4cfa525a93b9f79a3070e758a1ee96a7302dab0ae608c3b924975c82163e4",
+    "source-manifest.json": "662775f5bcd835931de8b81efa359f14cffee5f03a2b76e9ef7e1fc7dfdb7c0a",
+    "closed-loop-selftests/test.log": "8ef0632db941e154e997db76b0cff83efd21d4a1bc9a81b90499c7611c768ab0"
+  },
+  "complete_native_acceptance": false
+}

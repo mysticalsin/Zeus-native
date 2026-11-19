@@ -159,6 +159,7 @@ struct NotchLights: View {
         case .capsLock(let on): on ? Theme.bolt : .white
         case .battery: NotchLightTint.green.color
         case .landed(let airDrop): (airDrop ? NotchLightTint.blue : .amber).color
+        case .flingLanded: NotchLightTint.mint.color
         case .reminderPinned: NotchLightTint.blue.color
         case .eventRibbon: NotchLightTint.cyan.color
         case .entrance(_, let tint), .edgeWave(let tint): tint.color

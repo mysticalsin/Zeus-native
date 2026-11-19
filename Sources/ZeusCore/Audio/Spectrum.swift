@@ -144,7 +144,7 @@ public enum AudioCapturePermission: String, Sendable {
         switch self {
         case .notAsked: "Not asked yet"
         case .allowed: "Allowed"
-        case .refused: "Refused"
+        case .refused: "Denied"
         }
     }
 }

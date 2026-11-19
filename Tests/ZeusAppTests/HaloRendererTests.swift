@@ -5,6 +5,26 @@ import ZeusCore
 
 @Suite("Halo renderer")
 struct HaloRendererTests {
+    @Test func flattenedBezierCurvesKeepEndpointsAndMidpoints() {
+        var quadratic = Path()
+        quadratic.move(to: .zero)
+        quadratic.addQuadCurve(to: CGPoint(x: 20, y: 0), control: CGPoint(x: 10, y: 20))
+        let quad = Polyline(path: quadratic)
+        #expect(quad.points.count == 9)
+        #expect(quad.points.first == .zero)
+        #expect(quad.points[4] == CGPoint(x: 10, y: 10))
+        #expect(quad.points.last == CGPoint(x: 20, y: 0))
+
+        var cubic = Path()
+        cubic.move(to: .zero)
+        cubic.addCurve(to: CGPoint(x: 30, y: 0), control1: CGPoint(x: 0, y: 30), control2: CGPoint(x: 30, y: 30))
+        let curve = Polyline(path: cubic)
+        #expect(curve.points.count == 11)
+        #expect(curve.points.first == .zero)
+        #expect(curve.points[5] == CGPoint(x: 15, y: 22.5))
+        #expect(curve.points.last == CGPoint(x: 30, y: 0))
+    }
+
     @Test func polylineSlicesByArcLength() {
         var path = Path()
         path.move(to: .zero)

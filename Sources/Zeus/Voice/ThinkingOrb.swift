@@ -18,14 +18,14 @@ struct ThinkingOrbView: View {
     var diameter: CGFloat = 18
     var tint: Color = RecorderPill.accent
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         Group {
             if reduceMotion {
                 SoftPulse(tint: tint)
             } else {
-                TickingView(interval: 1.0 / 30) { context in
+                DisplaySynchronizedView(preferredFramesPerSecond: Motion.ambientFPS) { context in
                     Canvas { context2D, size in
                         Self.paint(mode: mode, time: context.date.timeIntervalSinceReferenceDate, size: size, tint: tint, into: &context2D)
                     }

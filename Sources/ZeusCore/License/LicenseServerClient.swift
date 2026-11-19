@@ -62,12 +62,12 @@ public struct LicenseServerClient: Sendable {
             let success = status.map { (200..<300).contains($0) } ?? false
             guard let reply = try? JSONDecoder().decode(Reply.self, from: data) else {
                 if let status, !success { return .failure(.server("The license server answered with an error (HTTP \(status)).")) }
-                return .failure(.server("The license server sent a reply ZEUS can't read."))
+                return .failure(.server("The license server sent a reply Zeus can't read."))
             }
             if !reply.ok { return .failure(Self.error(code: reply.error, message: reply.message)) }
             // A reply that claims ok on a non-2xx (or non-HTTP) response is not trusted.
             if !success {
-                return .failure(.server(status.map { "The license server answered with an error (HTTP \($0))." } ?? "The license server sent a reply ZEUS can't read."))
+                return .failure(.server(status.map { "The license server answered with an error (HTTP \($0))." } ?? "The license server sent a reply Zeus can't read."))
             }
             return .success(reply)
         } catch {

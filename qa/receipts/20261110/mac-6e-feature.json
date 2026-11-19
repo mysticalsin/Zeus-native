@@ -1,0 +1,92 @@
+{
+  "evidence_kind": "exact-source-development-revalidation",
+  "head": "6e863bdbe1a10a813b1a15c684cd0073e931c747",
+  "tested": "39718b2a716953c682a7b38505d8a8086c2ad0b3",
+  "source_snapshot_sha256": "3af56b463e012f84dfca4160870c09fd6542b3aebfd25b51eba83f62b31b4aa9",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42834065882",
+  "job_id": 129891437567,
+  "artifact_id": 13772603868,
+  "artifact_zip_sha256": "1c5909b1ea41113e75070e84a94d11fe460ab5a39e2e40b6d868b53bca607c3b",
+  "verified_tests": 678,
+  "mode": "development",
+  "release_ready": false,
+  "verified_checks": [
+    {
+      "id": "closed-loop-selftests",
+      "tests": 150,
+      "suites": 1
+    },
+    {
+      "id": "portable-polyglot",
+      "tests": 56,
+      "suites": 7
+    },
+    {
+      "id": "portable-regressions",
+      "tests": 76,
+      "suites": 9
+    },
+    {
+      "id": "portable-scribe",
+      "tests": 177,
+      "suites": 17
+    },
+    {
+      "id": "portable-presentation",
+      "tests": 33,
+      "suites": 5
+    },
+    {
+      "id": "portable-recordly-geometry",
+      "tests": 31,
+      "suites": 2
+    },
+    {
+      "id": "portable-wiki-relationships",
+      "tests": 26,
+      "suites": 3
+    },
+    {
+      "id": "release-mocks",
+      "tests": 13,
+      "suites": 1
+    },
+    {
+      "id": "portable-buddy",
+      "tests": 20,
+      "suites": 2
+    },
+    {
+      "id": "portable-dictation-insertion",
+      "tests": 17,
+      "suites": 1
+    },
+    {
+      "id": "portable-wiki-export",
+      "tests": 35,
+      "suites": 2
+    },
+    {
+      "id": "portable-keychain",
+      "tests": 6,
+      "suites": 1
+    },
+    {
+      "id": "portable-socket-safety",
+      "tests": 10,
+      "suites": 1
+    },
+    {
+      "id": "portable-bridge-transport",
+      "tests": 28,
+      "suites": 4
+    }
+  ],
+  "revalidated_artifacts": {
+    "job.json": "1ed90f5b16bdd767a130cdac85e2064b8fb616a303033b882f8e757f0f89ecc0",
+    "result.json": "c7692c9c981527b7f1b24915d1bbcbb6f5bf727a8f7294ae10051e8096e08ad2",
+    "source-manifest.json": "0791c4d8e60ad7d623ed9f2d2c6dc53fca8e77c8b43ddc74654ac0dd63263ad5",
+    "closed-loop-selftests/test.log": "88b31c5dbb1b9ec9d8f89af8f2a53a41b1e5be92f4ed5651501beb501998a0d2"
+  },
+  "validation_scope": "Exact-source gate.validate_feature_map validated every required development command receipt, log, source package, feature/regression binding and artifact hash. This does not satisfy missing native/device/release obligations."
+}

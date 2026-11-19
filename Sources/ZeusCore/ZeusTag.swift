@@ -86,7 +86,7 @@ public struct ZeusAction: Equatable, Sendable {
     }
 
     /// Actions that always need the user's OK, regardless of site consent.
-    public var alwaysNeedsConsent: Bool { kind == .delegateChrome }
+    public var alwaysNeedsConsent: Bool { ModelActionApproval.alwaysNeedsConsent(self) }
 
     /// The tag a model writes for this action, e.g. `[ACTION:{"type":"browser.back"}]`.
     /// Keys are sorted and `type` always matches `kind`, so parsing it gives this action back.
@@ -105,6 +105,8 @@ public enum ZeusTag: Equatable, Sendable {
     case point(PointTarget?)
     case highlight(HighlightTarget)
     case action(ZeusAction)
+    /// Marks to draw on the screen the model was shown, tied to spoken sentences (`TalkDraw`).
+    case draw(TalkDraw)
 
     /// The tag as a model would write it; `ZeusTagParser.parse` reads it back.
     /// Labels can't contain ":" or "]" (the tag syntax has no escaping).
@@ -121,14 +123,16 @@ public enum ZeusTag: Equatable, Sendable {
             return "[HIGHLIGHT:\(area.x),\(area.y),\(area.width),\(area.height)\(fields(area.label, area.screen))]"
         case .action(let action):
             return action.tagText
+        case .draw(let draw):
+            return "[DRAW:\(draw.json)]"
         }
     }
 }
 
 /// Parses ZEUS reply tags. Tags are expected at the start of a reply; a trailing tag
-/// (Clicky's old style) is also accepted so a model that ignores the instruction still works.
+/// (an older tag style) is also accepted so a model that ignores the instruction still works.
 public enum ZeusTagParser {
-    static let prefixes = ["[POINT:", "[HIGHLIGHT:", "[ACTION:"]
+    static let prefixes = ["[POINT:", "[HIGHLIGHT:", "[ACTION:", "[DRAW:"]
 
     public struct Result: Equatable, Sendable {
         public let tags: [ZeusTag]
@@ -146,7 +150,7 @@ public enum ZeusTagParser {
                 if let tag { tags.append(tag) }
                 rest = rest.dropFirst(length)
             case .incomplete, .notATag:
-                var spoken = String(rest)
+                var spoken = removingDrawTags(String(rest))
                 spoken = stripTrailingTags(from: spoken, into: &tags)
                 return Result(tags: tags, spokenText: spoken.trimmingCharacters(in: .whitespacesAndNewlines))
             }
@@ -168,6 +172,15 @@ public enum ZeusTagParser {
         }
         let body = text.dropFirst(prefix.count)
 
+        if prefix == "[DRAW:" {
+            switch scanDraw(text, final: false) {
+            case .complete(let json, let length):
+                return .complete(json.flatMap(TalkDrawParser.parse).map(ZeusTag.draw), length: length)
+            case .needMore:
+                return .incomplete
+            }
+        }
+
         if prefix == "[ACTION:" {
             guard let jsonEnd = endOfJSONObject(in: body) else { return .incomplete }
             let afterJSON = body[jsonEnd...].drop(while: \.isWhitespace)
@@ -183,6 +196,77 @@ public enum ZeusTagParser {
         let length = text.distance(from: text.startIndex, to: closeIndex) + 1
         let tag = prefix == "[POINT:" ? parsePoint(inner) : parseHighlight(inner)
         return .complete(tag, length: length)
+    }
+
+    static let drawPrefix = "[DRAW:"
+    /// A draw tag longer than this with no end is dropped: the model lost track of it.
+    static let drawSizeLimit = 4_096
+
+    enum DrawScan: Equatable {
+        /// The tag ends here (`length` counts from the opening bracket). `json` is nil when it was malformed.
+        case complete(json: String?, length: Int)
+        case needMore
+    }
+
+    /// Finds the end of a draw tag that starts at `text` (which begins with `[DRAW:`). The JSON is matched
+    /// with string and escape awareness. The tag ends at its `]`, or, when the model forgot the bracket, right after
+    /// the closing brace. A raw line break ends a malformed tag (JSON strings cannot contain one), so the speech
+    /// on the next line is never held back. `final` means no more text is coming.
+    static func scanDraw(_ text: Substring, final: Bool) -> DrawScan {
+        func length(through index: Substring.Index) -> Int { text.distance(from: text.startIndex, to: index) + 1 }
+        let end = text.endIndex
+        var index = text.index(text.startIndex, offsetBy: drawPrefix.count)
+        while index < end, text[index] == " " || text[index] == "\t" { index = text.index(after: index) }
+        guard index < end else { return .needMore }
+        if text[index] != "{" {
+            // Not an object: the tag ends at the first closing bracket or line break.
+            var probe = index
+            while probe < end {
+                if text[probe] == "]" || text[probe] == "\n" { return .complete(json: nil, length: length(through: probe)) }
+                probe = text.index(after: probe)
+            }
+            return .needMore
+        }
+        let start = index
+        var depth = 0, inString = false, escaped = false
+        while index < end {
+            let character = text[index]
+            if character == "\n" { return .complete(json: nil, length: length(through: index)) }
+            if inString {
+                if escaped { escaped = false } else if character == "\\" { escaped = true } else if character == "\"" { inString = false }
+            } else if character == "\"" {
+                inString = true
+            } else if character == "{" {
+                depth += 1
+            } else if character == "}" {
+                depth -= 1
+                if depth == 0 {
+                    let json = String(text[start...index])
+                    let afterObject = length(through: index)
+                    var next = text.index(after: index)
+                    while next < end, text[next] == " " || text[next] == "\t" { next = text.index(after: next) }
+                    if next == end { return final ? .complete(json: json, length: afterObject) : .needMore }
+                    return .complete(json: json, length: text[next] == "]" ? length(through: next) : afterObject)
+                }
+            }
+            index = text.index(after: index)
+        }
+        return .needMore
+    }
+
+    /// The text with every draw tag removed. A tag with no end is removed to the end of the text.
+    static func removingDrawTags(_ text: String) -> String {
+        var result = ""
+        var rest = Substring(text)
+        while let open = rest.range(of: drawPrefix) {
+            result += rest[..<open.lowerBound]
+            let tail = rest[open.lowerBound...]
+            switch scanDraw(tail, final: true) {
+            case .complete(_, let length): rest = tail.dropFirst(length)
+            case .needMore: return result
+            }
+        }
+        return result + rest
     }
 
     static func parsePoint(_ inner: String) -> ZeusTag? {
@@ -281,6 +365,8 @@ public struct ZeusTagStreamParser: Sendable {
 
     private var buffer = ""
     private var inLeadingTags = true
+    /// After an over-long draw tag was dropped: everything up to the next line break is part of it.
+    private var skipping = false
 
     public init() {}
 
@@ -295,10 +381,39 @@ public struct ZeusTagStreamParser: Sendable {
                 if let tag { outputs.append(.tag(tag)) }
                 buffer = String(trimmed.dropFirst(length))
             case .incomplete:
-                return outputs
+                guard trimmed.hasPrefix(ZeusTagParser.drawPrefix), trimmed.count > ZeusTagParser.drawSizeLimit else { return outputs }
+                buffer = ""
+                skipping = true
+                inLeadingTags = false
             case .notATag:
                 inLeadingTags = false
                 buffer = String(trimmed)
+            }
+        }
+
+        // A draw tag later in the reply is never spoken. It is held back whole (so brackets inside its JSON
+        // cannot be mistaken for the start of another tag) and dropped: marks come only from a leading tag.
+        while true {
+            if skipping {
+                guard let lineBreak = buffer.firstIndex(of: "\n") else { buffer = ""; break }
+                buffer = String(buffer[buffer.index(after: lineBreak)...])
+                skipping = false
+            }
+            guard let open = buffer.range(of: ZeusTagParser.drawPrefix) else { break }
+            let before = String(buffer[..<open.lowerBound])
+            if !before.isEmpty { outputs.append(.text(before)) }
+            let tail = buffer[open.lowerBound...]
+            switch ZeusTagParser.scanDraw(tail, final: false) {
+            case .complete(_, let length):
+                buffer = String(tail.dropFirst(length))
+            case .needMore:
+                if tail.count > ZeusTagParser.drawSizeLimit {
+                    buffer = ""
+                    skipping = true
+                } else {
+                    buffer = String(tail)
+                    return outputs
+                }
             }
         }
 
@@ -325,4 +440,34 @@ public struct ZeusTagStreamParser: Sendable {
         outputs.append(contentsOf: result.tags.map(Output.tag))
         return outputs
     }
+}
+
+/// Which model-proposed actions stop for a card before they run, whatever the site or session
+/// consent. Everything else is either read-only (reading a page, research, presenting a card, a
+/// walkthrough) or has its own gate: shell lines go through `ShellRiskClassifier`, Mac driving
+/// through the drive autonomy setting, page changes through per-site consent.
+public enum ModelActionApproval {
+    /// Sending text to another service, and starting a coding agent with a model-written prompt.
+    public static func needsCard(_ action: ZeusAction) -> Bool {
+        action.kind == .terminalAgent || alwaysNeedsConsent(action)
+    }
+
+    /// The Chrome-side subset: anything that hands a prompt to ChatGPT, Claude or Dust.
+    public static func alwaysNeedsConsent(_ action: ZeusAction) -> Bool {
+        switch action.kind {
+        case .delegateChrome, .delegateDust: true
+        case .panelOpen: !(action.payload["prompt"]?.stringValue ?? "").isEmpty
+        default: false
+        }
+    }
+
+    /// A page click whose label sends, deletes or buys asks every time, even on a site already allowed.
+    public static func clickAlwaysAsks(label: String?) -> Bool {
+        guard let label, !label.isEmpty else { return false }
+        if HandsGate.intent(clicking: label) != nil { return true }
+        let words = label.lowercased().split { !$0.isLetter }.map(String.init)
+        return words.contains { sensitiveWords.contains($0) }
+    }
+
+    private static let sensitiveWords: Set<String> = ["send", "delete", "buy", "purchase", "pay", "checkout", "remove"]
 }

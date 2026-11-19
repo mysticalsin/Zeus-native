@@ -118,7 +118,7 @@ final class WakeWordListener: @unchecked Sendable {
                 if !fired, settled || now.timeIntervalSince(spotted.at) > 8 {
                     toEnd = request
                     closingAt = now
-                    VoiceLog.log("wake", "speech ended after \"\(spotted.request)\", waiting for the final words")
+                    VoiceLog.logContent("wake", spotted.request, prefix: "speech ended, waiting for final words; request ")
                 }
             } else if !speaking || now.timeIntervalSince(windowStarted ?? now) > Self.windowLimit {
                 // Let the recogniser finish what it heard instead of cancelling: the last words
@@ -188,7 +188,7 @@ final class WakeWordListener: @unchecked Sendable {
                 if previous.request != match.request { spotted = (previous.at, match.request, now) }
             } else {
                 spotted = (now, match.request, now)
-                VoiceLog.log("wake", "phrase heard in \"\(result.bestTranscription.formattedString)\"")
+                VoiceLog.logContent("wake", result.bestTranscription.formattedString, prefix: "phrase heard in ")
             }
             if result.isFinal, !fired {
                 fired = true
@@ -197,7 +197,10 @@ final class WakeWordListener: @unchecked Sendable {
                 endWindowLocked()
             }
         } else if error != nil || result?.isFinal == true {
-            if let error { VoiceLog.log("error", "wake recogniser: \((error as NSError).domain) \((error as NSError).code) \(error.localizedDescription)") }
+            if let error {
+                VoiceLog.logContent("error", error.localizedDescription,
+                    prefix: "wake recogniser: \((error as NSError).domain) \((error as NSError).code); detail ")
+            }
             // The final pass can re-punctuate or re-segment ("Hey, Zeus. Open…") so the phrase no
             // longer matches. The wake was already heard: go with the longest request seen
             // (the final text after the first "zeus"-like word, else the last partial).
@@ -206,7 +209,8 @@ final class WakeWordListener: @unchecked Sendable {
                 let finalText = result?.bestTranscription.formattedString ?? ""
                 let tail = WakePhrase.spot("hey zeus " + (Self.afterZeus(finalText) ?? ""))?.request ?? ""
                 wake = tail.count > heard.request.count ? tail : heard.request
-                VoiceLog.log("wake", "final text \"\(finalText)\", using \"\(wake ?? "")\"")
+                VoiceLog.logContent("wake", finalText, prefix: "final text ")
+                VoiceLog.logContent("wake", wake ?? "", prefix: "selected request ")
             }
             endWindowLocked()
         }

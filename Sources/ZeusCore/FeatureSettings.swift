@@ -17,8 +17,75 @@ public enum FeatureSettings {
 
     // MARK: Fast path
 
-    /// Instant commands: local rules, then Laya or Jev. Off sends every command to the LLM.
+    /// Instant commands: local rules, then Jev. Off sends every command to the LLM.
     public static func fastPathEnabled(defaults: UserDefaults = .standard) -> Bool { bool("fastPath.enabled", default: true, defaults: defaults) }
+
+    // MARK: Desktop pointing
+
+    /// The pointing keys the owner picked, Control and Option on a fresh install (`docs/FIRST-RUN-DEFAULTS.md`).
+    public static let pointingShortcutDefault = "Control-Option"
+
+    /// Desktop pointing is on from the first launch. Turning it on only installs the key listener the owner's own
+    /// Input Monitoring or Accessibility grant allows; no capture happens until the keys are held.
+    public static func pointingEnabled(defaults: UserDefaults = .standard) -> Bool { bool("pointing.enabled", default: true, defaults: defaults) }
+
+    /// While the keys are held, drags are ink Zeus can see. Off leaves the pointer and clicks to the apps.
+    public static func pointingDrawWhileHeld(defaults: UserDefaults = .standard) -> Bool { bool("pointing.drawWhileHeld", default: true, defaults: defaults) }
+
+    /// A screenshot goes to the provider only with this separate consent, never by default.
+    public static func pointingSendScreenshot(defaults: UserDefaults = .standard) -> Bool { bool("pointing.sendScreenshot", default: false, defaults: defaults) }
+
+    public static func pointingShortcutName(defaults: UserDefaults = .standard) -> String { string("pointing.shortcut", default: pointingShortcutDefault, defaults: defaults) }
+
+    // MARK: Talk drawing
+
+    /// Marks drawn on the screen while a talk answer is spoken. Off until the owner turns it on: it sends one
+    /// screenshot of the cursor display to Claude with the question.
+    public static func talkDrawOnScreen(defaults: UserDefaults = .standard) -> Bool { bool("talk.drawOnScreen", default: false, defaults: defaults) }
+
+    /// Whether the brain gets a screenshot of each display with a talk question, so Zeus can see what the owner sees.
+    /// On unless the owner turns it off. Separate from drawing marks, which stays off until chosen.
+    public static func talkSeeScreen(defaults: UserDefaults = .standard) -> Bool { bool("talk.seeScreen", default: true, defaults: defaults) }
+
+    // MARK: Tiling
+
+    /// Arranging windows from the keyboard. Off until the owner turns it on, and a settings import cannot turn it on.
+    public static func tilingEnabled(defaults: UserDefaults = .standard) -> Bool { bool("tiling.enabled", default: false, defaults: defaults) }
+
+    /// The gap between two tiles, in points. A value that is not a number reads as 8; `TileConfig` clamps the range.
+    public static func tilingInnerGap(defaults: UserDefaults = .standard) -> Double { number("tiling.innerGap", default: 8, defaults: defaults) }
+
+    /// The gap between the tiles and the screen edge, in points.
+    public static func tilingOuterGap(defaults: UserDefaults = .standard) -> Double { number("tiling.outerGap", default: 8, defaults: defaults) }
+
+    /// The default split as the percentage the page shows (50). It is not the engine's ratio: pass `tilingDefaultRatio` to `TileConfig`.
+    public static func tilingSplitRatio(defaults: UserDefaults = .standard) -> Double { number("tiling.splitRatio", default: 50, defaults: defaults) }
+
+    /// The default split as the engine's ratio (0.5), the percentage over 100. `TileConfig` clamps the range.
+    public static func tilingDefaultRatio(defaults: UserDefaults = .standard) -> Double { tilingSplitRatio(defaults: defaults) / 100 }
+
+    /// A ring around the focused window.
+    public static func tilingFocusBorder(defaults: UserDefaults = .standard) -> Bool { bool("tiling.focusBorder", default: true, defaults: defaults) }
+
+    /// The modifiers held for every tiling key. An unknown stored label reads as the default pair (Control-Option-Command).
+    public static func tilingKeyBase(defaults: UserDefaults = .standard) -> TileModifierBase {
+        TileModifierBase(label: string("tiling.keyBase", default: TileModifierBase.standard.label, defaults: defaults))
+    }
+
+    /// Bundle ids Zeus never tiles, separated by commas or new lines (any kind, CRLF included). Case is kept: a bundle id is compared as written.
+    public static func tilingExcludedApps(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(string("tiling.excludedApps", default: "", defaults: defaults)
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty })
+    }
+
+    /// A stored number, or `value` when nothing is stored or the text is not a finite number.
+    private static func number(_ id: String, default value: Double, defaults: UserDefaults) -> Double {
+        guard let text = defaults.string(forKey: key(id)),
+              let number = Double(text.trimmingCharacters(in: .whitespaces)), number.isFinite else { return value }
+        return number
+    }
 
     // MARK: Browser agent
 

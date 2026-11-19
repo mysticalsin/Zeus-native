@@ -127,7 +127,7 @@ public enum PresenterEmptyState: Equatable, Sendable {
         case .noPresentation(let app): "No presentation open in \(app)"
         case .noNotesInDeck(let name): "No speaker notes in \(name)"
         case .noNotesOnSlide(let slide): "No notes on slide \(slide)"
-        case .automation(let app): "ZEUS can't read \(app) yet"
+        case .automation(let app): "Zeus can't read \(app) yet"
         case .googleSlides: "Google Slides notes: not yet"
         case .failed: "Couldn't read the speaker notes"
         }
@@ -140,7 +140,7 @@ public enum PresenterEmptyState: Equatable, Sendable {
         case .noPresentation(let app): "Open your deck in \(app), then start the slideshow."
         case .noNotesInDeck: "Add speaker notes to your slides, save, then press Reload."
         case .noNotesOnSlide: "Keep presenting: the next slide's notes show when you move on."
-        case .automation(let app): "Allow ZEUS to control \(app) under Automation in Settings › Permissions."
+        case .automation(let app): "Allow Zeus to control \(app) under Automation in Settings › Permissions."
         case .googleSlides: "Open the deck in Keynote or PowerPoint to read its notes here."
         case .failed(let detail): detail
         }

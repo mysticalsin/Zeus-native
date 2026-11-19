@@ -75,14 +75,14 @@ import Testing
 
     @Test func situationNamesMatchTheSpec() {
         #expect(Set(Situation.allCases.map(\.rawValue)) == ["ack.open", "ack.play", "ack.done", "ack.todoAdded", "failed", "approval",
-                                                           "agentDone", "greeting.morning", "greeting.evening", "greeting.lateNight", "wakeWord.heard", "identity", "joke", "smallTalk", "comparison", "metaphysical", "welcomeBack"])
+                                                           "agentDone", "greeting.morning", "greeting.evening", "greeting.lateNight", "wakeWord.heard", "identity", "joke", "smallTalk", "comparison", "metaphysical", "welcomeBack", "thinking", "errorSpoken"])
         #expect(Situation.greeting(hour: 8) == .greetingMorning)
         #expect(Situation.greeting(hour: 19) == .greetingEvening)
         #expect(Situation.greeting(hour: 1) == .greetingLateNight)
     }
 
     @Test func personalityDefaultsToUltron() throws {
-        let suite = "zeus.personality.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.personality.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         #expect(ZeusPersonality.current(defaults) == .ultron)
@@ -190,7 +190,7 @@ import Testing
 
     @Test func localQueriesAnswerLoyally() {
         for question in ["are you smarter than me", "how are you today?", "tell me something funny about Mondays"] {
-            let answer = PersonaQueries.localAnswer(for: question) ?? ""
+            let answer = PersonaQueries.localAnswer(for: question, personality: .ultron) ?? ""
             #expect(!answer.isEmpty, "\(question)")
             #expect(!PersonaCompliance.hasOminousHedge(answer))
             #expect(answer.filter { ".!?".contains($0) }.count <= 2, "\(answer)")

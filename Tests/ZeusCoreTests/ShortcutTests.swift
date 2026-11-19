@@ -30,15 +30,14 @@ import Testing
     }
 
     private func defaults() -> UserDefaults {
-        let suite = "zeus.shortcuts.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.shortcuts.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suite)!
-        d.removePersistentDomain(forName: suite)
         return d
     }
 
     @Test func freshInstallDefaults() {
         let d = defaults()
-        #expect(ShortcutStore.loadTalk(d) == .optionCommand)
+        #expect(ShortcutStore.loadTalk(d) == .controlOption)
         #expect(ShortcutStore.loadDictation(d) == .rightCommand)
     }
 
@@ -51,11 +50,11 @@ import Testing
     }
 
     @Test func oldSavedKeysMigrate() {
-        // Tony's earlier build forced Right Command for talk and dictation: talk moves to Option+Command, dictation keeps it.
+        // Tony's earlier build forced Right Command for talk and dictation: talk moves to Control+Option, dictation keeps it.
         let forced = defaults()
         forced.set("rightCommand", forKey: "pushToTalk")
         forced.set("rightCommand", forKey: "dictation.key")
-        #expect(ShortcutStore.loadTalk(forced) == .optionCommand)
+        #expect(ShortcutStore.loadTalk(forced) == .controlOption)
         #expect(ShortcutStore.loadDictation(forced) == .rightCommand)
         // A deliberate other choice survives, and dictation "off" stays off.
         let chosen = defaults()
@@ -168,18 +167,23 @@ import Testing
 
     // MARK: Hold versus double-tap: monitor logic against a fake clock
 
-    /// What HotkeyMonitor does for the talk binding: held-state edges drive TalkKeyLatch.
+    /// What HotkeyMonitor does for the talk binding: the keys go to the voice key machine (confirm 0) and its effects
+    /// are kept. `stop` reads `.send`, `stopLater(0.4)` reads `.wake(after: 0.4)`, `cancelPendingStop` reads no effect, and
+    /// the `.wake(after: 0.25)` beside a start is the machine's look at the live modifiers.
     private struct Rig {
-        var state = ShortcutState()
-        var latch = TalkKeyLatch()
-        var down = false
-        var actions: [TalkKeyLatch.Action] = []
-        let shortcut: Shortcut
+        var machine = VoiceKeyMachine()
+        var actions: [VoiceKeyMachine.Effect] = []
+        var live: ShortcutModifiers = []
+        let config: VoiceKeyMachine.Config
+        init(shortcut: Shortcut) { config = VoiceKeyMachine.Config(key: shortcut, role: .talk, mode: .hold) }
         mutating func feed(_ event: ShortcutEvent, at t: TimeInterval) {
-            state.apply(event)
-            let pressed = state.isHeld(shortcut)
-            if pressed, !down { down = true; if let a = latch.keyDown(at: t) { actions.append(a) } }
-            else if !pressed, down { down = false; if let a = latch.keyUp(at: t) { actions.append(a) } }
+            if case .flags(_, let modifiers) = event { live = modifiers }
+            actions += machine.handle(.key(event, at: t), config: config)
+        }
+        mutating func tick(at t: TimeInterval) -> [VoiceKeyMachine.Effect] {
+            let effects = machine.handle(.tick(at: t, live: live), config: config)
+            actions += effects
+            return effects
         }
         mutating func chord(down t: TimeInterval) {
             feed(.flags(keyCode: ShortcutTests.optL, modifiers: .option), at: t)
@@ -195,24 +199,41 @@ import Testing
         var rig = Rig(shortcut: .optionCommand)
         rig.chord(down: 0)
         rig.release(at: 1.2)
-        #expect(rig.actions == [.start, .stop])
+        #expect(rig.actions == [.start, .wake(after: 0.25), .send])
     }
 
     @Test func doubleTapLatchesUntilTheNextTap() {
         var rig = Rig(shortcut: .optionCommand)
         rig.chord(down: 0); rig.release(at: 0.1)        // quick tap: stop only after the gap
         rig.chord(down: 0.25); rig.release(at: 0.35)    // second quick tap: latched
-        #expect(rig.actions == [.start, .stopLater(0.4), .cancelPendingStop])
-        #expect(rig.latch.isLatched)
+        #expect(rig.actions == [.start, .wake(after: 0.25), .wake(after: 0.4), .wake(after: 0.25)])
+        #expect(rig.machine.isLatched)
         rig.chord(down: 4); rig.release(at: 4.1)        // any later tap ends it
-        #expect(rig.actions.last == .stop)
-        #expect(!rig.latch.isLatched)
+        #expect(rig.actions.last == .send)
+        #expect(!rig.machine.isLatched)
+    }
+
+    /// The press that ends a hands-free turn is `spent` until its key-up. The monitor reads it to tell a press that
+    /// ended a turn (nothing left to cancel) from one that began or continued a turn.
+    @Test func theTapThatEndsALatchedTurnIsEndingUntilItsKeyUp() {
+        var rig = Rig(shortcut: .optionCommand)
+        #expect(rig.machine.phase != .spent)
+        rig.chord(down: 0); rig.release(at: 0.1)
+        rig.chord(down: 0.25); rig.release(at: 0.35)
+        #expect(rig.machine.isLatched && rig.machine.phase != .spent)
+        let before = rig.actions.count
+        rig.chord(down: 4)
+        #expect(rig.actions.dropFirst(before) == [.send])
+        #expect(rig.machine.phase == .spent && !rig.machine.isLatched)
+        rig.release(at: 4.1)
+        #expect(rig.actions.count == before + 1, "the key-up of the ending press sends nothing more")
+        #expect(rig.machine.phase != .spent)
     }
 
     @Test func aSingleTapStopsAfterTheGap() {
         var rig = Rig(shortcut: .optionCommand)
         rig.chord(down: 0); rig.release(at: 0.1)
-        #expect(rig.latch.pendingStopFired() == .stop)
+        #expect(rig.tick(at: 0.5) == [.send])
     }
 
     // MARK: Recorder
@@ -266,7 +287,9 @@ import Testing
         #expect(ShortcutConflicts.warnings(for: anyCommand, other: .rightCommand, otherName: "Dictation").contains { $0.contains("Overlaps") })
         #expect(ShortcutConflicts.warnings(for: .rightCommand, other: .rightCommand, otherName: "Dictation").contains { $0.contains("double-tap") })
         #expect(ShortcutConflicts.warnings(for: .optionCommand, other: .function, otherName: "Dictation").isEmpty)
-        #expect(ShortcutConflicts.warnings(for: .controlOption, other: nil, otherName: "").contains { $0.contains("VoiceOver") })
+        // Control+Option is the talk key: VoiceOver is mentioned only while VoiceOver is on.
+        #expect(ShortcutConflicts.warnings(for: .controlOption, other: nil, otherName: "").isEmpty)
+        #expect(ShortcutConflicts.warnings(for: .controlOption, other: nil, otherName: "", voiceOverOn: true).contains { $0.contains("VoiceOver") })
     }
 }
 

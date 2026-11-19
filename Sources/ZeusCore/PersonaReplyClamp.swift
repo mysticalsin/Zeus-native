@@ -20,13 +20,16 @@ public enum PersonaReplyClamp: Sendable {
         return .chat
     }
 
+    /// A spoken reply is one to three sentences, even when the owner asks for detail.
+    public static let voiceMaxSentences = 3
+
     public static func maxSentences(transcript: String, personality: ZeusPersonality) -> Int {
         guard personality == .ultron else {
             return kind(for: transcript) == .chat ? 4 : 1
         }
         switch kind(for: transcript) {
         case .action, .gratitude: return 1
-        case .chat: return wantsDetail(transcript) ? 4 : 2
+        case .chat: return wantsDetail(transcript) ? voiceMaxSentences : 2
         }
     }
 

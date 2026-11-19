@@ -80,12 +80,14 @@ public enum MCPCodec {
             if let id { return .request(id: id, method: method, params: object["params"]) }
             return .notification(method: method, params: object["params"])
         }
-        guard let number = id?.numberValue, number.rounded() == number else { throw MCPCodecError.notAMessage }
+        // Untrusted JSON numbers can be finite but far outside Int's range. A plain Int(...)
+        // conversion traps the process; exact conversion also rejects fractions and nonfinite strings.
+        guard let number = id?.numberValue, let responseID = Int(exactly: number) else { throw MCPCodecError.notAMessage }
         if case .object(let error)? = object["error"] {
-            let code = Int(error["code"]?.numberValue ?? -32_603)
-            return .response(id: Int(number), result: nil, error: MCPError(code: code, message: error["message"]?.stringValue ?? "error"))
+            guard let code = Int(exactly: error["code"]?.numberValue ?? -32_603) else { throw MCPCodecError.notAMessage }
+            return .response(id: responseID, result: nil, error: MCPError(code: code, message: error["message"]?.stringValue ?? "error"))
         }
-        return .response(id: Int(number), result: object["result"], error: nil)
+        return .response(id: responseID, result: object["result"], error: nil)
     }
 }
 

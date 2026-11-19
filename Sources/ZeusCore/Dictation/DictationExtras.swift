@@ -21,39 +21,58 @@ public enum WAVFile {
         return data
     }
 
-    /// Samples of a file written by `encode` (or any 16-bit mono PCM WAV); nil otherwise.
+    /// Samples of a complete 16-bit mono PCM WAV; malformed or truncated containers fail closed.
     public static func decode(_ data: Data) -> (samples: [Float], sampleRate: Int)? {
-        guard data.count >= 44, data.prefix(4) == Data("RIFF".utf8), data[8..<12] == Data("WAVE".utf8) else { return nil }
-        func read<T: FixedWidthInteger>(_ type: T.Type, at offset: Int) -> T {
-            var value: T = 0
-            _ = withUnsafeMutableBytes(of: &value) { data.copyBytes(to: $0, from: offset..<offset + MemoryLayout<T>.size) }
-            return T(littleEndian: value)
-        }
-        var offset = 12
-        var rate = 16_000, channels = 1, bits = 16
-        while offset + 8 <= data.count {
-            let id = String(decoding: data[offset..<offset + 4], as: UTF8.self)
-            let size = Int(read(UInt32.self, at: offset + 4))
-            let body = offset + 8
-            if id == "fmt " {
-                channels = Int(read(UInt16.self, at: body + 2))
-                rate = Int(read(UInt32.self, at: body + 4))
-                bits = Int(read(UInt16.self, at: body + 14))
-            } else if id == "data" {
-                guard channels == 1, bits == 16 else { return nil }
-                let end = min(body + size, data.count)
-                var samples: [Float] = []
-                samples.reserveCapacity((end - body) / 2)
-                var position = body
-                while position + 1 < end {
-                    samples.append(Float(read(Int16.self, at: position)) / Float(Int16.max))
-                    position += 2
-                }
-                return (samples, rate)
+        data.withUnsafeBytes { bytes in
+            // Offsets below are relative to this buffer, including when Data is a nonzero-index slice.
+            guard bytes.count >= 44,
+                  bytes[0..<4].elementsEqual("RIFF".utf8),
+                  bytes[8..<12].elementsEqual("WAVE".utf8) else { return nil }
+            func u16(_ offset: Int) -> Int {
+                Int(UInt16(littleEndian: bytes.loadUnaligned(fromByteOffset: offset, as: UInt16.self)))
             }
-            offset = body + size + (size & 1)
+            func u32(_ offset: Int) -> Int {
+                Int(UInt32(littleEndian: bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)))
+            }
+            let declared = u32(4)
+            guard declared >= 36, declared <= bytes.count - 8 else { return nil }
+            let end = declared + 8
+            var offset = 12
+            var sampleRate: Int?
+            var payload: Range<Int>?
+            while offset < end {
+                guard end - offset >= 8 else { return nil }
+                let id = String(decoding: bytes[offset..<offset + 4], as: UTF8.self)
+                let size = u32(offset + 4)
+                let body = offset + 8
+                // Check each complete chunk before reading any format field or sample.
+                guard size <= end - body else { return nil }
+                if id == "fmt " {
+                    guard sampleRate == nil, size >= 16,
+                          u16(body) == 1, u16(body + 2) == 1,
+                          u16(body + 12) == 2, u16(body + 14) == 16 else { return nil }
+                    let rate = u32(body + 4)
+                    guard rate > 0, u32(body + 8) == rate * 2 else { return nil }
+                    sampleRate = rate
+                } else if id == "data" {
+                    guard sampleRate != nil, payload == nil, size % 2 == 0 else { return nil }
+                    payload = body..<body + size
+                }
+                offset = body + size
+                if size & 1 == 1 {
+                    guard offset < end else { return nil }
+                    offset += 1 // RIFF pads odd-sized chunks to an even byte boundary.
+                }
+            }
+            guard offset == end, let sampleRate, let payload else { return nil }
+            var samples: [Float] = []
+            samples.reserveCapacity(payload.count / 2)
+            for position in stride(from: payload.lowerBound, to: payload.upperBound, by: 2) {
+                let value = Int16(littleEndian: bytes.loadUnaligned(fromByteOffset: position, as: Int16.self))
+                samples.append(max(-1, Float(value) / Float(Int16.max)))
+            }
+            return (samples, sampleRate)
         }
-        return nil
     }
 }
 
@@ -98,7 +117,7 @@ extension DictationRecord {
 // MARK: Vocabulary capture
 
 /// Learns from a correction: compares what ZEUS wrote with what the person fixed it to and
-/// proposes replacements ("vibe is" → "Vibe Island") and new words for the vocabulary.
+/// proposes replacements ("mount roil" → "Mount Royal") and new words for the vocabulary.
 public enum VocabularyCapture {
     public struct Suggestion: Equatable, Sendable {
         public var replacements: [Replacement]
@@ -194,7 +213,7 @@ public enum VocabularyCapture {
 
 /// `zeus://` links, so Shortcuts, Raycast, Stream Deck or a script can drive ZEUS:
 /// `zeus://dictation/start`, `/stop`, `/toggle`, `/cancel`, `zeus://dictation/mode?key=email`,
-/// `zeus://chat/open?text=…`, `zeus://chat/new`.
+/// `zeus://chat/open?text=…`, `zeus://chat/new`, `zeus://settings`, `zeus://settings/<section>`.
 public enum ZeusDeepLink: Equatable, Sendable {
     case dictationStart
     case dictationStop
@@ -207,6 +226,10 @@ public enum ZeusDeepLink: Equatable, Sendable {
     case prompter
     /// `zeus://sticky/new?text=…`: a new sticky note.
     case stickyNew(text: String?)
+    /// `zeus://settings` or `zeus://settings/<section>`: opens the Settings window, nothing else. Zeus has no Dock icon,
+    /// so this is the way in when the menu bar icon is hidden. The section is the lowercased first path segment; the app
+    /// matches it to a Settings page and just opens Settings when it matches none.
+    case settings(section: String?)
 
     public static let scheme = "zeus"
 
@@ -227,6 +250,7 @@ public enum ZeusDeepLink: Equatable, Sendable {
             return key.isEmpty ? nil : .dictationMode(key)
         case ("chat", "new"): return .chatNew
         case ("prompter", _), ("teleprompter", _): return .prompter
+        case ("settings", _): return .settings(section: parts.dropFirst().first)
         case ("sticky", nil), ("sticky", "new"), ("note", "new"):
             let text = query["text"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             return .stickyNew(text: text?.isEmpty == false ? text : nil)

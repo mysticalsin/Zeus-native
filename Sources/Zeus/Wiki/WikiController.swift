@@ -5,8 +5,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 import ZeusCore
 
-/// Owns the Memory (learning wiki) window and everything it does. All state lives here, so the view needs no
-/// SwiftUI state wrappers. Pages are learned only from saved Scribe meetings (decisions and action items,
+/// The saved-source route has no permission or capture action. Its live implementation refuses
+/// to replace an active Scribe session; an isolated Memory window can supply an inert navigator.
+enum WikiMeetingNavigationOutcome: Equatable {
+    case opened, busy, panelUnavailable, unavailable
+}
+
+/// Owns the Memory (learning wiki) window and its content state; native keyboard focus stays in the view.
+/// Pages are learned only from saved Scribe meetings (decisions and action items,
 /// never private notes), only while learning is not paused, and only into the `personal` scope.
 @MainActor
 @Observable
@@ -36,11 +42,19 @@ final class WikiController {
     private(set) var settingsUnreadable = false
     var confirmingResetSettings = false
     var vaultExport: WikiMCPExportModel?
+    var graphOpen = false
+    var graphShowsList = false
+    var graphQuery = ""
+    var graphFilter: WikiGraphFilter = .all
+    var graphRelationID: String?
 
     @ObservationIgnored private let store: WikiStore
     @ObservationIgnored private let meetings: ScribeMeetingStore
     @ObservationIgnored private let userName: () -> String
     @ObservationIgnored private let clock: () -> Date
+    @ObservationIgnored private let cancelledMeetingIDs: () -> Set<UUID>
+    @ObservationIgnored private let navigateToMeeting: @MainActor (UUID) -> WikiMeetingNavigationOutcome
+    @ObservationIgnored private let announce: (String) -> Void
     @ObservationIgnored private var forgotten: Set<UUID> = []
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     /// Failed page saves and deletes, kept as explicit intents and retried on every refresh until they commit.
@@ -57,12 +71,18 @@ final class WikiController {
         store: WikiStore = .standard,
         meetings: ScribeMeetingStore = .standard,
         userName: @escaping () -> String = { NSUserName() },
-        clock: @escaping () -> Date = { Date() }
+        clock: @escaping () -> Date = { Date() },
+        cancelledMeetingIDs: @escaping () -> Set<UUID> = { ScribeCancelTombstones.ids },
+        navigateToMeeting: @escaping @MainActor (UUID) -> WikiMeetingNavigationOutcome = WikiController.openSavedMeeting,
+        announce: @escaping (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
     ) {
         self.store = store
         self.meetings = meetings
         self.userName = userName
         self.clock = clock
+        self.cancelledMeetingIDs = cancelledMeetingIDs
+        self.navigateToMeeting = navigateToMeeting
+        self.announce = announce
         reload()
         // An edit typed in the last 600 ms is written on Cmd-Q, not lost with the debounce.
         terminateObserver = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
@@ -90,7 +110,7 @@ final class WikiController {
     }
 
     func title(forMeeting id: UUID) -> String {
-        if ScribeCancelTombstones.ids.contains(id) { return "Cancelled meeting" }
+        if cancelledMeetingIDs().contains(id) { return "Cancelled meeting" }
         if forgotten.contains(id) || selectedPage?.forgottenContributors.contains(id) == true {
             return "Forgotten meeting"
         }
@@ -101,7 +121,7 @@ final class WikiController {
         guard !settingsUnreadable, let selectedID else { return [] }
         return WikiRelationships.related(to: selectedID, in: pages,
                                          availableMeetingIDs: availableMeetingIDs,
-                                         excluding: forgotten.union(ScribeCancelTombstones.ids))
+                                         excluding: forgotten.union(cancelledMeetingIDs()))
     }
 
     func selectRelated(_ id: String) {
@@ -110,13 +130,46 @@ final class WikiController {
         select(id)
     }
 
+    var graphSnapshot: WikiGraphSnapshot {
+        guard !settingsUnreadable else { return .make(focus: nil, relationships: []) }
+        return .make(focus: selectedPage, relationships: relatedPages, filter: graphFilter, query: graphQuery)
+    }
+
+    var hasGraphFilters: Bool {
+        graphFilter != .all || !graphQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var graphFilterDescription: String {
+        let search = graphQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        return graphFilter.title + (search.isEmpty ? "" : " · Search: “\(search)”")
+    }
+
+    func resetGraphFilters() {
+        graphQuery = ""
+        graphFilter = .all
+        graphRelationID = nil
+    }
+
+    func openGraph() {
+        guard vaultExport == nil else { return }
+        refreshFromMeetings(force: true) // Explicit navigation refreshes saved-source availability.
+        resetGraphFilters()
+        graphOpen = true
+    }
+
+    func selectGraphPage(_ id: String) {
+        let previous = selectedID
+        selectRelated(id) // Rechecks current evidence and flushes the editor before navigating.
+        if selectedID != previous { graphRelationID = nil; graphQuery = "" }
+    }
+
     /// A visible explanation, not a guessed replacement for an unavailable original source.
     func meetingSourceIssue(_ id: UUID) -> String? {
         if settingsUnreadable { return "Source access is unavailable until Memory's settings are recovered." }
         if forgotten.contains(id) || selectedPage?.forgottenContributors.contains(id) == true {
             return "This source was forgotten."
         }
-        if ScribeCancelTombstones.ids.contains(id) { return "This meeting was cancelled." }
+        if cancelledMeetingIDs().contains(id) { return "This meeting was cancelled." }
         if dismissedMeetingIDs.contains(id) { return "This source was removed from the Meetings list." }
         if !availableMeetingIDs.contains(id) { return "This saved source is missing or could not be read." }
         return nil
@@ -137,11 +190,6 @@ final class WikiController {
             return
         }
         if let issue = meetingSourceIssue(id) { setNotice(issue); return }
-        let scribe = ScribeController.shared
-        guard !scribe.phase.isActive else {
-            setNotice("Finish the current recording and notes before opening a saved meeting. Your session is still running.")
-            return
-        }
         // Re-read the original before navigation: the visible source list may outlive a deletion,
         // dismissal or unreadable file. Never recreate a missing recap or un-dismiss one.
         let matches = meetings.loadAll().records.filter { $0.id == id }
@@ -157,17 +205,26 @@ final class WikiController {
             setNotice("This source was removed from the Meetings list.")
             return
         }
-        guard let panel = NotchControllerBridge.controller, let topBar = panel.topBar else {
-            setNotice("The Meetings panel isn't available right now.")
-            return
-        }
-        guard scribe.openRecap(ScribeSessionID(rawValue: id)) else {
-            setNotice("This source is no longer available in Meetings.")
-            return
-        }
+        // Commit the editor before crossing the navigation boundary, including a refused route.
+        // A failure keeps the current page and graph in place with an actionable explanation.
         flushEdit()
+        switch navigateToMeeting(id) {
+        case .opened: graphOpen = false
+        case .busy:
+            setNotice("Finish the current recording and notes before opening a saved meeting. Your session is still running.")
+        case .panelUnavailable: setNotice("The Meetings panel isn't available right now.")
+        case .unavailable: setNotice("This source is no longer available in Meetings.")
+        }
+    }
+
+    private static func openSavedMeeting(_ id: UUID) -> WikiMeetingNavigationOutcome {
+        let scribe = ScribeController.shared
+        guard !scribe.phase.isActive else { return .busy }
+        guard let panel = NotchControllerBridge.controller, let topBar = panel.topBar else { return .panelUnavailable }
+        guard scribe.openRecap(ScribeSessionID(rawValue: id)) else { return .unavailable }
         topBar.selectedTab = .scribe
         panel.show(.panel)
+        return .opened
     }
 
     // MARK: Loading
@@ -204,7 +261,7 @@ final class WikiController {
         stampChecked = true
         lastStamp = stamp
         let result = meetings.loadAll()
-        let cancelled = ScribeCancelTombstones.ids
+        let cancelled = cancelledMeetingIDs()
         meetingTitles = Dictionary(result.records.filter { !cancelled.contains($0.id) }.map { ($0.id, $0.title) },
                                    uniquingKeysWith: { first, _ in first })
         dismissedMeetingIDs = Set(result.records.filter { $0.dismissedAt != nil }.map(\.id))
@@ -524,7 +581,7 @@ final class WikiController {
         if recovered.error != nil { settingsUnreadable = true; learningPaused = true }
         refreshFromMeetings(force: true)
         return WikiExportSnapshot(pages: pages, connection: TodoController.shared.connection,
-            availableMeetingIDs: availableMeetingIDs, forgottenMeetingIDs: forgotten.union(ScribeCancelTombstones.ids),
+            availableMeetingIDs: availableMeetingIDs, forgottenMeetingIDs: forgotten.union(cancelledMeetingIDs()),
             sourceTitles: meetingTitles, settingsReadable: !settingsUnreadable && pending.isEmpty)
     }
 
@@ -534,7 +591,7 @@ final class WikiController {
             guard var entry = try exportJournal.load(), entry.state == .uncertain, let draft = entry.draft else { return }
             let sourceIDs = Set(draft.pages.flatMap { $0.meetingIDs + $0.contributors + $0.facts.flatMap { $0.sources.compactMap(\.meetingID) } })
             guard settingsUnreadable || !sourceIDs.isSubset(of: availableMeetingIDs)
-                || !sourceIDs.isDisjoint(with: forgotten.union(ScribeCancelTombstones.ids)) else { return }
+                || !sourceIDs.isDisjoint(with: forgotten.union(cancelledMeetingIDs())) else { return }
             entry.invalidate()
             try exportJournal.save(entry)
             vaultExport?.invalidate()
@@ -574,7 +631,7 @@ final class WikiController {
 
     private func setNotice(_ text: String) {
         notice = text
-        AccessibilityNotification.Announcement(text).post()
+        announce(text)
     }
 
     // MARK: Persisting a new page list
@@ -602,6 +659,22 @@ final class WikiController {
     }
 
     // MARK: Window
+
+    /// Only this controller's window, never a process-wide window search.
+    var ownedWindow: NSWindow? { window }
+
+    /// Ends this controller's lifetime without leaving a delayed edit or notification observer behind.
+    /// Synthetic hosts call this before deleting their disposable stores.
+    func shutdown() {
+        flushEdit()
+        window?.close()
+        window = nil
+        windowDelegate = nil
+        if let terminateObserver {
+            NotificationCenter.default.removeObserver(terminateObserver)
+            self.terminateObserver = nil
+        }
+    }
 
     func showWindow() {
         if window == nil { window = makeWindow() }

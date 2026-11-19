@@ -85,4 +85,38 @@ struct ChatTests {
         store.delete(newer.id)
         #expect(store.all().map(\.id) == [older.id])
     }
+
+    @Test func visualOnlyLinkSurvivesStoreReloadWithoutInventingChatMessages() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-chat-link-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let link = UUID()
+        let conversation = ChatConversation(title: "A real visual explanation", createdAt: t0, visualExplanationID: link)
+        let store = ChatStore(root: dir)
+        try store.save(conversation)
+        let reloaded = try #require(ChatStore(root: dir).all().first)
+        #expect(reloaded.id == conversation.id && reloaded.visualExplanationID == link)
+        #expect(reloaded.messages.isEmpty && reloaded.exchanges().isEmpty)
+        #expect(reloaded.displayTitle == "A real visual explanation")
+        store.delete(conversation.id)
+        #expect(ChatStore(root: dir).all().isEmpty)
+    }
+
+    @Test func legacyConversationWithoutVisualLinkStillDecodesAndUnlinkedEmptyStaysUnsaved() throws {
+        let conversation = conversation([(.user, "An older conversation", false)])
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let encoded = try encoder.encode(conversation)
+        let decodedJSON = try JSONSerialization.jsonObject(with: encoded)
+        var legacy = try #require(decodedJSON as? [String: Any])
+        legacy.removeValue(forKey: "visualExplanationID")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(ChatConversation.self, from: JSONSerialization.data(withJSONObject: legacy))
+        #expect(decoded == conversation && decoded.visualExplanationID == nil)
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-chat-unlinked-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = ChatStore(root: dir)
+        try store.save(ChatConversation(title: "An unsent draft"))
+        #expect(store.all().isEmpty && !FileManager.default.fileExists(atPath: dir.path))
+    }
 }

@@ -20,24 +20,8 @@ enum Glass {
     static let fillRaised = Color.white.opacity(0.08)
     static let fillPressed = Color.white.opacity(0.14)
 
-    // MARK: Open notch (Glance-like glass: the desktop shows through below the notch row)
-    /// Opacity of the open panel's black below the notch row; the top stays solid to meet the notch.
-    static let notchPanelOpacity: Double = 0.80
-    /// Where the solid top ends, as a fraction of the open panel's height.
-    static let notchSolidStop: Double = 0.16
-    /// Glance's open panel: black at the top, (8,8,6) mid, (14,12,11) at the bottom.
-    /// Glance's open fill down the gap between cards on Home (parity/N4, x 864): black to y 45,
-    /// then up to its brightest behind the middle of the cards, easing off at the bottom.
-    static let notchPanelFill = LinearGradient(stops: [
-        .init(color: .black, location: 0),
-        .init(color: .black, location: 0.21),
-        .init(color: Color(red: 7 / 255, green: 6 / 255, blue: 5 / 255), location: 0.33),
-        .init(color: Color(red: 12 / 255, green: 11 / 255, blue: 10 / 255), location: 0.41),
-        .init(color: Color(red: 16 / 255, green: 14 / 255, blue: 13 / 255), location: 0.48),
-        .init(color: Color(red: 27 / 255, green: 26 / 255, blue: 23 / 255), location: 0.67),
-        .init(color: Color(red: 24 / 255, green: 22 / 255, blue: 20 / 255), location: 0.86),
-        .init(color: Color(red: 19 / 255, green: 18 / 255, blue: 16 / 255), location: 1),
-    ], startPoint: .top, endPoint: .bottom)
+    // MARK: Open notch
+    // The open body is the same solid black as the closed one (NotchView); only its shadow and tiles differ.
     static let notchShadow = (opacity: 0.32, radius: CGFloat(18), y: CGFloat(6))
     static let notchTile = Color.white.opacity(0.075)
     static let notchTileStroke = Color.white.opacity(0.11)
@@ -80,19 +64,40 @@ enum Glass {
 
 /// ZEUS's own SwiftPM resource bundle (avatar art, fonts), in the app or beside the binary.
 enum ZeusResources {
-    static let bundle: Bundle? = {
+    static var candidates: [URL] {
+        candidateURLs(resourceURL: Bundle.main.resourceURL, executableURL: Bundle.main.executableURL,
+            mainBundleURL: Bundle.main.bundleURL, moduleBundleURL: Bundle(for: ZeusResourceBundleAnchor.self).bundleURL)
+    }
+
+    /// SwiftPM puts the resource bundle beside its loaded .xctest bundle, not inside Contents/MacOS.
+    /// Only that explicit test-host shape gains a sibling candidate; installed app lookup stays contained.
+    static func candidateURLs(resourceURL: URL?, executableURL: URL?, mainBundleURL: URL,
+                              moduleBundleURL: URL) -> [URL] {
         let name = "Zeus_Zeus.bundle"
-        let candidates = [
-            Bundle.main.resourceURL?.appendingPathComponent(name),
-            Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(name),
-            Bundle.main.bundleURL.appendingPathComponent(name),
-        ].compactMap { $0 }
+        var urls = [resourceURL?.appendingPathComponent(name),
+                    executableURL?.deletingLastPathComponent().appendingPathComponent(name),
+                    mainBundleURL.appendingPathComponent(name)].compactMap { $0 }
+        for host in [mainBundleURL, moduleBundleURL] where host.pathExtension.lowercased() == "xctest" {
+            urls.append(host.deletingLastPathComponent().appendingPathComponent(name))
+        }
+        var seen = Set<URL>()
+        return urls.map(\.standardizedFileURL).filter { seen.insert($0).inserted }
+    }
+
+    static var lookupDescription: String {
+        "main=\(Bundle.main.bundleURL.path); module=\(Bundle(for: ZeusResourceBundleAnchor.self).bundleURL.path); candidates="
+            + candidates.map(\.path).joined(separator: ", ")
+    }
+
+    static let bundle: Bundle? = {
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
             if let bundle = Bundle(url: url) { return bundle }
         }
         return nil
     }()
 }
+
+private final class ZeusResourceBundleAnchor: NSObject {}
 
 enum GlassFonts {
     static let family = "Plus Jakarta Sans"
@@ -263,10 +268,8 @@ struct GlassDivider: View {
 
 /// Pill switch: white knob on the bolt when on, smoke when off.
 struct GlassToggleStyle: ToggleStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     func makeBody(configuration: Configuration) -> some View {
-        Button { withAnimation(Motion.page(reduceMotion: reduceMotion)) { configuration.isOn.toggle() } } label: {
+        Button { configuration.isOn.toggle() } label: {
             HStack {
                 configuration.label
                 ZStack(alignment: configuration.isOn ? .trailing : .leading) {
@@ -276,6 +279,7 @@ struct GlassToggleStyle: ToggleStyle {
                 }
                 .frame(width: 36, height: 20)
             }
+            .modifier(MotionEffect(active: configuration.isOn, curve: .page))
         }
         .buttonStyle(.plain)
         .accessibilityValue(configuration.isOn ? "On" : "Off")
@@ -295,7 +299,6 @@ struct GlassButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, quiet, danger }
     var kind: Kind = .secondary
     var compact = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -308,8 +311,7 @@ struct GlassButtonStyle: ButtonStyle {
             .background(Capsule().fill(background(pressed)))
             .overlay(Capsule().strokeBorder(kind == .secondary ? Glass.hairline : .clear, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.45)
-            .scaleEffect(pressed && isEnabled && !reduceMotion ? Motion.pressedScale : 1)
-            .animation(Motion.feedback(reduceMotion: reduceMotion), value: pressed)
+            .modifier(MotionEffect(active: pressed, enabled: isEnabled, presses: true))
             .contentShape(Capsule())
     }
 
@@ -336,7 +338,7 @@ struct GlassSegmented<Value: Hashable>: View {
     let options: [(Value, String)]
     let selection: Binding<Value>
     @Namespace private var pill
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         HStack(spacing: 2) {

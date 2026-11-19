@@ -12,7 +12,7 @@ struct PermissionsStep: View {
         case .speech: ("waveform", "Speech Recognition", "Turns your voice into text on this Mac.")
         case .accessibility: ("accessibility", "Accessibility", "Notices the talk key, inserts dictated text and clicks where you agree.")
         case .camera: ("camera", "Camera", "Records you while you read in the teleprompter.")
-        case .screen: ("rectangle.dashed", "Screen Recording", "Lets ZEUS see what you point at when you ask.")
+        case .screen: ("rectangle.dashed", "Screen Recording", "Lets Zeus see what you point at when you ask.")
         case .calendar: ("calendar", "Calendar", "Shows your next events in the notch.")
         case .reminders: ("checklist", "Reminders", "Shows what is due today.")
         case .automation: ("gearshape.2", "Automation", "Reads speaker notes from Keynote or PowerPoint and controls Music.")
@@ -22,7 +22,7 @@ struct PermissionsStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Allow what you need").font(.title.weight(.semibold)).accessibilityAddTraits(.isHeader)
-            Text("Each one is optional. ZEUS asks only when you press Allow, and you can change any of them later in Settings.")
+            Text("Each one is optional. Zeus asks only when you press Allow, and you can change any of them later in Settings.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 6) {
                 ForEach(PermissionsModel.Kind.allCases) { kind in row(kind) }

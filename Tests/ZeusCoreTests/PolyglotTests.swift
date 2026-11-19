@@ -445,6 +445,66 @@ private final class Events: @unchecked Sendable {
         #expect(transcript.lines[0].translation == nil)
     }
 
+    private static let newerSystemNotice = "Translation needs macOS 26 or later. Heard lines still show."
+
+    private func newerSystemNotices(_ events: Events) -> Int {
+        events.all.filter { $0 == .failed(Self.newerSystemNotice) }.count
+    }
+
+    @Test func olderSystemShowsHeardLineWithOneNewerSystemNotice() async {
+        let translator = FakeTranslator()
+        await translator.setStatus(.requiresNewerSystem)
+        // passLimit 1: the two lines go through the translator in two separate batches.
+        let (pipeline, events, _, _) = make(["Vamos começar a reunião agora.", "Vamos começar a reunião agora."], translator: translator, passLimit: 1)
+        let audio = (speech(seconds: 1) + silence(seconds: 1)) + (speech(seconds: 1) + silence(seconds: 1))
+        await pipeline.ingest(audio, from: .system)
+        await pipeline.finish()
+        #expect(events.lines.count == 2)
+        #expect(events.translations.isEmpty)
+        #expect(newerSystemNotices(events) == 1)
+        #expect(!events.all.contains { if case .failed(let text) = $0 { text.contains("not available for translation") } else { false } })
+        #expect(await translator.batches.isEmpty)
+    }
+
+    @Test func olderSystemNeverRequestsPack() async {
+        let translator = FakeTranslator()
+        await translator.setStatus(.requiresNewerSystem)
+        let (pipeline, events, _, _) = make(["Vamos começar a reunião agora."], translator: translator)
+        await say(pipeline)
+        await pipeline.finish()
+        #expect(!events.all.contains { if case .needsPack = $0 { true } else { false } })
+        #expect(events.lines.count == 1)
+    }
+
+    /// The card drops its notice on Clear and on a target change, so the reason is shown again after either.
+    @Test func olderSystemNoticeReturnsAfterClearAndAfterTargetChange() async {
+        let translator = FakeTranslator()
+        await translator.setStatus(.requiresNewerSystem)
+        let line = "Vamos começar a reunião agora."
+        let (pipeline, events, _, _) = make([line, line, line], translator: translator)
+        await say(pipeline)
+        await pipeline.finish()
+        #expect(newerSystemNotices(events) == 1)
+        await pipeline.clear(token: 1)
+        await say(pipeline)
+        await pipeline.finish()
+        #expect(newerSystemNotices(events) == 2)
+        await pipeline.setTarget("fr")
+        await say(pipeline)
+        await pipeline.finish()
+        #expect(newerSystemNotices(events) == 3)
+    }
+
+    @Test func unsupportedPairStillNamesThePair() async {
+        let translator = FakeTranslator()
+        await translator.setStatus(.unsupported)
+        let (pipeline, events, _, _) = make(["Vamos começar a reunião agora."], translator: translator)
+        await say(pipeline)
+        await pipeline.finish()
+        #expect(events.all.contains(.failed("Portuguese to English is not available for translation.")))
+        #expect(newerSystemNotices(events) == 0)
+    }
+
     @Test func targetChangeAppliesToTheNextSentence() async {
         let (pipeline, events, _, _) = make(["Okay, let's go.", "Vamos começar a reunião agora."])
         await say(pipeline)

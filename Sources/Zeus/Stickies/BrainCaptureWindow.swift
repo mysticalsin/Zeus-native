@@ -102,7 +102,7 @@ struct BrainCaptureView: View {
                     Button("Done", action: close).keyboardShortcut(.defaultAction)
                 }
             } else if model.vault == nil {
-                Text("Choose a vault in Settings › Memory, or set one up with Teach ZEUS About You.")
+                Text("Choose a vault in Settings › Memory, or set one up with Teach Zeus About You.")
                     .font(TopBarStyle.label(12.5)).foregroundStyle(Theme.cloudSecondary)
                 HStack {
                     Spacer()

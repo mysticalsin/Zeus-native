@@ -92,7 +92,7 @@ struct VoiceRingView: View {
     /// Rings that stay on screen together need different ids so each keeps its own motion.
     var runnerID = "voice-ring"
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
 
     var body: some View {
         let runner = VoiceRingRunner.runner(runnerID)
@@ -105,7 +105,8 @@ struct VoiceRingView: View {
                 }
                 .animation(.easeInOut(duration: 0.3), value: state)
             } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused)) { timeline in
+                // Display-synchronized (every refresh, 120 Hz on ProMotion): a 30 fps cap made the ring step.
+                DisplaySynchronizedView(paused: paused) { timeline in
                     canvas(runner: runner, now: timeline.date.timeIntervalSinceReferenceDate, live: true)
                 }
             }
@@ -127,10 +128,10 @@ struct VoiceRingView: View {
 
     static func label(for state: VoiceRingState) -> String {
         switch state {
-        case .idle: "ZEUS voice, ready"
-        case .listening: "ZEUS voice, listening"
-        case .speaking: "ZEUS voice, speaking"
-        case .processing: "ZEUS voice, thinking"
+        case .idle: "Zeus voice, ready"
+        case .listening: "Zeus voice, listening"
+        case .speaking: "Zeus voice, speaking"
+        case .processing: "Zeus voice, thinking"
         }
     }
 

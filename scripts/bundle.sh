@@ -9,6 +9,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${CONFIG:-release}"
+if [ "${RELEASE:-0}" = 1 ] && [ "$CONFIG" != release ]; then
+  echo "Release builds must use CONFIG=release (CONFIG=$CONFIG)." >&2
+  exit 1
+fi
 if [ "${RELEASE:-0}" = 1 ] && { [ -z "${SIGN_IDENTITY:-}" ] || [ "${SIGN_IDENTITY:-}" = - ]; }; then
   echo "Release builds require an explicit Developer ID Application signing identity." >&2
   exit 1
@@ -44,8 +48,11 @@ cp "$BIN/Zeus" "$APP/Contents/MacOS/Zeus"
 cp "$BIN/zeus-hook" "$BIN/zeus-bridge" "$APP/Contents/Helpers/"
 cp "$BIN/zeus-cli" "$APP/Contents/Helpers/zeus"
 # SwiftPM resource bundles (Zeus avatar art + dependencies like FluidAudio) live under Resources so the app signature stays sealed.
+# Test-target resource bundles (*Tests.bundle) hold fixtures only and never ship in the app.
 for bundle in "$BIN"/*.bundle; do
-  [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
+  [[ -e "$bundle" ]] || continue
+  [[ "$(basename "$bundle")" == *Tests.bundle ]] && continue
+  cp -R "$bundle" "$APP/Contents/Resources/"
 done
 
 # The Chrome extension ships inside the app; "Connect Chrome" copies it out for Load unpacked.
@@ -55,6 +62,15 @@ fi
 mkdir -p "$APP/Contents/Resources/ChromeExtension"
 cp extension/manifest.json "$APP/Contents/Resources/ChromeExtension/"
 cp -R extension/dist extension/icons extension/popup.html "$APP/Contents/Resources/ChromeExtension/"
+
+# Lean install: debug info and local symbols are not needed to run. Dynamic symbols stay, so behaviour is
+# unchanged; dSYMs are never copied into the app. Done before signing, which seals the stripped files.
+# ZEUS_KEEP_SYMBOLS=1 keeps them for a profiling build.
+if [ "${ZEUS_KEEP_SYMBOLS:-0}" != 1 ]; then
+  for bin in "$APP/Contents/MacOS/Zeus" "$APP/Contents/Helpers/"*; do
+    xcrun strip -S -x "$bin"
+  done
+fi
 
 for helper in "$APP/Contents/Helpers/"*; do
   codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$helper"

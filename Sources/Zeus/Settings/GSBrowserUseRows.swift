@@ -45,7 +45,7 @@ struct GSBrowserUseRows: View {
     var body: some View {
         let status = model.status
         GSRow(symbol: "checklist", title: "Separate browser setup",
-              text: "Zeus runs browser-use from uv, in its own browser profile (Zeus/browser-use-profile). Nothing is downloaded until you press Set up.") {
+              text: "Zeus runs a separate browser in its own profile. Nothing is downloaded until you press Set up.") {
             HStack(spacing: 8) {
                 if model.working { ProgressView().controlSize(.small) }
                 Button(status?.ready == true ? "Check again" : "Set up") {
@@ -67,6 +67,7 @@ struct GSBrowserUseRows: View {
         GSRow(symbol: "network", title: "Allowed sites", text: "The separate browser opens only these sites (and their subdomains), separated by commas. Empty means any site.") {
             GSTextInput(text: store.stringBinding("browserAgent.allowedDomains"), placeholder: "e.g. example.com, wikipedia.org", label: "Allowed sites")
         }
-        GSInfo(text: "Telemetry: off. Zeus starts browser-use with ANONYMIZED_TELEMETRY=False, no cloud sync, no version check and no AI keys: your own AI decides every step, browser-use only drives the page.")
+        GSInfo(text: "Telemetry is off. Your own AI decides every step; the separate browser only drives the page.")
+        GSDetails(text: "Zeus runs browser-use from uv, in its own profile (Zeus/browser-use-profile). It starts with ANONYMIZED_TELEMETRY=False, no cloud sync, no version check and no AI keys.")
     }
 }

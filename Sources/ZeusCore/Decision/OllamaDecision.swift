@@ -1,6 +1,6 @@
 import Foundation
 
-/// Last-resort local fallback when Laya is down: Ollama (qwen2.5:7b) asked for JSON, one call per
+/// Last-resort local fallback when Jev gave no answer: Ollama (qwen2.5:7b) asked for JSON, one call per
 /// request, mapped back into System One answers. Choices get the model's pick at a flat 0.6
 /// confidence because Ollama gives no calibrated probabilities.
 public struct OllamaDecision: DecisionProvider {

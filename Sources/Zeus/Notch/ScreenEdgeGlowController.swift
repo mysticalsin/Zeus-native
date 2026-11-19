@@ -90,6 +90,8 @@ final class ScreenEdgeGlowController {
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.level = .statusBar
+        // No system window animation: a stuck zoom left a ghost island 4 pt below the screen edge.
+        panel.animationBehavior = .none
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
@@ -107,7 +109,7 @@ private struct ScreenEdgeGlowView: View {
 
     var body: some View {
         if active {
-            TickingView(interval: Motion.reduced ? 1.0 / 15 : 1.0 / 60) { context in
+            EdgeLightClock(reduceMotion: Motion.reduced, reducedInterval: 1.0 / 15) { context in
                 content(at: context.date)
             }
             .allowsHitTesting(false)

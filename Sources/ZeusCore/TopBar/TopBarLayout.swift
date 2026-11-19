@@ -7,6 +7,8 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
     case continuity
     /// Appended last, off by default: the live audio spectrum. Switch it on in Settings › Top Bar.
     case waves
+    /// Appended last, but second in the default row: arrange windows from the keyboard.
+    case tiling
 
     public var id: String { rawValue }
 
@@ -31,8 +33,9 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .insomnia: "Insomnia"
         case .continuity: "Continuity"
         case .waves: "Waves"
+        case .tiling: "Tiling"
         case .polyglot: "Polyglot"
-        case .recordly: "Recordly"
+        case .recordly: "Record"
         case .scribe: "Scribe"
         }
     }
@@ -40,10 +43,11 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Tooltip and VoiceOver name: the title, plus what the less obvious tabs do.
     public var help: String {
         switch self {
-        case .insomnia: "Insomnia — keep working with the lid closed"
-        case .continuity: "Continuity — your keyboard and mouse across Macs and PCs (Beamer)"
-        case .polyglot: "Polyglot — live translated captions"
-        case .scribe: "Scribe — listens to a meeting and writes your notes"
+        case .insomnia: "Insomnia: keep working with the lid closed"
+        case .continuity: "Continuity: your keyboard and mouse across Macs and PCs (Beamer)"
+        case .polyglot: "Polyglot: live translated captions"
+        case .scribe: "Scribe: listens to a meeting and writes your notes"
+        case .tiling: "Tiling: arrange your windows from the keyboard"
         default: title
         }
     }
@@ -70,6 +74,7 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .insomnia: "moon.zzz.fill"
         case .continuity: "rectangle.connected.to.line.below"
         case .waves: "waveform"
+        case .tiling: "rectangle.split.2x2.fill"
         case .polyglot: "globe"
         case .recordly: "record.circle"
         case .scribe: "waveform.and.mic"
@@ -85,10 +90,10 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
     /// Glance's seven, as the live app labels them when selected (glance-clone-proof/parity/tabs):
     /// Home, Chat, Alerts, Clipboard, Shelf, then Zeus To-do and Murmure.
     public static let glanceSeven: [TopBarTab] = [.home, .chat, .notifications, .clipboard, .shelf, .todo, .dictation]
-    /// The row Tony asked for: Glance's seven, then Teleprompter, Insomnia and Polyglot. The row shows
-    /// these ten, then Recordly and Scribe; the rest stay one click away in Settings › Top Bar.
-    public static let defaultRow: [TopBarTab] = glanceSeven + [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
-    public static let standard = TopBarLayout(tabs: defaultRow + [.reminders, .today, .agents, .music, .calendar, .focus, .usage])
+    /// The row Tony asked for: Home, Tiling, Agents, then Chat, Alerts, Clipboard, Shelf, To-do, Murmure, Teleprompter,
+    /// Insomnia, Polyglot, Recordly and Scribe. The rest stay one click away in Settings › Top Bar.
+    public static let defaultRow: [TopBarTab] = [.home, .tiling, .agents] + glanceSeven.dropFirst() + [.teleprompter, .insomnia, .polyglot, .recordly, .scribe]
+    public static let standard = TopBarLayout(tabs: defaultRow + [.reminders, .today, .music, .calendar, .focus, .usage])
 
     /// A saved layout with Glance's seven moved to the front (in Glance's order), every other
     /// tab kept in its order after them. Tabs the person turned off stay off.
@@ -119,6 +124,16 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
         TopBarLayout(tabs: tabs + [.scribe].filter { !tabs.contains($0) }).defaultRowOrdered()
     }
 
+    /// One-time upgrade: Agents joins the default row right after Home (it was only shown while selected).
+    public func upgradedToAgentsRow() -> TopBarLayout {
+        TopBarLayout(tabs: tabs + [.agents].filter { !tabs.contains($0) }).defaultRowOrdered()
+    }
+
+    /// One-time upgrade: Tiling joins the default row right after Home.
+    public func upgradedToTilingRow() -> TopBarLayout {
+        TopBarLayout(tabs: tabs + [.tiling].filter { !tabs.contains($0) }).defaultRowOrdered()
+    }
+
     private func ordered(first order: [TopBarTab]) -> TopBarLayout {
         let first = order.filter { tabs.contains($0) }
         return TopBarLayout(tabs: first + tabs.filter { !first.contains($0) })
@@ -137,11 +152,15 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
             tabs.remove(at: index)
         } else {
             // Keep the canonical order when a tab comes back.
-            let order = TopBarTab.allCases
+            let order = Self.canonicalOrder
             let position = tabs.firstIndex { order.firstIndex(of: $0)! > order.firstIndex(of: tab)! } ?? tabs.endIndex
             tabs.insert(tab, at: position)
         }
     }
+
+    /// Where a tab goes when it is switched back on: the case order, except Tiling, which sits right after Home
+    /// where the default row puts it. Without this, a tab switched back on would land in front of Tiling.
+    private static let canonicalOrder: [TopBarTab] = [.home, .tiling] + TopBarTab.allCases.filter { $0 != .home && $0 != .tiling }
 
     public mutating func move(_ tab: TopBarTab, by offset: Int) {
         guard tab != .home, let index = tabs.firstIndex(of: tab) else { return }
@@ -229,7 +248,9 @@ public enum NotchCue: Equatable, Sendable {
     case volume(Double, muted: Bool)
     case charging(Int)
     case lowBattery(Int)
-    case trackChanged(title: String, artist: String)
+    /// `source` is where the track plays; `sourceChanged` is true when the notch showed another source before, and the
+    /// cue then names the source (`NowPlayingDisplay.cueText`).
+    case trackChanged(title: String, artist: String, source: NowPlayingSource?, sourceChanged: Bool)
     case shelfAdded(Int)
     case focusFinished(String)
     case dictation(String)
@@ -239,7 +260,7 @@ public enum NotchCue: Equatable, Sendable {
     case keyboardBacklight(Double)
     case shortcut(ShortcutPeek)
     case rain(minutes: Int)
-    /// A command was understood; `engine` is the badge (Rules, Laya, Jev, Ollama).
+    /// A command was understood; `engine` is the badge (Rules, Jev, Ollama).
     case decided(engine: String, summary: String)
     /// A feature needs a permission that is off: where to turn it on (never a system prompt).
     case hint(String)
@@ -248,6 +269,12 @@ public enum NotchCue: Equatable, Sendable {
     /// A keep-awake session notice ("Battery 20%", "Ended: Mac too hot").
     case keepAwake(String)
     case screenshot(title: String)
+    /// Files arrived from another Mac with Fling.
+    case flingArrived(count: Int, from: String)
+    /// A stack went out to another Mac.
+    case flingSent(count: Int, to: String)
+    /// A Fling send or receive did not work; the text says what to do.
+    case flingProblem(String)
 
     /// How long the cue stays before the notch settles again.
     public var duration: TimeInterval {
@@ -264,6 +291,7 @@ public enum NotchCue: Equatable, Sendable {
         case .permission: 9.0
         case .keepAwake: 4.0
         case .screenshot: 2.5
+        case .flingProblem: 4.0
         default: 2.2
         }
     }

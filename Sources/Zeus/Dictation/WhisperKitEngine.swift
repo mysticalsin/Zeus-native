@@ -12,6 +12,8 @@ final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
     private let machine: WhisperKitDownloadMachine
     private let lock = NSLock()
     private var loading: Task<PipeBox, Error>?
+    private var preparedPipe: PipeBox?
+    private var decoding = false
 
     init(store: WhisperKitModelStore = WhisperKitModelStore(),
          downloader: any WhisperKitModelDownloader = HubModelDownloader()) {
@@ -60,9 +62,47 @@ final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
     func transcribe(samples: [Float], hints: [String], language: String?) async throws -> String {
         guard !samples.isEmpty else { throw TranscriptionError.noSpeech }
         guard store.isDownloaded else { throw TranscriptionError.notReady(kind) }
+        try claimInference()
+        defer { lock.withLock { decoding = false } }
+        let pipe = try await loadedPipe().pipe
+        return try await decode(samples: samples, hints: hints, language: language, pipe: pipe)
+    }
+
+    /// Files on disk are not sufficient: Argmax 1.1.1 may fetch a missing/invalid
+    /// tokenizer even with download:false. This path admits only a fully loaded,
+    /// privately owned instance. It never creates, prepares, joins a load, or downloads.
+    func availabilityWithoutLoading() -> EngineAvailability {
+        lock.withLock { preparedPipe == nil ? .notDownloaded : .ready }
+    }
+
+    func transcribeWithoutLoading(samples: [Float], hints: [String], language: String?) async throws -> String {
+        try Task.checkCancellation()
+        guard !samples.isEmpty else { throw TranscriptionError.noSpeech }
+        let ready = try lock.withLock { () throws -> PipeBox in
+            guard let preparedPipe else { throw TranscriptionError.notReady(kind) }
+            guard !decoding else { throw WhisperKitEngineError.busy }
+            decoding = true
+            return preparedPipe
+        }
+        defer { lock.withLock { decoding = false } }
+        // The engine never publishes/unloads this pipe. Once recorded as ready,
+        // no caller can change its model state or tokenizer during this operation.
+        guard ready.pipe.modelState == .loaded, ready.pipe.tokenizer != nil else {
+            throw TranscriptionError.notReady(kind)
+        }
+        return try await decode(samples: samples, hints: hints, language: language, pipe: ready.pipe)
+    }
+
+    private func claimInference() throws {
+        try lock.withLock {
+            guard !decoding else { throw WhisperKitEngineError.busy }
+            decoding = true
+        }
+    }
+
+    private func decode(samples: [Float], hints: [String], language: String?, pipe: WhisperKit) async throws -> String {
         let code = DictationLanguage.engineLanguageCode(for: language)
         let prompt = Self.prompt(for: hints)
-        let pipe = try await loadedPipe().pipe
         var options = DecodingOptions()
         options.task = .transcribe
         options.language = code
@@ -97,7 +137,11 @@ final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
             return task
         }
         do {
-            return try await task.value
+            let result = try await task.value
+            if result.pipe.modelState == .loaded, result.pipe.tokenizer != nil {
+                lock.withLock { preparedPipe = result }
+            }
+            return result
         } catch {
             lock.withLock { loading = nil }
             throw error
@@ -110,9 +154,11 @@ private struct PipeBox: @unchecked Sendable { let pipe: WhisperKit }
 
 enum WhisperKitEngineError: LocalizedError {
     case download(String)
+    case busy
     var errorDescription: String? {
         switch self {
         case .download(let message): "The WhisperKit download did not finish: \(message)"
+        case .busy: "WhisperKit is already transcribing. Wait for the current transcription to finish."
         }
     }
 }

@@ -1,0 +1,96 @@
+{
+  "evidence_kind": "portable_linux_tests_and_source_review_not_native_app_acceptance",
+  "checked_at": "2026-11-10T16:27:13.688738+00:00",
+  "base_head": "6e863bdbe1a10a813b1a15c684cd0073e931c747",
+  "release_ready": false,
+  "core": {
+    "passed": 91,
+    "suites": 8,
+    "exact_source_files": 16,
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "/workspace/zeus-validation/visual-canonical-explanation-3/explanation",
+      "--jobs",
+      "2"
+    ],
+    "exit_code": 0,
+    "manifest": "visual-explanation-local/core-manifest.json",
+    "log": "visual-explanation-local/core-tests.log"
+  },
+  "controller": {
+    "passed": 25,
+    "exit_code": 0,
+    "scope": "Exact production Controller logic plus new Core Diagnostics, synthetic services and real private history stores; portable excerpt with inert native boundaries, not native SDK/AVFoundation/permission proof",
+    "manifest": "visual-explanation-local/controller-receipt.json",
+    "log": "visual-explanation-local/controller-tests.log",
+    "original_source_and_documented_controller_transformation_reverified": true
+  },
+  "verification_selftests": {
+    "passed": 154,
+    "exit_code": 0,
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "qa/closed-loop/tests",
+      "-v"
+    ],
+    "log": "visual-explanation-local/gate-selftests.log",
+    "scope": "Gate tooling tests; final feature/regression binding additions separately revalidated."
+  },
+  "syntax_only": {
+    "files": 50,
+    "exit_code": 0,
+    "receipt": "visual-explanation-local/syntax-receipt.json"
+  },
+  "policy": {
+    "feature_rows": 19,
+    "checks": 82,
+    "regressions": 207,
+    "explanation_test_method_bindings": 191,
+    "native_explanation_tests_authored_not_yet_run": 100,
+    "sha256": {
+      "qa/feature-map.json": "8e2edcaf52e8029075341c53f0682c015b4f4fb8fff05d72cd383ec3a0c3acad",
+      "qa/regressions.json": "0252f851b6dcac22cc87109e6898f275794ef83956f11244d30c329b05264429",
+      "qa/portable-core/prepare.py": "4527e6e123fc81a6dff38133baaa9fe58e3cbac7c2dbff34402982b7c1d59886"
+    }
+  },
+  "not_established": [
+    "Native SDK compilation/execution of the new feature",
+    "Live provider/recognition/synthesis/playback",
+    "GPU/rendered-frame timing and 240 FPS",
+    "Physical Mac permission/device/window journeys",
+    "Automatic installed-model preparation or download",
+    "Signing/notarization/Gatekeeper/commercial release"
+  ],
+  "artifacts": [
+    {
+      "path": "visual-explanation-local/core-tests.log",
+      "sha256": "d7b6a8f3db042e408161f2ecbbb728a096aa6205275f2a43f6bcc61477355eb7"
+    },
+    {
+      "path": "visual-explanation-local/core-manifest.json",
+      "sha256": "cc9dafde5f2b14d00da39ff11737351c40ebd97db6aacea01ef54e9b579f326f"
+    },
+    {
+      "path": "visual-explanation-local/controller-tests.log",
+      "sha256": "6d5ae8ed4e10997e14083090f3c5709e3cf46c54c2d2503bea0abd7d42d57b39"
+    },
+    {
+      "path": "visual-explanation-local/controller-receipt.json",
+      "sha256": "7f6ed9c9e90751c2431431249aee8b854959340abe253647b19d8f78a84f6cd6"
+    },
+    {
+      "path": "visual-explanation-local/gate-selftests.log",
+      "sha256": "bb57ae14c1f4bd796c28c15bbeb908bc221721b50e6f9f2aff852460eca5c1b4"
+    },
+    {
+      "path": "visual-explanation-local/syntax-receipt.json",
+      "sha256": "5b301ea2446515186ecd72fc359823b882b1a88a9e70f4d14838b50597ab90a1"
+    }
+  ]
+}

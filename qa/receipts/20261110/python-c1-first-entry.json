@@ -1,0 +1,155 @@
+{
+  "evidence_kind": "fresh-hosted-python-launch-observation",
+  "head": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+  "runs": [
+    {
+      "event": "push",
+      "variant": "xcode-direct",
+      "head": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+      "tested": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+      "run_id": "42826476634",
+      "artifact_id": 13770261169,
+      "artifact_zip_sha256": "67de010e355263005ad7977a15e31afa883492d729f379fde19da67523b512dc",
+      "measurement_status": "passed",
+      "driver_status": "failed",
+      "metadata_status": "failed",
+      "failure": null,
+      "entry_observed_seconds": 0.133512667,
+      "exit_observed_seconds": 0.134790167,
+      "entry_by_two_seconds": true,
+      "cleanup": {
+        "exit_code": 0,
+        "kill_sent": false,
+        "reaped": true,
+        "reaped_observed_ns": 70919209041,
+        "term_sent": false
+      },
+      "metadata_failed_commands": [
+        {
+          "command": [
+            "/usr/bin/xcrun",
+            "--find",
+            "python3"
+          ],
+          "failure": "request-deadline"
+        }
+      ],
+      "files": {
+        "driver-self-test.log": "a9281482d7b71d1e5ef31e81ba8ed3832b3d69a875aa24a3cbe84019896e78e4",
+        "events.jsonl": "7faf82483e53857bb9d1ac87a369c65da6bc52ac5a674af617cdf94d9ff15625",
+        "measurement.json": "56c36e631e376015b1e22d18bce95cfac8a355707aa611c2942c3d3fca5acfa6",
+        "metadata.json": "40027165e057e9495ceea62b24a667ca12dcda742077408399c0cd6eb24d6ce7",
+        "xcode-selection.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "event": "push",
+      "variant": "system-launcher",
+      "head": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+      "tested": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+      "run_id": "42826476634",
+      "artifact_id": 13769232903,
+      "artifact_zip_sha256": "5a7f64281a13ea73c05c19e04dce28178715b35058b6e5a91be4c275bb5988d5",
+      "measurement_status": "failed",
+      "driver_status": "failed",
+      "metadata_status": "passed",
+      "failure": "request-deadline",
+      "entry_observed_seconds": null,
+      "exit_observed_seconds": 3.007761958,
+      "entry_by_two_seconds": false,
+      "cleanup": {
+        "exit_code": -15,
+        "kill_sent": false,
+        "reaped": true,
+        "reaped_observed_ns": 74828826166,
+        "term_sent": true
+      },
+      "metadata_failed_commands": [],
+      "files": {
+        "driver-self-test.log": "bcdb45edb3f848e248ea8d6bd75f53117d6a11aeebdafccc9694455c8383bb47",
+        "events.jsonl": "f641e94f7ecbc73d07de34b45a4085aa9c0caf18746cbafe7e8bceae8cbaa726",
+        "measurement.json": "2c3567013c25101b4b4c56b78f53cb0931d8581b4cc8984468788d26bba391db",
+        "metadata.json": "11354e0d116b6176e96fa6bdcb472e4a914ad2d2339a9f9b1b6eca72c53a698e",
+        "xcode-selection.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "event": "pr",
+      "variant": "xcode-direct",
+      "head": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+      "tested": "1d15913cd9b5ef513658dbac3ea567764822d3ad",
+      "run_id": "42826489122",
+      "artifact_id": 13768298657,
+      "artifact_zip_sha256": "0c3ac3ba1fdea448ee1dbed78b5698aa303c01e4c1b593104f2c2dd3f48eb8a1",
+      "measurement_status": "passed",
+      "driver_status": "failed",
+      "metadata_status": "failed",
+      "failure": null,
+      "entry_observed_seconds": 0.150219375,
+      "exit_observed_seconds": 0.151782041,
+      "entry_by_two_seconds": true,
+      "cleanup": {
+        "exit_code": 0,
+        "kill_sent": false,
+        "reaped": true,
+        "reaped_observed_ns": 69522491625,
+        "term_sent": false
+      },
+      "metadata_failed_commands": [
+        {
+          "command": [
+            "/usr/bin/xcrun",
+            "--find",
+            "python3"
+          ],
+          "failure": "request-deadline"
+        }
+      ],
+      "files": {
+        "driver-self-test.log": "73b41cbed487803a9c77dfad9ace20e324671c4d8349174620fe80e09b47b862",
+        "events.jsonl": "59d87f12bd5937c92c107938f57efadea60c83950a64dfea34ae4b0bd2a3452e",
+        "measurement.json": "eb42e869dfbc8bf913053088dd604684adbf154a15d586ccd9483cf17a237871",
+        "metadata.json": "5c64426be162b9bb698ded82fb2b306634cde9d094a3a38f1e3e2dbea809e163",
+        "xcode-selection.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "event": "pr",
+      "variant": "system-launcher",
+      "head": "c1e34a1b492286d49cf5576f1e5bc5b30bc119b2",
+      "tested": "1d15913cd9b5ef513658dbac3ea567764822d3ad",
+      "run_id": "42826489122",
+      "artifact_id": 13769122562,
+      "artifact_zip_sha256": "c42cad13711bbfd77b3050cd4df369ccec10732c40dfd06e0a28f70bf0c128b2",
+      "measurement_status": "failed",
+      "driver_status": "failed",
+      "metadata_status": "passed",
+      "failure": "request-deadline",
+      "entry_observed_seconds": null,
+      "exit_observed_seconds": 3.006203625,
+      "entry_by_two_seconds": false,
+      "cleanup": {
+        "exit_code": -15,
+        "kill_sent": false,
+        "reaped": true,
+        "reaped_observed_ns": 71698523791,
+        "term_sent": true
+      },
+      "metadata_failed_commands": [],
+      "files": {
+        "driver-self-test.log": "95db292a9999266eb5c4596b86345af4f39bb4a2f3ab0eca94b05ae500bd8ab2",
+        "events.jsonl": "8102b4e81fdca9fb8545311d0ff4e7879867185a714e5d44a245a3858b2b2030",
+        "measurement.json": "72d7f95c4f348aad570a2be0c7fbc8c00cbc4bbb291a8d4905f23a6dec891c44",
+        "metadata.json": "133e992392610c6fd33104ec0d26c1ae0fc0c849ccb9e9483d1010bfdf42393d",
+        "xcode-selection.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "limits": [
+    "All four diagnostic jobs failed; no complete diagnostic pass claimed.",
+    "Direct-path marker and exit were observed within the original three-second deadline; later xcrun selection metadata timed out.",
+    "System launcher produced no entry marker before deadline on either fresh runner.",
+    "First explicit workflow launch only; image bootstrap history unknown.",
+    "Source hashes and file-backed observations were revalidated; this is not native Kokoro fixture acceptance or production managed-venv/model performance."
+  ]
+}

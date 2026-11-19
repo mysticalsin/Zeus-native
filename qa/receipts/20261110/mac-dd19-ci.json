@@ -1,0 +1,412 @@
+{
+  "scope": "Actual source-bound macOS build/discovery and per-process native execution. Eighteen complete App fixture suites pass independently; the required native aggregate remains failed. No full-feature, physical-device or release acceptance.",
+  "head_sha": "dd19cb5b5b7c477fe2cd717890279b7c436f0c70",
+  "tested_sha": "88b44af375d9ce967ed68920805311b7fd33d8d2",
+  "source_snapshot_sha256": "0577c6199f3bd0e838ec3ec0a11f4f1dbb18d1113fca9e1e837daf209c0d5280",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42754900180",
+  "app_job_id": 129626899869,
+  "app_artifact_id": 13736010448,
+  "production_build": "passed",
+  "test_target_build": "passed",
+  "native_discovery": "passed",
+  "compiled_selected_functions": 2293,
+  "native_execution": {
+    "status": "failed",
+    "selected_partitions": 22,
+    "verified_passing_partitions": 18,
+    "verified_passing_tests": 147,
+    "passing_partitions": [
+      {
+        "id": "native-DictationOwnershipIntegrationTests",
+        "tests": 49,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-PolyglotPinTests",
+        "tests": 2,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-RecorderPillTests",
+        "tests": 3,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-BrainCaptureModelTests",
+        "tests": 3,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-UltronVoiceEffectTests",
+        "tests": 2,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-EngineBrandLogoTests",
+        "tests": 6,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-OnboardingTests",
+        "tests": 18,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-OnboardingIsolationTests",
+        "tests": 10,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-PermissionsCaptureTests",
+        "tests": 3,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-RecordlyDebugWiringTests",
+        "tests": 5,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-ScribeLifecycleScenarioTests",
+        "tests": 4,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-RecordingFeedbackRenderTests",
+        "tests": 7,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-WikiGraphNavigationTests",
+        "tests": 10,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-HaloRendererTests",
+        "tests": 3,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-DisplaySynchronizedViewTests",
+        "tests": 2,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-ScribeIncomingWordTests",
+        "tests": 4,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-LicenseCredentialCleanupTests",
+        "tests": 4,
+        "parameter_cases": 0
+      },
+      {
+        "id": "native-MemoryMCPTransportTests",
+        "tests": 12,
+        "parameter_cases": 0
+      }
+    ],
+    "failing_partitions": [
+      {
+        "id": "native-ZeusCoreTests",
+        "exit_code": 1,
+        "reason": "command exited 1"
+      },
+      {
+        "id": "native-ScribeComponentJourneyTests",
+        "exit_code": 0,
+        "reason": "missing or ambiguous Swift Testing summary"
+      },
+      {
+        "id": "native-ScribeAccessibilityJourneyTests",
+        "exit_code": 1,
+        "reason": "command exited 1"
+      },
+      {
+        "id": "native-OwnedWindowEventDriverTests",
+        "exit_code": 0,
+        "reason": "missing or ambiguous Swift Testing summary"
+      }
+    ]
+  },
+  "failed_core_attempt": {
+    "logged_tests": 2138,
+    "logged_suites": 289,
+    "recorded_issues": 139,
+    "verified_tests": 0,
+    "issue_breakdown": {
+      "pipe_close_pollerr_assertion": 132,
+      "pipe_stop_wall_time": 1,
+      "mute_blocked_reader_fixture": 5,
+      "anyllm_redirect_helper_startup": 1
+    }
+  },
+  "ui_failures": [
+    {
+      "suite": "ScribeComponentJourneyTests",
+      "observed": "The event journey reports an unexpected event in its local release slot; teardown returns, then the next fixture starts before exit zero without summary or runEnded."
+    },
+    {
+      "suite": "ScribeAccessibilityJourneyTests",
+      "observed": "Both required fixtures fail: identified NSButton reports AXUnknown/disabled; the SwiftUI host has no matching Start control. Diagnostics show applicationActive=false and key=false."
+    },
+    {
+      "suite": "OwnedWindowEventDriverTests",
+      "observed": "The process exits zero immediately after its first native-button event dispatch, without test completion, summary or runEnded."
+    }
+  ],
+  "push_build_comparison": {
+    "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42754892595",
+    "app_job_id": 129626873368,
+    "app_artifact_id": 13735721077,
+    "tested_sha": "dd19cb5b5b7c477fe2cd717890279b7c436f0c70",
+    "source_snapshot_sha256": "0577c6199f3bd0e838ec3ec0a11f4f1dbb18d1113fca9e1e837daf209c0d5280",
+    "production_build": "passed",
+    "test_target_barrier": "failed",
+    "compiler_exit_code": 0,
+    "compiler_completion_line": true,
+    "observed_diagnostic": "Internal Error: dataCorrupted(Swift.DecodingError.Context(codingPath: [], debugDescription: \"Corrupted JSON\", underlyingError: Optional(unexpected end of file)))",
+    "native_execution": "blocked for all 22 partitions",
+    "artifacts": [
+      {
+        "path": "result.json",
+        "sha256": "91b9fee0e70f35c935a8cab033acea3eefbcf2b2c8feb7982d4240fe440b4a00"
+      },
+      {
+        "path": "native-build/build.log",
+        "sha256": "a01f53ae4a31296c43eacf0d1c25ed7deb4366baee84bd1f890abc15acfb1cd6"
+      }
+    ]
+  },
+  "push_development_comparison": {
+    "job_id": 129626873482,
+    "artifact_id": 13734439892,
+    "status": "failed",
+    "verified_tests": 601,
+    "failed_check": "portable-bridge-transport",
+    "failed_check_logged_tests": 27,
+    "failed_check_recorded_issues": 120,
+    "observed": "All issues are the Darwin pipe POLLERR assertion in NativeMessageIOTests.swift:174; the passing Linux checkpoint does not waive this failure."
+  },
+  "artifacts": [
+    {
+      "path": "result.json",
+      "sha256": "a4edd501a7a10f7d12231cda657fd83bc2969b4ef49e75e7dc5736ec385f8403"
+    },
+    {
+      "path": "source-manifest.json",
+      "sha256": "7d717578d3ba67102c8942549a8d02c844bb965c4d79cbf6f99838bdbbab2fa3"
+    },
+    {
+      "path": "native-build/build.log",
+      "sha256": "349e8849600a127686d46c6bf9942dbc2108270eb01da1d2261f6f4eaa767295"
+    },
+    {
+      "path": "native-discovery/test.log",
+      "sha256": "25b57a0d5ca868e414a7fd3f8371df0d96ec4c84bf058af88dfc1ad8404b5db2"
+    },
+    {
+      "path": "native-discovery/events.jsonl",
+      "sha256": "03cfc08e6e8bd573bb07c7b61d83a78858ce5950afdb2dffbf82825f5bbb051e"
+    },
+    {
+      "path": "native-ZeusCoreTests/test.log",
+      "sha256": "539d476fff9e59aabeee148bba96038349dfb77794177b575a7395c8312f4827"
+    },
+    {
+      "path": "native-ZeusCoreTests/events.jsonl",
+      "sha256": "bec3e17caefbb07d332e40e96f673b6b808d4860f963be232a6799c14525148d"
+    },
+    {
+      "path": "native-DictationOwnershipIntegrationTests/test.log",
+      "sha256": "719b7fe55209fa2695c8bbd01c159f493a8d9dc4b27c97378beec17ab2b61fc0"
+    },
+    {
+      "path": "native-DictationOwnershipIntegrationTests/events.jsonl",
+      "sha256": "a15c13e9ed1e4d45a8884f9fd0f159e7b099303cdc9876576d6f18d09843ea16"
+    },
+    {
+      "path": "native-PolyglotPinTests/test.log",
+      "sha256": "a1510ae1640ca12ab516bd5c528bb6e492da2903fb202284e212e8cf5426eb24"
+    },
+    {
+      "path": "native-PolyglotPinTests/events.jsonl",
+      "sha256": "5761eff3d629bfc9c7ed883b0579de32c79eaa824a5423f95f0c1ab096bf11c5"
+    },
+    {
+      "path": "native-RecorderPillTests/test.log",
+      "sha256": "d30243608a49f97c89bd49a2353fe8934ae5d399764a8e38fd291fb454b1ebfd"
+    },
+    {
+      "path": "native-RecorderPillTests/events.jsonl",
+      "sha256": "336f5153a3f15c881b9de508f566eda394409ce2ea3e592925fb76608e3e9512"
+    },
+    {
+      "path": "native-BrainCaptureModelTests/test.log",
+      "sha256": "90cbdd5ee83df17be86a92b0ae2161b7fa03519653dc6b91c3dfdd99f4027c49"
+    },
+    {
+      "path": "native-BrainCaptureModelTests/events.jsonl",
+      "sha256": "41dfb8731f74747e13976e03dee519a344ba415035b4a3840335980764f11fb6"
+    },
+    {
+      "path": "native-UltronVoiceEffectTests/test.log",
+      "sha256": "8e12fef96aede0c7c14a9f5b568c7de76a734d58383f81da8b4d1273c2216293"
+    },
+    {
+      "path": "native-UltronVoiceEffectTests/events.jsonl",
+      "sha256": "75cfe1521adcf11e264d3f2ca153fb6c69cc6f6b67307b08a4ea6b2d6ad72192"
+    },
+    {
+      "path": "native-EngineBrandLogoTests/test.log",
+      "sha256": "f29a7dad1944bbd9b464e0143f8678b85bcf0900d8ac4a249059432454b7e100"
+    },
+    {
+      "path": "native-EngineBrandLogoTests/events.jsonl",
+      "sha256": "472f290a9a4fde33eb2dad9b8d621ece18a1e44b4ace6a7246cb5e809b098a71"
+    },
+    {
+      "path": "native-OnboardingTests/test.log",
+      "sha256": "6ac18933dbcd10d0a2d6f6eaca235c2e531321c529ef7ab3a59db786c7e4a83a"
+    },
+    {
+      "path": "native-OnboardingTests/events.jsonl",
+      "sha256": "e72ed7c3008cdb10e9c28b3028febeea3fe787a3f91b2a25ec82f0f70d38a28a"
+    },
+    {
+      "path": "native-OnboardingIsolationTests/test.log",
+      "sha256": "e89332c285544d02fe72f1848cb095291d57dbd1f8e905e6c706e2a357293cac"
+    },
+    {
+      "path": "native-OnboardingIsolationTests/events.jsonl",
+      "sha256": "7e0b3205bc64fa6677a13c21c92a4a7ce2026e5c1e9fe12a59be61ec71d162cb"
+    },
+    {
+      "path": "native-PermissionsCaptureTests/test.log",
+      "sha256": "56d11a829125f225107ff6646761a5961eb23d78b20ccbb26866169479a434c6"
+    },
+    {
+      "path": "native-PermissionsCaptureTests/events.jsonl",
+      "sha256": "bc1bd527baa1d6a28c22a8a7c49a4283d38bcb26343f42541270990fa6e0bb24"
+    },
+    {
+      "path": "native-RecordlyDebugWiringTests/test.log",
+      "sha256": "9c8bfa590cfb0f14772d4a0ec34e0e89b3f6ecfbd341e36e0c76fb125a15cf38"
+    },
+    {
+      "path": "native-RecordlyDebugWiringTests/events.jsonl",
+      "sha256": "5a6fe581a4ca653d177bfa7bd25fad89ae1622de8947e33d74a8191f2fe860de"
+    },
+    {
+      "path": "native-ScribeLifecycleScenarioTests/test.log",
+      "sha256": "7766129e6df6ec4fa950120cc54bc5c777b02f8aad09be9c964a9bc3b7591eab"
+    },
+    {
+      "path": "native-ScribeLifecycleScenarioTests/events.jsonl",
+      "sha256": "e7b896dd6e45dd1b150e9be8245d03b5f2937be18f3cbb3652424297f140accb"
+    },
+    {
+      "path": "native-RecordingFeedbackRenderTests/test.log",
+      "sha256": "e8d2b6fdef46343da372f67ae2487c3d2b2f354b88d83028e7bddd4f348267e8"
+    },
+    {
+      "path": "native-RecordingFeedbackRenderTests/events.jsonl",
+      "sha256": "3c29f01eb44cdd09b669303e9d06c3ac405f837d4581ad231b0a46f00d92c957"
+    },
+    {
+      "path": "native-WikiGraphNavigationTests/test.log",
+      "sha256": "ab4d30cfee7ef5c361e4a45edb51fa235a0a38cc579d9f897233bf3406e5565b"
+    },
+    {
+      "path": "native-WikiGraphNavigationTests/events.jsonl",
+      "sha256": "b8baa793351d4f785790caca42b3c40ab6cf62b27730d3a92264c95988b5acdc"
+    },
+    {
+      "path": "native-HaloRendererTests/test.log",
+      "sha256": "ced95b5285a56c8e51e94941e033ded0fdf51ad1172dc761f7d0c7e7be2fa895"
+    },
+    {
+      "path": "native-HaloRendererTests/events.jsonl",
+      "sha256": "7895998a51b4e116be61686f7b738deed216db13131e6693a26611035b251510"
+    },
+    {
+      "path": "native-ScribeComponentJourneyTests/test.log",
+      "sha256": "447969245769e092b75ac3511ba664333504b9196da629dcaf07df23a2b2d93d"
+    },
+    {
+      "path": "native-ScribeComponentJourneyTests/events.jsonl",
+      "sha256": "7e31241961b9a660bd418dc1a1241bb56f0c31e359931edf6abff4962b70a250"
+    },
+    {
+      "path": "native-DisplaySynchronizedViewTests/test.log",
+      "sha256": "68de9dd06e3898de54a6e174c3d304b9ebea6c94d13db8492c836a1b446abf63"
+    },
+    {
+      "path": "native-DisplaySynchronizedViewTests/events.jsonl",
+      "sha256": "0af2b62b15321498d553609ff6c8b63eb4541221d1dddd205881cbd7a855927d"
+    },
+    {
+      "path": "native-ScribeIncomingWordTests/test.log",
+      "sha256": "941b0e0a81b66b4e232354ce4fc3e7ad065df88a03c44473f97c23998bb5b7a7"
+    },
+    {
+      "path": "native-ScribeIncomingWordTests/events.jsonl",
+      "sha256": "73b2b57150614e2c1a4a71ff671390082310eccad6bcbb9ce61cb0c5892bc8af"
+    },
+    {
+      "path": "native-LicenseCredentialCleanupTests/test.log",
+      "sha256": "bab3bdcc7140d3792aa98e3c0a3717f67ad9c8adffd105be0bfa08d4783b217f"
+    },
+    {
+      "path": "native-LicenseCredentialCleanupTests/events.jsonl",
+      "sha256": "fb7a8c2d023f3a79c986cffd8e6a622e195722d17b02be8636d019acbe368c72"
+    },
+    {
+      "path": "native-MemoryMCPTransportTests/test.log",
+      "sha256": "d9ee5e1d94056a5a69db3ba43c8a1ecff7af7fc63e7db112e52967f656984789"
+    },
+    {
+      "path": "native-MemoryMCPTransportTests/events.jsonl",
+      "sha256": "7ddba49b09e2e668ce1c25117e04b6fc17d311038dfac15ca23a97cb70360e75"
+    },
+    {
+      "path": "native-ScribeAccessibilityJourneyTests/test.log",
+      "sha256": "f2d5328ccbfdca07fa20c34768be8a518e4c97f42cb652d8831a98d60ff11053"
+    },
+    {
+      "path": "native-ScribeAccessibilityJourneyTests/events.jsonl",
+      "sha256": "dfc828e000d12368457c515790ec9f482ca235583dd04e50046d67ecf6e8a63d"
+    },
+    {
+      "path": "native-OwnedWindowEventDriverTests/test.log",
+      "sha256": "a320f6a29456eacb4ec1ae653cd44b33e93fcf192c98a0b947874d1e2fd00ce5"
+    },
+    {
+      "path": "native-OwnedWindowEventDriverTests/events.jsonl",
+      "sha256": "e74615acbb22b021abec78f5a04878121b79fdefb7339af484be8b06b773dbb2"
+    }
+  ],
+  "follow_up": "Repair the actual pipe-closure verification, deterministic async fixtures and native event/accessibility host failures, then rebuild and rerun. Keep every selected partition, exact identity, compiler diagnostic and terminal event mandatory.",
+  "preview_bundle": "skipped after native failure",
+  "release_acceptance": false,
+  "physical_frame_pacing": "not measured; generated offscreen frames do not establish display presentation or 240 FPS",
+  "capture_and_installation": "No microphone, system audio or screen capture, OS-consent grant, installation, signing or notarization.",
+  "pr_feature_map": {
+    "status": "failed",
+    "verified_non_bridge_checks": 601,
+    "bridge_status": "timed_out",
+    "bridge_timeout_seconds": 1800,
+    "bridge_reported_tests": 0,
+    "observed_bridge_function_starts": 25,
+    "observed_bridge_function_passes": 24,
+    "darwin_pollerr_issue_lines": 114,
+    "interpretation": "Incomplete bridge evidence with repeated platform-specific pipe assertions; timeout cause unproved. No full bridge or development pass. The current EPIPE guard requires a fresh Mac run.",
+    "artifact_id": 13736253371,
+    "job_id": 129626900247,
+    "artifacts": {
+      "result.json": "79cfc23406adb611ad5f60b08a4a1787c8855662b411083627e0e9eafd0569a4",
+      "portable-bridge-transport/test.log": "caa1a54c479b6e84da370b5368fe064bd4159ebb59684f5ec9ad563fcf702985"
+    }
+  }
+}

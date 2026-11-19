@@ -65,7 +65,8 @@
             "portable",
             "native-fixture",
             "release-mocks",
-            "unimplemented"
+            "unimplemented",
+            "native-module"
           ]
         },
         "tier": {
@@ -94,6 +95,9 @@
         "reason": {
           "type": "string",
           "minLength": 1
+        },
+        "module": {
+          "const": "ZeusCoreTests"
         }
       },
       "required": [
@@ -144,6 +148,25 @@
             "required": [
               "reason"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "native-module"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "module"
+            ],
+            "properties": {
+              "tier": {
+                "const": "native-integration"
+              }
+            }
           }
         }
       ]

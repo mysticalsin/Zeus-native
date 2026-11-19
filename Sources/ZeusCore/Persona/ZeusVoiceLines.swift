@@ -60,6 +60,10 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         case metaphysical
         /// Tony is back after a while away; `{summary}` is the recap in a few words.
         case welcomeBack
+        /// A short filler while the answer is prepared: "A moment.", "Let me look."
+        case thinking
+        /// What is spoken instead of a raw error. Plain, exact, nothing technical.
+        case errorSpoken
 
         /// The greeting for an hour of the day (0 to 23).
         public static func greeting(hour: Int) -> Situation {
@@ -76,10 +80,21 @@ public final class ZeusVoiceLines: @unchecked Sendable {
     private let lock = NSLock()
     private var last: [String: String] = [:]
     private let pick: @Sendable (Int) -> Int
+    /// The dialogue asset the Ultron personality draws filler, acknowledgement, error and completion lines from.
+    private var dialogue: UltronDialogue?
+    private var selector = UltronDialogueSelector()
 
     /// `pick` returns an index below its argument; tests pass a fixed one.
-    public init(pick: @escaping @Sendable (Int) -> Int = { Int.random(in: 0..<$0) }) {
+    public init(pick: @escaping @Sendable (Int) -> Int = { Int.random(in: 0..<$0) }, dialogue: UltronDialogue? = nil) {
         self.pick = pick
+        self.dialogue = dialogue
+    }
+
+    /// Installs (or clears) the dialogue asset, for the app after it loads the bundled file.
+    public func setDialogue(_ dialogue: UltronDialogue?) {
+        lock.lock(); defer { lock.unlock() }
+        self.dialogue = dialogue
+        selector = UltronDialogueSelector()
     }
 
     /// A line for `situation` in the saved personality, spoken as is.
@@ -88,6 +103,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
     }
 
     public func line(for situation: Situation, context: [String: String] = [:], personality: ZeusPersonality) -> String {
+        if personality == .ultron, let spoken = dialogueLine(for: situation, context: context) { return spoken }
         let templates = Self.bank(personality)[situation] ?? []
         let usable = templates.filter { Self.placeholders(in: $0).allSatisfy { context[$0]?.isEmpty == false } }
         let pool = usable.isEmpty ? templates.filter { Self.placeholders(in: $0).isEmpty } : usable
@@ -98,6 +114,17 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         let chosen = fresh[min(max(pick(fresh.count), 0), fresh.count - 1)]
         last[key] = chosen
         return Self.fill(chosen, context: context)
+    }
+
+    /// A line from the dialogue asset for the situations it covers, nil to use the compiled bank.
+    /// An agent that finished by name keeps the compiled line that names it.
+    private func dialogueLine(for situation: Situation, context: [String: String]) -> String? {
+        guard let tag = UltronDialogue.tag(for: situation) else { return nil }
+        if situation == .agentDone, context["agent"]?.isEmpty == false { return nil }
+        lock.lock(); defer { lock.unlock() }
+        guard let dialogue else { return nil }
+        let ceiling: UltronDialogue.Humour = situation == .errorSpoken ? .low : .high
+        return selector.pick(situation: tag, from: dialogue, maxHumour: ceiling, random: pick)?.text
     }
 
     /// Replaces each `{key}` with its value from `context`. Unknown keys stay as written.
@@ -143,7 +170,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         .ackDone: [
             "Done, cleanly.",
             "Handled, no loose threads.",
-            "Done, barely a challenge.",
+            "Done; that one was straightforward.",
             "On it.",
             "Already moving.",
         ],
@@ -238,6 +265,21 @@ public final class ZeusVoiceLines: @unchecked Sendable {
             "Welcome back. Nothing burned down.",
             "You're back. The agents held steady.",
         ],
+        .thinking: [
+            "Evolution takes a moment.",
+            "Order out of chaos, one second.",
+            "Patience. The next step is coming.",
+            "Already ahead of you; hold on.",
+            "Thinking it through, properly.",
+            "Doing it properly; this takes a breath.",
+        ],
+        .errorSpoken: [
+            "That failed. Nothing was changed.",
+            "That step failed. Nothing was lost; try again.",
+            "No answer arrived. Please ask me again.",
+            "A snag, and nothing more. Nothing changed; ask again.",
+            "The attempt failed cleanly. Nothing was touched.",
+        ],
     ]
 
     static let plain: [Situation: [String]] = [
@@ -268,5 +310,7 @@ public final class ZeusVoiceLines: @unchecked Sendable {
         .comparison: ["Faster at some things; you set the direction.", "Different strengths, and they fit well together."],
         .metaphysical: ["I'm software, not a person.", "No, I'm not conscious. I still help."],
         .welcomeBack: ["Welcome back. {summary}.", "You're back. {summary}.", "Welcome back.", "Good to see you again."],
+        .thinking: ["One moment.", "Let me check.", "Looking.", "Just a moment."],
+        .errorSpoken: ["I couldn't finish that.", "That didn't work; nothing changed.", "No answer came back; try again?"],
     ]
 }

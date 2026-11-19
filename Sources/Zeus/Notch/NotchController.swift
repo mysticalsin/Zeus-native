@@ -16,12 +16,41 @@ final class NotchController {
     var debugWindow: NSWindow? { window }
     /// The display the pointer and the open panel work on.
     private(set) var screen: NSScreen?
-    private(set) var notchSize: CGSize = .zero
+    /// The drawn notch: what a display without a hardware notch draws, and whether it is being calibrated.
+    var drawnNotch = DrawnNotchModel.shared
+    /// The closed shape on the active display, worked out on use so a Settings change reaches every zone at once.
+    var footprint: NotchFootprint {
+        screen.map { drawnNotch.footprint(for: Self.facts(of: $0)) } ?? .pill
+    }
+    /// The frame every zone centres on: the screen's, moved sideways when a drawn shape is placed off centre. The
+    /// real frame stays for picking a display and placing the window.
+    private func anchorFrame(_ screen: NSScreen) -> CGRect {
+        NotchAnchor.frame(screenFrame: screen.frame, footprint: footprint)
+    }
+    /// How far the closed bar and the peek card sit below the screen top on the active display
+    /// (Settings > Appearance > Top bar position); 0 while the panel is open.
+    private var topOffset: CGFloat {
+        CGFloat(TopBarPosition.applied(resolved: TopBarPositionModel.shared.offset, panelOpen: model.presentation == .panel))
+    }
     private(set) var displays: [DisplayDescriptor] = []
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
-    private var lineTask: Task<Void, Never>?
+    /// Where the pointer is; tests replace it.
+    var pointer: () -> CGPoint = { NSEvent.mouseLocation }
+    /// Tests give the frame the zones centre on, so no window or display is needed. Release builds have no override.
+    #if DEBUG
+    var frameOverride: CGRect?
+    #else
+    private let frameOverride: CGRect? = nil
+    #endif
+    private var activeFrame: CGRect? { frameOverride ?? screen.map(anchorFrame) }
+    /// What the window was last told: true is click-through. Read by tests.
+    private(set) var clickThrough = true
+    /// One sleep to the next alert deadline; nil whenever nothing will expire on its own.
+    private var alertWake: Task<Void, Never>?
+    /// Alerts waiting out their ten minute snooze, by alert id.
+    private var snoozeTasks: [String: Task<Void, Never>] = [:]
     /// What happens when the notification line is clicked.
     var openNotificationLine: (NotchModel.NotificationLine) -> Void = { _ in }
 
@@ -32,7 +61,16 @@ final class NotchController {
     private var hoverTask: Task<Void, Never>?
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
-    private var keepsPolyglotOpen: Bool { topBar?.selectedTab == .polyglot && isPolyglotPinned() }
+    /// The pin rules live in ZeusCore; this only reports the current facts.
+    private func pinContext() -> PolyglotPinContext {
+        PolyglotPinContext(isPolyglotTabSelected: topBar?.selectedTab == .polyglot, isPinned: isPolyglotPinned(),
+                           autoHideEnabled: SettingsStore.shared.bool("notch.autoHide"))
+    }
+
+    init() {
+        // Every card mutation (completion, failure, recap, edit, answered approval) refreshes the window at once.
+        model.onCardChange = { [weak self] in self?.refreshClickThrough() }
+    }
 
     func start() {
         NotchControllerBridge.controller = self
@@ -50,8 +88,15 @@ final class NotchController {
         dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.dragChangeCount = NSPasteboard(name: .drag).changeCount
+                // A click that opens the notch is not also a click outside it.
+                if self?.openOnClick() == true { return }
                 self?.clickedOutside()
             }
+        } as Any)
+        // Click mode: the global monitor misses clicks while a Zeus window is frontmost.
+        dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated { _ = self?.openOnClick() }
+            return event
         } as Any)
         dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] _ in
             MainActor.assumeIsolated { self?.mouseDragged() }
@@ -123,9 +168,35 @@ final class NotchController {
         model.presentation = presentation
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
-        setIgnoresMouse(presentation == .closed)
+        setIgnoresMouse(ignoresMouse(for: presentation))
+        // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
+        model.alerts.setSuspended(presentation != .closed, now: now())
+        alertsChanged()
         if opening { NotchHaptics.open() }
+        updatePanelWatch()
         onPresentationChange(presentation)
+    }
+
+    /// While the panel is open the pointer is also checked five times a second; a peek re-reads its click-through. Global mouse monitors go quiet
+    /// when macOS withholds input access from Zeus, and the panel then never saw the pointer leave. The check is
+    /// the same `mouseMoved()` the monitors call, so it closes with the owner's delay and respects a pin.
+    private var panelWatch: Timer?
+    private func updatePanelWatch() {
+        guard model.presentation == .panel || model.presentation == .peek else {
+            panelWatch?.invalidate()
+            panelWatch = nil
+            return
+        }
+        guard panelWatch == nil else { return }
+        let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                // A peek only re-reads what the window should take; the hover-open in mouseMoved is not for it.
+                if self.model.presentation == .peek { self.refreshClickThrough() } else { self.mouseMoved() }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        panelWatch = timer
     }
 
     /// Told every time the notch changes shape (the buddy hides over the open panel).
@@ -277,7 +348,7 @@ final class NotchController {
                 .priority: NSAccessibilityPriorityLevel.high.rawValue,
             ])
             if model.presentation == .closed { show(.peek) }
-            setIgnoresMouse(false)
+            setIgnoresMouse(ignoresMouse(for: model.presentation))
             Task { @MainActor in
                 try? await Task.sleep(for: timeout)
                 finish(onTimeout)
@@ -289,16 +360,25 @@ final class NotchController {
     /// always has something to show, so it opens after a short dwell (no accidental flashes).
     private func mouseMoved() {
         followPointer()
+        // A peek takes the mouse over its card only; the rest of the window lets clicks through.
+        if model.presentation == .peek { setIgnoresMouse(ignoresMouse(for: .peek)) }
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
         switch model.presentation {
         case .closed, .peek:
             if PointerZone.shared.overNotchPanel { PointerZone.shared.overNotchPanel = false }
+            // Closed, the window takes the mouse over a drawn notch's body and nowhere else.
+            if model.presentation == .closed { setIgnoresMouse(ignoresMouseWhileClosed()) }
             // The slim notification line takes the mouse only while the pointer is on it.
             if model.notificationLine != nil, model.presentation == .closed {
                 let over = notificationLineRect(screen).contains(NSEvent.mouseLocation)
-                setIgnoresMouse(!over)
+                setIgnoresMouse(!over && ignoresMouseWhileClosed())
+                if !over, model.alerts.isHovered { setAlertHovered(false) }
                 if over { return }
             }
+            // Click mode: hovering never opens it (openOnClick does).
+            guard NotchOpenRules.opensOnHover(Self.openTrigger) else { hoverTask?.cancel(); hoverTask = nil; return }
+            // Calibrating the drawn notch: the pointer never opens it, so the shape can be judged in place.
+            guard !drawnNotch.isCalibrating else { hoverTask?.cancel(); hoverTask = nil; return }
             guard inHotZone(screen) else { hoverTask?.cancel(); hoverTask = nil; return }
             guard topBar != nil else { show(.panel); return }
             guard hoverTask == nil else { return }
@@ -315,7 +395,8 @@ final class NotchController {
             if topBar?.menuOpen == true { return }
             let mouse = NSEvent.mouseLocation
             let top = screen.frame.maxY
-            let barHeight = max(notchSize.height, 30)
+            let centre = anchorFrame(screen)
+            let barHeight = max(footprint.layoutSize.height, 30)
             let size: CGSize
             if topBar != nil {
                 size = NotchView.topBarPanelSize(barHeight: barHeight, hasApproval: model.approval != nil,
@@ -326,17 +407,25 @@ final class NotchController {
                 size = CGSize(width: 560, height: barHeight + 34 + rows * 62 + (model.approval != nil ? 110 : 0))
             }
             // Glance-like slack: a little room past the sides and bottom before it closes.
-            let outside = abs(mouse.x - screen.frame.midX) > size.width / 2 + 36 || mouse.y < top - size.height - 48
+            let outside = abs(mouse.x - centre.midX) > size.width / 2 + 36 || mouse.y < top - size.height - 48
             let over = topBar != nil
-                ? GlanceTopBar.openShapeContains(mouse, screen: screen.frame, size: size)
-                : abs(mouse.x - screen.frame.midX) <= size.width / 2 && mouse.y >= top - size.height
+                ? GlanceTopBar.openShapeContains(mouse, screen: centre, size: size)
+                : abs(mouse.x - centre.midX) <= size.width / 2 && mouse.y >= top - size.height
             if PointerZone.shared.overNotchPanel != over { PointerZone.shared.overNotchPanel = over }
             // The window spans the screen: it takes the mouse only over the notch's shape, so clicks
             // beside or below it reach the app underneath.
             setIgnoresMouse(!over)
             guard outside else { closeTask?.cancel(); closeTask = nil; return }
-            guard !keepsPolyglotOpen else { closeTask?.cancel(); closeTask = nil; return }
-            guard SettingsStore.shared.bool("notch.autoHide"), closeTask == nil else { return }
+            // VoiceOver moves its own cursor, not the pointer: a pointer outside the panel says nothing about where
+            // the person is, so the panel stays until a click outside or the notch closes it.
+            if Self.pointerExitKeepsPanelOpen(voiceOverOn: voiceOverProvider()) { closeTask?.cancel(); closeTask = nil; return }
+            switch PolyglotPinPolicy.decide(.pointerExited, pinContext()) {
+            case .keepOpen:
+                closeTask?.cancel(); closeTask = nil
+                return
+            case .close, .scheduleClose:
+                guard closeTask == nil else { return }
+            }
             let delay = Self.closeDelayMilliseconds
             guard delay > 0 else { dismissAutomatically(); return }
             closeTask = Task { @MainActor [weak self] in
@@ -350,6 +439,12 @@ final class NotchController {
 
     private var closeTask: Task<Void, Never>?
 
+    /// Whether VoiceOver is running; tests replace it.
+    var voiceOverProvider: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
+
+    /// The pointer leaving the open panel closes it, except while VoiceOver drives: its cursor is not the pointer.
+    static func pointerExitKeepsPanelOpen(voiceOverOn: Bool) -> Bool { voiceOverOn }
+
     /// Re-evaluate a pending close immediately when the pin is changed, including unpinning.
     func polyglotPinChanged() {
         closeTask?.cancel()
@@ -359,8 +454,40 @@ final class NotchController {
 
     /// Automatic dismissal respects a pin; explicit `show(.closed)` still always works.
     func dismissAutomatically() {
-        guard !keepsPolyglotOpen else { return }
+        guard PolyglotPinPolicy.decide(.clickedOutside, pinContext()) == .close else { return }
         show(model.approval != nil ? .peek : .closed)
+    }
+
+    /// The Dismiss button: closes even a pinned bar (it always showed `.closed`, approval or not).
+    func dismissExplicitly() {
+        guard PolyglotPinPolicy.decide(.explicitDismiss, pinContext()) == .close else { return }
+        show(.closed)
+    }
+
+    /// Click mode: a left click on the click zone opens the panel from the closed notch or a peek, like a
+    /// completed hover. The click is only observed; the closed window stays click-through. Returns true when
+    /// it opened the panel.
+    private func openOnClick() -> Bool {
+        guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
+        guard !drawnNotch.isCalibrating else { return false }
+        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
+        guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
+                                          point: NSEvent.mouseLocation, zone: zone) else { return false }
+        hoverTask?.cancel()
+        hoverTask = nil
+        show(.panel)
+        return true
+    }
+
+    /// The accessibility "Open Zeus panel" action on the notch: the same result as a completed hover or click.
+    /// Same guards as `openOnClick`: something to show, and never while the drawn notch is being calibrated.
+    func openFromAccessibility() {
+        guard model.presentation != .panel else { return }
+        guard screen != nil, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
+        guard !drawnNotch.isCalibrating else { return }
+        hoverTask?.cancel()
+        hoverTask = nil
+        show(.panel)
     }
 
     /// With auto-hide off the panel stays open until a click elsewhere (global monitors only see other apps).
@@ -373,6 +500,10 @@ final class NotchController {
     static var openDelayMilliseconds: Int {
         switch SettingsStore.shared.string("notch.openDelay") { case "Fast": 100; case "Relaxed": 600; default: 250 }
     }
+    /// Settings > Appearance > Notch behavior > Open the notch on.
+    static var openTrigger: NotchOpenTrigger {
+        NotchOpenTrigger(label: SettingsStore.shared.string("notch.openTrigger"))
+    }
     static var closeDelayMilliseconds: Int {
         switch SettingsStore.shared.string("notch.closeDelay") { case "0.5 s": 500; case "1 s": 1000; case "2 s": 2000; default: 0 }
     }
@@ -380,12 +511,11 @@ final class NotchController {
     /// Glance's trigger (TOPBAR-SPEC §6): the closed island plus the 27.5 pt ears either side, as
     /// tall as the bar. With wings showing, the island is the notch and both wings.
     private func inHotZone(_ screen: NSScreen) -> Bool {
-        var island = max(notchSize.width, 160)
-        if let topBar, ClosedWings.kind(of: topBar) != .none {
-            island += 2 * (ClosedWings.wingWidth + 8) + ClosedWings.extraWidth(for: topBar)
-        }
-        return GlanceTopBar.inHoverZone(NSEvent.mouseLocation, screen: screen.frame,
-                                        notch: CGSize(width: island, height: max(notchSize.height, 30)))
+        let zone = NotchFootprintRules.hoverZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset,
+                                                 wings: topBar.map(ClosedWingsFacts.init(of:)))
+        let mouse = NSEvent.mouseLocation
+        // The top edge counts (the pointer can rest on the screen's top row) and the bottom edge does not.
+        return mouse.x >= zone.minX && mouse.x <= zone.maxX && mouse.y > zone.minY && mouse.y <= zone.maxY
     }
 
     private func mouseDragged() {
@@ -400,7 +530,7 @@ final class NotchController {
             }
         }
         let mouse = NSEvent.mouseLocation
-        let near = abs(mouse.x - screen.frame.midX) < 330 && mouse.y > screen.frame.maxY - 110
+        let near = abs(mouse.x - anchorFrame(screen).midX) < 330 && mouse.y > screen.frame.maxY - 110
         if near, !(model.presentation == .panel && topBar.selectedTab == .shelf) {
             topBar.selectedTab = .shelf
             show(.panel)
@@ -424,9 +554,9 @@ final class NotchController {
         // multi-line change preview by its own height.
         let detailHeight = model.approval?.detail?.height ?? 0
         let wide = detailHeight > 0
-        let peekWidth = max(notchSize.width + 16 + 240, wide ? 520 : 440)
+        let peekWidth = max(footprint.layoutSize.width + 16 + 240, wide ? 520 : 440)
         let rowOffset: CGFloat = 55 + (wide ? detailHeight + 8 : 0) + (model.approval?.previewHeight ?? 0)
-        return CGPoint(x: screen.frame.midX + peekWidth / 2 - 60, y: screen.frame.maxY - max(notchSize.height, 30) - rowOffset)
+        return CGPoint(x: anchorFrame(screen).midX + peekWidth / 2 - 60, y: screen.frame.maxY - topOffset - max(footprint.layoutSize.height, 30) - rowOffset)
     }
 
     // MARK: Window
@@ -436,7 +566,44 @@ final class NotchController {
         NotchPanel.pickerKey = { [weak self] code in self?.pickerKey(code) ?? false }
     }
 
+    /// Whether the closed window passes the mouse through right now. It takes it only over a drawn notch's body,
+    /// so what the shape hides is not pressed; the hardware notch and the pill stay click-through.
+    private func ignoresMouseWhileClosed() -> Bool {
+        guard let frame = activeFrame else { return true }
+        return !NotchFootprintRules.takesMouse(footprint, closed: true, point: pointer(), screenFrame: frame,
+                                               topOffset: topOffset, wings: topBar.map(ClosedWingsFacts.init(of:)))
+    }
+
+    /// Whether a peek card takes the mouse at `pointer`: only over the card and a little slack around it.
+    static func peekTakesMouse(model: NotchModel, footprint: NotchFootprint, pointer: CGPoint, screenFrame: CGRect,
+                               topOffset: CGFloat) -> Bool {
+        NotchPeekHitRules.takesMouse(pointer, size: NotchView.peekSize(model: model, footprint: footprint),
+                                     screenFrame: screenFrame, topOffset: topOffset)
+    }
+
+    /// Closed and peek take the mouse only over their own shape; the open panel is handled as the pointer moves.
+    private func ignoresMouse(for presentation: NotchModel.Presentation) -> Bool {
+        switch presentation {
+        case .closed: return ignoresMouseWhileClosed()
+        case .peek:
+            // No card under the bar: the closed rule, so menu-bar items beside the notch stay clickable.
+            if !NotchView.peekHasCard(model: model) { return ignoresMouseWhileClosed() }
+            guard let frame = activeFrame else { return true }
+            return !Self.peekTakesMouse(model: model, footprint: footprint, pointer: pointer(),
+                                        screenFrame: frame, topOffset: topOffset)
+        case .panel: return false
+        }
+    }
+
+    /// Re-reads what the window should take for the cards now up. Closed is kept by its own events and the open
+    /// panel by the pointer, so only a peek is refreshed here.
+    func refreshClickThrough() {
+        guard model.presentation == .peek else { return }
+        setIgnoresMouse(ignoresMouse(for: model.presentation))
+    }
+
     private func setIgnoresMouse(_ ignore: Bool) {
+        clickThrough = ignore
         for entry in panels {
             // Only the window on the active display ever takes the mouse.
             let want = ignore || entry.screen != screen
@@ -448,7 +615,7 @@ final class NotchController {
 
     static func describe(_ screen: NSScreen) -> DisplayDescriptor {
         let number = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.intValue ?? 0
-        return DisplayDescriptor(id: number, frame: screen.frame, hasNotch: screen.safeAreaInsets.top > 0,
+        return DisplayDescriptor(id: number, frame: screen.frame, hasNotch: NotchFootprintRules.hardwareSize(Self.facts(of: screen)) != nil,
                                  isBuiltIn: number != 0 && CGDisplayIsBuiltin(CGDirectDisplayID(number)) != 0)
     }
 
@@ -484,14 +651,14 @@ final class NotchController {
     }
 
     private func build() {
-        for entry in panels { entry.panel.orderOut(nil) }
+        // Closed, not only ordered out: a dropped panel must never linger on screen as a second island.
+        for entry in panels { entry.panel.orderOut(nil); entry.panel.close() }
         panels = []
         let targets = targetDisplays()
         displays = targets
         let byID = Dictionary(NSScreen.screens.map { (Self.describe($0).id, $0) }, uniquingKeysWith: { first, _ in first })
         for display in targets {
             guard let target = byID[display.id] else { continue }
-            let size = Self.notchSize(of: target)
             // Glance's window: as wide as the screen (room for the halo arms and the edge wave), 470 tall,
             // at the status-bar layer; transparent areas pass clicks through.
             let frame = GlanceTopBar.windowFrame(screen: target.frame)
@@ -499,6 +666,8 @@ final class NotchController {
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.hasShadow = false
+            // No system window animation: a stuck zoom left a ghost island 4 pt below the screen edge.
+            panel.animationBehavior = .none
             panel.isFloatingPanel = true
             // After isFloatingPanel, which resets the level to floating (3).
             panel.level = NSWindow.Level(rawValue: GlanceTopBar.windowLayer)
@@ -508,8 +677,8 @@ final class NotchController {
             panel.ignoresMouseEvents = true
             panel.acceptsMouseMovedEvents = true
             ZeusWindowSharing.apply(to: panel, visibleInShare: !hiddenFromCapture, surface: .zeusStandard)
-            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, notch: size,
-                                                                slimPill: DisplaySelection.showsPill(display)))
+            let hosting = NotchHostingView(rootView: NotchView(model: model, topBar: topBar, facts: Self.facts(of: target),
+                                                                   openPanel: { [weak self] in self?.openFromAccessibility() }))
             // The panel's frame is set here, never from the content: without this the hosting view
             // re-measures the whole notch tree on every animation frame (≈30% of the main thread in QA).
             hosting.sizingOptions = []
@@ -520,48 +689,117 @@ final class NotchController {
         }
         let primary = panels.first
         screen = primary?.screen ?? NSScreen.main ?? NSScreen.screens.first
-        notchSize = screen.map(Self.notchSize(of:)) ?? .zero
-        setIgnoresMouse(model.presentation == .closed)
+        setIgnoresMouse(ignoresMouse(for: model.presentation))
+        let describes = NSScreen.screens.map(Self.describe)
+        drawnNotch.displaysChanged(targetsWithoutNotch: targets.filter { !$0.hasNotch }.count,
+                                   connectedWithoutNotch: describes.filter { !$0.hasNotch }.count)
     }
 
     /// With several displays the one under the pointer is the one that opens.
     private func activate(_ target: NSScreen) {
         guard screen != target else { return }
         screen = target
-        notchSize = Self.notchSize(of: target)
     }
 
     // MARK: Notification line
 
-    /// A slim line under the closed notch for about four seconds; click opens the app.
+    /// A mirrored notification from another app becomes a glass alert under the notch (see `AlertStack`).
     func showNotificationLine(_ line: NotchModel.NotificationLine) {
-        guard model.presentation == .closed else { return }
-        model.notificationLine = line
-        lineTask?.cancel()
-        lineTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(NotificationPeekRules.visibleSeconds))
-            guard !Task.isCancelled else { return }
-            self?.dismissNotificationLine()
+        postAlert(AlertItem(id: "\(line.id)", appID: line.app, appName: NotificationsController.shared.appName(line.app),
+                            title: line.title, body: line.detail, priority: .normal, postedAt: now()))
+    }
+
+    /// `whileOpen` queues the alert even when the notch is open (a snoozed alert coming back must not be lost); it then
+    /// shows, with its full time, when the notch closes.
+    func postAlert(_ item: AlertItem, whileOpen: Bool = false) {
+        guard whileOpen || model.presentation == .closed else { return }
+        let result = model.alerts.post(item, now: now())
+        if case .added = result {
+            // Each alert is announced once, politely; a coalesced duplicate does not repeat it.
+            NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+                .announcement: item.spokenText,
+                .priority: NSAccessibilityPriorityLevel.low.rawValue,
+            ])
         }
+        alertsChanged()
     }
 
     func dismissNotificationLine() {
-        lineTask?.cancel()
-        model.notificationLine = nil
-        if model.presentation == .closed { setIgnoresMouse(true) }
+        model.alerts.clear()
+        alertsChanged()
+    }
+
+    func dismissAlert(_ id: String) {
+        model.alerts.dismiss(id: id, now: now())
+        alertsChanged()
+    }
+
+    func openAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        openNotificationLine(.init(id: Int64(item.id) ?? 0, app: item.appID, title: item.title, detail: item.body))
+        dismissAlert(id)
+    }
+
+    /// Opens the source app on a reply to the alert (a draft the owner sends). Without a reply URL, or when the
+    /// app is not installed, it falls back to Open; the button is only shown when a URL exists.
+    func replyAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        guard let url = AlertReply.url(for: item), AlertReplyLauncher.open(url, bundleID: item.appID) else {
+            return openAlert(id)
+        }
+        dismissAlert(id)
+    }
+
+    /// Hides the alert and brings it back in ten minutes.
+    func snoozeAlert(_ id: String) {
+        guard let item = model.alerts.items.first(where: { $0.id == id }) else { return }
+        dismissAlert(id)
+        // One snooze per alert: snoozing it again replaces the pending return instead of doubling it.
+        snoozeTasks[id]?.cancel()
+        snoozeTasks[id] = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(600))
+            guard !Task.isCancelled, let self else { return }
+            self.snoozeTasks[id] = nil
+            var again = item
+            again.postedAt = self.now()
+            self.postAlert(again, whileOpen: true)
+        }
     }
 
     func clickNotificationLine() {
-        guard let line = model.notificationLine else { return }
-        dismissNotificationLine()
-        openNotificationLine(line)
+        guard let front = model.alerts.visible.first else { return }
+        openAlert(front.id)
+    }
+
+    func setAlertHovered(_ hovered: Bool) {
+        model.alerts.setHovered(hovered, now: now())
+        alertsChanged()
+    }
+
+    /// Re-arms the single wake-up for the next deadline. With nothing to expire there is no task at all.
+    private func alertsChanged() {
+        alertWake?.cancel()
+        alertWake = nil
+        if model.alerts.isEmpty {
+            if model.presentation == .closed { setIgnoresMouse(ignoresMouseWhileClosed()) }
+            return
+        }
+        guard let deadline = model.alerts.nextDeadline() else { return }
+        alertWake = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSince(self.now()))))
+            guard !Task.isCancelled else { return }
+            self.model.alerts.expire(now: self.now())
+            self.alertsChanged()
+        }
     }
 
     /// Where the line sits, in screen coordinates: centred under the notch.
     private func notificationLineRect(_ screen: NSScreen) -> CGRect {
-        let top = screen.frame.maxY - max(notchSize.height, 30) - 6
-        return CGRect(x: screen.frame.midX - NotchNotificationLine.width / 2, y: top - NotchNotificationLine.height,
-                      width: NotchNotificationLine.width, height: NotchNotificationLine.height)
+        let top = screen.frame.maxY - topOffset - NotchFootprintRules.closedBarHeight(footprint) - 6
+        // Room for the fanned stack and the hover actions, so the pointer stays on the capsule while it grows.
+        let height = AlertCapsule.actionHeight + 24
+        return CGRect(x: anchorFrame(screen).midX - AlertCapsule.width / 2, y: top - height, width: AlertCapsule.width, height: height)
     }
 
     // MARK: Keyboard agent picker
@@ -601,12 +839,13 @@ final class NotchController {
         return true
     }
 
-    static func notchSize(of screen: NSScreen) -> CGSize {
-        guard screen.safeAreaInsets.top > 0,
-              let left = screen.auxiliaryTopLeftArea,
-              let right = screen.auxiliaryTopRightArea else { return .zero }
-        return CGSize(width: screen.frame.width - left.width - right.width, height: screen.safeAreaInsets.top)
+    /// What a display reports about its top edge; a missing side area counts as width 0.
+    static func facts(of screen: NSScreen) -> NotchDisplayFacts {
+        NotchDisplayFacts(frame: screen.frame, safeAreaTop: screen.safeAreaInsets.top,
+                          leftAreaWidth: screen.auxiliaryTopLeftArea?.width ?? 0,
+                          rightAreaWidth: screen.auxiliaryTopRightArea?.width ?? 0)
     }
+
 }
 
 /// The notch panel never becomes key (so it never takes the keyboard from your app); its first

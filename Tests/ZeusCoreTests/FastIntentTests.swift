@@ -298,6 +298,14 @@ import Testing
         #expect(MicConflict.counts(bundleID: "com.apple.FaceTime", pid: 600, ownPID: 100))
     }
 
+    @Test func micConflictCountsCallHelperProcessesAndOtherBrowsers() {
+        for helper in ["com.google.Chrome.helper", "com.apple.WebKit.GPU", "com.microsoft.teams2.helper",
+                       "com.microsoft.edgemac.helper", "org.mozilla.firefox", "company.thebrowser.Browser.helper"] {
+            #expect(MicConflict.counts(bundleID: helper, pid: 700, ownPID: 100), "\(helper) should pause Hey Zeus")
+        }
+        #expect(!MicConflict.counts(bundleID: "com.apple.universalaccessd", pid: 400, ownPID: 100))
+    }
+
     @Test func gateRules() {
         var gate = WakeGate()
         #expect(gate.pauseReason == "needs microphone and speech recognition")
@@ -332,21 +340,22 @@ import Testing
     }
 
     /// The per-buffer work the always-on tap does when nobody talks: RMS and the gate. A minute of
-    /// 48 kHz audio in 4096-frame buffers should cost well under a millisecond per buffer.
+    /// 48 kHz audio in 4096-frame buffers should cost well under a millisecond per buffer. The cost is
+    /// read from this thread's CPU clock, so a busy machine that preempts the test does not count as
+    /// work the tap would do.
     @Test func voiceActivityIsCheapPerBuffer() {
         var vad = VoiceActivity()
         let samples = (0..<4096).map { Float(sin(Double($0) * 0.01)) * 0.002 }
-        let clock = ContinuousClock()
         let buffers = 60 * 48_000 / 4096
-        let elapsed = clock.measure {
+        let cpuSeconds = ThreadCPUTime.measure {
             for _ in 0..<buffers {
                 var sum: Float = 0
                 for s in samples { sum += s * s }
                 vad.feed(rms: (sum / Float(samples.count)).squareRoot(), seconds: 4096 / 48_000)
             }
         }
-        let perBuffer = (Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15) / Double(buffers)
-        print("[fast] wake gate: \(String(format: "%.4f", perBuffer)) ms per 85 ms buffer (debug build, scalar RMS)")
+        let perBuffer = cpuSeconds * 1000 / Double(buffers)
+        print("[fast] wake gate: \(String(format: "%.4f", perBuffer)) ms per 85 ms buffer (debug build, scalar RMS, thread CPU time)")
         #expect(perBuffer < 1.0)
     }
 }
@@ -422,10 +431,10 @@ import Testing
     }
 
     @Test func personaLinesNameTheThing() {
-        let line = AckLines.persona.line(.opening("Spotify")) ?? ""
+        let line = AckLines.persona(personality: .ultron).line(.opening("Spotify")) ?? ""
         #expect(!line.isEmpty)
-        #expect(AckLines.persona.line(.volume(.up)) == nil)
-        #expect(AckLines.persona.line(.timer(seconds: 300)) == "Timer set for 5 minutes.")
+        #expect(AckLines.persona(personality: .ultron).line(.volume(.up)) == nil)
+        #expect(AckLines.persona(personality: .ultron).line(.timer(seconds: 300)) == "Timer set for 5 minutes.")
     }
 
     @Test func plainTimerEndsWithoutABreakAndRestoresFocusLength() {

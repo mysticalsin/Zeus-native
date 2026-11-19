@@ -44,6 +44,18 @@ final class OpenAICompatProvider: BrainProvider, @unchecked Sendable {
         _ = try? await BrainHTTP.session.data(for: request)
     }
 
+    /// Opens the TLS and HTTP/2 connection to a cloud API with a free metadata call (no tokens).
+    func warmConnection() async {
+        guard id == .openAIAPI, let key, !key.isEmpty else { return }
+        var request = URLRequest(url: baseURL.appendingPathComponent("models"), timeoutInterval: 6)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        if let (_, response) = try? await BrainHTTP.session.data(for: request),
+           let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+            VoiceLog.log("brain", "engine=openai prewarm=ok")
+        }
+    }
+
     func send(_ request: BrainRequest) -> AsyncThrowingStream<BrainEvent, Error> {
         AsyncThrowingStream { continuation in
             guard ModelCap.gatedHTTPModel(model) != nil else {
@@ -55,7 +67,7 @@ final class OpenAICompatProvider: BrainProvider, @unchecked Sendable {
                 let started = Date()
                 var firstTokenLogged = false
                 do {
-                    let (bytes, response) = try await BrainHTTP.session.bytes(for: self.urlRequest(prompt: request.transcript, system: request.systemPrompt, maxTokens: request.deep ? 1024 : 512))
+                    let (bytes, response) = try await BrainHTTP.session.bytes(for: self.urlRequest(prompt: request.transcript, system: ScreenSightNote.textOnlySystemPrompt(for: request), maxTokens: request.deep ? 1024 : 512))
                     if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                         var data = Data()
                         for try await byte in bytes { data.append(byte); if data.count > 2048 { break } }

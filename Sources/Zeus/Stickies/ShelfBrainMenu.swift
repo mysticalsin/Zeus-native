@@ -6,8 +6,20 @@ import ZeusCore
 /// or turn a short text file into a sticky.
 struct ShelfBrainMenu: View {
     let url: URL
+    /// The Shelf item and Fling, when Fling is on: adds a "Fling to" submenu with the nearby Macs and AirDrop.
+    var item: TopBarModel.ShelfItem?
+    var fling: (any FlingSending)?
 
     var body: some View {
+        if let item, let fling, fling.isEnabled {
+            Menu("Fling to") {
+                ForEach(fling.nearby.filter(\.paired)) { peer in
+                    Button(peer.name) { fling.send([item], to: .peer(id: peer.id), gesture: .menu) }
+                }
+                Button("AirDrop") { fling.send([item], to: .airDrop, gesture: .menu) }
+            }
+            Divider()
+        }
         Button("Save to Brain…") {
             BrainCaptureWindow.shared.show(title: url.deletingPathExtension().lastPathComponent, body: Self.body(for: url), source: "shelf")
         }
@@ -24,6 +36,6 @@ struct ShelfBrainMenu: View {
     }
 
     static func body(for url: URL) -> String {
-        text(of: url) ?? "From the ZEUS shelf: [\(url.lastPathComponent)](\(url.absoluteString))"
+        text(of: url) ?? "From the Zeus shelf: [\(url.lastPathComponent)](\(url.absoluteString))"
     }
 }

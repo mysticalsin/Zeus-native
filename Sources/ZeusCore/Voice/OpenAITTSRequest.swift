@@ -7,8 +7,15 @@ public enum OpenAITTSRequest {
         public var model: String
         public var voice: String
         public var apiKey: String
+        /// Tone instructions, sent only to models that accept them (gpt-4o-mini-tts).
+        public var instructions: String?
+        /// "wav" for a file, "pcm" for 24 kHz 16-bit mono that can play while it streams.
+        public var responseFormat: String
 
-        public init(baseURL: URL, model: String, voice: String, apiKey: String) {
+        public init(baseURL: URL, model: String, voice: String, apiKey: String,
+                    instructions: String? = nil, responseFormat: String = "wav") {
+            self.instructions = instructions
+            self.responseFormat = responseFormat
             self.baseURL = baseURL
             self.model = model
             self.voice = voice
@@ -26,12 +33,17 @@ public enum OpenAITTSRequest {
     }
 
     public static func body(text: String, config: Config) -> [String: Any] {
-        [
+        var body: [String: Any] = [
             "model": config.model,
             "input": text,
             "voice": config.voice,
-            "response_format": "wav",
+            "response_format": config.responseFormat,
         ]
+        if let instructions = config.instructions, !instructions.isEmpty,
+           UltronCloudVoice.supportsInstructions(model: config.model) {
+            body["instructions"] = instructions
+        }
+        return body
     }
 
     public static func makeRequest(text: String, config: Config, timeout: TimeInterval = 30) -> URLRequest? {

@@ -1,0 +1,33 @@
+{
+  "evidence_kind": "development-failure-source-and-artifact-revalidation",
+  "head": "e295aaf47aabce36c5563166a9e7376bca49b6c2",
+  "tested": "4b9bc4dbb4cd7b1e432a834e2f884ebaa83c4fab",
+  "source_snapshot_sha256": "41b1837c53b235fc9ad27243cb4340f9c545923cfcef5f6b67235bc25c91437a",
+  "run_url": "https://github.com/mysticalsin/Zeus-native/actions/runs/42814965666",
+  "job_id": 129825609685,
+  "artifact_id": 13766845557,
+  "artifact_zip_sha256": "789a93f1510bc6c9468ad4e7924dc63aa0aeec1d7ca7eda9abf7496485a789b4",
+  "status": "failed",
+  "failed_check": {
+    "id": "portable-bridge-transport",
+    "exit_code": 124,
+    "duration_seconds": 1800.031,
+    "tests_counted": 0,
+    "fully_printed_test_starts_without_terminal_result": [
+      "nonReadingChromeCannotStrandPendingRequestsOrKeepOpenStdinAlive"
+    ],
+    "limitation": "An unfinished named test is not proof of the exact blocking instruction; the log also ends with a partial Test marker."
+  },
+  "reported_development_totals": {
+    "tests": 613,
+    "suites": 52
+  },
+  "validation_scope": "Exact source/policy/job hashes and failure artifacts revalidated; this receipt does not independently certify each passing portable test. Failed bridge partition remains failed.",
+  "revalidated_artifacts": {
+    "job.json": "ac17b9ea5e8c96f2400fa79595b6ae42d577bdb1546fee9a099d8bd8f5f7c983",
+    "result.json": "0dc152ac2267511416f307b76b63fddb279ac72cfc69698a3b459956e16cfcde",
+    "source-manifest.json": "d82f110f6cf3a3209343be2167d1baa5da0b6037bcfa75981bc0e7e5aaf8c277",
+    "portable-bridge-transport/test.log": "da49309a0733d66edef427d08cf839938fcf3a088db9f5e9df9727f368c8ddac"
+  },
+  "complete_native_acceptance": false
+}

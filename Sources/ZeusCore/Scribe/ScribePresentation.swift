@@ -123,8 +123,8 @@ public enum ScribeMicIndicator: Equatable, Sendable {
     public var label: String {
         switch self {
         case .listening: return "Listening"
-        case .mutedNotRecorded: return "Mic muted — not recorded"
-        case .unknownNotRecorded: return "Mic status unknown — not recorded"
+        case .mutedNotRecorded: return "Mic muted, not recorded"
+        case .unknownNotRecorded: return "Mic status unknown, not recorded"
         }
     }
 
@@ -234,7 +234,7 @@ public enum ScribeSpeakerPalette {
     }
 }
 
-/// The measured end-of-meeting motion (CLAUDE-LEAD-20261107/SUPERWHISPER-REF/REFERENCE-MOTION.md), as pure
+/// The measured end-of-meeting motion (reference motion study, kept in private notes), as pure
 /// functions of a stage and the time since that stage began. Colours are Zeus's palette near the observed purples.
 public enum ScribeGlow {
     public enum Stage: Equatable, Sendable {

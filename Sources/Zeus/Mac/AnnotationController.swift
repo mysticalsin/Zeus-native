@@ -1,15 +1,15 @@
 import AppKit
 import ZeusCore
 
-/// Show-me: hold the left Command key on its own, then draw or circle anything on screen.
+/// Show-me: hold the left Control key on its own, then draw or circle anything on screen.
 /// A transparent overlay catches the stroke; on release ZEUS takes a screenshot, marks the
-/// region on it and answers (or acts) about that spot. A plain Command-click passes through.
+/// region on it and answers (or acts) about that spot. A quick Control-click passes through.
 @MainActor
 final class AnnotationController {
     static let shared = AnnotationController()
     static let enabledKey = "annotate.enabled"
     /// Hold this long before the overlay takes the mouse, so quick shortcuts never see it.
-    static let holdDelay: Duration = .milliseconds(350)
+    static let holdDelay: Duration = .milliseconds(ShowMeKey.holdDelayMilliseconds)
 
     private var flagsMonitor: Any?
     private var keyMonitor: Any?
@@ -29,10 +29,11 @@ final class AnnotationController {
     private func startMonitors() {
         flagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            let leftCommand = event.keyCode == 55
-            MainActor.assumeIsolated { AnnotationController.shared.flags(flags, leftCommand: leftCommand) }
+            let modifiers = ShortcutModifiers(flags)
+            let keyCode = event.keyCode
+            MainActor.assumeIsolated { AnnotationController.shared.flags(modifiers, keyCode: keyCode) }
         }
-        // Any other key while Command is down is a shortcut, not a drawing.
+        // Any other key while Control is down is a shortcut, not a drawing.
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == 53 {
                 MainActor.assumeIsolated { AnnotationController.shared.clearMark() }
@@ -49,17 +50,18 @@ final class AnnotationController {
         NSLog("[ZEUS] show-me: cleared")
     }
 
-    private func flags(_ flags: NSEvent.ModifierFlags, leftCommand: Bool) {
+    private func flags(_ modifiers: ShortcutModifiers, keyCode: UInt16) {
         guard enabled else { return }
-        if flags == .command, leftCommand {
+        if ShowMeKey.startsHold(modifiers: modifiers, keyCode: keyCode) {
             armTask?.cancel()
             armTask = Task { @MainActor in
                 try? await Task.sleep(for: Self.holdDelay)
-                guard !Task.isCancelled, NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                      NSEvent.pressedMouseButtons == 0 else { return }
+                let live = ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
+                guard !Task.isCancelled,
+                      ShowMeKey.mayArm(modifiers: live, pressedMouseButtons: Int(NSEvent.pressedMouseButtons)) else { return }
                 self.arm()
             }
-        } else if !flags.contains(.command) {
+        } else if ShowMeKey.endsHold(modifiers: modifiers) {
             armTask?.cancel()
             if drawing { finish() }
         } else {
@@ -108,15 +110,15 @@ final class AnnotationController {
         drawing = false
         MarkOverlay.shared.hide()
         guard !all.isEmpty else { MarkModel.shared.strokes = []; return }
-        // A Command-click with no drag was meant for the app underneath: hand it back.
+        // A Control-click with no drag was meant for the app underneath: hand it back.
         if strokes.count == 1, main.shape == .spot, let p = all.first {
             MarkModel.shared.strokes = []
-            NSLog("[ZEUS] show-me: plain Command-click passed through")
+            NSLog("[ZEUS] show-me: plain Control-click passed through")
             let q = DriveController.quartz(p)
             guard AccessibilityGate.trusted else { return }
             for type in [CGEventType.leftMouseDown, .leftMouseUp] {
                 let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: q, mouseButton: .left)
-                event?.flags = .maskCommand
+                event?.flags = .maskControl
                 event?.post(tap: .cghidEventTap)
             }
             return
@@ -128,7 +130,7 @@ final class AnnotationController {
             MarkModel.shared.strokes = []
             guard let (prompt, marked) = Self.mark(combined, shape: main.shape, on: shots) else {
                 NSLog("[ZEUS] show-me: no screenshot (Screen Recording off)")
-                self.onMark?("I marked something on screen but you can't see the screen yet. Tell me to turn on Screen Recording for ZEUS.", [])
+                self.onMark?("I marked something on screen but you can't see the screen yet. Tell me to turn on Screen Recording for Zeus.", [])
                 return
             }
             self.onMark?(prompt, marked)
@@ -163,7 +165,7 @@ final class AnnotationController {
         context.stroke(CGRect(x: pixels.minX, y: CGFloat(source.height) - pixels.maxY, width: pixels.width, height: pixels.height))
         guard let image = context.makeImage(),
               let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else { return nil }
-        return ScreenShot(jpegData: jpeg, label: shot.label + " (ZEUS outlined the marked spot)", pixelWidth: shot.pixelWidth,
+        return ScreenShot(jpegData: jpeg, label: shot.label + " (Zeus outlined the marked spot)", pixelWidth: shot.pixelWidth,
                           pixelHeight: shot.pixelHeight, displayFrame: shot.displayFrame)
     }
 }

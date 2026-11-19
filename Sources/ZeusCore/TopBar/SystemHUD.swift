@@ -145,3 +145,21 @@ public struct SystemHUDCoalescer: Sendable {
         lastMuted = muted
     }
 }
+
+/// How often brightness and keyboard backlight are read. macOS posts no public notification for
+/// either, so the read is a timer, but a slow one: it speeds up only for a short burst after a
+/// known event (a media key, a volume change, a level that just moved) and does not run at all
+/// when neither HUD is on or the displays are asleep.
+public enum SystemHUDPollPolicy {
+    public static let burstInterval: TimeInterval = 0.1
+    public static let idleInterval: TimeInterval = 1.0
+    public static let burstWindow: TimeInterval = 2.0
+
+    public static func interval(sinceLastChange: TimeInterval) -> TimeInterval {
+        sinceLastChange < burstWindow ? burstInterval : idleInterval
+    }
+
+    public static func shouldPoll(brightnessEnabled: Bool, keyboardBacklightEnabled: Bool, displaysAsleep: Bool) -> Bool {
+        !displaysAsleep && (brightnessEnabled || keyboardBacklightEnabled)
+    }
+}
