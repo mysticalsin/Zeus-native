@@ -19,6 +19,119 @@ import ZeusCore
         return (controller, box)
     }
 
+    @Test func aDoubleClickAcrossASwapDoesNotApproveTheNextCard() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card)
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func aVoiceOverActionAcrossASwapDoesNotApproveTheNextCard() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card)
+        controller.model.approval?.activateAllow()
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func aSwapLocksInputForEveryRiskIncludingHigh() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.approvalReduceMotion = { true }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second, risk: .high),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card)
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+        #expect(controller.model.approval?.allowGate.confirmVisible != true)
+    }
+
+    @Test func browsingAwayClearsAnArmedConfirm() {
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.approvalReduceMotion = { true }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: Box(), risk: .high),
+            card(id: "B", command: "second", box: Box(), risk: .high),
+        ])
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card)
+        #expect(controller.model.approval?.allowGate.confirmVisible == true)
+        controller.browseApproval(by: 1)
+        controller.browseApproval(by: 1)
+        #expect(controller.model.approval?.id == "A")
+        #expect(controller.model.approval?.allowGate.confirmVisible != true)
+    }
+
+    @Test func swappingBrowsingAndRemovalAnnounceTheCard() {
+        let controller = NotchController()
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: Box()),
+            card(id: "B", command: "second", box: Box(), risk: .high),
+        ])
+        controller.browseApproval(by: 1)
+        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .high, position: "2 of 2", outcome: nil))
+        controller.advanceAfterDisplayed("B")
+        #expect(controller.lastApprovalAnnouncement == ApprovalCard.announcement(risk: .low, position: "1 of 1", outcome: nil))
+    }
+
+    @Test func aPressThatSwapsCardsDoesNotFinishOnTheNextOne() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first),
+            card(id: "B", command: "second", box: second),
+        ])
+        controller.beginApprovalHold()
+        controller.browseApproval(by: 1)
+        controller.monotonicNow = { 1_000 + 1 }
+        controller.endApprovalHold(inside: true)
+        #expect(first.verdict == nil)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func aRequestThatArrivesDuringDenyAllStaysQueued() {
+        let boxes = [Box(), Box(), Box()]
+        let arrived = Box()
+        let controller = NotchController()
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: boxes[0], onResolve: {
+                controller.stageApprovals(controller.pendingApprovals + [card(id: "new", command: "later", box: arrived)])
+            }),
+            card(id: "B", command: "second", box: boxes[1]),
+            card(id: "C", command: "third", box: boxes[2]),
+        ])
+        controller.denyEveryApproval()
+        #expect(boxes.map(\.verdict) == [.deny, .deny, .deny])
+        #expect(arrived.verdict == nil)
+        #expect(controller.pendingApprovals.contains { $0.id == "new" } || controller.model.approval?.id == "new")
+    }
+
     @Test func denyAllResolvesEveryQueuedCard() {
         let controller = NotchController()
         let boxes = [Box(), Box(), Box()]
@@ -183,14 +296,17 @@ import ZeusCore
         #expect(box.verdict == .allow)
     }
 
-    private func card(id: String, command: String, box: Box, deny: Bool = false) -> NotchModel.Approval {
+    private func card(id: String, command: String, box: Box, deny: Bool = false, risk: HookEvent.Risk = .low, onResolve: (() -> Void)? = nil) -> NotchModel.Approval {
         NotchModel.Approval(
-            id: id, agent: "Claude", project: "zeus", tool: "Bash", command: command, risk: .low,
+            id: id, agent: "Claude", project: "zeus", tool: "Bash", command: command, risk: risk,
             position: "1 of 2", queueCount: 2,
             helperDeadlineMono: 9_000,
-            allowGate: ApprovalAllowGate(risk: .low, itemID: id),
+            allowGate: ApprovalAllowGate(risk: risk, itemID: id),
             deny: { if deny { box.verdict = .deny } },
-            resolve: { if !deny || $0 == .allow { box.verdict = $0 } })
+            resolve: {
+                if !deny || $0 == .allow { box.verdict = $0 }
+                onResolve?()
+            })
     }
 
     private final class Box { var verdict: HookDecision.Verdict? }

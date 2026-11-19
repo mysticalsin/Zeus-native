@@ -315,6 +315,8 @@ final class NotchController {
 
     /// Cards the arrows can show. Allow and Deny use whichever one is on screen.
     private(set) var pendingApprovals: [NotchModel.Approval] = []
+    /// The last card VoiceOver was told about after a swap, a browse, or a removal.
+    var lastApprovalAnnouncement: String?
 
     func stageApprovals(_ cards: [NotchModel.Approval]) {
         pendingApprovals = []
@@ -443,6 +445,11 @@ final class NotchController {
         if becomingVisible { card.appearedAt = Date() }
         pendingApprovals[index] = card
         model.approval = card
+    }
+
+    /// The shown card left. The next one, if any, becomes the card on screen.
+    func advanceAfterDisplayed(_ id: String) {
+        removePending(id: id)
     }
 
     private func removePending(id: String) {
