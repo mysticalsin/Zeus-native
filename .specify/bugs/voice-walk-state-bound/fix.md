@@ -11,7 +11,7 @@ The canonical graph is the search the shipped talk run prints. It is not pinned.
 
 Production timings are lets. The harness derives `WalkTiming` from those lets and from `PointingKeyGesture.watchdog`, `tapMaximum` and `doubleTapWindow`. Shifting the harness copy does not change the lets. There is no `VoiceWalkClock` static for the Control/Option mirror or the cut override.
 
-The agreement walk is not the search's whole move list. It adds interrupt, sweep, deliver, catchUp, busy, flip, mouse, missUp and waitLate where that run's machine has them, and it runs over every `WalkRun`. `waitHalfSecond` stays on the search only. A repeated keyDown is not a separate adapter event: toggle releases a key that is already down. Focus loss is the tiling matcher's result, not a talk-key event.
+The agreement walk is not the search's whole move list. It adds interrupt, sweep, deliver, catchUp, busy, flip, mouse, missUp and waitLate where that run's machine has them, and it runs over every `WalkRun`. `waitHalfSecond` stays on the plain walk, not on the search. A repeated keyDown is not a separate adapter event: toggle releases a key that is already down. Focus loss is the tiling matcher's result, not a talk-key event. The exact and folded walks go past the first age cut, step 3 when confirm is 0.15 and step 5 when confirm is 0, and a 0.15 confirm also goes past the hold gap.
 
 ## Changes
 

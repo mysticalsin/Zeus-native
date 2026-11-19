@@ -66,6 +66,24 @@ import ZeusCore
         }
     }
 
+    /// The call the closed wings make: art is the 62 pt wing, bars are the box, and the clipped row is box by box.
+    /// Varied proposals are not box by box, so dropping the proposal arguments would fail this test.
+    @Test func theShippedMusicCallIsBoxByBoxAndVariedProposalsAreNot() {
+        let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset
+        let (art, bars) = NotchClosedBodyLayout.musicContent()
+        #expect(art == NotchClosedBodyLayout.wingWidth)
+        #expect(bars == box)
+        let shipped = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 220, extra: 0, leftProposal: art, rightProposal: bars, clipsMusic: true)
+        #expect(shipped.leftWidth == box)
+        #expect(shipped.rightWidth == box)
+        let varied = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 220, extra: 0, leftProposal: 10, rightProposal: 70, clipsMusic: false)
+        #expect(varied.leftWidth == varied.rightWidth)
+        #expect(varied.leftWidth == box + NotchClosedBodyLayout.contentInset)
+        #expect(varied.leftWidth != box)
+    }
+
     /// Art and bars wider than the box stay inside it. The wings stay matched, so the test cannot pass by clipping one side only.
     @Test func wideArtAndBarsStayInsideTheBoxWithoutSkewingTheWings() {
         let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset

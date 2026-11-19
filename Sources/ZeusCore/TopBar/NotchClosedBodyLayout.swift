@@ -92,7 +92,8 @@ public enum NotchClosedBodyLayout {
                                    outwardInset: contentInset, clipWidth: 0)
     }
 
-    /// The widths the music wing actually offers: the bars fill the box, and the art is 14 pt wider at every scale.
+    /// The widths the music wing offers the row. The bars fill the content box. At scale 1 the art figure is
+    /// the 62 pt wing width, not the 18 pt album tile drawn inside the wing. The row then clips both to the box.
     public static func musicContent(scale: CGFloat = 1) -> (art: CGFloat, bars: CGFloat) {
         let bars = max(0, wingWidth - contentInset) * scale
         return (bars + contentInset * scale, bars)

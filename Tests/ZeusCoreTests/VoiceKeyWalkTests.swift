@@ -1950,7 +1950,7 @@ private func referenceMoves(fold: Bool) -> [Move] {
 }
 
 /// The moves the agreement walk adds, where the run's machine actually has them.
-/// Not the search's whole move list: `waitHalfSecond` stays on the search, a repeated keyDown is not a
+/// Not the search's whole move list: `waitHalfSecond` stays on the plain walk, a repeated keyDown is not a
 /// separate adapter event, and focus loss is the tiling matcher's result rather than a talk-key event.
 private func agreementMoves(_ sim: Sim, _ run: WalkRun, fold: Bool) -> [Move] {
     var out: [Move] = []
@@ -2120,17 +2120,29 @@ private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
         #expect(sim.step - start == confirm)
     }
 
+    /// A half-second wait is a plain-walk move. The search and the agreement walk do not offer it.
+    @Test func aHalfSecondWaitStaysOnThePlainWalk() {
+        let run = WalkRun.all[0]
+        let sim = Sim(run)
+        #expect(sim.plainMoves(run).contains { if case .waitHalfSecond = $0 { return true } else { return false } })
+        #expect(!sim.moves(run).contains { if case .waitHalfSecond = $0 { return true } else { return false } })
+        #expect(!agreementMoves(sim, run, fold: false).contains { if case .waitHalfSecond = $0 { return true } else { return false } })
+    }
+
     /// Exact and folded agreement, for every run, over the moves the fold can skip.
     @Test func theExactAndFoldedWalksAgreePastTheFirstCut() {
         let gap = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
         for run in WalkRun.all {
             let cut = firstAgeCut(confirm: run.configs[0].confirm)
-            let exact = ageSample(run, depth: 2, fold: false, merge: true, agreement: true)
+            let depth = run.configs[0].confirm == 0.15 ? gap + 1 : cut + 1
+            let exact = ageSample(run, depth: depth, fold: false, merge: true, agreement: true)
             #expect(exact.furthest > cut, "\(run.name) stopped at step \(exact.furthest), short of the cut at \(cut)")
             if run.configs[0].confirm == 0.15 {
+                #expect(exact.furthest > VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.checkEvery), "\(run.name)")
+                #expect(exact.furthest > VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdTapMax), "\(run.name)")
                 #expect(exact.furthest > gap, "\(run.name) stopped at step \(exact.furthest), short of the gap")
             }
-            let folded = ageSample(run, depth: 2, fold: true, merge: true, notPast: exact.furthest, agreement: true)
+            let folded = ageSample(run, depth: depth, fold: true, merge: true, notPast: exact.furthest, agreement: true)
             #expect(exact.verdicts == folded.verdicts, "\(run.name)")
             #expect(exact.outcomes == folded.outcomes, "\(run.name)")
         }
@@ -2250,8 +2262,8 @@ private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
         // One state per age-cut per key combination is the smallest graph that still visits the windows.
         let lower = cuts.count * (1 << min(run.keys.count, 6))
         #expect(report.states > lower, "the search found fewer states than the cuts and keys require")
-        // The unfolded bug graph printed 1,883,647 states (run 44445566167). Folding has to stay under that.
-        // It is not a pin of this head: no hosted swift test log of this head prints the count.
+        // A sanity window, not a pin. The unfolded bug graph printed 1,883,647 states (run 44445566167).
+        // Pinning waits on a hosted log of this head.
         #expect(report.states < 1_883_647)
     }
 

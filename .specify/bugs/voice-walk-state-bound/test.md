@@ -8,7 +8,7 @@
 
 ## Summary
 
-The state count is not pinned. Run 44445566167 at SHA 48add1d1 printed `voice key walk A talk hold Control-Option confirm 0.15: 1883647 states`. That is evidence of the unfolded bug, not a red run of this pull request and not a count for this head. The test requires the folded search to be larger than the cuts-and-keys floor and smaller than that unfolded bug size.
+The upper bound is a sanity window, not a pin. Run 44445566167 at SHA 48add1d1 printed `voice key walk A talk hold Control-Option confirm 0.15: 1883647 states`. That is evidence of the unfolded bug, not a count for this head. Pinning waits on a hosted log of this head. The test requires the folded search to be larger than the cuts-and-keys floor and smaller than that unfolded bug size.
 
 ## Checks Performed
 
