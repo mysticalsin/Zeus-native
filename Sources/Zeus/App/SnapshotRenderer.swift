@@ -88,6 +88,7 @@ enum SnapshotRenderer {
         saveSurface(ZStack { Theme.storm; AlertsAllClear() }.environment(\.colorScheme, .dark), size: CGSize(width: 480, height: 236), name: "alerts-page-empty")
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
+        renderMeetingAlerts(into: directory)
         renderParityStates(into: directory, notch: notch)
         // The agent hub: sessions with a reply field, then the New chat form.
         let hub = AgentHub.shared
@@ -755,6 +756,24 @@ enum SnapshotRenderer {
             model.presentation = .closed
             save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-quit-peek.png"))
+        }
+    }
+
+    private static func renderMeetingAlerts(into directory: URL) {
+        let rows: [(String, ScribeCallApp, String)] = [
+            ("teams", .teams, "person.2"),
+            ("zoom", .zoom, "video"),
+            ("meet", .meet, "video"),
+            ("webex", .other("Webex"), "phone"),
+        ]
+        for scheme in [ColorScheme.dark, ColorScheme.light] {
+            let tone = scheme == .dark ? "dark" : "light"
+            for row in rows {
+                let model = MeetingAlert.model(title: "Design review", start: Date().addingTimeInterval(600), now: Date(), app: row.1)
+                let view = MeetingAlertSnapshot(title: model.title, when: model.when, appName: model.appName, symbol: row.2, scheme: scheme)
+                save(view, size: CGSize(width: MeetingAlert.width, height: MeetingAlert.height),
+                     to: directory.appendingPathComponent("meeting-alert-\(row.0)-\(tone).png"))
+            }
         }
     }
 

@@ -8,6 +8,9 @@ import ZeusCore
 final class ScribeMeetingBannerModel {
     var headline = ""
     var detail = ""
+    var appName = ""
+    var when = ""
+    var symbol = "video"
     /// Empty hides the primary button (the countdown only offers Cancel).
     var primaryTitle = ""
     var secondaryTitle = ""
@@ -23,31 +26,63 @@ final class ScribeMeetingBannerModel {
     @ObservationIgnored var closeTapped: () -> Void = {}
 }
 
+/// One meeting notice, for snapshots. Synthetic title and time only.
+struct MeetingAlertSnapshot: View {
+    var title: String
+    var when: String
+    var appName: String
+    var symbol: String
+    var scheme: ColorScheme
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).frame(width: 22, height: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(TopBarStyle.label(12, .semibold)).lineLimit(1)
+                Text("\(when) · \(appName)").font(TopBarStyle.label(10.5)).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Text("Start").font(TopBarStyle.label(11, .semibold))
+            Text("Not now").font(TopBarStyle.label(11))
+        }
+        .padding(.horizontal, 10)
+        .frame(width: MeetingAlert.width, height: MeetingAlert.height)
+        .background(scheme == .dark ? Color.black : Color.white, in: RoundedRectangle(cornerRadius: 12))
+        .environment(\.colorScheme, scheme)
+    }
+}
+
 private struct ScribeMeetingBannerView: View {
     let model: ScribeMeetingBannerModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(model.headline)
-                .font(TopBarStyle.label(13, .semibold))
-                .foregroundStyle(Theme.cloudPrimary)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(model.detail)
-                .font(TopBarStyle.label(11, .regular))
-                .foregroundStyle(Theme.cloudSecondary)
+        HStack(spacing: 8) {
+            Image(systemName: model.symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 22, height: 22)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(model.headline)
+                    .font(TopBarStyle.label(12, .semibold))
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit(1)
+                Text("\(model.when) · \(model.appName)")
+                    .font(TopBarStyle.label(10.5, .regular))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
             if case .shown = model.card {
                 buttons
             } else {
                 ScribePopupStatusView(phase: model.card, onAction: model.primaryTapped, onClose: model.closeTapped)
             }
         }
-        .padding(14)
-        .frame(width: ScribeMeetingBanner.width, alignment: .leading)
-        .alertGlass(radius: 16)
-        .preferredColorScheme(.dark)
+        .padding(.horizontal, 10)
+        .frame(width: MeetingAlert.width, height: MeetingAlert.height)
+        .alertGlass(radius: 12)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Scribe: \(model.headline)")
+        .accessibilityLabel("\(model.headline), \(model.when), \(model.appName)")
     }
 
     private var buttons: some View {
@@ -76,7 +111,7 @@ private final class ScribeBannerPanel: NSPanel {
 @MainActor
 final class ScribeMeetingBanner {
     static let shared = ScribeMeetingBanner()
-    static let width: CGFloat = 340
+    static let width: CGFloat = MeetingAlert.width
     private static let margin: CGFloat = 16
 
     private enum Kind {
@@ -91,6 +126,7 @@ final class ScribeMeetingBanner {
     private var panel: NSPanel?
     private var hostingView: ScribeCardHostingView<ScribeMeetingBannerView>?
     private var kind: Kind = .ask
+    private var dismissTask: Task<Void, Never>?
     /// The meeting the card is about.
     private(set) var meeting: ScribeMeeting?
 
@@ -169,6 +205,11 @@ final class ScribeMeetingBanner {
             driver.dismiss()
         }
         model.card = .shown
+        let row = MeetingAlert.model(title: meeting.title, start: meeting.slot?.start, now: Date(), app: meeting.callApp)
+        model.headline = meeting.title.isEmpty ? "Meeting" : meeting.title
+        model.when = row.when
+        model.appName = row.appName
+        model.symbol = row.symbol
         return true
     }
 
@@ -210,6 +251,12 @@ final class ScribeMeetingBanner {
         // Front without activating Zeus: whatever the person is typing in keeps the keyboard.
         panel.orderFrontRegardless()
         AccessibilityNotification.Announcement(announce).post()
+        dismissTask?.cancel()
+        dismissTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(MeetingAlert.dismissAfter))
+            guard !Task.isCancelled else { return }
+            self.hide()
+        }
     }
 
     private func layout(_ panel: NSPanel) {
@@ -239,6 +286,7 @@ final class ScribeMeetingBanner {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        panel.sharingType = .none
         panel.setAccessibilityLabel("Scribe meeting")
         self.panel = panel
         self.hostingView = host
