@@ -12,7 +12,7 @@ public enum GlanceTopBar {
     public static let closedBottomRadius: CGFloat = 6
 
     // Open body
-    public static let bodyWidth: CGFloat = 870
+    public static let bodyWidth: CGFloat = 1040
     public static let ear: CGFloat = 27.5
     public static let earHeight: CGFloat = 30
     public static let bottomRadius: CGFloat = 22
@@ -48,14 +48,14 @@ public enum GlanceTopBar {
     }
 
     // Cards
-    public static let cardTop: CGFloat = 82
-    public static let cardHeight: CGFloat = 114
+    public static let cardTop: CGFloat = 76
+    public static let cardHeight: CGFloat = 84
     public static let cardGap: CGFloat = 10.5
     public static let cardInset: CGFloat = 18
     public static let cardRadius: CGFloat = 22
-    public static let bottomGap: CGFloat = 14
-    /// Pages other than Home get more room under the tab row.
-    public static let tallPageHeight: CGFloat = 236
+    public static let bottomGap: CGFloat = 8
+    /// Pages other than Home get more room under the tab row, and stay shorter than the old tall page.
+    public static let tallPageHeight: CGFloat = 168
 
     // Motion. Open: fitted to Glance's 60 fps hover-open (parity/N7-glance.mp4, width along y 37),
     // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: not yet

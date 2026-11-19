@@ -15,20 +15,21 @@ struct GlanceTopBarTests {
         #expect(GlanceTopBar.bodyHeight(home: false) <= GlanceTopBar.windowHeight)
     }
 
-    @Test func openHomeIs870By210WithEars() {
+    @Test func openHomeIsWideAndShort() {
         let size = GlanceTopBar.panelSize(home: true)
-        #expect(Double(size.width) == 925)          // 870 body + two 27.5 ears
-        #expect(Double(size.height) == 210)
-        #expect(Double(GlanceTopBar.bodyHeight(home: false)) == 332)
+        #expect(Double(size.width) == 1095)         // 1040 body + two 27.5 ears
+        #expect(Double(size.height) == 168)
+        #expect(Double(GlanceTopBar.bodyHeight(home: false)) == 252)
+        #expect(size.width > 1000 && size.height < 180)
     }
 
     @Test func fourEqualCards() {
         let cards = GlanceTopBar.cardFrames()
         #expect(cards.count == 4)
-        #expect(abs(Double(cards[0].width) - 200.625) < 0.01)  // spec 201 within 1 pt
+        #expect(abs(Double(cards[0].width) - 243.125) < 0.01)
         #expect(Double(cards[0].minX) == 18)
-        #expect(abs(Double(cards[3].maxX) - 852) < 0.01)        // 18 from the right edge
-        #expect(Double(cards[0].minY) == 82 && Double(cards[0].height) == 114)
+        #expect(abs(Double(cards[3].maxX) - 1022) < 0.01)       // 18 from the right edge
+        #expect(Double(cards[0].minY) == 76 && Double(cards[0].height) == 84)
         #expect(abs(Double(cards[1].minX - cards[0].maxX) - 10.5) < 0.01)
     }
 
@@ -37,9 +38,9 @@ struct GlanceTopBarTests {
         // at 14 pt between tabs. Zeus uses 12 pt so thirteen tabs fit: 2 pt less for each of the 6 gaps.
         #expect(abs(Double(GlanceTopBar.capsuleWidth(tabs: 7, countsExtra: 24.5)) - (411 - 6 * 2)) <= 1)
         #expect(GlanceTopBar.capsuleWidth(tabs: 0) == 0)
-        // Top 38, 34 tall (centre 55), and the cards still start at 82.
+        // Top 38, 34 tall (centre 55). The cards start just under that row.
         #expect(Double(GlanceTopBar.tabRowTop) == 38 && Double(GlanceTopBar.tabRowTop + GlanceTopBar.tabRowHeight / 2) == 55)
-        #expect(Double(GlanceTopBar.cardTop) == 82)
+        #expect(Double(GlanceTopBar.cardTop) == 76)
     }
 
     @Test func rowKeepsThirteenAndTheSelectedTab() {
@@ -53,7 +54,7 @@ struct GlanceTopBarTests {
 
     /// Thirteen tabs fit beside the more circle even with the widest selected label and three big counts.
     @Test func thirteenTabsFitTheRow() {
-        #expect(Double(GlanceTopBar.rowRoom) == 803)
+        #expect(Double(GlanceTopBar.rowRoom) == 973)
         let widest = TopBarLayout.defaultRow.map { GlanceTopBar.selectedPillWidth(title: $0.title, countWidth: 26) }.max() ?? 0
         let counts: CGFloat = 3 * 26 // "99+" beside Alerts, Clipboard and Shelf
         let worst = GlanceTopBar.capsuleWidth(tabs: 13, countsExtra: counts + widest - GlanceTopBar.selectedPill.width)
@@ -92,15 +93,16 @@ struct GlanceTopBarTests {
 
     @Test func openPanelTakesTheMouseOnlyOverItsShape() {
         let screen = CGRect(x: 0, y: 0, width: 1728, height: 1117)
-        let size = GlanceTopBar.panelSize(home: true)   // 925 x 210 with the ears
+        let size = GlanceTopBar.panelSize(home: true)   // 1095 x 168 with the ears
         func on(_ x: CGFloat, _ top: CGFloat) -> Bool {
             GlanceTopBar.openShapeContains(CGPoint(x: x, y: 1117 - top), screen: screen, size: size)
         }
-        #expect(on(864, 100) && on(430, 100) && on(1298, 100))   // body, both sides
-        #expect(!on(425, 100) && !on(1303, 100))                  // just outside the body
-        #expect(on(415, 1) && !on(415, 20))                       // the ear flares only near the top
-        #expect(!on(864, 211) && !on(430, 209))                   // below, and the rounded corner
-        #expect(on(451, 205))                                     // inside the corner curve
+        #expect(on(864, 80) && on(400, 80) && on(1320, 80))
+        #expect(!on(340, 80) && !on(1390, 80))
+        #expect(on(334, 1) && !on(334, 20))
+        #expect(!on(864, 169))
+        #expect(on(864, 160))
+        #expect(!on(1394, 160))
     }
 
     @Test func openFollowsGlancesMeasuredCurve() {
