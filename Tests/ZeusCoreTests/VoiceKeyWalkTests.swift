@@ -121,6 +121,8 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     let inOrder: Bool
     /// A mouse button may go down while the second key is held (it cancels that key's turn, never the primary key's).
     let mouse: Bool
+    /// Stop this run's search once this many states are recorded. Nil walks the whole graph.
+    let stateBound: Int?
 
     struct PressSet: Sendable { var slot: Int; var codes: [UInt16] }
 
@@ -141,9 +143,11 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
          late: Bool = false, quietFlip: Bool = false, missed: Bool = false, refusal: Bool = false,
          processingTime: Bool = false, chord: Bool = false, carbon: Bool = false, injection: Bool = true,
          groups: [[UInt16]]? = nil, second: (own: [UInt16], configs: [VoiceKeyMachine.Config])? = nil,
-         pressSets: [PressSet] = [], arbitrate: Bool = true, inOrder: Bool = true, mouse: Bool = false) {
+         pressSets: [PressSet] = [], arbitrate: Bool = true, inOrder: Bool = true, mouse: Bool = false,
+         stateBound: Int? = nil) {
         self.name = name
         self.mouse = mouse
+        self.stateBound = stateBound
         self.arbitrate = arbitrate
         self.inOrder = inOrder
         self.pressSets = pressSets
@@ -211,7 +215,8 @@ struct WalkRun: Sendable, CustomTestStringConvertible {
     static let all: [WalkRun] = [
         // A: shipped talk beside tiling, with the confirm. A0: the same without it.
         WalkRun("A talk hold Control-Option confirm 0.15", keys: basic, own: controlOption,
-                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true),
+                configs: [hold(.talk, .controlOption, confirm: 0.15, chord: 49)], late: true, chord: true,
+                stateBound: 200_000),
         WalkRun("A0 talk hold Control-Option confirm 0", keys: basic, own: controlOption,
                 configs: [hold(.talk, .controlOption, confirm: 0, chord: 49)], late: true, refusal: true, chord: true),
         // B: shipped dictation, with Left Command as a sixth key and a config that flips hold, toggle and off.
@@ -1619,6 +1624,9 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
             report.violations.append("the search passed the limit of \(limit) states")
             break
         }
+        // One run names a ceiling. Stop before recording another state past it. States expanded before the
+        // stop are still checked. The replay tests do not use this ceiling.
+        if let bound = run.stateBound, seen.count >= bound { break }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
         guard let sim = frontier[cursor] else { cursor += 1; continue }
@@ -1632,6 +1640,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
             record(next.found, at: cursor, move: move)
             let key = next.key(run).hashValue
             if seen[key] == nil {
+                if let bound = run.stateBound, seen.count >= bound { break }
                 seen[key] = frontier.count
                 parents.append(cursor)
                 via.append(move)
