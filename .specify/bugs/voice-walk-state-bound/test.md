@@ -8,7 +8,7 @@
 
 ## Summary
 
-The silent 200,000 ceiling is gone. A local optimized run of the canonical graph reported 864,682 states, depth 33, no violations, and the plain walk of 66,429 sequences met no stranger and no rule break. The negative searches still find the processing-time mistake, I6s, and I9. The hosted suite has not been re-run. This is not a verified verdict.
+The silent 200,000 ceiling is gone. A local optimized run of the jump walk reported 906,908 states, depth 33, no violations. Exact ages at depth 2 are covered by the folded keys, and shifting each window by one step changes the landings. The hosted suite has not been re-run. This is not a verified verdict.
 
 ## Checks Performed
 

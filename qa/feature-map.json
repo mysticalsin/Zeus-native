@@ -5479,6 +5479,22 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theCanonicalStepCollapsesAgesInsideOneThreshold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "aWaitJumpsToTheNextMachineCut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theFoldedWalkCoversExactAgesAtDepthTwo"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "shiftingEachWindowByOneStepChangesTheWalk"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "controlAndOptionAreOneStateAndTheMatcherAgrees"
             }
           ]
         },
