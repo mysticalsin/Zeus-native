@@ -119,8 +119,8 @@ struct BrainRouteTests {
         #expect(ModelBudget.shouldEscalate(task: .code, failed: false))
         #expect(ModelBudget.tier(task: .quickAnswer, failed: false, requestedDeep: false) == .fast)
         #expect(ModelBudget.tier(task: .research, failed: false, requestedDeep: false) == .deep)
-        #expect(ModelBudget.promptFits(String(repeating: "a", count: 10_000)))
-        #expect(!ModelBudget.promptFits(String(repeating: "a", count: 10_001)))
+        #expect(ModelBudget.promptFits(String(repeating: "a", count: 12_000)))
+        #expect(!ModelBudget.promptFits(String(repeating: "a", count: 12_001)))
     }
 
     @Test func aRevisedSpeculativeRunHasNoSideEffects() {

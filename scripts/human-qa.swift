@@ -465,7 +465,9 @@ func openTab(_ ctx: StepCtx, _ raw: String) -> Bool {
         _ = tab.press()
         return true
     }
-    ctx.notes.append("tab \(raw) not in the visible row; used Zeus debug socket")
+    // `debug tab` is refused unless "Allow command-line control" is on in Zeus Settings > Privacy. This run only
+    // reaches that path through the Zeus binary inside the app bundle, which the bundled-command rule accepts.
+    ctx.notes.append("tab \(raw) not in the visible row; used Zeus debug socket (needs Allow command-line control)")
     let p = Process()
     p.executableURL = URL(fileURLWithPath: opts.appPath + "/Contents/MacOS/Zeus")
     p.arguments = ["debug", "tab", raw]
@@ -482,8 +484,8 @@ let settingsPages: [(raw: String, title: String)] = [
     ("general", "General"), ("appearance", "Appearance"), ("sounds", "Sounds"), ("notifications", "Notifications"),
     ("shortcuts", "Shortcuts"), ("insomnia", "Insomnia"), ("integrations", "Integrations"), ("murmure", "Murmure"),
     ("polyglot", "Polyglot"), ("dictation", "Dictation"), ("voice", "Voice"), ("engine", "Engine"),
-    ("features", "Features"), ("beamer", "Beamer"), ("license", "License"), ("permissions", "Permissions"),
-    ("privacy", "Privacy"), ("diagnostics", "Diagnostics"), ("about", "About"),
+    ("features", "Features"), ("beamer", "Beamer"), ("tiling", "Tiling"), ("license", "License"),
+    ("permissions", "Permissions"), ("privacy", "Privacy"), ("diagnostics", "Diagnostics"), ("about", "About"),
 ]
 
 func settingsWindow() -> AXN? { window(titleContaining: "Zeus Settings") }

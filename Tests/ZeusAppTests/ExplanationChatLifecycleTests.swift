@@ -6,7 +6,7 @@ import ZeusCore
 
 /// Disposable stores and this test's own NSPanel only. No capture, permissions,
 /// user preferences, providers, global input or external windows are accessed.
-@MainActor @Suite("Explanation Chat links and owned window lifecycle", .serialized)
+@MainActor @Suite("Explanation Chat links and owned window lifecycle", .inNativeHost, .serialized)
 struct ExplanationChatLifecycleTests {
     private func directory() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-explanation-chat-\(UUID().uuidString)")

@@ -153,8 +153,11 @@ public enum PersistentCLIPolicy {
         public var turnsServed: Int
         public var startedAt: Date
         public var alive: Bool
+        /// The process served a turn that carried a screenshot, so its context holds the image.
+        public var carriedImage: Bool
 
-        public init(launchKey: String, turnsServed: Int, startedAt: Date, alive: Bool) {
+        public init(launchKey: String, turnsServed: Int, startedAt: Date, alive: Bool, carriedImage: Bool = false) {
+            self.carriedImage = carriedImage
             self.launchKey = launchKey
             self.turnsServed = turnsServed
             self.startedAt = startedAt
@@ -165,7 +168,7 @@ public enum PersistentCLIPolicy {
     public enum Action: Sendable, Equatable { case reuse, respawn }
 
     public static func action(existing: Slot?, wantedKey: String, now: Date) -> Action {
-        guard let slot = existing, slot.alive, slot.launchKey == wantedKey,
+        guard let slot = existing, slot.alive, !slot.carriedImage, slot.launchKey == wantedKey,
               slot.turnsServed < maxTurns, now.timeIntervalSince(slot.startedAt) < maxAgeSeconds else { return .respawn }
         return .reuse
     }

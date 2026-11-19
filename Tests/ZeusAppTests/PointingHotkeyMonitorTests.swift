@@ -74,6 +74,37 @@ struct PointingHotkeyMonitorTests {
         #expect(log.signals == [.began, .ended])
     }
 
+    @Test func withAConfirmTheChordPressedFastBeginsNothing() {
+        let (monitor, log) = monitor()
+        monitor.confirmProvider = { 0.15 }
+        press(monitor)
+        monitor.feed(.flags(keyCode: 55, modifiers: [.control, .option, .command]), at: 0.05)
+        monitor.confirmElapsed()
+        monitor.feed(.flags(keyCode: 55, modifiers: [.control, .option]), at: 0.1)
+        monitor.feed(.flags(keyCode: 58, modifiers: []), at: 0.2)
+        #expect(log.signals.isEmpty, "nothing began, so nothing is cancelled or ended: \(log.signals)")
+    }
+
+    @Test func withAConfirmAnExactHoldBeginsOnceItsTimeHasPassed() async throws {
+        let (monitor, log) = monitor()
+        monitor.confirmProvider = { 0.05 }
+        monitor.liveModifiers = { [.control, .option] }
+        press(monitor)
+        #expect(log.signals.isEmpty, "nothing at the key-down")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(log.signals == [.began], "\(log.signals)")
+        monitor.feed(.flags(keyCode: 58, modifiers: [.control]), at: 1)
+        #expect(log.signals == [.began, .ended])
+    }
+
+    @Test func anOrdinaryKeyWhoseKeyUpNoMonitorSawDoesNotKillThePointingKey() {
+        let (monitor, log) = monitor()
+        monitor.keysStillDown = { _ in [] } // the system says Tab is up
+        monitor.feed(.keyDown(keyCode: 48, modifiers: []), at: 0)
+        press(monitor, at: 1)
+        #expect(log.signals == [.began], "\(log.signals)")
+    }
+
     @Test func escapeOutsideAHoldIsReported() {
         let (monitor, log) = monitor()
         monitor.feed(.keyDown(keyCode: 53, modifiers: []), at: 0)

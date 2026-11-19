@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// A stroke drawn on screen while holding Command ("show me"). Points are global AppKit
+/// A stroke drawn on screen while holding left Control ("show me"). Points are global AppKit
 /// coordinates (bottom-left origin), in the order they were drawn.
 public struct AnnotationStroke: Equatable, Sendable {
     public enum Shape: String, Equatable, Sendable {

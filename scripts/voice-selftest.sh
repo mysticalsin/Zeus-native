@@ -69,7 +69,7 @@ rows = receipt["rows"]
 print("system voice:", receipt["systemVoice"])
 for row in rows:
     status = "spoke" if row["spoke"] else ("FAILED" if row["available"] else "skipped")
-    ms = row["firstAudioMs"]
+    ms = row.get("firstAudioMs")
     print(f'  {row["engine"]:<11} {status:<8} first audio {ms if ms is not None else "-"} ms  effect {row["effectPercent"]}%  {row["reason"]}')
 ok = any(r["engine"] == "system" and r["spoke"] for r in rows) and "samantha" not in receipt["systemVoice"].lower()
 print("PASS" if ok else "FAIL")

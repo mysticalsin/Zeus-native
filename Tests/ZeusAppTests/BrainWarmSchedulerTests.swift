@@ -102,6 +102,7 @@ import ZeusCore
 
     @Test func unselectedUnreadyAndPausedVoicesNeverWarmAsFallbacks() async {
         let log = ActionLog()
+        let others = VoiceTTSProvider.allCases.filter { $0 != .kokoro }.count
         for provider in VoiceTTSProvider.allCases where provider != .kokoro {
             log.selection = .init(provider: provider, ready: true, paused: false, voice: "unused", speed: 1)
             await log.actions.run([.localModel, .cloudConnection])
@@ -111,7 +112,7 @@ import ZeusCore
         await log.actions.warmSelectedVoice()
         log.selection = .init(provider: .kokoro, ready: true, paused: true, voice: "paused", speed: 1)
         await log.actions.warmSelectedVoice()
-        #expect(log.local == 3 && log.cloud == 3)
+        #expect(log.local == others && log.cloud == others)
         #expect(log.voices.isEmpty && log.speeds.isEmpty)
     }
 

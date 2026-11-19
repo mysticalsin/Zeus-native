@@ -134,6 +134,7 @@ private struct PrompterSetup: View {
 
 private struct PrompterRolling: View {
     let topBar: TopBarModel
+    static let countdownScrimOpacity: Double = 0.92
 
     var body: some View {
         let script = PrompterScript(topBar.script)
@@ -168,7 +169,8 @@ private struct PrompterRolling: View {
                             .shadow(color: Theme.bolt.opacity(0.6), radius: 12)
                             .frame(maxWidth: .infinity)
                             .frame(height: TopBarStyle.pageHeight)
-                            .background(Color.black.opacity(0.55))
+                            // Dim enough that the digit never competes with the script behind it.
+                            .background(Color.black.opacity(Self.countdownScrimOpacity))
                     }
                 }
             }

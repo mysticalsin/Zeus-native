@@ -193,6 +193,27 @@ enum HiddenTickWatch {
     }
 }
 
+/// What counts as a visible window, shared by the tick clocks and the sampling reader so they cannot drift apart.
+enum WindowVisibility {
+    /// Ordered in, not minimised and not faded out (the buddy overlay stays ordered in at alpha 0 while hidden).
+    static func isVisible(_ window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        return window.isVisible && !window.isMiniaturized && window.alphaValue > 0.01
+    }
+
+    /// The window events after which visibility may have changed.
+    static let changeNotifications: [NSNotification.Name] = [
+        NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+        NSWindow.didDeminiaturizeNotification, NSWindow.willCloseNotification, NSWindow.didBecomeKeyNotification,
+    ]
+
+    /// Visibility after `notification`. A window that is about to close still reports itself ordered in,
+    /// so closing reads hidden without waiting.
+    static func reading(after notification: NSNotification.Name, in window: NSWindow?) -> Bool {
+        notification == NSWindow.willCloseNotification ? false : isVisible(window)
+    }
+}
+
 /// Tells the clock about the hosting window: whether it is ordered in, not minimised and not faded out
 /// (the buddy overlay stays ordered in at alpha 0 while hidden).
 /// (Occlusion is not used: the transparent notch panel reports itself occluded while it is drawn.)
@@ -214,18 +235,14 @@ private struct WindowVisibilityProbe: NSViewRepresentable {
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-        var windowIsVisible: Bool {
-            guard let window else { return false }
-            return window.isVisible && !window.isMiniaturized && window.alphaValue > 0.01
-        }
+        var windowIsVisible: Bool { WindowVisibility.isVisible(window) }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             observers.forEach { NotificationCenter.default.removeObserver($0) }
             observers = []
             guard let window else { return }
-            for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
-                         NSWindow.didDeminiaturizeNotification, NSWindow.willCloseNotification, NSWindow.didBecomeKeyNotification] {
+            for name in WindowVisibility.changeNotifications {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.clock?.recheckWindow() }
                 })

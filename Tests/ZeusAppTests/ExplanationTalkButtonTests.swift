@@ -3,7 +3,7 @@ import Testing
 @testable import Zeus
 
 /// Direct owned native events and inert callbacks; no microphone or permission API.
-@MainActor @Suite("Explanation push-to-talk control", .serialized)
+@MainActor @Suite("Explanation push-to-talk control", .inNativeHost, .serialized)
 struct ExplanationTalkButtonTests {
     private enum Intent: Equatable {
         case begin(UUID), finish(UUID), cancel(UUID)

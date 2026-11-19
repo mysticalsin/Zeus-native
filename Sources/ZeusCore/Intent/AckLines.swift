@@ -102,7 +102,7 @@ public struct AckLines: Sendable {
         }
     }
 
-    /// A short in-character filler ("A moment.", "Let me look.") for a slow answer.
+    /// A short in-character filler ("Evolution takes a moment.", "Already ahead of you; hold on.") for a slow answer.
     public static func filler(personality: ZeusPersonality, lines: ZeusVoiceLines = ZeusVoiceLines()) -> String {
         lines.line(for: .thinking, personality: personality)
     }
