@@ -40,6 +40,18 @@ and stays interruptible. With Reduce Motion, state changes are immediate or a
 short crossfade, and nothing bounces. Keyboard and VoiceOver MUST be able to
 complete the same action. Status MUST NOT depend on color alone.
 
+### VI. Local without a model (NON-NEGOTIABLE)
+
+Tony, 13:34 BRT (t242u). He runs out of LLM tokens often, so the local
+surfaces MUST work fully with no model and no network. Face unlock, presence,
+approvals by face or Touch ID, music transport, multi-monitor, Settings, and
+onboarding have ZERO dependency on Claude or any other LLM or the network.
+The face path is on-device Swift using Vision and Core ML only. A red-first
+test runs that pipeline with network and LLM clients disabled or stubbed to
+throw, and fails if either client is entered. Where an LLM feature such as
+explain is unavailable, it shows a clear message and MUST NOT block a local
+feature. Zeus stays Swift. It is not rewritten in another language.
+
 ## Preserved surfaces
 
 The top bar's existing visuals, springs, and animations stay as they are unless
@@ -71,4 +83,4 @@ PATCH for wording that does not change a rule. Ratification date stays fixed.
 Every feature spec starts from these principles and names measurable acceptance
 criteria before implementation.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-19 | **Last Amended**: 2026-11-19
+**Version**: 1.1.0 | **Ratified**: 2026-11-19 | **Last Amended**: 2026-11-19
