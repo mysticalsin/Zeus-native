@@ -158,6 +158,26 @@ struct ApprovalDecisionTests {
         #expect(medium.activate(now: start) == .allow)
     }
 
+    @Test func aHighCardDoesNotInheritALowGate() {
+        var gate = ApprovalAllowGate(risk: .low, itemID: "card")
+        gate.retarget(item: "card", risk: .high)
+        #expect(gate.risk == .high)
+        #expect(gate.activate(now: 1, channel: .onScreen) == nil)
+    }
+
+    @Test func aSystemCancelledGestureClearsTheHold() {
+        var track = ApprovalHoldTracking()
+        track.press()
+        var gate = ApprovalAllowGate(risk: .high, itemID: "item")
+        gate.beginHold(now: 10)
+        if track.systemCancel() { gate.cancelHold() }
+        #expect(gate.holdingSince == nil)
+        var finished = ApprovalHoldTracking()
+        finished.press()
+        finished.release()
+        #expect(!finished.systemCancel())
+    }
+
     @Test func anOutsideReleaseDoesNotConfirmAndANewItemDropsTheHold() {
         let confirm = ApprovalGesture.onScreenConfirm(readyAfter: 0.4, expiresAfter: 8)
         #expect(ApprovalPress.outcome(inside: false, gesture: confirm) == .cancel)
