@@ -41,4 +41,10 @@ struct PermissionDeskTests {
         #expect(gone.can == false)
         #expect(gone.reason == "Unavailable")
     }
+
+    @Test func theCalendarReaderRunsOnlyWhenThatRowIsTapped() {
+        #expect(PermissionDesk.readsCalendar(kind: .calendar, tapped: true))
+        #expect(PermissionDesk.readsCalendar(kind: .calendar, tapped: false) == false)
+        #expect(PermissionDesk.readsCalendar(kind: .microphone, tapped: true) == false)
+    }
 }
