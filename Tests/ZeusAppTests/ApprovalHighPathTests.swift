@@ -409,6 +409,105 @@ import ZeusCore
         #expect(box.verdict == .allow)
     }
 
+    @Test func aNilCardIDDoesNotApprove() {
+        let box = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.model.approval = card(id: "A", command: "rm -rf /tmp/x", box: box, risk: .low)
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.model.approval?.helperDeadlineMono = 9_000
+        #expect(controller.activateApproval(kind: .card) == nil)
+        #expect(box.verdict == nil)
+    }
+
+    @Test func aStaleButtonIDDoesNotApprove() {
+        let (controller, box) = lowCard()
+        #expect(controller.activateApproval(kind: .card, cardID: "stale") == nil)
+        #expect(box.verdict == nil)
+    }
+
+    @Test func aStaleAllowShortcutDoesNotApprove() {
+        let (controller, box) = lowCard()
+        #expect(controller.activateApproval(kind: .shortcut, cardID: "stale") == nil)
+        #expect(box.verdict == nil)
+    }
+
+    @Test func aStaleVoiceOverActionDoesNotApprove() {
+        let (controller, box) = lowCard()
+        #expect(controller.activateApproval(kind: .voice, cardID: "stale") == nil)
+        #expect(box.verdict == nil)
+    }
+
+    @Test func aStaleDoubleClickDoesNotApprove() {
+        let (controller, box) = lowCard()
+        controller.activateApproval(kind: .card, cardID: "stale")
+        controller.activateApproval(kind: .card, cardID: "stale")
+        #expect(box.verdict == nil)
+    }
+
+    @Test func aDoubleClickAfterTheQuietIntervalDoesNotApproveTheNextCard() {
+        let first = Box()
+        let second = Box()
+        let controller = queued(first: first, second: second)
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card, cardID: "A")
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .card, cardID: "A")
+        controller.activateApproval(kind: .card, cardID: "A")
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func anAllowShortcutAfterTheQuietIntervalDoesNotApproveTheNextCard() {
+        let first = Box()
+        let second = Box()
+        let controller = queued(first: first, second: second)
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .shortcut, cardID: "A")
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.activateApproval(kind: .shortcut, cardID: "A")
+        #expect(first.verdict == .allow)
+        #expect(second.verdict == nil)
+    }
+
+    @Test func anAllowOnACardTheTerminalAlreadyAnsweredDoesNotApproveADifferentCommand() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "rm -rf /tmp/x", box: first),
+            card(id: "B", command: "curl https://example.invalid", box: second),
+        ])
+        let aimed = controller.model.approval?.activateAllow
+        controller.model.approval?.resolve(.deny)
+        #expect(first.verdict == .deny)
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        aimed?()
+        #expect(first.verdict == .deny)
+        #expect(second.verdict == nil)
+    }
+
+    private func lowCard() -> (NotchController, Box) {
+        let box = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.model.approval = card(id: "A", command: "rm -rf /tmp/x", box: box, risk: .low)
+        controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
+        controller.model.approval?.helperDeadlineMono = 9_000
+        return (controller, box)
+    }
+
+    private func queued(first: Box, second: Box) -> NotchController {
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.stageApprovals([
+            card(id: "A", command: "first", box: first, onResolve: { controller.advanceAfterDisplayed("A") }),
+            card(id: "B", command: "second", box: second),
+        ])
+        return controller
+    }
+
     private func card(id: String, command: String, box: Box, deny: Bool = false, risk: HookEvent.Risk = .low, onResolve: (() -> Void)? = nil) -> NotchModel.Approval {
         NotchModel.Approval(
             id: id, agent: "Claude", project: "zeus", tool: "Bash", command: command, risk: risk,
