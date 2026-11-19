@@ -158,6 +158,12 @@ struct ApprovalDecisionTests {
         #expect(medium.activate(now: start) == .allow)
     }
 
+    @Test func aTapOnApprovePlanActivates() {
+        #expect(ApprovalDetailPress.planRelease(inside: true, gesture: .tap) == .activate)
+        #expect(ApprovalDetailPress.planRelease(inside: true, gesture: .onScreenConfirm(readyAfter: 0.4, expiresAfter: 8)) == .activate)
+        #expect(ApprovalDetailPress.planRelease(inside: false, gesture: .tap) == .cancel)
+    }
+
     @Test func aHighCardDoesNotInheritALowGate() {
         var gate = ApprovalAllowGate(risk: .low, itemID: "card")
         gate.retarget(item: "card", risk: .high)

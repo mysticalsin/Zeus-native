@@ -19,6 +19,48 @@ import ZeusCore
         return (controller, box)
     }
 
+    @Test func browsingMakesAllowAndDenyActOnTheDisplayedRequest() {
+        let first = Box()
+        let second = Box()
+        let controller = NotchController()
+        controller.monotonicNow = { 1_000 }
+        controller.approvalReduceMotion = { false }
+        controller.approvalVoiceOver = { false }
+        controller.stageApprovals([
+            card(id: "front", command: "first", box: first),
+            card(id: "shown", command: "second", box: second),
+        ])
+        controller.browseApproval(by: 1)
+        #expect(controller.model.approval?.id == "shown")
+        #expect(controller.model.approval?.position == "2 of 2")
+        controller.activateApproval(kind: .card)
+        #expect(second.verdict == .allow)
+        #expect(first.verdict == nil)
+        let denyFirst = Box()
+        let denySecond = Box()
+        controller.stageApprovals([
+            card(id: "front", command: "first", box: denyFirst, deny: true),
+            card(id: "shown", command: "second", box: denySecond, deny: true),
+        ])
+        controller.browseApproval(by: 1)
+        controller.model.approval?.deny()
+        #expect(denySecond.verdict == .deny)
+        #expect(denyFirst.verdict == nil)
+    }
+
+    @Test func aHighAnswerIsSentOnceTheGateAllows() {
+        let (controller, box) = controller(reduceMotion: true)
+        let detail = ApprovalDetail(kind: .questions([]), input: .object([:]), session: "s")
+        controller.model.approval?.detail = detail
+        controller.commitDisplayedAnswers(inside: true)
+        #expect(detail.answered)
+        #expect(box.verdict == nil)
+        controller.monotonicNow = { 1_000 + 0.4 }
+        controller.commitDisplayedAnswers(inside: true)
+        #expect(box.verdict == .allow)
+        #expect(detail.updatedInput != nil)
+    }
+
     @Test func browseApprovalMovesWithinTheQueue() {
         let (controller, _) = controller()
         controller.model.approval?.queueCount = 3
@@ -78,6 +120,16 @@ import ZeusCore
         controller.monotonicNow = { 2_000 }
         controller.endApprovalHold(inside: true)
         #expect(box.verdict == .allow)
+    }
+
+    private func card(id: String, command: String, box: Box, deny: Bool = false) -> NotchModel.Approval {
+        NotchModel.Approval(
+            id: id, agent: "Claude", project: "zeus", tool: "Bash", command: command, risk: .low,
+            position: "1 of 2", queueCount: 2,
+            helperDeadlineMono: 9_000,
+            allowGate: ApprovalAllowGate(risk: .low, itemID: id),
+            deny: { if deny { box.verdict = .deny } },
+            resolve: { if !deny || $0 == .allow { box.verdict = $0 } })
     }
 
     private final class Box { var verdict: HookDecision.Verdict? }

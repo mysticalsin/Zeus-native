@@ -352,6 +352,13 @@ public struct ApprovalHoldTracking: Equatable {
     }
 }
 
+/// Approve Plan and Send Answers. An inside release is still treated as the end of a hold.
+public enum ApprovalDetailPress: Equatable, Sendable {
+    public static func planRelease(inside: Bool, gesture: ApprovalGesture) -> ApprovalPress {
+        inside ? .endHold : .cancel
+    }
+}
+
 /// What a pointer release on the Allow button does. A release outside the control never counts.
 public enum ApprovalPress: Equatable, Sendable {
     case cancel

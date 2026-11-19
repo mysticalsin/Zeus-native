@@ -313,11 +313,25 @@ final class NotchController {
         model.peekSessionID = sessionID
     }
 
+    /// Cards the arrows can show. Allow and Deny use whichever one is on screen.
+    private(set) var pendingApprovals: [NotchModel.Approval] = []
+
+    func stageApprovals(_ cards: [NotchModel.Approval]) {
+        pendingApprovals = cards
+        model.approval = cards.first
+    }
+
     /// Moves between requests waiting behind the card. The index stays inside the queue.
     func browseApproval(by delta: Int) {
         guard var approval = model.approval else { return }
         approval.queueIndex = ApprovalCard.step(index: approval.queueIndex, count: approval.queueCount, by: delta)
         model.approval = approval
+    }
+
+    /// Records the on-screen answers, then treats the release as the end of a hold.
+    func commitDisplayedAnswers(inside: Bool) {
+        model.approval?.detail?.answer()
+        if inside { endApprovalHold(inside: true) }
     }
 
     /// Shows an approval card and waits for Approve / Deny (click or voice). One card at a time:
