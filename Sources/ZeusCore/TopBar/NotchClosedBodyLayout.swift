@@ -51,6 +51,54 @@ public enum NotchClosedBodyLayout {
             rightWing: half ... half + content)
     }
 
+    /// The frames `ClosedWingsRow` lays out. Music art or bars wider than the box are clipped to it, so one
+    /// wing cannot grow by the 14 pt inset. Other wings stay the same width and may paint that inset outward.
+    public struct ClosedWingRowLayout: Equatable, Sendable {
+        public var gapWidth: CGFloat
+        public var leftWidth: CGFloat
+        public var rightWidth: CGFloat
+        /// Extra paintable width outside the content box, outward only. Zero when the music content is clipped.
+        public var outwardInset: CGFloat
+        /// Width of the container that clips music. Zero when the wing is not clipped. A child `.clipped()` is not this.
+        public var clipWidth: CGFloat
+
+        public init(gapWidth: CGFloat, leftWidth: CGFloat, rightWidth: CGFloat, outwardInset: CGFloat, clipWidth: CGFloat) {
+            self.gapWidth = gapWidth
+            self.leftWidth = leftWidth
+            self.rightWidth = rightWidth
+            self.outwardInset = outwardInset
+            self.clipWidth = clipWidth
+        }
+    }
+
+    /// `leftProposal` and `rightProposal` are the widths the wing content would like. Music is clipped to the
+    /// content box. Anything else may use the 14 pt inset, and both wings take that same width.
+    public static func rowLayout(
+        notchWidth: CGFloat,
+        extra: CGFloat,
+        leftProposal: CGFloat = 0,
+        rightProposal: CGFloat = 0,
+        clipsMusic: Bool
+    ) -> ClosedWingRowLayout {
+        let box = max(0, wingWidth - contentInset + extra)
+        if clipsMusic {
+            // The container is the box. Art wider than the bars does not widen either wing.
+            return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: box, rightWidth: box,
+                                       outwardInset: 0, clipWidth: box)
+        }
+        let cap = box + contentInset
+        let wanted = max(box, min(cap, max(leftProposal, rightProposal)))
+        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: wanted, rightWidth: wanted,
+                                   outwardInset: contentInset, clipWidth: 0)
+    }
+
+    /// The widths the music wing offers the row. The bars fill the content box. At scale 1 the art figure is
+    /// the 62 pt wing width, not the 18 pt album tile drawn inside the wing. The row then clips both to the box.
+    public static func musicContent(scale: CGFloat = 1) -> (art: CGFloat, bars: CGFloat) {
+        let bars = max(0, wingWidth - contentInset) * scale
+        return (bars + contentInset * scale, bars)
+    }
+
     /// Extra width on each wing for a cue kind (mirrors `ClosedWings.extraWidth` in the app target).
     public static func extraWingWidth(hasCue: Bool, cueExtra: CGFloat, wingKindExtra: CGFloat) -> CGFloat {
         guard hasCue else { return wingKindExtra }

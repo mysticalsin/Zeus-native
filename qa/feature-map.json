@@ -5490,6 +5490,38 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theChordOrdersKeepTheRules"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theShippedTalkHoldWalkFinishesUnderItsStateBound"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theCanonicalStepCollapsesAgesInsideOneThreshold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "aWaitJumpsToTheNextMachineCut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theExactAndFoldedWalksAgreePastTheFirstCut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theControlOptionMergeAgreesWithTheUnmergedWalk"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "shiftingEachMachineWindowChangesTheWalk"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "theJumpStopsAtTheSoonestTimer"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
+              "function": "controlAndOptionAreOneStateAndTheMatcherAgrees"
             }
           ]
         },
@@ -7717,7 +7749,7 @@
         {
           "id": "F13.closed-wings-geometry",
           "check": "native-ZeusCoreTests",
-          "acceptance": "The closed wings are two equal widths either side of a gap that is exactly the notch, for every notch width and every cue extra, and the body width grows both wings by the extra.",
+          "acceptance": "The closed wings are two equal widths either side of a gap that is exactly the notch, for every notch width and every cue extra, and the body width grows both wings by the extra. Music frames sit in that inset box, 14 pt inside the full wing.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
@@ -7742,6 +7774,18 @@
             {
               "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
               "function": "theRestingMascotFitsItsWing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "theMusicWingFramesStayInsideTheSymmetricContentBox"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "wideArtAndBarsStayInsideTheBoxWithoutSkewingTheWings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "aBarWithoutANotchAndAnExternalDisplayKeepMirroredWings"
             }
           ]
         },
