@@ -7759,6 +7759,14 @@
             {
               "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
               "function": "theMusicWingFramesStayInsideTheSymmetricContentBox"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "wideArtAndBarsStayInsideTheBoxWithoutSkewingTheWings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NotchClosedBodyLayoutTests.swift",
+              "function": "aBarWithoutANotchAndAnExternalDisplayKeepMirroredWings"
             }
           ]
         },
