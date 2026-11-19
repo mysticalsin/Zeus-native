@@ -123,7 +123,22 @@ public struct VoiceKeyMachine: Sendable, Equatable {
             sharedGap = 0.35
             pointingWatchdog = 0.25
             sharedDictationDelay = 0.25
+            active = Values()
         }
+
+        /// A shifted copy for a mutation test. The machine still reads the variables above.
+        public struct Values {
+            public var step = Timing.step
+            public var checkEvery = Timing.checkEvery
+            public var holdTapMax = Timing.holdTapMax
+            public var sharedTapMax = Timing.sharedTapMax
+            public var holdGap = Timing.holdGap
+            public var sharedGap = Timing.sharedGap
+            public var pointingWatchdog = Timing.pointingWatchdog
+            public var sharedDictationDelay = Timing.sharedDictationDelay
+        }
+
+        public static var active = Values()
 
         /// Step counts of the windows, including `confirm` and the cap. Sorted, with duplicates removed.
         public static func cuts(confirm: TimeInterval) -> [Int] {

@@ -2070,7 +2070,7 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
         defer { VoiceKeyMachine.Timing.restoreDefaults() }
         let talk = WalkRun.all[0]
         let originalTrace = jumpTrace(talk, cuts: VoiceKeyMachine.Timing.cuts(confirm: talk.configs[0].confirm))
-        VoiceKeyMachine.Timing.step += 0.05
+        VoiceKeyMachine.Timing.active.step += 0.05
         #expect(jumpTrace(talk, cuts: VoiceKeyMachine.Timing.cuts(confirm: talk.configs[0].confirm)) != originalTrace,
                 "the walk ignored a one-step shift of step")
         VoiceKeyMachine.Timing.restoreDefaults()
@@ -2083,13 +2083,13 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
             #expect(before != after, "the walk ignored a one-step shift of \(name)")
         }
         let hold = WalkRun.all.first { $0.name.hasPrefix("A0 ") }!
-        changed("checkEvery", { VoiceKeyMachine.Timing.checkEvery += VoiceKeyMachine.Timing.step }) {
+        changed("checkEvery", { VoiceKeyMachine.Timing.active.checkEvery += VoiceKeyMachine.Timing.active.step }) {
             timerJump(hold) { sim in
                 sim.apply(.toggle(0), hold)
                 sim.apply(.toggle(1), hold)
             }
         }
-        changed("holdGap", { VoiceKeyMachine.Timing.holdGap += VoiceKeyMachine.Timing.step }) {
+        changed("holdGap", { VoiceKeyMachine.Timing.active.holdGap += VoiceKeyMachine.Timing.active.step }) {
             timerJump(hold) { sim in
                 sim.apply(.toggle(0), hold)
                 sim.apply(.toggle(1), hold)
@@ -2097,26 +2097,26 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
                 sim.apply(.toggle(1), hold)
             }
         }
-        changed("holdTapMax", { VoiceKeyMachine.Timing.holdTapMax += VoiceKeyMachine.Timing.step }) {
+        changed("holdTapMax", { VoiceKeyMachine.Timing.active.holdTapMax += VoiceKeyMachine.Timing.active.step }) {
             releasePhase(talk, waits: VoiceKeyMachine.Timing.steps(0.30) + 1)
         }
         let shared = WalkRun.all.first { $0.name.hasPrefix("E ") }!
-        changed("sharedTapMax", { VoiceKeyMachine.Timing.sharedTapMax += VoiceKeyMachine.Timing.step }) {
+        changed("sharedTapMax", { VoiceKeyMachine.Timing.active.sharedTapMax += VoiceKeyMachine.Timing.active.step }) {
             releasePhase(shared, waits: VoiceKeyMachine.Timing.steps(0.25) + 1)
         }
         let dictation = WalkRun.all.first { $0.name.hasPrefix("D ") }!
-        changed("sharedGap", { VoiceKeyMachine.Timing.sharedGap += VoiceKeyMachine.Timing.step }) {
+        changed("sharedGap", { VoiceKeyMachine.Timing.active.sharedGap += VoiceKeyMachine.Timing.active.step }) {
             // A second press one step past the shipped gap is a new tap. One step more gap makes it the second tap.
             secondPress(shared, waits: VoiceKeyMachine.Timing.steps(0.35) + 1)
         }
-        changed("sharedDictationDelay", { VoiceKeyMachine.Timing.sharedDictationDelay += VoiceKeyMachine.Timing.step }) {
+        changed("sharedDictationDelay", { VoiceKeyMachine.Timing.active.sharedDictationDelay += VoiceKeyMachine.Timing.active.step }) {
             timerJump(dictation) { sim in
                 sim.apply(.toggle(0), dictation)
                 sim.apply(.toggle(1), dictation)
             }
         }
         let pointing = WalkRun.all.first { $0.pointing }!
-        changed("pointingWatchdog", { VoiceKeyMachine.Timing.pointingWatchdog += VoiceKeyMachine.Timing.step }) {
+        changed("pointingWatchdog", { VoiceKeyMachine.Timing.active.pointingWatchdog += VoiceKeyMachine.Timing.active.step }) {
             timerJump(pointing) { sim in
                 sim.apply(.toggle(0), pointing)
                 sim.apply(.toggle(1), pointing)
