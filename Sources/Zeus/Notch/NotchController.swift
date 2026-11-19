@@ -315,6 +315,8 @@ final class NotchController {
 
     /// Cards the arrows can show. Allow and Deny use whichever one is on screen.
     private(set) var pendingApprovals: [NotchModel.Approval] = []
+    /// Cards whose verdict was already delivered. A later Allow does not approve a different command.
+    private var settledApprovalIDs: Set<String> = []
     /// The last card VoiceOver was told about after a swap, a browse, or a removal.
     var lastApprovalAnnouncement: String?
     /// Where an announcement is posted. Tests replace it; the app posts to VoiceOver.
@@ -329,6 +331,11 @@ final class NotchController {
         pendingApprovals = []
         for var card in cards {
             let shownID = card.id
+            let deliver = card.resolve
+            card.resolve = { [weak self] verdict in
+                self?.settledApprovalIDs.insert(shownID)
+                deliver(verdict)
+            }
             card.activateAllow = { [weak self] in self?.activateApproval(kind: .card, cardID: shownID) }
             card.commitAnswers = { [weak self] inside in self?.commitDisplayedAnswers(inside: inside) }
             card.releasePlan = { [weak self] inside in self?.releaseDisplayedPlan(inside: inside) }
@@ -377,7 +384,7 @@ final class NotchController {
             model.approval?.detail?.withdraw()
             cancelApprovalHold()
         case .endHold: endApprovalHold(inside: true)
-        case .activate: activateApproval(kind: .card)
+        case .activate: activateApproval(kind: .card, cardID: model.approval?.id)
         }
     }
 
@@ -399,7 +406,7 @@ final class NotchController {
         case .activate:
             model.approval?.detail?.answer()
             if let card = model.approval { store(card) }
-            if activateApproval(kind: .card) != .allow, model.approval?.allowGate.confirmVisible != true {
+            if activateApproval(kind: .card, cardID: card.id) != .allow, model.approval?.allowGate.confirmVisible != true {
                 model.approval?.detail?.withdraw()
             }
         }
@@ -535,6 +542,7 @@ final class NotchController {
             let finish: @MainActor (HookDecision.Verdict) -> Void = { [weak self] verdict in
                 guard !finished else { return }
                 finished = true
+                self?.settledApprovalIDs.insert(id)
                 self?.removePending(id: id)
                 Task {
                     await ApprovalGate.shared.focus(id)
@@ -614,7 +622,8 @@ final class NotchController {
     @discardableResult
     func activateApproval(kind: ApprovalAudit.Kind, cardID: String? = nil) -> HookDecision.Verdict? {
         guard var card = model.approval else { return nil }
-        if let cardID, cardID != card.id { return nil }
+        if kind == .timeout || kind == .trusted { return nil }
+        guard let cardID, cardID == card.id, !settledApprovalIDs.contains(cardID) else { return nil }
         // Every risk, including high, stays quiet for the same 0.4 s after the card is displayed.
         guard ApprovalCard.inputOpen(now: Date(), appearedAt: card.appearedAt) else { return nil }
         let moment = monotonicNow()

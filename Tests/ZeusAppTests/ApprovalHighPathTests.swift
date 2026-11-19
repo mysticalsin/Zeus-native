@@ -30,8 +30,8 @@ import ZeusCore
             card(id: "B", command: "second", box: second),
         ])
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         #expect(first.verdict == .allow)
         #expect(second.verdict == nil)
     }
@@ -47,7 +47,7 @@ import ZeusCore
         ])
         let aimedAtA = controller.model.approval?.activateAllow
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
         aimedAtA?()
         #expect(first.verdict == .allow)
@@ -93,7 +93,7 @@ import ZeusCore
             card(id: "B", command: "second", box: second),
         ])
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         controller.model.approval?.activateAllow()
         #expect(first.verdict == .allow)
         #expect(second.verdict == nil)
@@ -126,8 +126,8 @@ import ZeusCore
             card(id: "B", command: "second", box: second, risk: .high),
         ])
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         #expect(first.verdict == .allow)
         #expect(second.verdict == nil)
         #expect(controller.model.approval?.allowGate.confirmVisible != true)
@@ -142,7 +142,7 @@ import ZeusCore
             card(id: "B", command: "second", box: Box(), risk: .high),
         ])
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         #expect(controller.model.approval?.allowGate.confirmVisible == true)
         controller.browseApproval(by: 1)
         controller.browseApproval(by: 1)
@@ -320,7 +320,7 @@ import ZeusCore
         #expect(controller.model.approval?.id == "shown")
         #expect(controller.model.approval?.position == "2 of 2")
         controller.model.approval?.appearedAt = Date().addingTimeInterval(-5)
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         #expect(second.verdict == .allow)
         #expect(first.verdict == nil)
         let denyFirst = Box()
@@ -361,24 +361,26 @@ import ZeusCore
 
     @Test func aShortcutAndASpokenYesNeverAllowHigh() {
         let (controller, box) = controller(reduceMotion: true)
-        controller.activateApproval(kind: .shortcut)
-        controller.activateApproval(kind: .shortcut)
-        controller.activateApproval(kind: .voice)
-        controller.activateApproval(kind: .voice)
+        let shown = controller.model.approval?.id
+        controller.activateApproval(kind: .shortcut, cardID: shown)
+        controller.activateApproval(kind: .shortcut, cardID: shown)
+        controller.activateApproval(kind: .voice, cardID: shown)
+        controller.activateApproval(kind: .voice, cardID: shown)
         #expect(box.verdict == nil)
         #expect(controller.model.approval?.allowGate.confirmVisible == false)
     }
 
     @Test func theOnScreenConfirmAllowsOnlyInsideItsWindow() {
         let (controller, box) = controller(reduceMotion: true)
-        controller.activateApproval(kind: .card)
+        let shown = controller.model.approval?.id
+        controller.activateApproval(kind: .card, cardID: shown)
         #expect(box.verdict == nil)
         #expect(controller.model.approval?.allowGate.confirmVisible == true)
         controller.monotonicNow = { 1_000 + 0.2 }
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: shown)
         #expect(box.verdict == nil)
         controller.monotonicNow = { 1_000 + 0.4 }
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: shown)
         #expect(box.verdict == .allow)
     }
 
@@ -392,7 +394,7 @@ import ZeusCore
     @Test func anAllowAfterSleepPastTheDeadlineIsRefused() {
         let (controller, box) = controller()
         controller.monotonicNow = { 9_000 }
-        controller.activateApproval(kind: .card)
+        controller.activateApproval(kind: .card, cardID: controller.model.approval?.id)
         #expect(box.verdict == .deny)
     }
 
