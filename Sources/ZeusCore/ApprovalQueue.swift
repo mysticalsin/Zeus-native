@@ -299,13 +299,16 @@ public struct ApprovalAllowGate: Equatable, Sendable {
         }
     }
 
-    /// A different request cannot inherit this hold or an armed confirm.
+    /// A different request, or a higher risk, cannot inherit this hold, this confirm, or a low-risk tap.
     public mutating func retarget(item id: String, risk: HookEvent.Risk? = nil) {
-        guard id != itemID else { return }
+        let nextRisk = risk ?? self.risk
+        let changed = id != itemID || nextRisk != self.risk
         itemID = id
-        _ = risk
-        cancelHold()
-        confirmArmedAt = nil
+        self.risk = nextRisk
+        if changed {
+            cancelHold()
+            confirmArmedAt = nil
+        }
     }
 
     public mutating func beginHold(now: TimeInterval) {
@@ -341,8 +344,12 @@ public struct ApprovalHoldTracking: Equatable {
 
     public mutating func release() { released = true; down = false }
 
-    /// True when the gesture was cancelled before it ended. Currently leaves the hold in place.
-    public mutating func systemCancel() -> Bool { false }
+    /// True when the gesture was cancelled before it ended. The hold must be cleared.
+    public mutating func systemCancel() -> Bool {
+        let clear = down && !released
+        down = false
+        return clear
+    }
 }
 
 /// What a pointer release on the Allow button does. A release outside the control never counts.

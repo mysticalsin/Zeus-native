@@ -241,9 +241,10 @@ struct ApprovalDetailView: View {
     let detail: ApprovalDetail
     let agent: String
     let resolve: (HookDecision.Verdict) -> Void
-    var beginHold: () -> Void = {}
-    var endHold: () -> Void = {}
-    var plainAllow: () -> Void = {}
+    var beginHold: () -> Void
+    var endHold: () -> Void
+    var plainAllow: () -> Void
+    var cancelHold: () -> Void
 
     var body: some View {
         switch detail.kind {
@@ -273,10 +274,12 @@ struct ApprovalDetailView: View {
                 .accessibilityHint("Sends the plan back to \(agent) to keep working on it.")
                 ApprovalAllowButton(title: "Approve Plan", tint: Theme.leaf, fraction: 0) {
                     beginHold()
-                } release: {
-                    endHold()
+                } release: { inside in
+                    if inside { endHold() } else { cancelHold() }
                 } accessibility: {
                     plainAllow()
+                } onCancel: {
+                    cancelHold()
                 }
                     .accessibilityHint("Lets \(agent) start on this plan.")
             }

@@ -679,7 +679,11 @@ private struct ApprovalBody: View {
                 }
             } else if let detail = approval.detail, !MeetingState.hideDetails {
                 // Never built while details are hidden: a diff's file name and source text are the content too.
-                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: approval.resolve)
+                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: approval.resolve,
+                                    beginHold: { approval.beginHold() },
+                                    endHold: { approval.endHold(true) },
+                                    plainAllow: { approval.activateAllow() },
+                                    cancelHold: { approval.cancelHold() })
             }
             if approval.detail?.hasOwnActions != true {
                 let preview = NotchModel.Approval.isChangePreview(approval.command) && !MeetingState.hideDetails
@@ -722,6 +726,8 @@ private struct ApprovalBody: View {
                         }
                     } accessibility: {
                         approval.activateAllow()
+                    } onCancel: {
+                        approval.cancelHold()
                     } onDisappearAction: {
                         approval.cancelHold()
                     }
@@ -757,14 +763,17 @@ private struct ApprovalBody: View {
 
 /// Pointer presses begin and end a hold. A click, a key, or VoiceOver uses the plain activation,
 /// which cannot finish a high-risk hold.
-private struct ApprovalAllowButton: View {
+struct ApprovalAllowButton: View {
     let title: String
     let tint: Color
     let fraction: Double
     let press: () -> Void
     let release: (Bool) -> Void
     let accessibility: () -> Void
+    var onCancel: () -> Void = {}
     var onDisappearAction: () -> Void = {}
+    @GestureState private var tracking = false
+    @State private var hold = ApprovalHoldTracking()
 
     var body: some View {
         Text(title)
@@ -776,18 +785,28 @@ private struct ApprovalAllowButton: View {
                 GeometryReader { proxy in
                     Capsule().fill(tint.opacity(0.35 + 0.65 * fraction))
                         .gesture(DragGesture(minimumDistance: 0)
-                            .onChanged { _ in press() }
+                            .updating($tracking) { _, state, _ in state = true }
+                            .onChanged { _ in
+                                if !hold.down { hold.press(); press() }
+                            }
                             .onEnded { value in
+                                hold.release()
                                 release(ApprovalButtonHit.contains(
                                     width: proxy.size.width, height: proxy.size.height,
                                     x: value.location.x, y: value.location.y))
                             })
                 }
             }
+            .onChange(of: tracking) { _, isDown in
+                if !isDown, hold.systemCancel() { onCancel() }
+            }
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(title == "Confirm" ? "Confirm. Press again after a short wait." : title)
             .accessibilityAction { accessibility() }
-            .onDisappear { onDisappearAction() }
+            .onDisappear {
+                if hold.systemCancel() { onCancel() }
+                onDisappearAction()
+            }
     }
 }
 
