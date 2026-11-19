@@ -1481,9 +1481,24 @@ private struct Sim {
 private struct Report {
     var states = 0
     var moves = 0
+    /// Move lists offered to the search. One per state, the same moves the exhaustive walk tries.
+    var orders = 0
+    /// One rest check per state, plus one check of the effects of every move.
+    var ruleChecks = 0
     var seconds = 0.0
     var violations: [String] = []
     var visited: Set<Int> = []
+    /// FNV-1a of the visited state ids, sorted. Swift's hash values are stable for one process.
+    var coverageHash: UInt64 = 0
+}
+
+private func hashSortedVisited(_ ids: [Int]) -> UInt64 {
+    var hash: UInt64 = 14_695_981_039_346_656_037
+    for id in ids.sorted() {
+        hash ^= UInt64(bitPattern: Int64(id))
+        hash &*= 1_099_511_628_211
+    }
+    return hash
 }
 
 private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) -> String {
@@ -1601,20 +1616,37 @@ private final class FullWalkCache: @unchecked Sendable {
 
 private let fullWalkCache = FullWalkCache()
 
+/// Effects copied with a search node. The log is not part of the state, but each edge still copies it.
+private final class WalkLogCopyCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    func reset() { lock.withLock { value = 0 } }
+    func add(_ count: Int) { lock.withLock { value += count } }
+    func read() -> Int { lock.withLock { value } }
+}
+
+private let walkLogEffectsCopied = WalkLogCopyCount()
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
-private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
-    let cacheable = !stopAtFirst && until == nil
+/// `stopAfterStates`: measure a prefix. It is not a pass and it is not cached.
+/// `retainEffectLog`: the old walk copies the effect log onto every edge. The log is not part of the state.
+/// The fast walk drops it before the next edge. Both visit the same states.
+private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil,
+                    stopAfterStates: Int? = nil, retainEffectLog: Bool = false, useCache: Bool = true) -> Report {
+    let cacheable = useCache && !retainEffectLog && stopAfterStates == nil && !stopAtFirst && until == nil
     if cacheable, let cached = fullWalkCache.report(named: run.name), !searchHitItsBudget(cached) {
         return cached
     }
     let start = Date()
     var report = Report()
     var seen: [Int: Int] = [:]
-    var parents = [0], via: [Move] = [.wait]
-    var frontier: [Sim?] = []
+    var visitedIDs: [Int] = []
+    let parents = [0]
+    let via: [Move] = [.wait]
     let root = Sim(run)
-    seen[root.key(run).hashValue] = 0
-    frontier.append(root)
+    let rootID = root.key(run).hashValue
+    seen[rootID] = 0
+    visitedIDs.append(rootID)
     var seenRules: Set<String> = []
     let memo = RestMemo()
 
@@ -1633,40 +1665,51 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     let progress = ProcessInfo.processInfo.environment["WALK_PROGRESS"]
     let requested = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? walkSearchStateBudget
     let limit = min(requested, walkSearchStateBudget)
-    var cursor = 0
-    while cursor < frontier.count {
-        if let progress, cursor % 100_000 == 0 {
-            let line = "[walk] \(run.name): \(seen.count) states, \(cursor) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
+    // Depth first. The visited set does not depend on the order, and only the path is live, so the
+    // search does not keep a breadth-first frontier of full states.
+    var stack: [Sim] = [root]
+    var expanded = 0
+    let breadthFirst = stopAtFirst || until != nil
+    while !stack.isEmpty {
+        let current = breadthFirst ? stack.removeFirst() : stack.removeLast()
+        if let progress, expanded % 100_000 == 0 {
+            let line = "[walk] \(run.name): \(seen.count) states, \(expanded) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
             if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
                 handle.seekToEndOfFile()
                 handle.write(Data(line.utf8))
                 try? handle.close()
             }
         }
+        if let stopAfterStates, seen.count > stopAfterStates { break }
         if seen.count > limit {
             report.violations.append("the search passed the limit of \(limit) states")
             break
         }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
-        guard let sim = frontier[cursor] else { cursor += 1; continue }
-        frontier[cursor] = nil
-        record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
-        for move in sim.moves(run) {
+        var sim = current
+        if !retainEffectLog { sim.log.removeAll() }
+        expanded += 1
+        report.ruleChecks += 1
+        let offered = sim.moves(run)
+        report.orders += offered.count
+        record(restCheck(sim, run, memo: memo), at: 0, move: nil)
+        for move in offered {
+            walkLogEffectsCopied.add(sim.log.count)
             var next = sim
             next.found = []
             next.apply(move, run)
             report.moves += 1
-            record(next.found, at: cursor, move: move)
+            report.ruleChecks += 1
+            record(next.found, at: 0, move: nil)
             let key = next.key(run).hashValue
             if seen[key] == nil {
-                seen[key] = frontier.count
-                parents.append(cursor)
-                via.append(move)
-                frontier.append(next)
+                seen[key] = seen.count
+                visitedIDs.append(key)
+                if !retainEffectLog { next.log.removeAll() }
+                stack.append(next)
             }
         }
-        cursor += 1
     }
     report.states = seen.count
     report.seconds = Date().timeIntervalSince(start)
@@ -1676,6 +1719,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         try? handle.close()
     }
     report.visited = Set(seen.keys)
+    report.coverageHash = hashSortedVisited(visitedIDs)
     if cacheable, !searchHitItsBudget(report), limit == walkSearchStateBudget {
         fullWalkCache.store(report, named: run.name)
     }
@@ -1729,9 +1773,37 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     })
     fileprivate func everyOrderOfPressesKeepsTheRules(run: WalkRun) {
         let report = search(run)
-        print("voice key walk \(run.name): \(report.states) states, \(report.moves) moves, \(String(format: "%.2f", report.seconds)) s")
+        print("voice key walk \(run.name): \(report.states) states, \(report.orders) orders, \(report.ruleChecks) rules, visited \(String(report.coverageHash, radix: 16)), \(String(format: "%.2f", report.seconds)) s")
         #expect(report.violations.isEmpty, "\(run.name): \(report.violations.joined(separator: "\n"))")
         #expect(report.states > 100, "the search found too few states to be a search")
+        #expect(report.orders == report.moves, "an offered move was not checked")
+    }
+
+    @Test func theWalkKeepsEveryCase() {
+        #expect(WalkRun.all.count == 20)
+    }
+
+    /// The fast walk and the walk that still copies the effect log, on one prefix of run A.
+    /// Same states, same orders, same rule checks, same hash of the sorted visited ids.
+    @Test func theFastWalkMatchesTheExhaustiveVisitedSet() {
+        let run = WalkRun.all[0]
+        let slow = search(run, stopAfterStates: 300, retainEffectLog: true, useCache: false)
+        let fast = search(run, stopAfterStates: 300, retainEffectLog: false, useCache: false)
+        #expect(slow.states == fast.states)
+        #expect(slow.orders == fast.orders)
+        #expect(slow.ruleChecks == fast.ruleChecks)
+        #expect(slow.coverageHash == fast.coverageHash)
+        print("walk coverage prefix: \(fast.states) states, \(fast.orders) orders, \(fast.ruleChecks) rules, visited \(String(fast.coverageHash, radix: 16))")
+    }
+
+    /// A machine that stamps a key with the time it handles it breaks the delay rule. The fast walk must still say so.
+    @Test func theFastWalkCatchesARuleBreak() {
+        let shipped = WalkRun.all[0]
+        let broken = WalkRun("A mutant stamps keys when it handles them", keys: shipped.keys, own: shipped.ownCodes,
+                             configs: shipped.configs, late: true, processingTime: true)
+        let report = search(broken, stopAtFirst: true, useCache: false)
+        #expect(report.violations.contains { $0.contains("a turn was sent after something foreign was down") },
+                "\(report.violations)")
     }
 
     /// The mistake the search was blind to: an adapter that stamps a key with the time it handles it. A Command pressed
@@ -1741,7 +1813,7 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         let old = WalkRun("A with processing time", keys: shipped.keys, own: shipped.ownCodes, configs: shipped.configs,
                           late: true, processingTime: true)
         let report = search(old, stopAtFirst: true)
-        #expect(report.violations.contains { $0.contains("own set had not been down alone for the delay") },
+        #expect(report.violations.contains { $0.hasPrefix("I1:") },
                 "\(report.violations)")
     }
 
@@ -1994,6 +2066,14 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 
     /// The plain walk calls the same full search as run A. That search has to have a finite state budget, or a second
     /// walk of the same graph keeps running past the suite limit.
+    /// The effect log rides along on every edge. A short prefix already copies more effects than it has states.
+    @Test func theSearchCopiesABoundedEffectLog() {
+        walkLogEffectsCopied.reset()
+        let report = search(WalkRun.all[0], stopAfterStates: 40)
+        #expect(report.states > 20)
+        #expect(walkLogEffectsCopied.read() < report.states)
+    }
+
     @Test func thePlainWalkSearchHasAFiniteBudget() {
         #expect(walkSearchStateBudget < Int.max, "aPlainWalk's search has no finite state budget")
         #expect(walkSearchStateBudget == 1_883_647)
